@@ -1,0 +1,284 @@
+<svg width="1920" height="1080" viewBox="0 0 1920 1080" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Gradient definitions -->
+  <defs>
+    <!-- Kenyan sunset sky gradient -->
+    <linearGradient id="kenyaSkyGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF6B35;stop-opacity:1" />
+      <stop offset="30%" style="stop-color:#F7931E;stop-opacity:1" />
+      <stop offset="60%" style="stop-color:#FFD23F;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#06A77D;stop-opacity:0.8" />
+    </linearGradient>
+    
+    <!-- Modern building gradients -->
+    <linearGradient id="modernBuildingGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#2C3E50;stop-opacity:0.95" />
+      <stop offset="100%" style="stop-color:#34495E;stop-opacity:0.9" />
+    </linearGradient>
+    
+    <!-- Traditional building gradient -->
+    <linearGradient id="traditionalBuildingGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B4513;stop-opacity:0.9" />
+      <stop offset="100%" style="stop-color:#A0522D;stop-opacity:0.85" />
+    </linearGradient>
+    
+    <!-- Crane gradient -->
+    <linearGradient id="craneGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#E74C3C;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#C0392B;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Road gradient -->
+    <linearGradient id="roadGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#555555;stop-opacity:0.8" />
+      <stop offset="100%" style="stop-color:#333333;stop-opacity:0.9" />
+    </linearGradient>
+    
+    <!-- Vegetation gradient -->
+    <linearGradient id="vegetationGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#228B22;stop-opacity:0.8" />
+      <stop offset="100%" style="stop-color:#006400;stop-opacity:0.9" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Sky background with Kenyan sunset colors -->
+  <rect width="1920" height="1080" fill="url(#kenyaSkyGradient)"/>
+  
+  <!-- Mount Kenya silhouette in the far background -->
+  <path d="M0,400 Q200,250 400,300 Q600,200 800,280 Q1000,150 1200,250 Q1400,180 1600,280 Q1800,220 1920,300 L1920,1080 L0,1080 Z" 
+        fill="#2C3E50" opacity="0.3"/>
+  
+  <!-- Rolling hills typical of Kenyan landscape -->
+  <path d="M0,500 Q320,400 640,450 Q960,380 1280,420 Q1600,360 1920,400 L1920,1080 L0,1080 Z" 
+        fill="url(#vegetationGradient)"/>
+  <path d="M0,600 Q240,520 480,560 Q720,500 960,540 Q1200,480 1440,520 Q1680,460 1920,500 L1920,1080 L0,1080 Z" 
+        fill="#228B22" opacity="0.7"/>
+  
+  <!-- Modern Nairobi skyline (left side) -->
+  <g transform="translate(50, 0)">
+    <!-- KICC-inspired building -->
+    <rect x="0" y="300" width="80" height="780" fill="url(#modernBuildingGradient)"/>
+    <rect x="20" y="280" width="40" height="20" fill="url(#modernBuildingGradient)"/>
+    <!-- Windows pattern -->
+    <g fill="#87CEEB" opacity="0.6">
+      <rect x="15" y="320" width="12" height="15"/>
+      <rect x="35" y="320" width="12" height="15"/>
+      <rect x="53" y="320" width="12" height="15"/>
+      <rect x="15" y="350" width="12" height="15"/>
+      <rect x="35" y="350" width="12" height="15"/>
+      <rect x="53" y="350" width="12" height="15"/>
+    </g>
+    
+    <!-- Modern high-rise 1 -->
+    <rect x="100" y="250" width="70" height="830" fill="url(#modernBuildingGradient)"/>
+    <g fill="#87CEEB" opacity="0.6">
+      <rect x="110" y="270" width="10" height="12"/>
+      <rect x="125" y="270" width="10" height="12"/>
+      <rect x="140" y="270" width="10" height="12"/>
+      <rect x="155" y="270" width="10" height="12"/>
+    </g>
+    
+    <!-- Modern high-rise 2 -->
+    <rect x="190" y="200" width="90" height="880" fill="url(#modernBuildingGradient)"/>
+    <g fill="#87CEEB" opacity="0.6">
+      <rect x="205" y="220" width="15" height="18"/>
+      <rect x="225" y="220" width="15" height="18"/>
+      <rect x="245" y="220" width="15" height="18"/>
+      <rect x="260" y="220" width="15" height="18"/>
+    </g>
+    
+    <!-- Modern high-rise 3 -->
+    <rect x="300" y="180" width="100" height="900" fill="url(#modernBuildingGradient)"/>
+    <g fill="#87CEEB" opacity="0.6">
+      <rect x="315" y="200" width="18" height="20"/>
+      <rect x="340" y="200" width="18" height="20"/>
+      <rect x="365" y="200" width="18" height="20"/>
+    </g>
+  </g>
+  
+  <!-- Construction cranes (active development) -->
+  <g transform="translate(450, 100)">
+    <!-- Main crane tower -->
+    <rect x="0" y="0" width="20" height="700" fill="url(#craneGradient)"/>
+    <!-- Crane jib -->
+    <rect x="-120" y="80" width="250" height="15" fill="url(#craneGradient)"/>
+    <!-- Counter-jib -->
+    <rect x="-80" y="80" width="80" height="15" fill="url(#craneGradient)"/>
+    <!-- Hook line -->
+    <line x1="90" y1="95" x2="90" y2="300" stroke="#E74C3C" stroke-width="3"/>
+    <!-- Load -->
+    <rect x="80" y="300" width="20" height="15" fill="#8B4513"/>
+  </g>
+  
+  <!-- Second crane -->
+  <g transform="translate(800, 150)">
+    <rect x="0" y="0" width="18" height="600" fill="url(#craneGradient)"/>
+    <rect x="-100" y="70" width="200" height="12" fill="url(#craneGradient)"/>
+    <rect x="-60" y="70" width="60" height="12" fill="url(#craneGradient)"/>
+    <line x1="70" y1="82" x2="70" y2="250" stroke="#E74C3C" stroke-width="2"/>
+  </g>
+  
+  <!-- Building under construction (showing progress) -->
+  <g transform="translate(600, 350)">
+    <!-- Building frame -->
+    <rect x="0" y="0" width="180" height="450" fill="none" stroke="#34495E" stroke-width="5"/>
+    <!-- Completed floors -->
+    <rect x="0" y="350" width="180" height="100" fill="url(#modernBuildingGradient)" opacity="0.8"/>
+    <rect x="0" y="250" width="180" height="100" fill="url(#modernBuildingGradient)" opacity="0.6"/>
+    <!-- Floor divisions -->
+    <line x1="0" y1="100" x2="180" y2="100" stroke="#34495E" stroke-width="3"/>
+    <line x1="0" y1="200" x2="180" y2="200" stroke="#34495E" stroke-width="3"/>
+    <line x1="0" y1="300" x2="180" y2="300" stroke="#34495E" stroke-width="3"/>
+    <!-- Vertical supports -->
+    <line x1="45" y1="0" x2="45" y2="450" stroke="#34495E" stroke-width="3"/>
+    <line x1="90" y1="0" x2="90" y2="450" stroke="#34495E" stroke-width="3"/>
+    <line x1="135" y1="0" x2="135" y2="450" stroke="#34495E" stroke-width="3"/>
+  </g>
+  
+  <!-- Traditional Kenyan architecture (right side) -->
+  <g transform="translate(1200, 0)">
+    <!-- Traditional round house with modern twist -->
+    <g transform="translate(100, 600)">
+      <ellipse cx="50" cy="80" rx="50" ry="40" fill="url(#traditionalBuildingGradient)"/>
+      <path d="M0,80 Q50,40 100,80 L100,120 L0,120 Z" fill="#DC143C"/>
+      <rect x="30" y="90" width="15" height="25" fill="#654321"/>
+      <circle cx="70" cy="100" r="8" fill="#87CEEB"/>
+    </g>
+    
+    <!-- Modern residential complex -->
+    <g transform="translate(200, 550)">
+      <rect x="0" y="0" width="120" height="150" fill="url(#traditionalBuildingGradient)"/>
+      <polygon points="0,0 60,-30 120,0" fill="#DC143C"/>
+      <rect x="20" y="30" width="25" height="40" fill="#654321"/>
+      <rect x="75" y="30" width="20" height="20" fill="#87CEEB"/>
+      <rect x="75" y="60" width="20" height="20" fill="#87CEEB"/>
+    </g>
+    
+    <!-- Shopping center/mall -->
+    <g transform="translate(350, 500)">
+      <rect x="0" y="0" width="200" height="200" fill="url(#modernBuildingGradient)"/>
+      <rect x="20" y="20" width="160" height="30" fill="#87CEEB" opacity="0.7"/>
+      <rect x="50" y="80" width="30" height="50" fill="#654321"/>
+      <rect x="120" y="80" width="30" height="50" fill="#654321"/>
+    </g>
+  </g>
+  
+  <!-- Infrastructure: Roads and bridges -->
+  <g transform="translate(0, 800)">
+    <!-- Main highway -->
+    <rect x="0" y="0" width="1920" height="60" fill="url(#roadGradient)"/>
+    <!-- Road markings -->
+    <rect x="0" y="25" width="100" height="5" fill="#FFFFFF"/>
+    <rect x="150" y="25" width="100" height="5" fill="#FFFFFF"/>
+    <rect x="300" y="25" width="100" height="5" fill="#FFFFFF"/>
+    <rect x="450" y="25" width="100" height="5" fill="#FFFFFF"/>
+    <rect x="600" y="25" width="100" height="5" fill="#FFFFFF"/>
+    <rect x="750" y="25" width="100" height="5" fill="#FFFFFF"/>
+    <rect x="900" y="25" width="100" height="5" fill="#FFFFFF"/>
+    <rect x="1050" y="25" width="100" height="5" fill="#FFFFFF"/>
+    <rect x="1200" y="25" width="100" height="5" fill="#FFFFFF"/>
+    <rect x="1350" y="25" width="100" height="5" fill="#FFFFFF"/>
+    <rect x="1500" y="25" width="100" height="5" fill="#FFFFFF"/>
+    <rect x="1650" y="25" width="100" height="5" fill="#FFFFFF"/>
+    <rect x="1800" y="25" width="100" height="5" fill="#FFFFFF"/>
+  </g>
+  
+  <!-- Bridge structure -->
+  <g transform="translate(900, 700)">
+    <!-- Bridge deck -->
+    <rect x="0" y="50" width="300" height="20" fill="url(#roadGradient)"/>
+    <!-- Support pillars -->
+    <rect x="75" y="70" width="15" height="100" fill="#34495E"/>
+    <rect x="210" y="70" width="15" height="100" fill="#34495E"/>
+    <!-- Cables -->
+    <line x1="82" y1="50" x2="50" y2="70" stroke="#34495E" stroke-width="2"/>
+    <line x1="82" y1="50" x2="120" y2="70" stroke="#34495E" stroke-width="2"/>
+    <line x1="217" y1="50" x2="180" y2="70" stroke="#34495E" stroke-width="2"/>
+    <line x1="217" y1="50" x2="250" y2="70" stroke="#34495E" stroke-width="2"/>
+  </g>
+  
+  <!-- Acacia trees (iconic Kenyan landscape) -->
+  <g transform="translate(1400, 400)">
+    <!-- Tree 1 -->
+    <rect x="15" y="200" width="10" height="80" fill="#8B4513"/>
+    <ellipse cx="20" cy="180" rx="40" ry="25" fill="#228B22" opacity="0.8"/>
+    
+    <!-- Tree 2 -->
+    <g transform="translate(100, 50)">
+      <rect x="12" y="180" width="8" height="70" fill="#8B4513"/>
+      <ellipse cx="16" cy="165" rx="35" ry="20" fill="#32CD32" opacity="0.7"/>
+    </g>
+    
+    <!-- Tree 3 -->
+    <g transform="translate(-80, 80)">
+      <rect x="18" y="190" width="12" height="90" fill="#8B4513"/>
+      <ellipse cx="24" cy="170" rx="45" ry="30" fill="#228B22" opacity="0.6"/>
+    </g>
+  </g>
+  
+  <!-- Construction vehicles and equipment -->
+  <g transform="translate(400, 850)">
+    <!-- Excavator -->
+    <rect x="0" y="0" width="60" height="30" fill="#FFD700"/>
+    <rect x="50" y="-20" width="40" height="20" fill="#FFD700"/>
+    <circle cx="15" cy="30" r="12" fill="#333333"/>
+    <circle cx="45" cy="30" r="12" fill="#333333"/>
+    
+    <!-- Dump truck -->
+    <g transform="translate(100, 0)">
+      <rect x="0" y="0" width="80" height="25" fill="#FF6B35"/>
+      <rect x="0" y="-15" width="30" height="15" fill="#FF6B35"/>
+      <circle cx="15" cy="25" r="10" fill="#333333"/>
+      <circle cx="65" cy="25" r="10" fill="#333333"/>
+    </g>
+  </g>
+  
+  <!-- Workers silhouettes -->
+  <g transform="translate(650, 750)">
+    <!-- Worker 1 with hard hat -->
+    <circle cx="10" cy="8" r="6" fill="#2F4F4F"/>
+    <rect x="7" y="14" width="6" height="18" fill="#FF6B35"/>
+    <rect x="5" y="32" width="4" height="15" fill="#2F4F4F"/>
+    <rect x="11" y="32" width="4" height="15" fill="#2F4F4F"/>
+    
+    <!-- Worker 2 -->
+    <circle cx="35" cy="6" r="5" fill="#2F4F4F"/>
+    <rect x="32" y="11" width="6" height="16" fill="#06A77D"/>
+    <rect x="30" y="27" width="4" height="13" fill="#2F4F4F"/>
+    <rect x="36" y="27" width="4" height="13" fill="#2F4F4F"/>
+    
+    <!-- Worker 3 -->
+    <circle cx="60" cy="7" r="5" fill="#2F4F4F"/>
+    <rect x="57" y="12" width="6" height="17" fill="#FFD23F"/>
+    <rect x="55" y="29" width="4" height="14" fill="#2F4F4F"/>
+    <rect x="61" y="29" width="4" height="14" fill="#2F4F4F"/>
+  </g>
+  
+  <!-- Kenyan flag elements integrated subtly -->
+  <rect x="0" y="0" width="1920" height="8" fill="#000000" opacity="0.6"/>
+  <rect x="0" y="8" width="1920" height="8" fill="#FF0000" opacity="0.6"/>
+  <rect x="0" y="16" width="1920" height="8" fill="#FFFFFF" opacity="0.6"/>
+  <rect x="0" y="24" width="1920" height="8" fill="#00FF00" opacity="0.6"/>
+  
+  <!-- Subtle overlay for text readability -->
+  <rect width="1920" height="1080" fill="rgba(0,0,0,0.35)"/>
+  
+  <!-- Light rays from the sun -->
+  <g opacity="0.3">
+    <path d="M1920,0 L1700,200 L1920,100 Z" fill="#FFD23F"/>
+    <path d="M1920,50 L1650,250 L1920,150 Z" fill="#F7931E"/>
+    <path d="M1920,100 L1600,300 L1920,200 Z" fill="#FF6B35"/>
+  </g>
+</svg>
+
+
+
+
+
+
+
+
+
+
+
+
+

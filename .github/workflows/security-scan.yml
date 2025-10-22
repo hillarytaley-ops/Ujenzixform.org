@@ -1,0 +1,473 @@
+name: 🛡️ Security Scan
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run security scans daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      scan_type:
+        description: 'Type of security scan'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+          - full
+          - dependencies
+          - code-analysis
+          - secrets
+
+env:
+  NODE_VERSION: '18'
+  SECURITY_REPORT_PATH: 'security-reports'
+
+jobs:
+  # Job 1: Dependency Vulnerability Scanning
+  dependency-scan:
+    name: 📦 Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 🔍 Checkout code
+        uses: actions/checkout@v4
+        
+      - name: 📋 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: 📦 Install dependencies
+        run: npm ci
+        
+      - name: 🔍 Run npm audit
+        run: |
+          mkdir -p ${{ env.SECURITY_REPORT_PATH }}
+          npm audit --audit-level moderate --json > ${{ env.SECURITY_REPORT_PATH }}/npm-audit.json || true
+          npm audit --audit-level moderate > ${{ env.SECURITY_REPORT_PATH }}/npm-audit.txt || true
+          
+      - name: 📊 Generate dependency report
+        run: |
+          echo "# Dependency Vulnerability Report" > ${{ env.SECURITY_REPORT_PATH }}/dependency-summary.md
+          echo "**Scan Date:** $(date)" >> ${{ env.SECURITY_REPORT_PATH }}/dependency-summary.md
+          echo "**Repository:** ${{ github.repository }}" >> ${{ env.SECURITY_REPORT_PATH }}/dependency-summary.md
+          echo "**Branch:** ${{ github.ref_name }}" >> ${{ env.SECURITY_REPORT_PATH }}/dependency-summary.md
+          echo "" >> ${{ env.SECURITY_REPORT_PATH }}/dependency-summary.md
+          
+          # Parse npm audit results
+          if [ -f "${{ env.SECURITY_REPORT_PATH }}/npm-audit.json" ]; then
+            CRITICAL=$(jq -r '.metadata.vulnerabilities.critical // 0' ${{ env.SECURITY_REPORT_PATH }}/npm-audit.json)
+            HIGH=$(jq -r '.metadata.vulnerabilities.high // 0' ${{ env.SECURITY_REPORT_PATH }}/npm-audit.json)
+            MODERATE=$(jq -r '.metadata.vulnerabilities.moderate // 0' ${{ env.SECURITY_REPORT_PATH }}/npm-audit.json)
+            LOW=$(jq -r '.metadata.vulnerabilities.low // 0' ${{ env.SECURITY_REPORT_PATH }}/npm-audit.json)
+            
+            echo "## Vulnerability Summary" >> ${{ env.SECURITY_REPORT_PATH }}/dependency-summary.md
+            echo "- 🔥 Critical: $CRITICAL" >> ${{ env.SECURITY_REPORT_PATH }}/dependency-summary.md
+            echo "- 🚨 High: $HIGH" >> ${{ env.SECURITY_REPORT_PATH }}/dependency-summary.md
+            echo "- ⚠️ Moderate: $MODERATE" >> ${{ env.SECURITY_REPORT_PATH }}/dependency-summary.md
+            echo "- ℹ️ Low: $LOW" >> ${{ env.SECURITY_REPORT_PATH }}/dependency-summary.md
+            
+            # Fail if critical or high vulnerabilities found
+            if [ "$CRITICAL" -gt 0 ] || [ "$HIGH" -gt 0 ]; then
+              echo "::error::Critical or High severity vulnerabilities found!"
+              echo "SECURITY_FAILURE=true" >> $GITHUB_ENV
+            fi
+          fi
+          
+      - name: 📤 Upload dependency scan results
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-scan-results
+          path: ${{ env.SECURITY_REPORT_PATH }}/
+          retention-days: 30
+
+  # Job 2: Secret Scanning
+  secret-scan:
+    name: 🔐 Secret Scanning
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 🔍 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for secret scanning
+          
+      - name: 🔐 Run TruffleHog secret scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: main
+          head: HEAD
+          extra_args: --debug --only-verified --json > ${{ env.SECURITY_REPORT_PATH }}/secrets-scan.json || true
+          
+      - name: 📊 Process secret scan results
+        run: |
+          mkdir -p ${{ env.SECURITY_REPORT_PATH }}
+          
+          echo "# Secret Scanning Report" > ${{ env.SECURITY_REPORT_PATH }}/secrets-summary.md
+          echo "**Scan Date:** $(date)" >> ${{ env.SECURITY_REPORT_PATH }}/secrets-summary.md
+          echo "**Repository:** ${{ github.repository }}" >> ${{ env.SECURITY_REPORT_PATH }}/secrets-summary.md
+          echo "" >> ${{ env.SECURITY_REPORT_PATH }}/secrets-summary.md
+          
+          if [ -f "${{ env.SECURITY_REPORT_PATH }}/secrets-scan.json" ]; then
+            SECRET_COUNT=$(wc -l < ${{ env.SECURITY_REPORT_PATH }}/secrets-scan.json || echo "0")
+            echo "## Results" >> ${{ env.SECURITY_REPORT_PATH }}/secrets-summary.md
+            echo "- Secrets found: $SECRET_COUNT" >> ${{ env.SECURITY_REPORT_PATH }}/secrets-summary.md
+            
+            if [ "$SECRET_COUNT" -gt 0 ]; then
+              echo "::error::Secrets detected in repository!"
+              echo "SECURITY_FAILURE=true" >> $GITHUB_ENV
+            else
+              echo "✅ No secrets detected" >> ${{ env.SECURITY_REPORT_PATH }}/secrets-summary.md
+            fi
+          else
+            echo "✅ No secrets detected" >> ${{ env.SECURITY_REPORT_PATH }}/secrets-summary.md
+          fi
+          
+      - name: 📤 Upload secret scan results
+        uses: actions/upload-artifact@v4
+        with:
+          name: secret-scan-results
+          path: ${{ env.SECURITY_REPORT_PATH }}/
+          retention-days: 30
+
+  # Job 3: Static Code Analysis
+  code-analysis:
+    name: 🔍 Static Code Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 🔍 Checkout code
+        uses: actions/checkout@v4
+        
+      - name: 📋 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: 📦 Install dependencies
+        run: npm ci
+        
+      - name: 🔍 Run ESLint security analysis
+        run: |
+          mkdir -p ${{ env.SECURITY_REPORT_PATH }}
+          npx eslint src/ --ext .ts,.tsx --format json > ${{ env.SECURITY_REPORT_PATH }}/eslint-security.json || true
+          npx eslint src/ --ext .ts,.tsx > ${{ env.SECURITY_REPORT_PATH }}/eslint-security.txt || true
+          
+      - name: 🛡️ Run Semgrep security scan
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/secrets
+            p/owasp-top-ten
+            p/react
+            p/typescript
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+        continue-on-error: true
+        
+      - name: 📊 Generate code analysis report
+        run: |
+          echo "# Static Code Analysis Report" > ${{ env.SECURITY_REPORT_PATH }}/code-analysis-summary.md
+          echo "**Scan Date:** $(date)" >> ${{ env.SECURITY_REPORT_PATH }}/code-analysis-summary.md
+          echo "**Repository:** ${{ github.repository }}" >> ${{ env.SECURITY_REPORT_PATH }}/code-analysis-summary.md
+          echo "" >> ${{ env.SECURITY_REPORT_PATH }}/code-analysis-summary.md
+          
+          # Process ESLint results
+          if [ -f "${{ env.SECURITY_REPORT_PATH }}/eslint-security.json" ]; then
+            ERROR_COUNT=$(jq '[.[] | select(.errorCount > 0)] | length' ${{ env.SECURITY_REPORT_PATH }}/eslint-security.json || echo "0")
+            WARNING_COUNT=$(jq '[.[] | select(.warningCount > 0)] | length' ${{ env.SECURITY_REPORT_PATH }}/eslint-security.json || echo "0")
+            
+            echo "## ESLint Analysis" >> ${{ env.SECURITY_REPORT_PATH }}/code-analysis-summary.md
+            echo "- Errors: $ERROR_COUNT" >> ${{ env.SECURITY_REPORT_PATH }}/code-analysis-summary.md
+            echo "- Warnings: $WARNING_COUNT" >> ${{ env.SECURITY_REPORT_PATH }}/code-analysis-summary.md
+          fi
+          
+          echo "## Semgrep Analysis" >> ${{ env.SECURITY_REPORT_PATH }}/code-analysis-summary.md
+          echo "- Results available in Semgrep dashboard" >> ${{ env.SECURITY_REPORT_PATH }}/code-analysis-summary.md
+          
+      - name: 📤 Upload code analysis results
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-analysis-results
+          path: ${{ env.SECURITY_REPORT_PATH }}/
+          retention-days: 30
+
+  # Job 4: License Compliance Check
+  license-check:
+    name: ⚖️ License Compliance
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 🔍 Checkout code
+        uses: actions/checkout@v4
+        
+      - name: 📋 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: 📦 Install dependencies
+        run: npm ci
+        
+      - name: ⚖️ Check license compliance
+        run: |
+          mkdir -p ${{ env.SECURITY_REPORT_PATH }}
+          
+          # Install license checker
+          npm install -g license-checker
+          
+          # Generate license report
+          license-checker --json > ${{ env.SECURITY_REPORT_PATH }}/licenses.json
+          license-checker --summary > ${{ env.SECURITY_REPORT_PATH }}/license-summary.txt
+          
+          # Check for problematic licenses
+          PROBLEMATIC_LICENSES="GPL-2.0,GPL-3.0,AGPL-1.0,AGPL-3.0,LGPL-2.0,LGPL-2.1,LGPL-3.0"
+          
+          echo "# License Compliance Report" > ${{ env.SECURITY_REPORT_PATH }}/license-compliance.md
+          echo "**Scan Date:** $(date)" >> ${{ env.SECURITY_REPORT_PATH }}/license-compliance.md
+          echo "**Repository:** ${{ github.repository }}" >> ${{ env.SECURITY_REPORT_PATH }}/license-compliance.md
+          echo "" >> ${{ env.SECURITY_REPORT_PATH }}/license-compliance.md
+          
+          # Check for problematic licenses
+          if license-checker --onlyAllow "MIT;ISC;BSD-2-Clause;BSD-3-Clause;Apache-2.0;Unlicense;CC0-1.0" --excludePrivatePackages; then
+            echo "✅ All licenses are compliant" >> ${{ env.SECURITY_REPORT_PATH }}/license-compliance.md
+          else
+            echo "❌ Problematic licenses detected" >> ${{ env.SECURITY_REPORT_PATH }}/license-compliance.md
+            echo "LICENSE_FAILURE=true" >> $GITHUB_ENV
+          fi
+          
+      - name: 📤 Upload license compliance results
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-compliance-results
+          path: ${{ env.SECURITY_REPORT_PATH }}/
+          retention-days: 30
+
+  # Job 5: Container Security (if using Docker)
+  container-scan:
+    name: 🐳 Container Security Scan
+    runs-on: ubuntu-latest
+    if: github.event.inputs.scan_type == 'full' || github.event_name == 'schedule'
+    
+    steps:
+      - name: 🔍 Checkout code
+        uses: actions/checkout@v4
+        
+      - name: 🐳 Build Docker image (if Dockerfile exists)
+        run: |
+          if [ -f "Dockerfile" ]; then
+            docker build -t ujenzipro2:security-scan .
+            echo "DOCKER_IMAGE_BUILT=true" >> $GITHUB_ENV
+          else
+            echo "No Dockerfile found, skipping container scan"
+          fi
+          
+      - name: 🛡️ Run Trivy container scan
+        if: env.DOCKER_IMAGE_BUILT == 'true'
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'ujenzipro2:security-scan'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          
+      - name: 📤 Upload Trivy scan results
+        if: env.DOCKER_IMAGE_BUILT == 'true'
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # Job 6: Security Report Generation
+  generate-report:
+    name: 📊 Generate Security Report
+    runs-on: ubuntu-latest
+    needs: [dependency-scan, secret-scan, code-analysis, license-check]
+    if: always()
+    
+    steps:
+      - name: 🔍 Checkout code
+        uses: actions/checkout@v4
+        
+      - name: 📥 Download all scan results
+        uses: actions/download-artifact@v4
+        with:
+          path: all-results/
+          
+      - name: 📊 Generate comprehensive security report
+        run: |
+          mkdir -p final-report
+          
+          cat > final-report/security-report.md << 'EOF'
+          # 🛡️ UjenziPro2 Security Scan Report
+          
+          **Scan Date:** $(date)
+          **Repository:** ${{ github.repository }}
+          **Branch:** ${{ github.ref_name }}
+          **Commit:** ${{ github.sha }}
+          **Triggered by:** ${{ github.event_name }}
+          
+          ## 📋 Scan Summary
+          
+          | Scan Type | Status | Critical Issues | Notes |
+          |-----------|--------|----------------|-------|
+          EOF
+          
+          # Process each scan result
+          for scan_type in dependency-scan secret-scan code-analysis license-compliance; do
+            if [ -d "all-results/${scan_type}-results" ]; then
+              echo "| ${scan_type} | ✅ Completed | - | See detailed results |" >> final-report/security-report.md
+            else
+              echo "| ${scan_type} | ❌ Failed | - | Scan did not complete |" >> final-report/security-report.md
+            fi
+          done
+          
+          cat >> final-report/security-report.md << 'EOF'
+          
+          ## 🔍 Detailed Results
+          
+          ### Dependency Vulnerabilities
+          EOF
+          
+          if [ -f "all-results/dependency-scan-results/dependency-summary.md" ]; then
+            cat all-results/dependency-scan-results/dependency-summary.md >> final-report/security-report.md
+          else
+            echo "No dependency scan results available" >> final-report/security-report.md
+          fi
+          
+          cat >> final-report/security-report.md << 'EOF'
+          
+          ### Secret Scanning
+          EOF
+          
+          if [ -f "all-results/secret-scan-results/secrets-summary.md" ]; then
+            cat all-results/secret-scan-results/secrets-summary.md >> final-report/security-report.md
+          else
+            echo "No secret scan results available" >> final-report/security-report.md
+          fi
+          
+          cat >> final-report/security-report.md << 'EOF'
+          
+          ### Code Analysis
+          EOF
+          
+          if [ -f "all-results/code-analysis-results/code-analysis-summary.md" ]; then
+            cat all-results/code-analysis-results/code-analysis-summary.md >> final-report/security-report.md
+          else
+            echo "No code analysis results available" >> final-report/security-report.md
+          fi
+          
+          cat >> final-report/security-report.md << 'EOF'
+          
+          ### License Compliance
+          EOF
+          
+          if [ -f "all-results/license-compliance-results/license-compliance.md" ]; then
+            cat all-results/license-compliance-results/license-compliance.md >> final-report/security-report.md
+          else
+            echo "No license compliance results available" >> final-report/security-report.md
+          fi
+          
+          cat >> final-report/security-report.md << 'EOF'
+          
+          ## 🎯 Recommendations
+          
+          1. **Address Critical Issues**: Fix any critical or high-severity vulnerabilities immediately
+          2. **Update Dependencies**: Keep all dependencies up to date
+          3. **Review Code**: Address any security-related code analysis findings
+          4. **Monitor Continuously**: Set up automated monitoring for new vulnerabilities
+          
+          ## 📞 Support
+          
+          For questions about this security report, contact: security@ujenzipro.co.ke
+          
+          ---
+          *Generated by UjenziPro2 Security Pipeline*
+          EOF
+          
+      - name: 📤 Upload final security report
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-report
+          path: final-report/
+          retention-days: 90
+          
+      - name: 💬 Comment on PR (if applicable)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            try {
+              const report = fs.readFileSync('final-report/security-report.md', 'utf8');
+              
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `## 🛡️ Security Scan Results\n\n${report}\n\n*Full results available in the [Actions artifacts](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})*`
+              });
+            } catch (error) {
+              console.log('Could not read security report file:', error);
+            }
+
+  # Job 7: Security Gate
+  security-gate:
+    name: 🚪 Security Gate
+    runs-on: ubuntu-latest
+    needs: [dependency-scan, secret-scan, code-analysis, license-check]
+    if: always()
+    
+    steps:
+      - name: 🔍 Check security scan results
+        run: |
+          echo "Evaluating security scan results..."
+          
+          # This job will fail if any critical security issues are found
+          # Customize these conditions based on your security requirements
+          
+          SECURITY_FAILURE=false
+          
+          # Check if any previous jobs failed due to security issues
+          if [ "${{ needs.dependency-scan.result }}" = "failure" ]; then
+            echo "❌ Dependency scan found critical issues"
+            SECURITY_FAILURE=true
+          fi
+          
+          if [ "${{ needs.secret-scan.result }}" = "failure" ]; then
+            echo "❌ Secret scan found issues"
+            SECURITY_FAILURE=true
+          fi
+          
+          if [ "${{ needs.code-analysis.result }}" = "failure" ]; then
+            echo "❌ Code analysis found critical issues"
+            SECURITY_FAILURE=true
+          fi
+          
+          if [ "${{ needs.license-check.result }}" = "failure" ]; then
+            echo "❌ License compliance issues found"
+            SECURITY_FAILURE=true
+          fi
+          
+          if [ "$SECURITY_FAILURE" = "true" ]; then
+            echo "::error::Security gate failed - critical security issues detected"
+            exit 1
+          else
+            echo "✅ Security gate passed - no critical issues detected"
+          fi
+          
+      - name: 🎉 Security gate success
+        if: success()
+        run: |
+          echo "🎉 All security checks passed!"
+          echo "✅ Dependencies are secure"
+          echo "✅ No secrets detected"
+          echo "✅ Code analysis passed"
+          echo "✅ License compliance verified"

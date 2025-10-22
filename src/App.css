@@ -1,0 +1,141 @@
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
+}
+
+/* Kenyan-Themed Circular Logo Styles */
+.kenyan-circular-logo {
+  border-radius: 50%;
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 
+    0 4px 12px rgba(76, 175, 80, 0.3),
+    0 2px 6px rgba(244, 67, 54, 0.2),
+    0 1px 3px rgba(0, 0, 0, 0.1);
+  filter: brightness(1.05) saturate(1.1);
+}
+
+.kenyan-circular-logo:hover {
+  transform: scale(1.1) rotate(5deg);
+  box-shadow: 
+    0 8px 25px rgba(76, 175, 80, 0.4),
+    0 4px 12px rgba(244, 67, 54, 0.3),
+    0 2px 8px rgba(255, 193, 7, 0.2),
+    0 1px 4px rgba(0, 0, 0, 0.15);
+  filter: brightness(1.15) saturate(1.2);
+}
+
+.kenyan-circular-logo-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, 
+    rgba(76, 175, 80, 0.1) 0%, 
+    rgba(255, 255, 255, 0.95) 25%, 
+    rgba(244, 67, 54, 0.1) 50%,
+    rgba(255, 255, 255, 0.95) 75%,
+    rgba(0, 0, 0, 0.1) 100%
+  );
+  border-radius: 50%;
+  padding: 3px;
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  position: relative;
+}
+
+.kenyan-circular-logo-container::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  background: linear-gradient(45deg, 
+    #4CAF50 0%, 
+    #F44336 25%, 
+    #000000 50%, 
+    #F44336 75%, 
+    #4CAF50 100%
+  );
+  z-index: -1;
+  opacity: 0.6;
+  transition: opacity 0.5s ease;
+}
+
+.kenyan-circular-logo-container:hover {
+  background: linear-gradient(135deg, 
+    rgba(76, 175, 80, 0.2) 0%, 
+    rgba(255, 255, 255, 1) 25%, 
+    rgba(244, 67, 54, 0.2) 50%,
+    rgba(255, 255, 255, 1) 75%,
+    rgba(0, 0, 0, 0.2) 100%
+  );
+  transform: scale(1.05);
+}
+
+.kenyan-circular-logo-container:hover::before {
+  opacity: 0.8;
+}
+
+/* Legacy Circular Logo Styles (for backward compatibility) */
+.circular-logo {
+  border-radius: 50%;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.circular-logo:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.circular-logo-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 50%;
+  padding: 2px;
+  transition: all 0.3s ease;
+}
+
+.circular-logo-container:hover {
+  background: rgba(255, 255, 255, 1);
+  transform: scale(1.05);
+}

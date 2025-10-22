@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <!-- Dark circular background gradient -->
+    <radialGradient id="darkCircleGradient" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#1a202c;stop-opacity:1" />
+      <stop offset="70%" style="stop-color:#2d3748;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4a5568;stop-opacity:1" />
+    </radialGradient>
+    
+    <!-- Blue gradient for the house -->
+    <linearGradient id="houseGradientDark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4A90E2;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#357ABD;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2E6DA4;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Chimney gradient -->
+    <linearGradient id="chimneyGradientDark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#5BA0F2;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4A90E2;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Text gradient -->
+    <linearGradient id="textGradientDark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#e2e8f0;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Dark circular background -->
+  <circle cx="60" cy="60" r="58" fill="url(#darkCircleGradient)" stroke="#4A90E2" stroke-width="2"/>
+  
+  <!-- House Icon (centered and scaled) -->
+  <g transform="translate(30, 25) scale(2)">
+    <!-- Main house body -->
+    <polygon points="0,12.5 15,5 30,12.5 30,25 0,25" fill="url(#houseGradientDark)" stroke="#5BA0F2" stroke-width="0.8"/>
+    
+    <!-- Roof -->
+    <polygon points="0,12.5 15,5 30,12.5" fill="url(#houseGradientDark)" stroke="#5BA0F2" stroke-width="0.8"/>
+    
+    <!-- Chimney -->
+    <rect x="22" y="7.5" width="4" height="5" fill="url(#chimneyGradientDark)" stroke="#5BA0F2" stroke-width="0.4"/>
+    
+    <!-- Door -->
+    <rect x="11" y="17.5" width="8" height="7.5" fill="#ffffff" stroke="#5BA0F2" stroke-width="0.8"/>
+    <circle cx="17" cy="21" r="0.6" fill="#4A90E2"/>
+    
+    <!-- Windows -->
+    <rect x="3" y="17.5" width="5" height="2.5" fill="#ffffff" stroke="#5BA0F2" stroke-width="0.8"/>
+    <rect x="22" y="17.5" width="5" height="2.5" fill="#ffffff" stroke="#5BA0F2" stroke-width="0.8"/>
+    
+    <!-- Window cross -->
+    <line x1="5.5" y1="17.5" x2="5.5" y2="20" stroke="#5BA0F2" stroke-width="0.4"/>
+    <line x1="3" y1="18.75" x2="8" y2="18.75" stroke="#5BA0F2" stroke-width="0.4"/>
+    <line x1="24.5" y1="17.5" x2="24.5" y2="20" stroke="#5BA0F2" stroke-width="0.4"/>
+    <line x1="22" y1="18.75" x2="27" y2="18.75" stroke="#5BA0F2" stroke-width="0.4"/>
+  </g>
+  
+  <!-- UjenziPro Text (curved around bottom) -->
+  <defs>
+    <path id="textCircleDark" d="M 20,85 A 40,40 0 0,1 100,85"/>
+  </defs>
+  <text font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="url(#textGradientDark)">
+    <textPath href="#textCircleDark" startOffset="50%" text-anchor="middle">
+      UjenziPro
+    </textPath>
+  </text>
+</svg>
+
+
+
+
+
+
+
+
+
+
+
+
+
+

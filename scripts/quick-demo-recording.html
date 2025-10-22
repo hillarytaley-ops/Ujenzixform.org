@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UjenziPro Demo Recording Helper</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #2563eb, #006633);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        h1 {
+            text-align: center;
+            color: #FFD700;
+            margin-bottom: 30px;
+        }
+        .step {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+            border-left: 5px solid #FFD700;
+        }
+        .step h3 {
+            color: #FFD700;
+            margin-top: 0;
+        }
+        button {
+            background: #FF6B35;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background: #e55a2b;
+            transform: translateY(-2px);
+        }
+        .script-section {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        .timer {
+            font-size: 24px;
+            font-weight: bold;
+            color: #FFD700;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #FFD700;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .recording-indicator {
+            display: none;
+            background: #ff4444;
+            color: white;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        .upload-section {
+            background: rgba(0, 102, 51, 0.3);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎬 UjenziPro Demo Recording Helper</h1>
+        
+        <div class="recording-indicator" id="recordingIndicator">
+            🔴 RECORDING IN PROGRESS - Follow the script below
+        </div>
+        
+        <div class="timer" id="timer">00:00</div>
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+        
+        <div class="step">
+            <h3>🎯 Quick Start Options</h3>
+            <button onclick="startScreenRecording()">📹 Start Screen Recording</button>
+            <button onclick="openUjenziPro()">🏠 Open UjenziPro Home Page</button>
+            <button onclick="showScript()">📝 Show Recording Script</button>
+        </div>
+        
+        <div class="step" id="scriptSection" style="display: none;">
+            <h3>📝 Recording Script (3:45 minutes)</h3>
+            
+            <div class="script-section">
+                <strong>Scene 1 (0:00-0:15): Opening</strong><br>
+                🎤 "From the bustling construction sites of Nairobi to the coastal developments of Mombasa..."<br>
+                📹 Show: Scroll to hero section, highlight "Kujenga Pamoja" badge
+            </div>
+            
+            <div class="script-section">
+                <strong>Scene 2 (0:15-0:45): Platform Overview</strong><br>
+                🎤 "Meet UjenziPro - Kenya's premier construction marketplace..."<br>
+                📹 Show: Main headline, CTA buttons, animated statistics
+            </div>
+            
+            <div class="script-section">
+                <strong>Scene 3 (0:45-1:00): Statistics</strong><br>
+                🎤 "Join over 2,500 professional builders, 850 verified suppliers..."<br>
+                📹 Show: Animated counters, hover effects
+            </div>
+            
+            <div class="script-section">
+                <strong>Scene 4 (1:00-1:45): Features</strong><br>
+                🎤 "Finding materials is now effortless. Search thousands of construction materials..."<br>
+                📹 Show: Feature cards, hover animations, search functionality
+            </div>
+            
+            <div class="script-section">
+                <strong>Scene 5 (1:45-2:15): How It Works</strong><br>
+                🎤 "Getting started is simple. First, create your detailed business profile..."<br>
+                📹 Show: 3-step process, interactive elements
+            </div>
+            
+            <div class="script-section">
+                <strong>Scene 6 (2:15-2:45): Kenya Features</strong><br>
+                🎤 "Built specifically for Kenya, by Kenyans. Pay seamlessly with M-Pesa..."<br>
+                📹 Show: M-Pesa section, 47 counties, KEBS verification
+            </div>
+            
+            <div class="script-section">
+                <strong>Scene 7 (2:45-3:15): Testimonials</strong><br>
+                🎤 "Listen to success stories from across Kenya..."<br>
+                📹 Show: Testimonial cards, star ratings, geographic diversity
+            </div>
+            
+            <div class="script-section">
+                <strong>Scene 8 (3:15-3:45): Call to Action</strong><br>
+                🎤 "Ready to transform your construction business? Join thousands already using UjenziPro..."<br>
+                📹 Show: Final CTA section, contact information
+            </div>
+        </div>
+        
+        <div class="step">
+            <h3>🎬 Recording Tips</h3>
+            <ul>
+                <li><strong>Screen Size:</strong> Set browser to 1920x1080 if possible</li>
+                <li><strong>Speed:</strong> Move cursor slowly and deliberately</li>
+                <li><strong>Audio:</strong> Speak clearly, pause between sections</li>
+                <li><strong>Timing:</strong> Each scene should be 15-30 seconds</li>
+                <li><strong>Quality:</strong> Use good lighting and quiet environment</li>
+            </ul>
+        </div>
+        
+        <div class="upload-section">
+            <h3>📤 After Recording</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <button onclick="openYouTube()">📺 Upload to YouTube</button>
+                <button onclick="openVimeo()">🎥 Upload to Vimeo</button>
+                <button onclick="showUpdateScript()">🔄 Update Website Code</button>
+                <button onclick="testVideo()">✅ Test Video Playback</button>
+            </div>
+        </div>
+        
+        <div class="step" id="updateSection" style="display: none;">
+            <h3>🔄 Update Your Website</h3>
+            <div class="script-section">
+                <strong>1. Get your video ID from YouTube URL:</strong><br>
+                https://youtube.com/watch?v=<span style="color: #FFD700;">YOUR_VIDEO_ID</span>
+            </div>
+            <div class="script-section">
+                <strong>2. Run this command in your project:</strong><br>
+                <code>node scripts/update-demo-video.js --youtube "YOUR_VIDEO_ID"</code>
+            </div>
+            <div class="script-section">
+                <strong>3. Or manually update src/pages/Index.tsx:</strong><br>
+                <code>videoId="YOUR_VIDEO_ID"</code>
+            </div>
+        </div>
+        
+        <div class="step">
+            <h3>🆘 Need Help?</h3>
+            <p><strong>Can't record?</strong> Use these alternatives:</p>
+            <button onclick="openLoom()">📹 Use Loom (Easy)</button>
+            <button onclick="openCanva()">🎨 Use Canva Video</button>
+            <button onclick="openFiverr()">👨‍💻 Hire on Fiverr</button>
+        </div>
+    </div>
+
+    <script>
+        let startTime;
+        let timerInterval;
+        let totalDuration = 225; // 3:45 in seconds
+
+        function startScreenRecording() {
+            if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
+                navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
+                    .then(stream => {
+                        document.getElementById('recordingIndicator').style.display = 'block';
+                        startTimer();
+                        
+                        // Create video element to show preview
+                        const video = document.createElement('video');
+                        video.srcObject = stream;
+                        video.autoplay = true;
+                        video.muted = true;
+                        video.style.position = 'fixed';
+                        video.style.bottom = '20px';
+                        video.style.right = '20px';
+                        video.style.width = '200px';
+                        video.style.borderRadius = '10px';
+                        video.style.zIndex = '1000';
+                        document.body.appendChild(video);
+                        
+                        stream.getVideoTracks()[0].addEventListener('ended', () => {
+                            stopRecording();
+                            document.body.removeChild(video);
+                        });
+                    })
+                    .catch(err => {
+                        alert('Screen recording not supported. Please use OBS Studio or another recording tool.');
+                        console.error('Error: ', err);
+                    });
+            } else {
+                alert('Screen recording not supported in this browser. Please use Chrome or Firefox, or download OBS Studio.');
+            }
+        }
+
+        function startTimer() {
+            startTime = Date.now();
+            timerInterval = setInterval(updateTimer, 1000);
+        }
+
+        function updateTimer() {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const minutes = Math.floor(elapsed / 60);
+            const seconds = elapsed % 60;
+            
+            document.getElementById('timer').textContent = 
+                `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            
+            const progress = (elapsed / totalDuration) * 100;
+            document.getElementById('progressFill').style.width = Math.min(progress, 100) + '%';
+            
+            if (elapsed >= totalDuration) {
+                document.getElementById('timer').style.color = '#FF6B35';
+                document.getElementById('timer').textContent += ' - Recording Complete!';
+            }
+        }
+
+        function stopRecording() {
+            clearInterval(timerInterval);
+            document.getElementById('recordingIndicator').style.display = 'none';
+            alert('Recording stopped! Now upload your video to YouTube and update your website.');
+        }
+
+        function openUjenziPro() {
+            window.open(window.location.origin, '_blank');
+        }
+
+        function showScript() {
+            const section = document.getElementById('scriptSection');
+            section.style.display = section.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function showUpdateScript() {
+            const section = document.getElementById('updateSection');
+            section.style.display = section.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function openYouTube() {
+            window.open('https://studio.youtube.com/channel/UC/videos/upload', '_blank');
+        }
+
+        function openVimeo() {
+            window.open('https://vimeo.com/upload', '_blank');
+        }
+
+        function openLoom() {
+            window.open('https://www.loom.com/', '_blank');
+        }
+
+        function openCanva() {
+            window.open('https://www.canva.com/create/videos/', '_blank');
+        }
+
+        function openFiverr() {
+            window.open('https://www.fiverr.com/search/gigs?query=demo%20video&source=main_banner', '_blank');
+        }
+
+        function testVideo() {
+            alert('After updating your video ID, clear browser cache (Ctrl+F5) and test the video on your home page!');
+        }
+
+        // Auto-show script on load
+        setTimeout(() => {
+            document.getElementById('scriptSection').style.display = 'block';
+        }, 2000);
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+

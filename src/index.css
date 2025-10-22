@@ -1,0 +1,172 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* Kenyan-inspired Professional Construction Palette */
+    --background: 45 15% 97%; /* Warm off-white like limestone */
+    --foreground: 25 15% 15%; /* Deep earth brown */
+
+    --card: 0 0% 100%;
+    --card-foreground: 25 15% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 25 15% 15%;
+
+    /* Kenyan Flag Red - patriotic and construction-appropriate */
+    --primary: 0 75% 45%; /* Kenyan flag red */
+    --primary-foreground: 0 0% 98%;
+
+    /* Steel Gray - modern construction materials */
+    --secondary: 210 15% 92%; /* Light steel gray */
+    --secondary-foreground: 25 15% 15%;
+
+    --muted: 45 25% 94%; /* Warm concrete */
+    --muted-foreground: 25 8% 45%;
+
+    --accent: 35 45% 85%; /* Sand/cement color */
+    --accent-foreground: 25 15% 15%;
+
+    /* Kenyan-themed construction colors */
+    --construction-orange: 25 95% 55%; /* Safety orange */
+    --construction-blue: 210 100% 25%; /* Steel blue */
+    --earth-brown: 25 35% 25%; /* Rich Kenyan earth */
+    --concrete-gray: 210 8% 85%; /* Concrete */
+    --safety-yellow: 48 100% 67%; /* Construction yellow */
+    --kenyan-green: 140 60% 35%; /* Kenyan flag green */
+    --kenyan-black: 0 0% 12%; /* Kenyan flag black/shield */
+    --acacia-gold: 45 85% 55%; /* Acacia tree gold */
+    --savanna-beige: 40 25% 80%; /* Savanna landscape */
+    
+    /* Text colors for better contrast */
+    --text-on-dark: 0 0% 100%; /* Pure white for dark backgrounds */
+    --text-primary-light: 45 15% 95%; /* Light text for dark sections */
+    --text-secondary-light: 45 8% 75%; /* Muted light text */
+    --text-accent: 25 95% 55%; /* Accent orange text */
+    
+    /* New semantic colors for About page */
+    --text-dark-green: 150 80% 25%; /* Dark green for text */
+    --text-medium-blue: 210 75% 35%; /* Medium blue for text */
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 45 20% 88%;
+    --input: 45 20% 88%;
+    --ring: 12 85% 45%;
+
+    --radius: 0.5rem;
+
+    /* Gradients for professional backgrounds */
+    --gradient-construction: linear-gradient(135deg, hsl(45 15% 97%), hsl(35 25% 94%));
+    --gradient-primary: linear-gradient(135deg, hsl(12 85% 45%), hsl(12 85% 35%));
+    --gradient-hero: linear-gradient(135deg, hsl(25 35% 25%), hsl(12 85% 45%));
+
+    --sidebar-background: 45 25% 96%;
+    --sidebar-foreground: 25 15% 25%;
+    --sidebar-primary: 12 85% 45%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 35 35% 90%;
+    --sidebar-accent-foreground: 25 15% 15%;
+    --sidebar-border: 45 20% 88%;
+    --sidebar-ring: 12 85% 45%;
+  }
+
+  .dark {
+    /* Dark mode construction theme */
+    --background: 25 20% 8%; /* Dark earth */
+    --foreground: 45 15% 95%;
+
+    --card: 25 15% 12%;
+    --card-foreground: 45 15% 95%;
+
+    --popover: 25 15% 12%;
+    --popover-foreground: 45 15% 95%;
+
+    --primary: 12 75% 55%; /* Lighter brick in dark mode */
+    --primary-foreground: 25 20% 8%;
+
+    --secondary: 25 15% 18%;
+    --secondary-foreground: 45 15% 95%;
+
+    --muted: 25 15% 18%;
+    --muted-foreground: 45 8% 65%;
+
+    --accent: 25 15% 18%;
+    --accent-foreground: 45 15% 95%;
+
+    /* Custom construction colors for dark mode */
+    --construction-orange: 25 85% 60%;
+    --construction-blue: 210 80% 35%;
+    --earth-brown: 25 25% 35%;
+    --concrete-gray: 210 8% 25%;
+    --safety-yellow: 48 90% 60%;
+    
+    /* Text colors for dark mode */
+    --text-on-light: 25 15% 15%; /* Dark text for light backgrounds */
+    --text-primary-dark: 25 15% 25%; /* Primary dark text */
+    --text-secondary-dark: 25 8% 35%; /* Muted dark text */
+    
+    /* New semantic colors for About page dark mode */
+    --text-dark-green: 150 70% 40%; /* Lighter dark green for dark mode */
+    --text-medium-blue: 210 70% 50%; /* Lighter medium blue for dark mode */
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 25 15% 18%;
+    --input: 25 15% 18%;
+    --ring: 12 75% 55%;
+
+    --gradient-construction: linear-gradient(135deg, hsl(25 20% 8%), hsl(25 15% 12%));
+    --gradient-primary: linear-gradient(135deg, hsl(12 75% 55%), hsl(12 75% 45%));
+    --gradient-hero: linear-gradient(135deg, hsl(25 15% 12%), hsl(12 75% 55%));
+
+    --sidebar-background: 25 15% 10%;
+    --sidebar-foreground: 45 15% 90%;
+    --sidebar-primary: 12 75% 55%;
+    --sidebar-primary-foreground: 25 20% 8%;
+    --sidebar-accent: 25 15% 15%;
+    --sidebar-accent-foreground: 45 15% 90%;
+    --sidebar-border: 25 15% 15%;
+    --sidebar-ring: 12 75% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    background-image: url('https://images.unsplash.com/photo-1581094794329-c8112a89af12?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+  }
+
+  /* Overlay to ensure content readability */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.90);
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  /* Dark mode overlay */
+  .dark body::before {
+    background: rgba(0, 0, 0, 0.75);
+  }
+}

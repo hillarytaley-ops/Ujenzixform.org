@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 120" width="400" height="120">
+  <defs>
+    <!-- Background gradient -->
+    <linearGradient id="backgroundGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4A90E2;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#357ABD;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2E6DA4;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background circle for logo -->
+  <circle cx="200" cy="60" r="50" fill="url(#backgroundGradient)" stroke="#ffffff" stroke-width="2"/>
+  
+  <!-- UjenziPro Text - Centered -->
+  <text x="200" y="70" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#ffffff">
+    UjenziPro
+  </text>
+  
+  <!-- Subtle shadow for text -->
+  <text x="202" y="72" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#000000" opacity="0.3">
+    UjenziPro
+  </text>
+</svg>
+

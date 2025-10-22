@@ -1,0 +1,39 @@
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Circular Background with Kenyan Flag Colors -->
+  <circle cx="60" cy="60" r="60" fill="url(#circularGradient)"/>
+  
+  <!-- Inner Circle -->
+  <circle cx="60" cy="60" r="55" fill="#1a2332" stroke="url(#borderGradient)" stroke-width="2"/>
+  
+  <!-- UjenziPro Text - Centered -->
+  <text x="60" y="65" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="14" font-weight="bold">UjenziPro</text>
+  
+  <!-- Kenyan Flag Colors Border -->
+  <circle cx="60" cy="60" r="58" fill="none" stroke="url(#flagGradient)" stroke-width="3"/>
+  
+  <!-- Definitions -->
+  <defs>
+    <!-- Circular Background Gradient -->
+    <radialGradient id="circularGradient" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#2d5a3d;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1a2332;stop-opacity:1" />
+    </radialGradient>
+    
+    <!-- Border Gradient -->
+    <linearGradient id="borderGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4CAF50;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#FFC107;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#F44336;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Kenyan Flag Gradient -->
+    <linearGradient id="flagGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#000000;stop-opacity:1" />
+      <stop offset="25%" style="stop-color:#F44336;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#4CAF50;stop-opacity:1" />
+      <stop offset="75%" style="stop-color:#F44336;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#000000;stop-opacity:1" />
+    </linearGradient>
+    
+  </defs>
+</svg>

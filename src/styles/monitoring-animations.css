@@ -1,0 +1,816 @@
+/* ============================================
+   UJENZIPRO MONITORING PAGE ANIMATIONS
+   Advanced animations for surveillance & monitoring dashboard
+   ============================================ */
+
+/* ==========================================
+   CAMERA FEED ANIMATIONS
+   ========================================== */
+
+/* Live camera pulse animation */
+@keyframes cameraPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);
+  }
+}
+
+.camera-live-pulse {
+  animation: cameraPulse 2s ease-in-out infinite;
+}
+
+/* Recording indicator blink */
+@keyframes recordingBlink {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scale(0.9);
+  }
+}
+
+.recording-indicator {
+  animation: recordingBlink 1.5s ease-in-out infinite;
+}
+
+/* Camera card hover effect */
+@keyframes cameraCardHover {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    transform: translateY(-5px) scale(1.02);
+  }
+}
+
+.camera-card:hover {
+  animation: cameraCardHover 0.3s ease-out forwards;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
+/* Video feed loading animation */
+@keyframes videoFeedLoad {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.video-feed-loading {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.9) 0%,
+    rgba(30, 41, 59, 0.9) 50%,
+    rgba(0, 0, 0, 0.9) 100%
+  );
+  background-size: 200% 100%;
+  animation: videoFeedLoad 2s linear infinite;
+}
+
+/* ==========================================
+   DRONE SPECIFIC ANIMATIONS
+   ========================================== */
+
+/* Drone floating animation */
+@keyframes droneFloat {
+  0%, 100% {
+    transform: translateY(0px) translateX(0px);
+  }
+  25% {
+    transform: translateY(-5px) translateX(3px);
+  }
+  50% {
+    transform: translateY(-8px) translateX(0px);
+  }
+  75% {
+    transform: translateY(-5px) translateX(-3px);
+  }
+}
+
+.drone-icon-float {
+  animation: droneFloat 4s ease-in-out infinite;
+}
+
+/* Drone propeller spin */
+@keyframes droneSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.drone-spinning {
+  animation: droneSpin 1s linear infinite;
+}
+
+/* Aerial badge shimmer */
+@keyframes aerialShimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+.aerial-badge-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(168, 85, 247, 0.8) 0%,
+    rgba(217, 70, 239, 1) 50%,
+    rgba(168, 85, 247, 0.8) 100%
+  );
+  background-size: 200% auto;
+  animation: aerialShimmer 3s linear infinite;
+}
+
+/* ==========================================
+   STATUS INDICATOR ANIMATIONS
+   ========================================== */
+
+/* Online status pulse */
+@keyframes statusOnline {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+    border-color: rgba(34, 197, 94, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(34, 197, 94, 0);
+    border-color: rgba(34, 197, 94, 1);
+  }
+}
+
+.status-online {
+  animation: statusOnline 2s ease-in-out infinite;
+}
+
+/* Offline status pulse */
+@keyframes statusOffline {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+    opacity: 1;
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+    opacity: 0.7;
+  }
+}
+
+.status-offline {
+  animation: statusOffline 2s ease-in-out infinite;
+}
+
+/* Maintenance status rotate */
+@keyframes statusMaintenance {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.status-maintenance {
+  animation: statusMaintenance 3s linear infinite;
+}
+
+/* ==========================================
+   SIGNAL & BATTERY ANIMATIONS
+   ========================================== */
+
+/* Signal strength bars */
+@keyframes signalBars {
+  0%, 100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(0.6);
+  }
+}
+
+.signal-bar-1 {
+  animation: signalBars 1.5s ease-in-out infinite;
+  animation-delay: 0s;
+}
+
+.signal-bar-2 {
+  animation: signalBars 1.5s ease-in-out infinite;
+  animation-delay: 0.2s;
+}
+
+.signal-bar-3 {
+  animation: signalBars 1.5s ease-in-out infinite;
+  animation-delay: 0.4s;
+}
+
+.signal-bar-4 {
+  animation: signalBars 1.5s ease-in-out infinite;
+  animation-delay: 0.6s;
+}
+
+/* Battery charging animation */
+@keyframes batteryCharge {
+  0% {
+    width: 0%;
+  }
+  100% {
+    width: 100%;
+  }
+}
+
+.battery-charging {
+  animation: batteryCharge 2s ease-in-out infinite;
+}
+
+/* Low battery warning */
+@keyframes batteryWarning {
+  0%, 100% {
+    background-color: rgba(239, 68, 68, 0.8);
+  }
+  50% {
+    background-color: rgba(251, 191, 36, 0.8);
+  }
+}
+
+.battery-low {
+  animation: batteryWarning 1s ease-in-out infinite;
+}
+
+/* ==========================================
+   MONITORING STATS ANIMATIONS
+   ========================================== */
+
+/* Stats counter animation */
+@keyframes countUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stat-counter {
+  animation: countUp 0.8s ease-out;
+}
+
+/* Stats card reveal */
+@keyframes statsReveal {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.stats-card {
+  animation: statsReveal 0.6s ease-out;
+}
+
+.stats-card:nth-child(1) { animation-delay: 0.1s; }
+.stats-card:nth-child(2) { animation-delay: 0.2s; }
+.stats-card:nth-child(3) { animation-delay: 0.3s; }
+.stats-card:nth-child(4) { animation-delay: 0.4s; }
+
+/* ==========================================
+   ALERT & NOTIFICATION ANIMATIONS
+   ========================================== */
+
+/* Alert pulse */
+@keyframes alertPulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.7);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 10px rgba(251, 191, 36, 0);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0);
+  }
+}
+
+.alert-pulse {
+  animation: alertPulse 2s ease-in-out infinite;
+}
+
+/* Notification slide in */
+@keyframes notificationSlideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.notification-slide {
+  animation: notificationSlideIn 0.5s ease-out;
+}
+
+/* Critical alert shake */
+@keyframes criticalShake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+  20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+
+.critical-alert {
+  animation: criticalShake 0.5s ease-in-out;
+  animation-iteration-count: 3;
+}
+
+/* ==========================================
+   PROGRESS & LOADING ANIMATIONS
+   ========================================== */
+
+/* Project progress fill */
+@keyframes progressFill {
+  from {
+    width: 0%;
+  }
+}
+
+.progress-fill {
+  animation: progressFill 2s ease-out;
+}
+
+/* Loading spinner */
+@keyframes monitoringSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.monitoring-spinner {
+  animation: monitoringSpin 1s linear infinite;
+}
+
+/* Refresh animation */
+@keyframes refreshSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.refresh-icon {
+  animation: refreshSpin 1s ease-in-out;
+}
+
+.refresh-icon:hover {
+  animation: refreshSpin 0.5s ease-in-out infinite;
+}
+
+/* ==========================================
+   SYSTEM HEALTH ANIMATIONS
+   ========================================== */
+
+/* Health meter pulse */
+@keyframes healthPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+.health-meter {
+  animation: healthPulse 3s ease-in-out infinite;
+}
+
+/* Server status indicator */
+@keyframes serverBlink {
+  0%, 100% {
+    background-color: rgba(34, 197, 94, 1);
+  }
+  50% {
+    background-color: rgba(34, 197, 94, 0.5);
+  }
+}
+
+.server-active {
+  animation: serverBlink 2s ease-in-out infinite;
+}
+
+/* Network activity */
+@keyframes networkActivity {
+  0%, 100% {
+    transform: scaleX(1);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scaleX(1.5);
+    opacity: 1;
+  }
+}
+
+.network-activity {
+  animation: networkActivity 1s ease-in-out infinite;
+}
+
+/* ==========================================
+   MAP & LOCATION ANIMATIONS
+   ========================================== */
+
+/* Location marker bounce */
+@keyframes markerBounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.location-marker {
+  animation: markerBounce 2s ease-in-out infinite;
+}
+
+/* Radar sweep */
+@keyframes radarSweep {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.radar-sweep {
+  animation: radarSweep 4s linear infinite;
+}
+
+/* Ripple effect for live locations */
+@keyframes locationRipple {
+  0% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7),
+                0 0 0 0 rgba(59, 130, 246, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(59, 130, 246, 0),
+                0 0 0 20px rgba(59, 130, 246, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0),
+                0 0 0 0 rgba(59, 130, 246, 0);
+  }
+}
+
+.location-ripple {
+  animation: locationRipple 3s ease-out infinite;
+}
+
+/* ==========================================
+   VIDEO CONTROLS ANIMATIONS
+   ========================================== */
+
+/* Play button pulse */
+@keyframes playPulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+}
+
+.play-button:hover {
+  animation: playPulse 1s ease-in-out infinite;
+}
+
+/* Volume bars */
+@keyframes volumeBars {
+  0%, 100% {
+    height: 30%;
+  }
+  50% {
+    height: 100%;
+  }
+}
+
+.volume-bar {
+  animation: volumeBars 0.5s ease-in-out infinite;
+}
+
+/* Controls slide up */
+@keyframes controlsSlideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.video-controls {
+  animation: controlsSlideUp 0.3s ease-out;
+}
+
+/* ==========================================
+   DATA VISUALIZATION ANIMATIONS
+   ========================================== */
+
+/* Graph bars grow */
+@keyframes barGrow {
+  from {
+    transform: scaleY(0);
+    transform-origin: bottom;
+  }
+  to {
+    transform: scaleY(1);
+    transform-origin: bottom;
+  }
+}
+
+.graph-bar {
+  animation: barGrow 0.8s ease-out;
+}
+
+/* Line graph draw */
+@keyframes lineDraw {
+  from {
+    stroke-dashoffset: 1000;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.graph-line {
+  stroke-dasharray: 1000;
+  animation: lineDraw 2s ease-out forwards;
+}
+
+/* Pie chart rotate in */
+@keyframes pieRotateIn {
+  from {
+    transform: rotate(-90deg) scale(0);
+    opacity: 0;
+  }
+  to {
+    transform: rotate(0deg) scale(1);
+    opacity: 1;
+  }
+}
+
+.pie-chart {
+  animation: pieRotateIn 1s ease-out;
+}
+
+/* ==========================================
+   KENYAN FLAG THEMED ANIMATIONS
+   ========================================== */
+
+/* Kenya flag gradient pulse */
+@keyframes kenyaGradientPulse {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.kenya-gradient {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.8),
+    rgba(188, 18, 43, 0.8),
+    rgba(0, 104, 56, 0.8),
+    rgba(188, 18, 43, 0.8),
+    rgba(0, 0, 0, 0.8)
+  );
+  background-size: 200% 200%;
+  animation: kenyaGradientPulse 5s ease infinite;
+}
+
+/* ==========================================
+   TAB TRANSITION ANIMATIONS
+   ========================================== */
+
+/* Tab content fade in */
+@keyframes tabFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tab-content {
+  animation: tabFadeIn 0.5s ease-out;
+}
+
+/* Tab indicator slide */
+@keyframes tabIndicatorSlide {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.tab-indicator {
+  animation: tabIndicatorSlide 0.3s ease-out;
+}
+
+/* ==========================================
+   HOVER & INTERACTION ANIMATIONS
+   ========================================== */
+
+/* Glow on hover */
+@keyframes glowEffect {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(59, 130, 246, 0.5),
+                0 0 10px rgba(59, 130, 246, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.8),
+                0 0 30px rgba(59, 130, 246, 0.6);
+  }
+}
+
+.hover-glow:hover {
+  animation: glowEffect 1.5s ease-in-out infinite;
+}
+
+/* Scale on hover */
+.hover-scale {
+  transition: transform 0.3s ease;
+}
+
+.hover-scale:hover {
+  transform: scale(1.05);
+}
+
+/* Button ripple effect */
+@keyframes buttonRipple {
+  to {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+.button-ripple::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  transform: translate(-50%, -50%) scale(0);
+  animation: buttonRipple 0.6s ease-out;
+}
+
+/* ==========================================
+   ACCESSIBILITY ANIMATIONS
+   ========================================== */
+
+/* Respect user preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Focus visible for keyboard navigation */
+@keyframes focusRing {
+  0%, 100% {
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(59, 130, 246, 0.3);
+  }
+}
+
+.focus-visible:focus {
+  animation: focusRing 1.5s ease-in-out infinite;
+  outline: none;
+}
+
+/* ==========================================
+   UTILITY CLASSES
+   ========================================== */
+
+/* Fade in */
+.fade-in {
+  animation: fadeIn 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Slide in from left */
+.slide-in-left {
+  animation: slideInLeft 0.5s ease-out;
+}
+
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Slide in from right */
+.slide-in-right {
+  animation: slideInRight 0.5s ease-out;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Bounce in */
+.bounce-in {
+  animation: bounceIn 0.8s ease-out;
+}
+
+@keyframes bounceIn {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Rotate in */
+.rotate-in {
+  animation: rotateIn 0.6s ease-out;
+}
+
+@keyframes rotateIn {
+  from {
+    transform: rotate(-180deg);
+    opacity: 0;
+  }
+  to {
+    transform: rotate(0deg);
+    opacity: 1;
+  }
+}
+
+
+
+
