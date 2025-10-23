@@ -111,7 +111,7 @@ const Index = () => {
 
   return (
     <OptimizedBackground
-      src="/kenyan-home-construction-bg.svg"
+      src="/construction-site-drones.jpg"
       fallbackSrc="/kenyan-home-bg-small.svg"
       className="min-h-screen"
     >
