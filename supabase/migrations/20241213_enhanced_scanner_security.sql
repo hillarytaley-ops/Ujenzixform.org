@@ -343,3 +343,4 @@ GRANT EXECUTE ON FUNCTION public.log_qr_validation_failure TO authenticated;
 
 
 
+

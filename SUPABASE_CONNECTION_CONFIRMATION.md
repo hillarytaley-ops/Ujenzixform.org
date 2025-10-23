@@ -439,3 +439,4 @@ Your UjenziPro application is **COMPLETELY CONNECTED** to Supabase with:
 
 
 
+

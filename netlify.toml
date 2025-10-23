@@ -6,7 +6,7 @@
   publish = "dist"
   
   # Node version
-  environment = { NODE_VERSION = "18" }
+  environment = { NODE_VERSION = "20" }
 
 # Redirect rules for SPA (Single Page Application)
 [[redirects]]
@@ -76,4 +76,6 @@
   pretty_urls = true
 [build.processing.images]
   compress = true
+
+
 
