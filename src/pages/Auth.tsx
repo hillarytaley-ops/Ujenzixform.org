@@ -48,56 +48,48 @@ const Auth = () => {
   }, [navigate]);
 
   const signUp = async (email: string, password: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-    
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        captchaToken: undefined // Disable captcha requirement
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/`,
+          data: {
+            email: email
+          }
+        }
+      });
+      
+      if (error) {
+        console.error('Sign up error:', error);
+        return { error };
       }
-    });
-    return { error };
+      
+      console.log('Sign up successful:', data);
+      return { error: null };
+    } catch (err: any) {
+      console.error('Sign up exception:', err);
+      return { error: err };
+    }
   };
 
   const signIn = async (email: string, password: string) => {
     try {
-      // Rate limiting check
-      const attemptKey = `login_attempts_${email}`;
-      const attempts = parseInt(localStorage.getItem(attemptKey) || '0');
-      const lastAttempt = localStorage.getItem(`${attemptKey}_time`);
-      
-      if (attempts >= 5 && lastAttempt) {
-        const timeDiff = Date.now() - parseInt(lastAttempt);
-        if (timeDiff < 15 * 60 * 1000) { // 15 minutes lockout
-          throw new Error('Too many failed attempts. Please try again in 15 minutes.');
-        } else {
-          // Reset attempts after lockout period
-          localStorage.removeItem(attemptKey);
-          localStorage.removeItem(`${attemptKey}_time`);
-        }
-      }
-
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
       });
       
       if (error) {
-        // Increment failed attempts
-        localStorage.setItem(attemptKey, (attempts + 1).toString());
-        localStorage.setItem(`${attemptKey}_time`, Date.now().toString());
-        throw error;
-      } else {
-        // Clear attempts on successful login
-        localStorage.removeItem(attemptKey);
-        localStorage.removeItem(`${attemptKey}_time`);
+        console.error('Sign in error:', error);
+        return { error };
       }
       
+      console.log('Sign in successful:', data);
       return { error: null };
-    } catch (error: any) {
-      return { error };
+    } catch (err: any) {
+      console.error('Sign in exception:', err);
+      return { error: err };
     }
   };
 
