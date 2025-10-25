@@ -178,7 +178,7 @@ export const SupplierGrid = ({ onSupplierSelect, onQuoteRequest }: SupplierGridP
     hasDelivery: false,
   });
   const [currentPage, setCurrentPage] = useState(1);
-  const [supplierSource, setSupplierSource] = useState<SupplierSource>("registered");
+  const [supplierSource, setSupplierSource] = useState<SupplierSource>("sample");
   const [retryCount, setRetryCount] = useState(0);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -384,7 +384,6 @@ export const SupplierGrid = ({ onSupplierSelect, onQuoteRequest }: SupplierGridP
   }
 
   return (
-    <ErrorBoundary>
       <div className="space-y-6">
         {/* Enhanced Data Source Selection */}
         <DataSourceSelector
@@ -400,13 +399,50 @@ export const SupplierGrid = ({ onSupplierSelect, onQuoteRequest }: SupplierGridP
         <AdvancedFilters
           filters={filters}
           onFiltersChange={handleFiltersChange}
-          resultCount={currentTotalCount}
+          resultCount={supplierSource === "sample" ? demoSuppliers.length : currentTotalCount}
         />
 
         {isLoading ? (
           <div className="flex justify-center py-12">
             <LoadingSpinner message="Loading suppliers..." />
           </div>
+        ) : supplierSource === "sample" ? (
+          <>
+            {/* Demo Suppliers Display */}
+            {paginatedDemoSuppliers.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground text-lg">
+                  No suppliers found matching your criteria.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {paginatedDemoSuppliers.map((supplier) => (
+                    <SecureSupplierCard
+                      key={supplier.id}
+                      supplier={supplier}
+                      onViewCatalog={handleViewCatalog}
+                      onRequestQuote={handleRequestQuote}
+                      onReviewSupplier={handleReviewSupplier}
+                      isAuthenticated={isAuthenticated}
+                      userRole={userRole}
+                    />
+                  ))}
+                </div>
+
+                {demoTotalPages > 1 && (
+                  <div className="flex justify-center mt-8">
+                    <CustomPagination
+                      currentPage={currentPage}
+                      totalPages={demoTotalPages}
+                      onPageChange={setCurrentPage}
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </>
         ) : suppliers.length === 0 ? (
           <div className="text-center py-12">
             <div className="space-y-4">
@@ -480,6 +516,5 @@ export const SupplierGrid = ({ onSupplierSelect, onQuoteRequest }: SupplierGridP
           />
         )}
       </div>
-    </ErrorBoundary>
   );
 };
