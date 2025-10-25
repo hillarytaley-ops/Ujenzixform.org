@@ -383,10 +383,10 @@ const Index = () => {
         <section className="py-16 bg-gradient-to-br from-kenyan-green/10 to-acacia-gold/10">
           <div className="container mx-auto px-4">
             <div className="text-center mb-12">
-              <h2 className="text-3xl font-bold text-foreground mb-4">
+              <h2 className="text-3xl font-bold text-gray-900 mb-4">
                 Built for Kenya, By Kenyans
               </h2>
-              <p className="text-xl font-semibold text-gray-900 max-w-2xl mx-auto">
+              <p className="text-xl font-semibold text-white max-w-2xl mx-auto drop-shadow-lg">
                 Features designed specifically for the Kenyan construction market
               </p>
             </div>
