@@ -386,7 +386,7 @@ const Index = () => {
               <h2 className="text-3xl font-bold text-foreground mb-4">
                 Built for Kenya, By Kenyans
               </h2>
-              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              <p className="text-xl font-semibold text-gray-900 max-w-2xl mx-auto">
                 Features designed specifically for the Kenyan construction market
               </p>
             </div>
