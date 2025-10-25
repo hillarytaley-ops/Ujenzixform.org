@@ -147,11 +147,11 @@ const Auth = () => {
             title: "Invalid credentials",
             description: "Please check your email and password."
           });
-        } else if (error.message.includes("captcha")) {
+        } else if (error.message.toLowerCase().includes("captcha")) {
           toast({
             variant: "destructive",
-            title: "CAPTCHA Error",
-            description: "CAPTCHA verification is disabled. Please contact support if this persists."
+            title: "⚠️ CAPTCHA Protection Enabled",
+            description: "Please disable CAPTCHA in Supabase Dashboard: Authentication → Providers → Email → Turn OFF 'Enable CAPTCHA protection'"
           });
         } else {
           toast({
