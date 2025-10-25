@@ -54,7 +54,8 @@ const Auth = () => {
       email,
       password,
       options: {
-        emailRedirectTo: redirectUrl
+        emailRedirectTo: redirectUrl,
+        captchaToken: undefined // Disable captcha requirement
       }
     });
     return { error };
@@ -153,6 +154,12 @@ const Auth = () => {
             variant: "destructive",
             title: "Invalid credentials",
             description: "Please check your email and password."
+          });
+        } else if (error.message.includes("captcha")) {
+          toast({
+            variant: "destructive",
+            title: "CAPTCHA Error",
+            description: "CAPTCHA verification is disabled. Please contact support if this persists."
           });
         } else {
           toast({
