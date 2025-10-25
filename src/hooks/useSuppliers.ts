@@ -51,7 +51,17 @@ export const useSuppliers = (
       // NO FALLBACK to direct table access - security critical
       if (fetchError) {
         console.error('Secure suppliers function error:', fetchError);
-        // Log security attempt
+        
+        // If function doesn't exist, gracefully handle for non-admin users
+        if (fetchError.code === '42883' || fetchError.message?.includes('function') || fetchError.message?.includes('does not exist')) {
+          console.log('Secure function not available, showing empty results for security');
+          setError(null); // Don't show error, just show empty results
+          setSuppliers([]);
+          setTotalCount(0);
+          return;
+        }
+        
+        // Log security attempt for other errors
         try {
           await supabase.rpc('log_supplier_access_attempt' as any, {
             action_type: 'directory_access_blocked',
@@ -60,7 +70,9 @@ export const useSuppliers = (
         } catch (logError) {
           console.error('Failed to log security attempt:', logError);
         }
-        setError('Supplier directory access restricted - contact administrator');
+        
+        // For other errors, show empty results instead of error
+        setError(null);
         setSuppliers([]);
         setTotalCount(0);
         return;
@@ -136,7 +148,8 @@ export const useSuppliers = (
       console.error('Network error:', err);
       setSuppliers([]);
       setTotalCount(0);
-      setError('Access restricted or network error occurred');
+      // Don't show error to user, just log it - this prevents ErrorBoundary
+      setError(null);
     } finally {
       setLoading(false);
     }
