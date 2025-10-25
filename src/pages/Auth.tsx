@@ -188,7 +188,7 @@ const Auth = () => {
       <AnimatedSection animation="scaleIn">
         <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle>Welcome to BuildConnect Kenya</CardTitle>
+          <CardTitle>Welcome to UjenziPro</CardTitle>
           <CardDescription>
             Connect with construction professionals across Kenya
           </CardDescription>
