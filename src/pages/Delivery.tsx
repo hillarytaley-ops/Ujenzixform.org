@@ -196,15 +196,17 @@ const Delivery = () => {
       
       {/* Enhanced Hero Section */}
       <AnimatedSection animation="fadeInUp">
-        <section 
-          className="text-white py-20 relative overflow-hidden"
-        style={{
-          backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7)), url('https://images.unsplash.com/photo-1566576912321-d58ddd7a6088?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat'
-        }}
-      >
+        <section className="text-white py-20 relative overflow-hidden">
+          {/* Delivery Trucks and Construction Materials Background */}
+          <div 
+            className="absolute inset-0"
+            style={{
+              backgroundImage: `url('https://images.unsplash.com/photo-1519003300449-424ad0405076?w=1920&h=1080&fit=crop')`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center'
+            }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-br from-black/75 via-green-900/60 to-red-900/60"></div>
         <div className="container mx-auto px-4 text-center relative z-10">
           <Badge className="mb-6 bg-gradient-to-r from-green-600 to-red-600 text-white px-6 py-2 text-lg font-semibold">
             🇰🇪 Kenya's Premier Delivery Network

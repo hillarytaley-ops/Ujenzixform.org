@@ -151,11 +151,17 @@ const SuppliersContent = () => {
 
       {/* Kenyan-Themed Hero Section */}
       <AnimatedSection animation="fadeInUp">
-        <section className="bg-gradient-to-br from-green-600 via-red-600 to-black text-white py-20 relative overflow-hidden">
-        {/* Kenyan Flag Pattern Background */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="h-full w-full bg-gradient-to-r from-black via-red-500 to-green-600"></div>
-        </div>
+        <section className="text-white py-20 relative overflow-hidden">
+        {/* Construction Site Background Image */}
+        <div 
+          className="absolute inset-0"
+          style={{
+            backgroundImage: `url('https://images.unsplash.com/photo-1541888946425-d81bb19240f5?w=1920&h=1080&fit=crop')`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center'
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-green-900/60 to-red-900/60"></div>
         
         <div className="container mx-auto px-4 text-center relative z-10">
           <div className="mb-6">
