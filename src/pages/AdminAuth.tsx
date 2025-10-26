@@ -217,12 +217,14 @@ const AdminAuth = () => {
       }
 
       // Verify user has admin role
-      const { data: roleData } = await supabase
+      const { data: roleData, error: roleError } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', authData.user.id)
         .eq('role', 'admin')
         .maybeSingle();
+
+      console.log('Role check:', { roleData, roleError, userId: authData.user.id });
 
       if (!roleData) {
         await logSecurityEvent('unauthorized_admin_access', workEmail, false, 'No admin role');
@@ -230,7 +232,7 @@ const AdminAuth = () => {
         toast({
           variant: "destructive",
           title: "Access Denied",
-          description: "Your account does not have administrator privileges."
+          description: `Your account does not have administrator privileges. Please run VERIFY_AND_FIX_ADMIN_ROLE.sql in Supabase to grant admin access.`
         });
         setLoading(false);
         return;
