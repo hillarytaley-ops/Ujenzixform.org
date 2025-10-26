@@ -45,13 +45,10 @@ const AdminAuth = () => {
 
   const validateWorkEmail = (email: string): boolean => {
     // Only allow company domain emails (you can customize this)
-    const allowedDomains = ['ujenzipro.com', 'ujenzipro.co.ke'];
+    const allowedDomains = ['ujenzipro.com', 'ujenzipro.co.ke', 'gmail.com'];
     const emailDomain = email.split('@')[1]?.toLowerCase();
     
     if (!emailDomain) return false;
-    
-    // For development, also allow gmail (remove in production)
-    if (emailDomain === 'gmail.com') return true;
     
     return allowedDomains.includes(emailDomain);
   };
@@ -139,47 +136,73 @@ const AdminAuth = () => {
       // Hash the staff code
       const hashedCode = await hashStaffCode(staffCode.toUpperCase());
 
-      // Verify admin credentials via secure function
-      const { data, error } = await supabase.rpc('verify_admin_staff_credentials', {
-        work_email: workEmail.toLowerCase(),
-        staff_code_hash: hashedCode
-      }).maybeSingle();
+      // For development: Allow specific test credentials
+      // TODO: Replace with database verification after migration
+      const validTestCredentials = [
+        { email: 'hillarytaley@gmail.com', hash: await hashStaffCode('UJPRO-2024-0001') }
+      ];
 
-      if (error || !data?.is_valid) {
-        await logSecurityEvent('failed_admin_login', workEmail, false, 'Invalid credentials');
-        
-        const newAttempts = attempts + 1;
-        setAttempts(newAttempts);
+      const isValidCredential = validTestCredentials.some(
+        cred => cred.email.toLowerCase() === workEmail.toLowerCase() && cred.hash === hashedCode
+      );
 
-        // Lock account after 3 failed attempts
-        if (newAttempts >= 3) {
-          const lockoutTime = Date.now() + (30 * 60 * 1000); // 30 minutes
-          setLockoutUntil(lockoutTime);
-          localStorage.setItem(`admin_lockout_${workEmail}`, lockoutTime.toString());
+      if (!isValidCredential) {
+        // Try database verification if available
+        try {
+          const { data, error } = await supabase.rpc('verify_admin_staff_credentials', {
+            work_email: workEmail.toLowerCase(),
+            staff_code_hash: hashedCode
+          }).maybeSingle();
+
+          if (error || !data?.is_valid) {
+            throw new Error('Invalid credentials');
+          }
+        } catch (dbError) {
+          // Database function not available or credentials invalid
+          await logSecurityEvent('failed_admin_login', workEmail, false, 'Invalid credentials');
           
-          await logSecurityEvent('admin_account_locked', workEmail, false, `Locked after ${newAttempts} attempts`);
+          const newAttempts = attempts + 1;
+          setAttempts(newAttempts);
+
+          // Lock account after 3 failed attempts
+          if (newAttempts >= 3) {
+            const lockoutTime = Date.now() + (30 * 60 * 1000); // 30 minutes
+            setLockoutUntil(lockoutTime);
+            localStorage.setItem(`admin_lockout_${workEmail}`, lockoutTime.toString());
+            
+            await logSecurityEvent('admin_account_locked', workEmail, false, `Locked after ${newAttempts} attempts`);
+            
+            toast({
+              variant: "destructive",
+              title: "Account Locked",
+              description: "Too many failed attempts. Account locked for 30 minutes."
+            });
+          } else {
+            toast({
+              variant: "destructive",
+              title: "Invalid Credentials",
+              description: `Invalid work email or staff code. ${3 - newAttempts} attempts remaining.`
+            });
+          }
           
-          toast({
-            variant: "destructive",
-            title: "Account Locked",
-            description: "Too many failed attempts. Account locked for 30 minutes."
-          });
-        } else {
-          toast({
-            variant: "destructive",
-            title: "Invalid Credentials",
-            description: `Invalid work email or staff code. ${3 - newAttempts} attempts remaining.`
-          });
+          setLoading(false);
+          return;
         }
-        
-        setLoading(false);
-        return;
       }
 
       // Credentials valid - now authenticate via Supabase
+      // For development: Use the actual password
+      // TODO: After migration, staff code will be the password
+      let authPassword = staffCode.toUpperCase();
+      
+      // Check if using test credentials, use actual account password
+      if (workEmail.toLowerCase() === 'hillarytaley@gmail.com' && staffCode.toUpperCase() === 'UJPRO-2024-0001') {
+        authPassword = 'Admin123456'; // Your actual password
+      }
+      
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: workEmail.toLowerCase(),
-        password: staffCode.toUpperCase() // Use staff code as password
+        password: authPassword
       });
 
       if (authError) {
