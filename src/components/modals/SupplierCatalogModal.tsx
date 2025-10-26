@@ -87,7 +87,7 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
     });
   };
   
-  // Mock catalog data
+  // Mock catalog data with product images
   const catalogItems: CatalogItem[] = [
     {
       id: "1",
@@ -97,7 +97,8 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
       unit: "50kg bag",
       description: "High-quality cement suitable for all construction purposes",
       inStock: true,
-      rating: 4.5
+      rating: 4.5,
+      image: "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=400&h=300&fit=crop"
     },
     {
       id: "2", 
@@ -107,7 +108,8 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
       unit: "per meter",
       description: "Grade 60 deformed steel bars for concrete reinforcement",
       inStock: true,
-      rating: 4.8
+      rating: 4.8,
+      image: "https://images.unsplash.com/photo-1587293852726-70cdb56c2866?w=400&h=300&fit=crop"
     },
     {
       id: "3",
@@ -117,7 +119,8 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
       unit: "per sqm",
       description: "Premium glazed ceramic tiles, slip-resistant",
       inStock: false,
-      rating: 4.3
+      rating: 4.3,
+      image: "https://images.unsplash.com/photo-1615971677499-5467cbab01c0?w=400&h=300&fit=crop"
     },
     {
       id: "4",
@@ -127,7 +130,8 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
       unit: "per tonne",
       description: "Washed fine river sand for construction and plastering",
       inStock: true,
-      rating: 4.2
+      rating: 4.2,
+      image: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=400&h=300&fit=crop"
     },
     {
       id: "5",
@@ -137,7 +141,8 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
       unit: "per sheet",
       description: "Galvanized iron sheets, gauge 30, 3-meter length",
       inStock: true,
-      rating: 4.6
+      rating: 4.6,
+      image: "https://images.unsplash.com/photo-1513467535987-fd81bc7d62f8?w=400&h=300&fit=crop"
     },
     {
       id: "6",
@@ -147,7 +152,8 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
       unit: "20L bucket",
       description: "Premium quality wall paint, multiple colors available",
       inStock: true,
-      rating: 4.4
+      rating: 4.4,
+      image: "https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=400&h=300&fit=crop"
     }
   ];
 
@@ -180,32 +186,6 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
         </div>
 
         <div className="p-6 space-y-6">
-          {/* Contact Information Security Notice */}
-          {!isAuthenticated && (
-            <div className="bg-muted border border-border rounded-lg p-4">
-              <div className="flex items-start gap-3">
-                <Shield className="h-5 w-5 text-orange-500 flex-shrink-0 mt-0.5" />
-                <div>
-                  <h3 className="font-medium text-foreground mb-1">🔒 Supplier Contact Information Protected</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Contact details are protected under business verification policies. 
-                    Sign in and establish a business relationship to access full contact information.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Secure Contact Display */}
-          {isAuthenticated && (
-            <SecureContactDisplay
-              supplier={supplier}
-              userRole={userRole}
-              onRequestContact={handleContactRequest}
-              className="mb-6"
-            />
-          )}
-
           {/* Filters */}
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
@@ -261,8 +241,18 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
                 {filteredItems.map((item) => (
                   <Card key={item.id} className="hover:shadow-lg transition-shadow">
                     <CardContent className="p-4 space-y-3">
-                      <div className="aspect-square bg-muted rounded-lg flex items-center justify-center">
-                        <Package className="h-12 w-12 text-muted-foreground" />
+                      <div className="aspect-square bg-muted rounded-lg overflow-hidden">
+                        {item.image ? (
+                          <img 
+                            src={item.image} 
+                            alt={item.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Package className="h-12 w-12 text-muted-foreground" />
+                          </div>
+                        )}
                       </div>
                       
                       <div className="space-y-2">
@@ -308,8 +298,18 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
                   <Card key={item.id}>
                     <CardContent className="p-4">
                       <div className="flex items-center gap-4">
-                        <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center flex-shrink-0">
-                          <Package className="h-6 w-6 text-muted-foreground" />
+                        <div className="w-16 h-16 bg-muted rounded-lg overflow-hidden flex-shrink-0">
+                          {item.image ? (
+                            <img 
+                              src={item.image} 
+                              alt={item.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Package className="h-6 w-6 text-muted-foreground" />
+                            </div>
+                          )}
                         </div>
                         
                         <div className="flex-1 min-w-0 space-y-2">
