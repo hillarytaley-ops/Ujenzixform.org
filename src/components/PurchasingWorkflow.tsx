@@ -14,6 +14,7 @@ const PurchasingWorkflow = () => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedWorkflow, setSelectedWorkflow] = useState<'tender' | 'direct' | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     checkUserProfile();
@@ -29,15 +30,17 @@ const PurchasingWorkflow = () => {
       }
 
       // SECURITY: Explicit column selection - exclude sensitive data, include timestamps
-      const { data: profile, error } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('id, user_id, full_name, company_name, user_type, is_professional, avatar_url, created_at, updated_at')
         .eq('user_id', user.id)
         .single();
 
-      if (error) {
-        console.error('Error fetching profile:', error);
-        toast.error('Failed to load user profile');
+      if (profileError) {
+        console.error('Error fetching profile:', profileError);
+        // Don't show error, just continue with null profile
+        setUserProfile(null);
+        setLoading(false);
         return;
       }
 
@@ -60,7 +63,8 @@ const PurchasingWorkflow = () => {
       }
     } catch (error) {
       console.error('Error checking user profile:', error);
-      toast.error('Authentication error');
+      // Don't show error, just set loading to false
+      setError('Failed to load');
     } finally {
       setLoading(false);
     }
@@ -71,6 +75,22 @@ const PurchasingWorkflow = () => {
       <Card>
         <CardContent className="flex items-center justify-center p-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Purchase Orders</CardTitle>
+          <CardDescription>Create and manage your purchase orders</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground">
+            Sign in to access the purchasing system and create orders with suppliers.
+          </p>
         </CardContent>
       </Card>
     );
