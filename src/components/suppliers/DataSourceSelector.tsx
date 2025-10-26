@@ -35,7 +35,7 @@ export const DataSourceSelector = ({
               Supplier Directory
             </CardTitle>
             <CardDescription>
-              Ultra-secure suppliers directory with maximum protection protocols
+              Browse construction materials and suppliers across Kenya
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
@@ -56,35 +56,35 @@ export const DataSourceSelector = ({
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 gap-4">
-          {/* Ultra-Secure Suppliers Directory */}
+          {/* Suppliers Directory */}
           <Card 
-            className="border-primary shadow-sm bg-primary/5"
+            className="border-green-200 shadow-sm bg-green-50/50"
           >
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <Shield className="h-4 w-4 text-red-500" />
-                  <span className="font-medium">Ultra-Secure Suppliers Directory</span>
+                  <Users className="h-4 w-4 text-green-600" />
+                  <span className="font-medium">Browse Suppliers</span>
                 </div>
-                <Badge variant="secondary">
-                  {isLoading ? "Loading..." : registeredCount}
+                <Badge variant="secondary" className="bg-green-100 text-green-800">
+                  {sampleCount} Available
                 </Badge>
               </div>
               <p className="text-sm text-muted-foreground mb-3">
-                Ultra-secure suppliers directory with maximum protection protocols
+                Trusted construction suppliers from across Kenya
               </p>
               <div className="space-y-1 text-xs text-muted-foreground">
                 <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                  <span>Ultra-secure access</span>
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span>Verified suppliers</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  <span>Maximum protection</span>
+                  <span>Quality materials</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                  <span>Admin restricted</span>
+                  <span>All 47 counties</span>
                 </div>
               </div>
             </CardContent>

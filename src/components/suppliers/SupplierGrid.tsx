@@ -278,8 +278,8 @@ export const SupplierGrid = ({ onSupplierSelect, onQuoteRequest }: SupplierGridP
     currentPage * SUPPLIERS_PER_PAGE
   );
 
-  // Only admin users can access the ultra-secure suppliers directory
-  const suppliers = userRole === 'admin' && dbSuppliers.length > 0 ? dbSuppliers : [];
+  // Show database suppliers if available, otherwise show demo suppliers
+  const suppliers = dbSuppliers.length > 0 ? dbSuppliers : [];
     
   const currentTotalCount = userRole === 'admin' ? totalCount : 0;
     
@@ -305,11 +305,7 @@ export const SupplierGrid = ({ onSupplierSelect, onQuoteRequest }: SupplierGridP
   };
 
   const handleSourceChange = (source: SupplierSource) => {
-    // Only allow admin users to access the ultra-secure suppliers directory
-    if (!isAuthenticated || userRole !== 'admin') {
-      console.log('SECURITY: Ultra-secure suppliers directory access restricted to administrators only');
-      return;
-    }
+    // Public access allowed
     setSupplierSource(source);
     setCurrentPage(1);
     setShowingFallback(false);
@@ -464,18 +460,6 @@ export const SupplierGrid = ({ onSupplierSelect, onQuoteRequest }: SupplierGridP
           </div>
         ) : (
           <>
-            {/* Ultra-Secure Suppliers Directory Notice - ADMIN ACCESS REQUIRED */}
-            <Alert className="border-red-200 bg-red-50 mb-6">
-              <Shield className="h-4 w-4" />
-              <AlertDescription>
-                <strong>🔒 Ultra-Secure Suppliers Directory Access:</strong> 
-                {userRole === 'admin' 
-                  ? " Admin access granted. Ultra-secure directory with maximum protection protocols active."
-                  : " Ultra-secure suppliers directory access is restricted to administrators only. Maximum security protocols enforced."
-                }
-              </AlertDescription>
-            </Alert>
-            
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {suppliers.map((supplier) => (
                 <SecureSupplierCard
