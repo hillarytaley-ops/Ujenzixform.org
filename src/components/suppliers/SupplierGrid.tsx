@@ -381,17 +381,8 @@ export const SupplierGrid = ({ onSupplierSelect, onQuoteRequest }: SupplierGridP
 
   return (
       <div className="space-y-6">
-        {/* Enhanced Data Source Selection */}
-        <DataSourceSelector
-          currentSource={supplierSource}
-          onSourceChange={handleSourceChange}
-          registeredCount={totalCount}
-          sampleCount={DEMO_SUPPLIERS.length}
-          isLoading={isLoading}
-          hasError={!!error}
-          showingFallback={showingFallback}
-        />
-
+        {/* Data Source Selector - Hidden for cleaner UI, showing sample by default */}
+        
         <AdvancedFilters
           filters={filters}
           onFiltersChange={handleFiltersChange}

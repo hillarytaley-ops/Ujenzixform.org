@@ -169,65 +169,6 @@ const SuppliersContent = () => {
             <span className="text-green-300 font-semibold">Tujengi Kenya Pamoja</span> - Let's Build Kenya Together
           </p>
 
-          {/* Register as Supplier - Kenyan-Styled Call-to-Action */}
-          <div className="mb-10">
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-6">
-              <Button 
-                size="lg" 
-                onClick={handleShowRegistration}
-                className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold px-10 py-4 rounded-full shadow-2xl transform hover:scale-105 transition-all duration-300"
-              >
-                <Store className="h-6 w-6 mr-3" />
-                Jiunge Nasi - Register as Supplier
-              </Button>
-              
-              <div className="text-center sm:text-left">
-                <p className="text-green-200 font-medium">🚀 Free Registration</p>
-                <p className="text-sm text-green-300">Grow your business across Kenya</p>
-              </div>
-            </div>
-            
-            <div className="bg-black/20 rounded-2xl p-6 backdrop-blur-sm border border-white/20">
-              <p className="text-lg text-yellow-200 mb-3 font-semibold">
-                🏆 Why Choose UjenziPro?
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                <div className="text-center">
-                  <span className="block text-2xl mb-2">🌍</span>
-                  <p className="text-green-200">All 47 Counties</p>
-                  <p className="text-white/80">Nationwide Coverage</p>
-                </div>
-                <div className="text-center">
-                  <span className="block text-2xl mb-2">🤝</span>
-                  <p className="text-green-200">Trusted Network</p>
-                  <p className="text-white/80">Verified Suppliers</p>
-                </div>
-                <div className="text-center">
-                  <span className="block text-2xl mb-2">📈</span>
-                  <p className="text-green-200">Business Growth</p>
-                  <p className="text-white/80">Expand Your Reach</p>
-                </div>
-              </div>
-            </div>
-          </div>
-            
-            {/* Kenyan Business Values */}
-            <div className="flex flex-wrap justify-center gap-3 mb-8">
-              <Badge className="bg-green-500/20 text-green-100 border-green-400 px-4 py-2 text-sm font-medium">
-                🤝 Uongozi - Leadership in Business
-              </Badge>
-              <Badge className="bg-red-500/20 text-red-100 border-red-400 px-4 py-2 text-sm font-medium">
-                🛡️ Usalama - Secure Platform
-              </Badge>
-              <Badge className="bg-yellow-500/20 text-yellow-100 border-yellow-400 px-4 py-2 text-sm font-medium">
-                📞 Mawasiliano - Direct Communication
-              </Badge>
-              {!user && (
-                <Badge className="bg-white/20 text-white border-white/40 px-4 py-2 text-sm font-medium">
-                  🔑 Ingia - Sign In for Full Access
-                </Badge>
-              )}
-            </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full max-w-5xl mx-auto">
               <TabsList className={`grid w-full bg-black/30 backdrop-blur-sm border-2 border-green-400/30 rounded-2xl p-2 ${
@@ -239,19 +180,19 @@ const SuppliersContent = () => {
                 {(showDirectoryAccess || !user) && (
                   <TabsTrigger value="suppliers" className="flex items-center gap-2 data-[state=active]:bg-green-500 data-[state=active]:text-white font-medium rounded-xl transition-all duration-300">
                     <Building className="h-4 w-4" />
-                    {showDirectoryAccess ? '🛡️ Secure Directory' : '🏪 Wauzaji - Suppliers'}
+                    Suppliers
                   </TabsTrigger>
                 )}
                 {showRegistrationOnly && (
                   <TabsTrigger value="register" className="flex items-center gap-2 data-[state=active]:bg-green-500 data-[state=active]:text-white font-medium rounded-xl transition-all duration-300">
                     <Store className="h-4 w-4" />
-                    🚀 Jiunge - Register as Supplier
+                    Register as Supplier
                   </TabsTrigger>
                 )}
                 {(showDirectoryAccess || !user) && (
                   <TabsTrigger value="purchase" className="flex items-center gap-2 data-[state=active]:bg-green-500 data-[state=active]:text-white font-medium rounded-xl transition-all duration-300">
                     <ShoppingBag className="h-4 w-4" />
-                    🛒 Nunua - Purchase
+                    Purchase
                   </TabsTrigger>
                 )}
                 {isAdmin && (
