@@ -21,6 +21,7 @@ const Suppliers = lazy(() => import("./pages/Suppliers"));
 const About = lazy(() => import("./pages/About"));
 const Contact = lazy(() => import("./pages/Contact"));
 const Auth = lazy(() => import("./pages/Auth"));
+const AdminAuth = lazy(() => import("./pages/AdminAuth"));
 const Feedback = lazy(() => import("./pages/Feedback"));
 const Tracking = lazy(() => import("./pages/Tracking"));
 const Monitoring = lazy(() => import("./pages/Monitoring"));
@@ -93,6 +94,7 @@ const App = () => {
                     <Route path="/about" element={<About />} />
                     <Route path="/contact" element={<Contact />} />
                     <Route path="/auth" element={<Auth />} />
+                    <Route path="/admin-login" element={<AdminAuth />} />
                     <Route path="/feedback" element={<Feedback />} />
                     <Route path="/tracking" element={<Tracking />} />
                     <Route path="/monitoring" element={<Monitoring />} />
