@@ -125,14 +125,14 @@ const SuppliersContent = () => {
       <div className="min-h-screen bg-gradient-construction flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="text-muted-foreground">Loading ultra-secure suppliers directory...</p>
+          <p className="text-muted-foreground">Loading suppliers directory...</p>
         </div>
       </div>
     );
   }
 
-  // Ultra-Secure Directory Access Control: Directory is admin-only, but registration is public
-  const showDirectoryAccess = isAdmin;
+  // Public Access: Everyone can view supplier materials and directory
+  const showDirectoryAccess = true; // Changed from isAdmin to make public
   const showRegistrationOnly = !loading && user && !isAdmin;
 
   return (
@@ -446,21 +446,20 @@ const SuppliersContent = () => {
                 <SupplierRegistrationForm />
               ) : (
                 <>
-                  {/* Enhanced Admin Access Notice for Suppliers Directory - Admin Only */}
-                {isAdmin && (
-                  <div className="bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-200 rounded-lg p-6 mb-6">
+                  {/* Public Suppliers Directory Notice */}
+                  <div className="bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-300 rounded-lg p-6 mb-6">
                   <div className="flex items-start gap-4">
                     <div className="flex-shrink-0">
-                      <Shield className="h-8 w-8 text-red-600" />
+                      <Building className="h-8 w-8 text-green-600" />
                     </div>
                     <div className="flex-1">
-                      <h3 className="text-xl font-bold text-red-800 mb-3">
-                        🚨 Ultra-Secure Suppliers Directory Access
+                      <h3 className="text-xl font-bold text-green-800 mb-3">
+                        🏪 Browse Kenya's Construction Suppliers
                       </h3>
-                      <div className="text-red-700 space-y-3 mb-4">
+                      <div className="text-gray-700 space-y-3 mb-4">
                         <p className="font-medium">
-                          <strong>ULTRA-SECURE ENFORCEMENT:</strong> All supplier contact information is protected under 
-                          maximum security protocols to prevent data harvesting and unauthorized access.
+                          Discover trusted construction suppliers across Kenya! Browse materials, compare options, 
+                          and connect with verified suppliers from all 47 counties.
                         </p>
                         
                         <div className="bg-white/50 rounded-lg p-4 border border-red-200">
@@ -533,7 +532,6 @@ const SuppliersContent = () => {
                     </div>
                   </div>
                 </div>
-                )}
                 
                 <SupplierGrid 
                   onSupplierSelect={handleSupplierSelect}
