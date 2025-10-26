@@ -163,10 +163,11 @@ const SuppliersContent = () => {
             </span>
           </h1>
           
-          <p className="text-xl md:text-2xl mb-8 opacity-90 max-w-3xl mx-auto leading-relaxed">
-            Connecting Kenyan builders with trusted suppliers across all 47 counties. 
-            <br />
-            <span className="text-green-300 font-semibold">Tujengi Kenya Pamoja</span> - Let's Build Kenya Together
+          <p className="text-xl md:text-2xl mb-8 opacity-90 max-w-4xl mx-auto leading-relaxed">
+            <strong>Your Construction Materials Hub:</strong> Browse verified suppliers, explore product catalogs with images, 
+            compare prices and quality, request quotes instantly, place bulk orders, arrange delivery across Kenya, 
+            track material shipments, verify authenticity with QR codes, and build lasting business relationships 
+            with trusted suppliers from Mombasa to Eldoret.
           </p>
 
 

@@ -307,8 +307,10 @@ const Monitoring = () => {
             </h1>
             
             <p className="text-2xl md:text-4xl mb-12 text-white/90 font-medium drop-shadow-lg leading-relaxed">
-              Comprehensive surveillance and monitoring dashboard for construction sites, 
-              cameras, and system health across Kenya
+              <strong>24/7 Site Surveillance:</strong> Monitor construction sites with live camera feeds and aerial drone views, 
+              watch progress in real-time, review recorded footage, detect security issues, track worker safety, 
+              verify material deliveries, check project milestones, receive instant alerts, access multiple projects, 
+              and maintain complete oversight of your construction sites from anywhere in Kenya.
             </p>
             
             {/* Monitoring Technology Stats */}

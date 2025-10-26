@@ -177,9 +177,11 @@ const Tracking = () => {
                 Delivery Tracking
               </h1>
               
-              <p className="text-2xl md:text-4xl mb-12 text-white/90 font-medium drop-shadow-lg leading-relaxed">
-                Monitor and manage deliveries with military-grade real-time tracking 
-                and advanced privacy protection across Kenya
+              <p className="text-2xl md:text-4xl mb-12 text-white/90 font-medium drop-shadow-lg leading-relaxed max-w-4xl mx-auto">
+                <strong>Real-Time Delivery Tracking:</strong> Track construction material deliveries with live GPS location updates, 
+                view delivery routes and estimated arrival times, receive status notifications, monitor multiple shipments, 
+                verify delivery completion, check driver details, review delivery history, access proof of delivery, 
+                and ensure materials reach your construction site safely and on schedule.
               </p>
               
               {/* Tracking Technology Stats */}

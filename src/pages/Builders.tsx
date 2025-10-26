@@ -217,7 +217,9 @@ const Builders = () => {
             </h1>
             
             <p className="text-2xl md:text-4xl mb-12 text-white/90 font-medium drop-shadow-lg leading-relaxed">
-              Connect with certified construction professionals across all 47 counties of Kenya
+              <strong>Find Your Perfect Builder:</strong> Browse certified builders and contractors, view portfolios and ratings, 
+              compare quotes, check availability, verify certifications, read reviews from past clients, and hire trusted 
+              professionals for residential, commercial, or industrial projects across all 47 counties.
             </p>
             
             {/* Professional Stats */}

@@ -210,8 +210,11 @@ const Delivery = () => {
             🇰🇪 Kenya's Premier Delivery Network
           </Badge>
           <h1 className="text-5xl md:text-6xl font-bold mb-6 drop-shadow-2xl">Delivery Management</h1>
-          <p className="text-xl md:text-2xl mb-8 opacity-90 drop-shadow-lg">
-            {isAdmin ? "Complete workflow for construction material deliveries" : "Request delivery for your construction materials"}
+          <p className="text-xl md:text-2xl mb-8 opacity-90 drop-shadow-lg max-w-4xl mx-auto leading-relaxed">
+            <strong>Smart Delivery Solutions:</strong> Request material deliveries from suppliers to construction sites, 
+            track deliveries in real-time with GPS, calculate delivery costs instantly, manage multiple deliveries, 
+            coordinate with verified transport providers, receive notifications, generate delivery notes, 
+            and ensure materials arrive safely and on time across Kenya.
           </p>
           
           {/* Delivery Stats */}

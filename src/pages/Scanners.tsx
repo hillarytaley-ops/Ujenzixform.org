@@ -336,9 +336,11 @@ const Scanners = () => {
               Material Scanners
             </h1>
             
-            <p className="text-2xl md:text-4xl mb-12 text-white/90 font-medium drop-shadow-lg leading-relaxed">
-              Advanced QR Code scanning system connecting suppliers and construction sites 
-              for complete material tracking across Kenya
+            <p className="text-2xl md:text-4xl mb-12 text-white/90 font-medium drop-shadow-lg leading-relaxed max-w-4xl mx-auto">
+              <strong>Material Authentication System:</strong> Scan QR codes on construction materials to verify authenticity, 
+              track materials from supplier warehouse to construction site, check quality certifications, 
+              view product details and specifications, generate dispatch and receipt notes, maintain inventory records, 
+              prevent counterfeit materials, ensure KEBS compliance, and create complete audit trails for every material delivery.
             </p>
             
             {/* Scanner Technology Stats */}
