@@ -397,12 +397,12 @@ const SuppliersContent = () => {
               {modals.registrationModal.isOpen ? (
                 <SupplierRegistrationForm />
               ) : (
-                <>
-                <SupplierGrid 
-                  onSupplierSelect={handleSupplierSelect}
-                  onQuoteRequest={handleQuoteRequest}
-                />
-                </>
+                <div className="space-y-6">
+                  <SupplierGrid 
+                    onSupplierSelect={handleSupplierSelect}
+                    onQuoteRequest={handleQuoteRequest}
+                  />
+                </div>
               )}
             </TabsContent>
           )}
