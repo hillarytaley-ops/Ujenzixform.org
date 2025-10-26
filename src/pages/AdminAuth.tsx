@@ -226,7 +226,10 @@ const AdminAuth = () => {
 
       console.log('Role check:', { roleData, roleError, userId: authData.user.id });
 
-      if (!roleData) {
+      // For development: Allow specific email to bypass role check
+      const isDevelopmentAdmin = workEmail.toLowerCase() === 'hillarytaley@gmail.com';
+
+      if (!roleData && !isDevelopmentAdmin) {
         await logSecurityEvent('unauthorized_admin_access', workEmail, false, 'No admin role');
         await supabase.auth.signOut();
         toast({
@@ -236,6 +239,11 @@ const AdminAuth = () => {
         });
         setLoading(false);
         return;
+      }
+      
+      // Log if using development bypass
+      if (isDevelopmentAdmin && !roleData) {
+        console.warn('Using development admin bypass for:', workEmail);
       }
 
       // Success - log and redirect
