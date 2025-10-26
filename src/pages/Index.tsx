@@ -119,27 +119,87 @@ const Index = () => {
 
         {/* Hero Section */}
         <section className="container mx-auto px-4 py-16 text-center">
-          <AnimatedHero
-            title="Jenga, Unganisha, na Stawi Pamoja"
-            subtitle="Build, Connect, and Prosper Together"
-            description="Kenya's premier construction marketplace connecting builders, suppliers, and clients. From the coastal projects of Mombasa to the highland developments of Eldoret, from Kisumu's lakeside constructions to Garissa's growing infrastructure - build your dreams across all 47 counties with trusted professionals."
-          />
+          <AnimatedSection animation="fadeInUp">
+            <h1 className="text-5xl md:text-6xl font-bold mb-6 text-foreground drop-shadow-lg">
+              Kenya's Construction Marketplace
+            </h1>
+            <p className="text-xl md:text-2xl mb-4 text-foreground/90 max-w-4xl mx-auto">
+              Connect builders, suppliers, and construction professionals across all 47 counties
+            </p>
+            <p className="text-lg mb-10 text-foreground/80 max-w-3xl mx-auto">
+              From finding certified builders to sourcing quality materials, tracking deliveries with QR codes, 
+              and monitoring construction sites with drones - everything you need in one platform
+            </p>
+          </AnimatedSection>
           
-          <AnimatedCTAButtons
-            buttons={[
-              {
-                to: "/builders",
-                text: "Find Builders",
-                className: "bg-primary hover:bg-primary/90 text-primary-foreground text-lg px-8 py-4 shadow-lg"
-              },
-              {
-                to: "/suppliers",
-                text: "Explore Suppliers",
-                variant: "outline",
-                className: "border-2 text-lg px-8 py-4 shadow-lg"
-              }
-            ]}
-          />
+          {/* Main Action Buttons */}
+          <AnimatedSection animation="fadeInUp" delay={100}>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
+              <Link to="/builders">
+                <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground text-lg px-10 py-6 shadow-xl">
+                  👷 Find Builders
+                </Button>
+              </Link>
+              <Link to="/suppliers">
+                <Button size="lg" variant="outline" className="border-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground text-lg px-10 py-6 shadow-xl bg-white/90">
+                  🏪 Browse Suppliers
+                </Button>
+              </Link>
+            </div>
+            
+            {/* Quick Access Links */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-4xl mx-auto mb-12">
+              <Link to="/delivery">
+                <Button variant="ghost" className="w-full h-auto py-4 flex flex-col items-center gap-2 hover:bg-white/80 hover:shadow-md transition-all bg-white/60">
+                  <span className="text-2xl">🚚</span>
+                  <span className="text-sm font-medium">Request Delivery</span>
+                </Button>
+              </Link>
+              <Link to="/tracking">
+                <Button variant="ghost" className="w-full h-auto py-4 flex flex-col items-center gap-2 hover:bg-white/80 hover:shadow-md transition-all bg-white/60">
+                  <span className="text-2xl">📍</span>
+                  <span className="text-sm font-medium">Track Materials</span>
+                </Button>
+              </Link>
+              <Link to="/monitoring">
+                <Button variant="ghost" className="w-full h-auto py-4 flex flex-col items-center gap-2 hover:bg-white/80 hover:shadow-md transition-all bg-white/60">
+                  <span className="text-2xl">🎥</span>
+                  <span className="text-sm font-medium">Site Monitoring</span>
+                </Button>
+              </Link>
+              <Link to="/scanners">
+                <Button variant="ghost" className="w-full h-auto py-4 flex flex-col items-center gap-2 hover:bg-white/80 hover:shadow-md transition-all bg-white/60">
+                  <span className="text-2xl">📦</span>
+                  <span className="text-sm font-medium">QR Scanner</span>
+                </Button>
+              </Link>
+            </div>
+          </AnimatedSection>
+
+          {/* Registration Section */}
+          <AnimatedSection animation="scaleIn" delay={200}>
+            <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-8 shadow-2xl max-w-3xl mx-auto mb-12">
+              <h2 className="text-2xl font-bold mb-4 text-gray-900">Ready to Get Started?</h2>
+              <p className="text-gray-700 mb-6">Join UjenziPro and grow your construction business</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Link to="/builder-registration">
+                  <Button size="lg" className="w-full bg-construction-orange hover:bg-construction-orange/90 text-white py-6">
+                    <Building2 className="h-5 w-5 mr-2" />
+                    Register as Builder
+                  </Button>
+                </Link>
+                <Link to="/suppliers">
+                  <Button size="lg" variant="outline" className="w-full border-2 border-green-600 text-green-700 hover:bg-green-600 hover:text-white py-6">
+                    <Store className="h-5 w-5 mr-2" />
+                    Register as Supplier
+                  </Button>
+                </Link>
+              </div>
+              <p className="text-sm text-gray-500 mt-4">
+                Already have an account? <Link to="/auth" className="text-primary hover:underline font-medium">Sign In</Link>
+              </p>
+            </div>
+          </AnimatedSection>
 
           {/* Quick Stats */}
           <div className="mt-12">
