@@ -55,39 +55,25 @@ const SuppliersContent = () => {
       if (user) {
         setUser(user);
         
-        // Get user role - try to get profile, create if doesn't exist
-        let { data: profileData, error: profileError } = await supabase
-          .from('profiles')
+        // Get role from user_roles table
+        const { data: roleData } = await supabase
+          .from('user_roles')
           .select('role')
           .eq('user_id', user.id)
-          .single();
+          .limit(1)
+          .maybeSingle();
         
-        if (profileError || !profileData) {
-          console.log('No profile found or error, using default role');
-          // Set default role if no profile found
-          setUserRole('builder');
-          setIsAdmin(false);
+        const userRole = (roleData?.role as any) || 'builder';
+        setUserRole(userRole);
+        setIsAdmin(roleData?.role === 'admin');
+        
+        // Set default tab based on role
+        if (roleData?.role === 'supplier') {
+          setActiveTab("workflow");
+        } else if (roleData?.role === 'admin') {
           setActiveTab("suppliers");
         } else {
-          // Get role from user_roles table
-          const { data: roleData } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', user.id)
-            .limit(1)
-            .maybeSingle();
-          
-          const userRole = (roleData?.role as any) || 'builder';
-          setUserRole(userRole);
-          setIsAdmin(roleData?.role === 'admin');
-          // Set default tab based on role
-          if (roleData?.role === 'supplier') {
-            setActiveTab("workflow");
-          } else if (roleData?.role === 'admin') {
-            setActiveTab("suppliers");
-          } else {
-            setActiveTab("register");
-          }
+          setActiveTab("suppliers"); // Changed from register to suppliers for public viewing
         }
       } else {
         // No authenticated user, set default values to allow page viewing
