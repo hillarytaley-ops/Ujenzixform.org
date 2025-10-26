@@ -126,9 +126,12 @@ const Index = () => {
             <p className="text-xl md:text-2xl mb-4 text-foreground/90 max-w-4xl mx-auto">
               Connect builders, suppliers, and construction professionals across all 47 counties
             </p>
-            <p className="text-lg mb-10 text-foreground/80 max-w-3xl mx-auto">
-              From finding certified builders to sourcing quality materials, tracking deliveries with QR codes, 
-              and monitoring construction sites with drones - everything you need in one platform
+            <p className="text-lg mb-10 text-foreground/80 max-w-4xl mx-auto leading-relaxed">
+              <strong>Your Complete Construction Solution:</strong> Find and hire certified builders and contractors, 
+              browse verified suppliers and source quality materials, request and manage deliveries with real-time GPS tracking, 
+              scan materials with QR codes for authenticity verification, monitor construction sites with live cameras and drones, 
+              process secure M-Pesa payments, generate purchase orders and invoices, track project progress, 
+              and manage your entire construction workflow - all in one integrated platform designed for Kenya's construction industry.
             </p>
           </AnimatedSection>
           
