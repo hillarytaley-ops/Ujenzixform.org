@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Building, ShoppingBag, FileText, Package, Store, Database, Users, Receipt, QrCode, Truck, Shield } from "lucide-react";
+import { Link } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import AnimatedSection from "@/components/AnimatedSection";
@@ -34,6 +35,7 @@ const SuppliersContent = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("suppliers");
+  const [hasError, setHasError] = useState(false);
   const { toast } = useToast();
   const { 
     modals, 
@@ -89,10 +91,32 @@ const SuppliersContent = () => {
       setUserRole(null);
       setIsAdmin(false);
       setActiveTab("suppliers");
+      setHasError(false); // Don't treat auth error as page error
     } finally {
       setLoading(false);
     }
   };
+
+  // Safe error boundary handler
+  if (hasError) {
+    return (
+      <div className="min-h-screen bg-gradient-construction">
+        <Navigation />
+        <div className="container mx-auto px-4 py-20">
+          <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-xl p-8 text-center">
+            <h1 className="text-3xl font-bold mb-4">Suppliers</h1>
+            <p className="text-gray-700 mb-6">
+              Browse construction materials and suppliers across Kenya
+            </p>
+            <Button onClick={() => window.location.reload()} className="bg-primary">
+              Reload Page
+            </Button>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   const handleSupplierSelect = (supplier: Supplier) => {
     openCatalogModal(supplier);
