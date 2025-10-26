@@ -441,65 +441,6 @@ const About: React.FC = () => {
         </section>
 
         {/* Privacy and Security Section */}
-        <section className="py-16 bg-muted/50" aria-labelledby="security-heading">
-          <div className="container mx-auto px-4">
-            <div className="max-w-4xl mx-auto text-center">
-              <h2 id="security-heading" className="text-3xl font-bold mb-8 flex items-center justify-center gap-2">
-                <Shield className="h-8 w-8 text-primary" />
-                Privacy & Security
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card className="border-green-200 bg-green-50">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-green-800">
-                      <Shield className="h-5 w-5" />
-                      Data Protection
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-green-700">
-                      We implement enterprise-grade security measures to protect your business information 
-                      and maintain strict privacy standards across all our services.
-                    </p>
-                  </CardContent>
-                </Card>
-                
-                <Card className="border-blue-200 bg-blue-50">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-blue-800">
-                      <Users className="h-5 w-5" />
-                      Privacy First
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-blue-700">
-                      Your privacy is our priority. We collect only necessary information and never share 
-                      your data without explicit consent. Full transparency in all our operations.
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
-              
-              <div className="mt-8 flex flex-wrap justify-center gap-4">
-                <Button variant="outline" className="flex items-center gap-2">
-                  <Shield className="h-4 w-4" />
-                  Privacy Policy
-                  <ExternalLink className="h-3 w-3" />
-                </Button>
-                <Button variant="outline" className="flex items-center gap-2">
-                  <Users className="h-4 w-4" />
-                  Terms of Service
-                  <ExternalLink className="h-3 w-3" />
-                </Button>
-                <Button variant="outline" className="flex items-center gap-2">
-                  <Award className="h-4 w-4" />
-                  Security Certifications
-                  <ExternalLink className="h-3 w-3" />
-                </Button>
-              </div>
-            </div>
-          </div>
-        </section>
 
         {/* Performance & Security Footer */}
         {process.env.NODE_ENV === 'development' && (

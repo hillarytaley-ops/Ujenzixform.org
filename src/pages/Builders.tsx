@@ -514,26 +514,7 @@ const Builders = () => {
         ) : (
           /* Public Directory with Enhanced Search */
           <div className="space-y-8">
-            {/* Public Directory Header */}
-            <div className="text-center mb-12">
-              <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-8 border-2 border-white/50 shadow-2xl max-w-4xl mx-auto">
-                <h2 className="text-4xl font-bold mb-4 text-gray-900 flex items-center justify-center gap-3">
-                  <Building2 className="h-10 w-10 text-primary" />
-                  Kenya's Construction Professionals
-                </h2>
-                <p className="text-xl text-gray-700 leading-relaxed">
-                  Discover certified builders, contractors, and construction companies across all 47 counties. 
-                  From residential homes to commercial complexes, find the right professional for your project.
-                </p>
-              </div>
-            </div>
-
-            <ErrorBoundary fallback={
-              <div className="p-6 border-2 border-yellow-200 rounded-xl bg-yellow-50/90 backdrop-blur-sm shadow-lg">
-                <h3 className="text-yellow-800 font-bold mb-2 text-lg">Search Component Error</h3>
-                <p className="text-yellow-700">There was an error loading the search component. Please refresh the page.</p>
-              </div>
-            }>
+            <ErrorBoundary fallback={<div></div>}>
               <div className="bg-white/95 backdrop-blur-sm rounded-2xl border-2 border-white/50 shadow-2xl p-6">
                 <EnhancedSearch 
                   onSearchChange={(filters) => {

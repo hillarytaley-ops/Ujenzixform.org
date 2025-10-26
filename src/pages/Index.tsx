@@ -177,10 +177,6 @@ const Index = () => {
             />
           </div>
 
-          {/* Trust Badges */}
-          <div className="mt-12">
-            <TrustBadges />
-          </div>
         </section>
 
         {/* Video Section - Complete Platform Demo with Monitoring */}

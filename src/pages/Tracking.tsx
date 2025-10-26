@@ -264,13 +264,6 @@ const Tracking = () => {
                   )}
                 </div>
 
-                <Alert className="border-blue-200 bg-blue-50">
-                  <Package className="h-4 w-4" />
-                  <AlertDescription>
-                    <strong>Secure Tracking:</strong> All delivery tracking data is protected with military-grade security. 
-                    Location information and sensitive details are only visible to authorized personnel based on your role.
-                  </AlertDescription>
-                </Alert>
               </div>
               </header>
             </AnimatedSection>

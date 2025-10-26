@@ -240,30 +240,6 @@ const Delivery = () => {
       <main className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-8">
-          {/* Role Badge */}
-          <div className="flex justify-center gap-2 mb-6">
-            {userRole && (
-              <Badge variant="outline" className="capitalize">
-                {userRole} Access
-              </Badge>
-            )}
-            {!isAdmin && (
-              <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200">
-                Public Access - Request Only
-              </Badge>
-            )}
-          </div>
-          
-          {/* Access Notice for Public Users */}
-          {!isAdmin && (
-            <Alert className="max-w-2xl mx-auto mb-6 border-amber-200 bg-amber-50">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                <strong>Public Access:</strong> You can request deliveries here. For tracking and management features, 
-                please contact our admin team or sign in with an admin account.
-              </AlertDescription>
-            </Alert>
-          )}
         </div>
 
         {/* Become a Provider Call-to-Action */}

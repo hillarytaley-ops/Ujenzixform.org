@@ -101,34 +101,6 @@ export default function Feedback() {
           <AnimatedSection animation="fadeInUp">
             <div className="mb-12">
               <div className="bg-white/95 backdrop-blur-sm p-8 rounded-2xl border-2 border-white/50 shadow-2xl max-w-4xl mx-auto">
-              <div className="flex items-start space-x-4">
-                <div className="p-4 bg-gradient-to-br from-green-500 to-red-500 rounded-full shadow-lg">
-                  <Shield className="h-8 w-8 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-4">Privacy & Data Protection</h3>
-                  <p className="text-lg text-gray-700 leading-relaxed mb-4">
-                    Your feedback is confidential and secure. We use industry-standard encryption 
-                    to protect your data and never share personal information with third parties. 
-                    Feedback is used solely for service improvement purposes.
-                  </p>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-                    <div className="flex items-center gap-2 text-green-700">
-                      <Shield className="h-5 w-5" />
-                      <span className="font-medium">SSL Encrypted</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-blue-700">
-                      <Users className="h-5 w-5" />
-                      <span className="font-medium">Confidential</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-red-700">
-                      <Award className="h-5 w-5" />
-                      <span className="font-medium">Service Improvement</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
             </div>
           </AnimatedSection>

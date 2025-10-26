@@ -409,27 +409,6 @@ const Contact = () => {
                     )}
                   </div>
                   
-                  <div className="bg-muted/50 p-4 rounded-lg mb-6">
-                    <div className="flex items-start space-x-3">
-                      <div className="h-5 w-5 text-primary mt-0.5">🔒</div>
-                      <div className="text-sm">
-                        <p className="font-medium text-foreground mb-1">Your Information is Protected</p>
-                        <p className="text-muted-foreground">
-                          We use SSL encryption and secure data handling practices. Your personal information 
-                          is never shared with third parties and is only used to respond to your inquiry.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Security Notice */}
-                  <Alert className="border-green-200 bg-green-50">
-                    <Shield className="h-4 w-4" />
-                    <AlertDescription>
-                      <strong>Security Protected:</strong> This form includes advanced security measures including 
-                      bot protection, spam filtering, and secure data transmission.
-                    </AlertDescription>
-                  </Alert>
 
                   {/* Security Score Display */}
                   {securityScore < 80 && (
