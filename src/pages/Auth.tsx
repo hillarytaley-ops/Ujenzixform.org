@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -326,6 +326,17 @@ const Auth = () => {
           </Tabs>
         </CardContent>
         </Card>
+
+        {/* Admin Staff Portal Link */}
+        <div className="mt-6 text-center">
+          <Link 
+            to="/admin-login"
+            className="text-sm text-muted-foreground hover:text-red-600 underline flex items-center justify-center gap-2 transition-colors"
+          >
+            <span>🔒</span>
+            <span>UjenziPro Staff? Use Admin Portal</span>
+          </Link>
+        </div>
       </AnimatedSection>
     </div>
   );

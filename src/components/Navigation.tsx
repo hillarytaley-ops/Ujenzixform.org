@@ -186,6 +186,11 @@ const Navigation = () => {
                       Get Started
                     </Button>
                   </Link>
+                  <Link to="/admin-login">
+                    <Button variant="ghost" className="w-full text-xs text-muted-foreground hover:text-red-600 hover:bg-red-50">
+                      🔒 Staff Portal
+                    </Button>
+                  </Link>
                 </>
               )}
             </div>
