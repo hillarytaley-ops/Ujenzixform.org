@@ -1,15 +1,8 @@
 -- ============================================
--- SIMPLEST ADMIN GRANT - GUARANTEED TO WORK
+-- SIMPLE ADMIN ROLE GRANT - GUARANTEED TO WORK
 -- ============================================
 
--- First check what roles exist
-SELECT role::text FROM user_roles LIMIT 1;
-
--- Delete any existing roles for your account
-DELETE FROM user_roles 
-WHERE user_id = (SELECT id FROM auth.users WHERE email = 'hillarytaley@gmail.com');
-
--- Try to insert with text cast
+-- Method 1: Try with text casting
 INSERT INTO user_roles (user_id, role, created_at, updated_at)
 SELECT 
   id,
@@ -17,14 +10,10 @@ SELECT
   NOW(),
   NOW()
 FROM auth.users 
-WHERE email = 'hillarytaley@gmail.com';
+WHERE email = 'hillarytaley@gmail.com'
+ON CONFLICT (user_id, role) DO UPDATE SET updated_at = NOW();
 
--- Check if it worked
-SELECT 
-  'Checking result...' as status,
-  COUNT(*) as admin_roles_count
-FROM user_roles ur
-JOIN auth.users u ON u.id = ur.user_id
-WHERE u.email = 'hillarytaley@gmail.com'
-  AND ur.role::text = 'admin';
+-- Verify
+SELECT * FROM user_roles 
+WHERE user_id IN (SELECT id FROM auth.users WHERE email = 'hillarytaley@gmail.com');
 

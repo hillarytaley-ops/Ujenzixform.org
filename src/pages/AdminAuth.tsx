@@ -217,21 +217,16 @@ const AdminAuth = () => {
       }
 
       // Verify user has admin role
-      // First, get ALL roles for this user
-      const { data: allRoles, error: allRolesError } = await supabase
+      const { data: roleData, error: roleError } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('user_id', authData.user.id);
+        .eq('user_id', authData.user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
 
-      console.log('All roles for user:', { allRoles, allRolesError, userId: authData.user.id });
+      console.log('Role check:', { roleData, roleError, userId: authData.user.id });
 
-      // Check if admin role exists
-      const hasAdminRole = allRoles && allRoles.length > 0 && 
-        allRoles.some(r => r.role === 'admin' || r.role?.toString() === 'admin');
-
-      console.log('Has admin role:', hasAdminRole);
-
-      if (!hasAdminRole) {
+      if (!roleData) {
         await logSecurityEvent('unauthorized_admin_access', workEmail, false, 'No admin role');
         await supabase.auth.signOut();
         toast({
