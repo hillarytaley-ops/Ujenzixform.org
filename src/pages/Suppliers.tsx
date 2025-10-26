@@ -398,7 +398,24 @@ const SuppliersContent = () => {
 
           {(showDirectoryAccess || !user) && (
             <TabsContent value="purchase" className="space-y-8">
-              <PurchasingWorkflow />
+              <div className="max-w-4xl mx-auto">
+                <div className="bg-white rounded-lg shadow-lg p-8">
+                  <h2 className="text-2xl font-bold mb-4">Purchase Materials</h2>
+                  <p className="text-gray-700 mb-6">
+                    Create purchase orders and manage your material procurement
+                  </p>
+                  <div className="space-y-4">
+                    <p className="text-muted-foreground">
+                      Sign in to access the full purchasing system and create orders with suppliers.
+                    </p>
+                    <Link to="/auth">
+                      <Button className="bg-primary hover:bg-primary/90">
+                        Sign In to Create Purchase Orders
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              </div>
             </TabsContent>
           )}
         </Tabs>
