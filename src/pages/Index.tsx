@@ -290,7 +290,7 @@ const Index = () => {
               <VideoSection 
                 videoId="pedwSxiDpCs"
                 useYouTube={true}
-                thumbnail="/ujenzipro-demo-thumbnail.svg"
+                thumbnail="https://img.youtube.com/vi/pedwSxiDpCs/maxresdefault.jpg"
                 title="UjenziPro Complete Platform Demo with Monitoring"
                 description="Real-time site monitoring, builder network, supplier marketplace, QR tracking, and more"
               />
