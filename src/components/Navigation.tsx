@@ -49,17 +49,50 @@ const Navigation = () => {
   const isActive = (path: string) => location.pathname === path;
 
   const handleSignOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
+    try {
+      // First check if there's an active session
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      
+      if (!currentSession) {
+        // No active session, just clear local state and redirect
+        setSession(null);
+        setUser(null);
+        toast({
+          title: "Signed out successfully"
+        });
+        window.location.href = '/auth';
+        return;
+      }
+      
+      // If there's a session, sign out normally
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        // Even if signOut fails, clear local state and redirect
+        console.error('Sign out error:', error);
+        setSession(null);
+        setUser(null);
+        toast({
+          title: "Signed out successfully",
+          description: "Session cleared"
+        });
+        window.location.href = '/auth';
+      } else {
+        toast({
+          title: "Signed out successfully"
+        });
+        window.location.href = '/auth';
+      }
+    } catch (error) {
+      // Catch any unexpected errors
+      console.error('Unexpected sign out error:', error);
+      setSession(null);
+      setUser(null);
       toast({
-        variant: "destructive",
-        title: "Error signing out",
-        description: error.message
+        title: "Signed out successfully",
+        description: "Session cleared"
       });
-    } else {
-      toast({
-        title: "Signed out successfully"
-      });
+      window.location.href = '/auth';
     }
   };
 
