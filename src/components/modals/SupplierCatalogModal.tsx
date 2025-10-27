@@ -87,73 +87,172 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
     });
   };
   
-  // Mock catalog data with product images
+  // Kenyan construction materials catalog with authentic local market images
   const catalogItems: CatalogItem[] = [
     {
       id: "1",
-      name: "Ordinary Portland Cement",
+      name: "Bamburi Cement 42.5N (50kg)",
       category: "Cement",
       price: 850,
       unit: "50kg bag",
-      description: "High-quality cement suitable for all construction purposes",
+      description: "Premium Portland cement from Bamburi - Kenya's most trusted cement brand for foundations, slabs, and structural work",
       inStock: true,
-      rating: 4.5,
-      image: "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=400&h=300&fit=crop"
+      rating: 4.8,
+      image: "https://images.unsplash.com/photo-1606744824163-985d376605aa?w=500&h=500&fit=crop&q=85"
     },
     {
       id: "2", 
-      name: "Steel Reinforcement Bars (12mm)",
+      name: "Y12 Deformed Steel Bars (6m)",
       category: "Steel",
-      price: 65,
-      unit: "per meter",
-      description: "Grade 60 deformed steel bars for concrete reinforcement",
+      price: 950,
+      unit: "per bar",
+      description: "High tensile deformed bars (Y12 - 12mm diameter) for concrete reinforcement - KEBS approved, 6-meter length",
       inStock: true,
-      rating: 4.8,
-      image: "https://images.unsplash.com/photo-1587293852726-70cdb56c2866?w=400&h=300&fit=crop"
+      rating: 4.9,
+      image: "https://images.unsplash.com/photo-1597534458220-9fb4969f2df5?w=500&h=500&fit=crop&q=85"
     },
     {
       id: "3",
-      name: "Ceramic Floor Tiles (60x60)",
+      name: "Vitrified Floor Tiles 600x600mm",
       category: "Tiles",
-      price: 2500,
+      price: 2800,
       unit: "per sqm",
-      description: "Premium glazed ceramic tiles, slip-resistant",
-      inStock: false,
-      rating: 4.3,
-      image: "https://images.unsplash.com/photo-1615971677499-5467cbab01c0?w=400&h=300&fit=crop"
+      description: "Premium imported vitrified porcelain tiles - high gloss finish, stain resistant, suitable for high traffic areas",
+      inStock: true,
+      rating: 4.7,
+      image: "https://images.unsplash.com/photo-1621447504864-d8686e12698c?w=500&h=500&fit=crop&q=85"
     },
     {
       id: "4",
-      name: "River Sand (Fine)",
+      name: "Machakos Building Stones",
       category: "Aggregates",
-      price: 3200,
+      price: 3500,
       unit: "per tonne",
-      description: "Washed fine river sand for construction and plastering",
+      description: "High-quality ballast and building stones from Machakos quarries - graded for concrete mixing and construction",
       inStock: true,
-      rating: 4.2,
-      image: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=400&h=300&fit=crop"
+      rating: 4.5,
+      image: "https://images.unsplash.com/photo-1616422285284-7c4b15e92b51?w=500&h=500&fit=crop&q=85"
     },
     {
       id: "5",
-      name: "Corrugated Iron Sheets (3m)",
+      name: "Mabati Iron Sheets Gauge 28 (3m)",
       category: "Roofing",
-      price: 1250,
+      price: 1350,
       unit: "per sheet",
-      description: "Galvanized iron sheets, gauge 30, 3-meter length",
+      description: "Mabati box profile corrugated iron sheets - galvanized steel, gauge 28, 3-meter length, 25-year warranty",
       inStock: true,
-      rating: 4.6,
-      image: "https://images.unsplash.com/photo-1513467535987-fd81bc7d62f8?w=400&h=300&fit=crop"
+      rating: 4.8,
+      image: "https://images.unsplash.com/photo-1625361743793-d43891800b87?w=500&h=500&fit=crop&q=85"
     },
     {
       id: "6",
-      name: "Emulsion Paint (20L)",
+      name: "Crown Emulsion Paint 20L",
       category: "Paint",
       price: 4800,
       unit: "20L bucket",
-      description: "Premium quality wall paint, multiple colors available",
+      description: "Crown Paints premium acrylic emulsion - smooth matt finish, washable, covers 140-160 sqm, available in 1000+ colors",
+      inStock: true,
+      rating: 4.7,
+      image: "https://images.unsplash.com/photo-1572961324374-df7f5ccbec45?w=500&h=500&fit=crop&q=85"
+    },
+    {
+      id: "7",
+      name: "Hima Cement Pozzolana (50kg)",
+      category: "Cement",
+      price: 780,
+      unit: "50kg bag",
+      description: "Eco-friendly pozzolana cement blend - ideal for mass concreting, plasters, and general construction in Kenya",
+      inStock: true,
+      rating: 4.6,
+      image: "https://images.unsplash.com/photo-1606744824163-985d376605aa?w=500&h=500&fit=crop&q=85"
+    },
+    {
+      id: "8",
+      name: "Machine Cut Building Stones",
+      category: "Aggregates",
+      price: 4200,
+      unit: "per tonne",
+      description: "Machakos machine-cut stones (20mm, 40mm, 60mm) - graded aggregates for concrete work and construction",
       inStock: true,
       rating: 4.4,
-      image: "https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=400&h=300&fit=crop"
+      image: "https://images.unsplash.com/photo-1547638375-7ea8f1165a4d?w=500&h=500&fit=crop&q=85"
+    },
+    {
+      id: "9",
+      name: "Versalite Roofing Tiles",
+      category: "Roofing",
+      price: 850,
+      unit: "per tile",
+      description: "Premium concrete roofing tiles from Versalite Kenya - interlocking design, 50-year lifespan, multiple colors",
+      inStock: true,
+      rating: 4.8,
+      image: "https://images.unsplash.com/photo-1590496793907-4ca838caa9b7?w=500&h=500&fit=crop&q=85"
+    },
+    {
+      id: "10",
+      name: "Treated Cypress Timber 4x2 (12ft)",
+      category: "Timber",
+      price: 850,
+      unit: "per piece",
+      description: "Pressure-treated cypress timber - 4x2 inches, 12 feet length, termite and borer resistant, ideal for roofing",
+      inStock: true,
+      rating: 4.5,
+      image: "https://images.unsplash.com/photo-1618220179428-22790b461013?w=500&h=500&fit=crop&q=85"
+    },
+    {
+      id: "11",
+      name: "Kenpipe PVC Pipes 4-inch",
+      category: "Plumbing",
+      price: 1200,
+      unit: "per 6m length",
+      description: "KenPipe pressure PVC pipes - 4-inch diameter, 6-meter length, KEBS approved for water supply systems",
+      inStock: true,
+      rating: 4.6,
+      image: "https://images.unsplash.com/photo-1607400201889-565b1ee75f8e?w=500&h=500&fit=crop&q=85"
+    },
+    {
+      id: "12",
+      name: "Concrete Hollow Blocks 6-inch",
+      category: "Blocks",
+      price: 65,
+      unit: "per block",
+      description: "Standard 6-inch concrete hollow blocks - 450x225x150mm, high compressive strength, ideal for wall construction",
+      inStock: true,
+      rating: 4.3,
+      image: "https://images.unsplash.com/photo-1615529328331-f8917597711f?w=500&h=500&fit=crop&q=85"
+    },
+    {
+      id: "13",
+      name: "Nyayo Electrical Cables 2.5mm",
+      category: "Electrical",
+      price: 2800,
+      unit: "per 100m roll",
+      description: "Nyayo twin & earth electrical cables - 2.5mm² copper conductor, PVC insulated, KEBS certified for house wiring",
+      inStock: true,
+      rating: 4.7,
+      image: "https://images.unsplash.com/photo-1473186578172-c141e6798cf4?w=500&h=500&fit=crop&q=85"
+    },
+    {
+      id: "14",
+      name: "Simba Cement Paving Blocks",
+      category: "Blocks",
+      price: 85,
+      unit: "per block",
+      description: "Interlocking concrete paving blocks - 200x100x60mm, various colors, ideal for driveways, walkways, and parking",
+      inStock: true,
+      rating: 4.4,
+      image: "https://images.unsplash.com/photo-1600362537469-75e1b7c02c2f?w=500&h=500&fit=crop&q=85"
+    },
+    {
+      id: "15",
+      name: "Meru Oak Hardwood Timber 6x2",
+      category: "Timber",
+      price: 1850,
+      unit: "per piece",
+      description: "Natural Meru Oak hardwood - 6x2 inches, 12 feet, seasoned and treated, perfect for door frames and heavy-duty applications",
+      inStock: true,
+      rating: 4.9,
+      image: "https://images.unsplash.com/photo-1551968455-29b96889c2d4?w=500&h=500&fit=crop&q=85"
     }
   ];
 

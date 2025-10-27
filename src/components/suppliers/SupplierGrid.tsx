@@ -17,12 +17,12 @@ import { useToast } from "@/hooks/use-toast";
 
 const SUPPLIERS_PER_PAGE = 12;
 
-// Sample/Demo suppliers data
+// Sample/Demo suppliers data with authentic Kenyan construction industry branding
 const DEMO_SUPPLIERS: Supplier[] = [
   {
     id: "demo-1",
     company_name: "Bamburi Cement",
-    company_logo_url: "https://ui-avatars.com/api/?name=Bamburi+Cement&background=0D8ABC&color=fff&size=128&bold=true",
+    company_logo_url: "https://ui-avatars.com/api/?name=BAMBURI&background=004B87&color=ffffff&size=200&bold=true&font-size=0.45&rounded=false",
     address: "Mombasa Road, Nairobi",
     county: "Nairobi",
     latitude: -1.3194,
@@ -65,7 +65,7 @@ const DEMO_SUPPLIERS: Supplier[] = [
   {
     id: "demo-2", 
     company_name: "Devki Steel Mills",
-    company_logo_url: "https://ui-avatars.com/api/?name=Devki+Steel&background=DC2626&color=fff&size=128&bold=true",
+    company_logo_url: "https://ui-avatars.com/api/?name=DEVKI&background=8B0000&color=FFD700&size=200&bold=true&font-size=0.45&rounded=false",
     address: "Ruiru Industrial Area, Kiambu",
     county: "Kiambu",
     latitude: -1.1432,
@@ -108,7 +108,7 @@ const DEMO_SUPPLIERS: Supplier[] = [
   {
     id: "demo-3",
     company_name: "Crown Paints Kenya",
-    company_logo_url: "https://ui-avatars.com/api/?name=Crown+Paints&background=EAB308&color=000&size=128&bold=true",
+    company_logo_url: "https://ui-avatars.com/api/?name=CROWN&background=E31E24&color=ffffff&size=200&bold=true&font-size=0.45&rounded=false",
     address: "Nairobi",
     rating: 4.7,
     total_reviews: 67,
@@ -123,7 +123,7 @@ const DEMO_SUPPLIERS: Supplier[] = [
   {
     id: "demo-4",
     company_name: "Tile & Carpet Centre",
-    company_logo_url: "https://ui-avatars.com/api/?name=Tile+Carpet&background=8B5CF6&color=fff&size=128&bold=true",
+    company_logo_url: "https://ui-avatars.com/api/?name=T%26C&background=1E3A8A&color=FCD34D&size=200&bold=true&font-size=0.45&rounded=false",
     address: "Nairobi",
     rating: 4.6,
     specialties: ["Tiles", "Carpets", "Flooring Solutions"],
@@ -136,7 +136,7 @@ const DEMO_SUPPLIERS: Supplier[] = [
   {
     id: "demo-5",
     company_name: "Mabati Rolling Mills",
-    company_logo_url: "https://ui-avatars.com/api/?name=Mabati+Mills&background=059669&color=fff&size=128&bold=true",
+    company_logo_url: "https://ui-avatars.com/api/?name=MABATI&background=C41E3A&color=ffffff&size=200&bold=true&font-size=0.4&rounded=false",
     address: "Nakuru", 
     rating: 4.8,
     specialties: ["Iron Sheets", "Roofing", "Steel Products"],
@@ -149,7 +149,7 @@ const DEMO_SUPPLIERS: Supplier[] = [
   {
     id: "demo-6",
     company_name: "Homa Lime Company",
-    company_logo_url: "https://ui-avatars.com/api/?name=Homa+Lime&background=F97316&color=fff&size=128&bold=true",
+    company_logo_url: "https://ui-avatars.com/api/?name=HOMA+LIME&background=228B22&color=ffffff&size=200&bold=true&font-size=0.35&rounded=false",
     address: "Homa Bay",
     rating: 4.4,
     specialties: ["Lime", "Aggregates", "Mining Products"],
