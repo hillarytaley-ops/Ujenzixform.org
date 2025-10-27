@@ -280,14 +280,14 @@ const Monitoring = () => {
         <div 
           className="absolute inset-0"
           style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')`,
+            backgroundImage: `url('/drone-monitoring-bg.jpg')`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
             backgroundAttachment: 'fixed'
           }}
           role="img"
-          aria-label="Modern Kenyan construction site with advanced surveillance cameras and monitoring systems for comprehensive construction project oversight"
+          aria-label="Drone monitoring construction site - aerial surveillance for Kenyan construction projects"
         />
         
         {/* Kenyan flag colors overlay with monitoring theme */}
