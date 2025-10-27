@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Test - UjenziPro</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 40px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .logo-test {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+        .logo-item {
+            text-align: center;
+        }
+        img {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+        }
+        .success { color: green; font-weight: bold; }
+        .error { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>🧪 UjenziPro Image Loading Test</h1>
+    
+    <div class="test-section">
+        <h2>Test 1: Supplier Logos (UI Avatars)</h2>
+        <p>These should show colorful square logos with company names...</p>
+        
+        <div class="logo-test">
+            <div class="logo-item">
+                <img 
+                    src="https://ui-avatars.com/api/?name=BAMBURI&background=004B87&color=ffffff&size=200&bold=true&font-size=0.45&rounded=false" 
+                    alt="Bamburi"
+                    width="128"
+                    height="128"
+                    onload="document.getElementById('logo1').innerHTML = '✅ Loaded'"
+                    onerror="document.getElementById('logo1').innerHTML = '❌ Failed'"
+                />
+                <p>Bamburi Cement</p>
+                <p id="logo1">⏳ Loading...</p>
+            </div>
+            
+            <div class="logo-item">
+                <img 
+                    src="https://ui-avatars.com/api/?name=DEVKI&background=8B0000&color=FFD700&size=200&bold=true&font-size=0.45&rounded=false" 
+                    alt="Devki"
+                    width="128"
+                    height="128"
+                    onload="document.getElementById('logo2').innerHTML = '✅ Loaded'"
+                    onerror="document.getElementById('logo2').innerHTML = '❌ Failed'"
+                />
+                <p>Devki Steel</p>
+                <p id="logo2">⏳ Loading...</p>
+            </div>
+            
+            <div class="logo-item">
+                <img 
+                    src="https://ui-avatars.com/api/?name=CROWN&background=E31E24&color=ffffff&size=200&bold=true&font-size=0.45&rounded=false" 
+                    alt="Crown"
+                    width="128"
+                    height="128"
+                    onload="document.getElementById('logo3').innerHTML = '✅ Loaded'"
+                    onerror="document.getElementById('logo3').innerHTML = '❌ Failed'"
+                />
+                <p>Crown Paints</p>
+                <p id="logo3">⏳ Loading...</p>
+            </div>
+            
+            <div class="logo-item">
+                <img 
+                    src="https://ui-avatars.com/api/?name=MABATI&background=C41E3A&color=ffffff&size=200&bold=true&font-size=0.4&rounded=false" 
+                    alt="Mabati"
+                    width="128"
+                    height="128"
+                    onload="document.getElementById('logo4').innerHTML = '✅ Loaded'"
+                    onerror="document.getElementById('logo4').innerHTML = '❌ Failed'"
+                />
+                <p>Mabati Mills</p>
+                <p id="logo4">⏳ Loading...</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test 2: Construction Material Images (Unsplash)</h2>
+        <p>These should show real construction materials...</p>
+        
+        <div class="logo-test">
+            <div class="logo-item">
+                <img 
+                    src="https://images.unsplash.com/photo-1606744824163-985d376605aa?w=300&h=300&fit=crop&q=85" 
+                    alt="Cement"
+                    width="200"
+                    height="200"
+                    onload="document.getElementById('prod1').innerHTML = '✅ Loaded'"
+                    onerror="document.getElementById('prod1').innerHTML = '❌ Failed'"
+                />
+                <p>Cement Bags</p>
+                <p id="prod1">⏳ Loading...</p>
+            </div>
+            
+            <div class="logo-item">
+                <img 
+                    src="https://images.unsplash.com/photo-1597534458220-9fb4969f2df5?w=300&h=300&fit=crop&q=85" 
+                    alt="Steel"
+                    width="200"
+                    height="200"
+                    onload="document.getElementById('prod2').innerHTML = '✅ Loaded'"
+                    onerror="document.getElementById('prod2').innerHTML = '❌ Failed'"
+                />
+                <p>Steel Bars</p>
+                <p id="prod2">⏳ Loading...</p>
+            </div>
+            
+            <div class="logo-item">
+                <img 
+                    src="https://images.unsplash.com/photo-1572961324374-df7f5ccbec45?w=300&h=300&fit=crop&q=85" 
+                    alt="Paint"
+                    width="200"
+                    height="200"
+                    onload="document.getElementById('prod3').innerHTML = '✅ Loaded'"
+                    onerror="document.getElementById('prod3').innerHTML = '❌ Failed'"
+                />
+                <p>Paint Buckets</p>
+                <p id="prod3">⏳ Loading...</p>
+            </div>
+            
+            <div class="logo-item">
+                <img 
+                    src="https://images.unsplash.com/photo-1615529328331-f8917597711f?w=300&h=300&fit=crop&q=85" 
+                    alt="Blocks"
+                    width="200"
+                    height="200"
+                    onload="document.getElementById('prod4').innerHTML = '✅ Loaded'"
+                    onerror="document.getElementById('prod4').innerHTML = '❌ Failed'"
+                />
+                <p>Building Blocks</p>
+                <p id="prod4">⏳ Loading...</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h2>📋 Diagnostic Results</h2>
+        <div id="results">
+            <p><strong>If all show ✅:</strong> Images work! Problem is in React app.</p>
+            <p><strong>If all show ❌:</strong> Network/CSP blocking images.</p>
+            <p><strong>If mixed:</strong> Some image sources blocked.</p>
+        </div>
+        
+        <h3>Next Steps Based on Results:</h3>
+        <ul>
+            <li><strong>All ✅</strong> → Check React DevTools, component rendering, data flow</li>
+            <li><strong>All ❌</strong> → Check network, firewall, CSP settings, browser extensions</li>
+            <li><strong>Mixed</strong> → Identify which sources work, update code to use working sources</li>
+        </ul>
+    </div>
+    
+    <div class="test-section">
+        <h2>🔍 Browser Console Check</h2>
+        <p>Press F12 and check Console tab for errors like:</p>
+        <ul>
+            <li>"Refused to load image... violates Content Security Policy"</li>
+            <li>"Failed to load resource"</li>
+            <li>"CORS error"</li>
+            <li>"net::ERR_BLOCKED_BY_CLIENT"</li>
+        </ul>
+    </div>
+    
+    <script>
+        console.log('🧪 UjenziPro Image Test Page Loaded');
+        console.log('Check the status indicators above each image');
+        console.log('All logos and products should show ✅ Loaded');
+        
+        // Log any image loading errors
+        window.addEventListener('error', function(e) {
+            if (e.target.tagName === 'IMG') {
+                console.error('❌ Image failed to load:', e.target.src);
+            }
+        }, true);
+        
+        // After 5 seconds, summarize results
+        setTimeout(() => {
+            const loaded = document.querySelectorAll('p:contains("✅")').length;
+            const failed = document.querySelectorAll('p:contains("❌")').length;
+            console.log(`\n📊 Test Results: ${loaded} loaded, ${failed} failed`);
+        }, 5000);
+    </script>
+</body>
+</html>
+
