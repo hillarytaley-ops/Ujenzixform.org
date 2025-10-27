@@ -30,6 +30,9 @@ const Scanners = lazy(() => import("./pages/Scanners"));
 const DeliveryProviderApplication = lazy(() => import("./pages/DeliveryProviderApplication"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
+// Auth Guard
+import { AuthRequired } from "@/components/security/AuthRequired";
+
 // Optimized loading component
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-screen bg-background">
@@ -84,23 +87,27 @@ const App = () => {
               <ErrorBoundary>
                 <Suspense fallback={<PageLoader />}>
                   <Routes>
+                    {/* Public Routes - No Auth Required */}
                     <Route path="/" element={<Index />} />
-                    <Route path="/builders" element={<Builders />} />
-                    <Route path="/builder-registration" element={<BuilderRegistration />} />
-                    <Route path="/builders/register" element={<BuilderRegistration />} />
-                    <Route path="/professional-builder-registration" element={<ProfessionalBuilderRegistration />} />
-                    <Route path="/private-client-registration" element={<PrivateBuilderRegistration />} />
-                    <Route path="/suppliers" element={<Suppliers />} />
-                    <Route path="/about" element={<About />} />
-                    <Route path="/contact" element={<Contact />} />
                     <Route path="/auth" element={<Auth />} />
                     <Route path="/admin-login" element={<AdminAuth />} />
-                    <Route path="/feedback" element={<Feedback />} />
-                    <Route path="/tracking" element={<Tracking />} />
-                    <Route path="/monitoring" element={<Monitoring />} />
-                    <Route path="/delivery" element={<Delivery />} />
-                    <Route path="/scanners" element={<Scanners />} />
-                    <Route path="/delivery/apply" element={<DeliveryProviderApplication />} />
+                    <Route path="/about" element={<About />} />
+                    <Route path="/contact" element={<Contact />} />
+                    
+                    {/* Protected Routes - Auth Required */}
+                    <Route path="/builders" element={<AuthRequired><Builders /></AuthRequired>} />
+                    <Route path="/builder-registration" element={<AuthRequired><BuilderRegistration /></AuthRequired>} />
+                    <Route path="/builders/register" element={<AuthRequired><BuilderRegistration /></AuthRequired>} />
+                    <Route path="/professional-builder-registration" element={<AuthRequired><ProfessionalBuilderRegistration /></AuthRequired>} />
+                    <Route path="/private-client-registration" element={<AuthRequired><PrivateBuilderRegistration /></AuthRequired>} />
+                    <Route path="/suppliers" element={<AuthRequired><Suppliers /></AuthRequired>} />
+                    <Route path="/feedback" element={<AuthRequired><Feedback /></AuthRequired>} />
+                    <Route path="/tracking" element={<AuthRequired><Tracking /></AuthRequired>} />
+                    <Route path="/monitoring" element={<AuthRequired><Monitoring /></AuthRequired>} />
+                    <Route path="/delivery" element={<AuthRequired><Delivery /></AuthRequired>} />
+                    <Route path="/scanners" element={<AuthRequired><Scanners /></AuthRequired>} />
+                    <Route path="/delivery/apply" element={<AuthRequired><DeliveryProviderApplication /></AuthRequired>} />
+                    
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                 </Suspense>
