@@ -86,27 +86,35 @@ const App = () => {
             <BrowserRouter>
               <ErrorBoundary>
                 <Suspense fallback={<PageLoader />}>
-                  <AuthRequired>
-                    <Routes>
-                      {/* All routes require authentication - single sign-in at app entry */}
-                      <Route path="/" element={<Index />} />
-                      <Route path="/builders" element={<Builders />} />
-                      <Route path="/builder-registration" element={<BuilderRegistration />} />
-                      <Route path="/builders/register" element={<BuilderRegistration />} />
-                      <Route path="/professional-builder-registration" element={<ProfessionalBuilderRegistration />} />
-                      <Route path="/private-client-registration" element={<PrivateBuilderRegistration />} />
-                      <Route path="/suppliers" element={<Suppliers />} />
-                      <Route path="/about" element={<About />} />
-                      <Route path="/contact" element={<Contact />} />
-                      <Route path="/feedback" element={<Feedback />} />
-                      <Route path="/tracking" element={<Tracking />} />
-                      <Route path="/monitoring" element={<Monitoring />} />
-                      <Route path="/delivery" element={<Delivery />} />
-                      <Route path="/scanners" element={<Scanners />} />
-                      <Route path="/delivery/apply" element={<DeliveryProviderApplication />} />
-                      <Route path="*" element={<NotFound />} />
-                    </Routes>
-                  </AuthRequired>
+                  <Routes>
+                    {/* Public Auth Routes */}
+                    <Route path="/auth" element={<Auth />} />
+                    <Route path="/admin-login" element={<AdminAuth />} />
+                    
+                    {/* All other routes require authentication */}
+                    <Route path="/*" element={
+                      <AuthRequired>
+                        <Routes>
+                          <Route path="/" element={<Index />} />
+                          <Route path="/builders" element={<Builders />} />
+                          <Route path="/builder-registration" element={<BuilderRegistration />} />
+                          <Route path="/builders/register" element={<BuilderRegistration />} />
+                          <Route path="/professional-builder-registration" element={<ProfessionalBuilderRegistration />} />
+                          <Route path="/private-client-registration" element={<PrivateBuilderRegistration />} />
+                          <Route path="/suppliers" element={<Suppliers />} />
+                          <Route path="/about" element={<About />} />
+                          <Route path="/contact" element={<Contact />} />
+                          <Route path="/feedback" element={<Feedback />} />
+                          <Route path="/tracking" element={<Tracking />} />
+                          <Route path="/monitoring" element={<Monitoring />} />
+                          <Route path="/delivery" element={<Delivery />} />
+                          <Route path="/scanners" element={<Scanners />} />
+                          <Route path="/delivery/apply" element={<DeliveryProviderApplication />} />
+                          <Route path="*" element={<NotFound />} />
+                        </Routes>
+                      </AuthRequired>
+                    } />
+                  </Routes>
                 </Suspense>
                 {/* Privacy features will be re-enabled once dependencies are resolved */}
               </ErrorBoundary>
