@@ -314,65 +314,67 @@ const Auth = () => {
                       placeholder="Enter your password"
                       required
                     />
-                    <div className="flex justify-end">
-                      <Dialog open={showResetDialog} onOpenChange={setShowResetDialog}>
-                        <DialogTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="link"
-                            className="text-xs text-primary hover:underline p-0 h-auto"
-                          >
-                            Forgot password?
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-md bg-white/95 backdrop-blur-xl">
-                          <DialogHeader>
-                            <DialogTitle className="flex items-center gap-2">
-                              <KeyRound className="h-5 w-5 text-primary" />
-                              Reset Password
-                            </DialogTitle>
-                            <DialogDescription>
-                              Enter your email address and we'll send you a link to reset your password.
-                            </DialogDescription>
-                          </DialogHeader>
-                          <form onSubmit={handlePasswordReset} className="space-y-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="reset-email">Email Address</Label>
-                              <Input
-                                id="reset-email"
-                                type="email"
-                                placeholder="Enter your email"
-                                value={resetEmail}
-                                onChange={(e) => setResetEmail(e.target.value)}
-                                required
-                                disabled={resetLoading}
-                              />
-                            </div>
-                            <div className="flex justify-end gap-3">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => {
-                                  setShowResetDialog(false);
-                                  setResetEmail("");
-                                }}
-                                disabled={resetLoading}
-                              >
-                                Cancel
-                              </Button>
-                              <Button type="submit" disabled={resetLoading}>
-                                {resetLoading ? "Sending..." : "Send Reset Link"}
-                              </Button>
-                            </div>
-                          </form>
-                        </DialogContent>
-                      </Dialog>
-                    </div>
                   </div>
                   <Button type="submit" className="w-full" disabled={loading}>
                     {loading ? "Signing in..." : "Sign In"}
                   </Button>
                 </form>
+                
+                {/* Forgot Password Link - After Sign In Button */}
+                <div className="flex justify-start mt-4">
+                  <Dialog open={showResetDialog} onOpenChange={setShowResetDialog}>
+                    <DialogTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="link"
+                        className="text-sm text-primary hover:underline p-0 h-auto"
+                      >
+                        Forgot password?
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md bg-white/95 backdrop-blur-xl">
+                      <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                          <KeyRound className="h-5 w-5 text-primary" />
+                          Reset Password
+                        </DialogTitle>
+                        <DialogDescription>
+                          Enter your email address and we'll send you a link to reset your password.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <form onSubmit={handlePasswordReset} className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="reset-email">Email Address</Label>
+                          <Input
+                            id="reset-email"
+                            type="email"
+                            placeholder="Enter your email"
+                            value={resetEmail}
+                            onChange={(e) => setResetEmail(e.target.value)}
+                            required
+                            disabled={resetLoading}
+                          />
+                        </div>
+                        <div className="flex justify-end gap-3">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              setShowResetDialog(false);
+                              setResetEmail("");
+                            }}
+                            disabled={resetLoading}
+                          >
+                            Cancel
+                          </Button>
+                          <Button type="submit" disabled={resetLoading}>
+                            {resetLoading ? "Sending..." : "Send Reset Link"}
+                          </Button>
+                        </div>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
               </div>
             </TabsContent>
             
