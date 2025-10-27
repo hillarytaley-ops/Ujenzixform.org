@@ -358,7 +358,7 @@ const Monitoring = () => {
         <div 
           className="absolute inset-0"
           style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1503387762-592deb58ef4e?ixlib=rb-4.0.3&auto=format&fit=crop&w=2131&q=80')`,
+            backgroundImage: `url('/monitoring-bg.jpg')`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
@@ -369,12 +369,12 @@ const Monitoring = () => {
         />
         
         {/* Light overlay for monitoring interface readability */}
-        <div className="absolute inset-0 bg-white/92 backdrop-blur-[1px]"></div>
+        <div className="absolute inset-0 bg-white/30 backdrop-blur-[0.5px]"></div>
         
         <div className="container mx-auto px-4 relative z-10">
           {/* Enhanced Header */}
           <div className="text-center mb-12">
-            <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-8 border-2 border-white/50 shadow-2xl max-w-4xl mx-auto">
+            <div className="bg-white/40 backdrop-blur-sm rounded-2xl p-8 border-2 border-white/30 shadow-2xl max-w-4xl mx-auto">
               <h2 className="text-5xl font-bold mb-6 text-gray-900 flex items-center justify-center gap-3">
                 <Shield className="h-12 w-12 text-primary" />
                 Advanced Monitoring & Surveillance
@@ -406,7 +406,7 @@ const Monitoring = () => {
                   </AlertDescription>
                 </Alert>
               ) : (
-                <Alert className="border-blue-200 bg-blue-50">
+                <Alert className="border-blue-200 bg-blue-50/40">
                   <Shield className="h-4 w-4" />
                   <AlertDescription>
                     <strong>Comprehensive Monitoring:</strong> Access live camera feeds, track project progress, 
@@ -418,9 +418,9 @@ const Monitoring = () => {
           </div>
 
           {userRole !== 'supplier' && (
-            <div className="bg-white/95 backdrop-blur-sm rounded-2xl border-2 border-white/50 shadow-2xl p-6">
+            <div className="bg-white/40 backdrop-blur-sm rounded-2xl border-2 border-white/30 shadow-2xl p-6">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className={`grid w-full max-w-4xl mx-auto mb-8 bg-gray-100/80 backdrop-blur-sm ${
+                <TabsList className={`grid w-full max-w-4xl mx-auto mb-8 bg-gray-100/50 backdrop-blur-sm ${
                   isAdmin ? 'grid-cols-4' : 'grid-cols-1'
                 }`}>
               {isAdmin && (
@@ -588,8 +588,8 @@ const Monitoring = () => {
                             return (
                               <div
                                 key={camera.id}
-                                className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                                  selectedCamera === camera.id ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'
+                                className={`p-3 border rounded-lg cursor-pointer transition-colors backdrop-blur-sm ${
+                                  selectedCamera === camera.id ? 'border-primary bg-primary/10' : 'hover:bg-white/20'
                                 } ${isDrone ? 'border-l-4 border-l-purple-500' : ''}`}
                                 onClick={() => setSelectedCamera(camera.id)}
                               >
@@ -612,7 +612,7 @@ const Monitoring = () => {
                                   <div className="flex items-center gap-2">
                                     <span className={isDrone ? 'font-medium text-purple-600' : ''}>{camera.quality}</span>
                                     {camera.isRecording && <Video className="h-3 w-3 text-red-500" />}
-                                    {isDrone && <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700">Aerial</Badge>}
+                                    {isDrone && <Badge variant="outline" className="text-xs bg-purple-50/40 text-purple-700">Aerial</Badge>}
                                   </div>
                                   <div className="flex items-center gap-2">
                                     <Eye className="h-3 w-3" />
