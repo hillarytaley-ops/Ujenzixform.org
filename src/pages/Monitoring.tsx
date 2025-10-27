@@ -374,7 +374,7 @@ const Monitoring = () => {
         <div className="container mx-auto px-4 relative z-10">
           {/* Enhanced Header */}
           <div className="text-center mb-12">
-            <div className="bg-white/40 backdrop-blur-sm rounded-2xl p-8 border-2 border-white/30 shadow-2xl max-w-4xl mx-auto">
+            <div className="bg-white/30 backdrop-blur-md rounded-2xl p-8 border-2 border-white/20 shadow-2xl max-w-4xl mx-auto">
               <h2 className="text-5xl font-bold mb-6 text-gray-900 flex items-center justify-center gap-3">
                 <Shield className="h-12 w-12 text-primary" />
                 Advanced Monitoring & Surveillance
@@ -406,7 +406,7 @@ const Monitoring = () => {
                   </AlertDescription>
                 </Alert>
               ) : (
-                <Alert className="border-blue-200 bg-blue-50/40">
+                <Alert className="border-blue-200/50 bg-blue-50/30">
                   <Shield className="h-4 w-4" />
                   <AlertDescription>
                     <strong>Comprehensive Monitoring:</strong> Access live camera feeds, track project progress, 
@@ -418,9 +418,9 @@ const Monitoring = () => {
           </div>
 
           {userRole !== 'supplier' && (
-            <div className="bg-white/40 backdrop-blur-sm rounded-2xl border-2 border-white/30 shadow-2xl p-6">
+            <div className="bg-white/30 backdrop-blur-md rounded-2xl border-2 border-white/20 shadow-2xl p-6">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className={`grid w-full max-w-4xl mx-auto mb-8 bg-gray-100/50 backdrop-blur-sm ${
+                <TabsList className={`grid w-full max-w-4xl mx-auto mb-8 bg-gray-100/40 backdrop-blur-md ${
                   isAdmin ? 'grid-cols-4' : 'grid-cols-1'
                 }`}>
               {isAdmin && (

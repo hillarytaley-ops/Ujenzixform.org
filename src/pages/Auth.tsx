@@ -183,9 +183,26 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-secondary/20 flex items-center justify-center p-4">
-      <AnimatedSection animation="scaleIn">
-        <Card className="w-full max-w-md">
+    <div className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden">
+      {/* Background Image */}
+      <div 
+        className="absolute inset-0 z-0"
+        style={{
+          backgroundImage: `url('/auth-bg.jpg')`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          backgroundAttachment: 'fixed'
+        }}
+        role="img"
+        aria-label="Kenyan construction workers with hard hats reviewing construction project plans at building site"
+      />
+      
+      {/* Overlay for readability */}
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] z-0"></div>
+      
+      <AnimatedSection animation="scaleIn" className="relative z-10">
+        <Card className="w-full max-w-md bg-white/95 backdrop-blur-md shadow-2xl border-white/50">
         <CardHeader className="text-center">
           <CardTitle>Welcome to UjenziPro</CardTitle>
           <CardDescription>
@@ -328,10 +345,10 @@ const Auth = () => {
         </Card>
 
         {/* Admin Staff Portal Link */}
-        <div className="mt-6 text-center">
+        <div className="mt-6 text-center bg-white/90 backdrop-blur-sm rounded-lg p-4 border border-white/50">
           <Link 
             to="/admin-login"
-            className="text-sm text-muted-foreground hover:text-red-600 underline flex items-center justify-center gap-2 transition-colors"
+            className="text-sm text-gray-700 hover:text-red-600 underline flex items-center justify-center gap-2 transition-colors font-medium"
           >
             <span>🔒</span>
             <span>UjenziPro Staff? Use Admin Portal</span>

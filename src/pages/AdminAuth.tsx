@@ -279,9 +279,26 @@ const AdminAuth = () => {
   const remainingAttempts = Math.max(0, 3 - attempts);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
-      <AnimatedSection animation="scaleIn">
-        <Card className="w-full max-w-md border-2 border-red-900/50 shadow-2xl">
+    <div className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden">
+      {/* Background Image */}
+      <div 
+        className="absolute inset-0 z-0"
+        style={{
+          backgroundImage: `url('/auth-bg.jpg')`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          backgroundAttachment: 'fixed'
+        }}
+        role="img"
+        aria-label="Kenyan construction workers with hard hats reviewing construction project plans at building site"
+      />
+      
+      {/* Dark overlay for admin portal */}
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-900/85 via-red-900/75 to-slate-900/85 backdrop-blur-[2px] z-0"></div>
+      
+      <AnimatedSection animation="scaleIn" className="relative z-10">
+        <Card className="w-full max-w-md border-2 border-red-900/50 shadow-2xl bg-slate-900/90 backdrop-blur-md">
           <CardHeader className="text-center bg-gradient-to-r from-red-950 to-slate-950 border-b-2 border-red-900/50">
             <div className="flex justify-center mb-4">
               <div className="p-4 bg-red-900/30 rounded-full border-2 border-red-500/50">
