@@ -280,7 +280,7 @@ const Monitoring = () => {
         <div 
           className="absolute inset-0"
           style={{
-            backgroundImage: `url('/drone-monitoring-bg.jpg')`,
+            backgroundImage: `url('https://images.unsplash.com/photo-1473968512647-3e447244af8f?w=1920&h=1080&fit=crop&q=80')`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
