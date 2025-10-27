@@ -17,12 +17,20 @@ export const AuthRequired = ({ children }: AuthRequiredProps) => {
   const location = useLocation();
 
   useEffect(() => {
+    // Allow access to auth pages without authentication
+    const publicPaths = ['/auth', '/admin-login'];
+    if (publicPaths.includes(location.pathname)) {
+      setIsAuthenticated(true); // Bypass auth check for auth pages
+      setLoading(false);
+      return;
+    }
+
     checkAuth();
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setIsAuthenticated(!!session);
-      if (!session && location.pathname !== '/auth' && location.pathname !== '/') {
+      if (!session && !publicPaths.includes(location.pathname)) {
         navigate('/auth');
       }
     });
@@ -36,14 +44,15 @@ export const AuthRequired = ({ children }: AuthRequiredProps) => {
       setIsAuthenticated(!!session);
       setLoading(false);
 
-      // If not authenticated and trying to access protected route, redirect to auth
-      if (!session && location.pathname !== '/auth' && location.pathname !== '/') {
+      // If not authenticated, redirect to auth page
+      if (!session) {
         navigate('/auth');
       }
     } catch (error) {
       console.error('Auth check error:', error);
       setIsAuthenticated(false);
       setLoading(false);
+      navigate('/auth');
     }
   };
 
