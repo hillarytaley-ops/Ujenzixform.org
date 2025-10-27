@@ -295,10 +295,10 @@ const AdminAuth = () => {
       />
       
       {/* Very subtle red tint only - no darkness */}
-      <div className="absolute inset-0 bg-gradient-to-br from-red-900/15 via-red-900/10 to-red-900/15 z-0"></div>
+      <div className="absolute inset-0 bg-gradient-to-br from-red-900/10 via-red-900/5 to-red-900/10 z-0"></div>
       
       <AnimatedSection animation="scaleIn" className="relative z-10">
-        <Card className="w-full max-w-md border-2 border-red-600/60 shadow-2xl bg-slate-900/75 backdrop-blur-xl">
+        <Card className="w-full max-w-md border-2 border-red-600/70 shadow-2xl bg-slate-900/65 backdrop-blur-2xl">
           <CardHeader className="text-center bg-gradient-to-r from-red-950 to-slate-950 border-b-2 border-red-900/50">
             <div className="flex justify-center mb-4">
               <div className="p-4 bg-red-900/30 rounded-full border-2 border-red-500/50">

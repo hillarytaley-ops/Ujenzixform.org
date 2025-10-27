@@ -201,7 +201,7 @@ const Auth = () => {
       {/* No overlay - 100% clear background! */}
       
       <AnimatedSection animation="scaleIn" className="relative z-10">
-        <Card className="w-full max-w-md bg-white/80 backdrop-blur-xl shadow-2xl border-white/80">
+        <Card className="w-full max-w-md bg-white/70 backdrop-blur-2xl shadow-2xl border-white/90">
         <CardHeader className="text-center">
           <CardTitle>Welcome to UjenziPro</CardTitle>
           <CardDescription>
