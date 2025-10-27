@@ -22,6 +22,7 @@ const About = lazy(() => import("./pages/About"));
 const Contact = lazy(() => import("./pages/Contact"));
 const Auth = lazy(() => import("./pages/Auth"));
 const AdminAuth = lazy(() => import("./pages/AdminAuth"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Feedback = lazy(() => import("./pages/Feedback"));
 const Tracking = lazy(() => import("./pages/Tracking"));
 const Monitoring = lazy(() => import("./pages/Monitoring"));
@@ -90,6 +91,7 @@ const App = () => {
                     {/* Public Auth Routes */}
                     <Route path="/auth" element={<Auth />} />
                     <Route path="/admin-login" element={<AdminAuth />} />
+                    <Route path="/reset-password" element={<ResetPassword />} />
                     
                     {/* All other routes require authentication */}
                     <Route path="/*" element={
