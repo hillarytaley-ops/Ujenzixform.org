@@ -198,11 +198,10 @@ const Auth = () => {
         aria-label="Kenyan construction workers with hard hats reviewing construction project plans at building site"
       />
       
-      {/* Overlay for readability */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] z-0"></div>
+      {/* No overlay - 100% clear background! */}
       
       <AnimatedSection animation="scaleIn" className="relative z-10">
-        <Card className="w-full max-w-md bg-white/95 backdrop-blur-md shadow-2xl border-white/50">
+        <Card className="w-full max-w-md bg-white/80 backdrop-blur-xl shadow-2xl border-white/80">
         <CardHeader className="text-center">
           <CardTitle>Welcome to UjenziPro</CardTitle>
           <CardDescription>
