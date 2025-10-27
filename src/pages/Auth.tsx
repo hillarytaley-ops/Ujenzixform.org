@@ -306,8 +306,15 @@ const Auth = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="signin-password">Password</Label>
+                    <Label htmlFor="signin-password">Password</Label>
+                    <Input
+                      id="signin-password"
+                      name="password"
+                      type="password"
+                      placeholder="Enter your password"
+                      required
+                    />
+                    <div className="flex justify-end">
                       <Dialog open={showResetDialog} onOpenChange={setShowResetDialog}>
                         <DialogTrigger asChild>
                           <Button
@@ -361,13 +368,6 @@ const Auth = () => {
                         </DialogContent>
                       </Dialog>
                     </div>
-                    <Input
-                      id="signin-password"
-                      name="password"
-                      type="password"
-                      placeholder="Enter your password"
-                      required
-                    />
                   </div>
                   <Button type="submit" className="w-full" disabled={loading}>
                     {loading ? "Signing in..." : "Sign In"}
