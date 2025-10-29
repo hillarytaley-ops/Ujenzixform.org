@@ -28,6 +28,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { SupplierProductManager } from "./SupplierProductManager";
 
 interface WorkflowStats {
   totalOrders: number;
@@ -73,6 +74,7 @@ export const SupplierWorkflowDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [supplierId, setSupplierId] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -86,6 +88,9 @@ export const SupplierWorkflowDashboard: React.FC = () => {
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+
+      // Set supplier ID for product manager
+      setSupplierId(user.id);
 
       // Load supplier stats and orders
       // This would be replaced with actual database queries
@@ -334,8 +339,9 @@ export const SupplierWorkflowDashboard: React.FC = () => {
 
       {/* Main Workflow Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="products">Products</TabsTrigger>
           <TabsTrigger value="orders">Orders</TabsTrigger>
           <TabsTrigger value="workflow">Workflow</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
@@ -410,6 +416,22 @@ export const SupplierWorkflowDashboard: React.FC = () => {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="products" className="space-y-4">
+          {supplierId ? (
+            <SupplierProductManager supplierId={supplierId} />
+          ) : (
+            <Card>
+              <CardContent className="flex items-center justify-center h-64">
+                <div className="text-center">
+                  <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="text-lg font-medium mb-2">Loading...</h3>
+                  <p className="text-muted-foreground">Getting your supplier information</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="orders" className="space-y-4">
