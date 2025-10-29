@@ -280,14 +280,14 @@ const Monitoring = () => {
         <div 
           className="absolute inset-0"
           style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?w=1920&h=1080&fit=crop&q=80')`,
+            backgroundImage: `url('https://images.unsplash.com/photo-1508614999368-9260051292e5?w=1920&h=1080&fit=crop&q=80')`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
             backgroundAttachment: 'fixed'
           }}
           role="img"
-          aria-label="Professional drone and camera surveillance technology for construction site monitoring"
+          aria-label="Professional security surveillance cameras and monitoring technology for construction site security"
         />
         
         {/* Kenyan flag colors overlay with monitoring theme */}
