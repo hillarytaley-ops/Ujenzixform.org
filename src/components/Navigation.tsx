@@ -38,6 +38,7 @@ const Navigation = () => {
     { path: "/builders", label: "Builders" },
     { path: "/suppliers", label: "Suppliers" },
     { path: "/delivery", label: "Delivery" },
+    { path: "/analytics", label: "ML Analytics" },
     { path: "/scanners", label: "Scanners" },
     { path: "/tracking", label: "Tracking" },
     { path: "/monitoring", label: "Monitoring" },

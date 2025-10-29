@@ -28,6 +28,7 @@ const Tracking = lazy(() => import("./pages/Tracking"));
 const Monitoring = lazy(() => import("./pages/Monitoring"));
 const Delivery = lazy(() => import("./pages/Delivery"));
 const Scanners = lazy(() => import("./pages/Scanners"));
+const Analytics = lazy(() => import("./pages/Analytics"));
 const DeliveryProviderApplication = lazy(() => import("./pages/DeliveryProviderApplication"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -111,6 +112,7 @@ const App = () => {
                           <Route path="/monitoring" element={<Monitoring />} />
                           <Route path="/delivery" element={<Delivery />} />
                           <Route path="/scanners" element={<Scanners />} />
+                          <Route path="/analytics" element={<Analytics />} />
                           <Route path="/delivery/apply" element={<DeliveryProviderApplication />} />
                           <Route path="*" element={<NotFound />} />
                         </Routes>
