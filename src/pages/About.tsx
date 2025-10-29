@@ -144,7 +144,7 @@ const About: React.FC = () => {
         Skip to main content
       </a>
       
-      <div className="min-h-screen bg-gradient-construction">
+      <div className="min-h-screen bg-background">
         <Navigation />
 
         {/* Hero Section */}
