@@ -479,16 +479,38 @@ const SuppliersContent = () => {
               ) : (
                 <div className="space-y-6">
                   {/* Materials Marketplace - Show products instead of supplier cards */}
-                  <React.Suspense fallback={
+                  {isAdmin ? (
+                    // Simpler view for admins on mobile to prevent crashes
                     <Card>
-                      <CardContent className="p-12 text-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                        <p className="text-muted-foreground">Loading materials marketplace...</p>
+                      <CardHeader>
+                        <CardTitle>Admin Materials View</CardTitle>
+                        <CardDescription>
+                          Viewing materials marketplace as administrator
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <React.Suspense fallback={
+                          <div className="p-12 text-center">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                            <p className="text-muted-foreground">Loading materials...</p>
+                          </div>
+                        }>
+                          <MaterialsGrid />
+                        </React.Suspense>
                       </CardContent>
                     </Card>
-                  }>
-                    <MaterialsGrid />
-                  </React.Suspense>
+                  ) : (
+                    <React.Suspense fallback={
+                      <Card>
+                        <CardContent className="p-12 text-center">
+                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                          <p className="text-muted-foreground">Loading materials marketplace...</p>
+                        </CardContent>
+                      </Card>
+                    }>
+                      <MaterialsGrid />
+                    </React.Suspense>
+                  )}
                   
                   {/* Optional: Link to view suppliers list */}
                   <Card className="bg-blue-50/50 border-blue-200">
