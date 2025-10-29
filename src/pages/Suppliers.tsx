@@ -38,7 +38,20 @@ const SuppliersContent = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("suppliers");
   const [hasError, setHasError] = useState(false);
+  const [renderError, setRenderError] = useState<Error | null>(null);
   const { toast } = useToast();
+
+  // Add error boundary effect
+  useEffect(() => {
+    const handleError = (error: ErrorEvent) => {
+      console.error('Suppliers page error:', error);
+      setRenderError(error.error);
+      setHasError(true);
+    };
+
+    window.addEventListener('error', handleError);
+    return () => window.removeEventListener('error', handleError);
+  }, []);
   const { 
     modals, 
     openQuoteModal, 
@@ -100,19 +113,39 @@ const SuppliersContent = () => {
   };
 
   // Safe error boundary handler
-  if (hasError) {
+  if (hasError || renderError) {
     return (
-      <div className="min-h-screen bg-gradient-construction">
+      <div className="min-h-screen bg-background">
         <Navigation />
         <div className="container mx-auto px-4 py-20">
           <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-xl p-8 text-center">
-            <h1 className="text-3xl font-bold mb-4">Suppliers</h1>
-            <p className="text-gray-700 mb-6">
-              Browse construction materials and suppliers across Kenya
+            <h1 className="text-3xl font-bold mb-4 text-red-600">⚠️ Page Error</h1>
+            <p className="text-gray-700 mb-4">
+              Sorry, something went wrong loading the suppliers page.
             </p>
-            <Button onClick={() => window.location.reload()} className="bg-primary">
-              Reload Page
-            </Button>
+            {renderError && (
+              <div className="bg-red-50 border border-red-200 rounded p-4 mb-4 text-left">
+                <p className="text-sm text-red-800 font-mono">
+                  Error: {renderError.message}
+                </p>
+              </div>
+            )}
+            <div className="space-y-3">
+              <Button onClick={() => {
+                setHasError(false);
+                setRenderError(null);
+                window.location.reload();
+              }} className="bg-primary w-full">
+                Reload Page
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => window.location.href = '/'} 
+                className="w-full"
+              >
+                Go to Home
+              </Button>
+            </div>
           </div>
         </div>
         <Footer />
@@ -147,9 +180,11 @@ const SuppliersContent = () => {
   const showDirectoryAccess = true; // Changed from isAdmin to make public
   const showRegistrationOnly = !loading && user && !isAdmin;
 
-  return (
-    <div className="min-h-screen bg-gradient-construction">
-      <Navigation />
+  // Wrap entire render in try-catch for mobile safety
+  try {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
 
       {/* Kenyan-Themed Hero Section */}
       <AnimatedSection animation="fadeInUp">
@@ -529,7 +564,26 @@ const SuppliersContent = () => {
 
       <Footer />
     </div>
-  );
+    );
+  } catch (error) {
+    console.error('Critical render error:', error);
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="max-w-md bg-white rounded-lg shadow-xl p-8 text-center">
+          <h1 className="text-2xl font-bold mb-4 text-red-600">⚠️ Error</h1>
+          <p className="text-gray-700 mb-6">
+            The page failed to load. This might be a mobile compatibility issue.
+          </p>
+          <Button onClick={() => window.location.reload()} className="w-full mb-3">
+            Try Again
+          </Button>
+          <Button variant="outline" onClick={() => window.location.href = '/'} className="w-full">
+            Go Home
+          </Button>
+        </div>
+      </div>
+    );
+  }
 };
 
 const Suppliers = () => {
