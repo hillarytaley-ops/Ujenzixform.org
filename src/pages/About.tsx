@@ -221,22 +221,8 @@ const About: React.FC = () => {
 
         {/* Values Section */}
         <section className="py-24 relative overflow-hidden" aria-labelledby="values-heading">
-          {/* Kenyan Construction Workers Background */}
-          <div 
-            className="absolute inset-0"
-            style={{
-              backgroundImage: `url('https://images.unsplash.com/photo-1581094794329-c8112a89af12?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat',
-              backgroundAttachment: 'fixed'
-            }}
-            role="img"
-            aria-label="Kenyan construction workers collaborating on a building project, showcasing teamwork and professional construction practices"
-          />
-          
-          {/* Light overlay for readability */}
-          <div className="absolute inset-0 bg-white/85 backdrop-blur-[1px]"></div>
+          {/* Clean values background */}
+          <div className="absolute inset-0 bg-gradient-to-br from-gray-50 via-blue-50/30 to-gray-100"></div>
           
           <div className="container mx-auto px-4 relative z-10">
             <h2 id="values-heading" className="text-5xl font-bold text-center mb-4 text-gray-900 drop-shadow-sm">Our Values</h2>
