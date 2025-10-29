@@ -53,6 +53,106 @@ const PRODUCT_CATEGORIES = [
   'Other'
 ];
 
+// Demo materials for when database is empty
+const DEMO_MATERIALS: Material[] = [
+  {
+    id: 'demo-1',
+    supplier_id: 'demo',
+    name: 'Bamburi Cement 42.5N (50kg)',
+    description: 'Premium Portland cement from Bamburi - Kenya\'s most trusted cement brand',
+    category: 'Cement',
+    unit: 'bag',
+    unit_price: 850,
+    in_stock: true,
+    created_at: new Date().toISOString(),
+    supplier: {
+      company_name: 'Demo Supplier - Nairobi',
+      location: 'Nairobi',
+      rating: 4.8
+    }
+  },
+  {
+    id: 'demo-2',
+    supplier_id: 'demo',
+    name: 'Y12 Deformed Steel Bars (6m)',
+    description: 'High tensile deformed bars for concrete reinforcement - KEBS approved',
+    category: 'Steel',
+    unit: 'bar',
+    unit_price: 950,
+    in_stock: true,
+    created_at: new Date().toISOString(),
+    supplier: {
+      company_name: 'Demo Supplier - Mombasa',
+      location: 'Mombasa',
+      rating: 4.9
+    }
+  },
+  {
+    id: 'demo-3',
+    supplier_id: 'demo',
+    name: 'Vitrified Floor Tiles 600x600mm',
+    description: 'Premium vitrified porcelain tiles - high gloss finish, stain resistant',
+    category: 'Tiles',
+    unit: 'sqm',
+    unit_price: 2800,
+    in_stock: true,
+    created_at: new Date().toISOString(),
+    supplier: {
+      company_name: 'Demo Supplier - Nairobi',
+      location: 'Nairobi',
+      rating: 4.7
+    }
+  },
+  {
+    id: 'demo-4',
+    supplier_id: 'demo',
+    name: 'Crown Emulsion Paint 20L',
+    description: 'Crown Paints premium acrylic emulsion - smooth matt finish, washable',
+    category: 'Paint',
+    unit: '20L bucket',
+    unit_price: 4800,
+    in_stock: true,
+    created_at: new Date().toISOString(),
+    supplier: {
+      company_name: 'Demo Supplier - Kisumu',
+      location: 'Kisumu',
+      rating: 4.7
+    }
+  },
+  {
+    id: 'demo-5',
+    supplier_id: 'demo',
+    name: 'Mabati Iron Sheets Gauge 28 (3m)',
+    description: 'Mabati box profile corrugated iron sheets - galvanized steel, 25-year warranty',
+    category: 'Iron Sheets',
+    unit: 'sheet',
+    unit_price: 1350,
+    in_stock: true,
+    created_at: new Date().toISOString(),
+    supplier: {
+      company_name: 'Demo Supplier - Eldoret',
+      location: 'Eldoret',
+      rating: 4.8
+    }
+  },
+  {
+    id: 'demo-6',
+    supplier_id: 'demo',
+    name: 'Treated Cypress Timber 4x2 (12ft)',
+    description: 'Pressure-treated cypress timber - termite and borer resistant',
+    category: 'Timber',
+    unit: 'piece',
+    unit_price: 850,
+    in_stock: true,
+    created_at: new Date().toISOString(),
+    supplier: {
+      company_name: 'Demo Supplier - Nakuru',
+      location: 'Nakuru',
+      rating: 4.6
+    }
+  }
+];
+
 export const MaterialsGrid = () => {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [filteredMaterials, setFilteredMaterials] = useState<Material[]>([]);
@@ -74,38 +174,71 @@ export const MaterialsGrid = () => {
   const loadMaterials = async () => {
     try {
       setLoading(true);
+      
+      // First, try to load materials without join (in case suppliers table has issues)
       const { data, error } = await supabase
         .from('materials')
-        .select(`
-          *,
-          suppliers!inner (
-            company_name,
-            location,
-            rating
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error loading materials:', error);
+        throw error;
+      }
 
-      // Transform data to include supplier info
+      // Transform data with default supplier info
       const transformedData = data?.map(item => ({
         ...item,
         supplier: {
-          company_name: (item as any).suppliers?.company_name || 'Unknown Supplier',
-          location: (item as any).suppliers?.location || 'Kenya',
-          rating: (item as any).suppliers?.rating || 0
+          company_name: 'Supplier', // Default - we'll fetch supplier info separately if needed
+          location: 'Kenya',
+          rating: 4.5
         }
       })) || [];
 
+      // Use demo materials if database is empty
+      if (transformedData.length === 0) {
+        console.log('No materials in database, using demo materials');
+        setMaterials(DEMO_MATERIALS);
+        setLoading(false);
+        return;
+      }
+
       setMaterials(transformedData);
+      
+      // Optionally fetch supplier names
+      if (data && data.length > 0) {
+        const supplierIds = [...new Set(data.map(m => m.supplier_id))];
+        const { data: suppliersData } = await supabase
+          .from('suppliers')
+          .select('id, user_id, company_name, location, rating')
+          .in('user_id', supplierIds);
+
+        if (suppliersData) {
+          // Update materials with supplier info
+          const updated = transformedData.map(material => {
+            const supplier = suppliersData.find(s => s.user_id === material.supplier_id);
+            return {
+              ...material,
+              supplier: supplier ? {
+                company_name: supplier.company_name || 'Supplier',
+                location: supplier.location || 'Kenya',
+                rating: supplier.rating || 4.5
+              } : material.supplier
+            };
+          });
+          setMaterials(updated);
+        }
+      }
     } catch (error) {
       console.error('Error loading materials:', error);
       toast({
         title: 'Error loading materials',
-        description: 'Failed to fetch materials catalog',
+        description: error instanceof Error ? error.message : 'Failed to fetch materials catalog',
         variant: 'destructive'
       });
+      // Set empty array on error to show empty state
+      setMaterials([]);
     } finally {
       setLoading(false);
     }

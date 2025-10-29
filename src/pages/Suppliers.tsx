@@ -17,6 +17,7 @@ import { MaterialsGrid } from "@/components/suppliers/MaterialsGrid";
 import { QuoteRequestModal } from "@/components/modals/QuoteRequestModal";
 import { SupplierCatalogModal } from "@/components/modals/SupplierCatalogModal";
 import PurchasingWorkflow from "@/components/PurchasingWorkflow";
+import { Card, CardContent } from "@/components/ui/card";
 import { RealTimeStats } from "@/components/suppliers/RealTimeStats";
 import { SecurityAlert } from "@/components/security/SecurityAlert";
 import { AdminAccessGuard } from "@/components/security/AdminAccessGuard";
