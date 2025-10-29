@@ -291,3 +291,4 @@ If you need to adjust clarity:
 
 **Your construction workers image is now displayed in near-full clarity while maintaining a beautiful, modern glass-morphism design!** 🎉🏗️👷🇰🇪✨
 
+

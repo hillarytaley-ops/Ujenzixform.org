@@ -320,3 +320,4 @@ WHERE id IN ('company-logos', 'profile-images', 'product-images');
 -- Next: Restart server, clear cache, test!
 -- =====================================================
 
+

@@ -255,3 +255,4 @@ FROM materials;
 -- Products: Unsplash (real construction material photos)
 -- =====================================================
 
+

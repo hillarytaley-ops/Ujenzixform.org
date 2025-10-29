@@ -307,3 +307,4 @@ WHERE avatar_url IS NOT NULL OR company_logo_url IS NOT NULL;
 -- ✅ No more missing images!
 -- =====================================================
 
+

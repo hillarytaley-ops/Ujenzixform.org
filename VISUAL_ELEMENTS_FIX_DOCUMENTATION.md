@@ -518,3 +518,4 @@ If images still don't show after applying the fix:
 **Difficulty**: ⭐⭐ EASY - Just run SQL script
 
 
+

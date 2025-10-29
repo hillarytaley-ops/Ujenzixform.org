@@ -350,3 +350,4 @@ FROM materials;
 -- 5. Suppliers can now add their own products with images
 -- =====================================================
 
+

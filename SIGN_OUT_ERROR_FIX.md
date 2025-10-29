@@ -350,3 +350,4 @@ const handleSignOut = async () => {
 
 **Status**: ✅ FIXED - Sign out now works reliably on Netlify and all environments!
 
+
