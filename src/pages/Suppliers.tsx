@@ -286,34 +286,31 @@ const SuppliersContent = () => {
         <main className="container mx-auto px-4 py-8 bg-gradient-to-b from-gray-50/30 to-white min-h-screen">
           {/* Enhanced Kenyan-Styled Security Notice - Admin Only */}
           {isAdmin && (
-            <div className="bg-gradient-to-r from-gray-50 via-blue-50 to-gray-50 border-2 border-gray-400 rounded-2xl p-6 mb-8 shadow-lg">
-              <div className="flex items-start gap-4">
-                <div className="flex-shrink-0 bg-blue-600 p-3 rounded-full">
-                  <Shield className="h-8 w-8 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold bg-gradient-to-r from-gray-700 to-blue-600 bg-clip-text text-transparent mb-2">
-                    🇰🇪 Usalama wa Wauzaji - Supplier Security (Admin View)
-                  </h3>
-                  <p className="text-amber-700 text-sm mb-4">
-                    Contact information is protected under ultra-secure access controls to prevent 
-                    data harvesting, spam, and unauthorized use. As an administrator, you have full access 
-                    to all supplier contact details and business information.
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <Badge variant="outline" className="text-xs bg-amber-100 text-amber-800 border-amber-300">
-                      🛡️ Contact Info Protected
-                    </Badge>
-                    <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800 border-blue-300">
-                      ✅ Admin Access Granted
-                    </Badge>
-                    <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800 border-blue-300">
-                      📊 Full Data Access
-                    </Badge>
+            <React.Suspense fallback={<div className="h-20"></div>}>
+              <div className="bg-gradient-to-r from-gray-50 via-blue-50 to-gray-50 border-2 border-gray-400 rounded-2xl p-6 mb-8 shadow-lg">
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 bg-blue-600 p-3 rounded-full">
+                    <Shield className="h-8 w-8 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold bg-gradient-to-r from-gray-700 to-blue-600 bg-clip-text text-transparent mb-2">
+                      🇰🇪 Admin Dashboard
+                    </h3>
+                    <p className="text-gray-700 text-sm mb-4">
+                      You have full access to supplier data, applications, and analytics.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800 border-blue-300">
+                        ✅ Admin Access
+                      </Badge>
+                      <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800 border-blue-300">
+                        📊 Full Data Access
+                      </Badge>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            </React.Suspense>
           )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -407,18 +404,29 @@ const SuppliersContent = () => {
           {isAdmin && (
             <>
               <TabsContent value="applications" className="space-y-8">
-                <SupplierApplicationManager />
+                <React.Suspense fallback={
+                  <Card>
+                    <CardContent className="p-12 text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                      <p className="text-muted-foreground">Loading applications...</p>
+                    </CardContent>
+                  </Card>
+                }>
+                  <SupplierApplicationManager />
+                </React.Suspense>
               </TabsContent>
               
               <TabsContent value="registered-users" className="space-y-8">
-                <div className="bg-muted rounded-lg p-8 text-center">
-                  <Users className="h-12 w-12 mx-auto mb-4 text-primary" />
-                  <h3 className="text-2xl font-bold mb-4">Registered Users Management</h3>
-                  <p className="text-lg mb-6 opacity-90">Admin view of all registered builders and suppliers</p>
-                  <Badge variant="outline" className="bg-accent text-accent-foreground border-border">
-                    Admin Dashboard - Coming Soon
-                  </Badge>
-                </div>
+                <Card className="bg-white rounded-lg shadow-lg">
+                  <CardContent className="p-8 text-center">
+                    <Users className="h-12 w-12 mx-auto mb-4 text-primary" />
+                    <h3 className="text-2xl font-bold mb-4">Registered Users Management</h3>
+                    <p className="text-lg mb-6 text-muted-foreground">Admin view of all registered builders and suppliers</p>
+                    <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">
+                      Admin Dashboard - Coming Soon
+                    </Badge>
+                  </CardContent>
+                </Card>
               </TabsContent>
             </>
           )}
