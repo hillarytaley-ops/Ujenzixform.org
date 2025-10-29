@@ -164,11 +164,21 @@ export const MaterialsGrid = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    loadMaterials();
+    // Wrap in try-catch to prevent crashes
+    try {
+      loadMaterials();
+    } catch (error) {
+      console.error('Error in loadMaterials effect:', error);
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    filterMaterials();
+    try {
+      filterMaterials();
+    } catch (error) {
+      console.error('Error in filterMaterials effect:', error);
+    }
   }, [materials, searchQuery, selectedCategory, priceRange, stockFilter]);
 
   const loadMaterials = async () => {

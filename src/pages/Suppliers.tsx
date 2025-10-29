@@ -436,7 +436,16 @@ const SuppliersContent = () => {
               ) : (
                 <div className="space-y-6">
                   {/* Materials Marketplace - Show products instead of supplier cards */}
-                  <MaterialsGrid />
+                  <React.Suspense fallback={
+                    <Card>
+                      <CardContent className="p-12 text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                        <p className="text-muted-foreground">Loading materials marketplace...</p>
+                      </CardContent>
+                    </Card>
+                  }>
+                    <MaterialsGrid />
+                  </React.Suspense>
                   
                   {/* Optional: Link to view suppliers list */}
                   <Card className="bg-blue-50/50 border-blue-200">
