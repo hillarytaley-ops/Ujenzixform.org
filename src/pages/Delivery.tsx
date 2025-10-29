@@ -31,9 +31,24 @@ import {
   Zap,
   Shield
 } from "lucide-react";
-import { EnhancedDeliveryAnalytics } from "@/components/delivery/EnhancedDeliveryAnalytics";
-import { BulkDeliveryManager } from "@/components/delivery/BulkDeliveryManager";
-import { DeliverySecurityDashboard } from "@/components/delivery/DeliverySecurityDashboard";
+// Lazy load these components to prevent errors from breaking the page
+const EnhancedDeliveryAnalytics = React.lazy(() => 
+  import("@/components/delivery/EnhancedDeliveryAnalytics")
+    .then(module => ({ default: module.EnhancedDeliveryAnalytics }))
+    .catch(() => ({ default: () => <div>Analytics temporarily unavailable</div> }))
+);
+
+const BulkDeliveryManager = React.lazy(() => 
+  import("@/components/delivery/BulkDeliveryManager")
+    .then(module => ({ default: module.BulkDeliveryManager }))
+    .catch(() => ({ default: () => <div>Bulk manager temporarily unavailable</div> }))
+);
+
+const DeliverySecurityDashboard = React.lazy(() => 
+  import("@/components/delivery/DeliverySecurityDashboard")
+    .then(module => ({ default: module.DeliverySecurityDashboard }))
+    .catch(() => ({ default: () => <div>Security dashboard temporarily unavailable</div> }))
+);
 
 const Delivery = () => {
   const [activeTab, setActiveTab] = useState("request");
@@ -99,20 +114,31 @@ const Delivery = () => {
 
   const checkUserRole = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setUser(user);
-        const { data: roleData } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .limit(1)
-          .maybeSingle();
-        
-        setUserRole((roleData?.role as any) || null);
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      // Handle no user gracefully (public access allowed)
+      if (authError || !user) {
+        console.log('No authenticated user, showing public delivery page');
+        setUser(null);
+        setUserRole(null);
+        setLoading(false);
+        return;
       }
+
+      setUser(user);
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+      
+      setUserRole((roleData?.role as any) || null);
     } catch (error) {
       console.error('Error checking user role:', error);
+      // Don't crash, just set defaults
+      setUser(null);
+      setUserRole(null);
     } finally {
       setLoading(false);
     }
@@ -206,35 +232,73 @@ const Delivery = () => {
               backgroundPosition: 'center'
             }}
           />
-          <div className="absolute inset-0 bg-gradient-to-br from-black/75 via-green-900/60 to-red-900/60"></div>
+          <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-gray-900/70 to-gray-800/70"></div>
         <div className="container mx-auto px-4 text-center relative z-10">
-          <Badge className="mb-6 bg-gradient-to-r from-green-600 to-red-600 text-white px-6 py-2 text-lg font-semibold">
+          <Badge className="mb-6 bg-gradient-to-r from-gray-700 to-blue-600 text-white px-6 py-2 text-lg font-semibold">
             🇰🇪 Kenya's Premier Delivery Network
           </Badge>
-          <h1 className="text-5xl md:text-6xl font-bold mb-6 drop-shadow-2xl">Delivery Management</h1>
+          <h1 className="text-5xl md:text-6xl font-bold mb-6 drop-shadow-2xl">
+            <span className="bg-gradient-to-r from-white via-gray-200 to-white bg-clip-text text-transparent">
+              Delivery
+            </span>
+            <br />
+            <span className="text-4xl text-blue-400">
+              Management
+            </span>
+          </h1>
           <p className="text-xl md:text-2xl mb-8 opacity-90 drop-shadow-lg max-w-4xl mx-auto leading-relaxed">
             <strong>Smart Delivery Solutions:</strong> Request material deliveries from suppliers to construction sites, 
             track deliveries in real-time with GPS, calculate delivery costs instantly, manage multiple deliveries, 
             coordinate with verified transport providers, receive notifications, generate delivery notes, 
             and ensure materials arrive safely and on time across Kenya.
           </p>
+
+          {/* Action Buttons - Always Visible */}
+          <div className="flex flex-wrap gap-4 justify-center mb-8">
+            <Button 
+              size="lg"
+              onClick={() => setActiveTab("request")}
+              className="bg-white text-gray-900 hover:bg-gray-100 font-semibold px-8 py-6 text-lg shadow-xl"
+            >
+              <Truck className="h-5 w-5 mr-2" />
+              Request Delivery
+            </Button>
+            
+            <Button 
+              size="lg"
+              onClick={() => setActiveTab("tracking")}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
+            >
+              <MapPin className="h-5 w-5 mr-2" />
+              Track Deliveries
+            </Button>
+            
+            <Button 
+              size="lg"
+              onClick={() => setActiveTab("calculator")}
+              className="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
+            >
+              <Calculator className="h-5 w-5 mr-2" />
+              Cost Calculator
+            </Button>
+          </div>
           
           {/* Delivery Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-              <div className="text-2xl font-bold text-green-400">1000+</div>
+              <div className="text-2xl font-bold text-blue-400">1000+</div>
               <div className="text-sm opacity-90">Monthly Deliveries</div>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-              <div className="text-2xl font-bold text-blue-400">47</div>
+              <div className="text-2xl font-bold text-gray-300">47</div>
               <div className="text-sm opacity-90">Counties Served</div>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-              <div className="text-2xl font-bold text-yellow-400">98%</div>
+              <div className="text-2xl font-bold text-orange-400">98%</div>
               <div className="text-sm opacity-90">On-Time Rate</div>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-              <div className="text-2xl font-bold text-red-400">24/7</div>
+              <div className="text-2xl font-bold text-blue-300">24/7</div>
               <div className="text-sm opacity-90">Tracking</div>
             </div>
           </div>
@@ -554,17 +618,23 @@ const Delivery = () => {
 
             {/* Bulk Operations Tab */}
             <TabsContent value="bulk" className="space-y-6">
-              <BulkDeliveryManager userRole={userRole} userId={user?.id} />
+              <React.Suspense fallback={<div className="text-center p-8">Loading...</div>}>
+                <BulkDeliveryManager userRole={userRole} userId={user?.id} />
+              </React.Suspense>
             </TabsContent>
 
             {/* Enhanced Analytics Tab */}
             <TabsContent value="analytics" className="space-y-6">
-              <EnhancedDeliveryAnalytics userRole={userRole} userId={user?.id} />
+              <React.Suspense fallback={<div className="text-center p-8">Loading analytics...</div>}>
+                <EnhancedDeliveryAnalytics userRole={userRole} userId={user?.id} />
+              </React.Suspense>
             </TabsContent>
 
             {/* Security Dashboard Tab */}
             <TabsContent value="security" className="space-y-6">
-              <DeliverySecurityDashboard userRole={userRole} userId={user?.id} />
+              <React.Suspense fallback={<div className="text-center p-8">Loading security dashboard...</div>}>
+                <DeliverySecurityDashboard userRole={userRole} userId={user?.id} />
+              </React.Suspense>
             </TabsContent>
 
             {/* History Tab */}
