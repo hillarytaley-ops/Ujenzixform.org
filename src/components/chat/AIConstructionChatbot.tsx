@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
+// import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   MessageCircle,
   Send,
@@ -536,7 +536,7 @@ Examples:
         {!isMinimized && (
           <CardContent className="p-0">
             {/* Messages Area */}
-            <ScrollArea className="h-96 p-4" ref={scrollRef}>
+            <div className="h-96 p-4 overflow-y-auto" ref={scrollRef}>
               <div className="space-y-4">
                 {messages.map((message) => (
                   <div
@@ -615,7 +615,7 @@ Examples:
                   </div>
                 )}
               </div>
-            </ScrollArea>
+            </div>
 
             {/* Input Area */}
             <div className="border-t p-4 bg-gray-50">
