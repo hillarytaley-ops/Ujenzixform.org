@@ -39,6 +39,8 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
   const [priceFilter, setPriceFilter] = useState("all");
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [realProducts, setRealProducts] = useState<CatalogItem[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
   const { toast } = useToast();
   
   // Check authentication status and user role
@@ -70,6 +72,50 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
       checkAuth();
     }
   }, [isOpen]);
+
+  // Load real products from database
+  useEffect(() => {
+    const loadProducts = async () => {
+      if (!isOpen || !supplier.id) return;
+      
+      try {
+        setLoadingProducts(true);
+        const { data, error } = await supabase
+          .from('materials')
+          .select('*')
+          .eq('supplier_id', supplier.id)
+          .eq('in_stock', true);
+
+        if (error) {
+          console.error('Error loading products:', error);
+          return;
+        }
+
+        if (data && data.length > 0) {
+          // Transform database products to catalog items
+          const products: CatalogItem[] = data.map(product => ({
+            id: product.id,
+            name: product.name,
+            category: product.category,
+            price: product.unit_price,
+            unit: product.unit,
+            description: product.description || 'No description available',
+            inStock: product.in_stock,
+            rating: 4.5, // Default rating
+            image: product.image_url || undefined // Will fallback to default category image
+          }));
+          
+          setRealProducts(products);
+        }
+      } catch (error) {
+        console.error('Error loading products:', error);
+      } finally {
+        setLoadingProducts(false);
+      }
+    };
+
+    loadProducts();
+  }, [isOpen, supplier.id]);
 
   // Secure contact request handler
   const handleContactRequest = async (supplierId: string) => {
@@ -257,7 +303,10 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
     }
   ];
 
-  const filteredItems = catalogItems.filter(item => {
+  // Use real products if available, otherwise show demo catalog
+  const catalogItemsToShow = realProducts.length > 0 ? realProducts : catalogItems;
+
+  const filteredItems = catalogItemsToShow.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          item.description.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === "all" || item.category === selectedCategory;
@@ -269,7 +318,7 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
     return matchesSearch && matchesCategory && matchesPrice;
   });
 
-  const categories = ["all", ...new Set(catalogItems.map(item => item.category))];
+  const categories = ["all", ...new Set(catalogItemsToShow.map(item => item.category))];
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -332,7 +381,8 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
                 <TabsTrigger value="list">List View</TabsTrigger>
               </TabsList>
               <div className="text-sm text-muted-foreground">
-                {filteredItems.length} of {catalogItems.length} products
+                {filteredItems.length} of {catalogItemsToShow.length} products
+                {realProducts.length > 0 && <span className="ml-2 text-green-600">(Live)</span>}
               </div>
             </div>
 
