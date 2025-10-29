@@ -225,22 +225,8 @@ const Tracking = () => {
         </AnimatedSection>
 
         <main className="flex-1 py-20 relative overflow-hidden">
-          {/* Kenyan Construction Logistics Background */}
-          <div 
-            className="absolute inset-0"
-            style={{
-              backgroundImage: `url('https://images.unsplash.com/photo-1566576912321-d58ddd7a6088?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat',
-              backgroundAttachment: 'fixed'
-            }}
-            role="img"
-            aria-label="Kenyan delivery trucks and logistics vehicles with GPS tracking systems transporting construction materials across Kenya"
-          />
-          
-          {/* Light overlay for tracking interface readability */}
-          <div className="absolute inset-0 bg-white/92 backdrop-blur-[1px]"></div>
+          {/* Clean professional gradient background - no cartoon images */}
+          <div className="absolute inset-0 bg-gradient-to-br from-gray-50 via-blue-50/30 to-gray-100"></div>
           
           <div className="container mx-auto px-4 relative z-10">
             <AnimatedSection animation="fadeInUp">
