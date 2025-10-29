@@ -35,6 +35,9 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 // Auth Guard
 import { AuthRequired } from "@/components/security/AuthRequired";
 
+// AI Chatbot
+import { AIConstructionChatbot } from "@/components/chat/AIConstructionChatbot";
+
 // Optimized loading component
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-screen bg-background">
@@ -69,14 +72,16 @@ const queryClient = new QueryClient({
 });
 
 const App = () => {
-  // Temporarily simplified to get the app running
-  // useEffect(() => {
-  //   // Initialize privacy service
-  //   DataPrivacyService.initializePrivacySettings();
-  //   return () => {
-  //     DataPrivacyService.cleanupPrivacySettings();
-  //   };
-  // }, []);
+  const [user, setUser] = React.useState<any>(null);
+
+  React.useEffect(() => {
+    // Get current user for chatbot
+    import('@/integrations/supabase/client').then(({ supabase }) => {
+      supabase.auth.getUser().then(({ data }) => {
+        setUser(data.user);
+      });
+    });
+  }, []);
 
   return (
     <ThemeProvider>
@@ -122,6 +127,12 @@ const App = () => {
                 </Suspense>
                 {/* Privacy features will be re-enabled once dependencies are resolved */}
               </ErrorBoundary>
+              
+              {/* AI Chatbot - Available on all pages */}
+              <AIConstructionChatbot 
+                userId={user?.id}
+                userName={user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Guest'}
+              />
             </BrowserRouter>
           </TooltipProvider>
         </QueryClientProvider>
