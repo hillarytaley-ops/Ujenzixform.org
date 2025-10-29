@@ -13,6 +13,7 @@ import GoodsReceivedNoteViewer from "@/components/suppliers/GoodsReceivedNoteVie
 import SupplierInvoiceViewer from "@/components/suppliers/SupplierInvoiceViewer";
 import QRScanner from "@/components/QRScanner";
 import { SupplierGrid } from "@/components/suppliers/SupplierGrid";
+import { MaterialsGrid } from "@/components/suppliers/MaterialsGrid";
 import { QuoteRequestModal } from "@/components/modals/QuoteRequestModal";
 import { SupplierCatalogModal } from "@/components/modals/SupplierCatalogModal";
 import PurchasingWorkflow from "@/components/PurchasingWorkflow";
@@ -433,10 +434,29 @@ const SuppliersContent = () => {
                 <SupplierRegistrationForm />
               ) : (
                 <div className="space-y-6">
-                  <SupplierGrid 
-                    onSupplierSelect={handleSupplierSelect}
-                    onQuoteRequest={handleQuoteRequest}
-                  />
+                  {/* Materials Marketplace - Show products instead of supplier cards */}
+                  <MaterialsGrid />
+                  
+                  {/* Optional: Link to view suppliers list */}
+                  <Card className="bg-blue-50/50 border-blue-200">
+                    <CardContent className="p-6 text-center">
+                      <p className="text-sm text-muted-foreground mb-3">
+                        Want to see supplier profiles instead of products?
+                      </p>
+                      <Button 
+                        variant="outline"
+                        onClick={() => {
+                          toast({
+                            title: 'Supplier Directory',
+                            description: 'Supplier profiles view - coming soon! Currently showing materials catalog.'
+                          });
+                        }}
+                      >
+                        <Store className="h-4 w-4 mr-2" />
+                        View Supplier Profiles
+                      </Button>
+                    </CardContent>
+                  </Card>
                 </div>
               )}
             </TabsContent>
