@@ -161,20 +161,20 @@ const SuppliersContent = () => {
             backgroundPosition: 'center'
           }}
         />
-        <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-green-900/60 to-red-900/60"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-gray-900/70 to-gray-800/70"></div>
         
         <div className="container mx-auto px-4 text-center relative z-10">
           <div className="mb-6">
             <span className="text-2xl mb-2 block">🇰🇪</span>
-            <p className="text-lg text-green-200 mb-2">Karibu - Welcome to Kenya's Premier</p>
+            <p className="text-lg text-gray-200 mb-2">Karibu - Welcome to Kenya's Premier</p>
           </div>
           
           <h1 className="text-5xl md:text-6xl font-bold mb-6 leading-tight">
-            <span className="bg-gradient-to-r from-green-300 to-white bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-white via-gray-200 to-white bg-clip-text text-transparent">
               UjenziPro
             </span>
             <br />
-            <span className="text-3xl md:text-4xl text-yellow-300">
+            <span className="text-3xl md:text-4xl text-blue-400">
               Suppliers Marketplace
             </span>
           </h1>
@@ -186,28 +186,57 @@ const SuppliersContent = () => {
             with trusted suppliers from Mombasa to Eldoret.
           </p>
 
+          {/* Action Buttons - Always Visible */}
+          <div className="flex flex-wrap gap-4 justify-center mb-8">
+            <Button 
+              size="lg"
+              onClick={() => setActiveTab("suppliers")}
+              className="bg-white text-gray-900 hover:bg-gray-100 font-semibold px-8 py-6 text-lg shadow-xl"
+            >
+              <Building className="h-5 w-5 mr-2" />
+              Browse Suppliers
+            </Button>
+            
+            <Button 
+              size="lg"
+              onClick={() => user ? setActiveTab("register") : window.location.href = '/auth'}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
+            >
+              <Store className="h-5 w-5 mr-2" />
+              Register as Supplier
+            </Button>
+            
+            <Button 
+              size="lg"
+              onClick={() => setActiveTab("purchase")}
+              className="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
+            >
+              <ShoppingBag className="h-5 w-5 mr-2" />
+              Purchase Materials
+            </Button>
+          </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full max-w-5xl mx-auto">
-              <TabsList className={`grid w-full bg-black/30 backdrop-blur-sm border-2 border-green-400/30 rounded-2xl p-2 ${
+              <TabsList className={`grid w-full bg-black/40 backdrop-blur-sm border-2 border-gray-400/30 rounded-2xl p-2 ${
                 userRole === 'supplier' ? 'grid-cols-7' : 
                 isAdmin ? 'grid-cols-3' : 
                 showRegistrationOnly ? 'grid-cols-1' : 
                 'grid-cols-2'
               }`}>
                 {(showDirectoryAccess || !user) && (
-                  <TabsTrigger value="suppliers" className="flex items-center gap-2 data-[state=active]:bg-green-500 data-[state=active]:text-white font-medium rounded-xl transition-all duration-300">
+                  <TabsTrigger value="suppliers" className="flex items-center gap-2 data-[state=active]:bg-gray-700 data-[state=active]:text-white font-medium rounded-xl transition-all duration-300">
                     <Building className="h-4 w-4" />
                     Suppliers
                   </TabsTrigger>
                 )}
                 {showRegistrationOnly && (
-                  <TabsTrigger value="register" className="flex items-center gap-2 data-[state=active]:bg-green-500 data-[state=active]:text-white font-medium rounded-xl transition-all duration-300">
+                  <TabsTrigger value="register" className="flex items-center gap-2 data-[state=active]:bg-blue-600 data-[state=active]:text-white font-medium rounded-xl transition-all duration-300">
                     <Store className="h-4 w-4" />
                     Register as Supplier
                   </TabsTrigger>
                 )}
                 {(showDirectoryAccess || !user) && (
-                  <TabsTrigger value="purchase" className="flex items-center gap-2 data-[state=active]:bg-green-500 data-[state=active]:text-white font-medium rounded-xl transition-all duration-300">
+                  <TabsTrigger value="purchase" className="flex items-center gap-2 data-[state=active]:bg-orange-600 data-[state=active]:text-white font-medium rounded-all duration-300">
                     <ShoppingBag className="h-4 w-4" />
                     Purchase
                   </TabsTrigger>
@@ -252,16 +281,16 @@ const SuppliersContent = () => {
          </section>
       </AnimatedSection>
 
-        <main className="container mx-auto px-4 py-8 bg-gradient-to-b from-green-50/30 to-white min-h-screen">
+        <main className="container mx-auto px-4 py-8 bg-gradient-to-b from-gray-50/30 to-white min-h-screen">
           {/* Enhanced Kenyan-Styled Security Notice - Admin Only */}
           {isAdmin && (
-            <div className="bg-gradient-to-r from-green-50 via-yellow-50 to-red-50 border-2 border-green-400 rounded-2xl p-6 mb-8 shadow-lg">
+            <div className="bg-gradient-to-r from-gray-50 via-blue-50 to-gray-50 border-2 border-gray-400 rounded-2xl p-6 mb-8 shadow-lg">
               <div className="flex items-start gap-4">
-                <div className="flex-shrink-0 bg-green-500 p-3 rounded-full">
+                <div className="flex-shrink-0 bg-blue-600 p-3 rounded-full">
                   <Shield className="h-8 w-8 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold bg-gradient-to-r from-green-600 to-red-600 bg-clip-text text-transparent mb-2">
+                  <h3 className="text-xl font-bold bg-gradient-to-r from-gray-700 to-blue-600 bg-clip-text text-transparent mb-2">
                     🇰🇪 Usalama wa Wauzaji - Supplier Security (Admin View)
                   </h3>
                   <p className="text-amber-700 text-sm mb-4">
@@ -273,7 +302,7 @@ const SuppliersContent = () => {
                     <Badge variant="outline" className="text-xs bg-amber-100 text-amber-800 border-amber-300">
                       🛡️ Contact Info Protected
                     </Badge>
-                    <Badge variant="outline" className="text-xs bg-green-100 text-green-800 border-green-300">
+                    <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800 border-blue-300">
                       ✅ Admin Access Granted
                     </Badge>
                     <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800 border-blue-300">
@@ -289,12 +318,12 @@ const SuppliersContent = () => {
           {/* Kenyan-Themed Registration Tab for Non-Admin Users */}
           {showRegistrationOnly && (
             <TabsContent value="register" className="space-y-8">
-              <div className="bg-gradient-to-br from-green-50 via-white to-red-50 border-3 border-green-300 rounded-2xl p-8 mb-8 shadow-2xl">
+              <div className="bg-gradient-to-br from-gray-50 via-white to-blue-50 border-3 border-gray-300 rounded-2xl p-8 mb-8 shadow-2xl">
                 <div className="text-center mb-6">
-                  <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-green-500 to-green-600 rounded-full mb-4 shadow-lg">
+                  <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-600 to-blue-700 rounded-full mb-4 shadow-lg">
                     <Store className="h-10 w-10 text-white" />
                   </div>
-                  <h3 className="text-3xl font-bold bg-gradient-to-r from-green-600 to-red-600 bg-clip-text text-transparent mb-3">
+                  <h3 className="text-3xl font-bold bg-gradient-to-r from-gray-700 to-blue-600 bg-clip-text text-transparent mb-3">
                     🇰🇪 Jiunge na UjenziPro
                   </h3>
                   <p className="text-xl text-green-800 mb-2">Register as a Kenyan Supplier</p>
@@ -307,7 +336,7 @@ const SuppliersContent = () => {
                   </p>
                   
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-                    <div className="text-center p-4 bg-green-50 rounded-xl border border-green-200">
+                    <div className="text-center p-4 bg-gray-50 rounded-xl border border-gray-200">
                       <div className="text-3xl mb-2">🚀</div>
                       <h4 className="font-bold text-green-800 mb-1">Bure Kabisa</h4>
                       <p className="text-sm text-green-600">Free Registration</p>
