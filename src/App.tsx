@@ -37,6 +37,7 @@ import { AuthRequired } from "@/components/security/AuthRequired";
 
 // AI Chatbot
 import { AIConstructionChatbot } from "@/components/chat/AIConstructionChatbot";
+import { SimpleChatButton } from "@/components/chat/SimpleChatButton";
 
 // Optimized loading component
 const PageLoader = () => (
@@ -91,11 +92,8 @@ const App = () => {
             <Toaster />
             <Sonner />
             <BrowserRouter>
-              {/* AI Chatbot - Available on all pages (OUTSIDE routes so always visible) */}
-              <AIConstructionChatbot 
-                userId={user?.id}
-                userName={user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Guest'}
-              />
+              {/* AI Chatbot - Simple version for testing */}
+              <SimpleChatButton />
               
               <ErrorBoundary>
                 <Suspense fallback={<PageLoader />}>
