@@ -187,8 +187,7 @@ const SuppliersContent = () => {
         <Navigation />
 
       {/* Kenyan-Themed Hero Section */}
-      <AnimatedSection animation="fadeInUp">
-        <section className="text-white py-20 relative overflow-hidden">
+      <section className="text-white py-20 relative overflow-hidden">
         {/* Construction Site Background Image */}
         <div 
           className="absolute inset-0"
@@ -316,7 +315,6 @@ const SuppliersContent = () => {
             </Tabs>
           </div>
          </section>
-      </AnimatedSection>
 
         <main className="container mx-auto px-4 py-8 bg-gradient-to-b from-gray-50/30 to-white min-h-screen">
           {/* Enhanced Kenyan-Styled Security Notice - Admin Only */}
@@ -582,7 +580,9 @@ const SuppliersContent = () => {
       )}
 
       {/* Real-time Stats Section */}
-      <RealTimeStats />
+      <React.Suspense fallback={<div className="h-20"></div>}>
+        {!isAdmin && <RealTimeStats />}
+      </React.Suspense>
 
       <Footer />
     </div>
