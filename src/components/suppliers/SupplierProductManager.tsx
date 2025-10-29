@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Plus, Edit, Trash2, Package, Image as ImageIcon } from 'lucide-react';
-import { ProductImageUpload } from './ProductImageUpload';
+import { CategoryImageSelector } from './CategoryImageSelector';
 import {
   Dialog,
   DialogContent,
@@ -40,17 +40,24 @@ interface SupplierProductManagerProps {
 const PRODUCT_CATEGORIES = [
   'Cement',
   'Steel',
-  'Paint',
   'Tiles',
-  'Roofing',
+  'Paint',
   'Timber',
-  'Blocks',
-  'Aggregates',
+  'Hardware',
   'Plumbing',
   'Electrical',
-  'Hardware',
-  'Glass',
+  'Aggregates',
+  'Roofing',
+  'Insulation',
+  'Tools',
+  'Stone',
+  'Sand',
+  'Plywood',
   'Doors',
+  'Wire',
+  'Iron Sheets',
+  'Blocks',
+  'Glass',
   'Windows',
   'Other'
 ];
@@ -283,12 +290,37 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
             </DialogHeader>
 
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Product Image Upload */}
+              {/* Category Selection - Must be first to enable default images */}
+              <div className="space-y-2">
+                <Label htmlFor="category">Product Category *</Label>
+                <Select
+                  value={formData.category}
+                  onValueChange={(value) => setFormData({ ...formData, category: value })}
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PRODUCT_CATEGORIES.map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        {cat}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Select category first to see default images
+                </p>
+              </div>
+
+              {/* Product Image Upload with Category Support */}
               <div>
                 <Label className="text-lg font-semibold mb-4 block">Product Image *</Label>
-                <ProductImageUpload
+                <CategoryImageSelector
                   currentImageUrl={formData.image_url}
-                  onImageUpload={(url) => setFormData({ ...formData, image_url: url })}
+                  onImageSelect={(url) => setFormData({ ...formData, image_url: url })}
+                  category={formData.category}
                   productName={formData.name || 'product'}
                   supplierId={supplierId}
                 />
@@ -318,27 +350,8 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
                 />
               </div>
 
-              {/* Category and Unit */}
+              {/* Unit and Price */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="category">Category *</Label>
-                  <Select
-                    value={formData.category}
-                    onValueChange={(value) => setFormData({ ...formData, category: value })}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PRODUCT_CATEGORIES.map((category) => (
-                        <SelectItem key={category} value={category}>
-                          {category}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="unit">Unit *</Label>
@@ -496,4 +509,5 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
     </div>
   );
 };
+
 
