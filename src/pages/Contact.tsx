@@ -139,22 +139,8 @@ const Contact = () => {
           role="banner"
           aria-labelledby="contact-hero-heading"
         >
-        {/* Kenyan Construction Site Background */}
-        <div 
-          className="absolute inset-0"
-          style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1503387762-592deb58ef4e?ixlib=rb-4.0.3&auto=format&fit=crop&w=2131&q=80')`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat',
-            backgroundAttachment: 'fixed'
-          }}
-          role="img"
-          aria-label="Professional Kenyan construction site with modern building development and construction workers in Nairobi"
-        />
-        
-        {/* Kenyan flag colors overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-gray-900/60 to-gray-800/60"></div>
+        {/* Clean professional contact background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-blue-900 to-gray-800"></div>
         
         <div className="container mx-auto px-4 text-center relative z-10">
           <div className="max-w-4xl mx-auto">

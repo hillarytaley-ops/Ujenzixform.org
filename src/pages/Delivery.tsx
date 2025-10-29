@@ -223,16 +223,8 @@ const Delivery = () => {
       {/* Enhanced Hero Section */}
       <AnimatedSection animation="fadeInUp">
         <section className="text-white py-20 relative overflow-hidden">
-          {/* Real Delivery Truck - Professional Logistics Background */}
-          <div 
-            className="absolute inset-0"
-            style={{
-              backgroundImage: `url('https://images.unsplash.com/photo-1519003300449-424ad0405076?w=1920&h=1080&fit=crop&q=80')`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center'
-            }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-gray-900/70 to-gray-800/70"></div>
+          {/* Clean professional delivery background */}
+          <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-blue-900 to-gray-800"></div>
         <div className="container mx-auto px-4 text-center relative z-10">
           <Badge className="mb-6 bg-gradient-to-r from-gray-700 to-blue-600 text-white px-6 py-2 text-lg font-semibold">
             🇰🇪 Kenya's Premier Delivery Network

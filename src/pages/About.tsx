@@ -280,22 +280,8 @@ const About: React.FC = () => {
 
         {/* Team Section */}
         <section className="py-24 relative overflow-hidden" aria-labelledby="team-heading">
-          {/* Kenyan Modern Architecture Background */}
-          <div 
-            className="absolute inset-0"
-            style={{
-              backgroundImage: `url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat',
-              backgroundAttachment: 'fixed'
-            }}
-            role="img"
-            aria-label="Modern Kenyan office buildings and construction architecture showcasing professional development and urban growth"
-          />
-          
-          {/* Professional overlay */}
-          <div className="absolute inset-0 bg-gradient-to-b from-blue-900/80 via-gray-900/70 to-green-900/80"></div>
+          {/* Clean team background */}
+          <div className="absolute inset-0 bg-gradient-to-br from-gray-50 via-blue-50/30 to-gray-100"></div>
           
           <div className="container mx-auto px-4 relative z-10">
             <h2 id="team-heading" className="text-5xl font-bold text-center mb-6 text-white drop-shadow-2xl">Meet Our Team</h2>
