@@ -91,6 +91,12 @@ const App = () => {
             <Toaster />
             <Sonner />
             <BrowserRouter>
+              {/* AI Chatbot - Available on all pages (OUTSIDE routes so always visible) */}
+              <AIConstructionChatbot 
+                userId={user?.id}
+                userName={user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Guest'}
+              />
+              
               <ErrorBoundary>
                 <Suspense fallback={<PageLoader />}>
                   <Routes>
@@ -127,12 +133,6 @@ const App = () => {
                 </Suspense>
                 {/* Privacy features will be re-enabled once dependencies are resolved */}
               </ErrorBoundary>
-              
-              {/* AI Chatbot - Available on all pages */}
-              <AIConstructionChatbot 
-                userId={user?.id}
-                userName={user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Guest'}
-              />
             </BrowserRouter>
           </TooltipProvider>
         </QueryClientProvider>
