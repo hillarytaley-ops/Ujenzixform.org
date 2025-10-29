@@ -12,6 +12,7 @@ import { SecureContactDisplay } from "@/components/suppliers/SecureContactDispla
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { UserRole } from "@/types/userProfile";
+import { getDefaultCategoryImage } from "@/config/defaultCategoryImages";
 
 interface SupplierCatalogModalProps {
   supplier: Supplier;
@@ -337,13 +338,17 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
 
             <TabsContent value="grid">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredItems.map((item) => (
+                {filteredItems.map((item) => {
+                  // Use custom image, fallback to default category image, or show placeholder
+                  const imageUrl = item.image || getDefaultCategoryImage(item.category);
+                  
+                  return (
                   <Card key={item.id} className="hover:shadow-lg transition-shadow">
                     <CardContent className="p-4 space-y-3">
                       <div className="aspect-square bg-muted rounded-lg overflow-hidden">
-                        {item.image ? (
+                        {imageUrl ? (
                           <img 
-                            src={item.image} 
+                            src={imageUrl} 
                             alt={item.name}
                             className="w-full h-full object-cover"
                           />
@@ -387,20 +392,25 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
                       </div>
                     </CardContent>
                   </Card>
-                ))}
+                  );
+                })}
               </div>
             </TabsContent>
 
             <TabsContent value="list">
               <div className="space-y-2">
-                {filteredItems.map((item) => (
+                {filteredItems.map((item) => {
+                  // Use custom image, fallback to default category image, or show placeholder
+                  const imageUrl = item.image || getDefaultCategoryImage(item.category);
+                  
+                  return (
                   <Card key={item.id}>
                     <CardContent className="p-4">
                       <div className="flex items-center gap-4">
                         <div className="w-16 h-16 bg-muted rounded-lg overflow-hidden flex-shrink-0">
-                          {item.image ? (
+                          {imageUrl ? (
                             <img 
-                              src={item.image} 
+                              src={imageUrl} 
                               alt={item.name}
                               className="w-full h-full object-cover"
                             />
@@ -441,7 +451,8 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
                       </div>
                     </CardContent>
                   </Card>
-                ))}
+                  );
+                })}
               </div>
             </TabsContent>
           </Tabs>

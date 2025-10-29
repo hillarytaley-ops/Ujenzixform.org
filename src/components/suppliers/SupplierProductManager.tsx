@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Plus, Edit, Trash2, Package, Image as ImageIcon } from 'lucide-react';
 import { CategoryImageSelector } from './CategoryImageSelector';
+import { getDefaultCategoryImage } from '@/config/defaultCategoryImages';
 import {
   Dialog,
   DialogContent,
@@ -442,13 +443,17 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {products.map((product) => (
+          {products.map((product) => {
+            // Use custom image, fallback to default category image
+            const imageUrl = product.image_url || getDefaultCategoryImage(product.category);
+            
+            return (
             <Card key={product.id} className="overflow-hidden hover:shadow-lg transition-shadow">
               {/* Product Image */}
               <div className="relative aspect-square bg-muted">
-                {product.image_url ? (
+                {imageUrl ? (
                   <img
-                    src={product.image_url}
+                    src={imageUrl}
                     alt={product.name}
                     className="w-full h-full object-cover"
                   />
@@ -503,7 +508,8 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
                 </div>
               </CardContent>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
