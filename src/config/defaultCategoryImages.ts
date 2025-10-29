@@ -1,21 +1,25 @@
 /**
- * Default Category Images Configuration
+ * Default Category Images Configuration - KENYA CONSTRUCTION MATERIALS
  * 
- * This file contains placeholder image URLs for each material category.
+ * This file contains images for Kenyan construction material categories.
  * Suppliers can choose to use these default images or upload their own custom images.
  * 
- * HOW TO ADD REAL IMAGES:
- * 1. Download/purchase royalty-free images from sources like:
+ * HOW TO ADD REAL KENYAN BRAND IMAGES:
+ * 1. Take photos at local hardware stores OR
+ * 2. Contact Kenyan suppliers (Bamburi, Mabati, Crown Paints) for permission OR
+ * 3. Use free stock photos from:
  *    - Unsplash (unsplash.com) - Free for commercial use
  *    - Pexels (pexels.com) - Free for commercial use
- *    - Pixabay (pixabay.com) - Free for commercial use
  * 
- * 2. Upload images to Supabase Storage:
+ * 4. Upload YOUR images to Supabase Storage:
  *    - Bucket: 'default-category-images'
  *    - Recommended size: 800x800px
  *    - Format: JPG or PNG
  * 
- * 3. Replace the placeholder URLs below with your Supabase public URLs
+ * 5. Replace the URLs below with your Supabase public URLs:
+ *    Format: https://YOUR_PROJECT.supabase.co/storage/v1/object/public/default-category-images/cement.jpg
+ * 
+ * See: KENYA_SPECIFIC_IMAGES_GUIDE.md for detailed instructions
  */
 
 export interface CategoryImage {
@@ -28,12 +32,12 @@ export const DEFAULT_CATEGORY_IMAGES: Record<string, CategoryImage> = {
   'Cement': {
     category: 'Cement',
     imageUrl: 'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=800&q=80',
-    description: 'Cement bags and powder'
+    description: 'Cement - Bamburi, Savannah, Mombasa Cement (50kg bags)'
   },
   'Steel': {
     category: 'Steel',
     imageUrl: 'https://images.unsplash.com/photo-1565620843922-434f8c65e939?w=800&q=80',
-    description: 'Steel bars and reinforcement'
+    description: 'Steel Bars - Y8, Y10, Y12, Y16 KEBS approved rebar'
   },
   'Tiles': {
     category: 'Tiles',
@@ -43,12 +47,12 @@ export const DEFAULT_CATEGORY_IMAGES: Record<string, CategoryImage> = {
   'Paint': {
     category: 'Paint',
     imageUrl: 'https://images.unsplash.com/photo-1562259949-e8e7689d7828?w=800&q=80',
-    description: 'Paint cans and buckets'
+    description: 'Paints - Crown, Basco, Galaxy Paints Kenya'
   },
   'Timber': {
     category: 'Timber',
     imageUrl: 'https://images.unsplash.com/photo-1614963366795-3b0e4c7f9ba7?w=800&q=80',
-    description: 'Lumber and wood planks'
+    description: 'Timber - Cypress, Pine, Hardwood (treated & untreated)'
   },
   'Hardware': {
     category: 'Hardware',
@@ -58,12 +62,12 @@ export const DEFAULT_CATEGORY_IMAGES: Record<string, CategoryImage> = {
   'Plumbing': {
     category: 'Plumbing',
     imageUrl: 'https://images.unsplash.com/photo-1607472586893-edb57bdc0e39?w=800&q=80',
-    description: 'Pipes and plumbing fittings'
+    description: 'Plumbing - Kenpipe, PVC pipes & fittings KEBS approved'
   },
   'Electrical': {
     category: 'Electrical',
     imageUrl: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=800&q=80',
-    description: 'Electrical wires and cables'
+    description: 'Electrical - Nyayo, Kinga cables KEBS certified'
   },
   'Aggregates': {
     category: 'Aggregates',
@@ -73,7 +77,7 @@ export const DEFAULT_CATEGORY_IMAGES: Record<string, CategoryImage> = {
   'Roofing': {
     category: 'Roofing',
     imageUrl: 'https://images.unsplash.com/photo-1632778149955-e80f8ceca2e8?w=800&q=80',
-    description: 'Roofing sheets and materials'
+    description: 'Roofing - Mabati, Safal, Corrugated Iron Sheets Kenya'
   },
   'Insulation': {
     category: 'Insulation',
@@ -113,7 +117,7 @@ export const DEFAULT_CATEGORY_IMAGES: Record<string, CategoryImage> = {
   'Iron Sheets': {
     category: 'Iron Sheets',
     imageUrl: 'https://images.unsplash.com/photo-1632778149955-e80f8ceca2e8?w=800&q=80',
-    description: 'Corrugated iron and metal roofing sheets'
+    description: 'Iron Sheets - Mabati Box Profile, Gauge 28-32'
   },
   'Blocks': {
     category: 'Blocks',
