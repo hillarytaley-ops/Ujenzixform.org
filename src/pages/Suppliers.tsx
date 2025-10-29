@@ -180,6 +180,44 @@ const SuppliersContent = () => {
   const showDirectoryAccess = true; // Changed from isAdmin to make public
   const showRegistrationOnly = !loading && user && !isAdmin;
 
+  // MOBILE ADMIN: Completely simplified view to prevent crashes
+  if (isAdmin && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <div className="container mx-auto px-4 py-8">
+          <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h1 className="text-2xl font-bold mb-2">🇰🇪 Admin Dashboard</h1>
+            <p className="text-muted-foreground mb-4">
+              Mobile admin view - simplified for stability
+            </p>
+            <div className="space-y-2">
+              <Badge className="bg-blue-600 text-white">✅ Admin Access</Badge>
+              <Badge variant="outline">📱 Mobile View</Badge>
+            </div>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Materials Marketplace</CardTitle>
+              <CardDescription>Browse construction materials from suppliers</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <MaterialsGrid />
+            </CardContent>
+          </Card>
+
+          <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+            <p className="text-sm text-center text-muted-foreground">
+              💡 For full admin features, please use desktop
+            </p>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
   // Wrap entire render in try-catch for mobile safety
   try {
     return (
