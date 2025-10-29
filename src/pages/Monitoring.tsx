@@ -276,18 +276,18 @@ const Monitoring = () => {
           role="banner"
           aria-labelledby="monitoring-hero-heading"
         >
-        {/* Kenyan Construction Surveillance & Monitoring Background */}
+        {/* Security Camera & Drone Surveillance Background */}
         <div 
           className="absolute inset-0"
           style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1508514177221-188b1cf16e9d?w=1920&h=1080&fit=crop&q=80')`,
+            backgroundImage: `url('https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?w=1920&h=1080&fit=crop&q=80')`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
             backgroundAttachment: 'fixed'
           }}
           role="img"
-          aria-label="Drone monitoring construction site - aerial surveillance for Kenyan construction projects"
+          aria-label="Professional drone and camera surveillance technology for construction site monitoring"
         />
         
         {/* Kenyan flag colors overlay with monitoring theme */}
@@ -296,7 +296,7 @@ const Monitoring = () => {
         <div className="container mx-auto px-4 text-center relative z-10">
           <div className="max-w-5xl mx-auto">
             <div className="mb-8 flex justify-center">
-              <Badge className="bg-gradient-to-r from-green-600 to-red-600 text-white px-8 py-3 text-xl font-bold border border-white/30 shadow-lg">
+              <Badge className="bg-gradient-to-r from-gray-700 to-blue-600 text-white px-8 py-3 text-xl font-bold border border-white/30 shadow-lg">
                 🇰🇪 Advanced Construction Monitoring
               </Badge>
             </div>
