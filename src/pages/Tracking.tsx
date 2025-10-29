@@ -147,18 +147,18 @@ const Tracking = () => {
             role="banner"
             aria-labelledby="tracking-hero-heading"
           >
-          {/* Kenyan GPS Tracking & Logistics Background */}
+          {/* GPS Tracking & Logistics Background - Delivery trucks with tracking technology */}
           <div 
             className="absolute inset-0"
             style={{
-              backgroundImage: `url('https://images.unsplash.com/photo-1558618666-fcd25c85cd64?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')`,
+              backgroundImage: `url('https://images.unsplash.com/photo-1566576721346-d4a3b4eaeb55?w=1920&h=1080&fit=crop&q=80')`,
               backgroundSize: 'cover',
               backgroundPosition: 'center',
               backgroundRepeat: 'no-repeat',
               backgroundAttachment: 'fixed'
             }}
             role="img"
-            aria-label="Professional Kenyan construction site with GPS tracking technology and delivery vehicles for real-time material tracking and logistics management"
+            aria-label="Professional logistics and GPS tracking technology for real-time material delivery tracking and fleet management"
           />
           
           {/* Kenyan flag colors overlay with tracking theme */}
