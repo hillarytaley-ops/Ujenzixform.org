@@ -223,11 +223,11 @@ const Delivery = () => {
       {/* Enhanced Hero Section */}
       <AnimatedSection animation="fadeInUp">
         <section className="text-white py-20 relative overflow-hidden">
-          {/* Delivery Trucks and Construction Materials Background */}
+          {/* Real Delivery Truck - Professional Logistics Background */}
           <div 
             className="absolute inset-0"
             style={{
-              backgroundImage: `url('https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?w=1920&h=1080&fit=crop')`,
+              backgroundImage: `url('https://images.unsplash.com/photo-1519003300449-424ad0405076?w=1920&h=1080&fit=crop&q=80')`,
               backgroundSize: 'cover',
               backgroundPosition: 'center'
             }}
