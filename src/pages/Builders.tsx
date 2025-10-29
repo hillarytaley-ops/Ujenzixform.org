@@ -201,19 +201,25 @@ const Builders = () => {
           aria-label="Professional Kenyan construction site with modern buildings, cranes, and construction professionals working on high-rise development projects"
         />
         
-        {/* Kenyan flag colors overlay with professional gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-black/85 via-green-900/70 to-red-900/70"></div>
+        {/* Clean professional overlay */}
+        <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-gray-900/70 to-gray-800/70"></div>
         
         <div className="container mx-auto px-4 text-center relative z-10">
           <div className="max-w-5xl mx-auto">
             <div className="mb-8 flex justify-center">
-              <Badge className="bg-gradient-to-r from-green-600 to-red-600 text-white px-8 py-3 text-xl font-bold border border-white/30 shadow-lg">
+              <Badge className="bg-gradient-to-r from-gray-700 to-blue-600 text-white px-8 py-3 text-xl font-bold border border-white/30 shadow-lg">
                 🇰🇪 Kenya's Premier Construction Professionals
               </Badge>
             </div>
             
-            <h1 id="builders-hero-heading" className="text-6xl md:text-8xl font-bold mb-8 text-white drop-shadow-2xl">
-              Professional Builders Directory
+            <h1 id="builders-hero-heading" className="text-6xl md:text-8xl font-bold mb-8 drop-shadow-2xl">
+              <span className="bg-gradient-to-r from-white via-gray-200 to-white bg-clip-text text-transparent">
+                Professional Builders
+              </span>
+              <br />
+              <span className="text-5xl md:text-6xl text-blue-400">
+                Directory
+              </span>
             </h1>
             
             <p className="text-2xl md:text-4xl mb-12 text-white/90 font-medium drop-shadow-lg leading-relaxed">
@@ -222,22 +228,52 @@ const Builders = () => {
               professionals for residential, commercial, or industrial projects across all 47 counties.
             </p>
             
+            {/* Action Buttons - Always Visible */}
+            <div className="flex flex-wrap gap-4 justify-center mb-12">
+              <Button 
+                size="lg"
+                onClick={() => setShowDashboard(false)}
+                className="bg-white text-gray-900 hover:bg-gray-100 font-semibold px-8 py-6 text-lg shadow-xl"
+              >
+                <Building2 className="h-5 w-5 mr-2" />
+                Browse Builders
+              </Button>
+              
+              <Button 
+                size="lg"
+                onClick={() => window.location.href = '/builders/register'}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
+              >
+                <Building2 className="h-5 w-5 mr-2" />
+                Register as Builder
+              </Button>
+              
+              <Button 
+                size="lg"
+                onClick={() => window.location.href = '/suppliers'}
+                className="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
+              >
+                <ShoppingCart className="h-5 w-5 mr-2" />
+                Purchase Materials
+              </Button>
+            </div>
+
             {/* Professional Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
               <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
-                <div className="text-4xl font-bold text-green-400 mb-2">150+</div>
+                <div className="text-4xl font-bold text-blue-400 mb-2">150+</div>
                 <div className="text-white font-medium">Certified Builders</div>
               </div>
               <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
-                <div className="text-4xl font-bold text-blue-400 mb-2">500+</div>
+                <div className="text-4xl font-bold text-gray-300 mb-2">500+</div>
                 <div className="text-white font-medium">Completed Projects</div>
               </div>
               <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
-                <div className="text-4xl font-bold text-yellow-400 mb-2">47</div>
+                <div className="text-4xl font-bold text-orange-400 mb-2">47</div>
                 <div className="text-white font-medium">Counties Served</div>
               </div>
               <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
-                <div className="text-4xl font-bold text-red-400 mb-2">24/7</div>
+                <div className="text-4xl font-bold text-blue-300 mb-2">24/7</div>
                 <div className="text-white font-medium">Support</div>
               </div>
             </div>
@@ -246,7 +282,7 @@ const Builders = () => {
             <div className="flex flex-col sm:flex-row justify-center items-center gap-6">
               <div className="flex items-center gap-4">
                 {isAdmin && (
-                  <Badge className="bg-red-600/90 text-white border-white/30 px-4 py-2 text-lg font-semibold">
+                  <Badge className="bg-blue-600/90 text-white border-white/30 px-4 py-2 text-lg font-semibold">
                     <Shield className="h-5 w-5 mr-2" />
                     Admin View
                   </Badge>
@@ -259,16 +295,6 @@ const Builders = () => {
                   >
                     <Settings className="h-5 w-5" />
                     {showDashboard ? 'View Public Directory' : 'Builder Dashboard'}
-                  </Button>
-                )}
-                {!userProfile && (
-                  <Button
-                    variant="outline"
-                    onClick={() => window.location.href = '/builders/register'}
-                    className="bg-green-600/90 backdrop-blur-sm border-white/30 text-white hover:bg-green-700/90 px-6 py-3 text-lg font-semibold"
-                  >
-                    <Building2 className="h-5 w-5 mr-2" />
-                    Register as Builder
                   </Button>
                 )}
               </div>
@@ -331,9 +357,9 @@ const Builders = () => {
               <div className="space-y-8">
                 {/* Professional Builder Header */}
                 <Card className="bg-white/95 backdrop-blur-sm border-2 border-white/50 shadow-2xl">
-                  <CardHeader className="bg-gradient-to-r from-green-50 via-blue-50 to-red-50 border-b border-gray-200">
+                  <CardHeader className="bg-gradient-to-r from-gray-50 via-blue-50 to-gray-50 border-b border-gray-200">
                     <CardTitle className="flex items-center gap-3 text-3xl font-bold text-gray-900">
-                      <div className="p-3 bg-gradient-to-br from-green-500 to-red-500 rounded-full shadow-lg">
+                      <div className="p-3 bg-gradient-to-br from-blue-600 to-blue-700 rounded-full shadow-lg">
                         <Shield className="h-8 w-8 text-white" />
                       </div>
                       Professional Builder Workflow
@@ -449,9 +475,9 @@ const Builders = () => {
             <div className="space-y-8">
               {/* Private Builder Header */}
               <Card className="bg-white/95 backdrop-blur-sm border-2 border-white/50 shadow-2xl">
-                <CardHeader className="bg-gradient-to-r from-blue-50 via-green-50 to-yellow-50 border-b border-gray-200">
+                <CardHeader className="bg-gradient-to-r from-gray-50 via-blue-50 to-gray-50 border-b border-gray-200">
                   <CardTitle className="flex items-center gap-3 text-3xl font-bold text-gray-900">
-                    <div className="p-3 bg-gradient-to-br from-blue-500 to-green-500 rounded-full shadow-lg">
+                    <div className="p-3 bg-gradient-to-br from-blue-600 to-blue-700 rounded-full shadow-lg">
                       <Shield className="h-8 w-8 text-white" />
                     </div>
                     Private Builder Workflow
@@ -581,7 +607,7 @@ const Builders = () => {
         />
         
         {/* Professional overlay */}
-        <div className="absolute inset-0 bg-gradient-to-b from-green-900/80 via-black/70 to-red-900/80"></div>
+        <div className="absolute inset-0 bg-gradient-to-b from-gray-900/80 via-black/70 to-gray-800/80"></div>
         
         <div className="container mx-auto px-4 relative z-10">
           <div className="text-center mb-16">
@@ -594,7 +620,7 @@ const Builders = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 text-center">
             <div className="bg-white/15 backdrop-blur-sm rounded-2xl p-8 border border-white/20 hover:bg-white/20 transition-all duration-300 shadow-xl">
-              <div className="text-5xl font-bold text-green-400 mb-4 drop-shadow-lg">150+</div>
+              <div className="text-5xl font-bold text-blue-400 mb-4 drop-shadow-lg">150+</div>
               <div className="text-2xl font-semibold text-white mb-2">Certified Builders</div>
               <div className="text-white/80">Verified professionals across Kenya</div>
             </div>
