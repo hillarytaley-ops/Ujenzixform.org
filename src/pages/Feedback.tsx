@@ -32,7 +32,7 @@ export default function Feedback() {
         />
         
         {/* Kenyan flag colors overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-green-900/60 to-red-900/60"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-gray-900/60 to-gray-800/60"></div>
         
         <div className="container mx-auto px-4 text-center relative z-10">
           <div className="max-w-4xl mx-auto">

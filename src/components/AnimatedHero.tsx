@@ -60,7 +60,7 @@ const AnimatedHero: React.FC<AnimatedHeroProps> = ({
     >
       {/* Badge */}
       <motion.div variants={badgeVariants} className="mb-4 flex justify-center">
-        <Badge className="mb-4 bg-kenyan-green text-white border-kenyan-green">
+        <Badge className="mb-4 bg-gradient-to-r from-gray-700 to-blue-600 text-white border-blue-600">
           {badge}
         </Badge>
       </motion.div>
@@ -79,7 +79,7 @@ const AnimatedHero: React.FC<AnimatedHeroProps> = ({
           Jenga,{' '}
         </motion.span>
         <motion.span 
-          className="text-acacia-gold inline-block"
+          className="text-blue-400 inline-block"
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.5, duration: 0.5 }}
@@ -95,7 +95,7 @@ const AnimatedHero: React.FC<AnimatedHeroProps> = ({
           na{' '}
         </motion.span>
         <motion.span 
-          className="text-kenyan-green inline-block"
+          className="text-orange-400 inline-block"
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.9, duration: 0.5 }}
@@ -106,7 +106,7 @@ const AnimatedHero: React.FC<AnimatedHeroProps> = ({
 
       {/* Subtitle */}
       <motion.div 
-        className="text-2xl font-medium mb-4 text-acacia-gold"
+        className="text-2xl font-medium mb-4 text-blue-400"
         variants={itemVariants}
       >
         {subtitle}

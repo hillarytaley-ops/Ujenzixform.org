@@ -162,12 +162,12 @@ const Tracking = () => {
           />
           
           {/* Kenyan flag colors overlay with tracking theme */}
-          <div className="absolute inset-0 bg-gradient-to-br from-black/85 via-green-900/70 to-red-900/70"></div>
+          <div className="absolute inset-0 bg-gradient-to-br from-black/85 via-gray-900/70 to-gray-800/70"></div>
           
           <div className="container mx-auto px-4 text-center relative z-10">
             <div className="max-w-5xl mx-auto">
               <div className="mb-8 flex justify-center">
-                <Badge className="bg-gradient-to-r from-green-600 to-red-600 text-white px-8 py-3 text-xl font-bold border border-white/30 shadow-lg">
+                <Badge className="bg-gradient-to-r from-gray-700 to-blue-600 text-white px-8 py-3 text-xl font-bold border border-white/30 shadow-lg">
                   🇰🇪 Military-Grade GPS Tracking System
                 </Badge>
               </div>
@@ -255,7 +255,7 @@ const Tracking = () => {
                 </p>
 
                 <div className="flex justify-center gap-4 mb-6">
-                  <Badge className="bg-gradient-to-r from-green-500 to-blue-500 text-white px-4 py-2 text-lg font-semibold">
+                  <Badge className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-2 text-lg font-semibold">
                     <Eye className="h-4 w-4 mr-2" />
                     Authorized Access
                   </Badge>

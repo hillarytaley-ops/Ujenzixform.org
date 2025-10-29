@@ -243,7 +243,7 @@ const Index = () => {
         </section>
 
         {/* Video Section - Complete Platform Demo with Monitoring */}
-        <section className="py-16 bg-gradient-to-br from-slate-50 to-slate-100">
+        <section className="py-16 bg-gradient-to-br from-gray-50 to-gray-100">
           <div className="container mx-auto px-4">
             <AnimatedSection animation="fadeInUp">
               <div className="text-center mb-12">
@@ -323,7 +323,7 @@ const Index = () => {
               </div>
               
               {/* Benefits callout */}
-              <div className="mt-8 bg-gradient-to-r from-primary/5 to-kenyan-green/5 rounded-lg p-6 border border-primary/10">
+              <div className="mt-8 bg-gradient-to-r from-blue-50/50 to-gray-50/50 rounded-lg p-6 border border-gray-200">
                 <div className="text-center">
                   <h3 className="text-xl font-bold text-foreground mb-3">
                     Everything You Need in One Platform
@@ -439,7 +439,7 @@ const Index = () => {
         </section>
 
         {/* Kenya-Specific Features */}
-        <section className="py-16 bg-gradient-to-br from-kenyan-green/10 to-acacia-gold/10">
+        <section className="py-16 bg-gradient-to-br from-gray-50 to-blue-50/30">
           <div className="container mx-auto px-4">
             <div className="text-center mb-12">
               <h2 className="text-3xl font-bold text-gray-900 mb-4">

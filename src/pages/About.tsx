@@ -156,7 +156,7 @@ const About: React.FC = () => {
           >
           {/* Kenyan Construction Background */}
           <div 
-            className="absolute inset-0 bg-gradient-to-br from-blue-900/90 via-green-900/80 to-red-900/90"
+            className="absolute inset-0 bg-gradient-to-br from-blue-900/90 via-gray-900/80 to-gray-800/90"
             style={{
               backgroundImage: `url('https://images.unsplash.com/photo-1541888946425-d81bb19240f5?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')`,
               backgroundSize: 'cover',
@@ -169,7 +169,7 @@ const About: React.FC = () => {
           />
           
           {/* Overlay with Kenyan flag colors gradient */}
-          <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-green-900/40 to-red-900/40"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-gray-900/40 to-gray-800/40"></div>
           
           <div className="container mx-auto px-4 text-center relative z-10">
             <Badge className="mb-6 bg-gradient-to-r from-green-600 to-red-600 text-white border-white/30 px-4 py-2 text-lg font-semibold" aria-label="Proudly Kenyan company">
@@ -379,7 +379,7 @@ const About: React.FC = () => {
           />
           
           {/* Kenyan flag colors overlay */}
-          <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-green-900/60 to-red-900/60"></div>
+          <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-gray-900/60 to-gray-800/60"></div>
           
           <div className="container mx-auto px-4 relative z-10">
             <h2 id="stats-heading" className="text-5xl font-bold text-center mb-4 drop-shadow-2xl">Our Impact Across Kenya</h2>
