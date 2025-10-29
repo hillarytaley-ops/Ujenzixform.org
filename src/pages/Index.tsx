@@ -110,45 +110,77 @@ const Index = () => {
   ];
 
   return (
-    <OptimizedBackground
-      src="/construction-site-drones.jpg"
-      fallbackSrc="/kenyan-home-bg-small.svg"
-      className="min-h-screen"
-    >
+    <div className="min-h-screen bg-background">
         <Navigation />
 
-        {/* Hero Section */}
-        <section className="container mx-auto px-4 py-16 text-center">
-          <AnimatedSection animation="fadeInUp">
-            <h1 className="text-5xl md:text-6xl font-bold mb-6 text-foreground drop-shadow-lg">
-              Kenya's Construction Marketplace
-            </h1>
-            <p className="text-xl md:text-2xl mb-4 text-foreground/90 max-w-4xl mx-auto">
-              Connect builders, suppliers, and construction professionals across all 47 counties
-            </p>
-            <p className="text-lg mb-10 text-foreground/80 max-w-4xl mx-auto leading-relaxed">
-              <strong>Your Complete Construction Solution:</strong> Find and hire certified builders and contractors, 
-              browse verified suppliers and source quality materials, request and manage deliveries with real-time GPS tracking, 
-              scan materials with QR codes for authenticity verification, monitor construction sites with live cameras and drones, 
-              process secure M-Pesa payments, generate purchase orders and invoices, track project progress, 
-              and manage your entire construction workflow - all in one integrated platform designed for Kenya's construction industry.
-            </p>
-          </AnimatedSection>
-          
-          {/* Main Action Buttons */}
-          <AnimatedSection animation="fadeInUp" delay={100}>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
-              <Link to="/builders">
-                <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground text-lg px-10 py-6 shadow-xl">
-                  👷 Find Builders
-                </Button>
-              </Link>
-              <Link to="/suppliers">
-                <Button size="lg" variant="outline" className="border-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground text-lg px-10 py-6 shadow-xl bg-white/90">
-                  🏪 Browse Suppliers
-                </Button>
-              </Link>
-            </div>
+        {/* Hero Section - Matching Suppliers/Builders Design */}
+        <AnimatedSection animation="fadeInUp">
+          <section className="text-white py-20 relative overflow-hidden">
+            {/* Construction Site Background */}
+            <div 
+              className="absolute inset-0"
+              style={{
+                backgroundImage: `url('https://images.unsplash.com/photo-1541888946425-d81bb19240f5?w=1920&h=1080&fit=crop')`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center'
+              }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-gray-900/70 to-gray-800/70"></div>
+            
+            <div className="container mx-auto px-4 text-center relative z-10">
+              <div className="mb-6">
+                <span className="text-2xl mb-2 block">🇰🇪</span>
+                <p className="text-lg text-gray-200 mb-2">Karibu - Welcome to Kenya's</p>
+              </div>
+              
+              <h1 className="text-5xl md:text-6xl font-bold mb-6 leading-tight">
+                <span className="bg-gradient-to-r from-white via-gray-200 to-white bg-clip-text text-transparent">
+                  UjenziPro
+                </span>
+                <br />
+                <span className="text-3xl md:text-4xl text-blue-400">
+                  Construction Marketplace
+                </span>
+              </h1>
+              
+              <p className="text-xl md:text-2xl mb-8 opacity-90 max-w-4xl mx-auto leading-relaxed">
+                <strong>Your Complete Construction Solution:</strong> Find certified builders, browse verified suppliers, 
+                request deliveries with GPS tracking, scan materials with QR codes, monitor sites with live cameras, 
+                and manage your entire construction workflow across all 47 counties.
+              </p>
+
+              {/* Action Buttons - Always Visible */}
+              <div className="flex flex-wrap gap-4 justify-center mb-8">
+                <Link to="/suppliers">
+                  <Button 
+                    size="lg"
+                    className="bg-white text-gray-900 hover:bg-gray-100 font-semibold px-8 py-6 text-lg shadow-xl"
+                  >
+                    <Store className="h-5 w-5 mr-2" />
+                    Browse Materials
+                  </Button>
+                </Link>
+                
+                <Link to="/builders">
+                  <Button 
+                    size="lg"
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
+                  >
+                    <Building2 className="h-5 w-5 mr-2" />
+                    Find Builders
+                  </Button>
+                </Link>
+                
+                <Link to="/delivery">
+                  <Button 
+                    size="lg"
+                    className="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
+                  >
+                    <Truck className="h-5 w-5 mr-2" />
+                    Request Delivery
+                  </Button>
+                </Link>
+              </div>
             
             {/* Quick Access Links */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-w-4xl mx-auto mb-12">
@@ -576,7 +608,7 @@ const Index = () => {
         </section>
 
         <Footer />
-    </OptimizedBackground>
+    </div>
   );
 };
 
