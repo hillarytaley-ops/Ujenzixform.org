@@ -227,7 +227,7 @@ const Delivery = () => {
           <div 
             className="absolute inset-0"
             style={{
-              backgroundImage: `url('https://images.unsplash.com/photo-1519003300449-424ad0405076?w=1920&h=1080&fit=crop')`,
+              backgroundImage: `url('https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?w=1920&h=1080&fit=crop')`,
               backgroundSize: 'cover',
               backgroundPosition: 'center'
             }}
