@@ -134,7 +134,7 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
     });
   };
   
-  // Kenyan construction materials catalog with authentic local market images
+  // Kenyan construction materials catalog - now uses default category images
   const catalogItems: CatalogItem[] = [
     {
       id: "1",
@@ -145,7 +145,7 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
       description: "Premium Portland cement from Bamburi - Kenya's most trusted cement brand for foundations, slabs, and structural work",
       inStock: true,
       rating: 4.8,
-      image: "https://images.unsplash.com/photo-1618491994992-2f6d7105d8b2?w=500&h=500&fit=crop&q=85"
+      // image removed - will use default Cement image
     },
     {
       id: "2", 
@@ -156,7 +156,7 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
       description: "High tensile deformed bars (Y12 - 12mm diameter) for concrete reinforcement - KEBS approved, 6-meter length",
       inStock: true,
       rating: 4.9,
-      image: "https://images.unsplash.com/photo-1565084888279-aca607ecce8c?w=500&h=500&fit=crop&q=85"
+      // image removed - will use default Steel image
     },
     {
       id: "3",
@@ -167,7 +167,7 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
       description: "Premium imported vitrified porcelain tiles - high gloss finish, stain resistant, suitable for high traffic areas",
       inStock: true,
       rating: 4.7,
-      image: "https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?w=500&h=500&fit=crop&q=85"
+      // image removed - will use default Tiles image
     },
     {
       id: "4",
@@ -178,7 +178,7 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
       description: "High-quality ballast and building stones from Machakos quarries - graded for concrete mixing and construction",
       inStock: true,
       rating: 4.5,
-      image: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=500&h=500&fit=crop&q=85"
+      // image removed - will use default Aggregates image
     },
     {
       id: "5",
@@ -189,7 +189,7 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
       description: "Mabati box profile corrugated iron sheets - galvanized steel, gauge 28, 3-meter length, 25-year warranty",
       inStock: true,
       rating: 4.8,
-      image: "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=500&h=500&fit=crop&q=85"
+      // image removed - will use default Roofing image
     },
     {
       id: "6",
@@ -200,7 +200,7 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
       description: "Crown Paints premium acrylic emulsion - smooth matt finish, washable, covers 140-160 sqm, available in 1000+ colors",
       inStock: true,
       rating: 4.7,
-      image: "https://images.unsplash.com/photo-1513467535987-fd81bc7d62f8?w=500&h=500&fit=crop&q=85"
+      // image removed - will use default Paint image
     },
     {
       id: "7",
@@ -211,7 +211,7 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
       description: "Eco-friendly pozzolana cement blend - ideal for mass concreting, plasters, and general construction in Kenya",
       inStock: true,
       rating: 4.6,
-      image: "https://images.unsplash.com/photo-1618491994992-2f6d7105d8b2?w=500&h=500&fit=crop&q=85"
+      // image removed - will use default Cement image
     },
     {
       id: "8",
@@ -222,7 +222,7 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
       description: "Machakos machine-cut stones (20mm, 40mm, 60mm) - graded aggregates for concrete work and construction",
       inStock: true,
       rating: 4.4,
-      image: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=500&h=500&fit=crop&q=85"
+      // image removed - will use default Aggregates image
     },
     {
       id: "9",
@@ -233,7 +233,7 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
       description: "Premium concrete roofing tiles from Versalite Kenya - interlocking design, 50-year lifespan, multiple colors",
       inStock: true,
       rating: 4.8,
-      image: "https://images.unsplash.com/photo-1604762512592-3d83f6543bde?w=500&h=500&fit=crop&q=85"
+      // image removed - will use default Roofing image
     },
     {
       id: "10",
@@ -244,7 +244,7 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
       description: "Pressure-treated cypress timber - 4x2 inches, 12 feet length, termite and borer resistant, ideal for roofing",
       inStock: true,
       rating: 4.5,
-      image: "https://images.unsplash.com/photo-1566576912321-d58ddd7a6088?w=500&h=500&fit=crop&q=85"
+      // image removed - will use default Timber image
     },
     {
       id: "11",
@@ -255,7 +255,7 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
       description: "KenPipe pressure PVC pipes - 4-inch diameter, 6-meter length, KEBS approved for water supply systems",
       inStock: true,
       rating: 4.6,
-      image: "https://images.unsplash.com/photo-1585704032915-c3400ca199e7?w=500&h=500&fit=crop&q=85"
+      // image removed - will use default Plumbing image
     },
     {
       id: "12",
@@ -266,7 +266,7 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
       description: "Standard 6-inch concrete hollow blocks - 450x225x150mm, high compressive strength, ideal for wall construction",
       inStock: true,
       rating: 4.3,
-      image: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=500&h=500&fit=crop&q=85"
+      // image removed - will use default Blocks image
     },
     {
       id: "13",
@@ -277,7 +277,7 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
       description: "Nyayo twin & earth electrical cables - 2.5mm² copper conductor, PVC insulated, KEBS certified for house wiring",
       inStock: true,
       rating: 4.7,
-      image: "https://images.unsplash.com/photo-1591696331296-6174cd5e31c9?w=500&h=500&fit=crop&q=85"
+      // image removed - will use default Electrical image
     },
     {
       id: "14",
@@ -288,7 +288,7 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
       description: "Interlocking concrete paving blocks - 200x100x60mm, various colors, ideal for driveways, walkways, and parking",
       inStock: true,
       rating: 4.4,
-      image: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=500&h=500&fit=crop&q=85"
+      // image removed - will use default Blocks image
     },
     {
       id: "15",
@@ -299,7 +299,7 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
       description: "Natural Meru Oak hardwood - 6x2 inches, 12 feet, seasoned and treated, perfect for door frames and heavy-duty applications",
       inStock: true,
       rating: 4.9,
-      image: "https://images.unsplash.com/photo-1601596846439-ea13e8c0ca59?w=500&h=500&fit=crop&q=85"
+      // image removed - will use default Timber image
     }
   ];
 
