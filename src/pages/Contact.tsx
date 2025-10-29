@@ -192,22 +192,8 @@ const Contact = () => {
 
       {/* Contact Section */}
       <main className="py-20 relative overflow-hidden">
-        {/* Kenyan Construction Materials Background */}
-        <div 
-          className="absolute inset-0"
-          style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1590736969955-71cc94901144?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat',
-            backgroundAttachment: 'fixed'
-          }}
-          role="img"
-          aria-label="Kenyan construction materials warehouse with cement bags, steel bars, and building supplies ready for delivery"
-        />
-        
-        {/* Light overlay for form readability */}
-        <div className="absolute inset-0 bg-white/90 backdrop-blur-[2px]"></div>
+        {/* Clean form background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-50 via-blue-50/30 to-gray-100"></div>
         
         <div className="container mx-auto px-4 relative z-10">
           <div className="text-center mb-12">
@@ -578,22 +564,8 @@ const Contact = () => {
         className="py-24 relative overflow-hidden"
         aria-labelledby="faq-heading"
       >
-        {/* Kenyan Construction Equipment Background */}
-        <div 
-          className="absolute inset-0"
-          style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1558618666-fcd25c85cd64?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat',
-            backgroundAttachment: 'fixed'
-          }}
-          role="img"
-          aria-label="Kenyan construction equipment and machinery at a modern construction site showcasing professional construction operations"
-        />
-        
-        {/* Dark overlay for text readability */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-gray-900/70 to-green-900/80"></div>
+        {/* Clean FAQ background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-blue-900 to-gray-800"></div>
         
         <div className="container mx-auto px-4 relative z-10">
           <div className="text-center mb-16">

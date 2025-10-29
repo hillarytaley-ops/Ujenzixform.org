@@ -154,19 +154,8 @@ const About: React.FC = () => {
             role="banner"
             aria-labelledby="hero-heading"
           >
-          {/* Kenyan Construction Background */}
-          <div 
-            className="absolute inset-0 bg-gradient-to-br from-blue-900/90 via-gray-900/80 to-gray-800/90"
-            style={{
-              backgroundImage: `url('https://images.unsplash.com/photo-1541888946425-d81bb19240f5?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat',
-              backgroundAttachment: 'fixed'
-            }}
-            role="img"
-            aria-label="Modern Kenyan construction site with high-rise buildings and construction workers in Nairobi"
-          />
+          {/* Clean professional background */}
+          <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-blue-900 to-gray-800"></div>
           
           {/* Overlay with Kenyan flag colors gradient */}
           <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-gray-900/40 to-gray-800/40"></div>
@@ -364,22 +353,8 @@ const About: React.FC = () => {
           className="py-24 text-white relative overflow-hidden"
           aria-labelledby="stats-heading"
         >
-          {/* Kenyan Construction Materials Background */}
-          <div 
-            className="absolute inset-0"
-            style={{
-              backgroundImage: `url('https://images.unsplash.com/photo-1504307651254-35680f356dfd?ixlib=rb-4.0.3&auto=format&fit=crop&w=2076&q=80')`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat',
-              backgroundAttachment: 'fixed'
-            }}
-            role="img"
-            aria-label="Kenyan construction materials including cement bags, steel reinforcement bars, and building supplies at a construction site"
-          />
-          
-          {/* Kenyan flag colors overlay */}
-          <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-gray-900/60 to-gray-800/60"></div>
+          {/* Clean stats background */}
+          <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-blue-900 to-gray-800"></div>
           
           <div className="container mx-auto px-4 relative z-10">
             <h2 id="stats-heading" className="text-5xl font-bold text-center mb-4 drop-shadow-2xl">Our Impact Across Kenya</h2>

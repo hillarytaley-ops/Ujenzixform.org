@@ -306,22 +306,8 @@ const Scanners = () => {
           role="banner"
           aria-labelledby="scanners-hero-heading"
         >
-        {/* Kenyan QR Scanning & Technology Background */}
-        <div 
-          className="absolute inset-0"
-          style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1581094794329-c8112a89af12?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat',
-            backgroundAttachment: 'fixed'
-          }}
-          role="img"
-          aria-label="Kenyan construction workers using modern technology and QR scanning systems for material tracking and verification at construction sites"
-        />
-        
-        {/* Kenyan flag colors overlay with tech gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-black/85 via-gray-900/70 to-gray-800/70"></div>
+        {/* Clean QR Technology Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-blue-900 to-gray-800"></div>
         
         <div className="container mx-auto px-4 text-center relative z-10">
           <div className="max-w-5xl mx-auto">
@@ -384,22 +370,8 @@ const Scanners = () => {
       </AnimatedSection>
 
       <main className="py-20 relative overflow-hidden">
-        {/* Kenyan Construction Materials & QR Technology Background */}
-        <div 
-          className="absolute inset-0"
-          style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1590736969955-71cc94901144?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat',
-            backgroundAttachment: 'fixed'
-          }}
-          role="img"
-          aria-label="Kenyan construction materials warehouse with QR codes and modern scanning technology for material verification and tracking"
-        />
-        
-        {/* Light overlay for scanner interface readability */}
-        <div className="absolute inset-0 bg-white/92 backdrop-blur-[1px]"></div>
+        {/* Clean gradient background for scanner interface */}
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-50 via-blue-50/30 to-gray-100"></div>
         
         <div className="container mx-auto px-4 relative z-10">
           {/* Enhanced Header */}
