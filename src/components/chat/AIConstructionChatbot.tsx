@@ -51,7 +51,7 @@ export const AIConstructionChatbot: React.FC<AIConstructionChatbotProps> = ({
     if (isOpen && messages.length === 0) {
       setTimeout(() => {
         addBotMessage(
-          `🇰🇪 Karibu ${userName}! I'm your AI Construction Assistant.\n\nI can help you with:\n\n• Material prices and specifications\n• Supplier recommendations\n• Delivery cost estimates\n• Construction best practices\n• Platform features and navigation\n\nWhat would you like to know?`,
+          `🇰🇪 Karibu ${userName}! I'm UJbot, your AI Construction Assistant.\n\nI can help you with:\n\n• Material prices and specifications\n• Supplier recommendations\n• Delivery cost estimates\n• Construction best practices\n• Platform features and navigation\n\nWhat would you like to know?`,
           [
             'What materials do I need for a 3-bedroom house?',
             'Compare cement prices',
@@ -505,7 +505,7 @@ Examples:
                 <Bot className="h-5 w-5" />
               </div>
               <div>
-                <CardTitle className="text-lg">AI Construction Assistant</CardTitle>
+                <CardTitle className="text-lg">UJbot - AI Assistant</CardTitle>
                 <div className="text-xs opacity-90 flex items-center gap-1">
                   <div className="h-2 w-2 bg-green-400 rounded-full animate-pulse"></div>
                   Online • Kenya Construction Expert
@@ -621,7 +621,7 @@ Examples:
             <div className="border-t p-4 bg-gray-50">
               <div className="flex gap-2">
                 <Input
-                  placeholder="Ask about construction materials, prices, suppliers..."
+                  placeholder="Ask UJbot about materials, prices, suppliers..."
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyPress={handleKeyPress}
@@ -630,14 +630,16 @@ Examples:
                 <Button
                   onClick={handleSendMessage}
                   disabled={!inputValue.trim() || isTyping}
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 transition-all"
+                  title="Send message"
                 >
                   <Send className="h-4 w-4" />
+                  <span className="sr-only">Send</span>
                 </Button>
               </div>
               <div className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
                 <Sparkles className="h-3 w-3" />
-                Powered by AI • Kenya Construction Knowledge Base
+                Powered by UJbot 🇰🇪 • Kenya Construction Expert
               </div>
             </div>
           </CardContent>
