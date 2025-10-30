@@ -37,9 +37,9 @@ const Auth = () => {
         setSession(session);
         setUser(session?.user ?? null);
         
-        // Redirect authenticated users to home
+        // Redirect authenticated users to builder portal
         if (session?.user) {
-          navigate("/");
+          navigate("/portal");
         }
       }
     );
@@ -51,7 +51,7 @@ const Auth = () => {
       
       // Redirect if already authenticated
       if (session?.user) {
-        navigate("/");
+        navigate("/portal");
       }
     });
 

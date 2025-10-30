@@ -19,6 +19,7 @@ const ProfessionalBuilderRegistration = lazy(() => import("./pages/ProfessionalB
 const PrivateBuilderRegistration = lazy(() => import("./pages/PrivateBuilderRegistration"));
 const Suppliers = lazy(() => import("./pages/Suppliers"));
 const SuppliersIPhone = lazy(() => import("./pages/SuppliersIPhone"));
+const BuilderPortal = lazy(() => import("./pages/BuilderPortal"));
 const About = lazy(() => import("./pages/About"));
 const Contact = lazy(() => import("./pages/Contact"));
 const Auth = lazy(() => import("./pages/Auth"));
@@ -114,6 +115,7 @@ const App = () => {
                           <Route path="/builders/register" element={<BuilderRegistration />} />
                           <Route path="/professional-builder-registration" element={<ProfessionalBuilderRegistration />} />
                           <Route path="/private-client-registration" element={<PrivateBuilderRegistration />} />
+                          <Route path="/portal" element={<BuilderPortal />} />
                           <Route path="/suppliers" element={
                             /iPhone|iPad|iPod/i.test(navigator.userAgent) 
                               ? <SuppliersIPhone /> 
