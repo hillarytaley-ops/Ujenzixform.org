@@ -92,40 +92,67 @@ const ProfessionalBuilderRegistration = () => {
     setIsSubmitting(true);
 
     try {
-      // Create user account with builder_category metadata
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: data.email,
-        password: "temp_password_" + Math.random().toString(36).substring(7), // Temporary password
-        options: {
-          data: {
-            full_name: data.full_name,
-            builder_category: 'professional',
-            user_type: 'company'
-          }
-        }
-      });
-
-      if (authError) {
-        throw authError;
+      // Step 1: Get current user (must be logged in first)
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in first before completing registration.",
+          variant: "destructive"
+        });
+        navigate("/auth");
+        return;
       }
 
+      // Step 2: Create profile in profiles table
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .upsert({
+          user_id: user.id,
+          full_name: data.full_name,
+          phone: data.phone,
+          company_name: data.company_name,
+          location: data.location,
+          builder_category: 'professional',
+          specialties: data.specialties,
+          years_experience: data.years_experience,
+          description: data.description,
+          portfolio_url: data.portfolio_url || null,
+          insurance_details: data.insurance_details,
+          registration_number: data.registration_number,
+          license_number: data.license_number,
+        });
+
+      if (profileError) throw profileError;
+
+      // Step 3: Set user role as 'professional_builder'
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .upsert({
+          user_id: user.id,
+          role: 'professional_builder'
+        });
+
+      if (roleError) throw roleError;
+
       toast({
-        title: "Professional Builder Registration Submitted",
-        description: "Your application will be reviewed within 1-2 business days. You'll receive an email with login credentials and next steps.",
+        title: "Registration Successful!",
+        description: "Your professional builder profile has been created. You can now request quotes from suppliers.",
       });
 
       // Reset form
       form.reset();
       setSelectedSpecialties([]);
       
-      // Redirect to success page or login
-      navigate("/auth?message=registration_success");
+      // Redirect to builders page
+      navigate("/builders?welcome=true");
 
     } catch (error) {
       console.error("Registration error:", error);
       toast({
         title: "Registration Failed",
-        description: "There was an error submitting your registration. Please try again.",
+        description: error instanceof Error ? error.message : "There was an error submitting your registration. Please try again.",
         variant: "destructive"
       });
     } finally {
