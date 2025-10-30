@@ -115,7 +115,7 @@ const PrivateBuilderRegistration = () => {
     setIsSubmitting(true);
 
     try {
-      // Step 1: Get current user (must be logged in first)
+      // Get current user (must be logged in first)
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       
       if (userError || !user) {
@@ -128,51 +128,49 @@ const PrivateBuilderRegistration = () => {
         return;
       }
 
-      // Step 2: Create profile in profiles table
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert({
-          user_id: user.id,
-          full_name: data.full_name,
-          phone: data.phone,
-          location: data.location,
-          builder_category: 'private',
-          project_types: data.project_types,
-          project_timeline: data.project_timeline,
-          budget_range: data.budget_range,
-          project_description: data.project_description,
-          property_type: data.property_type,
-        });
+      // OPTIMIZED: Run both database updates in parallel for faster execution
+      const [profileResult, roleResult] = await Promise.all([
+        supabase
+          .from('profiles')
+          .upsert({
+            user_id: user.id,
+            full_name: data.full_name,
+            phone: data.phone,
+            location: data.location,
+            builder_category: 'private',
+            project_types: data.project_types,
+            project_timeline: data.project_timeline,
+            budget_range: data.budget_range,
+            project_description: data.project_description,
+            property_type: data.property_type,
+          }),
+        supabase
+          .from('user_roles')
+          .upsert({
+            user_id: user.id,
+            role: 'private_client'
+          })
+      ]);
 
-      if (profileError) throw profileError;
-
-      // Step 3: Set user role as 'private_client'
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .upsert({
-          user_id: user.id,
-          role: 'private_client'
-        });
-
-      if (roleError) throw roleError;
+      if (profileResult.error) throw profileResult.error;
+      if (roleResult.error) throw roleResult.error;
 
       toast({
-        title: "Registration Successful!",
-        description: "Welcome to UjenziPro! You can now connect with builders and purchase materials directly.",
+        title: "✅ Registration Complete!",
+        description: "Welcome to UjenziPro! You can now purchase materials directly.",
+        duration: 3000,
       });
 
-      // Reset form
+      // Reset form and redirect (no waiting)
       form.reset();
       setSelectedProjectTypes([]);
-      
-      // Redirect to home
       navigate("/?welcome=true");
 
     } catch (error) {
       console.error("Registration error:", error);
       toast({
         title: "Registration Failed",
-        description: error instanceof Error ? error.message : "There was an error submitting your registration. Please try again.",
+        description: error instanceof Error ? error.message : "Please check all required fields and try again.",
         variant: "destructive"
       });
     } finally {

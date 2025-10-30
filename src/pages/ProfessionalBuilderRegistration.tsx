@@ -92,7 +92,7 @@ const ProfessionalBuilderRegistration = () => {
     setIsSubmitting(true);
 
     try {
-      // Step 1: Get current user (must be logged in first)
+      // Get current user (must be logged in first)
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       
       if (userError || !user) {
@@ -105,54 +105,52 @@ const ProfessionalBuilderRegistration = () => {
         return;
       }
 
-      // Step 2: Create profile in profiles table
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert({
-          user_id: user.id,
-          full_name: data.full_name,
-          phone: data.phone,
-          company_name: data.company_name,
-          location: data.location,
-          builder_category: 'professional',
-          specialties: data.specialties,
-          years_experience: data.years_experience,
-          description: data.description,
-          portfolio_url: data.portfolio_url || null,
-          insurance_details: data.insurance_details,
-          registration_number: data.registration_number,
-          license_number: data.license_number,
-        });
+      // OPTIMIZED: Run both database updates in parallel for faster execution
+      const [profileResult, roleResult] = await Promise.all([
+        supabase
+          .from('profiles')
+          .upsert({
+            user_id: user.id,
+            full_name: data.full_name,
+            phone: data.phone,
+            company_name: data.company_name,
+            location: data.location,
+            builder_category: 'professional',
+            specialties: data.specialties,
+            years_experience: data.years_experience,
+            description: data.description,
+            portfolio_url: data.portfolio_url || null,
+            insurance_details: data.insurance_details,
+            registration_number: data.registration_number,
+            license_number: data.license_number,
+          }),
+        supabase
+          .from('user_roles')
+          .upsert({
+            user_id: user.id,
+            role: 'professional_builder'
+          })
+      ]);
 
-      if (profileError) throw profileError;
-
-      // Step 3: Set user role as 'professional_builder'
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .upsert({
-          user_id: user.id,
-          role: 'professional_builder'
-        });
-
-      if (roleError) throw roleError;
+      if (profileResult.error) throw profileResult.error;
+      if (roleResult.error) throw roleResult.error;
 
       toast({
-        title: "Registration Successful!",
-        description: "Your professional builder profile has been created. You can now request quotes from suppliers.",
+        title: "✅ Registration Complete!",
+        description: "Your professional profile is ready. You can now request quotes from suppliers.",
+        duration: 3000,
       });
 
-      // Reset form
+      // Reset form and redirect (no waiting)
       form.reset();
       setSelectedSpecialties([]);
-      
-      // Redirect to builders page
       navigate("/builders?welcome=true");
 
     } catch (error) {
       console.error("Registration error:", error);
       toast({
         title: "Registration Failed",
-        description: error instanceof Error ? error.message : "There was an error submitting your registration. Please try again.",
+        description: error instanceof Error ? error.message : "Please check all required fields and try again.",
         variant: "destructive"
       });
     } finally {
