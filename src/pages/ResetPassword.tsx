@@ -123,11 +123,26 @@ const ResetPassword = () => {
   }
 
   return (
-    <div className="min-h-screen relative flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 via-white to-gray-50">
-      {/* Background removed - Clean gradient background */}
+    <div className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden">
+      {/* Beautiful Kenyan Construction Workers Background */}
+      <div 
+        className="absolute inset-0 z-0"
+        style={{
+          backgroundImage: `url('https://images.unsplash.com/photo-1541888946425-d81bb19240f5?w=1920&h=1080&fit=crop')`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          backgroundAttachment: 'fixed'
+        }}
+        role="img"
+        aria-label="Kenyan construction workers at building site"
+      />
+      
+      {/* Semi-transparent overlay for readability */}
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-0"></div>
       
       <AnimatedSection animation="scaleIn" className="relative z-10">
-        <Card className="w-full max-w-md bg-white shadow-2xl border-gray-200">
+        <Card className="w-full max-w-md bg-white/95 backdrop-blur-md shadow-2xl border-white/50">
           <CardHeader className="text-center">
             <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
               <Lock className="h-6 w-6 text-primary" />
