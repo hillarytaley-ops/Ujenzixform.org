@@ -233,7 +233,7 @@ const Auth = () => {
       <div 
         className="absolute inset-0 z-0"
         style={{
-          backgroundImage: `url('https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-gW4eb5K3am2BERQxC6jCNuhvaVOrTl.png')`,
+          backgroundImage: `url('https://1drv.ms/u/c/ab1ea28a217e89bc/ETlICCcd8txOsCYnAv6MkgsBvKgrzcT341mNdzx1zw0MIA?e=hfoSfp'), url('https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-gW4eb5K3am2BERQxC6jCNuhvaVOrTl.png')`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
