@@ -1,32 +1,113 @@
 import React, { useState } from 'react';
-import { MessageCircle, X, Send, Bot, User } from 'lucide-react';
+import { MessageCircle, X, Send, Bot, User, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+
+interface Message {
+  role: 'user' | 'bot';
+  content: string;
+  suggestions?: string[];
+}
 
 export const SimpleChatButton = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState<Array<{role: 'user' | 'bot', content: string}>>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isTyping, setIsTyping] = useState(false);
 
-  const handleSend = () => {
+  // Enhanced AI Response Engine - Kenya Construction Knowledge
+  const getAIResponse = async (userQuery: string): Promise<{ response: string; suggestions?: string[] }> => {
+    const query = userQuery.toLowerCase();
+
+    // Material Prices
+    if (query.includes('price') || query.includes('cost') || query.includes('how much')) {
+      if (query.includes('cement')) {
+        return {
+          response: `💰 **Cement Prices in Kenya:**\n\n**Bamburi Cement 42.5N (50kg):** KES 850 - 900\n**Savannah Cement (50kg):** KES 780 - 820\n**Mombasa Cement (50kg):** KES 800 - 850\n\n**Bulk Discounts:**\n- 50-100 bags: 5% off\n- 100-500 bags: 10% off\n- 500+ bags: 15% off\n\n**Tip:** Coastal regions have lower prices!`,
+          suggestions: ['Compare steel prices', 'Find cement suppliers', 'Calculate cement needed']
+        };
+      }
+      if (query.includes('steel') || query.includes('rebar')) {
+        return {
+          response: `🔩 **Steel Prices (per 6m bar):**\n\n**Y8 (8mm):** KES 380 - 420\n**Y10 (10mm):** KES 580 - 620\n**Y12 (12mm):** KES 850 - 950\n**Y16 (16mm):** KES 1,450 - 1,550\n**Y20 (20mm):** KES 2,200 - 2,400\n\n**Per Ton:** KES 85,000 - 95,000`,
+          suggestions: ['Calculate steel needed', 'Find steel suppliers', 'Compare prices']
+        };
+      }
+    }
+
+    // Material Calculations
+    if (query.includes('calculate') || query.includes('how many') || query.includes('how much')) {
+      if (query.includes('cement')) {
+        return {
+          response: `🔢 **Cement Calculator:**\n\n**3-Bedroom House:**\n- Foundation: 150-200 bags\n- Columns & Beams: 100-150 bags\n- Slabs: 200-250 bags\n- **Total: 450-600 bags**\n\n**Per Square Meter:**\n- Foundation: 8-10 bags/sqm\n- Floor slab: 6-8 bags/sqm`,
+          suggestions: ['Calculate for my project', 'Get cement quote', 'Find suppliers']
+        };
+      }
+    }
+
+    // Suppliers
+    if (query.includes('supplier') || query.includes('find') || query.includes('where')) {
+      return {
+        response: `🏪 **Finding Suppliers:**\n\n**Browse Materials:**\n1. Click "Browse Materials" button\n2. Use filters (Category, Location, Price)\n3. View supplier profiles\n4. Request quotes\n\nAll suppliers are verified with ratings!\n\n**Tell me:** What material and which county?`,
+        suggestions: ['Cement in Nairobi', 'Steel in Mombasa', 'Paint in Kisumu']
+      };
+    }
+
+    // Delivery
+    if (query.includes('delivery') || query.includes('deliver')) {
+      return {
+        response: `🚚 **Delivery Services:**\n\n**Cost Estimates:**\n- Within Nairobi: KES 3,000 - 8,000\n- Suburbs (20-30km): KES 8,000 - 15,000\n- Inter-county: KES 15,000 - 50,000\n\n**Features:**\n✅ Real-time GPS tracking\n✅ QR verification\n✅ Secure payment`,
+        suggestions: ['Request delivery', 'Track delivery', 'Delivery to my location']
+      };
+    }
+
+    // Help
+    if (query.includes('help') || query.includes('how')) {
+      return {
+        response: `🆘 **UJbot Can Help With:**\n\n📦 Material prices & availability\n🔢 Quantity calculations\n🏪 Finding suppliers\n🚚 Delivery estimates\n🏗️ Project planning\n💡 Best practices\n\nWhat do you need help with?`,
+        suggestions: ['Material prices', 'Calculate materials', 'Find suppliers', 'Request delivery']
+      };
+    }
+
+    // Default response
+    return {
+      response: `Hi! I'm UJbot 🤖🇰🇪\n\nI can help with:\n• **Prices** - Material costs\n• **Calculate** - Quantities needed\n• **Find** - Suppliers near you\n• **Delivery** - Costs & tracking\n• **Build** - Project estimates\n\nWhat would you like to know?`,
+      suggestions: ['Cement prices', 'Calculate for 3-bedroom house', 'Find suppliers', 'Delivery costs']
+    };
+  };
+
+  const handleSend = async () => {
     if (!message.trim()) return;
     
     // Add user message
-    const userMessage = { role: 'user' as const, content: message };
+    const userMessage: Message = { role: 'user', content: message };
     setMessages(prev => [...prev, userMessage]);
     
     // Clear input
+    const userQuery = message;
     setMessage('');
     
-    // Simulate UJbot response
-    setTimeout(() => {
-      const botResponse = { 
-        role: 'bot' as const, 
-        content: `Thank you for your message! UJbot is here to help. For real-time assistance with "${message}", please contact our support team or browse our materials and suppliers directory.` 
+    // Show typing indicator
+    setIsTyping(true);
+    
+    // Get AI response
+    setTimeout(async () => {
+      const aiResponse = await getAIResponse(userQuery);
+      const botResponse: Message = { 
+        role: 'bot', 
+        content: aiResponse.response,
+        suggestions: aiResponse.suggestions
       };
       setMessages(prev => [...prev, botResponse]);
-    }, 1000);
+      setIsTyping(false);
+    }, 800);
+  };
+
+  const handleSuggestionClick = (suggestion: string) => {
+    setMessage(suggestion);
+    setTimeout(() => handleSend(), 100);
   };
 
   if (!isOpen) {
@@ -85,28 +166,96 @@ export const SimpleChatButton = () => {
                 </div>
               </div>
 
-              <div className="text-center text-xs text-gray-500 py-4">
-                Ask me anything about construction in Kenya!
+              {/* Quick Action Buttons */}
+              <div className="grid grid-cols-2 gap-2 mb-4">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-auto py-2 text-xs"
+                  onClick={() => handleSuggestionClick('Cement prices')}
+                >
+                  💰 Cement Prices
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-auto py-2 text-xs"
+                  onClick={() => handleSuggestionClick('Calculate for 3-bedroom house')}
+                >
+                  🔢 Calculate Materials
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-auto py-2 text-xs"
+                  onClick={() => handleSuggestionClick('Find suppliers in Nairobi')}
+                >
+                  🏪 Find Suppliers
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-auto py-2 text-xs"
+                  onClick={() => handleSuggestionClick('Delivery costs')}
+                >
+                  🚚 Delivery Info
+                </Button>
+              </div>
+
+              <div className="text-center text-xs text-gray-500 py-2">
+                Click a button or ask me anything!
               </div>
             </>
           ) : (
             <div className="space-y-3">
               {messages.map((msg, idx) => (
-                <div key={idx} className={`flex items-start gap-2 ${msg.role === 'user' ? 'justify-end' : ''}`}>
-                  {msg.role === 'bot' && <Bot className="h-4 w-4 mt-1 text-blue-600" />}
-                  <div className={`rounded-lg p-3 max-w-[80%] ${
-                    msg.role === 'user' 
-                      ? 'bg-blue-600 text-white ml-auto' 
-                      : 'bg-white'
-                  }`}>
-                    <div className="text-sm">
-                      {msg.role === 'bot' && <strong className="text-blue-600">UJbot: </strong>}
-                      {msg.content}
+                <div key={idx}>
+                  <div className={`flex items-start gap-2 ${msg.role === 'user' ? 'justify-end' : ''}`}>
+                    {msg.role === 'bot' && <Bot className="h-4 w-4 mt-1 text-blue-600 flex-shrink-0" />}
+                    <div className={`rounded-lg p-3 max-w-[80%] ${
+                      msg.role === 'user' 
+                        ? 'bg-blue-600 text-white ml-auto' 
+                        : 'bg-white'
+                    }`}>
+                      <div className="text-sm whitespace-pre-line">
+                        {msg.role === 'bot' && <strong className="text-blue-600">UJbot: </strong>}
+                        {msg.content}
+                      </div>
                     </div>
+                    {msg.role === 'user' && <User className="h-4 w-4 mt-1 flex-shrink-0" />}
                   </div>
-                  {msg.role === 'user' && <User className="h-4 w-4 mt-1" />}
+                  
+                  {/* Suggestion Buttons */}
+                  {msg.role === 'bot' && msg.suggestions && (
+                    <div className="flex flex-wrap gap-2 mt-2 ml-6">
+                      {msg.suggestions.map((suggestion, sIdx) => (
+                        <Badge
+                          key={sIdx}
+                          variant="outline"
+                          className="cursor-pointer hover:bg-blue-50 text-xs"
+                          onClick={() => handleSuggestionClick(suggestion)}
+                        >
+                          {suggestion}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
+              
+              {/* Typing Indicator */}
+              {isTyping && (
+                <div className="flex items-start gap-2">
+                  <Bot className="h-4 w-4 mt-1 text-blue-600" />
+                  <div className="bg-white rounded-lg p-3">
+                    <div className="flex gap-1">
+                      <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                      <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                      <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -131,8 +280,9 @@ export const SimpleChatButton = () => {
               <Send className="h-4 w-4" />
             </Button>
           </div>
-          <div className="text-xs text-gray-500 mt-2">
-            Powered by UJbot 🇰🇪
+          <div className="text-xs text-gray-500 mt-2 flex items-center gap-1">
+            <Sparkles className="h-3 w-3" />
+            Powered by UJbot 🇰🇪 • Kenya Construction AI
           </div>
         </div>
       </Card>
