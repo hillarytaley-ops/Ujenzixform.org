@@ -239,23 +239,25 @@ const Builders = () => {
                 Browse Builders
               </Button>
               
-              <Button 
-                size="lg"
-                onClick={() => window.location.href = '/builders/register'}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
-              >
-                <Building2 className="h-5 w-5 mr-2" />
-                Register as Builder
-              </Button>
+              <Link to="/builder-registration">
+                <Button 
+                  size="lg"
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
+                >
+                  <Building2 className="h-5 w-5 mr-2" />
+                  Register as Builder
+                </Button>
+              </Link>
               
-              <Button 
-                size="lg"
-                onClick={() => window.location.href = '/suppliers'}
-                className="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
-              >
-                <ShoppingCart className="h-5 w-5 mr-2" />
-                Purchase Materials
-              </Button>
+              <Link to="/suppliers">
+                <Button 
+                  size="lg"
+                  className="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
+                >
+                  <ShoppingCart className="h-5 w-5 mr-2" />
+                  Purchase Materials
+                </Button>
+              </Link>
             </div>
 
             {/* Professional Stats */}
