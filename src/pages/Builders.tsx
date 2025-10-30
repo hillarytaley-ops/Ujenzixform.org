@@ -188,22 +188,22 @@ const Builders = () => {
           role="banner"
           aria-labelledby="builders-hero-heading"
         >
-        {/* Kenyan Professional Construction Background */}
+        {/* Your Custom Kenyan Construction Workers with Tablet Background */}
         <div 
           className="absolute inset-0"
           style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1487958449943-2429e8be8625?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')`,
+            backgroundImage: `url('/builders-hero-bg.jpg'), url('https://images.unsplash.com/photo-1487958449943-2429e8be8625?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
             backgroundAttachment: 'fixed'
           }}
           role="img"
-          aria-label="Professional Kenyan construction site with modern buildings, cranes, and construction professionals working on high-rise development projects"
+          aria-label="Professional Kenyan construction workers in orange safety vests and hard hats reviewing project plans on tablet at modern construction site"
         />
         
-        {/* Clean professional overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-gray-900/70 to-gray-800/70"></div>
+        {/* Lighter overlay to show your beautiful image */}
+        <div className="absolute inset-0 bg-gradient-to-br from-black/50 via-gray-900/40 to-gray-800/40"></div>
         
         <div className="container mx-auto px-4 text-center relative z-10">
           <div className="max-w-5xl mx-auto">
