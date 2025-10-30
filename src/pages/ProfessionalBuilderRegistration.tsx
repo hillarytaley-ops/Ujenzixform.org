@@ -158,13 +158,29 @@ const ProfessionalBuilderRegistration = () => {
       form.reset();
       setSelectedSpecialties([]);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Registration error:", error);
+      
+      // Show detailed error message
+      let errorMessage = "Please try again.";
+      if (error?.message) {
+        errorMessage = error.message;
+      } else if (error?.error_description) {
+        errorMessage = error.error_description;
+      } else if (error?.details) {
+        errorMessage = error.details;
+      }
+      
       toast({
         title: "Registration Failed",
-        description: error instanceof Error ? error.message : "Please try again.",
-        variant: "destructive"
+        description: errorMessage,
+        variant: "destructive",
+        duration: 5000,
       });
+      
+      // Log full error for debugging
+      console.error("Full error details:", JSON.stringify(error, null, 2));
+      
       setIsSubmitting(false);
     }
   };
