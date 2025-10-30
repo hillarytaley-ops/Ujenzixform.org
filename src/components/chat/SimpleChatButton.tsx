@@ -71,18 +71,26 @@ export const SimpleChatButton = () => {
       };
     }
 
+    // Monitoring Services
+    if (query.includes('monitor') || query.includes('camera') || query.includes('surveillance') || query.includes('watch') || query.includes('security')) {
+      return {
+        response: `📹 **Site Monitoring Services:**\n\n**What We Offer:**\n✅ 24/7 Live Camera Surveillance\n✅ Drone Aerial Monitoring\n✅ AI-Powered Security Alerts\n✅ Time-lapse Construction Progress\n✅ Remote Site Inspection\n\n**Benefits:**\n• Prevent theft & vandalism\n• Monitor worker productivity\n• Track construction progress\n• Remote project oversight\n• Insurance compliance\n• Security documentation\n\n**Pricing:**\n- Basic Camera Setup: KES 50,000 - 100,000\n- Monthly Monitoring: KES 15,000 - 30,000\n- Drone Services: KES 10,000 - 25,000/session\n\n**Access:** Click "Site Monitoring" in menu`,
+        suggestions: ['How does monitoring work?', 'Setup site cameras', 'Drone monitoring costs', 'Security features']
+      };
+    }
+
     // Help
     if (query.includes('help') || query.includes('how')) {
       return {
-        response: `🆘 **UJbot Can Help With:**\n\n📦 Material prices & availability\n🔢 Quantity calculations\n🏪 Finding suppliers\n🚚 Delivery estimates\n🏗️ Project planning\n💡 Best practices\n\nWhat do you need help with?`,
-        suggestions: ['Material prices', 'Calculate materials', 'Find suppliers', 'Request delivery']
+        response: `🆘 **UJbot Can Help With:**\n\n📦 Material prices & availability\n🔢 Quantity calculations\n🏪 Finding suppliers\n🚚 Delivery estimates\n📹 Site monitoring & security\n🏗️ Project planning\n💡 Best practices\n\nWhat do you need help with?`,
+        suggestions: ['Material prices', 'Calculate materials', 'Find suppliers', 'Site monitoring']
       };
     }
 
     // Default response
     return {
-      response: `Hi! I'm UJbot 🤖🇰🇪\n\nI can help with:\n• **Prices** - Material costs\n• **Calculate** - Quantities needed\n• **Find** - Suppliers near you\n• **Delivery** - Costs & tracking\n• **Build** - Project estimates\n\nWhat would you like to know?`,
-      suggestions: ['Cement prices', 'Calculate for 3-bedroom house', 'Find suppliers', 'Delivery costs']
+      response: `Hi! I'm UJbot 🤖🇰🇪\n\nI can help with:\n• **Prices** - Material costs\n• **Calculate** - Quantities needed\n• **Find** - Suppliers near you\n• **Delivery** - Costs & tracking\n• **Monitoring** - Site security & cameras\n• **Build** - Project estimates\n\nWhat would you like to know?`,
+      suggestions: ['Cement prices', 'Calculate for 3-bedroom house', 'Find suppliers', 'Site monitoring']
     };
   };
 
@@ -204,9 +212,9 @@ export const SimpleChatButton = () => {
                   variant="outline" 
                   size="sm" 
                   className="h-auto py-2 text-xs"
-                  onClick={() => handleSuggestionClick('Delivery costs')}
+                  onClick={() => handleSuggestionClick('Site monitoring')}
                 >
-                  🚚 Delivery Info
+                  📹 Site Monitoring
                 </Button>
               </div>
 
