@@ -15,6 +15,7 @@ import SupplierInvoiceViewer from "@/components/suppliers/SupplierInvoiceViewer"
 import QRScanner from "@/components/QRScanner";
 import { SupplierGrid } from "@/components/suppliers/SupplierGrid";
 import { MaterialsGrid } from "@/components/suppliers/MaterialsGrid";
+import { MaterialsGridSafe } from "@/components/suppliers/MaterialsGridSafe";
 import { QuoteRequestModal } from "@/components/modals/QuoteRequestModal";
 import { SupplierCatalogModal } from "@/components/modals/SupplierCatalogModal";
 import PurchasingWorkflow from "@/components/PurchasingWorkflow";
@@ -180,8 +181,8 @@ const SuppliersContent = () => {
   const showDirectoryAccess = true; // Changed from isAdmin to make public
   const showRegistrationOnly = !loading && user && !isAdmin;
 
-  // MOBILE ADMIN: Completely simplified view to prevent crashes
-  // iPhone/Safari compatible - no React.Suspense issues
+  // MOBILE ADMIN: Ultra-safe view that cannot crash on iPhone
+  // Uses MaterialsGridSafe - guaranteed to work on all devices
   if (isAdmin && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
     return (
       <div className="min-h-screen bg-background">
@@ -204,7 +205,7 @@ const SuppliersContent = () => {
               <CardDescription>Browse construction materials from suppliers</CardDescription>
             </CardHeader>
             <CardContent>
-              <MaterialsGrid />
+              <MaterialsGridSafe />
             </CardContent>
           </Card>
 
