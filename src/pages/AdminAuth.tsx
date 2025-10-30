@@ -279,26 +279,11 @@ const AdminAuth = () => {
   const remainingAttempts = Math.max(0, 3 - attempts);
 
   return (
-    <div className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden">
-      {/* Background Image */}
-      <div 
-        className="absolute inset-0 z-0"
-        style={{
-          backgroundImage: `url('/auth-bg.jpg')`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          backgroundAttachment: 'fixed'
-        }}
-        role="img"
-        aria-label="Kenyan construction workers with hard hats reviewing construction project plans at building site"
-      />
-      
-      {/* Very subtle red tint only - no darkness */}
-      <div className="absolute inset-0 bg-gradient-to-br from-red-900/10 via-red-900/5 to-red-900/10 z-0"></div>
+    <div className="min-h-screen relative flex items-center justify-center p-4 bg-gradient-to-br from-red-50 via-white to-gray-50">
+      {/* Background removed - Clean gradient background */}
       
       <AnimatedSection animation="scaleIn" className="relative z-10">
-        <Card className="w-full max-w-md border-2 border-red-600/70 shadow-2xl bg-slate-900/65 backdrop-blur-2xl">
+        <Card className="w-full max-w-md border-2 border-red-600/70 shadow-2xl bg-white">
           <CardHeader className="text-center bg-gradient-to-r from-red-950 to-slate-950 border-b-2 border-red-900/50">
             <div className="flex justify-center mb-4">
               <div className="p-4 bg-red-900/30 rounded-full border-2 border-red-500/50">

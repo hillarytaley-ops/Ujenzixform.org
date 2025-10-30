@@ -228,25 +228,11 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden">
-      {/* Background Image */}
-      <div 
-        className="absolute inset-0 z-0"
-        style={{
-          backgroundImage: `url('/auth-bg.jpg')`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          backgroundAttachment: 'fixed'
-        }}
-        role="img"
-        aria-label="Kenyan construction workers with hard hats reviewing construction project plans at building site"
-      />
-      
-      {/* No overlay - 100% clear background! */}
+    <div className="min-h-screen relative flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 via-white to-gray-50">
+      {/* Background removed - Clean gradient background */}
       
       <AnimatedSection animation="scaleIn" className="relative z-10">
-        <Card className="w-full max-w-md bg-white/70 backdrop-blur-2xl shadow-2xl border-white/90">
+        <Card className="w-full max-w-md bg-white shadow-2xl border-gray-200">
         <CardHeader className="text-center">
           <CardTitle>Welcome to UjenziPro</CardTitle>
           <CardDescription>
