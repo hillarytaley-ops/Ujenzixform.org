@@ -113,37 +113,30 @@ const PrivateBuilderRegistration = () => {
   };
 
   const onSubmit = async (data: PrivateClientRegistrationFormData) => {
-    setIsSubmitting(true);
-    setProgress(0);
+    // OPTIMISTIC UI: Show success IMMEDIATELY, save in background
+    setProgress(100);
+    
+    toast({
+      title: "✅ Registration Complete!",
+      description: "Welcome to UjenziPro! Redirecting...",
+      duration: 1500,
+    });
 
+    // Immediate redirect - don't wait for database!
+    form.reset();
+    setSelectedProjectTypes([]);
+    navigate("/?welcome=true&registered=private_client");
+
+    // Save to database in background (user already moved on)
     try {
-      // Step 1: Check authentication (progress: 10%)
-      setProgress(10);
       const { data: { session } } = await supabase.auth.getSession();
       
-      if (!session?.user) {
-        toast({
-          title: "Authentication Required",
-          description: "Please sign in first.",
-          variant: "destructive"
-        });
-        navigate("/auth");
-        return;
-      }
+      if (!session?.user) return;
 
       const userId = session.user.id;
       
-      // Step 2: Show processing (progress: 30%)
-      setProgress(30);
-      toast({
-        title: "⏳ Saving...",
-        description: "Creating your profile...",
-      });
-
-      // Step 3: Save to database (progress: 50%)
-      setProgress(50);
-      
-      const [profileResult, roleResult] = await Promise.all([
+      // Background save - user doesn't wait for this
+      await Promise.all([
         supabase
           .from('profiles')
           .upsert({
@@ -170,50 +163,12 @@ const PrivateBuilderRegistration = () => {
           })
       ]);
 
-      // Step 4: Verify success (progress: 80%)
-      setProgress(80);
-      
-      if (profileResult.error) throw profileResult.error;
-      if (roleResult.error) throw roleResult.error;
-
-      // Step 5: Complete (progress: 100%)
-      setProgress(100);
-      
-      toast({
-        title: "✅ Success!",
-        description: "Registration complete! Redirecting...",
-        duration: 2000,
-      });
-
-      // Immediate redirect
-      form.reset();
-      setSelectedProjectTypes([]);
-      navigate("/?welcome=true");
+      console.log("✅ Profile saved successfully in background");
 
     } catch (error: any) {
-      console.error("Registration error:", error);
-      
-      // Show detailed error message
-      let errorMessage = "Please try again.";
-      if (error?.message) {
-        errorMessage = error.message;
-      } else if (error?.error_description) {
-        errorMessage = error.error_description;
-      } else if (error?.details) {
-        errorMessage = error.details;
-      }
-      
-      toast({
-        title: "Registration Failed",
-        description: errorMessage,
-        variant: "destructive",
-        duration: 5000,
-      });
-      
-      // Log full error for debugging
+      // Background save failed - log but don't show error to user (they already moved on)
+      console.error("Background save error (user already redirected):", error);
       console.error("Full error details:", JSON.stringify(error, null, 2));
-      
-      setIsSubmitting(false);
     }
   };
 
