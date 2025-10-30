@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { useLocation } from 'react-router-dom';
 
 interface Message {
   role: 'user' | 'bot';
@@ -12,10 +13,17 @@ interface Message {
 }
 
 export const SimpleChatButton = () => {
+  const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
+
+  // Hide UJbot on auth pages (login, signup, password reset)
+  const authPages = ['/auth', '/admin-login', '/reset-password'];
+  if (authPages.includes(location.pathname)) {
+    return null;
+  }
 
   // Enhanced AI Response Engine - Kenya Construction Knowledge
   const getAIResponse = async (userQuery: string): Promise<{ response: string; suggestions?: string[] }> => {
