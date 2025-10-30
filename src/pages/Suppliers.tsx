@@ -191,16 +191,16 @@ const SuppliersContent = () => {
 
       {/* Kenyan-Themed Hero Section */}
       <section className="text-white py-20 relative overflow-hidden">
-        {/* Construction Site Background Image */}
+        {/* Your Custom Building Materials Banner Background */}
         <div 
           className="absolute inset-0"
           style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1541888946425-d81bb19240f5?w=1920&h=1080&fit=crop')`,
+            backgroundImage: `url('/suppliers-hero-bg.jpg?v=1'), url('https://images.unsplash.com/photo-1541888946425-d81bb19240f5?w=1920&h=1080&fit=crop')`,
             backgroundSize: 'cover',
             backgroundPosition: 'center'
           }}
         />
-        <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-gray-900/70 to-gray-800/70"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-black/60 via-gray-900/50 to-gray-800/50"></div>
         
         <div className="container mx-auto px-4 text-center relative z-10">
           <div className="mb-6">
