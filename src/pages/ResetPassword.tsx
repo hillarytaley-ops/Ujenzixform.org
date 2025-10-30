@@ -138,11 +138,11 @@ const ResetPassword = () => {
         aria-label="Kenyan construction workers in yellow hard hats reviewing blueprints at steel construction site"
       />
       
-      {/* Semi-transparent overlay for readability */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm z-0"></div>
+      {/* Light overlay for readability - clearer background */}
+      <div className="absolute inset-0 bg-black/20 z-0"></div>
       
       <AnimatedSection animation="scaleIn" className="relative z-10">
-        <Card className="w-full max-w-md bg-white/95 backdrop-blur-md shadow-2xl border-white/50">
+        <Card className="w-full max-w-md bg-white/98 backdrop-blur-sm shadow-2xl border-white/70">
           <CardHeader className="text-center">
             <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
               <Lock className="h-6 w-6 text-primary" />
