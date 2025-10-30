@@ -195,7 +195,7 @@ const SuppliersContent = () => {
         <div 
           className="absolute inset-0"
           style={{
-            backgroundImage: `url('/suppliers-hero-bg.jpg?v=1'), url('https://images.unsplash.com/photo-1541888946425-d81bb19240f5?w=1920&h=1080&fit=crop')`,
+            backgroundImage: `url('/suppliers-hero-bg.jpg?v=2'), url('/suppliers-hero-bg.jpg'), url('https://images.unsplash.com/photo-1541888946425-d81bb19240f5?w=1920&h=1080&fit=crop')`,
             backgroundSize: 'cover',
             backgroundPosition: 'center'
           }}
