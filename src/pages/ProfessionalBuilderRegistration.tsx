@@ -92,25 +92,33 @@ const ProfessionalBuilderRegistration = () => {
     setIsSubmitting(true);
 
     try {
-      // Get current user (must be logged in first)
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      // ULTRA-FAST: Use session instead of getUser (no network call needed)
+      const { data: { session } } = await supabase.auth.getSession();
       
-      if (userError || !user) {
+      if (!session?.user) {
         toast({
           title: "Authentication Required",
-          description: "Please sign in first before completing registration.",
+          description: "Please sign in first.",
           variant: "destructive"
         });
         navigate("/auth");
         return;
       }
 
-      // OPTIMIZED: Run both database updates in parallel for faster execution
+      const userId = session.user.id;
+
+      // Show immediate feedback
+      toast({
+        title: "Processing...",
+        description: "Saving your professional profile...",
+      });
+
+      // OPTIMIZED: Run both updates in parallel + specify conflict resolution
       const [profileResult, roleResult] = await Promise.all([
         supabase
           .from('profiles')
           .upsert({
-            user_id: user.id,
+            user_id: userId,
             full_name: data.full_name,
             phone: data.phone,
             company_name: data.company_name,
@@ -123,12 +131,16 @@ const ProfessionalBuilderRegistration = () => {
             insurance_details: data.insurance_details,
             registration_number: data.registration_number,
             license_number: data.license_number,
+          }, {
+            onConflict: 'user_id'
           }),
         supabase
           .from('user_roles')
           .upsert({
-            user_id: user.id,
+            user_id: userId,
             role: 'professional_builder'
+          }, {
+            onConflict: 'user_id'
           })
       ]);
 
@@ -136,24 +148,23 @@ const ProfessionalBuilderRegistration = () => {
       if (roleResult.error) throw roleResult.error;
 
       toast({
-        title: "✅ Registration Complete!",
-        description: "Your professional profile is ready. You can now request quotes from suppliers.",
-        duration: 3000,
+        title: "✅ Success!",
+        description: "Profile created! Redirecting...",
+        duration: 2000,
       });
 
-      // Reset form and redirect (no waiting)
+      // Immediate redirect
+      setTimeout(() => navigate("/builders?welcome=true"), 500);
       form.reset();
       setSelectedSpecialties([]);
-      navigate("/builders?welcome=true");
 
     } catch (error) {
       console.error("Registration error:", error);
       toast({
         title: "Registration Failed",
-        description: error instanceof Error ? error.message : "Please check all required fields and try again.",
+        description: error instanceof Error ? error.message : "Please try again.",
         variant: "destructive"
       });
-    } finally {
       setIsSubmitting(false);
     }
   };

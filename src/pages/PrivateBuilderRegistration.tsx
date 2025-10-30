@@ -115,25 +115,33 @@ const PrivateBuilderRegistration = () => {
     setIsSubmitting(true);
 
     try {
-      // Get current user (must be logged in first)
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      // ULTRA-FAST: Use session instead of getUser (no network call needed)
+      const { data: { session } } = await supabase.auth.getSession();
       
-      if (userError || !user) {
+      if (!session?.user) {
         toast({
           title: "Authentication Required",
-          description: "Please sign in first before completing registration.",
+          description: "Please sign in first.",
           variant: "destructive"
         });
         navigate("/auth");
         return;
       }
 
-      // OPTIMIZED: Run both database updates in parallel for faster execution
+      const userId = session.user.id;
+
+      // Show immediate feedback
+      toast({
+        title: "Processing...",
+        description: "Saving your registration...",
+      });
+
+      // OPTIMIZED: Run both updates in parallel + use single SELECT for speed
       const [profileResult, roleResult] = await Promise.all([
         supabase
           .from('profiles')
           .upsert({
-            user_id: user.id,
+            user_id: userId,
             full_name: data.full_name,
             phone: data.phone,
             location: data.location,
@@ -143,12 +151,16 @@ const PrivateBuilderRegistration = () => {
             budget_range: data.budget_range,
             project_description: data.project_description,
             property_type: data.property_type,
+          }, {
+            onConflict: 'user_id'
           }),
         supabase
           .from('user_roles')
           .upsert({
-            user_id: user.id,
+            user_id: userId,
             role: 'private_client'
+          }, {
+            onConflict: 'user_id'
           })
       ]);
 
@@ -156,24 +168,23 @@ const PrivateBuilderRegistration = () => {
       if (roleResult.error) throw roleResult.error;
 
       toast({
-        title: "✅ Registration Complete!",
-        description: "Welcome to UjenziPro! You can now purchase materials directly.",
-        duration: 3000,
+        title: "✅ Success!",
+        description: "Registration complete! Redirecting...",
+        duration: 2000,
       });
 
-      // Reset form and redirect (no waiting)
+      // Immediate redirect
+      setTimeout(() => navigate("/?welcome=true"), 500);
       form.reset();
       setSelectedProjectTypes([]);
-      navigate("/?welcome=true");
 
     } catch (error) {
       console.error("Registration error:", error);
       toast({
         title: "Registration Failed",
-        description: error instanceof Error ? error.message : "Please check all required fields and try again.",
+        description: error instanceof Error ? error.message : "Please try again.",
         variant: "destructive"
       });
-    } finally {
       setIsSubmitting(false);
     }
   };
