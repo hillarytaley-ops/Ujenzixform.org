@@ -99,10 +99,10 @@ const ProfessionalBuilderRegistration = () => {
       duration: 1500,
     });
 
-    // Immediate redirect - don't wait for database!
+    // Immediate redirect to suppliers page - where they can request quotes!
     form.reset();
     setSelectedSpecialties([]);
-    navigate("/builders?welcome=true&registered=professional_builder");
+    navigate("/suppliers?welcome=professional_builder&tab=suppliers");
 
     // Save to database in background (user already moved on)
     try {

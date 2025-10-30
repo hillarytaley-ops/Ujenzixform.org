@@ -122,10 +122,10 @@ const PrivateBuilderRegistration = () => {
       duration: 1500,
     });
 
-    // Immediate redirect - don't wait for database!
+    // Immediate redirect to suppliers page - where they can buy materials!
     form.reset();
     setSelectedProjectTypes([]);
-    navigate("/?welcome=true&registered=private_client");
+    navigate("/suppliers?welcome=private_client&tab=purchase");
 
     // Save to database in background (user already moved on)
     try {

@@ -4,10 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Search, ShoppingCart, Store, Package, Filter } from 'lucide-react';
+import { Search, ShoppingCart, Store, Package, Filter, PartyPopper } from 'lucide-react';
 import { getDefaultCategoryImage } from '@/config/defaultCategoryImages';
+import { useSearchParams } from 'react-router-dom';
 
 // iOS/Safari compatibility check
 const isIOSSafari = () => {
@@ -161,6 +163,7 @@ const DEMO_MATERIALS: Material[] = [
 ];
 
 export const MaterialsGrid = () => {
+  const [searchParams] = useSearchParams();
   const [materials, setMaterials] = useState<Material[]>(DEMO_MATERIALS);
   const [filteredMaterials, setFilteredMaterials] = useState<Material[]>(DEMO_MATERIALS);
   const [loading, setLoading] = useState(true);
@@ -170,7 +173,17 @@ export const MaterialsGrid = () => {
   const [stockFilter, setStockFilter] = useState('all');
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const { toast} = useToast();
+  const [showWelcome, setShowWelcome] = useState(false);
+  const { toast } = useToast();
+  
+  // Check for welcome message from registration
+  useEffect(() => {
+    const welcomeParam = searchParams.get('welcome');
+    if (welcomeParam) {
+      setShowWelcome(true);
+      setTimeout(() => setShowWelcome(false), 10000); // Hide after 10 seconds
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     // Check user role for purchase flow
@@ -364,6 +377,23 @@ export const MaterialsGrid = () => {
 
   return (
     <div className="space-y-6">
+      {/* Welcome Message for New Registrations */}
+      {showWelcome && (
+        <Alert className="bg-gradient-to-r from-green-50 to-blue-50 border-green-300">
+          <PartyPopper className="h-5 w-5 text-green-600" />
+          <AlertDescription className="ml-2">
+            <strong className="text-green-800">🎉 Welcome to UjenziPro!</strong>
+            <p className="mt-1">
+              {searchParams.get('welcome') === 'private_client' ? (
+                <>You can now <strong>purchase materials directly</strong> using the <span className="text-green-600 font-bold">"Buy Now"</span> buttons below. Start shopping!</>
+              ) : (
+                <>You can now <strong>request quotes from suppliers</strong> using the <span className="text-blue-600 font-bold">"Request Quote"</span> buttons below. Get the best deals!</>
+              )}
+            </p>
+          </AlertDescription>
+        </Alert>
+      )}
+      
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
