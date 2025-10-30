@@ -306,8 +306,18 @@ const Scanners = () => {
           role="banner"
           aria-labelledby="scanners-hero-heading"
         >
-        {/* Clean QR Technology Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-blue-900 to-gray-800"></div>
+        {/* Your Custom QR Scanner Image - Phone & Barcode Scanner */}
+        <div 
+          className="absolute inset-0"
+          style={{
+            backgroundImage: `url('/scanners-hero-bg.jpg?v=1'), url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080"%3E%3Crect fill="%23e8e8e8" width="1920" height="1080"/%3E%3C/svg%3E')`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat'
+          }}
+        />
+        {/* Light overlay for text readability */}
+        <div className="absolute inset-0 bg-gradient-to-br from-black/50 via-gray-900/40 to-black/50"></div>
         
         <div className="container mx-auto px-4 text-center relative z-10">
           <div className="max-w-5xl mx-auto">
