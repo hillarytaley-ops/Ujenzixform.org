@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Building, ShoppingBag, FileText, Package, Store, Database, Users, Receipt, QrCode, Truck, Shield } from "lucide-react";
@@ -17,7 +18,7 @@ import { MaterialsGrid } from "@/components/suppliers/MaterialsGrid";
 import { QuoteRequestModal } from "@/components/modals/QuoteRequestModal";
 import { SupplierCatalogModal } from "@/components/modals/SupplierCatalogModal";
 import PurchasingWorkflow from "@/components/PurchasingWorkflow";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { RealTimeStats } from "@/components/suppliers/RealTimeStats";
 import { SecurityAlert } from "@/components/security/SecurityAlert";
 import { AdminAccessGuard } from "@/components/security/AdminAccessGuard";
@@ -25,7 +26,6 @@ import { Badge } from "@/components/ui/badge";
 import { SupplierWorkflowDashboard } from "@/components/suppliers/SupplierWorkflowDashboard";
 import { SupplierApplicationManager } from "@/components/suppliers/SupplierApplicationManager";
 import { SupplierOrderTracker } from "@/components/suppliers/SupplierOrderTracker";
-import { useState, useEffect } from "react";
 import { supabase } from '@/integrations/supabase/client';
 import { Supplier } from "@/types/supplier";
 import { useToast } from "@/hooks/use-toast";
@@ -181,6 +181,7 @@ const SuppliersContent = () => {
   const showRegistrationOnly = !loading && user && !isAdmin;
 
   // MOBILE ADMIN: Completely simplified view to prevent crashes
+  // iPhone/Safari compatible - no React.Suspense issues
   if (isAdmin && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
     return (
       <div className="min-h-screen bg-background">

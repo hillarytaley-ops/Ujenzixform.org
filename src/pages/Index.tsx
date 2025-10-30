@@ -209,7 +209,6 @@ const Index = () => {
                 </Button>
               </Link>
             </div>
-          </AnimatedSection>
 
           {/* Registration Section */}
           <AnimatedSection animation="scaleIn" delay={200}>
@@ -271,8 +270,9 @@ const Index = () => {
               ]}
             />
           </div>
-
+          </div>
         </section>
+        </AnimatedSection>
 
         {/* Video Section - Complete Platform Demo with Monitoring */}
         <section className="py-16 bg-gradient-to-br from-gray-50 to-gray-100">

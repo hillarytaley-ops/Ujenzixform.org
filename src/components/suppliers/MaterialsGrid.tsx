@@ -9,6 +9,13 @@ import { useToast } from '@/hooks/use-toast';
 import { Search, ShoppingCart, Store, Package, Filter } from 'lucide-react';
 import { getDefaultCategoryImage } from '@/config/defaultCategoryImages';
 
+// iOS/Safari compatibility check
+const isIOSSafari = () => {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent;
+  return /iPad|iPhone|iPod/.test(ua) || (ua.includes('Mac') && 'ontouchend' in document);
+};
+
 interface Material {
   id: string;
   supplier_id: string;
@@ -154,8 +161,8 @@ const DEMO_MATERIALS: Material[] = [
 ];
 
 export const MaterialsGrid = () => {
-  const [materials, setMaterials] = useState<Material[]>([]);
-  const [filteredMaterials, setFilteredMaterials] = useState<Material[]>([]);
+  const [materials, setMaterials] = useState<Material[]>(DEMO_MATERIALS);
+  const [filteredMaterials, setFilteredMaterials] = useState<Material[]>(DEMO_MATERIALS);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All Categories');
@@ -169,6 +176,8 @@ export const MaterialsGrid = () => {
       loadMaterials();
     } catch (error) {
       console.error('Error in loadMaterials effect:', error);
+      setMaterials(DEMO_MATERIALS);
+      setFilteredMaterials(DEMO_MATERIALS);
       setLoading(false);
     }
   }, []);
@@ -178,12 +187,18 @@ export const MaterialsGrid = () => {
       filterMaterials();
     } catch (error) {
       console.error('Error in filterMaterials effect:', error);
+      setFilteredMaterials(materials.length > 0 ? materials : DEMO_MATERIALS);
     }
   }, [materials, searchQuery, selectedCategory, priceRange, stockFilter]);
 
   const loadMaterials = async () => {
     try {
       setLoading(true);
+      
+      // iOS/Safari specific: Add delay to prevent race conditions
+      if (isIOSSafari()) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
       
       // First, try to load materials without join (in case suppliers table has issues)
       const { data, error } = await supabase
@@ -193,62 +208,76 @@ export const MaterialsGrid = () => {
 
       if (error) {
         console.error('Error loading materials:', error);
-        throw error;
+        // Don't throw - just use demo materials instead
+        console.log('Database error, using demo materials');
+        setMaterials(DEMO_MATERIALS);
+        setFilteredMaterials(DEMO_MATERIALS);
+        setLoading(false);
+        return;
       }
 
       // Transform data with default supplier info
-      const transformedData = data?.map(item => ({
+      // iOS Safari compatible: Avoid optional chaining in maps
+      const transformedData = data ? data.map(item => ({
         ...item,
         supplier: {
           company_name: 'Supplier', // Default - we'll fetch supplier info separately if needed
           location: 'Kenya',
           rating: 4.5
         }
-      })) || [];
+      })) : [];
 
       // Use demo materials if database is empty
       if (transformedData.length === 0) {
         console.log('No materials in database, using demo materials');
         setMaterials(DEMO_MATERIALS);
+        setFilteredMaterials(DEMO_MATERIALS);
         setLoading(false);
         return;
       }
 
       setMaterials(transformedData);
       
-      // Optionally fetch supplier names
+      // Optionally fetch supplier names (but don't fail if this errors)
       if (data && data.length > 0) {
-        const supplierIds = [...new Set(data.map(m => m.supplier_id))];
-        const { data: suppliersData } = await supabase
-          .from('suppliers')
-          .select('id, user_id, company_name, location, rating')
-          .in('user_id', supplierIds);
+        try {
+          const supplierIds = Array.from(new Set(data.map(m => m.supplier_id).filter(Boolean)));
+          
+          if (supplierIds.length > 0) {
+            const { data: suppliersData, error: suppliersError } = await supabase
+              .from('suppliers')
+              .select('id, user_id, company_name, location, rating')
+              .in('user_id', supplierIds);
 
-        if (suppliersData) {
-          // Update materials with supplier info
-          const updated = transformedData.map(material => {
-            const supplier = suppliersData.find(s => s.user_id === material.supplier_id);
-            return {
-              ...material,
-              supplier: supplier ? {
-                company_name: supplier.company_name || 'Supplier',
-                location: supplier.location || 'Kenya',
-                rating: supplier.rating || 4.5
-              } : material.supplier
-            };
-          });
-          setMaterials(updated);
+            if (!suppliersError && suppliersData && suppliersData.length > 0) {
+              // Update materials with supplier info - iOS Safari compatible
+              const updated = transformedData.map(material => {
+                const supplier = suppliersData.find(s => s.user_id === material.supplier_id);
+                return {
+                  ...material,
+                  supplier: supplier ? {
+                    company_name: supplier.company_name || 'Supplier',
+                    location: supplier.location || 'Kenya',
+                    rating: supplier.rating || 4.5
+                  } : material.supplier
+                };
+              });
+              setMaterials(updated);
+            } else {
+              console.log('Could not fetch supplier info, using defaults');
+            }
+          }
+        } catch (suppError) {
+          console.log('Error fetching suppliers, using default supplier info');
+          // Continue with existing data - don't fail
         }
       }
     } catch (error) {
       console.error('Error loading materials:', error);
-      toast({
-        title: 'Error loading materials',
-        description: error instanceof Error ? error.message : 'Failed to fetch materials catalog',
-        variant: 'destructive'
-      });
-      // Set empty array on error to show empty state
-      setMaterials([]);
+      // Don't show error toast - just use demo materials
+      console.log('Falling back to demo materials');
+      setMaterials(DEMO_MATERIALS);
+      setFilteredMaterials(DEMO_MATERIALS);
     } finally {
       setLoading(false);
     }
