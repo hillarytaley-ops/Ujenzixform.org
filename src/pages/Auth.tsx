@@ -229,18 +229,18 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden">
-      {/* Beautiful Kenyan Construction Workers Background */}
+      {/* Beautiful Kenyan Construction Workers with Yellow Hard Hats Background */}
       <div 
         className="absolute inset-0 z-0"
         style={{
-          backgroundImage: `url('https://images.unsplash.com/photo-1541888946425-d81bb19240f5?w=1920&h=1080&fit=crop')`,
+          backgroundImage: `url('https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-gW4eb5K3am2BERQxC6jCNuhvaVOrTl.png')`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
           backgroundAttachment: 'fixed'
         }}
         role="img"
-        aria-label="Kenyan construction workers at building site"
+        aria-label="Kenyan construction workers in yellow hard hats reviewing blueprints at steel construction site"
       />
       
       {/* Semi-transparent overlay for readability */}
