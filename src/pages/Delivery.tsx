@@ -227,7 +227,7 @@ const Delivery = () => {
           <div 
             className="absolute inset-0"
             style={{
-              backgroundImage: `url('/delivery-hero-bg.jpg?v=1'), url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080"%3E%3Crect fill="%23f5f5f0" width="1920" height="1080"/%3E%3C/svg%3E')`,
+              backgroundImage: `url('/delivery-hero-bg.jpg?v=3'), url('/delivery-hero-bg.jpg'), url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080"%3E%3Crect fill="%23f5f5f0" width="1920" height="1080"/%3E%3C/svg%3E')`,
               backgroundSize: 'cover',
               backgroundPosition: 'center',
               backgroundRepeat: 'no-repeat'
