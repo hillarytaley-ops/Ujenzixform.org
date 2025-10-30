@@ -116,16 +116,16 @@ const Index = () => {
         {/* Hero Section - Matching Suppliers/Builders Design */}
         <AnimatedSection animation="fadeInUp">
           <section className="text-white py-20 relative overflow-hidden">
-            {/* Construction Site Background */}
+            {/* Your Custom Kenyan Construction Worker Hero Image */}
             <div 
               className="absolute inset-0"
               style={{
-                backgroundImage: `url('https://images.unsplash.com/photo-1541888946425-d81bb19240f5?w=1920&h=1080&fit=crop')`,
+                backgroundImage: `url('/slide-1.jpg'), url('https://images.unsplash.com/photo-1541888946425-d81bb19240f5?w=1920&h=1080&fit=crop')`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center'
               }}
             />
-            <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-gray-900/70 to-gray-800/70"></div>
+            <div className="absolute inset-0 bg-gradient-to-br from-black/50 via-gray-900/40 to-gray-800/40"></div>
             
             <div className="container mx-auto px-4 text-center relative z-10">
               <div className="mb-6">
