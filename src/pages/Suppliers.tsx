@@ -357,32 +357,31 @@ const SuppliersContent = () => {
 
         <main className="container mx-auto px-4 py-8 bg-gradient-to-b from-gray-50/30 to-white min-h-screen">
           {/* Enhanced Kenyan-Styled Security Notice - Admin Only */}
+          {/* iPhone/Safari Compatible - NO React.Suspense */}
           {isAdmin && (
-            <React.Suspense fallback={<div className="h-20"></div>}>
-              <div className="bg-gradient-to-r from-gray-50 via-blue-50 to-gray-50 border-2 border-gray-400 rounded-2xl p-6 mb-8 shadow-lg">
-                <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0 bg-blue-600 p-3 rounded-full">
-                    <Shield className="h-8 w-8 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold bg-gradient-to-r from-gray-700 to-blue-600 bg-clip-text text-transparent mb-2">
-                      🇰🇪 Admin Dashboard
-                    </h3>
-                    <p className="text-gray-700 text-sm mb-4">
-                      You have full access to supplier data, applications, and analytics.
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800 border-blue-300">
-                        ✅ Admin Access
-                      </Badge>
-                      <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800 border-blue-300">
-                        📊 Full Data Access
-                      </Badge>
-                    </div>
+            <div className="bg-gradient-to-r from-gray-50 via-blue-50 to-gray-50 border-2 border-gray-400 rounded-2xl p-6 mb-8 shadow-lg">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0 bg-blue-600 p-3 rounded-full">
+                  <Shield className="h-8 w-8 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold bg-gradient-to-r from-gray-700 to-blue-600 bg-clip-text text-transparent mb-2">
+                    🇰🇪 Admin Dashboard
+                  </h3>
+                  <p className="text-gray-700 text-sm mb-4">
+                    You have full access to supplier data, applications, and analytics.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800 border-blue-300">
+                      ✅ Admin Access
+                    </Badge>
+                    <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800 border-blue-300">
+                      📊 Full Data Access
+                    </Badge>
                   </div>
                 </div>
               </div>
-            </React.Suspense>
+            </div>
           )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -476,16 +475,8 @@ const SuppliersContent = () => {
           {isAdmin && (
             <>
               <TabsContent value="applications" className="space-y-8">
-                <React.Suspense fallback={
-                  <Card>
-                    <CardContent className="p-12 text-center">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                      <p className="text-muted-foreground">Loading applications...</p>
-                    </CardContent>
-                  </Card>
-                }>
-                  <SupplierApplicationManager />
-                </React.Suspense>
+                {/* iPhone/Safari Compatible - NO React.Suspense */}
+                <SupplierApplicationManager />
               </TabsContent>
               
               <TabsContent value="registered-users" className="space-y-8">
@@ -516,38 +507,18 @@ const SuppliersContent = () => {
               ) : (
                 <div className="space-y-6">
                   {/* Materials Marketplace - Show products instead of supplier cards */}
-                  {isAdmin ? (
-                    // Simpler view for admins on mobile to prevent crashes
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Admin Materials View</CardTitle>
-                        <CardDescription>
-                          Viewing materials marketplace as administrator
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <React.Suspense fallback={
-                          <div className="p-12 text-center">
-                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                            <p className="text-muted-foreground">Loading materials...</p>
-                          </div>
-                        }>
-                          <MaterialsGrid />
-                        </React.Suspense>
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    <React.Suspense fallback={
-                      <Card>
-                        <CardContent className="p-12 text-center">
-                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                          <p className="text-muted-foreground">Loading materials marketplace...</p>
-                        </CardContent>
-                      </Card>
-                    }>
+                  {/* iPhone/Safari Compatible - NO React.Suspense */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>{isAdmin ? 'Admin Materials View' : 'Materials Marketplace'}</CardTitle>
+                      <CardDescription>
+                        {isAdmin ? 'Viewing materials marketplace as administrator' : 'Browse construction materials from verified suppliers'}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
                       <MaterialsGrid />
-                    </React.Suspense>
-                  )}
+                    </CardContent>
+                  </Card>
                   
                   {/* Optional: Link to view suppliers list */}
                   <Card className="bg-blue-50/50 border-blue-200">
@@ -619,9 +590,8 @@ const SuppliersContent = () => {
       )}
 
       {/* Real-time Stats Section */}
-      <React.Suspense fallback={<div className="h-20"></div>}>
-        {!isAdmin && <RealTimeStats />}
-      </React.Suspense>
+      {/* iPhone/Safari Compatible - NO React.Suspense */}
+      {!isAdmin && <RealTimeStats />}
 
       <Footer />
     </div>
