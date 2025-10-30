@@ -181,44 +181,7 @@ const SuppliersContent = () => {
   const showDirectoryAccess = true; // Changed from isAdmin to make public
   const showRegistrationOnly = !loading && user && !isAdmin;
 
-  // MOBILE ADMIN: Ultra-safe view that cannot crash on iPhone
-  // Uses MaterialsGridSafe - guaranteed to work on all devices
-  if (isAdmin && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Navigation />
-        <div className="container mx-auto px-4 py-8">
-          <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-            <h1 className="text-2xl font-bold mb-2">🇰🇪 Admin Dashboard</h1>
-            <p className="text-muted-foreground mb-4">
-              Mobile admin view - simplified for stability
-            </p>
-            <div className="space-y-2">
-              <Badge className="bg-blue-600 text-white">✅ Admin Access</Badge>
-              <Badge variant="outline">📱 Mobile View</Badge>
-            </div>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Materials Marketplace</CardTitle>
-              <CardDescription>Browse construction materials from suppliers</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <MaterialsGridSafe />
-            </CardContent>
-          </Card>
-
-          <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-            <p className="text-sm text-center text-muted-foreground">
-              💡 For full admin features, please use desktop
-            </p>
-          </div>
-        </div>
-        <Footer />
-      </div>
-    );
-  }
+  // REMOVED: Mobile admin restriction - Full admin access on all devices now!
 
   // Wrap entire render in try-catch for mobile safety
   try {
@@ -508,7 +471,7 @@ const SuppliersContent = () => {
               ) : (
                 <div className="space-y-6">
                   {/* Materials Marketplace - Show products instead of supplier cards */}
-                  {/* iPhone/Safari Compatible - NO React.Suspense */}
+                  {/* iPhone/Safari Compatible - Uses safe version on mobile */}
                   <Card>
                     <CardHeader>
                       <CardTitle>{isAdmin ? 'Admin Materials View' : 'Materials Marketplace'}</CardTitle>
@@ -517,7 +480,7 @@ const SuppliersContent = () => {
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <MaterialsGrid />
+                      {/iPhone|iPad|iPod/i.test(navigator.userAgent) ? <MaterialsGridSafe /> : <MaterialsGrid />}
                     </CardContent>
                   </Card>
                   
