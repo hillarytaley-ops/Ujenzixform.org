@@ -52,8 +52,30 @@ const Analytics = () => {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="text-muted-foreground">Loading ML Analytics...</p>
+          <p className="text-muted-foreground">Loading...</p>
         </div>
+      </div>
+    );
+  }
+
+  // ADMIN ONLY ACCESS - Block all non-admin users
+  if (!user || userRole !== 'admin') {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Navigation />
+        <div className="container mx-auto px-4 py-20">
+          <div className="max-w-md mx-auto bg-white rounded-lg shadow-xl p-8 text-center">
+            <div className="text-6xl mb-4">🔒</div>
+            <h1 className="text-2xl font-bold mb-4 text-red-600">Access Denied</h1>
+            <p className="text-gray-700 mb-6">
+              This page is restricted to administrators only.
+            </p>
+            <Button onClick={() => window.location.href = '/'} className="w-full">
+              Return to Home
+            </Button>
+          </div>
+        </div>
+        <Footer />
       </div>
     );
   }

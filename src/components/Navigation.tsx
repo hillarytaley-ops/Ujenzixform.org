@@ -12,33 +12,58 @@ const Navigation = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const location = useLocation();
   const { toast } = useToast();
 
   useEffect(() => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
+        
+        // Get user role when session changes
+        if (session?.user) {
+          const { data: roleData } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', session.user.id)
+            .limit(1)
+            .maybeSingle();
+          setUserRole(roleData?.role || null);
+        } else {
+          setUserRole(null);
+        }
       }
     );
 
     // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      
+      // Get user role on initial load
+      if (session?.user) {
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .limit(1)
+          .maybeSingle();
+        setUserRole(roleData?.role || null);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  const navItems = [
+  // Public navigation items (visible to everyone)
+  const publicNavItems = [
     { path: "/", label: "Home" },
     { path: "/builders", label: "Builders" },
     { path: "/suppliers", label: "Suppliers" },
     { path: "/delivery", label: "Delivery" },
-    { path: "/analytics", label: "ML Analytics" },
     { path: "/scanners", label: "Scanners" },
     { path: "/tracking", label: "Tracking" },
     { path: "/monitoring", label: "Monitoring" },
@@ -46,6 +71,16 @@ const Navigation = () => {
     { path: "/contact", label: "Contact" },
     { path: "/feedback", label: "Feedback" },
   ];
+
+  // Admin-only navigation items (only visible to admin)
+  const adminNavItems = [
+    { path: "/analytics", label: "ML Analytics" },
+  ];
+
+  // Combine nav items based on user role
+  const navItems = userRole === 'admin' 
+    ? [...publicNavItems, ...adminNavItems] 
+    : publicNavItems;
 
   const isActive = (path: string) => location.pathname === path;
 
