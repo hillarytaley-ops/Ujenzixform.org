@@ -4,7 +4,22 @@
 -- Adds columns needed for Professional Builder and Private Client registration
 -- ================================================================
 
--- Add columns for Private Client registration
+-- Step 1: Create builder_category enum type if it doesn't exist
+DO $$ 
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'builder_category') THEN
+    CREATE TYPE public.builder_category AS ENUM ('professional', 'private');
+    RAISE NOTICE '✓ Created builder_category enum type';
+  ELSE
+    RAISE NOTICE '✓ builder_category enum type already exists';
+  END IF;
+END $$;
+
+-- Step 2: Add builder_category column first
+ALTER TABLE public.profiles 
+ADD COLUMN IF NOT EXISTS builder_category public.builder_category;
+
+-- Step 3: Add columns for Private Client registration
 ALTER TABLE public.profiles 
 ADD COLUMN IF NOT EXISTS project_types TEXT[],
 ADD COLUMN IF NOT EXISTS project_timeline TEXT,
