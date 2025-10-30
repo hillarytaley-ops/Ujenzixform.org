@@ -168,9 +168,31 @@ export const MaterialsGrid = () => {
   const [selectedCategory, setSelectedCategory] = useState('All Categories');
   const [priceRange, setPriceRange] = useState('all');
   const [stockFilter, setStockFilter] = useState('all');
-  const { toast } = useToast();
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { toast} = useToast();
 
   useEffect(() => {
+    // Check user role for purchase flow
+    const checkUserRole = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          setIsAuthenticated(true);
+          const { data: roleData } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', user.id)
+            .maybeSingle();
+          setUserRole(roleData?.role || null);
+        }
+      } catch (error) {
+        console.error('Error checking user role:', error);
+      }
+    };
+    
+    checkUserRole();
+    
     // Wrap in try-catch to prevent crashes
     try {
       loadMaterials();
@@ -505,16 +527,45 @@ export const MaterialsGrid = () => {
                     )}
                   </div>
 
-                  {/* Actions */}
+                  {/* Actions - Different for Professional Builders vs Private Clients */}
                   <div className="flex gap-2">
-                    <Button 
-                      className="flex-1"
-                      onClick={() => handleRequestQuote(material)}
-                      disabled={!material.in_stock}
-                    >
-                      <ShoppingCart className="h-4 w-4 mr-2" />
-                      Request Quote
-                    </Button>
+                    {/* Professional Builders: Request Quote */}
+                    {userRole === 'builder' || userRole === 'professional_builder' ? (
+                      <Button 
+                        className="flex-1 bg-blue-600 hover:bg-blue-700"
+                        onClick={() => handleRequestQuote(material)}
+                        disabled={!material.in_stock}
+                      >
+                        <ShoppingCart className="h-4 w-4 mr-2" />
+                        Request Quote
+                      </Button>
+                    ) : userRole === 'private_client' ? (
+                      /* Private Clients: Purchase Directly */
+                      <Button 
+                        className="flex-1 bg-green-600 hover:bg-green-700"
+                        onClick={() => toast({
+                          title: 'Purchase Materials',
+                          description: `Proceeding to purchase ${material.name} from ${material.supplier?.company_name}. Direct purchase enabled for private clients.`,
+                        })}
+                        disabled={!material.in_stock}
+                      >
+                        <ShoppingCart className="h-4 w-4 mr-2" />
+                        Buy Now
+                      </Button>
+                    ) : (
+                      /* Not logged in or other roles */
+                      <Button 
+                        className="flex-1"
+                        onClick={() => toast({
+                          title: 'Sign In Required',
+                          description: 'Please sign in to purchase materials or request quotes.',
+                        })}
+                        disabled={!material.in_stock}
+                      >
+                        <ShoppingCart className="h-4 w-4 mr-2" />
+                        {!isAuthenticated ? 'Sign In to Buy' : 'Request Quote'}
+                      </Button>
+                    )}
                     <Button 
                       variant="outline"
                       onClick={() => toast({
