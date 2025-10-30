@@ -65,6 +65,7 @@ type ProfessionalRegistrationFormData = z.infer<typeof professionalRegistrationS
 const ProfessionalBuilderRegistration = () => {
   const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [progress, setProgress] = useState(0);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -90,9 +91,11 @@ const ProfessionalBuilderRegistration = () => {
 
   const onSubmit = async (data: ProfessionalRegistrationFormData) => {
     setIsSubmitting(true);
+    setProgress(0);
 
     try {
-      // ULTRA-FAST: Use session instead of getUser (no network call needed)
+      // Step 1: Check authentication (progress: 10%)
+      setProgress(10);
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session?.user) {
@@ -106,14 +109,17 @@ const ProfessionalBuilderRegistration = () => {
       }
 
       const userId = session.user.id;
-
-      // Show immediate feedback
+      
+      // Step 2: Show processing (progress: 30%)
+      setProgress(30);
       toast({
-        title: "Processing...",
-        description: "Saving your professional profile...",
+        title: "⏳ Saving...",
+        description: "Creating your professional profile...",
       });
 
-      // OPTIMIZED: Run both updates in parallel + specify conflict resolution
+      // Step 3: Save to database (progress: 50%)
+      setProgress(50);
+      
       const [profileResult, roleResult] = await Promise.all([
         supabase
           .from('profiles')
@@ -144,9 +150,15 @@ const ProfessionalBuilderRegistration = () => {
           })
       ]);
 
+      // Step 4: Verify success (progress: 80%)
+      setProgress(80);
+      
       if (profileResult.error) throw profileResult.error;
       if (roleResult.error) throw roleResult.error;
 
+      // Step 5: Complete (progress: 100%)
+      setProgress(100);
+      
       toast({
         title: "✅ Success!",
         description: "Profile created! Redirecting...",
@@ -154,9 +166,9 @@ const ProfessionalBuilderRegistration = () => {
       });
 
       // Immediate redirect
-      setTimeout(() => navigate("/builders?welcome=true"), 500);
       form.reset();
       setSelectedSpecialties([]);
+      navigate("/builders?welcome=true");
 
     } catch (error: any) {
       console.error("Registration error:", error);
@@ -565,14 +577,39 @@ const ProfessionalBuilderRegistration = () => {
                     />
                   </div>
 
-                  <Button 
-                    type="submit" 
-                    className="w-full bg-blue-600 hover:bg-blue-700" 
-                    disabled={isSubmitting}
-                    size="lg"
-                  >
-                    {isSubmitting ? "Submitting Application..." : "Submit Professional Builder Registration"}
-                  </Button>
+                  <div className="space-y-4">
+                    {/* Progress Bar */}
+                    {isSubmitting && (
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm text-muted-foreground">
+                          <span>Processing registration...</span>
+                          <span>{progress}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-500"
+                            style={{ width: `${progress}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <Button 
+                      type="submit" 
+                      className="w-full bg-blue-600 hover:bg-blue-700" 
+                      disabled={isSubmitting}
+                      size="lg"
+                    >
+                      {isSubmitting ? (
+                        <span className="flex items-center gap-2">
+                          <span className="animate-spin">⏳</span>
+                          {progress < 30 ? "Checking..." : progress < 80 ? "Saving..." : "Finishing..."}
+                        </span>
+                      ) : (
+                        "Submit Professional Builder Registration"
+                      )}
+                    </Button>
+                  </div>
                 </form>
               </Form>
             </CardContent>
