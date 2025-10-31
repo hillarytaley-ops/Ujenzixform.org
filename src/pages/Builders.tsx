@@ -22,7 +22,7 @@ import BuilderMap from "@/components/builders/BuilderMap";
 import ChatWidget from "@/components/builders/ChatWidget";
 import { EnhancedSearch } from "@/components/builders/EnhancedSearch";
 import { ReviewsSystem } from "@/components/builders/ReviewsSystem";
-import { NotificationSystem } from "@/components/builders/NotificationSystem";
+// import { NotificationSystem } from "@/components/builders/NotificationSystem";
 // import { AnalyticsDashboard } from "@/components/builders/AnalyticsDashboardEnhanced";
 import { PDFExport } from "@/components/builders/PDFExport";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
@@ -305,7 +305,6 @@ const Builders = () => {
               <div className="flex items-center gap-3 bg-white/10 backdrop-blur-sm rounded-full p-2 border border-white/20">
                 <ThemeToggle />
                 <LanguageToggle />
-                {userProfile && <NotificationSystem builderId={userProfile.user_id} isBuilder={true} />}
               </div>
             </div>
             
