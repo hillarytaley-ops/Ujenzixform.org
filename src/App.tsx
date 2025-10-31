@@ -64,26 +64,42 @@ const ErrorFallback = ({ error, resetErrorBoundary }: { error: Error; resetError
   </div>
 );
 
-// Optimized QueryClient with faster settings
+// Optimized QueryClient with aggressive caching for better performance
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      gcTime: 10 * 60 * 1000, // 10 minutes (replaces cacheTime)
+      staleTime: 10 * 60 * 1000, // 10 minutes - longer cache for better performance
+      gcTime: 30 * 60 * 1000, // 30 minutes - keep in cache longer
+      refetchOnWindowFocus: false, // Disable auto-refetch for better performance
+      refetchOnReconnect: false, // Disable on reconnect
+      retry: 1, // Only retry once to fail faster
     },
   },
 });
 
 const App = () => {
   const [user, setUser] = React.useState<any>(null);
+  const [showChat, setShowChat] = React.useState(false);
 
   React.useEffect(() => {
-    // Get current user for chatbot
-    import('@/integrations/supabase/client').then(({ supabase }) => {
-      supabase.auth.getUser().then(({ data }) => {
-        setUser(data.user);
+    // Get current user for chatbot (deferred)
+    const timer = setTimeout(() => {
+      import('@/integrations/supabase/client').then(({ supabase }) => {
+        supabase.auth.getUser().then(({ data }) => {
+          setUser(data.user);
+        });
       });
-    });
+    }, 1000);
+
+    // Load chat widget after page is interactive (defer for better initial load)
+    const chatTimer = setTimeout(() => {
+      setShowChat(true);
+    }, 2000);
+
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(chatTimer);
+    };
   }, []);
 
   return (
@@ -94,8 +110,8 @@ const App = () => {
             <Toaster />
             <Sonner />
             <BrowserRouter>
-              {/* AI Chatbot - Simple version for testing */}
-              <SimpleChatButton />
+              {/* AI Chatbot - Deferred load for better performance */}
+              {showChat && <SimpleChatButton />}
               
               <ErrorBoundary>
                 <Suspense fallback={<PageLoader />}>
