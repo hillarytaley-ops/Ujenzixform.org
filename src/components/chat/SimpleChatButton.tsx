@@ -309,7 +309,7 @@ export const SimpleChatButton = () => {
           </div>
           <div className="text-xs text-gray-500 mt-2 flex items-center gap-1">
             <Sparkles className="h-3 w-3" />
-            Powered by UjenziPro 🇰🇪 • AI & Human Support Available
+            Powered by UjenziPro 🇰🇪 • AI & Human Support Available • v2.0
           </div>
         </div>
       </Card>
