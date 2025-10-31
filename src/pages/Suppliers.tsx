@@ -211,76 +211,79 @@ const SuppliersContent = () => {
             <p className="text-lg text-gray-200 mb-2">Karibu - Welcome to Kenya's Premier</p>
           </div>
           
-          <h1 className="text-5xl md:text-6xl font-bold mb-6 leading-tight">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 md:mb-6 leading-tight px-2">
             <span className="bg-gradient-to-r from-white via-gray-200 to-white bg-clip-text text-transparent">
               UjenziPro
             </span>
             <br />
-            <span className="text-3xl md:text-4xl text-blue-400">
+            <span className="text-2xl sm:text-3xl md:text-4xl text-blue-400">
               Suppliers Marketplace
             </span>
           </h1>
           
-          <p className="text-xl md:text-2xl mb-8 opacity-90 max-w-4xl mx-auto leading-relaxed">
+          <p className="text-base sm:text-lg md:text-xl lg:text-2xl mb-6 md:mb-8 opacity-90 max-w-4xl mx-auto leading-relaxed px-4">
             <strong>Your Construction Materials Hub:</strong> Browse verified suppliers, explore product catalogs with images, 
             compare prices and quality, request quotes instantly, place bulk orders, arrange delivery across Kenya, 
             track material shipments, verify authenticity with QR codes, and build lasting business relationships 
             with trusted suppliers from Mombasa to Eldoret.
           </p>
 
-          {/* Action Buttons - Always Visible */}
-          <div className="flex flex-wrap gap-4 justify-center mb-8">
+          {/* Action Buttons - Mobile Responsive */}
+          <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 justify-center mb-6 md:mb-8 px-4">
             <Button 
               size="lg"
               onClick={() => setActiveTab("suppliers")}
-              className="bg-white text-gray-900 hover:bg-gray-100 font-semibold px-8 py-6 text-lg shadow-xl"
+              className="bg-white text-gray-900 hover:bg-gray-100 font-semibold px-6 sm:px-8 py-4 sm:py-6 text-base sm:text-lg shadow-xl w-full sm:w-auto"
             >
-              <Building className="h-5 w-5 mr-2" />
-              Browse Suppliers
+              <Building className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+              <span className="whitespace-nowrap">Browse Suppliers</span>
             </Button>
             
             <Button 
               size="lg"
               onClick={() => user ? setActiveTab("register") : window.location.href = '/auth'}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 sm:px-8 py-4 sm:py-6 text-base sm:text-lg shadow-xl w-full sm:w-auto"
             >
-              <Store className="h-5 w-5 mr-2" />
-              Register as Supplier
+              <Store className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+              <span className="whitespace-nowrap">Register as Supplier</span>
             </Button>
             
             <Button 
               size="lg"
               onClick={() => setActiveTab("purchase")}
-              className="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
+              className="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-6 sm:px-8 py-4 sm:py-6 text-base sm:text-lg shadow-xl w-full sm:w-auto"
             >
-              <ShoppingBag className="h-5 w-5 mr-2" />
-              Purchase Materials
+              <ShoppingBag className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+              <span className="whitespace-nowrap">Purchase Materials</span>
             </Button>
           </div>
 
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full max-w-5xl mx-auto">
-              <TabsList className={`grid w-full bg-black/40 backdrop-blur-sm border-2 border-gray-400/30 rounded-2xl p-2 ${
-                userRole === 'supplier' ? 'grid-cols-7' : 
-                isAdmin ? 'grid-cols-3' : 
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full max-w-5xl mx-auto px-2">
+              <TabsList className={`grid w-full bg-black/40 backdrop-blur-sm border-2 border-gray-400/30 rounded-xl md:rounded-2xl p-1 md:p-2 gap-1 md:gap-0 text-xs sm:text-sm ${
+                userRole === 'supplier' ? 'grid-cols-3 sm:grid-cols-4 md:grid-cols-7' : 
+                isAdmin ? 'grid-cols-2 sm:grid-cols-3' : 
                 showRegistrationOnly ? 'grid-cols-1' : 
                 'grid-cols-2'
               }`}>
                 {(showDirectoryAccess || !user) && (
-                  <TabsTrigger value="suppliers" className="flex items-center gap-2 data-[state=active]:bg-gray-700 data-[state=active]:text-white font-medium rounded-xl transition-all duration-300">
-                    <Building className="h-4 w-4" />
-                    Suppliers
+                  <TabsTrigger value="suppliers" className="flex items-center justify-center gap-1 sm:gap-2 data-[state=active]:bg-gray-700 data-[state=active]:text-white font-medium rounded-lg md:rounded-xl transition-all duration-300 px-2 py-2">
+                    <Building className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                    <span className="hidden sm:inline">Suppliers</span>
+                    <span className="sm:hidden">Supply</span>
                   </TabsTrigger>
                 )}
                 {showRegistrationOnly && (
-                  <TabsTrigger value="register" className="flex items-center gap-2 data-[state=active]:bg-blue-600 data-[state=active]:text-white font-medium rounded-xl transition-all duration-300">
-                    <Store className="h-4 w-4" />
-                    Register as Supplier
+                  <TabsTrigger value="register" className="flex items-center justify-center gap-1 sm:gap-2 data-[state=active]:bg-blue-600 data-[state=active]:text-white font-medium rounded-lg md:rounded-xl transition-all duration-300 px-2 py-2">
+                    <Store className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                    <span className="hidden sm:inline">Register as Supplier</span>
+                    <span className="sm:hidden">Register</span>
                   </TabsTrigger>
                 )}
                 {(showDirectoryAccess || !user) && (
-                  <TabsTrigger value="purchase" className="flex items-center gap-2 data-[state=active]:bg-orange-600 data-[state=active]:text-white font-medium rounded-all duration-300">
-                    <ShoppingBag className="h-4 w-4" />
-                    Purchase
+                  <TabsTrigger value="purchase" className="flex items-center justify-center gap-1 sm:gap-2 data-[state=active]:bg-orange-600 data-[state=active]:text-white font-medium rounded-lg md:rounded-xl transition-all duration-300 px-2 py-2">
+                    <ShoppingBag className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                    <span className="hidden sm:inline">Purchase</span>
+                    <span className="sm:hidden">Buy</span>
                   </TabsTrigger>
                 )}
                 {isAdmin && (
