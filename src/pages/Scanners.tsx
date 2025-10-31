@@ -306,17 +306,17 @@ const Scanners = () => {
           role="banner"
           aria-labelledby="scanners-hero-heading"
         >
-        {/* Your Custom QR Scanner Image - Phone & Barcode Scanner - Responsive */}
+        {/* QR Scanner Mobile App Interface - Responsive Background */}
         <div 
           className="absolute inset-0"
           style={{
-              backgroundImage: `url('/scanners-hero-bg.jpg?v=4'), url('/scanners-hero-bg.jpg'), url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080"%3E%3Crect fill="%23e8e8e8" width="1920" height="1080"/%3E%3C/svg%3E')`,
+              backgroundImage: `url('/scanners-hero-new.jpg?v=5'), url('/scanners-hero-bg.jpg?v=4'), url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080"%3E%3Crect fill="%23e8e8e8" width="1920" height="1080"/%3E%3C/svg%3E')`,
             backgroundSize: 'cover',
             backgroundPosition: 'center center',
             backgroundRepeat: 'no-repeat'
           }}
           role="img"
-          aria-label="QR code scanner and mobile scanning system"
+          aria-label="Professional QR code scanner mobile application interface with scanning frame and controls"
         />
         {/* Light overlay for text readability */}
         <div className="absolute inset-0 bg-gradient-to-br from-black/50 via-gray-900/40 to-black/50"></div>
