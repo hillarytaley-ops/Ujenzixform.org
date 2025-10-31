@@ -276,15 +276,14 @@ const Monitoring = () => {
           role="banner"
           aria-labelledby="monitoring-hero-heading"
         >
-        {/* Security Camera & Drone Surveillance Background */}
+        {/* Security Camera & Drone Surveillance Background - Responsive */}
         <div 
           className="absolute inset-0"
           style={{
             backgroundImage: `url('https://images.unsplash.com/photo-1508614999368-9260051292e5?w=1920&h=1080&fit=crop&q=80')`,
             backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat',
-            backgroundAttachment: 'fixed'
+            backgroundPosition: 'center center',
+            backgroundRepeat: 'no-repeat'
           }}
           role="img"
           aria-label="Professional security surveillance cameras and monitoring technology for construction site security"
@@ -354,15 +353,14 @@ const Monitoring = () => {
       </AnimatedSection>
 
       <main className="py-20 relative overflow-hidden">
-        {/* Kenyan Construction Site Monitoring Background */}
+        {/* Kenyan Construction Site Monitoring Background - Responsive */}
         <div 
           className="absolute inset-0"
           style={{
             backgroundImage: `url('/monitoring-bg.jpg')`,
             backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat',
-            backgroundAttachment: 'fixed'
+            backgroundPosition: 'center center',
+            backgroundRepeat: 'no-repeat'
           }}
           role="img"
           aria-label="Professional Kenyan construction site with monitoring systems and surveillance technology for comprehensive project oversight"

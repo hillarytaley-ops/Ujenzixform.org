@@ -147,15 +147,14 @@ const Tracking = () => {
             role="banner"
             aria-labelledby="tracking-hero-heading"
           >
-          {/* GPS Map & Tracking Technology Background */}
+          {/* GPS Map & Tracking Technology Background - Responsive */}
           <div 
             className="absolute inset-0"
             style={{
               backgroundImage: `url('https://images.unsplash.com/photo-1569336415962-a4bd9f69cd83?w=1920&h=1080&fit=crop&q=80')`,
               backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat',
-              backgroundAttachment: 'fixed'
+              backgroundPosition: 'center center',
+              backgroundRepeat: 'no-repeat'
             }}
             role="img"
             aria-label="Professional GPS tracking map technology for real-time delivery monitoring and location tracking across Kenya"

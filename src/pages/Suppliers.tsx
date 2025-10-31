@@ -191,14 +191,17 @@ const SuppliersContent = () => {
 
       {/* Kenyan-Themed Hero Section */}
       <section className="text-white py-20 relative overflow-hidden">
-        {/* Your Custom Building Materials Banner Background */}
+        {/* Your Custom Building Materials Banner Background - Responsive */}
         <div 
           className="absolute inset-0"
           style={{
             backgroundImage: `url('/suppliers-hero-bg.jpg?v=2'), url('/suppliers-hero-bg.jpg'), url('https://images.unsplash.com/photo-1541888946425-d81bb19240f5?w=1920&h=1080&fit=crop')`,
             backgroundSize: 'cover',
-            backgroundPosition: 'center'
+            backgroundPosition: 'center center',
+            backgroundRepeat: 'no-repeat'
           }}
+          role="img"
+          aria-label="Construction materials and building supplies"
         />
         <div className="absolute inset-0 bg-gradient-to-br from-black/60 via-gray-900/50 to-gray-800/50"></div>
         
