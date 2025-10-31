@@ -284,29 +284,28 @@ const Index = () => {
               <div className="text-center mb-12">
                 {/* NEW Badge highlighting monitoring */}
                 <Badge className="mb-4 bg-primary/10 text-primary border-primary/20 px-4 py-1 text-sm font-semibold">
-                  🚁 NEW: Real-Time Site Monitoring
+                  🚁 NEW: Live Site Monitoring
                 </Badge>
                 
                 {/* Updated heading */}
                 <h2 className="text-4xl font-bold text-foreground mb-4">
-                  See UjenziPro's Complete Platform in Action
+                  See UjenziPro in Action
                 </h2>
                 
-                {/* Enhanced description with monitoring emphasis */}
+                {/* Simplified description */}
                 <p className="text-lg text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-                  Watch our comprehensive demo featuring{' '}
+                  Watch how UjenziPro connects builders and suppliers across Kenya with{' '}
                   <span className="font-semibold text-primary">
-                    real-time construction site monitoring with drones and cameras
+                    drone monitoring, QR tracking, and secure M-Pesa payments
                   </span>
-                  , builder directory, supplier network, QR material tracking, and secure M-Pesa payments 
-                  across all 47 counties.
+                  .
                 </p>
                 
                 {/* Video metadata */}
-                <div className="mt-4 flex items-center justify-center gap-6 text-sm text-muted-foreground">
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-sm text-muted-foreground">
                   <span className="flex items-center gap-2">
                     <span className="text-base">⏱️</span>
-                    <span>5-6 minutes</span>
+                    <span>6 min</span>
                   </span>
                   <span className="flex items-center gap-2">
                     <span className="text-base">📹</span>
