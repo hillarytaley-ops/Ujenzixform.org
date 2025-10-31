@@ -257,33 +257,33 @@ const Delivery = () => {
             and ensure materials arrive safely and on time across Kenya.
           </p>
 
-          {/* Action Buttons - Always Visible */}
-          <div className="flex flex-wrap gap-4 justify-center mb-8">
+          {/* Action Buttons - Mobile Responsive */}
+          <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 justify-center mb-6 md:mb-8 px-4">
             <Button 
               size="lg"
               onClick={() => setActiveTab("request")}
-              className="bg-white text-gray-900 hover:bg-gray-100 font-semibold px-8 py-6 text-lg shadow-xl"
+              className="bg-white text-gray-900 hover:bg-gray-100 font-semibold px-6 sm:px-8 py-4 sm:py-6 text-base sm:text-lg shadow-xl w-full sm:w-auto"
             >
-              <Truck className="h-5 w-5 mr-2" />
-              Request Delivery
+              <Truck className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+              <span className="whitespace-nowrap">Request Delivery</span>
             </Button>
             
             <Button 
               size="lg"
               onClick={() => setActiveTab("tracking")}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 sm:px-8 py-4 sm:py-6 text-base sm:text-lg shadow-xl w-full sm:w-auto"
             >
-              <MapPin className="h-5 w-5 mr-2" />
-              Track Deliveries
+              <MapPin className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+              <span className="whitespace-nowrap">Track Deliveries</span>
             </Button>
             
             <Button 
               size="lg"
               onClick={() => setActiveTab("calculator")}
-              className="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
+              className="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-6 sm:px-8 py-4 sm:py-6 text-base sm:text-lg shadow-xl w-full sm:w-auto"
             >
-              <Calculator className="h-5 w-5 mr-2" />
-              Cost Calculator
+              <Calculator className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+              <span className="whitespace-nowrap">Cost Calculator</span>
             </Button>
           </div>
           
