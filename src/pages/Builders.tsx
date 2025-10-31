@@ -188,18 +188,18 @@ const Builders = () => {
           role="banner"
           aria-labelledby="builders-hero-heading"
         >
-        {/* Your Custom Kenyan Construction Workers with Tablet Background */}
+        {/* Professional Kenyan Construction Workers Planning Background */}
         <div 
           className="absolute inset-0"
           style={{
-            backgroundImage: `url('/builders-hero-bg.jpg?v=1'), url('/builders-hero-bg.webp'), url('https://images.unsplash.com/photo-1487958449943-2429e8be8625?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')`,
+            backgroundImage: `url('/builders-hero-new.jpg?v=2'), url('/builders-hero-bg.jpg?v=1'), url('https://images.unsplash.com/photo-1487958449943-2429e8be8625?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
             backgroundAttachment: 'fixed'
           }}
           role="img"
-          aria-label="Professional Kenyan construction workers in orange safety vests and hard hats reviewing project plans on tablet at modern construction site"
+          aria-label="Professional Kenyan construction workers in safety vests and hard hats reviewing architectural blueprints at active construction site with crane in background"
         />
         
         {/* Lighter overlay to show your beautiful image */}
