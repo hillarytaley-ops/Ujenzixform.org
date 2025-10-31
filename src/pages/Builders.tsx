@@ -27,6 +27,7 @@ import { ReviewsSystem } from "@/components/builders/ReviewsSystem";
 import { PDFExport } from "@/components/builders/PDFExport";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { LanguageToggle } from "@/components/ui/language-toggle";
+import { LoginPortal } from "@/components/LoginPortal";
 // Builder components temporarily disabled for debugging
 // import ProfessionalBuilderDashboard from "@/components/ProfessionalBuilderDashboard";
 // import PrivateBuilderDirectPurchase from "@/components/PrivateBuilderDirectPurchase";
@@ -545,6 +546,15 @@ const Builders = () => {
         ) : (
           /* Public Directory with Enhanced Search */
           <div className="space-y-8">
+            {/* Login Portal for Builders - Only show if not logged in */}
+            {!userProfile && (
+              <div className="bg-white/95 backdrop-blur-sm rounded-2xl border-2 border-white/50 shadow-2xl p-6">
+                <LoginPortal 
+                  type="builder"
+                />
+              </div>
+            )}
+
             <ErrorBoundary fallback={<div></div>}>
               <div className="bg-white/95 backdrop-blur-sm rounded-2xl border-2 border-white/50 shadow-2xl p-6">
                 <EnhancedSearch 

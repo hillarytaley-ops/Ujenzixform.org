@@ -16,6 +16,7 @@ import AnimatedHero from "@/components/AnimatedHero";
 import AnimatedStatsGrid from "@/components/AnimatedStatsGrid";
 import AnimatedCTAButtons from "@/components/AnimatedCTAButtons";
 import AnimatedFeatureCard from "@/components/AnimatedFeatureCard";
+import { LoginPortal } from "@/components/LoginPortal";
 
 // Memoized components for better performance
 const FeatureCard = memo(({ feature, index }: { feature: any, index: number }) => (
@@ -391,6 +392,19 @@ const Index = () => {
                 </div>
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* Login Portal Section */}
+        <section className="py-16 bg-white">
+          <div className="container mx-auto px-4">
+            <AnimatedSection animation="fadeInUp">
+              <LoginPortal 
+                type="general"
+                title="Access Your UjenziPro Account"
+                description="Login to manage projects, browse materials, track deliveries, and connect with Kenya's construction community."
+              />
+            </AnimatedSection>
           </div>
         </section>
 

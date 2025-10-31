@@ -31,6 +31,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Supplier } from "@/types/supplier";
 import { useToast } from "@/hooks/use-toast";
 import { ModalProvider, useModal } from "@/contexts/ModalContext";
+import { LoginPortal } from "@/components/LoginPortal";
 
 const SuppliersContent = () => {
   const [user, setUser] = useState<any>(null);
@@ -476,6 +477,13 @@ const SuppliersContent = () => {
                 <SupplierRegistrationForm />
               ) : (
                 <div className="space-y-6">
+                  {/* Login Portal for Suppliers - Only show if not logged in */}
+                  {!user && (
+                    <LoginPortal 
+                      type="supplier"
+                    />
+                  )}
+
                   {/* Materials Marketplace - Show products instead of supplier cards */}
                   {/* iPhone/Safari Compatible - Uses safe version on mobile */}
                   <Card>
