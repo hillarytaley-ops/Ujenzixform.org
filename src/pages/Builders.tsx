@@ -348,10 +348,12 @@ const Builders = () => {
         <div className="absolute inset-0 bg-white/92 backdrop-blur-[1px]"></div>
         
         <div className="container mx-auto px-4 relative z-10">
-          {/* Security Alert */}
-          <div className="mb-8">
-            <SecurityAlert />
-          </div>
+          {/* Security Alert - Admin Only */}
+          {isAdmin && (
+            <div className="mb-8">
+              <SecurityAlert />
+            </div>
+          )}
 
           {/* Dashboard for authenticated builders */}
           {showDashboard && canAccessDashboard ? (
