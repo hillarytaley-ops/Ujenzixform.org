@@ -67,8 +67,7 @@ const Auth = () => {
         options: {
           emailRedirectTo: `${window.location.origin}/`,
           data: {
-            email: email,
-            email_confirmed: true // Skip email confirmation for faster signup
+            email: email
           }
         }
       });
@@ -78,8 +77,15 @@ const Auth = () => {
         return { error };
       }
       
+      // Check if email confirmation is required
+      if (data.user && !data.session) {
+        // Email confirmation is enabled in Supabase
+        console.log('Email confirmation required');
+        return { error: null, needsConfirmation: true };
+      }
+      
       console.log('Sign up successful:', data);
-      return { error: null };
+      return { error: null, needsConfirmation: false };
     } catch (err: any) {
       console.error('Sign up exception:', err);
       return { error: err };
@@ -143,11 +149,12 @@ const Auth = () => {
     const password = formData.get("password") as string;
 
     try {
-      const { error } = isSignUp 
+      const result = isSignUp 
         ? await signUp(email, password)
         : await signIn(email, password);
 
-      if (error) {
+      if (result.error) {
+        const error = result.error;
         if (error.message.includes("User already registered")) {
           toast({
             variant: "destructive",
@@ -174,12 +181,23 @@ const Auth = () => {
           });
         }
       } else if (isSignUp) {
-        toast({
-          title: "✅ Account created!",
-          description: "Welcome to UjenziPro! Taking you to your dashboard...",
-        });
-        // Auto-redirect to home page after signup
-        setTimeout(() => navigate("/"), 1500);
+        if (result.needsConfirmation) {
+          // Email confirmation is required
+          toast({
+            title: "📧 Check your email",
+            description: "We've sent a confirmation link to verify your account. Click the link to complete signup.",
+          });
+        } else {
+          // Instant signup (no confirmation)
+          toast({
+            title: "✅ Account created!",
+            description: "Welcome to UjenziPro! Taking you to the platform...",
+          });
+          // Auto-redirect to home page after signup
+          setTimeout(() => {
+            window.location.href = '/';
+          }, 1500);
+        }
       } else {
         toast({
           title: "Welcome back!",
