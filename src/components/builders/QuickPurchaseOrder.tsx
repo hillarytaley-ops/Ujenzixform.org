@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,9 +6,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { ShoppingCart, Package, Plus, Trash2, Send, Loader2, CheckCircle } from 'lucide-react';
+import { ShoppingCart, Package, Plus, Trash2, Send, Loader2, CheckCircle, Users, Store, MapPin, Star } from 'lucide-react';
 
 interface QuickPurchaseOrderProps {
   builderId: string;
@@ -22,6 +24,15 @@ interface OrderItem {
   quantity: string;
   unit: string;
   notes: string;
+}
+
+interface Supplier {
+  id: string;
+  company_name: string;
+  location: string;
+  materials_offered: string[];
+  rating: number;
+  total_reviews: number;
 }
 
 const MATERIAL_CATEGORIES = [
@@ -50,7 +61,57 @@ export const QuickPurchaseOrder: React.FC<QuickPurchaseOrderProps> = ({ builderI
   const [deliveryDate, setDeliveryDate] = useState('');
   const [additionalNotes, setAdditionalNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
+  const [loadingSuppliers, setLoadingSuppliers] = useState(false);
+  const [showSupplierSelection, setShowSupplierSelection] = useState(false);
   const { toast } = useToast();
+
+  // Fetch suppliers when component mounts
+  useEffect(() => {
+    fetchSuppliers();
+  }, []);
+
+  const fetchSuppliers = async () => {
+    setLoadingSuppliers(true);
+    try {
+      const { data, error } = await supabase
+        .from('suppliers')
+        .select('id, company_name, location, materials_offered, rating, total_reviews')
+        .eq('status', 'active')
+        .order('rating', { ascending: false })
+        .limit(20);
+
+      if (error) throw error;
+
+      setSuppliers(data || []);
+    } catch (error) {
+      console.error('Error fetching suppliers:', error);
+      toast({
+        title: 'Could not load suppliers',
+        description: 'You can still submit the order and we\'ll match suppliers for you',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingSuppliers(false);
+    }
+  };
+
+  const toggleSupplier = (supplierId: string) => {
+    setSelectedSuppliers(prev => 
+      prev.includes(supplierId)
+        ? prev.filter(id => id !== supplierId)
+        : [...prev, supplierId]
+    );
+  };
+
+  const selectAll = () => {
+    setSelectedSuppliers(suppliers.map(s => s.id));
+  };
+
+  const clearAll = () => {
+    setSelectedSuppliers([]);
+  };
 
   const addItem = () => {
     setItems([...items, { 
@@ -134,9 +195,30 @@ export const QuickPurchaseOrder: React.FC<QuickPurchaseOrderProps> = ({ builderI
 
       if (itemsError) throw itemsError;
 
+      // Send to selected suppliers or all if none selected
+      const targetSuppliers = selectedSuppliers.length > 0 
+        ? selectedSuppliers 
+        : suppliers.map(s => s.id);
+
+      // Create quote requests for selected suppliers
+      if (targetSuppliers.length > 0) {
+        const quoteRequests = targetSuppliers.map(supplierId => ({
+          order_id: orderData.id,
+          supplier_id: supplierId,
+          status: 'pending',
+          created_at: new Date().toISOString()
+        }));
+
+        await supabase.from('quote_requests').insert(quoteRequests);
+      }
+
+      const supplierCount = selectedSuppliers.length > 0 
+        ? selectedSuppliers.length 
+        : 'all available';
+
       toast({
         title: '✅ Purchase Order Created!',
-        description: `Order #${orderData.id.slice(0, 8)} submitted successfully. Suppliers will send quotes soon.`,
+        description: `Order #${orderData.id.slice(0, 8)} sent to ${supplierCount} supplier(s). You'll receive quotes soon.`,
       });
 
       // Reset form
@@ -320,6 +402,100 @@ export const QuickPurchaseOrder: React.FC<QuickPurchaseOrderProps> = ({ builderI
             </div>
           </div>
 
+          {/* Supplier Selection */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-lg font-semibold flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Select Suppliers (Optional)
+              </Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowSupplierSelection(!showSupplierSelection)}
+              >
+                {showSupplierSelection ? 'Hide' : 'Choose Suppliers'}
+              </Button>
+            </div>
+
+            {showSupplierSelection && (
+              <Card className="bg-gray-50">
+                <CardContent className="p-4">
+                  {loadingSuppliers ? (
+                    <div className="text-center py-4">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto text-gray-400" />
+                      <p className="text-sm text-gray-500 mt-2">Loading suppliers...</p>
+                    </div>
+                  ) : suppliers.length === 0 ? (
+                    <p className="text-sm text-gray-500 text-center py-4">
+                      No suppliers available. Your order will be broadcast to all suppliers.
+                    </p>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-sm text-gray-600">
+                          {selectedSuppliers.length > 0 
+                            ? `${selectedSuppliers.length} supplier(s) selected` 
+                            : 'No suppliers selected (will send to all)'}
+                        </p>
+                        <div className="flex gap-2">
+                          <Button type="button" variant="link" size="sm" onClick={selectAll} className="h-auto p-0 text-xs">
+                            Select All
+                          </Button>
+                          <Button type="button" variant="link" size="sm" onClick={clearAll} className="h-auto p-0 text-xs">
+                            Clear All
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-60 overflow-y-auto">
+                        {suppliers.map((supplier) => (
+                          <div
+                            key={supplier.id}
+                            className="flex items-center space-x-2 p-3 rounded-lg border bg-white hover:bg-blue-50 cursor-pointer transition-colors"
+                            onClick={() => toggleSupplier(supplier.id)}
+                          >
+                            <Checkbox
+                              id={supplier.id}
+                              checked={selectedSuppliers.includes(supplier.id)}
+                              onCheckedChange={() => toggleSupplier(supplier.id)}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <Store className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                                <label
+                                  htmlFor={supplier.id}
+                                  className="text-sm font-medium cursor-pointer truncate"
+                                >
+                                  {supplier.company_name}
+                                </label>
+                              </div>
+                              <div className="flex items-center gap-2 mt-1">
+                                <MapPin className="h-3 w-3 text-gray-400" />
+                                <span className="text-xs text-gray-500">{supplier.location || 'Kenya'}</span>
+                                {supplier.rating && (
+                                  <div className="flex items-center gap-1">
+                                    <Star className="h-3 w-3 text-yellow-500 fill-yellow-500" />
+                                    <span className="text-xs text-gray-600">{supplier.rating.toFixed(1)}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <p className="text-xs text-gray-500 mt-3">
+                        💡 Tip: Select specific suppliers or leave blank to send to all. More suppliers = more competitive quotes!
+                      </p>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
           {/* Additional Notes */}
           <div className="space-y-2">
             <Label htmlFor="notes">Additional Requirements (Optional)</Label>
@@ -336,7 +512,7 @@ export const QuickPurchaseOrder: React.FC<QuickPurchaseOrderProps> = ({ builderI
           <Alert className="bg-blue-50 border-blue-200">
             <Package className="h-4 w-4 text-blue-600" />
             <AlertDescription className="text-sm text-blue-800">
-              <strong>How it works:</strong> After submitting, verified suppliers will review your order and send competitive quotes. 
+              <strong>How it works:</strong> After submitting, selected suppliers (or all if none selected) will review your order and send competitive quotes. 
               You'll be notified to compare and select the best offer.
             </AlertDescription>
           </Alert>
