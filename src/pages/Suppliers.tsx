@@ -32,13 +32,15 @@ import { Supplier } from "@/types/supplier";
 import { useToast } from "@/hooks/use-toast";
 import { ModalProvider, useModal } from "@/contexts/ModalContext";
 import { LoginPortal } from "@/components/LoginPortal";
+import { useSearchParams } from "react-router-dom";
 
 const SuppliersContent = () => {
+  const [searchParams] = useSearchParams();
   const [user, setUser] = useState<any>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("suppliers");
+  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "suppliers");
   const [hasError, setHasError] = useState(false);
   const [renderError, setRenderError] = useState<Error | null>(null);
   const { toast } = useToast();
