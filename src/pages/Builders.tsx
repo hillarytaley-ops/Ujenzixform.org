@@ -28,6 +28,12 @@ import { PDFExport } from "@/components/builders/PDFExport";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { LanguageToggle } from "@/components/ui/language-toggle";
 import { LoginPortal } from "@/components/LoginPortal";
+import { QuickPurchaseOrder } from "@/components/builders/QuickPurchaseOrder";
+import {
+  Dialog,
+  DialogContent,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 // Builder components temporarily disabled for debugging
 // import ProfessionalBuilderDashboard from "@/components/ProfessionalBuilderDashboard";
 // import PrivateBuilderDirectPurchase from "@/components/PrivateBuilderDirectPurchase";
@@ -59,6 +65,7 @@ const Builders = () => {
   const [showMap, setShowMap] = useState(false);
   const [chatBuilder, setChatBuilder] = useState<any>(null);
   const [showChat, setShowChat] = useState(false);
+  const [showPurchaseOrder, setShowPurchaseOrder] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -252,17 +259,25 @@ const Builders = () => {
                 </Button>
               </Link>
               
-{!loading && (
+              {!loading && (
                 userProfile ? (
-                  <Link to="/suppliers?tab=purchase">
-                    <Button 
-                      size="lg"
-                      className="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
-                    >
-                      <ShoppingCart className="h-5 w-5 mr-2" />
-                      Purchase Materials
-                    </Button>
-                  </Link>
+                  <Dialog open={showPurchaseOrder} onOpenChange={setShowPurchaseOrder}>
+                    <DialogTrigger asChild>
+                      <Button 
+                        size="lg"
+                        className="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
+                      >
+                        <ShoppingCart className="h-5 w-5 mr-2" />
+                        Create Purchase Order
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto bg-white p-0">
+                      <QuickPurchaseOrder 
+                        builderId={userProfile.user_id}
+                        onClose={() => setShowPurchaseOrder(false)}
+                      />
+                    </DialogContent>
+                  </Dialog>
                 ) : (
                   <Link to="/auth">
                     <Button 
