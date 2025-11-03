@@ -294,20 +294,20 @@ const AdminAuth = () => {
         aria-label="Kenyan construction workers in yellow hard hats reviewing blueprints at steel construction site"
       />
       
-      {/* Dark overlay with red tint for admin security feel */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-900/85 via-red-900/70 to-slate-900/85 z-0"></div>
+      {/* Dark overlay for admin security feel */}
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-900/85 via-blue-900/70 to-slate-900/85 z-0"></div>
       
       <AnimatedSection animation="scaleIn" className="relative z-10">
-        <Card className="w-full max-w-md border-2 border-red-600/70 shadow-2xl bg-slate-900/65 backdrop-blur-2xl">
-          <CardHeader className="text-center bg-gradient-to-r from-red-950 to-slate-950 border-b-2 border-red-900/50">
+        <Card className="w-full max-w-md border-2 border-blue-600/70 shadow-2xl bg-slate-900/65 backdrop-blur-2xl">
+          <CardHeader className="text-center bg-gradient-to-r from-blue-950 to-slate-950 border-b-2 border-blue-900/50">
             <div className="flex justify-center mb-4">
-              <div className="p-4 bg-red-900/30 rounded-full border-2 border-red-500/50">
-                <Shield className="h-12 w-12 text-red-500" />
+              <div className="p-4 bg-blue-900/30 rounded-full border-2 border-blue-500/50">
+                <Shield className="h-12 w-12 text-blue-500" />
               </div>
             </div>
             
             <CardTitle className="text-2xl text-white flex items-center justify-center gap-2">
-              <Lock className="h-6 w-6 text-red-500" />
+              <Lock className="h-6 w-6 text-blue-400" />
               UjenziPro Admin Portal
             </CardTitle>
             
@@ -316,11 +316,11 @@ const AdminAuth = () => {
             </CardDescription>
             
             <div className="mt-4 flex justify-center gap-2">
-              <Badge variant="destructive" className="bg-red-900/50 border-red-500/50">
+              <Badge className="bg-blue-900/50 border-blue-500/50 text-blue-300">
                 <KeyRound className="h-3 w-3 mr-1" />
                 High Security
               </Badge>
-              <Badge variant="outline" className="border-yellow-500/50 text-yellow-500">
+              <Badge variant="outline" className="border-blue-500/50 text-blue-400">
                 <AlertTriangle className="h-3 w-3 mr-1" />
                 Staff Only
               </Badge>
@@ -329,10 +329,10 @@ const AdminAuth = () => {
 
           <CardContent className="mt-6">
             {/* Security Warning */}
-            <Alert className="mb-6 border-red-900/50 bg-red-950/30">
-              <Shield className="h-4 w-4 text-red-500" />
+            <Alert className="mb-6 border-blue-900/50 bg-blue-950/30">
+              <Shield className="h-4 w-4 text-blue-500" />
               <AlertDescription className="text-sm text-gray-300">
-                <strong className="text-red-500">Security Notice:</strong> This portal is for authorized UjenziPro staff only. 
+                <strong className="text-blue-400">Security Notice:</strong> This portal is for authorized UjenziPro staff only. 
                 All access attempts are logged and monitored. Unauthorized access is prohibited.
               </AlertDescription>
             </Alert>
