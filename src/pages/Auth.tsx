@@ -19,7 +19,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { InstantPasswordReset } from "@/components/InstantPasswordReset";
+import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 
 const Auth = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -355,7 +355,7 @@ const Auth = () => {
                       </Button>
                     </DialogTrigger>
                     <DialogContent className="sm:max-w-md bg-transparent border-0 shadow-none p-0">
-                      <InstantPasswordReset onBack={() => setShowResetDialog(false)} />
+                      <SimplePasswordReset onBack={() => setShowResetDialog(false)} />
                     </DialogContent>
                   </Dialog>
                 </div>
