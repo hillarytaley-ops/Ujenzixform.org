@@ -223,14 +223,16 @@ const Delivery = () => {
       {/* Enhanced Hero Section */}
       <AnimatedSection animation="fadeInUp">
         <section className="text-white py-20 relative overflow-hidden">
-          {/* Your Custom Delivery Tracking Image - Yellow Truck & GPS - Responsive */}
+          {/* Your Custom Delivery Tracking Image - Yellow Truck & GPS - Fully Responsive */}
           <div 
             className="absolute inset-0"
             style={{
               backgroundImage: `url('/delivery-hero-bg.jpg?v=3'), url('/delivery-hero-bg.jpg'), url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080"%3E%3Crect fill="%23f5f5f0" width="1920" height="1080"/%3E%3C/svg%3E')`,
               backgroundSize: 'cover',
               backgroundPosition: 'center center',
-              backgroundRepeat: 'no-repeat'
+              backgroundRepeat: 'no-repeat',
+              WebkitBackgroundSize: 'cover',
+              MozBackgroundSize: 'cover'
             }}
             role="img"
             aria-label="Delivery truck and GPS tracking system"

@@ -306,14 +306,16 @@ const Scanners = () => {
           role="banner"
           aria-labelledby="scanners-hero-heading"
         >
-        {/* QR Scanner Mobile App Interface - Responsive Background */}
+        {/* QR Scanner Mobile App Interface - Fully Responsive Background */}
         <div 
           className="absolute inset-0"
           style={{
               backgroundImage: `url('/scanners-hero-new.jpg?v=5'), url('/scanners-hero-bg.jpg?v=4'), url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080"%3E%3Crect fill="%23e8e8e8" width="1920" height="1080"/%3E%3C/svg%3E')`,
             backgroundSize: 'cover',
             backgroundPosition: 'center center',
-            backgroundRepeat: 'no-repeat'
+            backgroundRepeat: 'no-repeat',
+            WebkitBackgroundSize: 'cover',
+            MozBackgroundSize: 'cover'
           }}
           role="img"
           aria-label="Professional QR code scanner mobile application interface with scanning frame and controls"

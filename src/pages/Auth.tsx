@@ -229,15 +229,14 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden">
-      {/* Beautiful Kenyan Construction Workers with Yellow Hard Hats Background */}
+      {/* Beautiful Kenyan Construction Workers with Yellow Hard Hats Background - Responsive */}
       <div 
         className="absolute inset-0 z-0"
         style={{
           backgroundImage: `url('/kenyan-workers.jpg'), url('https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-gW4eb5K3am2BERQxC6jCNuhvaVOrTl.png')`,
           backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          backgroundAttachment: 'fixed'
+          backgroundPosition: 'center center',
+          backgroundRepeat: 'no-repeat'
         }}
         role="img"
         aria-label="Kenyan construction workers in yellow hard hats reviewing blueprints at steel construction site"
@@ -449,7 +448,7 @@ const Auth = () => {
         <div className="mt-6 text-center bg-white/90 backdrop-blur-sm rounded-lg p-4 border border-white/50">
           <Link 
             to="/admin-login"
-            className="text-sm text-gray-700 hover:text-red-600 underline flex items-center justify-center gap-2 transition-colors font-medium"
+            className="text-sm text-gray-700 hover:text-blue-600 underline flex items-center justify-center gap-2 transition-colors font-medium"
           >
             <span>🔒</span>
             <span>UjenziPro Staff? Use Admin Portal</span>

@@ -189,14 +189,16 @@ const Builders = () => {
           role="banner"
           aria-labelledby="builders-hero-heading"
         >
-        {/* Professional Kenyan Construction Workers Planning Background - Responsive */}
+        {/* Professional Kenyan Construction Workers Planning Background - Fully Responsive */}
         <div 
           className="absolute inset-0"
           style={{
             backgroundImage: `url('/builders-hero-new.jpg?v=3'), url('/builders-hero-bg.jpg?v=1'), url('https://images.unsplash.com/photo-1487958449943-2429e8be8625?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')`,
             backgroundSize: 'cover',
             backgroundPosition: 'center center',
-            backgroundRepeat: 'no-repeat'
+            backgroundRepeat: 'no-repeat',
+            WebkitBackgroundSize: 'cover',
+            MozBackgroundSize: 'cover'
           }}
           role="img"
           aria-label="Professional Kenyan construction workers in safety vests and hard hats reviewing architectural blueprints at active construction site with crane in background"
