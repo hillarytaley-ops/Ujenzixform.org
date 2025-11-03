@@ -47,25 +47,22 @@ export const InstantPasswordReset: React.FC<InstantPasswordResetProps> = ({ onBa
     setLoading(true);
 
     try {
-      // Use Supabase's magic link API for OTP
-      const { error } = await supabase.auth.signInWithOtp({
-        email: email.trim(),
-        options: {
-          shouldCreateUser: false, // Don't create new users
-        }
+      // Use Supabase's password reset with OTP
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/reset-password`,
       });
 
       if (error) throw error;
 
       toast({
-        title: '✅ Code sent!',
-        description: 'Check your email for a 6-digit verification code',
+        title: '✅ Reset link sent!',
+        description: 'Check your email and click the reset link. It will work on all devices.',
       });
 
       setStep('verify');
       setResendCooldown(60);
     } catch (error: any) {
-      console.error('Error sending code:', error);
+      console.error('Error sending reset email:', error);
       
       // User-friendly error messages
       if (error.message?.includes('rate limit')) {
@@ -76,7 +73,7 @@ export const InstantPasswordReset: React.FC<InstantPasswordResetProps> = ({ onBa
         });
       } else {
         toast({
-          title: 'Error sending code',
+          title: 'Error sending reset email',
           description: 'Make sure your email is registered with UjenziPro',
           variant: 'destructive',
         });
@@ -86,118 +83,37 @@ export const InstantPasswordReset: React.FC<InstantPasswordResetProps> = ({ onBa
     }
   };
 
-  // Step 2: Verify code and reset password
+  // Step 2: User gets link, we show instructions
   const handleVerifyAndReset = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate code
-    if (verificationCode.length !== 6) {
-      toast({
-        title: 'Invalid code',
-        description: 'Please enter the 6-digit code from your email',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    // Validate passwords
-    if (newPassword !== confirmPassword) {
-      toast({
-        title: 'Passwords don\'t match',
-        description: 'Please make sure both passwords are identical',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (newPassword.length < 8) {
-      toast({
-        title: 'Password too short',
-        description: 'Password must be at least 8 characters',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      // Verify OTP first
-      const { data, error: verifyError } = await supabase.auth.verifyOtp({
-        email,
-        token: verificationCode,
-        type: 'email',
-      });
-
-      if (verifyError) throw verifyError;
-
-      // If verification successful, update password
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: newPassword
-      });
-
-      if (updateError) throw updateError;
-
-      setStep('success');
-      
-      toast({
-        title: '🎉 Password reset successful!',
-        description: 'Your password has been updated',
-      });
-
-      // Auto-redirect to login
-      setTimeout(() => {
-        window.location.href = '/auth';
-      }, 2000);
-
-    } catch (error: any) {
-      console.error('Error verifying code:', error);
-      
-      if (error.message?.includes('expired')) {
-        toast({
-          title: 'Code expired',
-          description: 'This code has expired. Please request a new one.',
-          variant: 'destructive',
-        });
-        setStep('email');
-        setResendCooldown(0);
-      } else {
-        toast({
-          title: 'Invalid code',
-          description: 'The code you entered is incorrect. Please try again.',
-          variant: 'destructive',
-        });
-      }
-    } finally {
-      setLoading(false);
-    }
+    toast({
+      title: 'Check your email',
+      description: 'Click the reset link in your email to continue',
+    });
   };
 
-  // Resend code
+  // Resend reset link
   const handleResendCode = async () => {
     if (resendCooldown > 0) return;
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: email.trim(),
-        options: {
-          shouldCreateUser: false,
-        }
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/reset-password`,
       });
 
       if (error) throw error;
 
       toast({
-        title: '✅ New code sent!',
-        description: 'Check your email for a fresh 6-digit code',
+        title: '✅ New link sent!',
+        description: 'Check your email for a fresh reset link',
       });
 
       setResendCooldown(60);
-      setVerificationCode(''); // Clear old code
     } catch (error) {
       toast({
-        title: 'Error resending code',
+        title: 'Error resending link',
         description: 'Please try again in a moment',
         variant: 'destructive',
       });
@@ -215,9 +131,9 @@ export const InstantPasswordReset: React.FC<InstantPasswordResetProps> = ({ onBa
             <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
               <Mail className="h-8 w-8 text-blue-600" />
             </div>
-            <CardTitle className="text-2xl">Quick Password Reset</CardTitle>
+            <CardTitle className="text-2xl">Reset Your Password</CardTitle>
             <CardDescription>
-              No links required - just enter your email and get a code instantly
+              Enter your email to receive a secure password reset link
             </CardDescription>
           </CardHeader>
           
@@ -244,21 +160,21 @@ export const InstantPasswordReset: React.FC<InstantPasswordResetProps> = ({ onBa
               <Alert>
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription className="text-xs">
-                  <strong>⚡ Instant Reset:</strong> You'll get a 6-digit code in your email within 30 seconds. 
-                  No clicking links - just copy the code!
+                  <strong>⚡ Quick Process:</strong> You'll receive a reset link in your email within 1-2 minutes. 
+                  The link will work on all devices and browsers!
                 </AlertDescription>
               </Alert>
 
-              <Button type="submit" className="w-full h-12 text-base" disabled={loading}>
+              <Button type="submit" className="w-full h-12 text-base bg-blue-600 hover:bg-blue-700" disabled={loading}>
                 {loading ? (
                   <>
                     <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                    Sending code...
+                    Sending reset link...
                   </>
                 ) : (
                   <>
                     <Mail className="h-5 w-5 mr-2" />
-                    Get Reset Code
+                    Send Reset Link
                   </>
                 )}
               </Button>
@@ -280,144 +196,108 @@ export const InstantPasswordReset: React.FC<InstantPasswordResetProps> = ({ onBa
         </>
       )}
 
-      {/* Step 2: Enter Code and New Password */}
+      {/* Step 2: Check Email for Link */}
       {step === 'verify' && (
         <>
           <CardHeader className="text-center space-y-2">
-            <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-              <KeyRound className="h-8 w-8 text-green-600" />
+            <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center animate-pulse">
+              <Mail className="h-8 w-8 text-green-600" />
             </div>
-            <CardTitle className="text-2xl">Enter Verification Code</CardTitle>
+            <CardTitle className="text-2xl">✅ Email Sent!</CardTitle>
             <CardDescription>
-              Code sent to <strong className="text-foreground">{email}</strong>
+              Check <strong className="text-foreground">{email}</strong> for the reset link
             </CardDescription>
           </CardHeader>
           
-          <CardContent>
-            <form onSubmit={handleVerifyAndReset} className="space-y-4">
-              {/* Verification Code Input */}
-              <div className="space-y-2">
-                <Label htmlFor="code" className="text-base font-semibold">6-Digit Code</Label>
-                <Input
-                  id="code"
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  placeholder="000000"
-                  value={verificationCode}
-                  onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  required
-                  maxLength={6}
-                  disabled={loading}
-                  autoFocus
-                  className="text-center text-3xl tracking-[0.5em] font-mono h-16"
-                />
-                <p className="text-xs text-muted-foreground text-center">
-                  Enter the code from your email
-                </p>
-              </div>
+          <CardContent className="space-y-4">
+            <Alert className="bg-green-50 border-green-200">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-sm text-green-800">
+                <strong>Password reset link sent successfully!</strong>
+              </AlertDescription>
+            </Alert>
 
-              {/* New Password */}
-              <div className="space-y-2">
-                <Label htmlFor="new-password" className="text-base font-semibold">New Password</Label>
-                <Input
-                  id="new-password"
-                  type="password"
-                  placeholder="Enter new password (min 8 characters)"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  required
-                  minLength={8}
-                  disabled={loading}
-                  className="h-12"
-                />
-              </div>
+            <div className="space-y-3 bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h4 className="font-semibold text-sm text-blue-900 flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                How to Reset Your Password:
+              </h4>
+              <ol className="text-sm text-blue-800 space-y-2 list-decimal list-inside ml-2">
+                <li><strong>Open the email</strong> from UjenziPro (check spam if needed)</li>
+                <li><strong>Click the "Reset Password" link</strong> in the email</li>
+                <li>You'll be taken to a secure reset page</li>
+                <li><strong>Enter your new password</strong> twice</li>
+                <li>Click "Reset Password" button</li>
+                <li>Done! Sign in with your new password ✅</li>
+              </ol>
+            </div>
 
-              {/* Confirm Password */}
-              <div className="space-y-2">
-                <Label htmlFor="confirm-password" className="text-base font-semibold">Confirm Password</Label>
-                <Input
-                  id="confirm-password"
-                  type="password"
-                  placeholder="Confirm new password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                  minLength={8}
-                  disabled={loading}
-                  className="h-12"
-                />
-                {newPassword && confirmPassword && newPassword === confirmPassword && (
-                  <p className="text-xs text-green-600 flex items-center gap-1">
-                    <Check className="h-3 w-3" />
-                    Passwords match
-                  </p>
-                )}
-              </div>
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="text-xs">
+                <strong>💡 Troubleshooting:</strong>
+                <ul className="mt-2 space-y-1">
+                  <li>• Check your <strong>spam/junk folder</strong></li>
+                  <li>• Email can take <strong>1-2 minutes</strong> to arrive</li>
+                  <li>• Link works for <strong>1 hour</strong></li>
+                  <li>• Click "Resend" if you don't receive it</li>
+                  <li>• Make sure you can access email on your device</li>
+                </ul>
+              </AlertDescription>
+            </Alert>
 
-              {/* Submit Button */}
-              <Button 
-                type="submit" 
-                className="w-full h-12 text-base bg-green-600 hover:bg-green-700" 
-                disabled={loading || verificationCode.length !== 6 || !newPassword || !confirmPassword}
+            {/* Action buttons */}
+            <div className="space-y-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleResendCode}
+                disabled={loading || resendCooldown > 0}
+                className="w-full h-12"
               >
                 {loading ? (
                   <>
-                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                    Resetting password...
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Sending...
+                  </>
+                ) : resendCooldown > 0 ? (
+                  <>
+                    <Mail className="h-4 w-4 mr-2" />
+                    Resend available in {resendCooldown}s
                   </>
                 ) : (
                   <>
-                    <CheckCircle className="h-5 w-5 mr-2" />
-                    Reset Password
+                    <Mail className="h-4 w-4 mr-2" />
+                    Resend Reset Link
                   </>
                 )}
               </Button>
 
-              {/* Resend and Back buttons */}
-              <div className="flex items-center justify-between pt-2">
-                <Button
-                  type="button"
-                  variant="link"
-                  onClick={() => {
-                    setStep('email');
-                    setVerificationCode('');
-                    setNewPassword('');
-                    setConfirmPassword('');
-                  }}
-                  disabled={loading}
-                  className="p-0 h-auto text-sm"
-                >
-                  <ArrowLeft className="h-3 w-3 mr-1" />
-                  Change email
-                </Button>
-                
-                <Button
-                  type="button"
-                  variant="link"
-                  onClick={handleResendCode}
-                  disabled={loading || resendCooldown > 0}
-                  className="p-0 h-auto text-sm"
-                >
-                  {resendCooldown > 0 ? (
-                    <span className="text-muted-foreground">
-                      Resend in {resendCooldown}s
-                    </span>
-                  ) : (
-                    <span className="text-blue-600">Resend code</span>
-                  )}
-                </Button>
-              </div>
-            </form>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setStep('email');
+                  setVerificationCode('');
+                }}
+                className="w-full"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Use Different Email
+              </Button>
 
-            {/* Help text */}
-            <Alert className="mt-4 bg-blue-50 border-blue-200">
-              <Mail className="h-4 w-4 text-blue-600" />
-              <AlertDescription className="text-xs text-blue-800">
-                <strong>💡 Tip:</strong> Check your spam folder if you don't see the email. 
-                The code is valid for 1 hour.
-              </AlertDescription>
-            </Alert>
+              {onBack && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={onBack}
+                  className="w-full"
+                >
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back to Sign In
+                </Button>
+              )}
+            </div>
           </CardContent>
         </>
       )}
