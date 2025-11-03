@@ -550,10 +550,70 @@ const Builders = () => {
                 </TabsContent>
 
                 <TabsContent value="direct-purchase" className="space-y-6">
-                  <div className="p-8 text-center border rounded-lg">
-                    <h2 className="text-2xl font-bold">Direct Purchase</h2>
-                    <p className="text-muted-foreground">Coming soon...</p>
-                  </div>
+                  <Card className="bg-gradient-to-r from-orange-50 to-orange-100">
+                    <CardHeader className="text-center">
+                      <CardTitle className="text-2xl flex items-center justify-center gap-2">
+                        <ShoppingCart className="h-6 w-6 text-orange-600" />
+                        Direct Material Purchase
+                      </CardTitle>
+                      <CardDescription className="text-base">
+                        Browse verified suppliers and purchase construction materials directly
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div className="bg-white rounded-lg p-4 text-center">
+                          <div className="text-3xl font-bold text-orange-600">850+</div>
+                          <div className="text-sm text-gray-600">Verified Suppliers</div>
+                        </div>
+                        <div className="bg-white rounded-lg p-4 text-center">
+                          <div className="text-3xl font-bold text-blue-600">47</div>
+                          <div className="text-sm text-gray-600">Counties Served</div>
+                        </div>
+                        <div className="bg-white rounded-lg p-4 text-center">
+                          <div className="text-3xl font-bold text-green-600">24/7</div>
+                          <div className="text-sm text-gray-600">Support</div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3 bg-white rounded-lg p-4">
+                        <h4 className="font-semibold text-gray-900">✨ What You Can Do:</h4>
+                        <ul className="space-y-2 text-sm text-gray-700">
+                          <li className="flex items-start gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                            <span><strong>Browse Materials:</strong> View all construction materials with photos and prices</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                            <span><strong>Compare Suppliers:</strong> See ratings, reviews, and pricing from multiple suppliers</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                            <span><strong>Request Quotes:</strong> Get competitive quotes for bulk orders</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                            <span><strong>Track Deliveries:</strong> Real-time GPS tracking of your materials</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                            <span><strong>Verify Quality:</strong> QR code scanning for material authentication</span>
+                          </li>
+                        </ul>
+                      </div>
+
+                      <Link to="/suppliers?tab=purchase">
+                        <Button size="lg" className="w-full h-14 bg-orange-600 hover:bg-orange-700 text-white font-semibold text-lg">
+                          <ShoppingCart className="h-5 w-5 mr-2" />
+                          Start Shopping for Materials
+                        </Button>
+                      </Link>
+
+                      <p className="text-xs text-center text-gray-500">
+                        💡 Tip: All suppliers are verified with ratings and reviews for your peace of mind
+                      </p>
+                    </CardContent>
+                  </Card>
                 </TabsContent>
 
                 <TabsContent value="monitoring" className="space-y-6">
