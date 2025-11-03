@@ -16,7 +16,6 @@ import AnimatedHero from "@/components/AnimatedHero";
 import AnimatedStatsGrid from "@/components/AnimatedStatsGrid";
 import AnimatedCTAButtons from "@/components/AnimatedCTAButtons";
 import AnimatedFeatureCard from "@/components/AnimatedFeatureCard";
-import { LoginPortal } from "@/components/LoginPortal";
 
 // Memoized components for better performance
 const FeatureCard = memo(({ feature, index }: { feature: any, index: number }) => (
