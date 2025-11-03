@@ -397,19 +397,6 @@ const Index = () => {
           </div>
         </section>
 
-        {/* Login Portal Section */}
-        <section className="py-16 bg-white">
-          <div className="container mx-auto px-4">
-            <AnimatedSection animation="fadeInUp">
-              <LoginPortal 
-                type="general"
-                title="Access Your UjenziPro Account"
-                description="Login to manage projects, browse materials, track deliveries, and connect with Kenya's construction community."
-              />
-            </AnimatedSection>
-          </div>
-        </section>
-
         {/* Features Section */}
         <section className="bg-muted py-16">
           <div className="container mx-auto px-4">
