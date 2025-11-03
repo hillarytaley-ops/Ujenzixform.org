@@ -95,9 +95,10 @@ const ResetPassword = () => {
           style={{
             backgroundImage: `url('/auth-bg.jpg')`,
             backgroundSize: 'cover',
-            backgroundPosition: 'center',
+            backgroundPosition: 'center center',
             backgroundRepeat: 'no-repeat',
-            backgroundAttachment: 'fixed'
+            WebkitBackgroundSize: 'cover',
+            MozBackgroundSize: 'cover'
           }}
           role="img"
           aria-label="Kenyan construction workers with hard hats reviewing construction project plans at building site"
@@ -125,18 +126,19 @@ const ResetPassword = () => {
   return (
     <div className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden">
       {/* Beautiful Kenyan Construction Workers with Yellow Hard Hats Background */}
-      <div 
-        className="absolute inset-0 z-0"
-        style={{
-          backgroundImage: `url('/kenyan-workers.jpg'), url('https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-gW4eb5K3am2BERQxC6jCNuhvaVOrTl.png')`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          backgroundAttachment: 'fixed'
-        }}
-        role="img"
-        aria-label="Kenyan construction workers in yellow hard hats reviewing blueprints at steel construction site"
-      />
+        <div 
+          className="absolute inset-0 z-0"
+          style={{
+            backgroundImage: `url('/kenyan-workers.jpg'), url('https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-gW4eb5K3am2BERQxC6jCNuhvaVOrTl.png')`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center center',
+            backgroundRepeat: 'no-repeat',
+            WebkitBackgroundSize: 'cover',
+            MozBackgroundSize: 'cover'
+          }}
+          role="img"
+          aria-label="Kenyan construction workers in yellow hard hats reviewing blueprints at steel construction site"
+        />
       
       {/* Light overlay for readability - clearer background */}
       <div className="absolute inset-0 bg-black/20 z-0"></div>
