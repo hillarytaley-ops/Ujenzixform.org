@@ -28,13 +28,6 @@ import { PDFExport } from "@/components/builders/PDFExport";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { LanguageToggle } from "@/components/ui/language-toggle";
 import { LoginPortal } from "@/components/LoginPortal";
-import { QuickPurchaseOrder } from "@/components/builders/QuickPurchaseOrder";
-import { PurchaseOrderManager } from "@/components/builders/PurchaseOrderManager";
-import {
-  Dialog,
-  DialogContent,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 // Builder components temporarily disabled for debugging
 // import ProfessionalBuilderDashboard from "@/components/ProfessionalBuilderDashboard";
 // import PrivateBuilderDirectPurchase from "@/components/PrivateBuilderDirectPurchase";
@@ -66,7 +59,6 @@ const Builders = () => {
   const [showMap, setShowMap] = useState(false);
   const [chatBuilder, setChatBuilder] = useState<any>(null);
   const [showChat, setShowChat] = useState(false);
-  const [showPurchaseOrder, setShowPurchaseOrder] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -262,23 +254,15 @@ const Builders = () => {
               
               {!loading && (
                 userProfile ? (
-                  <Dialog open={showPurchaseOrder} onOpenChange={setShowPurchaseOrder}>
-                    <DialogTrigger asChild>
-                      <Button 
-                        size="lg"
-                        className="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
-                      >
-                        <ShoppingCart className="h-5 w-5 mr-2" />
-                        Create Purchase Order
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto bg-white p-0">
-                      <QuickPurchaseOrder 
-                        builderId={userProfile.user_id}
-                        onClose={() => setShowPurchaseOrder(false)}
-                      />
-                    </DialogContent>
-                  </Dialog>
+                  <Link to="/suppliers?tab=purchase">
+                    <Button 
+                      size="lg"
+                      className="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
+                    >
+                      <ShoppingCart className="h-5 w-5 mr-2" />
+                      Purchase Materials
+                    </Button>
+                  </Link>
                 ) : (
                   <Link to="/auth">
                     <Button 
@@ -479,7 +463,16 @@ const Builders = () => {
                 </TabsContent>
 
                 <TabsContent value="materials" className="space-y-6">
-                  <PurchaseOrderManager builderId={userProfile.user_id} />
+                  <div className="p-8 text-center border rounded-lg">
+                    <h2 className="text-2xl font-bold">Material Manager</h2>
+                    <p className="text-muted-foreground mb-4">Browse and purchase materials from verified suppliers</p>
+                    <Link to="/suppliers?tab=purchase">
+                      <Button size="lg" className="bg-orange-600 hover:bg-orange-700">
+                        <ShoppingCart className="h-5 w-5 mr-2" />
+                        Go to Suppliers Page
+                      </Button>
+                    </Link>
+                  </div>
                 </TabsContent>
 
                 <TabsContent value="deliveries" className="space-y-6">
