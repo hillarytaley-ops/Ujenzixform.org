@@ -65,9 +65,10 @@ const Auth = () => {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/`,
+          emailRedirectTo: `${window.location.origin}/portal`,
           data: {
-            email: email
+            email: email,
+            email_confirmed: true // Skip email confirmation for faster signup
           }
         }
       });
@@ -174,9 +175,11 @@ const Auth = () => {
         }
       } else if (isSignUp) {
         toast({
-          title: "Check your email",
-          description: "We've sent you a confirmation link."
+          title: "✅ Account created!",
+          description: "Welcome to UjenziPro! Signing you in...",
         });
+        // Auto-redirect to portal after signup
+        setTimeout(() => navigate("/portal"), 1500);
       } else {
         toast({
           title: "Welcome back!",
