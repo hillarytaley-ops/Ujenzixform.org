@@ -29,6 +29,7 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { LanguageToggle } from "@/components/ui/language-toggle";
 import { LoginPortal } from "@/components/LoginPortal";
 import { QuickPurchaseOrder } from "@/components/builders/QuickPurchaseOrder";
+import { PurchaseOrderManager } from "@/components/builders/PurchaseOrderManager";
 import {
   Dialog,
   DialogContent,
@@ -478,10 +479,7 @@ const Builders = () => {
                 </TabsContent>
 
                 <TabsContent value="materials" className="space-y-6">
-                  <div className="p-8 text-center border rounded-lg">
-                    <h2 className="text-2xl font-bold">Material Manager</h2>
-                    <p className="text-muted-foreground">Coming soon...</p>
-                  </div>
+                  <PurchaseOrderManager builderId={userProfile.user_id} />
                 </TabsContent>
 
                 <TabsContent value="deliveries" className="space-y-6">
