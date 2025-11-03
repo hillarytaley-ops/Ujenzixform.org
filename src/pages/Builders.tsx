@@ -252,26 +252,28 @@ const Builders = () => {
                 </Button>
               </Link>
               
-              {userProfile ? (
-                <Link to="/suppliers?tab=purchase">
-                  <Button 
-                    size="lg"
-                    className="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
-                  >
-                    <ShoppingCart className="h-5 w-5 mr-2" />
-                    Purchase Materials
-                  </Button>
-                </Link>
-              ) : (
-                <Link to="/auth">
-                  <Button 
-                    size="lg"
-                    className="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
-                  >
-                    <ShoppingCart className="h-5 w-5 mr-2" />
-                    Sign In to Purchase
-                  </Button>
-                </Link>
+{!loading && (
+                userProfile ? (
+                  <Link to="/suppliers?tab=purchase">
+                    <Button 
+                      size="lg"
+                      className="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
+                    >
+                      <ShoppingCart className="h-5 w-5 mr-2" />
+                      Purchase Materials
+                    </Button>
+                  </Link>
+                ) : (
+                  <Link to="/auth">
+                    <Button 
+                      size="lg"
+                      className="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
+                    >
+                      <ShoppingCart className="h-5 w-5 mr-2" />
+                      Sign In to Purchase
+                    </Button>
+                  </Link>
+                )
               )}
             </div>
 
