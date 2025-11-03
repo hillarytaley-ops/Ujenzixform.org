@@ -19,6 +19,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { InstantPasswordReset } from "@/components/InstantPasswordReset";
 
 const Auth = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -332,46 +333,8 @@ const Auth = () => {
                         Forgot password?
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-md bg-white/95 backdrop-blur-xl">
-                      <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                          <KeyRound className="h-5 w-5 text-primary" />
-                          Reset Password
-                        </DialogTitle>
-                        <DialogDescription>
-                          Enter your email address and we'll send you a link to reset your password.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <form onSubmit={handlePasswordReset} className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="reset-email">Email Address</Label>
-                          <Input
-                            id="reset-email"
-                            type="email"
-                            placeholder="Enter your email"
-                            value={resetEmail}
-                            onChange={(e) => setResetEmail(e.target.value)}
-                            required
-                            disabled={resetLoading}
-                          />
-                        </div>
-                        <div className="flex justify-end gap-3">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => {
-                              setShowResetDialog(false);
-                              setResetEmail("");
-                            }}
-                            disabled={resetLoading}
-                          >
-                            Cancel
-                          </Button>
-                          <Button type="submit" disabled={resetLoading}>
-                            {resetLoading ? "Sending..." : "Send Reset Link"}
-                          </Button>
-                        </div>
-                      </form>
+                    <DialogContent className="sm:max-w-md bg-transparent border-0 shadow-none p-0">
+                      <InstantPasswordReset onBack={() => setShowResetDialog(false)} />
                     </DialogContent>
                   </Dialog>
                 </div>
