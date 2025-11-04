@@ -270,14 +270,15 @@ const Delivery = () => {
               <span className="whitespace-nowrap">Request Delivery</span>
             </Button>
             
-            <Button 
-              size="lg"
-              onClick={() => setActiveTab("tracking")}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 sm:px-8 py-4 sm:py-6 text-base sm:text-lg shadow-xl w-full sm:w-auto"
-            >
-              <MapPin className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-              <span className="whitespace-nowrap">Track Deliveries</span>
-            </Button>
+            <a href="/tracking">
+              <Button 
+                size="lg"
+                className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 sm:px-8 py-4 sm:py-6 text-base sm:text-lg shadow-xl w-full sm:w-auto"
+              >
+                <MapPin className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                <span className="whitespace-nowrap">Track Deliveries</span>
+              </Button>
+            </a>
             
             <Button 
               size="lg"
