@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import AnimatedSection from "@/components/AnimatedSection";
 import { User, Session } from '@supabase/supabase-js';
 import { Separator } from "@/components/ui/separator";
-import { Github, Mail, KeyRound } from "lucide-react";
+import { Github, Mail, KeyRound, CheckCircle, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -398,29 +398,60 @@ const Auth = () => {
 
                 <form onSubmit={(e) => handleSubmit(e, true)} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="signup-email">Email</Label>
+                    <Label htmlFor="signup-email">Email Address</Label>
                     <Input
                       id="signup-email"
                       name="email"
                       type="email"
-                      placeholder="Enter your email"
+                      placeholder="your.email@example.com"
                       required
+                      autoFocus
+                      className="h-12 text-base"
                     />
+                    <p className="text-xs text-muted-foreground">
+                      We'll never share your email
+                    </p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="signup-password">Password</Label>
+                    <Label htmlFor="signup-password">Create Password</Label>
                     <Input
                       id="signup-password"
                       name="password"
                       type="password"
-                      placeholder="Create a password"
+                      placeholder="Min 8 characters"
                       required
-                      minLength={6}
+                      minLength={8}
+                      className="h-12 text-base"
                     />
+                    <p className="text-xs text-muted-foreground">
+                      At least 8 characters for security
+                    </p>
                   </div>
-                  <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? "Creating account..." : "Sign Up"}
+
+                  <Alert className="bg-green-50 border-green-200">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <AlertDescription className="text-xs text-green-800">
+                      <strong>⚡ Instant Access:</strong> No email confirmation needed! Create account and start using UjenziPro immediately.
+                    </AlertDescription>
+                  </Alert>
+
+                  <Button type="submit" className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-semibold text-base" disabled={loading}>
+                    {loading ? (
+                      <>
+                        <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                        Creating account...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-5 w-5 mr-2" />
+                        Create Account - It's Free!
+                      </>
+                    )}
                   </Button>
+
+                  <p className="text-xs text-center text-muted-foreground">
+                    By signing up, you agree to our Terms of Service and Privacy Policy
+                  </p>
                 </form>
               </div>
             </TabsContent>
