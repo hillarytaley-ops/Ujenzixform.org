@@ -147,16 +147,17 @@ const Tracking = () => {
             role="banner"
             aria-labelledby="tracking-hero-heading"
           >
-          {/* GPS Map & Tracking Technology Background - Fully Responsive */}
+          {/* GPS Map & Tracking Technology Background - Zoomed Out */}
           <div 
             className="absolute inset-0"
             style={{
               backgroundImage: `url('https://images.unsplash.com/photo-1569336415962-a4bd9f69cd83?w=1920&h=1080&fit=crop&q=80')`,
-              backgroundSize: 'cover',
+              backgroundSize: 'contain',
               backgroundPosition: 'center center',
               backgroundRepeat: 'no-repeat',
-              WebkitBackgroundSize: 'cover',
-              MozBackgroundSize: 'cover'
+              WebkitBackgroundSize: 'contain',
+              MozBackgroundSize: 'contain',
+              backgroundColor: '#1a202c'
             }}
             role="img"
             aria-label="Professional GPS tracking map technology for real-time delivery monitoring and location tracking across Kenya"
@@ -231,31 +232,6 @@ const Tracking = () => {
           
           <div className="container mx-auto px-4 relative z-10">
             <AnimatedSection animation="fadeInUp">
-              <header className="text-center mb-12">
-                <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-8 border-2 border-white/50 shadow-2xl max-w-4xl mx-auto">
-                <h2 className="text-5xl font-bold mb-6 text-gray-900 flex items-center justify-center gap-3">
-                  <Package className="h-12 w-12 text-primary" />
-                  Advanced Delivery Tracking
-                </h2>
-                <p className="text-xl text-gray-700 leading-relaxed mb-6">
-                  Monitor and manage deliveries with military-grade real-time tracking and advanced privacy protection
-                </p>
-
-                <div className="flex justify-center gap-4 mb-6">
-                  <Badge className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-2 text-lg font-semibold">
-                    <Eye className="h-4 w-4 mr-2" />
-                    Authorized Access
-                  </Badge>
-                  {userRole && (
-                    <Badge className="bg-gradient-to-r from-blue-500 to-red-500 text-white px-4 py-2 text-lg font-semibold">
-                      {userRole === 'guest' ? 'Guest Access' : `${userRole} Dashboard`}
-                    </Badge>
-                  )}
-                </div>
-
-              </div>
-              </header>
-            </AnimatedSection>
 
             {/* Delivery Tracking Section */}
             <AnimatedSection animation="fadeInUp" delay={200}>
