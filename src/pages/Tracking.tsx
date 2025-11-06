@@ -182,8 +182,6 @@ const Tracking = () => {
           <div className="absolute inset-0 bg-gradient-to-br from-gray-50 via-blue-50/30 to-gray-100"></div>
           
           <div className="container mx-auto px-4 relative z-10">
-            <AnimatedSection animation="fadeInUp">
-
             {/* Delivery Tracking Section */}
             <AnimatedSection animation="fadeInUp" delay={200}>
               <div className="space-y-6">
