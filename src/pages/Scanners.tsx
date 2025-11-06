@@ -388,41 +388,6 @@ const Scanners = () => {
         <div className="absolute inset-0 bg-gradient-to-br from-gray-50 via-blue-50/30 to-gray-100"></div>
         
         <div className="container mx-auto px-4 relative z-10">
-          {/* Enhanced Header */}
-          <div className="text-center mb-12">
-            <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-8 border-2 border-white/50 shadow-2xl max-w-4xl mx-auto">
-              <h2 className="text-5xl font-bold mb-6 text-gray-900 flex items-center justify-center gap-3">
-                <Scan className="h-12 w-12 text-primary" />
-                Advanced Material Scanning
-              </h2>
-              <p className="text-xl text-gray-700 leading-relaxed mb-6">
-                QR Code scanning system linking suppliers and UjenziPro staff for complete material tracking across Kenya's construction industry
-              </p>
-              
-              {/* Role Badge */}
-              <div className="flex justify-center gap-4 mb-6">
-                {userRole && (
-                  <Badge className="bg-gradient-to-r from-blue-500 to-green-500 text-white px-4 py-2 text-lg font-semibold">
-                    {userRole} Access
-                  </Badge>
-                )}
-                <Badge className="bg-gradient-to-r from-green-500 to-red-500 text-white px-4 py-2 text-lg font-semibold">
-                  <QrCode className="h-4 w-4 mr-2" />
-                  Scanner Active
-                </Badge>
-              </div>
-
-              {/* Scanner Overview */}
-              <Alert className="border-blue-200 bg-blue-50">
-                <Scan className="h-4 w-4" />
-                <AlertDescription>
-                  <strong>Integrated Scanning System:</strong> Suppliers use dispatchable scanners at their stores during material dispatch. 
-                  UjenziPro staff use receivable scanners on project sites to verify and receive materials.
-                </AlertDescription>
-              </Alert>
-            </div>
-          </div>
-
           {/* QR Scanner Interface */}
           <div className="max-w-3xl mx-auto mb-12">
             <Card className="bg-white/95 backdrop-blur-sm border-2 border-white/50 shadow-2xl">
