@@ -374,50 +374,18 @@ const Monitoring = () => {
         <div className="absolute inset-0 bg-white/30 backdrop-blur-[0.5px]"></div>
         
         <div className="container mx-auto px-4 relative z-10">
-          {/* Enhanced Header */}
-          <div className="text-center mb-12">
-            <div className="bg-white/30 backdrop-blur-md rounded-2xl p-8 border-2 border-white/20 shadow-2xl max-w-4xl mx-auto">
-              <h2 className="text-5xl font-bold mb-6 text-gray-900 flex items-center justify-center gap-3">
-                <Shield className="h-12 w-12 text-primary" />
-                Advanced Monitoring & Surveillance
-              </h2>
-              <p className="text-xl text-gray-700 leading-relaxed mb-6">
-                Comprehensive monitoring dashboard for construction sites, cameras, and system health with ultra-strict access controls
-              </p>
-              
-              {/* Role Badge */}
-              <div className="flex justify-center gap-4 mb-6">
-                {userRole && (
-                  <Badge className="bg-gradient-to-r from-blue-500 to-green-500 text-white px-4 py-2 text-lg font-semibold">
-                    {userRole} Access
-                  </Badge>
-                )}
-                <Badge className="bg-gradient-to-r from-green-500 to-red-500 text-white px-4 py-2 text-lg font-semibold">
-                  <Eye className="h-4 w-4 mr-2" />
-                  Live Monitoring
-                </Badge>
-              </div>
-
-              {/* Access Notice */}
-              {userRole === 'supplier' ? (
-                <Alert variant="destructive">
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription>
-                    <strong>Access Restricted:</strong> Suppliers do not have access to the monitoring system. 
-                    This includes camera feeds, delivery tracking, and system monitoring. These features are restricted to builders and UjenziPro administrators.
-                  </AlertDescription>
-                </Alert>
-              ) : (
-                <Alert className="border-blue-200/50 bg-blue-50/30">
-                  <Shield className="h-4 w-4" />
-                  <AlertDescription>
-                    <strong>Comprehensive Monitoring:</strong> Access live camera feeds, track project progress, 
-                    monitor system health, and manage all aspects of your construction projects from one centralized dashboard.
-                  </AlertDescription>
-                </Alert>
-              )}
+          {/* Access Notice for Suppliers Only */}
+          {userRole === 'supplier' && (
+            <div className="mb-8">
+              <Alert variant="destructive" className="max-w-4xl mx-auto">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>Access Restricted:</strong> Suppliers do not have access to the monitoring system. 
+                  This includes camera feeds, delivery tracking, and system monitoring. These features are restricted to builders and UjenziPro administrators.
+                </AlertDescription>
+              </Alert>
             </div>
-          </div>
+          )}
 
           {userRole !== 'supplier' && (
             <div className="bg-white/30 backdrop-blur-md rounded-2xl border-2 border-white/20 shadow-2xl p-6">
