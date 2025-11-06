@@ -494,17 +494,17 @@ export const MaterialsGrid = () => {
 
             return (
               <Card key={material.id} className="overflow-hidden hover:shadow-xl transition-all duration-300 group">
-                {/* Material Image */}
-                <div className="relative aspect-square bg-muted overflow-hidden">
+                {/* Material Image - Larger */}
+                <div className="relative aspect-square bg-muted overflow-hidden h-64 sm:h-72 md:h-80">
                   {imageUrl ? (
                     <img
                       src={imageUrl}
                       alt={material.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      className="w-full h-full object-contain p-4 bg-white group-hover:scale-105 transition-transform duration-300"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Package className="h-16 w-16 text-muted-foreground" />
+                    <div className="w-full h-full flex items-center justify-center bg-white">
+                      <Package className="h-20 w-20 text-muted-foreground" />
                     </div>
                   )}
                   
