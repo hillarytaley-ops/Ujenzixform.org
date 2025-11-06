@@ -294,31 +294,6 @@ const Index = () => {
                 <h2 className="text-4xl font-bold text-foreground mb-4">
                   See UjenziPro in Action
                 </h2>
-                
-                {/* Simplified description */}
-                <p className="text-lg text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-                  Watch how UjenziPro connects builders and suppliers across Kenya with{' '}
-                  <span className="font-semibold text-primary">
-                    drone monitoring, QR tracking, and secure M-Pesa payments
-                  </span>
-                  .
-                </p>
-                
-                {/* Video metadata */}
-                <div className="mt-4 flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-sm text-muted-foreground">
-                  <span className="flex items-center gap-2">
-                    <span className="text-base">⏱️</span>
-                    <span>6 min</span>
-                  </span>
-                  <span className="flex items-center gap-2">
-                    <span className="text-base">📹</span>
-                    <span>Full HD</span>
-                  </span>
-                  <span className="flex items-center gap-2">
-                    <span className="text-base">🎯</span>
-                    <span>All Features</span>
-                  </span>
-                </div>
               </div>
             </AnimatedSection>
             
