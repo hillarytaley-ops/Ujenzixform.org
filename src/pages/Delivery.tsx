@@ -280,15 +280,6 @@ const Delivery = () => {
                 <span className="whitespace-nowrap">Track Deliveries</span>
               </Button>
             </Link>
-            
-            <Button 
-              size="lg"
-              onClick={() => setActiveTab("calculator")}
-              className="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-6 sm:px-8 py-4 sm:py-6 text-base sm:text-lg shadow-xl w-full sm:w-auto"
-            >
-              <Calculator className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-              <span className="whitespace-nowrap">Cost Calculator</span>
-            </Button>
           </div>
           
           {/* Delivery Stats */}
@@ -342,7 +333,7 @@ const Delivery = () => {
         {/* Main Content */}
         {isAdmin ? (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-7 max-w-5xl mx-auto mb-8">
+            <TabsList className="grid w-full grid-cols-6 max-w-5xl mx-auto mb-8">
               <TabsTrigger value="request" className="flex items-center gap-2">
                 <Package className="h-4 w-4" />
                 Request
@@ -350,10 +341,6 @@ const Delivery = () => {
               <TabsTrigger value="tracking" className="flex items-center gap-2">
                 <NavigationIcon className="h-4 w-4" />
                 Track
-              </TabsTrigger>
-              <TabsTrigger value="calculator" className="flex items-center gap-2">
-                <Calculator className="h-4 w-4" />
-                Calculate
               </TabsTrigger>
               <TabsTrigger value="bulk" className="flex items-center gap-2">
                 <Users className="h-4 w-4" />
@@ -599,29 +586,6 @@ const Delivery = () => {
                   ))}
                 </div>
               </div>
-            </TabsContent>
-
-            {/* Calculator Tab */}
-            <TabsContent value="calculator" className="space-y-6">
-              <Card className="max-w-2xl mx-auto">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Calculator className="h-5 w-5" />
-                    Delivery Cost Calculator
-                  </CardTitle>
-                  <CardDescription>
-                    Estimate delivery costs based on distance and material type
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Alert>
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>
-                      Cost calculator feature coming soon. Contact our team for custom quotes.
-                    </AlertDescription>
-                  </Alert>
-                </CardContent>
-              </Card>
             </TabsContent>
 
             {/* Bulk Operations Tab */}
