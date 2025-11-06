@@ -543,13 +543,13 @@ const Monitoring = () => {
                   </Badge>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  {/* Camera List */}
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                  {/* Camera List - Smaller */}
                   <div className="lg:col-span-1">
                     <Card>
                       <CardHeader>
-                        <CardTitle>Camera Feeds</CardTitle>
-                        <CardDescription>Select a camera to view live feed</CardDescription>
+                        <CardTitle className="text-lg">Camera Feeds</CardTitle>
+                        <CardDescription className="text-sm">Select camera</CardDescription>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-3">
@@ -606,14 +606,14 @@ const Monitoring = () => {
                     </Card>
                   </div>
 
-                  {/* Main Video Feed */}
-                  <div className="lg:col-span-2">
+                  {/* Main Video Feed - Larger */}
+                  <div className="lg:col-span-3">
                     <Card>
                       <CardHeader>
                         <div className="flex items-center justify-between">
                           <div>
-                            <CardTitle>{selectedCamera ? cameras.find(c => c.id === selectedCamera)?.name : 'Select Camera'}</CardTitle>
-                            <CardDescription>{selectedCamera ? cameras.find(c => c.id === selectedCamera)?.projectSite : 'Choose a camera to view live feed'}</CardDescription>
+                            <CardTitle className="text-2xl">{selectedCamera ? cameras.find(c => c.id === selectedCamera)?.name : 'Select Camera'}</CardTitle>
+                            <CardDescription className="text-base">{selectedCamera ? cameras.find(c => c.id === selectedCamera)?.projectSite : 'Choose a camera to view live feed'}</CardDescription>
                           </div>
                           {selectedCamera && (
                             <Badge className={getStatusColor(cameras.find(c => c.id === selectedCamera)?.status || '')}>
@@ -622,14 +622,14 @@ const Monitoring = () => {
                           )}
                         </div>
                       </CardHeader>
-                      <CardContent>
-                        <div className="aspect-video bg-black rounded-lg flex items-center justify-center relative">
+                      <CardContent className="p-2">
+                        <div className="aspect-video bg-black rounded-lg flex items-center justify-center relative min-h-[500px]">
                           {selectedCamera ? (
                             <div className="text-white text-center">
                               {selectedCamera.startsWith('drone-') ? (
                                 <>
-                                  <Plane className="h-12 w-12 mx-auto mb-4 opacity-75 text-purple-300" />
-                                  <p className="text-lg">Drone Aerial Feed</p>
+                                  <Plane className="h-16 w-16 mx-auto mb-4 opacity-75 text-purple-300" />
+                                  <p className="text-2xl font-semibold">Drone Aerial Feed</p>
                                   <p className="text-sm opacity-75">
                                     {cameras.find(c => c.id === selectedCamera)?.quality} Aerial Stream
                                   </p>
@@ -639,9 +639,9 @@ const Monitoring = () => {
                                 </>
                               ) : (
                                 <>
-                                  <Camera className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                                  <p className="text-lg">Live Feed</p>
-                                  <p className="text-sm opacity-75">
+                                  <Camera className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                                  <p className="text-2xl font-semibold">Live Feed</p>
+                                  <p className="text-lg opacity-75 mt-2">
                                     {cameras.find(c => c.id === selectedCamera)?.quality} Stream
                                   </p>
                                 </>
@@ -649,9 +649,9 @@ const Monitoring = () => {
                             </div>
                           ) : (
                             <div className="text-white text-center">
-                              <Monitor className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                              <p className="text-lg">Select a Camera</p>
-                              <p className="text-sm opacity-75">Choose from the list to view live feed</p>
+                              <Monitor className="h-20 w-20 mx-auto mb-4 opacity-50" />
+                              <p className="text-2xl font-semibold">Select a Camera</p>
+                              <p className="text-lg opacity-75 mt-2">Choose from the list to view live feed</p>
                             </div>
                           )}
                           
