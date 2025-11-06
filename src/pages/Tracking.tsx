@@ -168,59 +168,10 @@ const Tracking = () => {
           
           <div className="container mx-auto px-4 text-center relative z-10">
             <div className="max-w-5xl mx-auto">
-              <div className="mb-8 flex justify-center">
-                <Badge className="bg-gradient-to-r from-gray-700 to-blue-600 text-white px-8 py-3 text-xl font-bold border border-white/30 shadow-lg">
-                  🇰🇪 Military-Grade GPS Tracking System
-                </Badge>
-              </div>
-              
               <h1 id="tracking-hero-heading" className="text-6xl md:text-8xl font-bold mb-8 text-white drop-shadow-2xl flex items-center justify-center gap-4">
                 <Package className="h-16 w-16 md:h-20 md:w-20 text-primary" />
                 Delivery Tracking
               </h1>
-              
-              <p className="text-2xl md:text-4xl mb-12 text-white/90 font-medium drop-shadow-lg leading-relaxed max-w-4xl mx-auto">
-                <strong>Real-Time Delivery Tracking:</strong> Track construction material deliveries with live GPS location updates, 
-                view delivery routes and estimated arrival times, receive status notifications, monitor multiple shipments, 
-                verify delivery completion, check driver details, review delivery history, access proof of delivery, 
-                and ensure materials reach your construction site safely and on schedule.
-              </p>
-              
-              {/* Tracking Technology Stats */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
-                  <div className="text-4xl font-bold text-green-400 mb-2">Real-Time</div>
-                  <div className="text-white font-medium">GPS Tracking</div>
-                </div>
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
-                  <div className="text-4xl font-bold text-blue-400 mb-2">Military</div>
-                  <div className="text-white font-medium">Grade Security</div>
-                </div>
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
-                  <div className="text-4xl font-bold text-yellow-400 mb-2">Driver</div>
-                  <div className="text-white font-medium">Safety Priority</div>
-                </div>
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
-                  <div className="text-4xl font-bold text-red-400 mb-2">24/7</div>
-                  <div className="text-white font-medium">Monitoring</div>
-                </div>
-              </div>
-              
-              {/* Tracking Features Highlight */}
-              <div className="flex flex-wrap justify-center gap-4 text-white/90">
-                <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full backdrop-blur-sm">
-                  <Eye className="h-5 w-5" />
-                  <span className="font-medium">Authorized Access</span>
-                </div>
-                <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full backdrop-blur-sm">
-                  <Shield className="h-5 w-5" />
-                  <span className="font-medium">Privacy Protected</span>
-                </div>
-                <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full backdrop-blur-sm">
-                  <Package className="h-5 w-5" />
-                  <span className="font-medium">Secure Tracking</span>
-                </div>
-              </div>
             </div>
           </div>
           </section>
