@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { supabase } from "@/integrations/supabase/client";
@@ -270,7 +271,7 @@ const Delivery = () => {
               <span className="whitespace-nowrap">Request Delivery</span>
             </Button>
             
-            <a href="/tracking">
+            <Link to="/tracking">
               <Button 
                 size="lg"
                 className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 sm:px-8 py-4 sm:py-6 text-base sm:text-lg shadow-xl w-full sm:w-auto"
@@ -278,7 +279,7 @@ const Delivery = () => {
                 <MapPin className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                 <span className="whitespace-nowrap">Track Deliveries</span>
               </Button>
-            </a>
+            </Link>
             
             <Button 
               size="lg"
