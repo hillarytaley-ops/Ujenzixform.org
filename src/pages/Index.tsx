@@ -116,16 +116,17 @@ const Index = () => {
         {/* Hero Section - Matching Suppliers/Builders Design */}
         <AnimatedSection animation="fadeInUp">
           <section className="text-white py-20 relative overflow-hidden">
-            {/* Your Custom Kenyan Construction Worker Hero Image - Fully Responsive */}
+            {/* Your Custom Kenyan Construction Worker Hero Image - Zoomed Out */}
             <div 
               className="absolute inset-0"
               style={{
                 backgroundImage: `url('/home-hero-bg.jpg'), url('/slide-1.jpg'), url('https://images.unsplash.com/photo-1541888946425-d81bb19240f5?w=1920&h=1080&fit=crop')`,
-                backgroundSize: 'cover',
+                backgroundSize: 'contain',
                 backgroundPosition: 'center center',
                 backgroundRepeat: 'no-repeat',
-                WebkitBackgroundSize: 'cover',
-                MozBackgroundSize: 'cover'
+                WebkitBackgroundSize: 'contain',
+                MozBackgroundSize: 'contain',
+                backgroundColor: '#1a202c'
               }}
               role="img"
               aria-label="Kenyan construction workers and building site"
