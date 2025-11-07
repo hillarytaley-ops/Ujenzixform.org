@@ -23,7 +23,7 @@ import ChatWidget from "@/components/builders/ChatWidget";
 import { EnhancedSearch } from "@/components/builders/EnhancedSearch";
 import { ReviewsSystem } from "@/components/builders/ReviewsSystem";
 // import { NotificationSystem } from "@/components/builders/NotificationSystem";
-// import { AnalyticsDashboard } from "@/components/builders/AnalyticsDashboardEnhanced";
+import { SimpleAnalyticsDashboard } from "@/components/builders/SimpleAnalyticsDashboard";
 import { PDFExport } from "@/components/builders/PDFExport";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { LanguageToggle } from "@/components/ui/language-toggle";
@@ -440,10 +440,7 @@ const Builders = () => {
                 </TabsContent>
 
                 <TabsContent value="analytics" className="space-y-6">
-                  <div className="p-8 text-center border rounded-lg">
-                    <h2 className="text-2xl font-bold">Analytics Dashboard</h2>
-                    <p className="text-muted-foreground">Analytics temporarily disabled for debugging</p>
-                  </div>
+                  <SimpleAnalyticsDashboard builderId={userProfile.user_id} />
                 </TabsContent>
 
                 <TabsContent value="reviews" className="space-y-6">
