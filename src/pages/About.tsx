@@ -79,9 +79,9 @@ const About: React.FC = () => {
     },
     {
       name: "Sila Kapting'ei",
-      role: "CTO & Founder",
-      description: "senior engineer at leading tech companies",
-      image: "/placeholder.svg"
+      role: "Construction Industry Expert",
+      description: "Architectural Engineer with 10 years of experience in construction and engineering solutions",
+      image: "/sila-expert.jpg"
     },
     {
       name: "Eliud Rugut",
