@@ -264,8 +264,8 @@ const About: React.FC = () => {
           <div className="absolute inset-0 bg-gradient-to-br from-gray-50 via-blue-50/30 to-gray-100"></div>
           
           <div className="container mx-auto px-4 relative z-10">
-            <h2 id="team-heading" className="text-5xl font-bold text-center mb-6 text-white drop-shadow-2xl">Meet Our Team</h2>
-            <p className="text-xl text-center mb-16 text-white/90 max-w-3xl mx-auto drop-shadow-lg">
+            <h2 id="team-heading" className="text-5xl font-bold text-center mb-6 text-gray-900 drop-shadow-lg">Meet Our Team</h2>
+            <p className="text-xl text-center mb-16 text-gray-700 max-w-3xl mx-auto font-medium">
               Experienced professionals dedicated to transforming Kenya's construction landscape
             </p>
             
