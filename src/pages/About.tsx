@@ -269,7 +269,7 @@ const About: React.FC = () => {
               Experienced professionals dedicated to transforming Kenya's construction landscape
             </p>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto justify-items-center">
               {team.map((member, index) => (
                 <AnimatedSection key={`team-member-${index}`} animation="scaleIn" delay={index * 100}>
                   <Card 
