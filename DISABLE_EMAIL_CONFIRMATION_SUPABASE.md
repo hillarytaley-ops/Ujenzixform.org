@@ -265,3 +265,4 @@ signup()
 
 **Once you disable email confirmation in Supabase, signup will be instant with no white page!** ⚡✅
 
+

@@ -79,3 +79,4 @@ Lazy load images, use modern formats
 4. **Optimize Supabase client** - Single import pattern
 
 
+

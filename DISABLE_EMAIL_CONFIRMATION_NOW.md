@@ -225,3 +225,4 @@ But **you still need to disable it in Supabase** for best results!
 ---
 
 **Let me know once you've disabled it in Supabase and I'll help you test!** 🚀
+

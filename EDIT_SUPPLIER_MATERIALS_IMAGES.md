@@ -36,9 +36,9 @@
 // Current structure:
 export const getDefaultCategoryImage = (category: string): string | undefined => {
   const categoryImages: Record<string, string> = {
-    'Cement': 'https://your-cement-image-url.jpg',
-    'Steel': 'https://your-steel-image-url.jpg',
-    'Paint': 'https://your-paint-image-url.jpg',
+    'Cement': 'https://sl.bing.net/ga740SqkiSi',
+    'Steel': 'https://sl.bing.net/hUMRh1Ij3N6',
+    'Paint': 'https://sl.bing.net/d9dp6WvYpTE',
     // etc...
   };
   

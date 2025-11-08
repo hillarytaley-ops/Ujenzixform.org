@@ -320,3 +320,4 @@ Now you have BOTH:
 **Impact:** Massive improvement in user experience  
 **Risk:** Low (can re-enable email confirmation anytime)
 
+

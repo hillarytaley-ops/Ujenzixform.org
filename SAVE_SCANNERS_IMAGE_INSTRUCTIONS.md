@@ -196,3 +196,4 @@ This ensures everyone sees the new image immediately after deployment.
 
 **Your QR scanner mobile app interface will make an awesome hero background!** 📱✨
 
+
