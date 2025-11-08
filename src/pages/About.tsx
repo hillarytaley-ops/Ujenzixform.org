@@ -75,7 +75,7 @@ const About: React.FC = () => {
       name: "Hillary Kapting'ei",
       role: "CEO & Founder",
       description: "Information Technology Specialist with 6 years of experience in tech innovation and construction solutions",
-      image: "/hillary-ceo.jpg"
+      image: "/hillary-ceo.jpg?v=2"
     },
     {
       name: "Sila Kapting'ei",
