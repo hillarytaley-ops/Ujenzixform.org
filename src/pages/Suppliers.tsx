@@ -209,29 +209,28 @@ const SuppliersContent = () => {
           role="img"
           aria-label="Construction materials and building supplies"
         />
-        <div className="absolute inset-0 bg-gradient-to-br from-black/60 via-gray-900/50 to-gray-800/50"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-gray-900/60 to-gray-800/70"></div>
         
         <div className="container mx-auto px-4 text-center relative z-10">
-          <div className="mb-6">
-            <span className="text-2xl mb-2 block">🇰🇪</span>
-            <p className="text-lg text-gray-200 mb-2">Karibu - Welcome to Kenya's Premier</p>
+          <div className="mb-4 sm:mb-6">
+            <span className="text-3xl sm:text-4xl mb-2 block">🇰🇪</span>
+            <p className="text-base sm:text-lg text-white font-semibold mb-2 drop-shadow-lg">Karibu - Welcome to Kenya's Premier</p>
           </div>
           
-          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 md:mb-6 leading-tight px-2">
-            <span className="bg-gradient-to-r from-white via-gray-200 to-white bg-clip-text text-transparent">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-4 md:mb-6 leading-tight px-2 drop-shadow-2xl">
+            <span className="text-white drop-shadow-2xl">
               UjenziPro
             </span>
             <br />
-            <span className="text-2xl sm:text-3xl md:text-4xl text-blue-400">
+            <span className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl text-yellow-400 drop-shadow-2xl">
               Suppliers Marketplace
             </span>
           </h1>
           
-          <p className="text-base sm:text-lg md:text-xl lg:text-2xl mb-6 md:mb-8 opacity-90 max-w-4xl mx-auto leading-relaxed px-4">
-            <strong>Your Construction Materials Hub:</strong> Browse verified suppliers, explore product catalogs with images, 
-            compare prices and quality, request quotes instantly, place bulk orders, arrange delivery across Kenya, 
-            track material shipments, verify authenticity with QR codes, and build lasting business relationships 
-            with trusted suppliers from Mombasa to Eldoret.
+          <p className="text-sm sm:text-base md:text-lg lg:text-xl mb-6 md:mb-8 text-white max-w-4xl mx-auto leading-relaxed px-4 font-medium drop-shadow-lg">
+            <strong className="text-yellow-400">Your Construction Materials Hub:</strong> Browse verified suppliers, explore product catalogs, 
+            compare prices, request quotes, place orders, arrange delivery across Kenya, 
+            track shipments, and verify quality with QR codes.
           </p>
 
           {/* Action Buttons - Mobile Responsive */}

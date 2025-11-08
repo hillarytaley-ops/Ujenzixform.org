@@ -557,35 +557,35 @@ export const MaterialsGrid = () => {
                     )}
                   </div>
 
-                  {/* Actions - Different for Professional Builders vs Private Clients */}
-                  <div className="flex gap-2">
+                  {/* Actions - Mobile Friendly Buttons */}
+                  <div className="flex flex-col sm:flex-row gap-2">
                     {/* Professional Builders: Request Quote */}
                     {userRole === 'builder' || userRole === 'professional_builder' ? (
                       <Button 
-                        className="flex-1 bg-blue-600 hover:bg-blue-700"
+                        className="w-full sm:flex-1 bg-blue-600 hover:bg-blue-700 h-12 text-base font-semibold"
                         onClick={() => handleRequestQuote(material)}
                         disabled={!material.in_stock}
                       >
-                        <ShoppingCart className="h-4 w-4 mr-2" />
+                        <ShoppingCart className="h-5 w-5 mr-2" />
                         Request Quote
                       </Button>
                     ) : userRole === 'private_client' ? (
                       /* Private Clients: Purchase Directly */
                       <Button 
-                        className="flex-1 bg-green-600 hover:bg-green-700"
+                        className="w-full sm:flex-1 bg-green-600 hover:bg-green-700 h-12 text-base font-semibold"
                         onClick={() => toast({
                           title: 'Purchase Materials',
                           description: `Proceeding to purchase ${material.name} from ${material.supplier?.company_name}. Direct purchase enabled for private clients.`,
                         })}
                         disabled={!material.in_stock}
                       >
-                        <ShoppingCart className="h-4 w-4 mr-2" />
+                        <ShoppingCart className="h-5 w-5 mr-2" />
                         Buy Now
                       </Button>
                     ) : (
                       /* Not logged in or other roles */
                       <Button 
-                        className="flex-1"
+                        className="w-full sm:flex-1 h-12 text-base font-semibold"
                         onClick={() => toast({
                           title: 'Sign In Required',
                           description: 'Please sign in to purchase materials or request quotes.',
