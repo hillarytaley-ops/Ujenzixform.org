@@ -85,9 +85,9 @@ const About: React.FC = () => {
     },
     {
       name: "Eliud Rugut",
-      role: "Head of Operations",
-      description: "Expert in supply chain and logistics management",
-      image: "/placeholder.svg"
+      role: "Head of Business Development & Co-Founder",
+      description: "Accomplished businessman and unmatched innovator with 15 years of experience in innovation and business development",
+      image: "/eliud-cofounder.jpg?v=1"
     },
     {
       name: "Mary Akinyi",
