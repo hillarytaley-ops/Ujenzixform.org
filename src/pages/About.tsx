@@ -72,13 +72,13 @@ const About: React.FC = () => {
 
   const team = [
     {
-      name: "Sila Kapting'ei",
-      role: "CEO",
-      description: "15 years experience in construction and technology",
-      image: "/placeholder.svg"
+      name: "Hillary Kapting'ei",
+      role: "CEO & Founder",
+      description: "Information Technology Specialist with 6 years of experience in tech innovation and construction solutions",
+      image: "/hillary-ceo.jpg"
     },
     {
-      name: "Hillary Kaptng'ei ",
+      name: "Sila Kapting'ei",
       role: "CTO & Founder",
       description: "senior engineer at leading tech companies",
       image: "/placeholder.svg"
