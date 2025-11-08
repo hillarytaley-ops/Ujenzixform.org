@@ -88,12 +88,6 @@ const About: React.FC = () => {
       role: "Head of Business Development & Co-Founder",
       description: "Accomplished businessman and unmatched innovator with 15 years of experience in innovation and business development",
       image: "/eliud-cofounder.jpg?v=3"
-    },
-    {
-      name: "Mary Akinyi",
-      role: "Head of Business Development",
-      description: "Specialist in B2B relationships and partnerships",
-      image: "/placeholder.svg"
     }
   ];
 
