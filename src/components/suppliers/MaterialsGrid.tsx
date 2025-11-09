@@ -572,12 +572,12 @@ export const MaterialsGrid = () => {
                         Request Quote
                       </Button>
                     ) : userRole === 'private_client' ? (
-                      /* Private Clients: Purchase Directly */
+                      /* Private Clients: Purchase Directly (No quote needed) */
                       <Button 
                         className="w-full sm:flex-1 bg-green-600 hover:bg-green-700 h-12 text-base font-semibold"
                         onClick={() => toast({
-                          title: 'Purchase Materials',
-                          description: `Proceeding to purchase ${material.name} from ${material.supplier?.company_name}. Direct purchase enabled for private clients.`,
+                          title: '✅ Adding to Cart',
+                          description: `${material.name} from ${material.supplier?.company_name}. Proceed to checkout to complete purchase.`,
                         })}
                         disabled={!material.in_stock}
                       >
@@ -585,17 +585,14 @@ export const MaterialsGrid = () => {
                         Buy Now
                       </Button>
                     ) : (
-                      /* Not logged in or other roles */
+                      /* Not logged in - Redirect to Sign In */
                       <Button 
-                        className="w-full sm:flex-1 h-12 text-base font-semibold"
-                        onClick={() => toast({
-                          title: 'Sign In Required',
-                          description: 'Please sign in to purchase materials or request quotes.',
-                        })}
+                        className="w-full sm:flex-1 bg-orange-600 hover:bg-orange-700 h-12 text-base font-semibold"
+                        onClick={() => window.location.href = '/auth'}
                         disabled={!material.in_stock}
                       >
-                        <ShoppingCart className="h-4 w-4 mr-2" />
-                        {!isAuthenticated ? 'Sign In to Buy' : 'Request Quote'}
+                        <ShoppingCart className="h-5 w-5 mr-2" />
+                        Sign In to Create Purchase Order
                       </Button>
                     )}
                     <Button 
