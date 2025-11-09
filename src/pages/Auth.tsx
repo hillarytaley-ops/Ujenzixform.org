@@ -59,7 +59,13 @@ const Auth = () => {
       
       // Redirect if already authenticated
       if (session?.user) {
-        navigate("/portal");
+        const returnTo = sessionStorage.getItem('returnTo');
+        if (returnTo) {
+          sessionStorage.removeItem('returnTo');
+          navigate(returnTo);
+        } else {
+          navigate("/");
+        }
       }
     });
 
@@ -212,10 +218,23 @@ const Auth = () => {
           }, 1500);
         }
       } else {
-        toast({
-          title: "Welcome back!",
-          description: "You've been signed in successfully."
-        });
+        // Successful sign in
+        const returnTo = sessionStorage.getItem('returnTo');
+        if (returnTo) {
+          toast({
+            title: "✅ Signed In!",
+            description: "Taking you to browse materials...",
+          });
+          sessionStorage.removeItem('returnTo');
+          setTimeout(() => {
+            window.location.href = returnTo;
+          }, 1000);
+        } else {
+          toast({
+            title: "Welcome back!",
+            description: "You've been signed in successfully."
+          });
+        }
       }
     } catch (error) {
       toast({
