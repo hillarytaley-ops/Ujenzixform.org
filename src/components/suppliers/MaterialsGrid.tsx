@@ -585,14 +585,18 @@ export const MaterialsGrid = () => {
                         Buy Now
                       </Button>
                     ) : (
-                      /* Not logged in - Redirect to Sign In */
+                      /* Not logged in - Redirect to Sign In with return to suppliers */
                       <Button 
                         className="w-full sm:flex-1 bg-orange-600 hover:bg-orange-700 h-12 text-base font-semibold"
-                        onClick={() => window.location.href = '/auth'}
+                        onClick={() => {
+                          // Save current page to return after login
+                          sessionStorage.setItem('returnTo', '/suppliers?tab=purchase');
+                          window.location.href = '/auth';
+                        }}
                         disabled={!material.in_stock}
                       >
                         <ShoppingCart className="h-5 w-5 mr-2" />
-                        Sign In to Create Purchase Order
+                        Sign In to Purchase
                       </Button>
                     )}
                     <Button 

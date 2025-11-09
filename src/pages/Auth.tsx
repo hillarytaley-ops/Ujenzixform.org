@@ -39,9 +39,15 @@ const Auth = () => {
         setSession(session);
         setUser(session?.user ?? null);
         
-        // Redirect authenticated users to homepage
+        // Redirect authenticated users to saved location or homepage
         if (session?.user) {
-          navigate("/");
+          const returnTo = sessionStorage.getItem('returnTo');
+          if (returnTo) {
+            sessionStorage.removeItem('returnTo');
+            navigate(returnTo);
+          } else {
+            navigate("/");
+          }
         }
       }
     );
@@ -192,11 +198,17 @@ const Auth = () => {
           // Instant signup (no confirmation)
           toast({
             title: "✅ Account created!",
-            description: "Welcome to UjenziPro! Taking you to the platform...",
+            description: "Welcome to UjenziPro! Taking you to browse materials...",
           });
-          // Auto-redirect to home page after signup
+          // Auto-redirect to saved location or suppliers page after signup
           setTimeout(() => {
-            window.location.href = '/';
+            const returnTo = sessionStorage.getItem('returnTo');
+            if (returnTo) {
+              sessionStorage.removeItem('returnTo');
+              window.location.href = returnTo;
+            } else {
+              window.location.href = '/suppliers';
+            }
           }, 1500);
         }
       } else {
