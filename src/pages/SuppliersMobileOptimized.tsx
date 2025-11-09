@@ -1,14 +1,29 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Building, Store } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Building, Store, Package } from "lucide-react";
 import { Link } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
-import { MaterialsGridSafe } from "@/components/suppliers/MaterialsGridSafe";
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from "@/hooks/use-toast";
+
+// Lazy load the materials grid
+const MaterialsGridSafe = React.lazy(() => 
+  import("@/components/suppliers/MaterialsGridSafe").then(module => ({
+    default: module.MaterialsGridSafe
+  })).catch(() => ({
+    default: () => (
+      <div className="text-center py-12">
+        <Package className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+        <p className="text-gray-600">Materials loading...</p>
+        <p className="text-sm text-gray-500 mt-2">Please refresh if this persists</p>
+      </div>
+    )
+  }))
+);
 
 // Ultra-optimized Suppliers page for mobile/iPhone
 const SuppliersMobileOptimized = () => {
@@ -114,7 +129,14 @@ const SuppliersMobileOptimized = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <MaterialsGridSafe />
+              <Suspense fallback={
+                <div className="text-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                  <p className="text-gray-600">Loading materials...</p>
+                </div>
+              }>
+                <MaterialsGridSafe />
+              </Suspense>
             </CardContent>
           </Card>
         </div>
