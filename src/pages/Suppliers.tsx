@@ -192,24 +192,9 @@ const SuppliersContent = () => {
       <div className="min-h-screen bg-background">
         <Navigation />
 
-      {/* Kenyan-Themed Hero Section - Mobile & iPhone Optimized */}
-      <section className="text-white py-12 sm:py-16 md:py-20 relative overflow-hidden min-h-[500px] sm:min-h-[600px]">
-        {/* Your Custom Building Materials Banner Background - Zoomed Out */}
-        <div 
-          className="absolute inset-0"
-          style={{
-            backgroundImage: `url('/suppliers-hero-bg.jpg?v=2'), url('/suppliers-hero-bg.jpg'), url('https://images.unsplash.com/photo-1541888946425-d81bb19240f5?w=1920&h=1080&fit=crop')`,
-            backgroundSize: 'contain',
-            backgroundPosition: 'center center',
-            backgroundRepeat: 'no-repeat',
-            WebkitBackgroundSize: 'contain',
-            MozBackgroundSize: 'contain',
-            backgroundColor: '#1e40af'
-          }}
-          role="img"
-          aria-label="Construction materials and building supplies"
-        />
-        <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-gray-900/60 to-gray-800/70"></div>
+      {/* Kenyan-Themed Hero Section - iPhone Fixed */}
+      <section className="bg-gradient-to-br from-blue-700 via-blue-800 to-blue-900 text-white py-16 sm:py-20 relative overflow-hidden">
+        {/* Solid gradient background - always visible on iPhone */}
         
         <div className="container mx-auto px-4 text-center relative z-10">
           <div className="mb-4 sm:mb-6">
