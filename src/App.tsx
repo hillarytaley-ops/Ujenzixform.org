@@ -134,8 +134,8 @@ const App = () => {
                           <Route path="/private-client-registration" element={<PrivateBuilderRegistration />} />
                           <Route path="/portal" element={<BuilderPortal />} />
                           <Route path="/suppliers" element={
-                            /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) 
-                              ? <SuppliersMobileOptimized /> 
+                            /iPhone|iPad|iPod/i.test(navigator.userAgent) 
+                              ? <SuppliersIPhone /> 
                               : <Suppliers />
                           } />
                           <Route path="/about" element={<About />} />
