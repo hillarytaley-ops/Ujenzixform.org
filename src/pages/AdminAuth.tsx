@@ -38,7 +38,7 @@ const AdminAuth = () => {
       
       if (roleData) {
         // Already authenticated as admin, redirect
-        navigate("/delivery");
+        navigate("/");
       }
     }
   };
@@ -259,8 +259,8 @@ const AdminAuth = () => {
         description: "You have been securely authenticated."
       });
 
-      // Redirect to admin dashboard
-      navigate("/delivery");
+      // Redirect to homepage
+      navigate("/");
 
     } catch (error: any) {
       console.error('Admin auth error:', error);

@@ -39,9 +39,9 @@ const Auth = () => {
         setSession(session);
         setUser(session?.user ?? null);
         
-        // Redirect authenticated users to builder portal
+        // Redirect authenticated users to homepage
         if (session?.user) {
-          navigate("/portal");
+          navigate("/");
         }
       }
     );
