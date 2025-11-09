@@ -409,62 +409,79 @@ const Auth = () => {
                   </div>
                 </div>
 
-                <form onSubmit={(e) => handleSubmit(e, true)} className="space-y-4">
+                <form onSubmit={(e) => handleSubmit(e, true)} className="space-y-5">
+                  {/* Super Simple - Just 2 Fields */}
                   <div className="space-y-2">
-                    <Label htmlFor="signup-email">Email Address</Label>
+                    <Label htmlFor="signup-email" className="text-base font-semibold">Your Email</Label>
                     <Input
                       id="signup-email"
                       name="email"
                       type="email"
-                      placeholder="your.email@example.com"
+                      placeholder="john@example.com"
                       required
                       autoFocus
-                      className="h-12 text-base"
+                      autoComplete="email"
+                      className="h-14 text-lg"
                     />
-                    <p className="text-xs text-muted-foreground">
-                      We'll never share your email
-                    </p>
                   </div>
+                  
                   <div className="space-y-2">
-                    <Label htmlFor="signup-password">Create Password</Label>
+                    <Label htmlFor="signup-password" className="text-base font-semibold">Choose Password</Label>
                     <Input
                       id="signup-password"
                       name="password"
                       type="password"
-                      placeholder="Min 8 characters"
+                      placeholder="At least 8 characters"
                       required
                       minLength={8}
-                      className="h-12 text-base"
+                      autoComplete="new-password"
+                      className="h-14 text-lg"
                     />
-                    <p className="text-xs text-muted-foreground">
-                      At least 8 characters for security
-                    </p>
                   </div>
 
-                  <Alert className="bg-green-50 border-green-200">
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                    <AlertDescription className="text-xs text-green-800">
-                      <strong>⚡ Instant Access:</strong> No email confirmation needed! Create account and start using UjenziPro immediately.
+                  {/* Instant Access Promise */}
+                  <Alert className="bg-gradient-to-r from-green-50 to-blue-50 border-green-300 border-2">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <AlertDescription className="text-sm font-medium text-gray-800">
+                      <strong className="text-green-700 text-base">⚡ Instant Access!</strong><br/>
+                      No email verification needed. Start browsing materials immediately after signup.
                     </AlertDescription>
                   </Alert>
 
-                  <Button type="submit" className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-semibold text-base" disabled={loading}>
+                  {/* Big, Prominent Signup Button */}
+                  <Button 
+                    type="submit" 
+                    className="w-full h-16 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold text-lg shadow-xl" 
+                    disabled={loading}
+                  >
                     {loading ? (
                       <>
-                        <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                        Creating account...
+                        <Loader2 className="h-6 w-6 mr-2 animate-spin" />
+                        Creating Your Account...
                       </>
                     ) : (
                       <>
-                        <CheckCircle className="h-5 w-5 mr-2" />
-                        Create Account - It's Free!
+                        <CheckCircle className="h-6 w-6 mr-2" />
+                        Get Started - It's Free! 🚀
                       </>
                     )}
                   </Button>
 
-                  <p className="text-xs text-center text-muted-foreground">
-                    By signing up, you agree to our Terms of Service and Privacy Policy
-                  </p>
+                  {/* Trust Signals */}
+                  <div className="flex items-center justify-center gap-4 text-xs text-gray-600">
+                    <span className="flex items-center gap-1">
+                      <CheckCircle className="h-3 w-3 text-green-600" />
+                      Free Forever
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <CheckCircle className="h-3 w-3 text-green-600" />
+                      No Credit Card
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <CheckCircle className="h-3 w-3 text-green-600" />
+                      850+ Suppliers
+                    </span>
+                  </div>
                 </form>
               </div>
             </TabsContent>
