@@ -32,6 +32,7 @@ import { Supplier } from "@/types/supplier";
 import { useToast } from "@/hooks/use-toast";
 import { ModalProvider, useModal } from "@/contexts/ModalContext";
 import { LoginPortal } from "@/components/LoginPortal";
+import { PurchaseOrderWizard } from "@/components/suppliers/PurchaseOrderWizard";
 import { useSearchParams } from "react-router-dom";
 
 const SuppliersContent = () => {
@@ -514,24 +515,60 @@ const SuppliersContent = () => {
 
           {(showDirectoryAccess || !user) && (
             <TabsContent value="purchase" className="space-y-8">
-              <div className="max-w-4xl mx-auto">
-                <div className="bg-white rounded-lg shadow-lg p-8">
-                  <h2 className="text-2xl font-bold mb-4">Purchase Materials</h2>
-                  <p className="text-gray-700 mb-6">
-                    Create purchase orders and manage your material procurement
-                  </p>
-                  <div className="space-y-4">
-                    <p className="text-muted-foreground">
-                      Sign in to access the full purchasing system and create orders with suppliers.
-                    </p>
-                    <Link to="/auth">
-                      <Button className="bg-primary hover:bg-primary/90">
-                        Sign In to Create Purchase Orders
-                      </Button>
-                    </Link>
-                  </div>
+              {user ? (
+                /* Logged in users see the purchase wizard */
+                <PurchaseOrderWizard 
+                  userId={user.id}
+                  onComplete={() => {
+                    toast({
+                      title: 'Order submitted successfully!',
+                      description: 'Suppliers will send you quotes soon.',
+                    });
+                    setActiveTab('suppliers');
+                  }}
+                />
+              ) : (
+                /* Not logged in - show sign in prompt */
+                <div className="max-w-4xl mx-auto">
+                  <Card className="shadow-xl">
+                    <CardHeader className="bg-gradient-to-r from-orange-50 to-orange-100">
+                      <CardTitle className="text-2xl flex items-center gap-2">
+                        <ShoppingCart className="h-6 w-6 text-orange-600" />
+                        Create Purchase Order
+                      </CardTitle>
+                      <CardDescription className="text-base">
+                        Sign in to browse materials, select items, and create purchase orders
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-8 space-y-6">
+                      <Alert className="bg-blue-50 border-blue-200">
+                        <Package className="h-4 w-4 text-blue-600" />
+                        <AlertDescription className="text-sm text-blue-800">
+                          <strong>After signing in, you'll be able to:</strong>
+                          <ul className="mt-2 space-y-1 list-disc list-inside">
+                            <li>Browse 850+ verified suppliers</li>
+                            <li>Select materials and add to cart</li>
+                            <li>Choose quantities</li>
+                            <li>Create purchase orders</li>
+                            <li>Receive competitive quotes</li>
+                          </ul>
+                        </AlertDescription>
+                      </Alert>
+
+                      <Link to={`/auth?redirect=${encodeURIComponent('/suppliers?tab=purchase')}`}>
+                        <Button className="w-full h-14 bg-orange-600 hover:bg-orange-700 text-white font-bold text-lg">
+                          <ShoppingCart className="h-5 w-5 mr-2" />
+                          Sign In to Start Shopping
+                        </Button>
+                      </Link>
+
+                      <p className="text-xs text-center text-gray-500">
+                        Don't have an account? You'll be able to create one after clicking above.
+                      </p>
+                    </CardContent>
+                  </Card>
                 </div>
-              </div>
+              )}
             </TabsContent>
           )}
         </Tabs>
