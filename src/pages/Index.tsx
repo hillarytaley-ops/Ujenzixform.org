@@ -120,12 +120,10 @@ const Index = () => {
             <div 
               className="absolute inset-0"
               style={{
-                backgroundImage: `url('/home-hero-bg.jpg'), url('/slide-1.jpg'), url('https://images.unsplash.com/photo-1541888946425-d81bb19240f5?w=1920&h=1080&fit=crop')`,
-                backgroundSize: 'contain',
-                backgroundPosition: 'center center',
+                backgroundImage: `url('/kenyan-home-bg-small.svg')`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
-                WebkitBackgroundSize: 'contain',
-                MozBackgroundSize: 'contain',
                 backgroundColor: '#1a202c'
               }}
               role="img"

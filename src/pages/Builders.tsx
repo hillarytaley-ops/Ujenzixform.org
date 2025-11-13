@@ -193,7 +193,7 @@ const Builders = () => {
         <div 
           className="absolute inset-0"
           style={{
-            backgroundImage: `url('/builders-hero-new.jpg?v=3'), url('/builders-hero-bg.jpg?v=1'), url('https://images.unsplash.com/photo-1487958449943-2429e8be8625?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')`,
+            backgroundImage: `url('/builders-hero-bg.jpg?v=1')`,
             backgroundSize: 'contain',
             backgroundPosition: 'center center',
             backgroundRepeat: 'no-repeat',
@@ -351,7 +351,7 @@ const Builders = () => {
         <div 
           className="absolute inset-0"
           style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1541888946425-d81bb19240f5?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')`,
+            backgroundImage: `url('/builders-hero-bg.jpg?v=1')`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
@@ -689,7 +689,7 @@ const Builders = () => {
         <div 
           className="absolute inset-0"
           style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1590736969955-71cc94901144?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')`,
+            backgroundImage: `url('/builders-hero-bg.jpg?v=1')`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',

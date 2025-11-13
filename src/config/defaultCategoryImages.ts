@@ -46,7 +46,7 @@ export const DEFAULT_CATEGORY_IMAGES: Record<string, CategoryImage> = {
   },
   'Paint': {
     category: 'Paint',
-    imageUrl: '/paint.jpg',
+    imageUrl: '/paint.png',
     description: 'Paints - Crown, Basco, Galaxy Paints Kenya'
   },
   'Timber': {
@@ -71,7 +71,7 @@ export const DEFAULT_CATEGORY_IMAGES: Record<string, CategoryImage> = {
   },
   'Aggregates': {
     category: 'Aggregates',
-    imageUrl: '/aggregates.jpg',
+    imageUrl: '/stone.jpg',
     description: 'Gravel and construction aggregates'
   },
   'Roofing': {
