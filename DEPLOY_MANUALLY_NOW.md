@@ -210,3 +210,4 @@ dist/
 
 **No CLI, no commands, just drag and drop!** 📂✨
 
+

@@ -256,14 +256,14 @@ const Builders = () => {
               {!loading && (
                 userProfile ? (
                   <Link to="/suppliers?tab=purchase">
-                    <Button 
-                      size="lg"
-                      className="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
-                    >
-                      <ShoppingCart className="h-5 w-5 mr-2" />
-                      Purchase Materials
-                    </Button>
-                  </Link>
+                <Button 
+                  size="lg"
+                  className="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
+                >
+                  <ShoppingCart className="h-5 w-5 mr-2" />
+                  Purchase Materials
+                </Button>
+              </Link>
                 ) : (
                   <Link to="/auth">
                     <Button 
@@ -367,9 +367,9 @@ const Builders = () => {
         <div className="container mx-auto px-4 relative z-10">
           {/* Security Alert - Admin Only */}
           {isAdmin && (
-            <div className="mb-8">
-              <SecurityAlert />
-            </div>
+          <div className="mb-8">
+            <SecurityAlert />
+          </div>
           )}
 
           {/* Dashboard for authenticated builders */}
@@ -598,7 +598,7 @@ const Builders = () => {
                             <span><strong>Verify Quality:</strong> QR code scanning for material authentication</span>
                           </li>
                         </ul>
-                      </div>
+                  </div>
 
                       <Link to="/suppliers?tab=purchase">
                         <Button size="lg" className="w-full h-14 bg-orange-600 hover:bg-orange-700 text-white font-semibold text-lg">

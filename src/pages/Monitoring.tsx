@@ -378,12 +378,12 @@ const Monitoring = () => {
           {userRole === 'supplier' && (
             <div className="mb-8">
               <Alert variant="destructive" className="max-w-4xl mx-auto">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  <strong>Access Restricted:</strong> Suppliers do not have access to the monitoring system. 
-                  This includes camera feeds, delivery tracking, and system monitoring. These features are restricted to builders and UjenziPro administrators.
-                </AlertDescription>
-              </Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Access Restricted:</strong> Suppliers do not have access to the monitoring system. 
+                    This includes camera feeds, delivery tracking, and system monitoring. These features are restricted to builders and UjenziPro administrators.
+                  </AlertDescription>
+                </Alert>
             </div>
           )}
 
