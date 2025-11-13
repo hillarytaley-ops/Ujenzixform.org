@@ -31,6 +31,10 @@ const Auth = () => {
   const [showResetDialog, setShowResetDialog] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  
+  // Get redirect parameter from URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const redirectTo = urlParams.get('redirect') || null;
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -39,12 +43,10 @@ const Auth = () => {
         setSession(session);
         setUser(session?.user ?? null);
         
-        // Redirect authenticated users to saved location or homepage
+        // Redirect authenticated users to redirect URL or homepage
         if (session?.user) {
-          const returnTo = sessionStorage.getItem('returnTo');
-          if (returnTo) {
-            sessionStorage.removeItem('returnTo');
-            navigate(returnTo);
+          if (redirectTo) {
+            window.location.href = redirectTo;
           } else {
             navigate("/");
           }

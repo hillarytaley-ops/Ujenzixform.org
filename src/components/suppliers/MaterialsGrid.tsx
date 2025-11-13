@@ -589,9 +589,8 @@ export const MaterialsGrid = () => {
                       <Button 
                         className="w-full sm:flex-1 bg-orange-600 hover:bg-orange-700 h-12 text-base font-semibold"
                         onClick={() => {
-                          // Save current page to return after login
-                          sessionStorage.setItem('returnTo', '/suppliers?tab=purchase');
-                          window.location.href = '/auth';
+                          // Use URL parameter for more reliable redirect
+                          window.location.href = '/auth?redirect=' + encodeURIComponent('/suppliers?tab=purchase');
                         }}
                         disabled={!material.in_stock}
                       >
