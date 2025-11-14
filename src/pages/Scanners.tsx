@@ -30,6 +30,8 @@ import {
 } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { DispatchScanner } from '@/components/qr/DispatchScanner';
+import { ReceivingScanner } from '@/components/qr/ReceivingScanner';
 
 interface ScannedMaterial {
   id: string;
@@ -463,26 +465,29 @@ const Scanners = () => {
             </TabsTrigger>
           </TabsList>
 
-          {/* Dispatchable Scanners Tab */}
-          <TabsContent value="dispatchable" className="space-y-6">
-            <div className="max-w-6xl mx-auto">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="text-2xl font-bold">Dispatchable Materials</h2>
-                  <p className="text-muted-foreground">
-                    <strong>For Suppliers:</strong> Scan materials at your store/warehouse before dispatching to construction sites
-                  </p>
-                </div>
-                {isAdmin ? (
-                  <Badge variant="outline" className="bg-blue-50">
-                    {dispatchableMaterials.length} Items Ready
-                  </Badge>
-                ) : (
-                  <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                    Admin Access Required
-                  </Badge>
-                )}
+        {/* Dispatchable Scanners Tab */}
+        <TabsContent value="dispatchable" className="space-y-6">
+          <div className="max-w-6xl mx-auto">
+            <div className="mb-8">
+              <DispatchScanner />
+            </div>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold">Dispatchable Materials</h2>
+                <p className="text-muted-foreground">
+                  <strong>For Suppliers:</strong> Scan materials at your store/warehouse before dispatching to construction sites
+                </p>
               </div>
+              {isAdmin ? (
+                <Badge variant="outline" className="bg-blue-50">
+                  {dispatchableMaterials.length} Items Ready
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                  Admin Access Required
+                </Badge>
+              )}
+            </div>
 
               {isAdmin ? (
                 <>
@@ -610,26 +615,29 @@ const Scanners = () => {
             </div>
           </TabsContent>
 
-          {/* Receivable Scanners Tab */}
-          <TabsContent value="receivable" className="space-y-6">
-            <div className="max-w-6xl mx-auto">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="text-2xl font-bold">Receivable Materials</h2>
-                  <p className="text-muted-foreground">
-                    <strong>For UjenziPro Staff:</strong> Scan and verify materials upon arrival at construction sites
-                  </p>
-                </div>
-                {isAdmin ? (
-                  <Badge variant="outline" className="bg-green-50">
-                    {receivableMaterials.length} Items Received
-                  </Badge>
-                ) : (
-                  <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                    Admin Access Required
-                  </Badge>
-                )}
+        {/* Receivable Scanners Tab */}
+        <TabsContent value="receivable" className="space-y-6">
+          <div className="max-w-6xl mx-auto">
+            <div className="mb-8">
+              <ReceivingScanner />
+            </div>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold">Receivable Materials</h2>
+                <p className="text-muted-foreground">
+                  <strong>For UjenziPro Staff:</strong> Scan and verify materials upon arrival at construction sites
+                </p>
               </div>
+              {isAdmin ? (
+                <Badge variant="outline" className="bg-green-50">
+                  {receivableMaterials.length} Items Received
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                  Admin Access Required
+                </Badge>
+              )}
+            </div>
 
               {isAdmin ? (
                 <>

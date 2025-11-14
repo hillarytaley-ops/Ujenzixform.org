@@ -64,12 +64,20 @@ export const DispatchScanner: React.FC = () => {
     if (!codeReader) return;
 
     try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        toast.error('Camera not supported');
+        return;
+      }
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }
+        video: { facingMode: { ideal: 'environment' } }
       });
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        videoRef.current.setAttribute('playsinline', 'true');
+        try {
+          await videoRef.current.play();
+        } catch {}
         setIsScanning(true);
         toast.success('Camera scanner started');
 
@@ -92,6 +100,7 @@ export const DispatchScanner: React.FC = () => {
       stream.getTracks().forEach(track => track.stop());
       videoRef.current.srcObject = null;
     }
+    codeReader?.reset();
     setIsScanning(false);
     toast.info('Scanner stopped');
   };
