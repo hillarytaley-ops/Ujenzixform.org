@@ -68,21 +68,27 @@ export const ReceivingScanner: React.FC = () => {
         toast.error('Camera not supported');
         return;
       }
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' } }
+      if (!window.isSecureContext) {
+        toast.error('Camera requires a secure site');
+        return;
+      }
+      const permissionStream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false
       });
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoInputs = devices.filter(d => d.kind === 'videoinput');
+      const preferred =
+        videoInputs.find(d => /back|rear|environment/i.test(d.label)) ||
+        videoInputs[videoInputs.length - 1] ||
+        videoInputs[0];
+      permissionStream.getTracks().forEach(t => t.stop());
 
       if (videoRef.current) {
-        videoRef.current.srcObject = stream;
         videoRef.current.setAttribute('playsinline', 'true');
-        try {
-          await videoRef.current.play();
-        } catch {}
         setIsScanning(true);
         toast.success('Camera scanner started');
-
-        // Start decoding
-        codeReader.decodeFromVideoDevice(undefined, videoRef.current, (result, error) => {
+        codeReader.decodeFromVideoDevice(preferred?.deviceId, videoRef.current, (result, error) => {
           if (result) {
             processQRScan(result.getText(), 'mobile_camera');
           }
