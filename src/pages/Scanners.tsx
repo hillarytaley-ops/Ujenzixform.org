@@ -391,7 +391,29 @@ const Scanners = () => {
         <div className="absolute inset-0 bg-gradient-to-br from-gray-50 via-blue-50/30 to-gray-100"></div>
         
         <div className="container mx-auto px-4 relative z-10">
-          {/* Removed placeholder QR card; use scanners in tabs below */}
+          <div className="max-w-6xl mx-auto mb-12">
+            {userRole === 'supplier' ? (
+              <Suspense fallback={<div className="p-6 text-center text-muted-foreground">Loading dispatch scanner…</div>}>
+                <DispatchScanner />
+              </Suspense>
+            ) : userRole === 'builder' ? (
+              <Suspense fallback={<div className="p-6 text-center text-muted-foreground">Loading receiving scanner…</div>}>
+                <ReceivingScanner />
+              </Suspense>
+            ) : isAdmin ? (
+              <div className="space-y-6">
+                <div className="flex gap-2 justify-center mb-2">
+                  <Button variant="outline" onClick={() => setActiveTab('dispatchable')}>Dispatch Scanner</Button>
+                  <Button variant="outline" onClick={() => setActiveTab('receivable')}>Receiving Scanner</Button>
+                </div>
+                <Suspense fallback={<div className="p-6 text-center text-muted-foreground">Loading scanner…</div>}>
+                  {activeTab === 'receivable' ? <ReceivingScanner /> : <DispatchScanner />}
+                </Suspense>
+              </div>
+            ) : (
+              <div className="p-6 text-center text-muted-foreground">Sign in to use the scanner</div>
+            )}
+          </div>
 
         {/* Scanner Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
