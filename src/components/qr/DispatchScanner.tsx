@@ -33,6 +33,8 @@ export const DispatchScanner: React.FC = () => {
   const [notes, setNotes] = useState('');
   const [codeReader, setCodeReader] = useState<BrowserMultiFormatReader | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     checkAuth();
@@ -72,23 +74,15 @@ export const DispatchScanner: React.FC = () => {
         toast.error('Camera requires a secure site');
         return;
       }
-      const permissionStream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: false
-      });
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoInputs = devices.filter(d => d.kind === 'videoinput');
-      const preferred =
-        videoInputs.find(d => /back|rear|environment/i.test(d.label)) ||
-        videoInputs[videoInputs.length - 1] ||
-        videoInputs[0];
-      permissionStream.getTracks().forEach(t => t.stop());
+      if (!selectedDeviceId) {
+        await loadCameras();
+      }
 
       if (videoRef.current) {
         videoRef.current.setAttribute('playsinline', 'true');
         setIsScanning(true);
         toast.success('Camera scanner started');
-        codeReader.decodeFromVideoDevice(preferred?.deviceId, videoRef.current, (result, error) => {
+        codeReader.decodeFromVideoDevice(selectedDeviceId, videoRef.current, (result, error) => {
           if (result) {
             processQRScan(result.getText(), 'mobile_camera');
           }
@@ -98,6 +92,22 @@ export const DispatchScanner: React.FC = () => {
       console.error('Camera error:', error);
       toast.error('Failed to access camera');
     }
+  };
+
+  const loadCameras = async () => {
+    const permissionStream = await navigator.mediaDevices.getUserMedia({
+      video: true,
+      audio: false
+    });
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const inputs = devices.filter(d => d.kind === 'videoinput');
+    setVideoDevices(inputs);
+    const preferred =
+      inputs.find(d => /back|rear|environment/i.test(d.label)) ||
+      inputs[inputs.length - 1] ||
+      inputs[0];
+    setSelectedDeviceId(preferred?.deviceId);
+    permissionStream.getTracks().forEach(t => t.stop());
   };
 
   const stopScanning = () => {
@@ -206,6 +216,30 @@ export const DispatchScanner: React.FC = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="camera-source">Camera Source</Label>
+              <Select value={selectedDeviceId} onValueChange={setSelectedDeviceId}>
+                <SelectTrigger id="camera-source">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {videoDevices.length === 0 ? (
+                    <SelectItem value="">No cameras</SelectItem>
+                  ) : (
+                    videoDevices.map((d, i) => (
+                      <SelectItem key={d.deviceId || i} value={d.deviceId}>
+                        {d.label || `Camera ${i + 1}`}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-end">
+              <Button variant="outline" onClick={loadCameras} className="w-full">Refresh Cameras</Button>
+            </div>
+          </div>
           <div className="relative bg-black rounded-lg overflow-hidden">
             <video
               ref={videoRef}
