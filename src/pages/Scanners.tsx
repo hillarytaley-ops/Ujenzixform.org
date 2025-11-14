@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { DispatchScanner } from '@/components/qr/DispatchScanner';
 import { ReceivingScanner } from '@/components/qr/ReceivingScanner';
 
@@ -398,7 +399,9 @@ const Scanners = () => {
                   <Button variant="outline" onClick={() => setActiveTab('dispatchable')}>Dispatch Scanner</Button>
                   <Button variant="outline" onClick={() => setActiveTab('receivable')}>Receiving Scanner</Button>
                 </div>
-                {activeTab === 'receivable' ? <ReceivingScanner /> : <DispatchScanner />}
+                <ErrorBoundary>
+                  {activeTab === 'receivable' ? <ReceivingScanner /> : <DispatchScanner />}
+                </ErrorBoundary>
               </div>
             ) : (
               <div className="p-6 text-center text-muted-foreground">Sign in to use the scanner</div>
@@ -422,9 +425,11 @@ const Scanners = () => {
           <TabsContent value="dispatchable" className="space-y-6">
             <div className="max-w-6xl mx-auto">
               <div className="mb-8">
-                <Suspense fallback={<div className="p-6 text-center text-muted-foreground">Loading dispatch scanner…</div>}>
-                  <DispatchScanner />
-                </Suspense>
+                <ErrorBoundary>
+                  <Suspense fallback={<div className="p-6 text-center text-muted-foreground">Loading dispatch scanner…</div>}>
+                    <DispatchScanner />
+                  </Suspense>
+                </ErrorBoundary>
               </div>
               <div className="flex items-center justify-between mb-6">
                 <div>
@@ -574,9 +579,11 @@ const Scanners = () => {
           <TabsContent value="receivable" className="space-y-6">
             <div className="max-w-6xl mx-auto">
               <div className="mb-8">
-                <Suspense fallback={<div className="p-6 text-center text-muted-foreground">Loading receiving scanner…</div>}>
-                  <ReceivingScanner />
-                </Suspense>
+                <ErrorBoundary>
+                  <Suspense fallback={<div className="p-6 text-center text-muted-foreground">Loading receiving scanner…</div>}>
+                    <ReceivingScanner />
+                  </Suspense>
+                </ErrorBoundary>
               </div>
               <div className="flex items-center justify-between mb-6">
                 <div>
