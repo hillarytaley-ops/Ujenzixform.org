@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -30,6 +30,8 @@ import {
 } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+const DispatchScanner = lazy(() => import('@/components/qr/DispatchScanner').then(m => ({ default: m.DispatchScanner })));
+const ReceivingScanner = lazy(() => import('@/components/qr/ReceivingScanner').then(m => ({ default: m.ReceivingScanner })));
 
 interface ScannedMaterial {
   id: string;
@@ -407,6 +409,11 @@ const Scanners = () => {
           {/* Dispatchable Scanners Tab */}
           <TabsContent value="dispatchable" className="space-y-6">
             <div className="max-w-6xl mx-auto">
+              <div className="mb-8">
+                <Suspense fallback={<div className="p-6 text-center text-muted-foreground">Loading dispatch scanner…</div>}>
+                  <DispatchScanner />
+                </Suspense>
+              </div>
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h2 className="text-2xl font-bold">Dispatchable Materials</h2>
@@ -554,6 +561,11 @@ const Scanners = () => {
           {/* Receivable Scanners Tab */}
           <TabsContent value="receivable" className="space-y-6">
             <div className="max-w-6xl mx-auto">
+              <div className="mb-8">
+                <Suspense fallback={<div className="p-6 text-center text-muted-foreground">Loading receiving scanner…</div>}>
+                  <ReceivingScanner />
+                </Suspense>
+              </div>
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h2 className="text-2xl font-bold">Receivable Materials</h2>
