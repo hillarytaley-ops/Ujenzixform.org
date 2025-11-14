@@ -389,66 +389,7 @@ const Scanners = () => {
         <div className="absolute inset-0 bg-gradient-to-br from-gray-50 via-blue-50/30 to-gray-100"></div>
         
         <div className="container mx-auto px-4 relative z-10">
-          {/* QR Scanner Interface */}
-          <div className="max-w-3xl mx-auto mb-12">
-            <Card className="bg-white/95 backdrop-blur-sm border-2 border-white/50 shadow-2xl">
-              <CardHeader className="bg-gradient-to-r from-green-50 via-blue-50 to-red-50 border-b border-gray-200">
-                <CardTitle className="flex items-center gap-3 text-3xl font-bold text-gray-900">
-                  <div className="p-3 bg-gradient-to-br from-green-500 to-red-500 rounded-full shadow-lg">
-                    <Camera className="h-8 w-8 text-white" />
-                  </div>
-                  QR Code Scanner
-                </CardTitle>
-                <CardDescription className="text-lg text-gray-700">
-                  Point your camera at a QR code to scan material information and verify authenticity
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6 p-8">
-              <div className="aspect-video bg-black rounded-lg flex items-center justify-center relative">
-                {isScanning ? (
-                  <div className="text-white text-center">
-                    <Camera className="h-12 w-12 mx-auto mb-4 opacity-75" />
-                    <p className="text-lg">Scanning for QR codes...</p>
-                    <p className="text-sm opacity-75">Point camera at QR code</p>
-                  </div>
-                ) : (
-                  <div className="text-white text-center">
-                    <QrCode className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p className="text-lg">QR Scanner Ready</p>
-                    <p className="text-sm opacity-75">Click Start Scanning to begin</p>
-                  </div>
-                )}
-                
-                {/* Scanner Controls */}
-                <div className="absolute bottom-4 left-4 right-4 flex justify-center">
-                  <Button 
-                    onClick={() => setIsScanning(!isScanning)}
-                    variant={isScanning ? "destructive" : "default"}
-                  >
-                    {isScanning ? "Stop Scanning" : "Start Scanning"}
-                  </Button>
-                </div>
-              </div>
-
-              {/* Manual QR Input */}
-              <div className="space-y-2">
-                <Label htmlFor="manualQR">Or Enter QR Code Manually</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="manualQR"
-                    placeholder="Enter QR code"
-                    value={lastScannedCode}
-                    onChange={(e) => setLastScannedCode(e.target.value)}
-                  />
-                  <Button onClick={() => handleScanQR(lastScannedCode)}>
-                    <Search className="h-4 w-4 mr-2" />
-                    Scan
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+          {/* Removed placeholder QR card; use scanners in tabs below */}
 
         {/* Scanner Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
