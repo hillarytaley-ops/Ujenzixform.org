@@ -16,9 +16,25 @@ export const AuthRequired = ({ children }: AuthRequiredProps) => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const publicPaths = [
+    '/',
+    '/auth',
+    '/admin-login',
+    '/builders',
+    '/suppliers',
+    '/about',
+    '/contact',
+    '/feedback',
+    '/tracking',
+    '/monitoring',
+    '/delivery',
+    '/delivery/apply',
+    '/scanners',
+    '/analytics'
+  ];
+
   useEffect(() => {
-    // Allow access to auth pages without authentication
-    const publicPaths = ['/', '/auth', '/admin-login'];
+    // Allow access to public pages without authentication
     if (publicPaths.includes(location.pathname)) {
       setIsAuthenticated(true); // Bypass auth check for auth pages
       setLoading(false);
@@ -45,14 +61,16 @@ export const AuthRequired = ({ children }: AuthRequiredProps) => {
       setLoading(false);
 
       // If not authenticated, redirect to auth page
-      if (!session) {
+      if (!session && !publicPaths.includes(location.pathname)) {
         navigate('/auth');
       }
     } catch (error) {
       console.error('Auth check error:', error);
       setIsAuthenticated(false);
       setLoading(false);
-      navigate('/auth');
+      if (!publicPaths.includes(location.pathname)) {
+        navigate('/auth');
+      }
     }
   };
 
@@ -67,7 +85,7 @@ export const AuthRequired = ({ children }: AuthRequiredProps) => {
     );
   }
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated && !publicPaths.includes(location.pathname)) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background to-secondary/20 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">

@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
@@ -81,6 +82,7 @@ const queryClient = new QueryClient({
 const App = () => {
   const [user, setUser] = React.useState<any>(null);
   const [showChat, setShowChat] = React.useState(false);
+  const { toast } = useToast();
 
   React.useEffect(() => {
     // Get current user for chatbot (deferred)
@@ -100,6 +102,23 @@ const App = () => {
     return () => {
       clearTimeout(timer);
       clearTimeout(chatTimer);
+    };
+  }, []);
+
+  React.useEffect(() => {
+    const handleError = (event: ErrorEvent) => {
+      console.error('Global error:', event.error || event);
+      try { toast({ title: 'Error', description: event.message }); } catch {}
+    };
+    const handleRejection = (event: PromiseRejectionEvent) => {
+      console.error('Unhandled rejection:', event.reason);
+      try { toast({ title: 'Network/Error', description: String(event.reason) }); } catch {}
+    };
+    window.addEventListener('error', handleError);
+    window.addEventListener('unhandledrejection', handleRejection);
+    return () => {
+      window.removeEventListener('error', handleError);
+      window.removeEventListener('unhandledrejection', handleRejection);
     };
   }, []);
 
