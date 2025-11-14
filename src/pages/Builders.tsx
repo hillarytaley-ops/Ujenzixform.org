@@ -202,12 +202,10 @@ const Builders = () => {
         <div 
           className="absolute inset-0"
           style={{
-            backgroundImage: `image-set(url('/builders-hero-bg.webp') type('image/webp') 1x, url('/builders-hero-bg.jpg?v=1') type('image/jpeg') 1x)`,
-            backgroundSize: 'contain',
-            backgroundPosition: 'center center',
+            backgroundImage: `url('/builders-hero-bg.webp')`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
-            WebkitBackgroundSize: 'contain',
-            MozBackgroundSize: 'contain',
             backgroundColor: '#2d3748'
           }}
           role="img"
@@ -360,11 +358,11 @@ const Builders = () => {
         <div 
           className="absolute inset-0"
           style={{
-            backgroundImage: `image-set(url('/builders-hero-bg.webp') type('image/webp') 1x, url('/builders-hero-bg.jpg?v=1') type('image/jpeg') 1x)`,
+            backgroundImage: `url('/builders-hero-bg.webp')`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
-            backgroundAttachment: 'fixed'
+            contentVisibility: 'auto'
           }}
           role="img"
           aria-label="Modern Kenyan construction development with high-rise buildings and professional construction management"
