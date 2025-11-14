@@ -46,6 +46,7 @@ interface CameraFeed {
   isRecording: boolean;
   batteryLevel?: number;
   signalStrength: number;
+  streamUrl?: string;
 }
 
 interface ProjectMonitoring {
@@ -623,32 +624,60 @@ const Monitoring = () => {
                         </div>
                       </CardHeader>
                       <CardContent className="p-2">
-                        <div className="aspect-video bg-black rounded-lg flex items-center justify-center relative w-full min-h-[220px] sm:min-h-[320px] md:min-h-[420px] lg:min-h-[500px]">
+                        <div className="aspect-video bg-black rounded-lg relative w-full min-h-[220px] sm:min-h-[320px] md:min-h-[420px] lg:min-h-[500px] overflow-hidden">
                           {selectedCamera ? (
-                            <div className="text-white text-center">
-                              {selectedCamera.startsWith('drone-') ? (
-                                <>
-                                  <Plane className="h-12 w-12 sm:h-16 sm:w-16 mx-auto mb-4 opacity-75 text-purple-300" />
-                                  <p className="text-lg sm:text-2xl font-semibold">Drone Aerial Feed</p>
-                                  <p className="text-xs sm:text-sm opacity-75">
-                                    {cameras.find(c => c.id === selectedCamera)?.quality} Aerial Stream
-                                  </p>
-                                  <Badge className="mt-2 bg-purple-600 text-white">
-                                    Aerial View
-                                  </Badge>
-                                </>
-                              ) : (
-                                <>
-                                  <Camera className="h-12 w-12 sm:h-16 sm:w-16 mx-auto mb-4 opacity-50" />
-                                  <p className="text-lg sm:text-2xl font-semibold">Live Feed</p>
-                                  <p className="text-base sm:text-lg opacity-75 mt-2">
-                                    {cameras.find(c => c.id === selectedCamera)?.quality} Stream
-                                  </p>
-                                </>
-                              )}
-                            </div>
+                            (() => {
+                              const cam = cameras.find(c => c.id === selectedCamera);
+                              if (cam?.streamUrl) {
+                                const isIframe = /youtube|vimeo/i.test(cam.streamUrl);
+                                return isIframe ? (
+                                  <iframe
+                                    src={cam.streamUrl}
+                                    className="w-full h-full"
+                                    loading="lazy"
+                                    allow="autoplay; encrypted-media; picture-in-picture"
+                                    referrerPolicy="no-referrer"
+                                    sandbox="allow-scripts allow-same-origin allow-presentation"
+                                  />
+                                ) : (
+                                  <video
+                                    className="w-full h-full"
+                                    style={{ objectFit: 'cover' }}
+                                    controls
+                                    playsInline
+                                    preload="metadata"
+                                  >
+                                    <source src={cam.streamUrl} />
+                                  </video>
+                                );
+                              }
+                              return (
+                                <div className="absolute inset-0 flex items-center justify-center text-white text-center p-4">
+                                  {selectedCamera.startsWith('drone-') ? (
+                                    <>
+                                      <Plane className="h-12 w-12 sm:h-16 sm:w-16 mx-auto mb-4 opacity-75 text-purple-300" />
+                                      <p className="text-lg sm:text-2xl font-semibold">Drone Aerial Feed</p>
+                                      <p className="text-xs sm:text-sm opacity-75">
+                                        {cam?.quality} Aerial Stream
+                                      </p>
+                                      <Badge className="mt-2 bg-purple-600 text-white">
+                                        Aerial View
+                                      </Badge>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Camera className="h-12 w-12 sm:h-16 sm:w-16 mx-auto mb-4 opacity-50" />
+                                      <p className="text-lg sm:text-2xl font-semibold">Live Feed</p>
+                                      <p className="text-base sm:text-lg opacity-75 mt-2">
+                                        {cam?.quality} Stream
+                                      </p>
+                                    </>
+                                  )}
+                                </div>
+                              );
+                            })()
                           ) : (
-                            <div className="text-white text-center">
+                            <div className="absolute inset-0 flex items-center justify-center text-white text-center p-4">
                               <Monitor className="h-14 w-14 sm:h-20 sm:w-20 mx-auto mb-4 opacity-50" />
                               <p className="text-lg sm:text-2xl font-semibold">Select a Camera</p>
                               <p className="text-sm sm:text-lg opacity-75 mt-2">Choose from the list to view live feed</p>
