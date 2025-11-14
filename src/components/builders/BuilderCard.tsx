@@ -38,6 +38,15 @@ export const BuilderCard = ({ builder, onContactClick, onViewProfile, onReviewCl
     .toUpperCase()
     .slice(0, 2);
 
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const u = await getSafeImageUrl(displayImage || undefined, 600);
+      if (mounted) setImgSrc(u);
+    })();
+    return () => { mounted = false };
+  }, [displayImage]);
+
   return (
     <Card className="h-full hover:shadow-xl hover:-translate-y-2 transition-all duration-300 group border-2 hover:border-primary/20">
       <CardHeader className="pb-3">
@@ -156,11 +165,3 @@ export const BuilderCard = ({ builder, onContactClick, onViewProfile, onReviewCl
     </Card>
   );
 };
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      const u = await getSafeImageUrl(displayImage || undefined, 600);
-      if (mounted) setImgSrc(u);
-    })();
-    return () => { mounted = false };
-  }, [displayImage]);

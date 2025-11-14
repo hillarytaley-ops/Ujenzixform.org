@@ -37,6 +37,7 @@ const Scanners = lazy(() => import("./pages/Scanners"));
 const Analytics = lazy(() => import("./pages/Analytics"));
 const DeliveryProviderApplication = lazy(() => import("./pages/DeliveryProviderApplication"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const AdminImageMigration = lazy(() => import("./pages/AdminImageMigration"));
 
 // Auth Guard
 import { AuthRequired } from "@/components/security/AuthRequired";
@@ -110,12 +111,12 @@ const App = () => {
   React.useEffect(() => {
     const handleError = (event: ErrorEvent) => {
       console.error('Global error:', event.error || event);
-      try { toast({ title: 'Error', description: event.message }); } catch {}
+      toast({ title: 'Error', description: event.message });
       telemetry.track('global_error', 'error', event.message, { stack: event.error?.stack });
     };
     const handleRejection = (event: PromiseRejectionEvent) => {
       console.error('Unhandled rejection:', event.reason);
-      try { toast({ title: 'Network/Error', description: String(event.reason) }); } catch {}
+      toast({ title: 'Network/Error', description: String(event.reason) });
       telemetry.track('unhandled_rejection', 'error', String(event.reason));
     };
     window.addEventListener('error', handleError);
@@ -124,7 +125,7 @@ const App = () => {
       window.removeEventListener('error', handleError);
       window.removeEventListener('unhandledrejection', handleRejection);
     };
-  }, []);
+  }, [toast]);
 
   return (
     <ThemeProvider>
@@ -169,6 +170,7 @@ const App = () => {
                           <Route path="/delivery" element={<Delivery />} />
                           <Route path="/scanners" element={<Scanners />} />
                           <Route path="/analytics" element={<AdminGuard><Analytics /></AdminGuard>} />
+                          <Route path="/admin/image-migration" element={<AdminGuard><AdminImageMigration /></AdminGuard>} />
                           <Route path="/delivery/apply" element={<DeliveryProviderApplication />} />
                           <Route path="*" element={<NotFound />} />
                         </Routes>
