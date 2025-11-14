@@ -18,7 +18,7 @@ export const AuthRequired = ({ children }: AuthRequiredProps) => {
 
   useEffect(() => {
     // Allow access to auth pages without authentication
-    const publicPaths = ['/auth', '/admin-login'];
+    const publicPaths = ['/', '/auth', '/admin-login'];
     if (publicPaths.includes(location.pathname)) {
       setIsAuthenticated(true); // Bypass auth check for auth pages
       setLoading(false);
