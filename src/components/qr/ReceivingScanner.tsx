@@ -34,7 +34,7 @@ export const ReceivingScanner: React.FC = () => {
   const [codeReader, setCodeReader] = useState<BrowserMultiFormatReader | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string | undefined>(undefined);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
 
   useEffect(() => {
     checkAuth();
@@ -206,7 +206,7 @@ export const ReceivingScanner: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="camera-source">Camera Source</Label>
-              <Select value={selectedDeviceId} onValueChange={setSelectedDeviceId}>
+              <Select value={selectedDeviceId ?? ''} onValueChange={setSelectedDeviceId}>
                 <SelectTrigger id="camera-source">
                   <SelectValue />
                 </SelectTrigger>
