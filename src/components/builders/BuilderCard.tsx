@@ -40,8 +40,15 @@ export const BuilderCard = ({ builder, onContactClick, onViewProfile, onReviewCl
 
   useEffect(() => {
     let mounted = true;
+    const d = displayImage || undefined;
+    const isPublic = !!d && d.startsWith('/');
+    const isDirect = !!d && /^(https?:|data:|blob:)/i.test(d);
+    if (isPublic || isDirect) {
+      setImgSrc(d);
+      return () => { mounted = false };
+    }
     (async () => {
-      const u = await getSafeImageUrl(displayImage || undefined, 600);
+      const u = await getSafeImageUrl(d, 600);
       if (mounted) setImgSrc(u);
     })();
     return () => { mounted = false };
@@ -53,7 +60,12 @@ export const BuilderCard = ({ builder, onContactClick, onViewProfile, onReviewCl
         <div className="flex justify-between items-start gap-3">
           <div className="flex items-start gap-3 flex-1 min-w-0">
             <Avatar className="h-14 w-14 border-2 border-muted group-hover:scale-110 group-hover:border-primary/50 transition-all duration-300">
-              <AvatarImage src={imgSrc || displayImage} alt={builder.company_name || builder.full_name} />
+              <AvatarImage 
+                src={imgSrc || displayImage} 
+                alt={builder.company_name || builder.full_name}
+                loading="lazy"
+                decoding="async"
+              />
               <AvatarFallback className="bg-primary/10 text-primary font-semibold group-hover:bg-primary/20">
                 {initials}
               </AvatarFallback>
