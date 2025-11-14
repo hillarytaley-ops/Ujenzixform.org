@@ -30,8 +30,8 @@ import {
 } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-const DispatchScanner = lazy(() => import('@/components/qr/DispatchScanner').then(m => ({ default: m.DispatchScanner })));
-const ReceivingScanner = lazy(() => import('@/components/qr/ReceivingScanner').then(m => ({ default: m.ReceivingScanner })));
+import { DispatchScanner } from '@/components/qr/DispatchScanner';
+import { ReceivingScanner } from '@/components/qr/ReceivingScanner';
 
 interface ScannedMaterial {
   id: string;
