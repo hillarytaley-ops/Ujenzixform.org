@@ -545,14 +545,14 @@ const Monitoring = () => {
 
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                   {/* Camera List - Smaller */}
-                  <div className="lg:col-span-1">
+                  <div className="lg:col-span-1 order-2 lg:order-1">
                     <Card>
                       <CardHeader>
                         <CardTitle className="text-lg">Camera Feeds</CardTitle>
                         <CardDescription className="text-sm">Select camera</CardDescription>
                       </CardHeader>
                       <CardContent>
-                        <div className="space-y-3">
+                        <div className="space-y-3 max-h-[50vh] lg:max-h-none overflow-y-auto">
                           {cameras.map((camera) => {
                             const isDrone = camera.id.startsWith('drone-');
                             return (
@@ -607,13 +607,13 @@ const Monitoring = () => {
                   </div>
 
                   {/* Main Video Feed - Larger */}
-                  <div className="lg:col-span-3">
+                  <div className="lg:col-span-3 order-1 lg:order-2">
                     <Card>
                       <CardHeader>
                         <div className="flex items-center justify-between">
                           <div>
-                            <CardTitle className="text-2xl">{selectedCamera ? cameras.find(c => c.id === selectedCamera)?.name : 'Select Camera'}</CardTitle>
-                            <CardDescription className="text-base">{selectedCamera ? cameras.find(c => c.id === selectedCamera)?.projectSite : 'Choose a camera to view live feed'}</CardDescription>
+                            <CardTitle className="text-xl sm:text-2xl">{selectedCamera ? cameras.find(c => c.id === selectedCamera)?.name : 'Select Camera'}</CardTitle>
+                            <CardDescription className="text-sm sm:text-base">{selectedCamera ? cameras.find(c => c.id === selectedCamera)?.projectSite : 'Choose a camera to view live feed'}</CardDescription>
                           </div>
                           {selectedCamera && (
                             <Badge className={getStatusColor(cameras.find(c => c.id === selectedCamera)?.status || '')}>
@@ -623,14 +623,14 @@ const Monitoring = () => {
                         </div>
                       </CardHeader>
                       <CardContent className="p-2">
-                        <div className="aspect-video bg-black rounded-lg flex items-center justify-center relative min-h-[500px]">
+                        <div className="aspect-video bg-black rounded-lg flex items-center justify-center relative w-full min-h-[220px] sm:min-h-[320px] md:min-h-[420px] lg:min-h-[500px]">
                           {selectedCamera ? (
                             <div className="text-white text-center">
                               {selectedCamera.startsWith('drone-') ? (
                                 <>
-                                  <Plane className="h-16 w-16 mx-auto mb-4 opacity-75 text-purple-300" />
-                                  <p className="text-2xl font-semibold">Drone Aerial Feed</p>
-                                  <p className="text-sm opacity-75">
+                                  <Plane className="h-12 w-12 sm:h-16 sm:w-16 mx-auto mb-4 opacity-75 text-purple-300" />
+                                  <p className="text-lg sm:text-2xl font-semibold">Drone Aerial Feed</p>
+                                  <p className="text-xs sm:text-sm opacity-75">
                                     {cameras.find(c => c.id === selectedCamera)?.quality} Aerial Stream
                                   </p>
                                   <Badge className="mt-2 bg-purple-600 text-white">
@@ -639,9 +639,9 @@ const Monitoring = () => {
                                 </>
                               ) : (
                                 <>
-                                  <Camera className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                                  <p className="text-2xl font-semibold">Live Feed</p>
-                                  <p className="text-lg opacity-75 mt-2">
+                                  <Camera className="h-12 w-12 sm:h-16 sm:w-16 mx-auto mb-4 opacity-50" />
+                                  <p className="text-lg sm:text-2xl font-semibold">Live Feed</p>
+                                  <p className="text-base sm:text-lg opacity-75 mt-2">
                                     {cameras.find(c => c.id === selectedCamera)?.quality} Stream
                                   </p>
                                 </>
@@ -649,15 +649,15 @@ const Monitoring = () => {
                             </div>
                           ) : (
                             <div className="text-white text-center">
-                              <Monitor className="h-20 w-20 mx-auto mb-4 opacity-50" />
-                              <p className="text-2xl font-semibold">Select a Camera</p>
-                              <p className="text-lg opacity-75 mt-2">Choose from the list to view live feed</p>
+                              <Monitor className="h-14 w-14 sm:h-20 sm:w-20 mx-auto mb-4 opacity-50" />
+                              <p className="text-lg sm:text-2xl font-semibold">Select a Camera</p>
+                              <p className="text-sm sm:text-lg opacity-75 mt-2">Choose from the list to view live feed</p>
                             </div>
                           )}
                           
                           {/* Video Controls */}
                           {selectedCamera && (
-                            <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between">
+                            <div className="absolute bottom-2 sm:bottom-4 left-2 sm:left-4 right-2 sm:right-4 flex items-center justify-between">
                               <div className="flex items-center gap-2">
                                 <Button size="sm" variant="secondary">
                                   <Play className="h-4 w-4" />
