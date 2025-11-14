@@ -284,7 +284,7 @@ const AdminAuth = () => {
       <div 
         className="absolute inset-0 z-0"
         style={{
-          backgroundImage: `url('/kenyan-workers.jpg')`,
+          backgroundImage: `image-set(url('/kenyan-workers.webp') type('image/webp') 1x, url('/kenyan-workers.jpg') type('image/jpeg') 1x)`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',

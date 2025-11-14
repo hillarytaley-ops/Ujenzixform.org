@@ -193,7 +193,7 @@ const Builders = () => {
         <div 
           className="absolute inset-0"
           style={{
-            backgroundImage: `url('/builders-hero-bg.jpg?v=1')`,
+            backgroundImage: `image-set(url('/builders-hero-bg.webp') type('image/webp') 1x, url('/builders-hero-bg.jpg?v=1') type('image/jpeg') 1x)`,
             backgroundSize: 'contain',
             backgroundPosition: 'center center',
             backgroundRepeat: 'no-repeat',
@@ -351,7 +351,7 @@ const Builders = () => {
         <div 
           className="absolute inset-0"
           style={{
-            backgroundImage: `url('/builders-hero-bg.jpg?v=1')`,
+            backgroundImage: `image-set(url('/builders-hero-bg.webp') type('image/webp') 1x, url('/builders-hero-bg.jpg?v=1') type('image/jpeg') 1x)`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
@@ -689,7 +689,7 @@ const Builders = () => {
         <div 
           className="absolute inset-0"
           style={{
-            backgroundImage: `url('/builders-hero-bg.jpg?v=1')`,
+            backgroundImage: `image-set(url('/builders-hero-bg.webp') type('image/webp') 1x, url('/builders-hero-bg.jpg?v=1') type('image/jpeg') 1x)`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',

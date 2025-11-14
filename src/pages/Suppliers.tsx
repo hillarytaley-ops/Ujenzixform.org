@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Building, ShoppingBag, FileText, Package, Store, Database, Users, Receipt, QrCode, Truck, Shield } from "lucide-react";
@@ -7,12 +7,12 @@ import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import AnimatedSection from "@/components/AnimatedSection";
 import SupplierRegistrationForm from "@/components/SupplierRegistrationForm";
-import QRCodeManager from "@/components/QRCodeManager";
-import DeliveryNoteForm from "@/components/DeliveryNoteForm";
-import SupplierPurchaseOrderManager from "@/components/suppliers/SupplierPurchaseOrderManager";
-import GoodsReceivedNoteViewer from "@/components/suppliers/GoodsReceivedNoteViewer";
-import SupplierInvoiceViewer from "@/components/suppliers/SupplierInvoiceViewer";
-import QRScanner from "@/components/QRScanner";
+const QRCodeManager = React.lazy(() => import("@/components/QRCodeManager"));
+const DeliveryNoteForm = React.lazy(() => import("@/components/DeliveryNoteForm"));
+const SupplierPurchaseOrderManager = React.lazy(() => import("@/components/suppliers/SupplierPurchaseOrderManager"));
+const GoodsReceivedNoteViewer = React.lazy(() => import("@/components/suppliers/GoodsReceivedNoteViewer"));
+const SupplierInvoiceViewer = React.lazy(() => import("@/components/suppliers/SupplierInvoiceViewer"));
+const QRScanner = React.lazy(() => import("@/components/QRScanner"));
 import { SupplierGrid } from "@/components/suppliers/SupplierGrid";
 import { MaterialsGrid } from "@/components/suppliers/MaterialsGrid";
 import { MaterialsGridSafe } from "@/components/suppliers/MaterialsGridSafe";
@@ -24,15 +24,23 @@ import { RealTimeStats } from "@/components/suppliers/RealTimeStats";
 import { SecurityAlert } from "@/components/security/SecurityAlert";
 import { AdminAccessGuard } from "@/components/security/AdminAccessGuard";
 import { Badge } from "@/components/ui/badge";
-import { SupplierWorkflowDashboard } from "@/components/suppliers/SupplierWorkflowDashboard";
-import { SupplierApplicationManager } from "@/components/suppliers/SupplierApplicationManager";
-import { SupplierOrderTracker } from "@/components/suppliers/SupplierOrderTracker";
+const SupplierWorkflowDashboard = React.lazy(() => 
+  import("@/components/suppliers/SupplierWorkflowDashboard").then(m => ({ default: m.SupplierWorkflowDashboard }))
+);
+const SupplierApplicationManager = React.lazy(() => 
+  import("@/components/suppliers/SupplierApplicationManager").then(m => ({ default: m.SupplierApplicationManager }))
+);
+const SupplierOrderTracker = React.lazy(() => 
+  import("@/components/suppliers/SupplierOrderTracker").then(m => ({ default: m.SupplierOrderTracker }))
+);
 import { supabase } from '@/integrations/supabase/client';
 import { Supplier } from "@/types/supplier";
 import { useToast } from "@/hooks/use-toast";
 import { ModalProvider, useModal } from "@/contexts/ModalContext";
 import { LoginPortal } from "@/components/LoginPortal";
-import { PurchaseOrderWizard } from "@/components/suppliers/PurchaseOrderWizard";
+const PurchaseOrderWizard = React.lazy(() => 
+  import("@/components/suppliers/PurchaseOrderWizard").then(m => ({ default: m.PurchaseOrderWizard }))
+);
 import { useSearchParams } from "react-router-dom";
 
 const SuppliersContent = () => {
@@ -406,29 +414,41 @@ const SuppliersContent = () => {
               </TabsContent>
               
               <TabsContent value="purchase-orders" className="space-y-8">
-                <SupplierPurchaseOrderManager />
+                <Suspense fallback={<div className="py-8 text-center">Loading purchase orders...</div>}>
+                  <SupplierPurchaseOrderManager />
+                </Suspense>
               </TabsContent>
               
               <TabsContent value="qr-codes" className="space-y-8">
-                <QRCodeManager />
+                <Suspense fallback={<div className="py-8 text-center">Loading QR codes...</div>}>
+                  <QRCodeManager />
+                </Suspense>
               </TabsContent>
               
               <TabsContent value="qr-scanner" className="space-y-8">
-                <QRScanner onMaterialScanned={(material) => {
-                  console.log('Material scanned:', material);
-                }} />
+                <Suspense fallback={<div className="py-8 text-center">Loading scanner...</div>}>
+                  <QRScanner onMaterialScanned={(material) => {
+                    console.log('Material scanned:', material);
+                  }} />
+                </Suspense>
               </TabsContent>
               
               <TabsContent value="delivery-notes" className="space-y-8">
-                <DeliveryNoteForm />
+                <Suspense fallback={<div className="py-8 text-center">Loading delivery notes...</div>}>
+                  <DeliveryNoteForm />
+                </Suspense>
               </TabsContent>
               
               <TabsContent value="grn-viewer" className="space-y-8">
-                <GoodsReceivedNoteViewer />
+                <Suspense fallback={<div className="py-8 text-center">Loading GRN...</div>}>
+                  <GoodsReceivedNoteViewer />
+                </Suspense>
               </TabsContent>
               
               <TabsContent value="invoices" className="space-y-8">
-                <SupplierInvoiceViewer />
+                <Suspense fallback={<div className="py-8 text-center">Loading invoices...</div>}>
+                  <SupplierInvoiceViewer />
+                </Suspense>
               </TabsContent>
             </>
           )}
@@ -436,8 +456,9 @@ const SuppliersContent = () => {
           {isAdmin && (
             <>
               <TabsContent value="applications" className="space-y-8">
-                {/* iPhone/Safari Compatible - NO React.Suspense */}
-                <SupplierApplicationManager />
+                <Suspense fallback={<div className="py-8 text-center">Loading applications...</div>}>
+                  <SupplierApplicationManager />
+                </Suspense>
               </TabsContent>
               
               <TabsContent value="registered-users" className="space-y-8">
@@ -484,7 +505,11 @@ const SuppliersContent = () => {
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      {/iPhone|iPad|iPod/i.test(navigator.userAgent) ? <MaterialsGridSafe /> : <MaterialsGrid />}
+                      {/iPhone|iPad|iPod/i.test(navigator.userAgent) ? <MaterialsGridSafe /> : (
+                        <Suspense fallback={<div className="py-10 text-center">Loading catalog...</div>}>
+                          <MaterialsGrid />
+                        </Suspense>
+                      )}
                     </CardContent>
                   </Card>
                   
