@@ -185,20 +185,7 @@ export const ReceivingScanner: React.FC = () => {
     processQRScan(manualQRCode, 'physical_scanner');
   };
 
-  if (!['admin', 'builder'].includes(userRole || '')) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Receiving Scanner</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">
-            Access restricted to UjenziPro staff and administrators.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
+  const allowAccess = ['admin', 'builder'].includes(userRole || '');
 
   return (
     <div className="space-y-6">
@@ -211,6 +198,11 @@ export const ReceivingScanner: React.FC = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {!allowAccess && (
+            <div className="p-3 rounded-md bg-yellow-50 text-yellow-700 text-sm">
+              Access restricted. Sign in as builder or admin to record scans.
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="camera-source">Camera Source</Label>
@@ -312,7 +304,7 @@ export const ReceivingScanner: React.FC = () => {
             />
           </div>
 
-          <Button onClick={handleManualScan} className="w-full bg-green-600 hover:bg-green-700">
+          <Button onClick={handleManualScan} className="w-full bg-green-600 hover:bg-green-700" disabled={!allowAccess}>
             <PackageCheck className="h-4 w-4 mr-2" />
             Record Receipt Scan
           </Button>

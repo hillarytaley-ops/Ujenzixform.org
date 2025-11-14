@@ -185,20 +185,7 @@ export const DispatchScanner: React.FC = () => {
     processQRScan(manualQRCode, 'physical_scanner');
   };
 
-  if (!['supplier', 'admin'].includes(userRole || '')) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Dispatch Scanner</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">
-            Access restricted to suppliers and administrators.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
+  const allowAccess = ['supplier', 'admin'].includes(userRole || '');
 
   return (
     <div className="space-y-6">
@@ -225,6 +212,11 @@ export const DispatchScanner: React.FC = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {!allowAccess && (
+            <div className="p-3 rounded-md bg-yellow-50 text-yellow-700 text-sm">
+              Access restricted. Sign in as supplier or admin to record scans.
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="camera-source">Camera Source</Label>
@@ -344,7 +336,7 @@ export const DispatchScanner: React.FC = () => {
             />
           </div>
 
-          <Button onClick={handleManualScan} className="w-full">
+          <Button onClick={handleManualScan} className="w-full" disabled={!allowAccess}>
             <Scan className="h-4 w-4 mr-2" />
             Record Dispatch Scan
           </Button>
