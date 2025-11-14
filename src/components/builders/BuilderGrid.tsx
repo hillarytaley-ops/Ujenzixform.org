@@ -210,7 +210,7 @@ export const BuilderGrid = ({ onBuilderContact, onBuilderProfile, isAdmin = fals
     });
   };
 
-  const demoBuilders = useMemo(() => getFilteredBuilders(), [filters, allBuilders]);
+  const demoBuilders = getFilteredBuilders();
   const demoTotalPages = Math.ceil(demoBuilders.length / BUILDERS_PER_PAGE);
   const paginatedDemoBuilders = demoBuilders.slice(
     (currentPage - 1) * BUILDERS_PER_PAGE,

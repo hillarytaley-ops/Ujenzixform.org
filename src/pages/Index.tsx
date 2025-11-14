@@ -55,11 +55,6 @@ const TestimonialCard = memo(({ testimonial, index }: { testimonial: any, index:
 ));
 
 const Index = () => {
-  const [defer, setDefer] = React.useState(false);
-  React.useEffect(() => {
-    const t = setTimeout(() => setDefer(true), 600);
-    return () => clearTimeout(t);
-  }, []);
   const features = [
     {
       icon: Search,
@@ -283,7 +278,7 @@ const Index = () => {
         </section>
         </AnimatedSection>
 
-        {defer && (
+        {/* Video Section - Complete Platform Demo with Monitoring */}
         <section className="py-16 bg-gradient-to-br from-gray-50 to-gray-100">
           <div className="container mx-auto px-4">
             <AnimatedSection animation="fadeInUp">
@@ -374,9 +369,8 @@ const Index = () => {
             </div>
           </div>
         </section>
-        )}
 
-        {defer && (
+        {/* Features Section */}
         <section className="bg-muted py-16">
           <div className="container mx-auto px-4">
             <AnimatedSection animation="fadeInUp">
@@ -404,9 +398,8 @@ const Index = () => {
             </div>
           </div>
         </section>
-        )}
 
-        {defer && (
+        {/* How It Works Section */}
         <section className="py-16 bg-secondary">
           <div className="container mx-auto px-4">
             <div className="text-center mb-12">
@@ -439,9 +432,8 @@ const Index = () => {
             </div>
           </div>
         </section>
-        )}
 
-        {defer && (
+        {/* Testimonials */}
         <section className="py-16 bg-accent">
           <div className="container mx-auto px-4">
             <div className="text-center mb-12">
@@ -455,9 +447,8 @@ const Index = () => {
             </div>
           </div>
         </section>
-        )}
 
-        {defer && (
+        {/* Kenya-Specific Features */}
         <section className="py-16 bg-gradient-to-br from-gray-50 to-blue-50/30">
           <div className="container mx-auto px-4">
             <div className="text-center mb-12">
@@ -562,9 +553,8 @@ const Index = () => {
             </div>
           </div>
         </section>
-        )}
 
-        {defer && (
+        {/* CTA Section */}
         <section className="py-16 text-text-on-dark relative">
           <div 
             className="absolute inset-0"
@@ -594,7 +584,6 @@ const Index = () => {
             </AnimatedSection>
           </div>
         </section>
-        )}
 
         <Footer />
     </div>

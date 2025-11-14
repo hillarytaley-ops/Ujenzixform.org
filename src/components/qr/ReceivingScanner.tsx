@@ -82,11 +82,21 @@ export const ReceivingScanner: React.FC = () => {
         videoRef.current.setAttribute('playsinline', 'true');
         setIsScanning(true);
         toast.success('Camera scanner started');
-        codeReader.decodeFromVideoDevice(selectedDeviceId, videoRef.current, (result, error) => {
-          if (result) {
-            processQRScan(result.getText(), 'mobile_camera');
-          }
-        });
+        if (selectedDeviceId) {
+          codeReader.decodeFromVideoDevice(selectedDeviceId, videoRef.current, (result, error) => {
+            if (result) {
+              processQRScan(result.getText(), 'mobile_camera');
+            }
+          });
+        } else {
+          codeReader.decodeFromConstraints({
+            video: { facingMode: { ideal: 'environment' } }
+          } as any, videoRef.current, (result, error) => {
+            if (result) {
+              processQRScan(result.getText(), 'mobile_camera');
+            }
+          });
+        }
       }
     } catch (error) {
       console.error('Camera error:', error);
@@ -116,7 +126,6 @@ export const ReceivingScanner: React.FC = () => {
       stream.getTracks().forEach(track => track.stop());
       videoRef.current.srcObject = null;
     }
-    codeReader?.reset();
     setIsScanning(false);
     toast.info('Scanner stopped');
   };

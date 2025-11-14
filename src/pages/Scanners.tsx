@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect } from 'react';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -30,8 +30,6 @@ import {
 } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-const DispatchScanner = lazy(() => import('@/components/qr/DispatchScanner').then(m => ({ default: m.DispatchScanner })));
-const ReceivingScanner = lazy(() => import('@/components/qr/ReceivingScanner').then(m => ({ default: m.ReceivingScanner })));
 
 interface ScannedMaterial {
   id: string;
@@ -286,7 +284,16 @@ const Scanners = () => {
     }
   };
 
-  // Render page immediately; role-restricted sections handle their own loading states
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-construction flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="text-muted-foreground">Loading scanner system...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -303,7 +310,7 @@ const Scanners = () => {
         <div 
           className="absolute inset-0"
           style={{
-              backgroundImage: `url('/scanners-hero-new.jpg?v=5')`,
+              backgroundImage: `url('/scanners-hero-new.jpg?v=5'), url('/scanners-hero-bg.jpg?v=4'), url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080"%3E%3Crect fill="%23e8e8e8" width="1920" height="1080"/%3E%3C/svg%3E')`,
             backgroundSize: 'contain',
             backgroundPosition: 'center center',
             backgroundRepeat: 'no-repeat',
@@ -456,31 +463,26 @@ const Scanners = () => {
             </TabsTrigger>
           </TabsList>
 
-        {/* Dispatchable Scanners Tab */}
-        <TabsContent value="dispatchable" className="space-y-6">
-          <div className="max-w-6xl mx-auto">
-            <div className="mb-8">
-              <Suspense fallback={<div className="p-6 text-center text-muted-foreground">Loading dispatch scanner…</div>}>
-                <DispatchScanner />
-              </Suspense>
-            </div>
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-2xl font-bold">Dispatchable Materials</h2>
-                <p className="text-muted-foreground">
-                  <strong>For Suppliers:</strong> Scan materials at your store/warehouse before dispatching to construction sites
-                </p>
+          {/* Dispatchable Scanners Tab */}
+          <TabsContent value="dispatchable" className="space-y-6">
+            <div className="max-w-6xl mx-auto">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold">Dispatchable Materials</h2>
+                  <p className="text-muted-foreground">
+                    <strong>For Suppliers:</strong> Scan materials at your store/warehouse before dispatching to construction sites
+                  </p>
+                </div>
+                {isAdmin ? (
+                  <Badge variant="outline" className="bg-blue-50">
+                    {dispatchableMaterials.length} Items Ready
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                    Admin Access Required
+                  </Badge>
+                )}
               </div>
-              {isAdmin ? (
-                <Badge variant="outline" className="bg-blue-50">
-                  {dispatchableMaterials.length} Items Ready
-                </Badge>
-              ) : (
-                <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                  Admin Access Required
-                </Badge>
-              )}
-            </div>
 
               {isAdmin ? (
                 <>
@@ -608,31 +610,26 @@ const Scanners = () => {
             </div>
           </TabsContent>
 
-        {/* Receivable Scanners Tab */}
-        <TabsContent value="receivable" className="space-y-6">
-          <div className="max-w-6xl mx-auto">
-            <div className="mb-8">
-              <Suspense fallback={<div className="p-6 text-center text-muted-foreground">Loading receiving scanner…</div>}>
-                <ReceivingScanner />
-              </Suspense>
-            </div>
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-2xl font-bold">Receivable Materials</h2>
-                <p className="text-muted-foreground">
-                  <strong>For UjenziPro Staff:</strong> Scan and verify materials upon arrival at construction sites
-                </p>
+          {/* Receivable Scanners Tab */}
+          <TabsContent value="receivable" className="space-y-6">
+            <div className="max-w-6xl mx-auto">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold">Receivable Materials</h2>
+                  <p className="text-muted-foreground">
+                    <strong>For UjenziPro Staff:</strong> Scan and verify materials upon arrival at construction sites
+                  </p>
+                </div>
+                {isAdmin ? (
+                  <Badge variant="outline" className="bg-green-50">
+                    {receivableMaterials.length} Items Received
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                    Admin Access Required
+                  </Badge>
+                )}
               </div>
-              {isAdmin ? (
-                <Badge variant="outline" className="bg-green-50">
-                  {receivableMaterials.length} Items Received
-                </Badge>
-              ) : (
-                <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                  Admin Access Required
-                </Badge>
-              )}
-            </div>
 
               {isAdmin ? (
                 <>

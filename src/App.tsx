@@ -4,10 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { useToast } from "@/hooks/use-toast";
-import * as telemetry from "@/utils/telemetry";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
-import { AdminGuard } from "@/components/security/AdminGuard";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 // import { PrivacyPolicyBanner } from "@/components/PrivacyPolicyBanner";
@@ -37,7 +34,6 @@ const Scanners = lazy(() => import("./pages/Scanners"));
 const Analytics = lazy(() => import("./pages/Analytics"));
 const DeliveryProviderApplication = lazy(() => import("./pages/DeliveryProviderApplication"));
 const NotFound = lazy(() => import("./pages/NotFound"));
-const AdminImageMigration = lazy(() => import("./pages/AdminImageMigration"));
 
 // Auth Guard
 import { AuthRequired } from "@/components/security/AuthRequired";
@@ -85,7 +81,6 @@ const queryClient = new QueryClient({
 const App = () => {
   const [user, setUser] = React.useState<any>(null);
   const [showChat, setShowChat] = React.useState(false);
-  const { toast } = useToast();
 
   React.useEffect(() => {
     // Get current user for chatbot (deferred)
@@ -107,25 +102,6 @@ const App = () => {
       clearTimeout(chatTimer);
     };
   }, []);
-
-  React.useEffect(() => {
-    const handleError = (event: ErrorEvent) => {
-      console.error('Global error:', event.error || event);
-      toast({ title: 'Error', description: event.message });
-      telemetry.track('global_error', 'error', event.message, { stack: event.error?.stack });
-    };
-    const handleRejection = (event: PromiseRejectionEvent) => {
-      console.error('Unhandled rejection:', event.reason);
-      toast({ title: 'Network/Error', description: String(event.reason) });
-      telemetry.track('unhandled_rejection', 'error', String(event.reason));
-    };
-    window.addEventListener('error', handleError);
-    window.addEventListener('unhandledrejection', handleRejection);
-    return () => {
-      window.removeEventListener('error', handleError);
-      window.removeEventListener('unhandledrejection', handleRejection);
-    };
-  }, [toast]);
 
   return (
     <ThemeProvider>
@@ -169,8 +145,7 @@ const App = () => {
                           <Route path="/monitoring" element={<Monitoring />} />
                           <Route path="/delivery" element={<Delivery />} />
                           <Route path="/scanners" element={<Scanners />} />
-                          <Route path="/analytics" element={<AdminGuard><Analytics /></AdminGuard>} />
-                          <Route path="/admin/image-migration" element={<AdminGuard><AdminImageMigration /></AdminGuard>} />
+                          <Route path="/analytics" element={<Analytics />} />
                           <Route path="/delivery/apply" element={<DeliveryProviderApplication />} />
                           <Route path="*" element={<NotFound />} />
                         </Routes>
