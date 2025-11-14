@@ -12,6 +12,7 @@ export const useScrollAnimation = (options: UseScrollAnimationOptions = {}) => {
   const ref = useRef<HTMLElement>(null);
 
   useEffect(() => {
+    let fallbackTimer: NodeJS.Timeout | null = null;
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
@@ -31,9 +32,18 @@ export const useScrollAnimation = (options: UseScrollAnimationOptions = {}) => {
       observer.observe(currentRef);
     }
 
+    fallbackTimer = setTimeout(() => {
+      if (!isVisible) {
+        setIsVisible(true);
+      }
+    }, 800);
+
     return () => {
       if (currentRef) {
         observer.unobserve(currentRef);
+      }
+      if (fallbackTimer) {
+        clearTimeout(fallbackTimer);
       }
     };
   }, [threshold, rootMargin, triggerOnce]);
