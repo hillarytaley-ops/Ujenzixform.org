@@ -5,6 +5,8 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Star, MapPin, Package, Store, Shield, Lock, MessageSquare } from "lucide-react";
 import { Supplier } from "@/types/supplier";
 import { SupplierRatingDisplay } from "./SupplierRatingDisplay";
+import { useEffect, useState } from "react";
+import { getSafeImageUrl } from "@/utils/storage";
 
 interface SecureSupplierCardProps {
   supplier: Supplier | any;
@@ -23,6 +25,7 @@ export const SecureSupplierCard = ({
   isAuthenticated = false,
   userRole
 }: SecureSupplierCardProps) => {
+  const [logoSrc, setLogoSrc] = useState<string | undefined>(undefined);
   const initials = supplier.company_name
     ?.split(' ')
     .map((n: string) => n[0])
@@ -62,12 +65,21 @@ export const SecureSupplierCard = ({
     );
   };
 
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const u = await getSafeImageUrl(supplier.company_logo_url, 600);
+      if (mounted) setLogoSrc(u);
+    })();
+    return () => { mounted = false };
+  }, [supplier?.company_logo_url]);
+
   return (
     <Card className="hover:shadow-lg transition-all duration-200 hover:-translate-y-1">
       <CardHeader>
         <div className="flex items-start gap-4">
           <Avatar className="h-16 w-16 border-2 border-muted rounded-lg flex-shrink-0">
-            <AvatarImage src={supplier.company_logo_url} alt={supplier.company_name} />
+            <AvatarImage src={logoSrc || supplier.company_logo_url} alt={supplier.company_name} />
             <AvatarFallback className="bg-primary/10 text-primary font-semibold rounded-lg">
               {initials}
             </AvatarFallback>
@@ -169,3 +181,5 @@ export const SecureSupplierCard = ({
     </Card>
   );
 };
+
+export default SecureSupplierCard;

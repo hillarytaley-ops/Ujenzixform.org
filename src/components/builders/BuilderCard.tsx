@@ -5,6 +5,8 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Phone, Mail, MapPin, Building2, Star, Users, MessageSquare } from "lucide-react";
 import { UserProfile } from "@/types/userProfile";
 import { RatingDisplay } from "./RatingDisplay";
+import { useEffect, useState } from "react";
+import { getSafeImageUrl } from "@/utils/storage";
 
 interface BuilderCardProps {
   builder: UserProfile & {
@@ -27,6 +29,7 @@ interface BuilderCardProps {
 }
 
 export const BuilderCard = ({ builder, onContactClick, onViewProfile, onReviewClick }: BuilderCardProps) => {
+  const [imgSrc, setImgSrc] = useState<string | undefined>(undefined);
   const displayImage = builder.user_type === 'company' ? builder.company_logo_url : builder.avatar_url;
   const initials = (builder.company_name || builder.full_name || 'U')
     .split(' ')
@@ -41,7 +44,7 @@ export const BuilderCard = ({ builder, onContactClick, onViewProfile, onReviewCl
         <div className="flex justify-between items-start gap-3">
           <div className="flex items-start gap-3 flex-1 min-w-0">
             <Avatar className="h-14 w-14 border-2 border-muted group-hover:scale-110 group-hover:border-primary/50 transition-all duration-300">
-              <AvatarImage src={displayImage} alt={builder.company_name || builder.full_name} />
+              <AvatarImage src={imgSrc || displayImage} alt={builder.company_name || builder.full_name} />
               <AvatarFallback className="bg-primary/10 text-primary font-semibold group-hover:bg-primary/20">
                 {initials}
               </AvatarFallback>
@@ -153,3 +156,11 @@ export const BuilderCard = ({ builder, onContactClick, onViewProfile, onReviewCl
     </Card>
   );
 };
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const u = await getSafeImageUrl(displayImage || undefined, 600);
+      if (mounted) setImgSrc(u);
+    })();
+    return () => { mounted = false };
+  }, [displayImage]);
