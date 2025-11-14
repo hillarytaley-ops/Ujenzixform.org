@@ -5,7 +5,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import * as telemetry from "@/utils/telemetry";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
+import { AdminGuard } from "@/components/security/AdminGuard";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 // import { PrivacyPolicyBanner } from "@/components/PrivacyPolicyBanner";
@@ -109,10 +111,12 @@ const App = () => {
     const handleError = (event: ErrorEvent) => {
       console.error('Global error:', event.error || event);
       try { toast({ title: 'Error', description: event.message }); } catch {}
+      telemetry.track('global_error', 'error', event.message, { stack: event.error?.stack });
     };
     const handleRejection = (event: PromiseRejectionEvent) => {
       console.error('Unhandled rejection:', event.reason);
       try { toast({ title: 'Network/Error', description: String(event.reason) }); } catch {}
+      telemetry.track('unhandled_rejection', 'error', String(event.reason));
     };
     window.addEventListener('error', handleError);
     window.addEventListener('unhandledrejection', handleRejection);
@@ -164,7 +168,7 @@ const App = () => {
                           <Route path="/monitoring" element={<Monitoring />} />
                           <Route path="/delivery" element={<Delivery />} />
                           <Route path="/scanners" element={<Scanners />} />
-                          <Route path="/analytics" element={<Analytics />} />
+                          <Route path="/analytics" element={<AdminGuard><Analytics /></AdminGuard>} />
                           <Route path="/delivery/apply" element={<DeliveryProviderApplication />} />
                           <Route path="*" element={<NotFound />} />
                         </Routes>
