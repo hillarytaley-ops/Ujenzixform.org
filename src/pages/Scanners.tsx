@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -30,8 +30,8 @@ import {
 } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { DispatchScanner } from '@/components/qr/DispatchScanner';
-import { ReceivingScanner } from '@/components/qr/ReceivingScanner';
+const DispatchScanner = lazy(() => import('@/components/qr/DispatchScanner').then(m => ({ default: m.DispatchScanner })));
+const ReceivingScanner = lazy(() => import('@/components/qr/ReceivingScanner').then(m => ({ default: m.ReceivingScanner })));
 
 interface ScannedMaterial {
   id: string;
@@ -286,16 +286,7 @@ const Scanners = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-construction flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="text-muted-foreground">Loading scanner system...</p>
-        </div>
-      </div>
-    );
-  }
+  // Render page immediately; role-restricted sections handle their own loading states
 
   return (
     <div className="min-h-screen bg-background">
@@ -312,7 +303,7 @@ const Scanners = () => {
         <div 
           className="absolute inset-0"
           style={{
-              backgroundImage: `url('/scanners-hero-new.jpg?v=5'), url('/scanners-hero-bg.jpg?v=4'), url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080"%3E%3Crect fill="%23e8e8e8" width="1920" height="1080"/%3E%3C/svg%3E')`,
+              backgroundImage: `url('/scanners-hero-new.jpg?v=5')`,
             backgroundSize: 'contain',
             backgroundPosition: 'center center',
             backgroundRepeat: 'no-repeat',
@@ -469,7 +460,9 @@ const Scanners = () => {
         <TabsContent value="dispatchable" className="space-y-6">
           <div className="max-w-6xl mx-auto">
             <div className="mb-8">
-              <DispatchScanner />
+              <Suspense fallback={<div className="p-6 text-center text-muted-foreground">Loading dispatch scanner…</div>}>
+                <DispatchScanner />
+              </Suspense>
             </div>
             <div className="flex items-center justify-between mb-6">
               <div>
@@ -619,7 +612,9 @@ const Scanners = () => {
         <TabsContent value="receivable" className="space-y-6">
           <div className="max-w-6xl mx-auto">
             <div className="mb-8">
-              <ReceivingScanner />
+              <Suspense fallback={<div className="p-6 text-center text-muted-foreground">Loading receiving scanner…</div>}>
+                <ReceivingScanner />
+              </Suspense>
             </div>
             <div className="flex items-center justify-between mb-6">
               <div>
