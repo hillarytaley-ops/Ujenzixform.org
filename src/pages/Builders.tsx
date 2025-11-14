@@ -179,6 +179,15 @@ const Builders = () => {
   }
 
   return (
+    <ErrorBoundary fallback={
+      <div className="min-h-screen bg-background flex items-center justify-center p-8">
+        <div className="max-w-md text-center">
+          <h2 className="text-2xl font-bold mb-2">Builders page encountered an error</h2>
+          <p className="text-muted-foreground mb-4">An unexpected error occurred while rendering this page.</p>
+          <Button onClick={() => window.location.reload()} className="bg-blue-600 hover:bg-blue-700 text-white">Try Again</Button>
+        </div>
+      </div>
+    }>
     <div className="min-h-screen bg-background">
       <Navigation />
 
@@ -765,6 +774,7 @@ const Builders = () => {
 
       <Footer />
     </div>
+    </ErrorBoundary>
   );
 };
 
