@@ -15,8 +15,8 @@ export const useServiceWorker = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   useEffect(() => {
-    // Register service worker
-    if ('serviceWorker' in navigator) {
+    const enableSW = (import.meta as any)?.env?.VITE_ENABLE_SW === 'true' || (import.meta as any)?.env?.MODE !== 'production';
+    if (enableSW && 'serviceWorker' in navigator) {
       registerServiceWorker();
     }
 
