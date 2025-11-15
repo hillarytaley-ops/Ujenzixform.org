@@ -224,26 +224,40 @@ const Scanners = () => {
         return;
       }
 
-      // Simulate finding material by QR code (with enhanced security)
-      const foundMaterial = [...dispatchableMaterials, ...receivableMaterials]
-        .find(m => m.qrCode === sanitizedQrCode);
-      
-      if (foundMaterial) {
-        // Log successful scan
+      const { data, error } = await supabase.rpc('record_qr_scan', {
+        _qr_code: sanitizedQrCode,
+        _scan_type: scanMode,
+        _scanner_device_id: navigator.userAgent,
+        _scanner_type: 'web_scanner',
+        _material_condition: 'good',
+        _notes: null
+      });
+
+      if (error) {
+        toast({
+          title: 'Scan Failed',
+          description: 'Unable to record scan',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      const scanData = data as any;
+      if (scanData?.success) {
         await supabase.rpc('log_qr_validation_success', {
           qr_code_param: sanitizedQrCode,
-          material_id_param: foundMaterial.id
+          material_id_param: null
         });
 
         toast({
-          title: "Material Scanned Successfully",
-          description: `Found: ${foundMaterial.materialType} - ${foundMaterial.quantity}`,
+          title: scanMode === 'dispatch' ? 'Item Dispatched' : 'Item Received',
+          description: `${scanData.material_type ?? 'Material'}${scanData.quantity ? ` - ${scanData.quantity} ${scanData.unit ?? ''}` : ''}`.trim()
         });
       } else {
         toast({
-          title: "Material Not Found",
-          description: "QR code not recognized in the system",
-          variant: "destructive"
+          title: 'Scan Failed',
+          description: scanData?.error || 'Invalid QR code',
+          variant: 'destructive'
         });
       }
     } catch (error) {

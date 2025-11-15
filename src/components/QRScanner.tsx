@@ -4,9 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Scan, Camera, CheckCircle, Package, Clock } from 'lucide-react';
+import { BrowserMultiFormatReader } from '@zxing/browser';
+import { DecodeHintType } from '@zxing/library';
 
 interface QRScannerProps {
   onMaterialScanned: (material: ScannedMaterial) => void;
+  mode?: 'dispatch' | 'receiving';
 }
 
 interface ScannedMaterial {
@@ -23,24 +26,57 @@ const QRScanner: React.FC<QRScannerProps> = ({ onMaterialScanned }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [reader, setReader] = useState<BrowserMultiFormatReader | null>(null);
   const [scannedMaterials, setScannedMaterials] = useState<ScannedMaterial[]>([]);
   const [lastScan, setLastScan] = useState<string>('');
 
   const startScanning = async () => {
     try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        toast.error('Camera not supported on this device');
+        return;
+      }
+
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: 'environment', // Use back camera
+          facingMode: { ideal: 'environment' },
           width: { ideal: 1280 },
           height: { ideal: 720 }
-        }
+        },
+        audio: false
       });
 
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
+        videoRef.current.setAttribute('playsinline', 'true');
         setStream(mediaStream);
-        setIsScanning(true);
-        toast.success('QR Scanner started');
+      }
+
+      const hints = new Map();
+      hints.set(DecodeHintType.TRY_HARDER, true);
+      const r = new BrowserMultiFormatReader(hints);
+      setReader(r);
+
+      setIsScanning(true);
+      toast.success('QR Scanner started');
+
+      if (videoRef.current) {
+        await r.decodeFromConstraints(
+          { video: { facingMode: { ideal: 'environment' } } },
+          videoRef.current,
+          (result, err) => {
+            if (result) {
+              const text = result.getText();
+              if (text && text !== lastScan) {
+                const material = parseQRCode(text);
+                setScannedMaterials(prev => [material, ...prev.slice(0, 9)]);
+                onMaterialScanned(material);
+                setLastScan(text);
+                setTimeout(() => setLastScan(''), 3000);
+              }
+            }
+          }
+        );
       }
     } catch (error) {
       toast.error('Failed to access camera for scanning');
@@ -49,15 +85,19 @@ const QRScanner: React.FC<QRScannerProps> = ({ onMaterialScanned }) => {
   };
 
   const stopScanning = () => {
+    if (reader) {
+      try { reader.reset(); } catch {}
+      setReader(null);
+    }
     if (stream) {
       stream.getTracks().forEach(track => track.stop());
       setStream(null);
-      setIsScanning(false);
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
-      }
-      toast.info('QR Scanner stopped');
     }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setIsScanning(false);
+    toast.info('QR Scanner stopped');
   };
 
   const parseQRCode = (qrData: string): ScannedMaterial => {
@@ -109,45 +149,26 @@ const QRScanner: React.FC<QRScannerProps> = ({ onMaterialScanned }) => {
     }
   };
 
-  const simulateQRDetection = () => {
-    if (!isScanning) return;
-
-    // Simulate QR code detection
-    const qrCodes = [
-      'BAMBURI-CEMENT-BATCH001-2024',
-      'SIMBA-STEEL-12MM-LOT455-2024',
-      'SAVANNAH-BRICK-RED-BATCH789-2024',
-      'DEVKI-IRON-SHEETS-GAUGE28-2024',
-      'ARM-CEMENT-PORTLAND-BATCH123-2024'
-    ];
-
-    // Random chance of detection
-    if (Math.random() > 0.92) { // 8% chance per scan
-      const randomQR = qrCodes[Math.floor(Math.random() * qrCodes.length)];
-      
-      // Avoid duplicate scans within 5 seconds
-      if (randomQR !== lastScan) {
-        const material = parseQRCode(randomQR);
-        setScannedMaterials(prev => [material, ...prev.slice(0, 9)]);
-        onMaterialScanned(material);
-        setLastScan(randomQR);
-        
-        toast.success(`Material scanned: ${material.materialType}`, {
-          description: `Batch: ${material.batchNumber}`
-        });
-
-        // Reset lastScan after 5 seconds
-        setTimeout(() => setLastScan(''), 5000);
+  useEffect(() => {
+    return () => {
+      if (reader) {
+        try { reader.reset(); } catch {}
       }
-    }
-  };
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+    };
+  }, [reader, stream]);
 
   useEffect(() => {
-    if (!isScanning) return;
-
-    const interval = setInterval(simulateQRDetection, 1000);
-    return () => clearInterval(interval);
-  }, [isScanning, lastScan]);
+    if (!isScanning && reader) {
+      try { reader.reset(); } catch {}
+      setReader(null);
+    }
+  }, [isScanning, reader]);
 
   const getMaterialIcon = (materialType: string) => {
     const type = materialType.toLowerCase();
