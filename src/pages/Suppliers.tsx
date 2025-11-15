@@ -192,16 +192,7 @@ const SuppliersContent = () => {
     openRegistrationModal();
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-construction flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="text-muted-foreground">Loading suppliers directory...</p>
-        </div>
-      </div>
-    );
-  }
+  
 
   // Public Access: Everyone can view supplier materials and directory
   const showDirectoryAccess = true; // Changed from isAdmin to make public
