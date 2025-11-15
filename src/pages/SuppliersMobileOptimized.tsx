@@ -103,6 +103,15 @@ const SuppliersMobileOptimized = () => {
                 {user ? 'My Dashboard' : 'Sign In'}
               </Button>
             </Link>
+            <Link to="/suppliers?full=1" className="w-full">
+              <Button 
+                size="lg"
+                variant="secondary"
+                className="w-full h-12 bg-white/20 text-white hover:bg-white/30"
+              >
+                View Full Suppliers Page
+              </Button>
+            </Link>
           </div>
         </div>
       </section>
