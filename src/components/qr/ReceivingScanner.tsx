@@ -10,7 +10,7 @@ import { PackageCheck, Scan, CheckCircle, Camera, Building, HelpCircle } from 'l
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { BrowserMultiFormatReader } from '@zxing/browser';
- 
+
 
 interface ScanResult {
   qr_code: string;
@@ -32,13 +32,20 @@ export const ReceivingScanner: React.FC = () => {
   const [codeReader, setCodeReader] = useState<BrowserMultiFormatReader | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [facing, setFacing] = useState<'environment' | 'user'>('environment');
+  const CAMERA_CONSENT_KEY = 'scanner_camera_consent';
   
 
   useEffect(() => {
     checkAuth();
     const reader = new BrowserMultiFormatReader();
     setCodeReader(reader);
-
+    try {
+      const consent = localStorage.getItem(CAMERA_CONSENT_KEY);
+      const isiOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+      if (consent && !isiOS) {
+        setTimeout(() => { startCameraScanning().catch(() => {}); }, 300);
+      }
+    } catch {}
     
 
     return () => {
@@ -85,7 +92,7 @@ export const ReceivingScanner: React.FC = () => {
         setIsScanning(true);
         toast.success('Camera scanner started');
         codeReader.decodeFromConstraints({
-          video: { facingMode: { ideal: facing } }
+          video: { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 720 } }
         } as any, videoRef.current, (result, error) => {
           if (result) {
             processQRScan(result.getText(), 'mobile_camera');
@@ -97,12 +104,13 @@ export const ReceivingScanner: React.FC = () => {
             try { videoRef.current?.play?.(); } catch {}
           };
           await videoRef.current.play?.();
+          try { localStorage.setItem(CAMERA_CONSENT_KEY, 'true'); } catch {}
         } catch {}
 
         setTimeout(async () => {
           try {
             if (videoRef.current && (videoRef.current.readyState < 2 || videoRef.current.videoWidth === 0)) {
-              const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing }, audio: false });
+              const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
               videoRef.current.srcObject = stream;
               try { await videoRef.current.play?.(); } catch {}
             }
