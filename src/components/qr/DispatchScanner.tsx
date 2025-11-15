@@ -91,7 +91,23 @@ export const DispatchScanner: React.FC = () => {
             processQRScan(result.getText(), 'mobile_camera');
           }
         });
-        try { videoRef.current.muted = true; await videoRef.current.play?.(); } catch {}
+        try {
+          videoRef.current.muted = true;
+          videoRef.current.onloadedmetadata = () => {
+            try { videoRef.current?.play?.(); } catch {}
+          };
+          await videoRef.current.play?.();
+        } catch {}
+
+        setTimeout(async () => {
+          try {
+            if (videoRef.current && (videoRef.current.readyState < 2 || videoRef.current.videoWidth === 0)) {
+              const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing }, audio: false });
+              videoRef.current.srcObject = stream;
+              try { await videoRef.current.play?.(); } catch {}
+            }
+          } catch {}
+        }, 1200);
       }
     } catch (error) {
       console.error('Camera error:', error);
