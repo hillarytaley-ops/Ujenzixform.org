@@ -11,6 +11,8 @@ interface LazyImageProps {
   loading?: 'lazy' | 'eager';
   decoding?: 'async' | 'sync' | 'auto';
   candidates?: string[];
+  sources?: { type?: string; srcSet: string }[];
+  sizes?: string;
 }
 
 export const LazyImage: React.FC<LazyImageProps> = ({
@@ -22,7 +24,9 @@ export const LazyImage: React.FC<LazyImageProps> = ({
   onError,
   loading = 'lazy',
   decoding = 'async',
-  candidates
+  candidates,
+  sources,
+  sizes
 }) => {
   const [imageSrc, setImageSrc] = useState(placeholder);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -81,6 +85,44 @@ export const LazyImage: React.FC<LazyImageProps> = ({
     };
   }, [src, onLoad, onError]);
 
+  if (sources && sources.length && imageSrc !== placeholder) {
+    return (
+      <picture>
+        {sources.map((s, i) => (
+          <source key={i} type={s.type} srcSet={s.srcSet} sizes={sizes} />
+        ))}
+        <img
+          ref={imgRef}
+          src={imageSrc}
+          alt={alt}
+          className={cn(
+            'transition-opacity duration-300',
+            imageLoaded ? 'opacity-100' : 'opacity-70',
+            imageError && 'opacity-50 grayscale',
+            className
+          )}
+          loading={loading}
+          decoding={decoding}
+          onLoad={() => {
+            if (imageSrc !== placeholder) {
+              setImageLoaded(true);
+              onLoad?.();
+            }
+          }}
+          onError={() => {
+            if (imageSrc !== placeholder) {
+              setImageError(true);
+              setImageSrc(placeholder);
+              onError?.();
+            }
+          }}
+          crossOrigin="anonymous"
+          referrerPolicy="no-referrer"
+        />
+      </picture>
+    );
+  }
+
   return (
     <img
       ref={imgRef}
@@ -107,7 +149,6 @@ export const LazyImage: React.FC<LazyImageProps> = ({
           onError?.();
         }
       }}
-      // Security attributes
       crossOrigin="anonymous"
       referrerPolicy="no-referrer"
     />

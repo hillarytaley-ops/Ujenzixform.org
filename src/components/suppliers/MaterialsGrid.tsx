@@ -536,16 +536,23 @@ export const MaterialsGrid = () => {
             rendered.push(
               ...items.map((material, idx) => {
                 const imageUrl = material.image_url || getDefaultCategoryImage(material.category);
-                const candidates = imageUrl && imageUrl.startsWith('/')
-                  ? (() => {
-                      const base = imageUrl.replace(/^\//, '').replace(/\.(jpg|jpeg|png)$/i, '');
-                      return [
-                        `/optimized/${base}.avif`,
-                        `/optimized/${base}.webp`,
-                        imageUrl
-                      ];
-                    })()
+                const base = imageUrl && imageUrl.startsWith('/')
+                  ? imageUrl.replace(/^\//, '').replace(/\.(jpg|jpeg|png)$/i, '')
                   : undefined;
+                const candidates = base
+                  ? [
+                      `/optimized/${base}.avif`,
+                      `/optimized/${base}.webp`,
+                      imageUrl
+                    ]
+                  : undefined;
+                const sources = base
+                  ? [
+                      { type: 'image/avif', srcSet: `/optimized/${base}-400w.avif 400w, /optimized/${base}-800w.avif 800w` },
+                      { type: 'image/webp', srcSet: `/optimized/${base}-400w.webp 400w, /optimized/${base}-800w.webp 800w` }
+                    ]
+                  : undefined;
+                const sizes = '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw';
 
                 return (
                   <Card key={`${material.id}-${visibleStart + idx}`} className="overflow-hidden hover:shadow-xl transition-all duration-300 group" style={{ height: CARD_HEIGHT }}>
@@ -558,6 +565,8 @@ export const MaterialsGrid = () => {
                           loading="lazy"
                           decoding="async"
                           candidates={candidates}
+                          sources={sources}
+                          sizes={sizes}
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center bg-white">

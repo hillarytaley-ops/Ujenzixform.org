@@ -392,16 +392,23 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
                 {filteredItems.map((item) => {
                   // Use custom image, fallback to default category image, or show placeholder
                   const imageUrl = item.image || getDefaultCategoryImage(item.category);
-                  const candidates = imageUrl && imageUrl.startsWith('/')
-                    ? (() => {
-                        const base = imageUrl.replace(/^\//, '').replace(/\.(jpg|jpeg|png)$/i, '');
-                        return [
-                          `/optimized/${base}.avif`,
-                          `/optimized/${base}.webp`,
-                          imageUrl
-                        ];
-                      })()
+                  const base = imageUrl && imageUrl.startsWith('/')
+                    ? imageUrl.replace(/^\//, '').replace(/\.(jpg|jpeg|png)$/i, '')
                     : undefined;
+                  const candidates = base
+                    ? [
+                        `/optimized/${base}.avif`,
+                        `/optimized/${base}.webp`,
+                        imageUrl
+                      ]
+                    : undefined;
+                  const sources = base
+                    ? [
+                        { type: 'image/avif', srcSet: `/optimized/${base}-400w.avif 400w, /optimized/${base}-800w.avif 800w` },
+                        { type: 'image/webp', srcSet: `/optimized/${base}-400w.webp 400w, /optimized/${base}-800w.webp 800w` }
+                      ]
+                    : undefined;
+                  const sizes = '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw';
                   
                   return (
                   <Card key={item.id} className="hover:shadow-lg transition-shadow">
@@ -415,6 +422,8 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
                             loading="lazy"
                             decoding="async"
                             candidates={candidates}
+                            sources={sources}
+                            sizes={sizes}
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
@@ -466,16 +475,23 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
                 {filteredItems.map((item) => {
                   // Use custom image, fallback to default category image, or show placeholder
                   const imageUrl = item.image || getDefaultCategoryImage(item.category);
-                  const candidates = imageUrl && imageUrl.startsWith('/')
-                    ? (() => {
-                        const base = imageUrl.replace(/^\//, '').replace(/\.(jpg|jpeg|png)$/i, '');
-                        return [
-                          `/optimized/${base}.avif`,
-                          `/optimized/${base}.webp`,
-                          imageUrl
-                        ];
-                      })()
+                  const base = imageUrl && imageUrl.startsWith('/')
+                    ? imageUrl.replace(/^\//, '').replace(/\.(jpg|jpeg|png)$/i, '')
                     : undefined;
+                  const candidates = base
+                    ? [
+                        `/optimized/${base}.avif`,
+                        `/optimized/${base}.webp`,
+                        imageUrl
+                      ]
+                    : undefined;
+                  const sources = base
+                    ? [
+                        { type: 'image/avif', srcSet: `/optimized/${base}-400w.avif 400w, /optimized/${base}-800w.avif 800w` },
+                        { type: 'image/webp', srcSet: `/optimized/${base}-400w.webp 400w, /optimized/${base}-800w.webp 800w` }
+                      ]
+                    : undefined;
+                  const sizes = '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw';
                   
                   return (
                   <Card key={item.id}>
@@ -490,6 +506,8 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
                               loading="lazy"
                               decoding="async"
                               candidates={candidates}
+                              sources={sources}
+                              sizes={sizes}
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">

@@ -20,7 +20,15 @@ async function optimizeFile(filePath) {
   const webpOut = path.join(outDir, `${name}.webp`);
   const jpgOut = path.join(outDir, `${name}.jpg`);
 
-  const img = sharp(input).resize({ width: 800, withoutEnlargement: true, fit: 'inside' });
+  const baseImg = sharp(input);
+  const sizes = [400, 800];
+  for (const w of sizes) {
+    const sized = baseImg.clone().resize({ width: w, withoutEnlargement: true, fit: 'inside' });
+    await sized.clone().avif({ quality: 50 }).toFile(path.join(outDir, `${name}-${w}w.avif`));
+    await sized.clone().webp({ quality: 60 }).toFile(path.join(outDir, `${name}-${w}w.webp`));
+    await sized.clone().flatten({ background: '#ffffff' }).jpeg({ quality: 65, progressive: true }).toFile(path.join(outDir, `${name}-${w}w.jpg`));
+  }
+  const img = baseImg.clone().resize({ width: 800, withoutEnlargement: true, fit: 'inside' });
   await img.clone().avif({ quality: 50 }).toFile(avifOut);
   await img.clone().webp({ quality: 60 }).toFile(webpOut);
   await img.clone().flatten({ background: '#ffffff' }).jpeg({ quality: 65, progressive: true }).toFile(jpgOut);
