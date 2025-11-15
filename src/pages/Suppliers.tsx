@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Building, ShoppingBag, FileText, Package, Store, Database, Users, Receipt, QrCode, Truck, Shield } from "lucide-react";
@@ -20,7 +20,7 @@ import { QuoteRequestModal } from "@/components/modals/QuoteRequestModal";
 import { SupplierCatalogModal } from "@/components/modals/SupplierCatalogModal";
 import PurchasingWorkflow from "@/components/PurchasingWorkflow";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { RealTimeStats } from "@/components/suppliers/RealTimeStats";
+const RealTimeStatsLazy = React.lazy(() => import("@/components/suppliers/RealTimeStats").then(m => ({ default: m.RealTimeStats })));
 import { SecurityAlert } from "@/components/security/SecurityAlert";
 import { AdminAccessGuard } from "@/components/security/AdminAccessGuard";
 import { Badge } from "@/components/ui/badge";
@@ -46,6 +46,9 @@ const SuppliersContent = () => {
   const [renderError, setRenderError] = useState<Error | null>(null);
   const { toast } = useToast();
   const isiOS = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const conn: any = typeof navigator !== 'undefined' ? (navigator as any).connection : null;
+  const isLowData = !!conn && (conn.saveData || conn.effectiveType === 'slow-2g' || conn.effectiveType === '2g' || conn.effectiveType === '3g');
+  const [showStats, setShowStats] = useState(false);
 
   const navigate = useNavigate();
 
@@ -69,6 +72,13 @@ const SuppliersContent = () => {
     window.addEventListener('error', handleError);
     return () => window.removeEventListener('error', handleError);
   }, []);
+
+  useEffect(() => {
+    if (!isiOS && !isLowData) {
+      const t = setTimeout(() => setShowStats(true), 1500);
+      return () => clearTimeout(t);
+    }
+  }, [isiOS, isLowData]);
   const { 
     modals, 
     openQuoteModal, 
@@ -605,9 +615,11 @@ const SuppliersContent = () => {
         />
       )}
 
-      {/* Real-time Stats Section */}
-      {/* iPhone/Safari Compatible - NO React.Suspense */}
-      {!isAdmin && <RealTimeStats />}
+      {!isAdmin && !isiOS && !isLowData && (
+        <Suspense fallback={null}>
+          {showStats && <RealTimeStatsLazy />}
+        </Suspense>
+      )}
 
       <Footer />
     </div>
