@@ -151,7 +151,7 @@ const Scanners = () => {
 
   const isAdmin = userRole === 'admin';
 
-  const handleScanQR = async (qrCode: string) => {
+  const handleScanQR = async (qrCode: string, scannerType?: 'web_scanner' | 'physical_scanner') => {
     try {
       // Input validation and sanitization
       if (!qrCode || typeof qrCode !== 'string') {
@@ -228,7 +228,7 @@ const Scanners = () => {
         _qr_code: sanitizedQrCode,
         _scan_type: scanMode,
         _scanner_device_id: navigator.userAgent,
-        _scanner_type: 'web_scanner',
+        _scanner_type: scannerType ?? 'web_scanner',
         _material_condition: 'good',
         _notes: null
       });
@@ -412,7 +412,10 @@ const Scanners = () => {
                   <Button variant={scanMode === 'dispatch' ? 'default' : 'outline'} onClick={() => setScanMode('dispatch')}>Dispatch</Button>
                   <Button variant={scanMode === 'receiving' ? 'default' : 'outline'} onClick={() => setScanMode('receiving')}>Receiving</Button>
                 </div>
-                <QRScanner onMaterialScanned={(m) => handleScanQR(m.qrCode)} />
+                <QRScanner 
+                  onMaterialScanned={(m) => handleScanQR(m.qrCode)} 
+                  onRawScan={(text, type) => handleScanQR(text, type)}
+                />
               </div>
             ) : (
               <div className="p-6 text-center text-muted-foreground">Sign in to use the scanner</div>
@@ -436,7 +439,10 @@ const Scanners = () => {
           <TabsContent value="dispatchable" className="space-y-6">
             <div className="max-w-6xl mx-auto">
               <div className="mb-8">
-                <QRScanner onMaterialScanned={(m) => handleScanQR(m.qrCode)} />
+                <QRScanner 
+                  onMaterialScanned={(m) => handleScanQR(m.qrCode)} 
+                  onRawScan={(text, type) => handleScanQR(text, type)}
+                />
               </div>
               <div className="flex items-center justify-between mb-6">
                 <div>
@@ -586,7 +592,10 @@ const Scanners = () => {
           <TabsContent value="receivable" className="space-y-6">
             <div className="max-w-6xl mx-auto">
               <div className="mb-8">
-                <QRScanner onMaterialScanned={(m) => handleScanQR(m.qrCode)} />
+                <QRScanner 
+                  onMaterialScanned={(m) => handleScanQR(m.qrCode)} 
+                  onRawScan={(text, type) => handleScanQR(text, type)}
+                />
               </div>
               <div className="flex items-center justify-between mb-6">
                 <div>

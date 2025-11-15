@@ -6,10 +6,13 @@ import { toast } from 'sonner';
 import { Scan, Camera, CheckCircle, Package, Clock } from 'lucide-react';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { DecodeHintType } from '@zxing/library';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 
 interface QRScannerProps {
   onMaterialScanned: (material: ScannedMaterial) => void;
   mode?: 'dispatch' | 'receiving';
+  onRawScan?: (qrText: string, scannerType: 'web_scanner' | 'physical_scanner') => void;
 }
 
 interface ScannedMaterial {
@@ -27,8 +30,24 @@ const QRScanner: React.FC<QRScannerProps> = ({ onMaterialScanned }) => {
   const [isScanning, setIsScanning] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [reader, setReader] = useState<BrowserMultiFormatReader | null>(null);
+  const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
+  const [usePhysicalScanner, setUsePhysicalScanner] = useState(false);
+  const [manualInput, setManualInput] = useState('');
   const [scannedMaterials, setScannedMaterials] = useState<ScannedMaterial[]>([]);
   const [lastScan, setLastScan] = useState<string>('');
+
+  const loadCameras = async () => {
+    try {
+      const permission = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const inputs = devices.filter(d => d.kind === 'videoinput');
+      setVideoDevices(inputs);
+      const preferred = inputs.find(d => /back|rear|environment/i.test(d.label)) || inputs[inputs.length - 1] || inputs[0];
+      setSelectedDeviceId(preferred?.deviceId || '');
+      permission.getTracks().forEach(t => t.stop());
+    } catch {}
+  };
 
   const startScanning = async () => {
     try {
@@ -61,22 +80,37 @@ const QRScanner: React.FC<QRScannerProps> = ({ onMaterialScanned }) => {
       toast.success('QR Scanner started');
 
       if (videoRef.current) {
-        await r.decodeFromConstraints(
-          { video: { facingMode: { ideal: 'environment' } } },
-          videoRef.current,
-          (result, err) => {
-            if (result) {
-              const text = result.getText();
-              if (text && text !== lastScan) {
-                const material = parseQRCode(text);
-                setScannedMaterials(prev => [material, ...prev.slice(0, 9)]);
-                onMaterialScanned(material);
-                setLastScan(text);
-                setTimeout(() => setLastScan(''), 3000);
+        if (selectedDeviceId) {
+          await r.decodeFromVideoDevice(selectedDeviceId, videoRef.current, (result) => {
+            const text = result?.getText();
+            if (text && text !== lastScan) {
+              const material = parseQRCode(text);
+              setScannedMaterials(prev => [material, ...prev.slice(0, 9)]);
+              onMaterialScanned(material);
+              onRawScan?.(text, 'web_scanner');
+              setLastScan(text);
+              setTimeout(() => setLastScan(''), 3000);
+            }
+          });
+        } else {
+          await r.decodeFromConstraints(
+            { video: { facingMode: { ideal: 'environment' } } },
+            videoRef.current,
+            (result, err) => {
+              if (result) {
+                const text = result.getText();
+                if (text && text !== lastScan) {
+                  const material = parseQRCode(text);
+                  setScannedMaterials(prev => [material, ...prev.slice(0, 9)]);
+                  onMaterialScanned(material);
+                  onRawScan?.(text, 'web_scanner');
+                  setLastScan(text);
+                  setTimeout(() => setLastScan(''), 3000);
+                }
               }
             }
-          }
-        );
+          );
+        }
       }
     } catch (error) {
       toast.error('Failed to access camera for scanning');
@@ -193,6 +227,36 @@ const QRScanner: React.FC<QRScannerProps> = ({ onMaterialScanned }) => {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="flex gap-2 mb-4">
+            <Button variant={!usePhysicalScanner ? 'default' : 'outline'} onClick={() => setUsePhysicalScanner(false)}>Camera</Button>
+            <Button variant={usePhysicalScanner ? 'default' : 'outline'} onClick={() => setUsePhysicalScanner(true)}>Physical Scanner</Button>
+          </div>
+          {!usePhysicalScanner && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-4">
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="camera-source">Camera Source</Label>
+                <Select value={selectedDeviceId ?? ''} onValueChange={setSelectedDeviceId}>
+                  <SelectTrigger id="camera-source">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {videoDevices.length === 0 ? (
+                      <SelectItem value="">Default</SelectItem>
+                    ) : (
+                      videoDevices.map((d, i) => (
+                        <SelectItem key={d.deviceId || i} value={d.deviceId || ''}>
+                          {d.label || `Camera ${i + 1}`}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-end">
+                <Button variant="outline" onClick={loadCameras} className="w-full">Refresh Cameras</Button>
+              </div>
+            </div>
+          )}
           <div className="relative bg-black rounded-lg overflow-hidden mb-4">
             <video
               ref={videoRef}
@@ -231,19 +295,58 @@ const QRScanner: React.FC<QRScannerProps> = ({ onMaterialScanned }) => {
           </div>
 
           {/* Scanner Controls */}
-          <div className="flex gap-2">
-            {!isScanning ? (
-              <Button onClick={startScanning} className="flex items-center gap-2">
-                <Camera className="h-4 w-4" />
-                Start QR Scanner
-              </Button>
-            ) : (
-              <Button onClick={stopScanning} variant="outline" className="flex items-center gap-2">
-                <Scan className="h-4 w-4" />
-                Stop Scanner
-              </Button>
-            )}
-          </div>
+          {!usePhysicalScanner ? (
+            <div className="flex gap-2">
+              {!isScanning ? (
+                <Button onClick={startScanning} className="flex items-center gap-2">
+                  <Camera className="h-4 w-4" />
+                  Start QR Scanner
+                </Button>
+              ) : (
+                <Button onClick={stopScanning} variant="outline" className="flex items-center gap-2">
+                  <Scan className="h-4 w-4" />
+                  Stop Scanner
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label htmlFor="physical-input">Scan with physical scanner</Label>
+              <input
+                id="physical-input"
+                className="w-full border rounded-md p-2"
+                value={manualInput}
+                onChange={(e) => setManualInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && manualInput.trim()) {
+                    const material = parseQRCode(manualInput);
+                    setScannedMaterials(prev => [material, ...prev.slice(0, 9)]);
+                    onMaterialScanned(material);
+                    onRawScan?.(manualInput.trim(), 'physical_scanner');
+                    toast.success(`Material scanned: ${material.materialType}`, { description: `Batch: ${material.batchNumber}` });
+                    setManualInput('');
+                  }
+                }}
+                placeholder="Focus here and scan"
+              />
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => {
+                    if (!manualInput.trim()) return;
+                    const material = parseQRCode(manualInput);
+                    setScannedMaterials(prev => [material, ...prev.slice(0, 9)]);
+                    onMaterialScanned(material);
+                    onRawScan?.(manualInput.trim(), 'physical_scanner');
+                    toast.success(`Material scanned: ${material.materialType}`, { description: `Batch: ${material.batchNumber}` });
+                    setManualInput('');
+                  }}
+                >
+                  Process Scan
+                </Button>
+                <Button variant="outline" onClick={() => setManualInput('')}>Clear</Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
