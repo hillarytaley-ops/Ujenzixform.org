@@ -53,16 +53,18 @@ const SuppliersMobileOptimized = () => {
               Browse Materials
             </Button>
             
-            <Link to="/auth" className="w-full">
-              <Button 
-                size="lg"
-                variant="outline"
-                className="w-full h-14 border-2 border-white text-white hover:bg-white/20 font-bold text-lg"
-              >
-                <Store className="h-5 w-5 mr-2" />
-                Sign In
-              </Button>
-            </Link>
+            <Button 
+              size="lg"
+              variant="outline"
+              className="w-full h-14 border-2 border-white text-white hover:bg-white/20 font-bold text-lg"
+              onClick={() => {
+                const target = `/auth?redirect=${encodeURIComponent('/suppliers?tab=purchase')}`;
+                window.location.assign(target);
+              }}
+            >
+              <Store className="h-5 w-5 mr-2" />
+              Sign In
+            </Button>
             <Link to="/suppliers?full=1" className="w-full">
               <Button 
                 size="lg"
