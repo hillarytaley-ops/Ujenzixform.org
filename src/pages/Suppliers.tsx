@@ -58,13 +58,11 @@ const SuppliersContent = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (isiOS) {
-      const full = searchParams.get("full");
-      if (full !== "1") {
-        navigate("/suppliers-mobile", { replace: true });
-      }
+    const full = searchParams.get("full");
+    if (full !== "1") {
+      navigate("/suppliers-mobile", { replace: true });
     }
-  }, [isiOS]);
+  }, []);
 
   
 
