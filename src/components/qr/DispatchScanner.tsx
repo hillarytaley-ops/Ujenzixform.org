@@ -6,13 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Truck, Scan, CheckCircle, AlertCircle, Camera, HelpCircle } from 'lucide-react';
+import { Truck, Scan, CheckCircle, AlertCircle, Camera } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { BrowserMultiFormatReader } from '@zxing/browser';
-import { QuickTooltip, TooltipGuide } from '@/components/ui/tooltip-guide';
-import { qrSystemGuide } from '@/data/userGuides';
-import { QRWorkflowDocumentation } from './QRWorkflowDocumentation';
+ 
 
 interface ScanResult {
   qr_code: string;
@@ -33,70 +31,66 @@ export const DispatchScanner: React.FC = () => {
   const [notes, setNotes] = useState('');
   const [codeReader, setCodeReader] = useState<BrowserMultiFormatReader | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
-  const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
+  
 
   useEffect(() => {
     checkAuth();
     const reader = new BrowserMultiFormatReader();
     setCodeReader(reader);
     
+    
+
     return () => {
       if (videoRef.current?.srcObject) {
         const stream = videoRef.current.srcObject as MediaStream;
         stream.getTracks().forEach(track => track.stop());
       }
+      try { reader.reset(); } catch {}
     };
   }, []);
 
   const checkAuth = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-    const { data: roleData } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id)
-      .maybeSingle();
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .maybeSingle();
 
-    setUserRole(roleData?.role || null);
+      setUserRole(roleData?.role || null);
+    } catch (err) {
+      console.error('Auth check failed (non-fatal):', err);
+      setUserRole(null);
+    }
   };
 
   const startCameraScanning = async () => {
     if (!codeReader) return;
 
     try {
+      if (!window.isSecureContext && !/^(localhost|127\.0\.0\.1)$/.test(window.location.hostname)) {
+        toast.error('Camera requires HTTPS or localhost');
+        return;
+      }
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         toast.error('Camera not supported');
         return;
       }
-      if (!window.isSecureContext) {
-        toast.error('Camera requires a secure site');
-        return;
-      }
-      if (!selectedDeviceId) {
-        await loadCameras();
-      }
-
       if (videoRef.current) {
         videoRef.current.setAttribute('playsinline', 'true');
         setIsScanning(true);
         toast.success('Camera scanner started');
-        if (selectedDeviceId) {
-          codeReader.decodeFromVideoDevice(selectedDeviceId, videoRef.current, (result, error) => {
-            if (result) {
-              processQRScan(result.getText(), 'mobile_camera');
-            }
-          });
-        } else {
-          codeReader.decodeFromConstraints({
-            video: { facingMode: { ideal: 'environment' } }
-          } as any, videoRef.current, (result, error) => {
-            if (result) {
-              processQRScan(result.getText(), 'mobile_camera');
-            }
-          });
-        }
+        codeReader.decodeFromConstraints({
+          video: { facingMode: { ideal: 'environment' } }
+        } as any, videoRef.current, (result, error) => {
+          if (result) {
+            processQRScan(result.getText(), 'mobile_camera');
+          }
+        });
+        try { videoRef.current.muted = true; await videoRef.current.play?.(); } catch {}
       }
     } catch (error) {
       console.error('Camera error:', error);
@@ -104,23 +98,8 @@ export const DispatchScanner: React.FC = () => {
     }
   };
 
-  const loadCameras = async () => {
-    const permissionStream = await navigator.mediaDevices.getUserMedia({
-      video: true,
-      audio: false
-    });
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    const inputs = devices.filter(d => d.kind === 'videoinput');
-    setVideoDevices(inputs);
-    const preferred =
-      inputs.find(d => /back|rear|environment/i.test(d.label)) ||
-      inputs[inputs.length - 1] ||
-      inputs[0];
-    setSelectedDeviceId(preferred?.deviceId);
-    permissionStream.getTracks().forEach(t => t.stop());
-  };
-
   const stopScanning = () => {
+    try { codeReader?.reset(); } catch {}
     if (videoRef.current?.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream;
       stream.getTracks().forEach(track => track.stop());
@@ -142,7 +121,11 @@ export const DispatchScanner: React.FC = () => {
         _notes: notes || null
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Dispatch scan error:', error);
+        toast.error('Failed to record dispatch scan');
+        return;
+      }
 
       const scanData = data as any;
 
@@ -189,9 +172,6 @@ export const DispatchScanner: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* QR Workflow Documentation */}
-      <QRWorkflowDocumentation embedded={true} />
-      
       {/* Camera Scanner */}
       <Card>
         <CardHeader>
@@ -200,15 +180,6 @@ export const DispatchScanner: React.FC = () => {
               <Truck className="h-5 w-5" />
               Dispatch Scanner - Supplier
             </div>
-            <TooltipGuide 
-              guide={qrSystemGuide}
-              trigger={
-                <Button variant="outline" size="sm">
-                  <HelpCircle className="h-4 w-4 mr-2" />
-                  Help Guide
-                </Button>
-              }
-            />
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -217,30 +188,7 @@ export const DispatchScanner: React.FC = () => {
               Access restricted. Sign in as supplier or admin to record scans.
             </div>
           )}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="camera-source">Camera Source</Label>
-              <Select value={selectedDeviceId ?? ''} onValueChange={setSelectedDeviceId}>
-                <SelectTrigger id="camera-source">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {videoDevices.length === 0 ? (
-                    <SelectItem value="">No cameras</SelectItem>
-                  ) : (
-                    videoDevices.map((d, i) => (
-                      <SelectItem key={d.deviceId || i} value={d.deviceId}>
-                        {d.label || `Camera ${i + 1}`}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-end">
-              <Button variant="outline" onClick={loadCameras} className="w-full">Refresh Cameras</Button>
-            </div>
-          </div>
+          
           <div className="relative bg-black rounded-lg overflow-hidden">
             <video
               ref={videoRef}
@@ -281,16 +229,7 @@ export const DispatchScanner: React.FC = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <QuickTooltip 
-              content="Use a physical USB or Bluetooth scanner to scan QR codes. The scanner will automatically input the code into this field."
-              tips={[
-                "Connect USB scanner and it works like a keyboard",
-                "Pair Bluetooth scanners before use",
-                "Press Enter after scanning to process the code"
-              ]}
-            >
-              <Label htmlFor="qr-code">QR Code (from physical scanner)</Label>
-            </QuickTooltip>
+            <Label htmlFor="qr-code">QR Code (from physical scanner)</Label>
             <Input
               id="qr-code"
               value={manualQRCode}
@@ -302,16 +241,7 @@ export const DispatchScanner: React.FC = () => {
           </div>
 
           <div className="space-y-2">
-            <QuickTooltip 
-              content="Record the condition of materials being dispatched. This information is tracked throughout the delivery process."
-              tips={[
-                "Select 'Damaged' if materials show any defects",
-                "Use 'Minor Damage' for small issues that don't affect function",
-                "Excellent condition for premium quality materials"
-              ]}
-            >
-              <Label htmlFor="condition">Material Condition</Label>
-            </QuickTooltip>
+            <Label htmlFor="condition">Material Condition</Label>
             <Select value={materialCondition} onValueChange={setMaterialCondition}>
               <SelectTrigger id="condition">
                 <SelectValue />

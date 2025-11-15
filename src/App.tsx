@@ -114,13 +114,13 @@ const App = () => {
               {/* AI Chatbot - Deferred load for better performance */}
               {showChat && <SimpleChatButton />}
               
-              <ErrorBoundary>
-                <Suspense fallback={<PageLoader />}>
-                  <Routes>
+              <Suspense fallback={<PageLoader />}>
+                <Routes>
                     {/* Public Auth Routes */}
                     <Route path="/auth" element={<Auth />} />
                     <Route path="/admin-login" element={<AdminAuth />} />
                     <Route path="/reset-password" element={<ResetPassword />} />
+                    <Route path="/scanners" element={<Scanners />} />
                     
                     {/* All other routes require authentication */}
                     <Route path="/*" element={
@@ -144,17 +144,15 @@ const App = () => {
                           <Route path="/tracking" element={<Tracking />} />
                           <Route path="/monitoring" element={<Monitoring />} />
                           <Route path="/delivery" element={<Delivery />} />
-                          <Route path="/scanners" element={<Scanners />} />
                           <Route path="/analytics" element={<Analytics />} />
                           <Route path="/delivery/apply" element={<DeliveryProviderApplication />} />
                           <Route path="*" element={<NotFound />} />
                         </Routes>
                       </AuthRequired>
                     } />
-                  </Routes>
-                </Suspense>
-                {/* Privacy features will be re-enabled once dependencies are resolved */}
-              </ErrorBoundary>
+                </Routes>
+              </Suspense>
+              {/* Privacy features will be re-enabled once dependencies are resolved */}
             </BrowserRouter>
           </TooltipProvider>
         </QueryClientProvider>
