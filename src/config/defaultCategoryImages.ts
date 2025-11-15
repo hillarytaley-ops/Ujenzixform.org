@@ -31,107 +31,107 @@ export interface CategoryImage {
 export const DEFAULT_CATEGORY_IMAGES: Record<string, CategoryImage> = {
   'Cement': {
     category: 'Cement',
-    imageUrl: '/cement.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1581091012184-7c54a6b648bf?q=80&w=800&auto=format&fit=crop',
     description: 'Cement - Bamburi, Savannah, Mombasa Cement (50kg bags)'
   },
   'Steel': {
     category: 'Steel',
-    imageUrl: '/steel.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1581093535283-18d2d79a2f30?q=80&w=800&auto=format&fit=crop',
     description: 'Steel Bars - Y8, Y10, Y12, Y16 KEBS approved rebar'
   },
   'Tiles': {
     category: 'Tiles',
-    imageUrl: '/tiles.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1582582429416-dbf2e2eec0ed?q=80&w=800&auto=format&fit=crop',
     description: 'Floor and wall tiles'
   },
   'Paint': {
     category: 'Paint',
-    imageUrl: '/paint.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1519710164239-da123dc03ef4?q=80&w=800&auto=format&fit=crop',
     description: 'Paints - Crown, Basco, Galaxy Paints Kenya'
   },
   'Timber': {
     category: 'Timber',
-    imageUrl: '/timber.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?q=80&w=800&auto=format&fit=crop',
     description: 'Timber - Cypress, Pine, Hardwood (treated & untreated)'
   },
   'Hardware': {
     category: 'Hardware',
-    imageUrl: '/hardware.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1556228724-4c1dc4e38d3b?q=80&w=800&auto=format&fit=crop',
     description: 'Construction hardware and tools'
   },
   'Plumbing': {
     category: 'Plumbing',
-    imageUrl: '/plumbing.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1563436542-5b8b6ce2481e?q=80&w=800&auto=format&fit=crop',
     description: 'Plumbing - Kenpipe, PVC pipes & fittings KEBS approved'
   },
   'Electrical': {
     category: 'Electrical',
-    imageUrl: '/electrical.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1550684848-0e8283a1a946?q=80&w=800&auto=format&fit=crop',
     description: 'Electrical - Nyayo, Kinga cables KEBS certified'
   },
   'Aggregates': {
     category: 'Aggregates',
-    imageUrl: '/aggregates.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1529676468695-6386a0376dec?q=80&w=800&auto=format&fit=crop',
     description: 'Gravel and construction aggregates'
   },
   'Roofing': {
     category: 'Roofing',
-    imageUrl: '/roofing.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1496307042754-b4aa456c4a2d?q=80&w=800&auto=format&fit=crop',
     description: 'Roofing - Mabati, Safal, Corrugated Iron Sheets Kenya'
   },
   'Insulation': {
     category: 'Insulation',
-    imageUrl: '/insulation.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1581304931159-0cedf46af0c3?q=80&w=800&auto=format&fit=crop',
     description: 'Insulation materials'
   },
   'Tools': {
     category: 'Tools',
-    imageUrl: '/tools.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1519710164239-da123dc03ef4?q=80&w=800&auto=format&fit=crop',
     description: 'Construction tools and equipment'
   },
   'Stone': {
     category: 'Stone',
-    imageUrl: '/stone.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1506377713090-2f94a65f0568?q=80&w=800&auto=format&fit=crop',
     description: 'Building stones and rocks'
   },
   'Sand': {
     category: 'Sand',
-    imageUrl: '/sand.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1520284766981-3d6f11a5bafa?q=80&w=800&auto=format&fit=crop',
     description: 'Construction sand'
   },
   'Plywood': {
     category: 'Plywood',
-    imageUrl: '/plywood.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1550136513-548af4449bc7?q=80&w=800&auto=format&fit=crop',
     description: 'Plywood sheets and panels'
   },
   'Doors': {
     category: 'Doors',
-    imageUrl: '/doors.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1523413651479-597eb2da0ad6?q=80&w=800&auto=format&fit=crop',
     description: 'Doors and door frames'
   },
   'Wire': {
     category: 'Wire',
-    imageUrl: '/wire.png',
+    imageUrl: 'https://images.unsplash.com/photo-1562259942-2a0ab4b3b49f?q=80&w=800&auto=format&fit=crop',
     description: 'Construction wire and cables'
   },
   'Iron Sheets': {
     category: 'Iron Sheets',
-    imageUrl: '/iron-sheets.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1599419020646-5dfba7f03cfe?q=80&w=800&auto=format&fit=crop',
     description: 'Iron Sheets - Mabati Box Profile, Gauge 28-32'
   },
   'Blocks': {
     category: 'Blocks',
-    imageUrl: '/blocks.png',
+    imageUrl: 'https://images.unsplash.com/photo-1503387762-592deb58ef4e?q=80&w=800&auto=format&fit=crop',
     description: 'Concrete blocks and bricks'
   },
   'Glass': {
     category: 'Glass',
-    imageUrl: '/glass.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1552940026-6c88f7a0b48b?q=80&w=800&auto=format&fit=crop',
     description: 'Glass sheets and panels'
   },
   'Windows': {
     category: 'Windows',
-    imageUrl: '/windows.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1549399546-da189e3fd1f5?q=80&w=800&auto=format&fit=crop',
     description: 'Windows and window frames'
   },
   'Other': {

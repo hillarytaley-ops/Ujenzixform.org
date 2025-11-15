@@ -6,7 +6,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Building, Store, Package } from "lucide-react";
 import { Link } from "react-router-dom";
  
-import { MaterialsGridSafe } from "@/components/suppliers/MaterialsGridSafe";
+import { MaterialsGrid } from "@/components/suppliers/MaterialsGrid";
 
 // Ultra-optimized Suppliers page for mobile/iPhone
 const SuppliersMobileOptimized = () => {
@@ -98,7 +98,7 @@ const SuppliersMobileOptimized = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <MaterialsGridSafe />
+              <MaterialsGrid />
             </CardContent>
           </Card>
         </div>

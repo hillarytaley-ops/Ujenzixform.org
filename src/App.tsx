@@ -23,7 +23,7 @@ const SuppliersMobileOptimized = lazy(() => import("./pages/SuppliersMobileOptim
 const BuilderPortal = lazy(() => import("./pages/BuilderPortal"));
 const About = lazy(() => import("./pages/About"));
 const Contact = lazy(() => import("./pages/Contact"));
-const Auth = lazy(() => import("./pages/Auth"));
+import Auth from "./pages/Auth";
 const AdminAuth = lazy(() => import("./pages/AdminAuth"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Feedback = lazy(() => import("./pages/Feedback"));
