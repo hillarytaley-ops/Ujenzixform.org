@@ -36,12 +36,12 @@ export const DEFAULT_CATEGORY_IMAGES: Record<string, CategoryImage> = {
   },
   'Steel': {
     category: 'Steel',
-    imageUrl: '/hardware.jpg',
+    imageUrl: '/steel.jpg',
     description: 'Steel Bars - Y8, Y10, Y12, Y16 KEBS approved rebar'
   },
   'Tiles': {
     category: 'Tiles',
-    imageUrl: '/hardware.jpg',
+    imageUrl: '/tiles.jpg',
     description: 'Floor and wall tiles'
   },
   'Paint': {
@@ -51,7 +51,7 @@ export const DEFAULT_CATEGORY_IMAGES: Record<string, CategoryImage> = {
   },
   'Timber': {
     category: 'Timber',
-    imageUrl: '/hardware.jpg',
+    imageUrl: '/timber.jpg',
     description: 'Timber - Cypress, Pine, Hardwood (treated & untreated)'
   },
   'Hardware': {
@@ -86,7 +86,7 @@ export const DEFAULT_CATEGORY_IMAGES: Record<string, CategoryImage> = {
   },
   'Tools': {
     category: 'Tools',
-    imageUrl: '/hardware.jpg',
+    imageUrl: '/tools.jpg',
     description: 'Construction tools and equipment'
   },
   'Stone': {
@@ -111,7 +111,7 @@ export const DEFAULT_CATEGORY_IMAGES: Record<string, CategoryImage> = {
   },
   'Wire': {
     category: 'Wire',
-    imageUrl: '/electrical.jpg',
+    imageUrl: '/wire.jpg',
     description: 'Construction wire and cables'
   },
   'Iron Sheets': {
@@ -131,7 +131,7 @@ export const DEFAULT_CATEGORY_IMAGES: Record<string, CategoryImage> = {
   },
   'Windows': {
     category: 'Windows',
-    imageUrl: '/glass.jpg',
+    imageUrl: '/windows.jpg',
     description: 'Windows and window frames'
   },
   'Other': {
