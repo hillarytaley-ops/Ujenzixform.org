@@ -127,8 +127,8 @@ const App = () => {
                     <Route path="/scanners" element={<Scanners />} />
                     {/* Public Home and Suppliers access */}
                     <Route path="/" element={<Index />} />
-                    {/* Public Suppliers access */}
-                    <Route path="/suppliers" element={<Suppliers />} />
+                    {/* Public Suppliers access - map directly to mobile-optimized for reliability */}
+                    <Route path="/suppliers" element={<SuppliersMobileOptimized />} />
                     <Route path="/suppliers-mobile" element={<SuppliersMobileOptimized />} />
                     
                     {/* All other routes require authentication */}
