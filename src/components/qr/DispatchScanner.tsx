@@ -31,6 +31,7 @@ export const DispatchScanner: React.FC = () => {
   const [notes, setNotes] = useState('');
   const [codeReader, setCodeReader] = useState<BrowserMultiFormatReader | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [facing, setFacing] = useState<'environment' | 'user'>('environment');
   
 
   useEffect(() => {
@@ -84,7 +85,7 @@ export const DispatchScanner: React.FC = () => {
         setIsScanning(true);
         toast.success('Camera scanner started');
         codeReader.decodeFromConstraints({
-          video: { facingMode: { ideal: 'environment' } }
+          video: { facingMode: { ideal: facing } }
         } as any, videoRef.current, (result, error) => {
           if (result) {
             processQRScan(result.getText(), 'mobile_camera');
@@ -107,6 +108,15 @@ export const DispatchScanner: React.FC = () => {
     }
     setIsScanning(false);
     toast.info('Scanner stopped');
+  };
+
+  const toggleCamera = async () => {
+    const next = facing === 'environment' ? 'user' : 'environment';
+    setFacing(next);
+    if (isScanning) {
+      stopScanning();
+      await startCameraScanning();
+    }
   };
 
   const processQRScan = async (qrCode: string, scannerType: 'mobile_camera' | 'physical_scanner' | 'web_scanner') => {
@@ -215,6 +225,7 @@ export const DispatchScanner: React.FC = () => {
                 Stop Scanner
               </Button>
             )}
+            <Button onClick={toggleCamera} variant="outline">Switch Camera</Button>
           </div>
         </CardContent>
       </Card>
