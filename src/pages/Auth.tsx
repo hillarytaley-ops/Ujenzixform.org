@@ -35,6 +35,7 @@ const Auth = () => {
   // Get redirect parameter from URL
   const urlParams = new URLSearchParams(window.location.search);
   const redirectTo = urlParams.get('redirect') || null;
+  const liteMode = !!redirectTo;
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -48,7 +49,7 @@ const Auth = () => {
           if (redirectTo) {
             window.location.href = redirectTo;
           } else {
-            navigate("/");
+            window.location.href = '/suppliers?tab=purchase';
           }
         }
       }
@@ -236,6 +237,10 @@ const Auth = () => {
             title: "Welcome back!",
             description: "You've been signed in successfully."
           });
+          setTimeout(() => {
+            const target = redirectTo || '/suppliers?tab=purchase';
+            window.location.href = target;
+          }, 800);
         }
       }
     } catch (error) {
@@ -283,34 +288,8 @@ const Auth = () => {
     }
   };
 
-  return (
-    <div className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden">
-      {/* Beautiful Kenyan Construction Workers with Yellow Hard Hats Background - Responsive */}
-      <div 
-        className="absolute inset-0 z-0"
-        style={{
-          backgroundImage: `url('/kenyan-workers.jpg'), url('https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-gW4eb5K3am2BERQxC6jCNuhvaVOrTl.png')`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center center',
-          backgroundRepeat: 'no-repeat'
-        }}
-        role="img"
-        aria-label="Kenyan construction workers in yellow hard hats reviewing blueprints at steel construction site"
-      />
-      
-      {/* Light overlay for readability - clearer background */}
-      <div className="absolute inset-0 bg-black/20 z-0"></div>
-      
-      <AnimatedSection animation="scaleIn" className="relative z-10">
-        <Card className="w-full max-w-md bg-white/98 backdrop-blur-sm shadow-2xl border-white/70">
-        <CardHeader className="text-center">
-          <CardTitle>Welcome to UjenziPro</CardTitle>
-          <CardDescription>
-            Connect with construction professionals across Kenya
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="signin" className="w-full">
+  const authTabs = (
+    <Tabs defaultValue="signin" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>
@@ -506,11 +485,45 @@ const Auth = () => {
                 </form>
               </div>
             </TabsContent>
-          </Tabs>
-        </CardContent>
-        </Card>
+    </Tabs>
+  );
 
-        {/* Admin Staff Portal Link */}
+  if (liteMode) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle>Welcome to UjenziPro</CardTitle>
+            <CardDescription>Sign in to continue</CardDescription>
+          </CardHeader>
+          <CardContent>{authTabs}</CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden">
+      <div 
+        className="absolute inset-0 z-0"
+        style={{
+          backgroundImage: `url('/kenyan-workers.jpg'), url('https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-gW4eb5K3am2BERQxC6jCNuhvaVOrTl.png')`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center center',
+          backgroundRepeat: 'no-repeat'
+        }}
+        role="img"
+        aria-label="Kenyan construction workers in yellow hard hats reviewing blueprints at steel construction site"
+      />
+      <div className="absolute inset-0 bg-black/20 z-0"></div>
+      <AnimatedSection animation="scaleIn" className="relative z-10">
+        <Card className="w-full max-w-md bg-white/98 backdrop-blur-sm shadow-2xl border-white/70">
+          <CardHeader className="text-center">
+            <CardTitle>Welcome to UjenziPro</CardTitle>
+            <CardDescription>Connect with construction professionals across Kenya</CardDescription>
+          </CardHeader>
+          <CardContent>{authTabs}</CardContent>
+        </Card>
         <div className="mt-6 text-center bg-white/90 backdrop-blur-sm rounded-lg p-4 border border-white/50">
           <Link 
             to="/admin-login"
