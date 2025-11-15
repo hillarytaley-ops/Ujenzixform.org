@@ -121,6 +121,9 @@ const App = () => {
                     <Route path="/admin-login" element={<AdminAuth />} />
                     <Route path="/reset-password" element={<ResetPassword />} />
                     <Route path="/scanners" element={<Scanners />} />
+                    {/* Public Suppliers access */}
+                    <Route path="/suppliers" element={<Suppliers />} />
+                    <Route path="/suppliers-mobile" element={<SuppliersMobileOptimized />} />
                     
                     {/* All other routes require authentication */}
                     <Route path="/*" element={
@@ -133,7 +136,6 @@ const App = () => {
                           <Route path="/professional-builder-registration" element={<ProfessionalBuilderRegistration />} />
                           <Route path="/private-client-registration" element={<PrivateBuilderRegistration />} />
                           <Route path="/portal" element={<BuilderPortal />} />
-                          <Route path="/suppliers" element={<Suppliers />} />
                           <Route path="/about" element={<About />} />
                           <Route path="/contact" element={<Contact />} />
                           <Route path="/feedback" element={<Feedback />} />

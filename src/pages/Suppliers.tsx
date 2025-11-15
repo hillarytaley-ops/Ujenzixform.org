@@ -33,7 +33,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ModalProvider, useModal } from "@/contexts/ModalContext";
 import { LoginPortal } from "@/components/LoginPortal";
 import { PurchaseOrderWizard } from "@/components/suppliers/PurchaseOrderWizard";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 
 const SuppliersContent = () => {
   const [searchParams] = useSearchParams();
@@ -45,6 +45,18 @@ const SuppliersContent = () => {
   const [hasError, setHasError] = useState(false);
   const [renderError, setRenderError] = useState<Error | null>(null);
   const { toast } = useToast();
+  const isiOS = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (isiOS) {
+      const full = searchParams.get("full");
+      if (full !== "1") {
+        navigate("/suppliers-mobile", { replace: true });
+      }
+    }
+  }, [isiOS]);
 
   // Add error boundary effect
   useEffect(() => {
@@ -484,7 +496,7 @@ const SuppliersContent = () => {
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      {/iPhone|iPad|iPod/i.test(navigator.userAgent) ? <MaterialsGridSafe /> : <MaterialsGrid />}
+                      {isiOS ? <MaterialsGridSafe /> : <MaterialsGrid />}
                     </CardContent>
                   </Card>
                   

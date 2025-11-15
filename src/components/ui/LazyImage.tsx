@@ -37,6 +37,22 @@ export const LazyImage: React.FC<LazyImageProps> = ({
     const img = imgRef.current;
     if (!img) return;
 
+    if (typeof window !== 'undefined' && !("IntersectionObserver" in window)) {
+      const list = candidates && candidates.length ? candidates : [src];
+      const loader = new Image();
+      loader.onload = () => {
+        setImageSrc(loader.src);
+        setImageLoaded(true);
+        onLoad?.();
+      };
+      loader.onerror = () => {
+        setImageError(true);
+        onError?.();
+      };
+      loader.src = list[0];
+      return;
+    }
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
