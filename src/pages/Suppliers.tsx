@@ -489,7 +489,7 @@ const SuppliersContent = () => {
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      {isiOS ? <MaterialsGridSafe /> : <MaterialsGrid />}
+                      <MaterialsGridSafe />
                     </CardContent>
                   </Card>
                   
