@@ -31,52 +31,52 @@ export interface CategoryImage {
 export const DEFAULT_CATEGORY_IMAGES: Record<string, CategoryImage> = {
   'Cement': {
     category: 'Cement',
-    imageUrl: '/cement.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=800&q=80&auto=format&fit=crop',
     description: 'Cement - Bamburi, Savannah, Mombasa Cement (50kg bags)'
   },
   'Steel': {
     category: 'Steel',
-    imageUrl: '/steel.jpg',
+    imageUrl: '/kenyan-workers.jpg',
     description: 'Steel Bars - Y8, Y10, Y12, Y16 KEBS approved rebar'
   },
   'Tiles': {
     category: 'Tiles',
-    imageUrl: '/tiles.jpg',
+    imageUrl: '/kenyan-workers.jpg',
     description: 'Floor and wall tiles'
   },
   'Paint': {
     category: 'Paint',
-    imageUrl: '/paint.jpg',
+    imageUrl: '/kenyan-workers.jpg',
     description: 'Paints - Crown, Basco, Galaxy Paints Kenya'
   },
   'Timber': {
     category: 'Timber',
-    imageUrl: '/timber.jpg',
+    imageUrl: '/kenyan-workers.jpg',
     description: 'Timber - Cypress, Pine, Hardwood (treated & untreated)'
   },
   'Hardware': {
     category: 'Hardware',
-    imageUrl: '/hardware.jpg',
+    imageUrl: '/kenyan-workers.jpg',
     description: 'Construction hardware and tools'
   },
   'Plumbing': {
     category: 'Plumbing',
-    imageUrl: '/plumbing.jpg',
+    imageUrl: '/kenyan-workers.jpg',
     description: 'Plumbing - Kenpipe, PVC pipes & fittings KEBS approved'
   },
   'Electrical': {
     category: 'Electrical',
-    imageUrl: '/electrical.jpg',
+    imageUrl: '/kenyan-workers.jpg',
     description: 'Electrical - Nyayo, Kinga cables KEBS certified'
   },
   'Aggregates': {
     category: 'Aggregates',
-    imageUrl: '/aggregates.jpg',
+    imageUrl: '/kenyan-workers.jpg',
     description: 'Gravel and construction aggregates'
   },
   'Roofing': {
     category: 'Roofing',
-    imageUrl: '/roofing.jpg',
+    imageUrl: '/kenyan-workers.jpg',
     description: 'Roofing - Mabati, Safal, Corrugated Iron Sheets Kenya'
   },
   'Insulation': {
@@ -91,47 +91,47 @@ export const DEFAULT_CATEGORY_IMAGES: Record<string, CategoryImage> = {
   },
   'Stone': {
     category: 'Stone',
-    imageUrl: '/stone.jpg',
+    imageUrl: '/kenyan-workers.jpg',
     description: 'Building stones and rocks'
   },
   'Sand': {
     category: 'Sand',
-    imageUrl: '/sand.jpg',
+    imageUrl: '/kenyan-workers.jpg',
     description: 'Construction sand'
   },
   'Plywood': {
     category: 'Plywood',
-    imageUrl: '/plywood.jpg',
+    imageUrl: '/kenyan-workers.jpg',
     description: 'Plywood sheets and panels'
   },
   'Doors': {
     category: 'Doors',
-    imageUrl: '/doors.jpg',
+    imageUrl: '/kenyan-workers.jpg',
     description: 'Doors and door frames'
   },
   'Wire': {
     category: 'Wire',
-    imageUrl: '/wire.jpg',
+    imageUrl: '/kenyan-workers.jpg',
     description: 'Construction wire and cables'
   },
   'Iron Sheets': {
     category: 'Iron Sheets',
-    imageUrl: '/iron-sheets.jpg',
+    imageUrl: '/kenyan-workers.jpg',
     description: 'Iron Sheets - Mabati Box Profile, Gauge 28-32'
   },
   'Blocks': {
     category: 'Blocks',
-    imageUrl: '/blocks.jpg',
+    imageUrl: '/kenyan-workers.jpg',
     description: 'Concrete blocks and bricks'
   },
   'Glass': {
     category: 'Glass',
-    imageUrl: '/glass.jpg',
+    imageUrl: '/kenyan-workers.jpg',
     description: 'Glass sheets and panels'
   },
   'Windows': {
     category: 'Windows',
-    imageUrl: '/windows.jpg',
+    imageUrl: '/kenyan-workers.jpg',
     description: 'Windows and window frames'
   },
   'Other': {
