@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Search, ShoppingCart, Store, Package, Filter, PartyPopper } from 'lucide-react';
 import { getDefaultCategoryImage } from '@/config/defaultCategoryImages';
+import { LazyImage } from '@/components/ui/LazyImage';
 import { useSearchParams } from 'react-router-dom';
 
 // iOS/Safari compatibility check
@@ -497,7 +498,7 @@ export const MaterialsGrid = () => {
                 {/* Material Image - Larger */}
                 <div className="relative aspect-square bg-muted overflow-hidden h-64 sm:h-72 md:h-80">
                   {imageUrl ? (
-                    <img
+                    <LazyImage
                       src={imageUrl}
                       alt={material.name}
                       className="w-full h-full object-contain p-4 bg-white group-hover:scale-105 transition-transform duration-300"
@@ -509,7 +510,7 @@ export const MaterialsGrid = () => {
                       <Package className="h-20 w-20 text-muted-foreground" />
                     </div>
                   )}
-                  
+                
                   {/* Stock Badge */}
                   <div className="absolute top-2 right-2">
                     <Badge className={material.in_stock ? 'bg-green-600' : 'bg-red-600'}>

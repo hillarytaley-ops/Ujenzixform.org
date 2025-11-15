@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { UserRole } from "@/types/userProfile";
 import { getDefaultCategoryImage } from "@/config/defaultCategoryImages";
+import { LazyImage } from "@/components/ui/LazyImage";
 
 interface SupplierCatalogModalProps {
   supplier: Supplier;
@@ -397,10 +398,12 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
                     <CardContent className="p-4 space-y-3">
                       <div className="aspect-square bg-muted rounded-lg overflow-hidden">
                         {imageUrl ? (
-                          <img 
+                          <LazyImage 
                             src={imageUrl} 
                             alt={item.name}
                             className="w-full h-full object-cover"
+                            loading="lazy"
+                            decoding="async"
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
@@ -459,10 +462,12 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
                       <div className="flex items-center gap-4">
                         <div className="w-16 h-16 bg-muted rounded-lg overflow-hidden flex-shrink-0">
                           {imageUrl ? (
-                            <img 
+                            <LazyImage 
                               src={imageUrl} 
                               alt={item.name}
                               className="w-full h-full object-cover"
+                              loading="lazy"
+                              decoding="async"
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">
