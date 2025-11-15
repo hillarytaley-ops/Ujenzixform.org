@@ -125,6 +125,8 @@ const App = () => {
                     <Route path="/admin-login" element={<AdminAuth />} />
                     <Route path="/reset-password" element={<ResetPassword />} />
                     <Route path="/scanners" element={<Scanners />} />
+                    {/* Public Home and Suppliers access */}
+                    <Route path="/" element={<Index />} />
                     {/* Public Suppliers access */}
                     <Route path="/suppliers" element={<Suppliers />} />
                     <Route path="/suppliers-mobile" element={<SuppliersMobileOptimized />} />
@@ -133,7 +135,6 @@ const App = () => {
                     <Route path="/*" element={
                       <AuthRequired>
                         <Routes>
-                          <Route path="/" element={<Index />} />
                           <Route path="/builders" element={<Builders />} />
                           <Route path="/builder-registration" element={<BuilderRegistration />} />
                           <Route path="/builders/register" element={<BuilderRegistration />} />
