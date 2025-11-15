@@ -12,6 +12,11 @@ export const useScrollAnimation = (options: UseScrollAnimationOptions = {}) => {
   const ref = useRef<HTMLElement>(null);
 
   useEffect(() => {
+    if (typeof window === 'undefined' || !("IntersectionObserver" in window)) {
+      setIsVisible(true);
+      return;
+    }
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
