@@ -38,6 +38,7 @@ import { ModalProvider, useModal } from "@/contexts/ModalContext";
 import { LoginPortal } from "@/components/LoginPortal";
 import { PurchaseOrderWizard } from "@/components/suppliers/PurchaseOrderWizard";
 import { useSearchParams, useNavigate } from "react-router-dom";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 
 const SuppliersContent = () => {
   const [searchParams] = useSearchParams();
@@ -195,8 +196,16 @@ const SuppliersContent = () => {
   // REMOVED: Mobile admin restriction - Full admin access on all devices now!
 
   return (
-      <div className="min-h-screen bg-background">
-        <Navigation />
+      <ErrorBoundary fallback={
+        <div className="min-h-screen bg-background p-4">
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-xl font-semibold mb-4">Materials Marketplace</h2>
+            <MaterialsGridSafe />
+          </div>
+        </div>
+      }>
+        <div className="min-h-screen bg-background">
+          <Navigation />
 
       {/* Kenyan-Themed Hero Section - iPhone Fixed */}
       <section className="bg-gradient-to-br from-blue-700 via-blue-800 to-blue-900 text-white py-16 sm:py-20 relative overflow-hidden">
@@ -598,14 +607,11 @@ const SuppliersContent = () => {
         />
       )}
 
-      {!isAdmin && !isiOS && !isLowData && (
-        <Suspense fallback={null}>
-          {showStats && <RealTimeStatsLazy />}
-        </Suspense>
-      )}
+      {/* Real-time stats disabled for stability */}
 
-      <Footer />
-    </div>
+        <Footer />
+      </div>
+      </ErrorBoundary>
   );
 };
 
