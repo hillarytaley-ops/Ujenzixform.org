@@ -393,11 +393,14 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
                   // Use custom image, fallback to default category image, or show placeholder
                   const imageUrl = item.image || getDefaultCategoryImage(item.category);
                   const candidates = imageUrl && imageUrl.startsWith('/')
-                    ? [
-                        `/optimized/${imageUrl.replace('/','').replace('.jpg','')}.avif`,
-                        `/optimized/${imageUrl.replace('/','').replace('.jpg','')}.webp`,
-                        `/optimized/${imageUrl.replace('/','')}`
-                      ]
+                    ? (() => {
+                        const base = imageUrl.replace(/^\//, '').replace(/\.(jpg|jpeg|png)$/i, '');
+                        return [
+                          `/optimized/${base}.avif`,
+                          `/optimized/${base}.webp`,
+                          imageUrl
+                        ];
+                      })()
                     : undefined;
                   
                   return (
@@ -464,11 +467,14 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
                   // Use custom image, fallback to default category image, or show placeholder
                   const imageUrl = item.image || getDefaultCategoryImage(item.category);
                   const candidates = imageUrl && imageUrl.startsWith('/')
-                    ? [
-                        `/optimized/${imageUrl.replace('/','').replace('.jpg','')}.avif`,
-                        `/optimized/${imageUrl.replace('/','').replace('.jpg','')}.webp`,
-                        `/optimized/${imageUrl.replace('/','')}`
-                      ]
+                    ? (() => {
+                        const base = imageUrl.replace(/^\//, '').replace(/\.(jpg|jpeg|png)$/i, '');
+                        return [
+                          `/optimized/${base}.avif`,
+                          `/optimized/${base}.webp`,
+                          imageUrl
+                        ];
+                      })()
                     : undefined;
                   
                   return (

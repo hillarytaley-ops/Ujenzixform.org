@@ -24,7 +24,7 @@ interface ScannedMaterial {
   verified: boolean;
 }
 
-const QRScanner: React.FC<QRScannerProps> = ({ onMaterialScanned }) => {
+const QRScanner: React.FC<QRScannerProps> = ({ onMaterialScanned, onRawScan, mode }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isScanning, setIsScanning] = useState(false);
@@ -39,15 +39,23 @@ const QRScanner: React.FC<QRScannerProps> = ({ onMaterialScanned }) => {
 
   const loadCameras = async () => {
     try {
-      const permission = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+        setVideoDevices([]);
+        setSelectedDeviceId('');
+        return;
+      }
       const devices = await navigator.mediaDevices.enumerateDevices();
       const inputs = devices.filter(d => d.kind === 'videoinput');
       setVideoDevices(inputs);
       const preferred = inputs.find(d => /back|rear|environment/i.test(d.label)) || inputs[inputs.length - 1] || inputs[0];
       setSelectedDeviceId(preferred?.deviceId || '');
-      permission.getTracks().forEach(t => t.stop());
-    } catch {}
+    } catch {
+      setVideoDevices([]);
+      setSelectedDeviceId('');
+    }
   };
+
+  // Cameras are loaded on-demand via the Refresh button to avoid mount-time errors
 
   const startScanning = async () => {
     try {
@@ -68,6 +76,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ onMaterialScanned }) => {
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
         videoRef.current.setAttribute('playsinline', 'true');
+        try { videoRef.current.muted = true; await videoRef.current.play?.(); } catch {}
         setStream(mediaStream);
       }
 

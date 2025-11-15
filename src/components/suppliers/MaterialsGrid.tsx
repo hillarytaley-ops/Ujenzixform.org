@@ -537,11 +537,14 @@ export const MaterialsGrid = () => {
               ...items.map((material, idx) => {
                 const imageUrl = material.image_url || getDefaultCategoryImage(material.category);
                 const candidates = imageUrl && imageUrl.startsWith('/')
-                  ? [
-                      `/optimized/${imageUrl.replace('/','').replace('.jpg','')}.avif`,
-                      `/optimized/${imageUrl.replace('/','').replace('.jpg','')}.webp`,
-                      `/optimized/${imageUrl.replace('/','')}`
-                    ]
+                  ? (() => {
+                      const base = imageUrl.replace(/^\//, '').replace(/\.(jpg|jpeg|png)$/i, '');
+                      return [
+                        `/optimized/${base}.avif`,
+                        `/optimized/${base}.webp`,
+                        imageUrl
+                      ];
+                    })()
                   : undefined;
 
                 return (

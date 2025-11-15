@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { QrCode, Package, Download, DownloadCloud } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { QRCodeWriter, BarcodeFormat, EncodeHintType } from '@zxing/library';
 
 interface MaterialItem {
   id: string;
@@ -84,76 +85,50 @@ export const EnhancedQRCodeManager: React.FC = () => {
 
   const downloadQRCode = async (qrCode: string, materialType: string, itemSeq: number) => {
     try {
-      // Create canvas with QR code representation
+      const size = 420;
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
-      const size = 400;
       canvas.width = size;
       canvas.height = size + 80;
 
-      if (ctx) {
-        // White background
-        ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      if (!ctx) return;
 
-        // Simple QR code representation (blocks pattern)
-        const qrSize = 360;
-        const margin = 20;
-        const moduleSize = 12;
-        const modules = Math.floor(qrSize / moduleSize);
+      const writer = new QRCodeWriter();
+      const hints = new Map();
+      hints.set(EncodeHintType.MARGIN, 1);
+      const matrix = writer.encode(qrCode, BarcodeFormat.QR_CODE, size, size, hints);
 
-        // Generate pseudo-random pattern based on QR code string
-        ctx.fillStyle = 'black';
-        for (let y = 0; y < modules; y++) {
-          for (let x = 0; x < modules; x++) {
-            // Use QR code string to generate deterministic pattern
-            const seed = qrCode.charCodeAt(x % qrCode.length) + qrCode.charCodeAt(y % qrCode.length);
-            if ((seed + x + y) % 2 === 0) {
-              ctx.fillRect(
-                margin + x * moduleSize,
-                margin + y * moduleSize,
-                moduleSize - 1,
-                moduleSize - 1
-              );
-            }
+      ctx.fillStyle = 'white';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = 'black';
+
+      const scale = 1;
+      for (let x = 0; x < matrix.getWidth(); x++) {
+        for (let y = 0; y < matrix.getHeight(); y++) {
+          if (matrix.get(x, y)) {
+            ctx.fillRect(x * scale, y * scale, scale, scale);
           }
         }
-
-        // Add finder patterns (corners)
-        const drawFinderPattern = (x: number, y: number) => {
-          ctx.fillStyle = 'black';
-          ctx.fillRect(x, y, moduleSize * 7, moduleSize * 7);
-          ctx.fillStyle = 'white';
-          ctx.fillRect(x + moduleSize, y + moduleSize, moduleSize * 5, moduleSize * 5);
-          ctx.fillStyle = 'black';
-          ctx.fillRect(x + moduleSize * 2, y + moduleSize * 2, moduleSize * 3, moduleSize * 3);
-        };
-
-        drawFinderPattern(margin, margin);
-        drawFinderPattern(margin + qrSize - moduleSize * 7, margin);
-        drawFinderPattern(margin, margin + qrSize - moduleSize * 7);
-
-        // Add labels
-        ctx.fillStyle = 'black';
-        ctx.font = 'bold 16px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(materialType, size / 2, size + 20);
-        ctx.font = '14px Arial';
-        ctx.fillText(`Item #${itemSeq}`, size / 2, size + 40);
-        ctx.font = '11px monospace';
-        ctx.fillText(qrCode, size / 2, size + 60);
-
-        // Download
-        const link = document.createElement('a');
-        link.download = `QR_${qrCode}.png`;
-        link.href = canvas.toDataURL();
-        link.click();
-
-        toast({
-          title: "QR Code Downloaded",
-          description: `${materialType} - Item #${itemSeq}`,
-        });
       }
+
+      ctx.fillStyle = 'black';
+      ctx.font = 'bold 16px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(materialType, size / 2, size + 20);
+      ctx.font = '14px Arial';
+      ctx.fillText(`Item #${itemSeq}`, size / 2, size + 40);
+      ctx.font = '11px monospace';
+      ctx.fillText(qrCode, size / 2, size + 60);
+
+      const link = document.createElement('a');
+      link.download = `QR_${qrCode}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+
+      toast({
+        title: "QR Code Downloaded",
+        description: `${materialType} - Item #${itemSeq}`,
+      });
     } catch (error) {
       console.error('Error generating QR code:', error);
       toast({

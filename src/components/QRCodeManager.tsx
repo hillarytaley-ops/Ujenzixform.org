@@ -11,6 +11,7 @@ import { QrCode, Package, Truck, CheckCircle, Plus, Eye, Download } from 'lucide
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { UserRole } from "@/types/userProfile";
+import { QRCodeWriter, BarcodeFormat, EncodeHintType } from '@zxing/library';
 
 interface MaterialQRCode {
   qr_code: string;
@@ -103,49 +104,45 @@ const QRCodeManager: React.FC = () => {
   };
 
   const downloadQRCode = (qrCode: string, materialType: string, poNumber: string) => {
-    // Create a canvas to generate QR code image
+    const size = 320;
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
-    const size = 200;
-    
     canvas.width = size;
-    canvas.height = size + 60; // Extra space for text
-    
-    if (ctx) {
-      // White background
-      ctx.fillStyle = 'white';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      
-      // QR code placeholder (simplified - in real implementation, use a QR library)
-      ctx.fillStyle = 'black';
-      for (let i = 0; i < 10; i++) {
-        for (let j = 0; j < 10; j++) {
-          if (Math.random() > 0.5) {
-            ctx.fillRect(20 + i * 16, 20 + j * 16, 15, 15);
-          }
+    canvas.height = size + 80;
+
+    if (!ctx) return;
+
+    const writer = new QRCodeWriter();
+    const hints = new Map();
+    hints.set(EncodeHintType.MARGIN, 1);
+    const matrix = writer.encode(qrCode, BarcodeFormat.QR_CODE, size, size, hints);
+
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = 'black';
+
+    const scale = 1;
+    for (let x = 0; x < matrix.getWidth(); x++) {
+      for (let y = 0; y < matrix.getHeight(); y++) {
+        if (matrix.get(x, y)) {
+          ctx.fillRect(x * scale, y * scale, scale, scale);
         }
       }
-      
-      // Add border
-      ctx.strokeStyle = 'black';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(15, 15, 170, 170);
-      
-      // Add QR code text
-      ctx.fillStyle = 'black';
-      ctx.font = 'bold 12px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText(qrCode, size / 2, size + 20);
-      ctx.font = '10px Arial';
-      ctx.fillText(`${materialType}`, size / 2, size + 35);
-      ctx.fillText(`PO: ${poNumber}`, size / 2, size + 50);
-      
-      // Download
-      const link = document.createElement('a');
-      link.download = `QR_${qrCode}.png`;
-      link.href = canvas.toDataURL();
-      link.click();
     }
+
+    ctx.fillStyle = 'black';
+    ctx.font = 'bold 14px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(materialType, size / 2, size + 24);
+    ctx.font = '12px Arial';
+    ctx.fillText(`PO: ${poNumber}`, size / 2, size + 44);
+    ctx.font = '11px monospace';
+    ctx.fillText(qrCode, size / 2, size + 64);
+
+    const link = document.createElement('a');
+    link.download = `QR_${qrCode}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
   };
 
   const downloadAllQRCodes = () => {

@@ -111,7 +111,7 @@ export const DEFAULT_CATEGORY_IMAGES: Record<string, CategoryImage> = {
   },
   'Wire': {
     category: 'Wire',
-    imageUrl: '/wire.jpg',
+    imageUrl: '/wire.png',
     description: 'Construction wire and cables'
   },
   'Iron Sheets': {
