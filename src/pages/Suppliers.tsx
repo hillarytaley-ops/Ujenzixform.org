@@ -20,7 +20,11 @@ import { QuoteRequestModal } from "@/components/modals/QuoteRequestModal";
 import { SupplierCatalogModal } from "@/components/modals/SupplierCatalogModal";
 import PurchasingWorkflow from "@/components/PurchasingWorkflow";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-const RealTimeStatsLazy = React.lazy(() => import("@/components/suppliers/RealTimeStats").then(m => ({ default: m.RealTimeStats })));
+const RealTimeStatsLazy = React.lazy(() =>
+  import("@/components/suppliers/RealTimeStats")
+    .then(m => ({ default: m.RealTimeStats }))
+    .catch(() => ({ default: () => null }))
+);
 import { SecurityAlert } from "@/components/security/SecurityAlert";
 import { AdminAccessGuard } from "@/components/security/AdminAccessGuard";
 import { Badge } from "@/components/ui/badge";
@@ -61,17 +65,7 @@ const SuppliersContent = () => {
     }
   }, [isiOS]);
 
-  // Add error boundary effect
-  useEffect(() => {
-    const handleError = (error: ErrorEvent) => {
-      console.error('Suppliers page error:', error);
-      setRenderError(error.error);
-      setHasError(true);
-    };
-
-    window.addEventListener('error', handleError);
-    return () => window.removeEventListener('error', handleError);
-  }, []);
+  
 
   useEffect(() => {
     if (!isiOS && !isLowData) {
@@ -200,9 +194,7 @@ const SuppliersContent = () => {
 
   // REMOVED: Mobile admin restriction - Full admin access on all devices now!
 
-  // Wrap entire render in try-catch for mobile safety
-  try {
-    return (
+  return (
       <div className="min-h-screen bg-background">
         <Navigation />
 
@@ -614,26 +606,7 @@ const SuppliersContent = () => {
 
       <Footer />
     </div>
-    );
-  } catch (error) {
-    console.error('Critical render error:', error);
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="max-w-md bg-white rounded-lg shadow-xl p-8 text-center">
-          <h1 className="text-2xl font-bold mb-4 text-red-600">⚠️ Error</h1>
-          <p className="text-gray-700 mb-6">
-            The page failed to load. This might be a mobile compatibility issue.
-          </p>
-          <Button onClick={() => window.location.reload()} className="w-full mb-3">
-            Try Again
-          </Button>
-          <Button variant="outline" onClick={() => window.location.href = '/'} className="w-full">
-            Go Home
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  );
 };
 
 const Suppliers = () => {
