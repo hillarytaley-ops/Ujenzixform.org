@@ -13,17 +13,17 @@ async function ensureDir(dir) {
 
 async function optimizeFile(filePath) {
   const ext = path.extname(filePath).toLowerCase();
-  if (ext !== '.jpg' && ext !== '.jpeg') return;
+  if (ext !== '.jpg' && ext !== '.jpeg' && ext !== '.png') return;
   const name = path.basename(filePath, ext);
   const input = path.join(publicDir, `${name}${ext}`);
   const avifOut = path.join(outDir, `${name}.avif`);
   const webpOut = path.join(outDir, `${name}.webp`);
   const jpgOut = path.join(outDir, `${name}.jpg`);
 
-  const img = sharp(input).resize({ width: 800, withoutEnlargement: true });
+  const img = sharp(input).resize({ width: 800, withoutEnlargement: true, fit: 'inside' });
   await img.clone().avif({ quality: 50 }).toFile(avifOut);
   await img.clone().webp({ quality: 60 }).toFile(webpOut);
-  await img.clone().jpeg({ quality: 65, progressive: true }).toFile(jpgOut);
+  await img.clone().flatten({ background: '#ffffff' }).jpeg({ quality: 65, progressive: true }).toFile(jpgOut);
 }
 
 async function main() {

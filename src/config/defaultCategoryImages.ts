@@ -121,7 +121,7 @@ export const DEFAULT_CATEGORY_IMAGES: Record<string, CategoryImage> = {
   },
   'Blocks': {
     category: 'Blocks',
-    imageUrl: '/blocks.jpg',
+    imageUrl: '/blocks.png',
     description: 'Concrete blocks and bricks'
   },
   'Glass': {
