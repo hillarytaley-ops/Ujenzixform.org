@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Building, Store, Package } from "lucide-react";
+import { Building } from "lucide-react";
 import { Link } from "react-router-dom";
  
 import { MaterialsGrid } from "@/components/suppliers/MaterialsGrid";
@@ -53,19 +53,7 @@ const SuppliersMobileOptimized = () => {
               Browse Materials
             </Button>
             
-            <a
-              href={`/auth?lite=1&redirect=${encodeURIComponent('/suppliers?tab=purchase')}`}
-              className="block w-full"
-            >
-              <Button 
-                size="lg"
-                variant="outline"
-                className="w-full h-14 border-2 border-white text-white hover:bg-white/20 font-bold text-lg"
-              >
-                <Store className="h-5 w-5 mr-2" />
-                Sign In
-              </Button>
-            </a>
+            {/* Sign-in CTA removed to avoid confusion and issues; purchasing remains available via item flow */}
             <Link to="/suppliers?full=1" className="w-full">
               <Button 
                 size="lg"
