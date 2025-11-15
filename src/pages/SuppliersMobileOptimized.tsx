@@ -17,7 +17,11 @@ const SuppliersMobileOptimized = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    checkAuth();
+    const conn: any = typeof navigator !== 'undefined' ? (navigator as any).connection : null;
+    const isLowData = !!conn && (conn.saveData || conn.effectiveType === 'slow-2g' || conn.effectiveType === '2g' || conn.effectiveType === '3g');
+    if (!isLowData) {
+      setTimeout(checkAuth, 1500);
+    }
   }, []);
 
   const checkAuth = async () => {

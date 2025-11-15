@@ -83,19 +83,23 @@ const App = () => {
   const [showChat, setShowChat] = React.useState(false);
 
   React.useEffect(() => {
-    // Get current user for chatbot (deferred)
+    const conn: any = typeof navigator !== 'undefined' ? (navigator as any).connection : null;
+    const isLowData = !!conn && (conn.saveData || conn.effectiveType === 'slow-2g' || conn.effectiveType === '2g' || conn.effectiveType === '3g');
+
+    // Get current user for chatbot (deferred, longer delay on low-data)
     const timer = setTimeout(() => {
+      if (isLowData) return;
       import('@/integrations/supabase/client').then(({ supabase }) => {
         supabase.auth.getUser().then(({ data }) => {
           setUser(data.user);
         });
       });
-    }, 1000);
+    }, isLowData ? 4000 : 1000);
 
-    // Load chat widget after page is interactive (defer for better initial load)
+    // Load chat widget after page is interactive (skip on low-data)
     const chatTimer = setTimeout(() => {
-      setShowChat(true);
-    }, 2000);
+      if (!isLowData) setShowChat(true);
+    }, isLowData ? 6000 : 2000);
 
     return () => {
       clearTimeout(timer);
