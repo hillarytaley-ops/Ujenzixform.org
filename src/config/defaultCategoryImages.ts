@@ -31,7 +31,7 @@ export interface CategoryImage {
 export const DEFAULT_CATEGORY_IMAGES: Record<string, CategoryImage> = {
   'Cement': {
     category: 'Cement',
-    imageUrl: 'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=800&q=80&auto=format&fit=crop',
+    imageUrl: '/cement.jpg',
     description: 'Cement - Bamburi, Savannah, Mombasa Cement (50kg bags)'
   },
   'Steel': {
