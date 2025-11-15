@@ -59,7 +59,10 @@ const SuppliersMobileOptimized = () => {
               className="w-full h-14 border-2 border-white text-white hover:bg-white/20 font-bold text-lg"
               onClick={() => {
                 const target = `/auth?redirect=${encodeURIComponent('/suppliers?tab=purchase')}`;
-                window.location.assign(target);
+                const win = window.open(target, '_blank', 'noopener,noreferrer');
+                if (!win) {
+                  window.location.assign(target);
+                }
               }}
             >
               <Store className="h-5 w-5 mr-2" />
