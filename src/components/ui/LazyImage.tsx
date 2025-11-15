@@ -10,6 +10,7 @@ interface LazyImageProps {
   onError?: () => void;
   loading?: 'lazy' | 'eager';
   decoding?: 'async' | 'sync' | 'auto';
+  candidates?: string[];
 }
 
 export const LazyImage: React.FC<LazyImageProps> = ({
@@ -20,7 +21,8 @@ export const LazyImage: React.FC<LazyImageProps> = ({
   onLoad,
   onError,
   loading = 'lazy',
-  decoding = 'async'
+  decoding = 'async',
+  candidates
 }) => {
   const [imageSrc, setImageSrc] = useState(placeholder);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -35,28 +37,33 @@ export const LazyImage: React.FC<LazyImageProps> = ({
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            // Start loading the actual image
-            const imageLoader = new Image();
-            
-            imageLoader.onload = () => {
-              setImageSrc(src);
+            const list = candidates && candidates.length ? candidates : [src];
+            let index = 0;
+            const loader = new Image();
+            const tryNext = () => {
+              const next = list[index];
+              if (!next) {
+                setImageError(true);
+                onError?.();
+                return;
+              }
+              if (next.startsWith('/') || next.startsWith('https://') || next.startsWith('data:')) {
+                loader.src = next;
+              } else {
+                setImageError(true);
+                onError?.();
+              }
+            };
+            loader.onload = () => {
+              setImageSrc(loader.src);
               setImageLoaded(true);
               onLoad?.();
             };
-            
-            imageLoader.onerror = () => {
-              setImageError(true);
-              onError?.();
+            loader.onerror = () => {
+              index += 1;
+              tryNext();
             };
-            
-            // Security: Validate image URL before loading
-            if (src && (src.startsWith('/') || src.startsWith('https://') || src.startsWith('data:'))) {
-              imageLoader.src = src;
-            } else {
-              console.warn('Unsafe image URL blocked:', src);
-              setImageError(true);
-            }
-            
+            tryNext();
             observer.unobserve(img);
           }
         });

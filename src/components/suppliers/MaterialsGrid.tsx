@@ -176,6 +176,12 @@ export const MaterialsGrid = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
   const { toast } = useToast();
+  const gridRef = useRef<HTMLDivElement>(null);
+  const [columns, setColumns] = useState(1);
+  const [visibleStart, setVisibleStart] = useState(0);
+  const [visibleEnd, setVisibleEnd] = useState(24);
+  const CARD_HEIGHT = 420;
+  const BUFFER_ROWS = 2;
   
   // Check for welcome message from registration
   useEffect(() => {
@@ -226,6 +232,35 @@ export const MaterialsGrid = () => {
       setFilteredMaterials(materials.length > 0 ? materials : DEMO_MATERIALS);
     }
   }, [materials, searchQuery, selectedCategory, priceRange, stockFilter]);
+
+  useEffect(() => {
+    const updateColumns = () => {
+      const w = window.innerWidth;
+      if (w < 768) setColumns(1);
+      else if (w < 1024) setColumns(2);
+      else if (w < 1280) setColumns(3);
+      else setColumns(4);
+    };
+    const updateVisible = () => {
+      const rectTop = gridRef.current ? gridRef.current.getBoundingClientRect().top : 0;
+      const containerTop = window.scrollY + rectTop;
+      const startRow = Math.max(0, Math.floor((window.scrollY - containerTop) / CARD_HEIGHT) - BUFFER_ROWS);
+      const rowsInView = Math.ceil(window.innerHeight / CARD_HEIGHT) + BUFFER_ROWS * 2;
+      const startIndex = startRow * columns;
+      const endIndex = Math.min(filteredMaterials.length, startIndex + rowsInView * columns);
+      setVisibleStart(startIndex);
+      setVisibleEnd(endIndex);
+    };
+    updateColumns();
+    updateVisible();
+    const onResize = () => { updateColumns(); updateVisible(); };
+    window.addEventListener('resize', onResize);
+    window.addEventListener('scroll', updateVisible, { passive: true });
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('scroll', updateVisible);
+    };
+  }, [filteredMaterials, columns]);
 
   const loadMaterials = async () => {
     try {
@@ -488,131 +523,135 @@ export const MaterialsGrid = () => {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredMaterials.map((material) => {
-            // Use custom image or fallback to default category image
-            const imageUrl = material.image_url || getDefaultCategoryImage(material.category);
+        <div ref={gridRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {(() => {
+            const totalRows = Math.ceil(filteredMaterials.length / columns);
+            const startRow = Math.floor(visibleStart / columns);
+            const endRow = Math.ceil(visibleEnd / columns);
+            const topSpacer = startRow * CARD_HEIGHT;
+            const bottomSpacer = Math.max(0, (totalRows - endRow) * CARD_HEIGHT);
+            const items = filteredMaterials.slice(visibleStart, visibleEnd);
+            const rendered = [] as JSX.Element[];
+            if (topSpacer > 0) rendered.push(<div key="top-spacer" style={{ height: topSpacer }} />);
+            rendered.push(
+              ...items.map((material, idx) => {
+                const imageUrl = material.image_url || getDefaultCategoryImage(material.category);
+                const candidates = imageUrl && imageUrl.startsWith('/')
+                  ? [
+                      `/optimized/${imageUrl.replace('/','').replace('.jpg','')}.avif`,
+                      `/optimized/${imageUrl.replace('/','').replace('.jpg','')}.webp`,
+                      `/optimized/${imageUrl.replace('/','')}`
+                    ]
+                  : undefined;
 
-            return (
-              <Card key={material.id} className="overflow-hidden hover:shadow-xl transition-all duration-300 group">
-                {/* Material Image - Larger */}
-                <div className="relative aspect-square bg-muted overflow-hidden h-64 sm:h-72 md:h-80">
-                  {imageUrl ? (
-                    <LazyImage
-                      src={imageUrl}
-                      alt={material.name}
-                      className="w-full h-full object-contain p-4 bg-white group-hover:scale-105 transition-transform duration-300"
-                      loading="lazy"
-                      decoding="async"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-white">
-                      <Package className="h-20 w-20 text-muted-foreground" />
-                    </div>
-                  )}
-                
-                  {/* Stock Badge */}
-                  <div className="absolute top-2 right-2">
-                    <Badge className={material.in_stock ? 'bg-green-600' : 'bg-red-600'}>
-                      {material.in_stock ? 'In Stock' : 'Out of Stock'}
-                    </Badge>
-                  </div>
-
-                  {/* Category Badge */}
-                  <div className="absolute top-2 left-2">
-                    <Badge variant="secondary" className="bg-black/60 text-white border-none">
-                      {material.category}
-                    </Badge>
-                  </div>
-                </div>
-
-                {/* Material Info */}
-                <CardHeader>
-                  <CardTitle className="text-lg line-clamp-2 group-hover:text-blue-600 transition-colors">
-                    {material.name}
-                  </CardTitle>
-                  <CardDescription className="line-clamp-2">
-                    {material.description || 'No description available'}
-                  </CardDescription>
-                </CardHeader>
-
-                <CardContent className="space-y-4">
-                  {/* Supplier Info */}
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Store className="h-4 w-4" />
-                    <span className="font-medium">{material.supplier?.company_name}</span>
-                  </div>
-
-                  {/* Price */}
-                  <div className="flex items-baseline justify-between">
-                    <div>
-                      <div className="text-2xl font-bold text-blue-600">
-                        KES {material.unit_price.toLocaleString()}
+                return (
+                  <Card key={`${material.id}-${visibleStart + idx}`} className="overflow-hidden hover:shadow-xl transition-all duration-300 group" style={{ height: CARD_HEIGHT }}>
+                    <div className="relative aspect-square bg-muted overflow-hidden h-64 sm:h-72 md:h-80">
+                      {imageUrl ? (
+                        <LazyImage
+                          src={imageUrl}
+                          alt={material.name}
+                          className="w-full h-full object-contain p-4 bg-white group-hover:scale-105 transition-transform duration-300"
+                          loading="lazy"
+                          decoding="async"
+                          candidates={candidates}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-white">
+                          <Package className="h-20 w-20 text-muted-foreground" />
+                        </div>
+                      )}
+                      <div className="absolute top-2 right-2">
+                        <Badge className={material.in_stock ? 'bg-green-600' : 'bg-red-600'}>
+                          {material.in_stock ? 'In Stock' : 'Out of Stock'}
+                        </Badge>
                       </div>
-                      <div className="text-sm text-muted-foreground">
-                        per {material.unit}
+                      <div className="absolute top-2 left-2">
+                        <Badge variant="secondary" className="bg-black/60 text-white border-none">
+                          {material.category}
+                        </Badge>
                       </div>
                     </div>
-                    {material.supplier?.rating > 0 && (
-                      <Badge variant="outline" className="bg-yellow-50">
-                        ⭐ {material.supplier.rating.toFixed(1)}
-                      </Badge>
-                    )}
-                  </div>
-
-                  {/* Actions - Mobile Friendly Buttons */}
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    {/* Professional Builders: Request Quote */}
-                    {userRole === 'builder' || userRole === 'professional_builder' ? (
-                      <Button 
-                        className="w-full sm:flex-1 bg-blue-600 hover:bg-blue-700 h-12 text-base font-semibold"
-                        onClick={() => handleRequestQuote(material)}
-                        disabled={!material.in_stock}
-                      >
-                        <ShoppingCart className="h-5 w-5 mr-2" />
-                        Request Quote
-                      </Button>
-                    ) : userRole === 'private_client' ? (
-                      /* Private Clients: Purchase Directly (No quote needed) */
-                      <Button 
-                        className="w-full sm:flex-1 bg-green-600 hover:bg-green-700 h-12 text-base font-semibold"
-                        onClick={() => toast({
-                          title: '✅ Adding to Cart',
-                          description: `${material.name} from ${material.supplier?.company_name}. Proceed to checkout to complete purchase.`,
-                        })}
-                        disabled={!material.in_stock}
-                      >
-                        <ShoppingCart className="h-5 w-5 mr-2" />
-                        Buy Now
-                      </Button>
-                    ) : (
-                      /* Not logged in - Redirect to Sign In with return to suppliers */
-                      <Button 
-                        className="w-full sm:flex-1 bg-orange-600 hover:bg-orange-700 h-12 text-base font-semibold"
-                        onClick={() => {
-                          // Use URL parameter for more reliable redirect
-                          window.location.href = '/auth?redirect=' + encodeURIComponent('/suppliers?tab=purchase');
-                        }}
-                        disabled={!material.in_stock}
-                      >
-                        <ShoppingCart className="h-5 w-5 mr-2" />
-                        Sign In to Purchase
-                      </Button>
-                    )}
-                    <Button 
-                      variant="outline"
-                      onClick={() => toast({
-                        title: 'Supplier Info',
-                        description: `${material.supplier?.company_name} - ${material.supplier?.location}`
-                      })}
-                    >
-                      <Store className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg line-clamp-2 group-hover:text-blue-600 transition-colors">
+                        {material.name}
+                      </CardTitle>
+                      <CardDescription className="line-clamp-2">
+                        {material.description || 'No description available'}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Store className="h-4 w-4" />
+                        <span className="font-medium">{material.supplier?.company_name}</span>
+                      </div>
+                      <div className="flex items-baseline justify-between">
+                        <div>
+                          <div className="text-2xl font-bold text-blue-600">
+                            KES {material.unit_price.toLocaleString()}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            per {material.unit}
+                          </div>
+                        </div>
+                        {material.supplier?.rating > 0 && (
+                          <Badge variant="outline" className="bg-yellow-50">
+                            ⭐ {material.supplier.rating.toFixed(1)}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        {userRole === 'builder' || userRole === 'professional_builder' ? (
+                          <Button 
+                            className="w-full sm:flex-1 bg-blue-600 hover:bg-blue-700 h-12 text-base font-semibold"
+                            onClick={() => handleRequestQuote(material)}
+                            disabled={!material.in_stock}
+                          >
+                            <ShoppingCart className="h-5 w-5 mr-2" />
+                            Request Quote
+                          </Button>
+                        ) : userRole === 'private_client' ? (
+                          <Button 
+                            className="w-full sm:flex-1 bg-green-600 hover:bg-green-700 h-12 text-base font-semibold"
+                            onClick={() => toast({
+                              title: '✅ Adding to Cart',
+                              description: `${material.name} from ${material.supplier?.company_name}. Proceed to checkout to complete purchase.`,
+                            })}
+                            disabled={!material.in_stock}
+                          >
+                            <ShoppingCart className="h-5 w-5 mr-2" />
+                            Buy Now
+                          </Button>
+                        ) : (
+                          <Button 
+                            className="w-full sm:flex-1 bg-orange-600 hover:bg-orange-700 h-12 text-base font-semibold"
+                            onClick={() => {
+                              window.location.href = '/auth?redirect=' + encodeURIComponent('/suppliers?tab=purchase');
+                            }}
+                            disabled={!material.in_stock}
+                          >
+                            <ShoppingCart className="h-5 w-5 mr-2" />
+                            Sign In to Purchase
+                          </Button>
+                        )}
+                        <Button 
+                          variant="outline"
+                          onClick={() => toast({
+                            title: 'Supplier Info',
+                            description: `${material.supplier?.company_name} - ${material.supplier?.location}`
+                          })}
+                        >
+                          <Store className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })
             );
-          })}
+            if (bottomSpacer > 0) rendered.push(<div key="bottom-spacer" style={{ height: bottomSpacer }} />);
+            return rendered;
+          })()}
         </div>
       )}
     </div>

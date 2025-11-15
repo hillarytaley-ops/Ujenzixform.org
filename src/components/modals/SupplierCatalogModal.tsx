@@ -392,6 +392,13 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
                 {filteredItems.map((item) => {
                   // Use custom image, fallback to default category image, or show placeholder
                   const imageUrl = item.image || getDefaultCategoryImage(item.category);
+                  const candidates = imageUrl && imageUrl.startsWith('/')
+                    ? [
+                        `/optimized/${imageUrl.replace('/','').replace('.jpg','')}.avif`,
+                        `/optimized/${imageUrl.replace('/','').replace('.jpg','')}.webp`,
+                        `/optimized/${imageUrl.replace('/','')}`
+                      ]
+                    : undefined;
                   
                   return (
                   <Card key={item.id} className="hover:shadow-lg transition-shadow">
@@ -404,6 +411,7 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
                             className="w-full h-full object-cover"
                             loading="lazy"
                             decoding="async"
+                            candidates={candidates}
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
@@ -455,6 +463,13 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
                 {filteredItems.map((item) => {
                   // Use custom image, fallback to default category image, or show placeholder
                   const imageUrl = item.image || getDefaultCategoryImage(item.category);
+                  const candidates = imageUrl && imageUrl.startsWith('/')
+                    ? [
+                        `/optimized/${imageUrl.replace('/','').replace('.jpg','')}.avif`,
+                        `/optimized/${imageUrl.replace('/','').replace('.jpg','')}.webp`,
+                        `/optimized/${imageUrl.replace('/','')}`
+                      ]
+                    : undefined;
                   
                   return (
                   <Card key={item.id}>
@@ -468,6 +483,7 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
                               className="w-full h-full object-cover"
                               loading="lazy"
                               decoding="async"
+                              candidates={candidates}
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">
