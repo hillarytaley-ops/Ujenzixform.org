@@ -146,8 +146,34 @@ export const DEFAULT_CATEGORY_IMAGES: Record<string, CategoryImage> = {
  * @param category - The material category
  * @returns The default image URL or undefined if not found
  */
+const normalizeCategory = (raw: string): string => {
+  const v = (raw || '').trim().toLowerCase();
+  const direct = Object.keys(DEFAULT_CATEGORY_IMAGES).find(k => k.toLowerCase() === v);
+  if (direct) return direct;
+  const synonyms: Record<string, string[]> = {
+    'Aggregates': ['ballast', 'gravel', 'stone', 'stones', 'aggregate'],
+    'Sand': ['river sand', 'sand'],
+    'Blocks': ['cabro', 'paving blocks', 'pavement blocks', 'concrete blocks', 'blocks'],
+    'Iron Sheets': ['mabati', 'roofing sheets', 'iron sheets', 'roofing'],
+    'Steel': ['rebar', 'steel bars', 'reinforcement'],
+    'Plumbing': ['pipes', 'pvc pipes', 'plumbing'],
+    'Electrical': ['cables', 'switches', 'sockets', 'electrical'],
+    'Timber': ['wood', 'lumber', 'timber'],
+    'Tiles': ['ceramic tiles', 'floor tiles', 'wall tiles', 'tiles'],
+    'Doors': ['door', 'flush door', 'steel door', 'wooden door', 'doors'],
+    'Windows': ['window', 'aluminium window', 'upvc window', 'windows'],
+    'Wire': ['wire mesh', 'chain link', 'mesh', 'wire'],
+    'Tools': ['tools', 'hardware']
+  };
+  for (const target of Object.keys(synonyms)) {
+    if (synonyms[target].some(s => v.includes(s))) return target;
+  }
+  return 'Other';
+};
+
 export const getDefaultCategoryImage = (category: string): string | undefined => {
-  return DEFAULT_CATEGORY_IMAGES[category]?.imageUrl;
+  const key = normalizeCategory(category);
+  return DEFAULT_CATEGORY_IMAGES[key]?.imageUrl;
 };
 
 /**
@@ -164,6 +190,7 @@ export const getCategoryOptions = (): CategoryImage[] => {
  * @returns True if default image exists
  */
 export const hasDefaultImage = (category: string): boolean => {
-  return !!DEFAULT_CATEGORY_IMAGES[category];
+  const key = normalizeCategory(category);
+  return !!DEFAULT_CATEGORY_IMAGES[key];
 };
 
