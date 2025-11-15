@@ -5,39 +5,21 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Building, Store, Package } from "lucide-react";
 import { Link } from "react-router-dom";
-import Navigation from "@/components/Navigation";
-import Footer from "@/components/Footer";
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from "@/hooks/use-toast";
+ 
 import { MaterialsGridSafe } from "@/components/suppliers/MaterialsGridSafe";
 
 // Ultra-optimized Suppliers page for mobile/iPhone
 const SuppliersMobileOptimized = () => {
-  const [user, setUser] = useState<any>(null);
-  const { toast } = useToast();
+  
 
-  useEffect(() => {
-    const conn: any = typeof navigator !== 'undefined' ? (navigator as any).connection : null;
-    const isLowData = !!conn && (conn.saveData || conn.effectiveType === 'slow-2g' || conn.effectiveType === '2g' || conn.effectiveType === '3g');
-    if (!isLowData) {
-      setTimeout(checkAuth, 1500);
-    }
-  }, []);
+  
 
-  const checkAuth = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user || null);
-    } catch (error) {
-      console.error('Auth check error:', error);
-    }
-  };
+  
 
   // Render immediately without gating on auth
 
   return (
     <div className="min-h-screen bg-background">
-      <Navigation />
 
       {/* Simple, Highly Visible Hero for iPhone */}
       <section className="bg-gradient-to-br from-blue-600 to-blue-800 text-white py-16 px-4">
@@ -71,14 +53,14 @@ const SuppliersMobileOptimized = () => {
               Browse Materials
             </Button>
             
-            <Link to={user ? "/suppliers" : "/auth"} className="w-full">
+            <Link to="/auth" className="w-full">
               <Button 
                 size="lg"
                 variant="outline"
                 className="w-full h-14 border-2 border-white text-white hover:bg-white/20 font-bold text-lg"
               >
                 <Store className="h-5 w-5 mr-2" />
-                {user ? 'My Dashboard' : 'Sign In'}
+                Sign In
               </Button>
             </Link>
             <Link to="/suppliers?full=1" className="w-full">
@@ -122,7 +104,7 @@ const SuppliersMobileOptimized = () => {
         </div>
       </main>
 
-      <Footer />
+      
     </div>
   );
 };
