@@ -35,7 +35,8 @@ const Auth = () => {
   // Get redirect parameter from URL
   const urlParams = new URLSearchParams(window.location.search);
   const redirectTo = urlParams.get('redirect') || null;
-  const liteMode = !!redirectTo;
+  const liteParam = urlParams.get('lite');
+  const liteMode = (liteParam === '1') || !!redirectTo;
 
   useEffect(() => {
     // Set up auth state listener FIRST

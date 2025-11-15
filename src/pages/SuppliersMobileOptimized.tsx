@@ -54,7 +54,7 @@ const SuppliersMobileOptimized = () => {
             </Button>
             
             <a
-              href={`/auth?redirect=${encodeURIComponent('/suppliers?tab=purchase')}`}
+              href={`/auth?lite=1&redirect=${encodeURIComponent('/suppliers?tab=purchase')}`}
               className="block w-full"
             >
               <Button 
