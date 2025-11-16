@@ -543,48 +543,48 @@ const Monitoring = () => {
                   </Badge>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                  {/* Camera List - Smaller */}
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 md:gap-6">
+                  {/* Camera List - Smaller - Mobile Optimized */}
                   <div className="lg:col-span-1">
                     <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg">Camera Feeds</CardTitle>
-                        <CardDescription className="text-sm">Select camera</CardDescription>
+                      <CardHeader className="p-4 md:p-6">
+                        <CardTitle className="text-base md:text-lg">Camera Feeds</CardTitle>
+                        <CardDescription className="text-xs md:text-sm">Select camera</CardDescription>
                       </CardHeader>
-                      <CardContent>
-                        <div className="space-y-3">
+                      <CardContent className="p-4 md:p-6">
+                        <div className="space-y-2 md:space-y-3">
                           {cameras.map((camera) => {
                             const isDrone = camera.id.startsWith('drone-');
                             return (
                               <div
                                 key={camera.id}
-                                className={`p-3 border rounded-lg cursor-pointer transition-colors backdrop-blur-sm ${
+                                className={`p-2 md:p-3 border rounded-lg cursor-pointer transition-colors backdrop-blur-sm ${
                                   selectedCamera === camera.id ? 'border-primary bg-primary/10' : 'hover:bg-white/20'
                                 } ${isDrone ? 'border-l-4 border-l-purple-500' : ''}`}
                                 onClick={() => setSelectedCamera(camera.id)}
                               >
-                                <div className="flex items-center justify-between mb-2">
-                                  <div className="flex items-center gap-2">
-                                    {isDrone && <Plane className="h-4 w-4 text-purple-500" />}
-                                    <span className="font-medium">{camera.name}</span>
+                                <div className="flex items-center justify-between mb-1 md:mb-2">
+                                  <div className="flex items-center gap-1 md:gap-2">
+                                    {isDrone && <Plane className="h-3 w-3 md:h-4 md:w-4 text-purple-500" />}
+                                    <span className="font-medium text-xs md:text-sm">{camera.name}</span>
                                   </div>
-                                  <Badge className={getStatusColor(camera.status)}>
+                                  <Badge className={`text-xs ${getStatusColor(camera.status)}`}>
                                     {camera.status}
                                   </Badge>
                                 </div>
-                                <div className="text-sm text-muted-foreground mb-2">
+                                <div className="text-xs md:text-sm text-muted-foreground mb-1 md:mb-2 truncate">
                                   {camera.projectSite}
                                 </div>
-                                <div className="text-xs text-muted-foreground mb-2">
+                                <div className="text-xs text-muted-foreground mb-1 md:mb-2 truncate">
                                   {camera.location}
                                 </div>
                                 <div className="flex items-center justify-between text-xs">
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-1 md:gap-2">
                                     <span className={isDrone ? 'font-medium text-purple-600' : ''}>{camera.quality}</span>
                                     {camera.isRecording && <Video className="h-3 w-3 text-red-500" />}
-                                    {isDrone && <Badge variant="outline" className="text-xs bg-purple-50/40 text-purple-700">Aerial</Badge>}
+                                    {isDrone && <Badge variant="outline" className="text-xs bg-purple-50/40 text-purple-700 hidden md:inline-flex">Aerial</Badge>}
                                   </div>
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-1 md:gap-2">
                                     <Eye className="h-3 w-3" />
                                     <span>{camera.viewers}</span>
                                     <Wifi className="h-3 w-3" />
@@ -606,80 +606,80 @@ const Monitoring = () => {
                     </Card>
                   </div>
 
-                  {/* Main Video Feed - Larger */}
+                  {/* Main Video Feed - Larger - Mobile Responsive */}
                   <div className="lg:col-span-3">
                     <Card>
-                      <CardHeader>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <CardTitle className="text-2xl">{selectedCamera ? cameras.find(c => c.id === selectedCamera)?.name : 'Select Camera'}</CardTitle>
-                            <CardDescription className="text-base">{selectedCamera ? cameras.find(c => c.id === selectedCamera)?.projectSite : 'Choose a camera to view live feed'}</CardDescription>
+                      <CardHeader className="p-4 md:p-6">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <CardTitle className="text-lg md:text-xl lg:text-2xl truncate">{selectedCamera ? cameras.find(c => c.id === selectedCamera)?.name : 'Select Camera'}</CardTitle>
+                            <CardDescription className="text-sm md:text-base truncate">{selectedCamera ? cameras.find(c => c.id === selectedCamera)?.projectSite : 'Choose a camera to view live feed'}</CardDescription>
                           </div>
                           {selectedCamera && (
-                            <Badge className={getStatusColor(cameras.find(c => c.id === selectedCamera)?.status || '')}>
+                            <Badge className={`text-xs md:text-sm flex-shrink-0 ${getStatusColor(cameras.find(c => c.id === selectedCamera)?.status || '')}`}>
                               {cameras.find(c => c.id === selectedCamera)?.status}
                             </Badge>
                           )}
                         </div>
                       </CardHeader>
-                      <CardContent className="p-2">
-                        <div className="aspect-video bg-black rounded-lg flex items-center justify-center relative min-h-[500px]">
+                      <CardContent className="p-2 md:p-4">
+                        <div className="aspect-video bg-black rounded-lg flex items-center justify-center relative min-h-[200px] sm:min-h-[300px] md:min-h-[400px] lg:min-h-[500px]">
                           {selectedCamera ? (
-                            <div className="text-white text-center">
+                            <div className="text-white text-center p-4">
                               {selectedCamera.startsWith('drone-') ? (
                                 <>
-                                  <Plane className="h-16 w-16 mx-auto mb-4 opacity-75 text-purple-300" />
-                                  <p className="text-2xl font-semibold">Drone Aerial Feed</p>
-                                  <p className="text-sm opacity-75">
+                                  <Plane className="h-12 w-12 sm:h-14 sm:w-14 md:h-16 md:w-16 mx-auto mb-2 md:mb-4 opacity-75 text-purple-300" />
+                                  <p className="text-lg sm:text-xl md:text-2xl font-semibold">Drone Aerial Feed</p>
+                                  <p className="text-xs sm:text-sm opacity-75 mt-1">
                                     {cameras.find(c => c.id === selectedCamera)?.quality} Aerial Stream
                                   </p>
-                                  <Badge className="mt-2 bg-purple-600 text-white">
+                                  <Badge className="mt-2 bg-purple-600 text-white text-xs md:text-sm">
                                     Aerial View
                                   </Badge>
                                 </>
                               ) : (
                                 <>
-                                  <Camera className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                                  <p className="text-2xl font-semibold">Live Feed</p>
-                                  <p className="text-lg opacity-75 mt-2">
+                                  <Camera className="h-12 w-12 sm:h-14 sm:w-14 md:h-16 md:w-16 mx-auto mb-2 md:mb-4 opacity-50" />
+                                  <p className="text-lg sm:text-xl md:text-2xl font-semibold">Live Feed</p>
+                                  <p className="text-sm sm:text-base md:text-lg opacity-75 mt-2">
                                     {cameras.find(c => c.id === selectedCamera)?.quality} Stream
                                   </p>
                                 </>
                               )}
                             </div>
                           ) : (
-                            <div className="text-white text-center">
-                              <Monitor className="h-20 w-20 mx-auto mb-4 opacity-50" />
-                              <p className="text-2xl font-semibold">Select a Camera</p>
-                              <p className="text-lg opacity-75 mt-2">Choose from the list to view live feed</p>
+                            <div className="text-white text-center p-4">
+                              <Monitor className="h-12 w-12 sm:h-16 sm:w-16 md:h-20 md:w-20 mx-auto mb-2 md:mb-4 opacity-50" />
+                              <p className="text-lg sm:text-xl md:text-2xl font-semibold">Select a Camera</p>
+                              <p className="text-sm sm:text-base md:text-lg opacity-75 mt-1 md:mt-2">Choose from the list to view live feed</p>
                             </div>
                           )}
                           
-                          {/* Video Controls */}
+                          {/* Video Controls - Mobile Responsive */}
                           {selectedCamera && (
-                            <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <Button size="sm" variant="secondary">
-                                  <Play className="h-4 w-4" />
+                            <div className="absolute bottom-2 md:bottom-4 left-2 md:left-4 right-2 md:right-4 flex items-center justify-between">
+                              <div className="flex items-center gap-1 md:gap-2">
+                                <Button size="sm" variant="secondary" className="h-8 w-8 md:h-9 md:w-9 p-0">
+                                  <Play className="h-3 w-3 md:h-4 md:w-4" />
                                 </Button>
-                                <Button size="sm" variant="secondary">
-                                  <Pause className="h-4 w-4" />
+                                <Button size="sm" variant="secondary" className="h-8 w-8 md:h-9 md:w-9 p-0">
+                                  <Pause className="h-3 w-3 md:h-4 md:w-4" />
                                 </Button>
                               </div>
                               
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1 md:gap-2">
                                 {isAdmin && (
-                                  <Button size="sm" variant="secondary">
-                                    <Settings className="h-4 w-4" />
+                                  <Button size="sm" variant="secondary" className="h-8 w-8 md:h-9 md:w-9 p-0">
+                                    <Settings className="h-3 w-3 md:h-4 md:w-4" />
                                   </Button>
                                 )}
                                 {selectedCamera.startsWith('drone-') && isAdmin && (
-                                  <Button size="sm" variant="secondary" title="Drone Controls">
-                                    <Plane className="h-4 w-4" />
+                                  <Button size="sm" variant="secondary" title="Drone Controls" className="h-8 w-8 md:h-9 md:w-9 p-0">
+                                    <Plane className="h-3 w-3 md:h-4 md:w-4" />
                                   </Button>
                                 )}
-                                <Button size="sm" variant="secondary">
-                                  <RefreshCw className="h-4 w-4" />
+                                <Button size="sm" variant="secondary" className="h-8 w-8 md:h-9 md:w-9 p-0">
+                                  <RefreshCw className="h-3 w-3 md:h-4 md:w-4" />
                                 </Button>
                               </div>
                             </div>
