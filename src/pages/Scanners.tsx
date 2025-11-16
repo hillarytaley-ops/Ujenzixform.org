@@ -3,12 +3,15 @@ import { Button } from "@/components/ui/button";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { DispatchScanner } from '@/components/qr/DispatchScanner';
 import { ReceivingScanner } from '@/components/qr/ReceivingScanner';
+import Navigation from "@/components/Navigation";
+import Footer from "@/components/Footer";
 
 
 const Scanners = () => {
   useEffect(() => {}, []);
   return (
     <div className="min-h-screen bg-background">
+      <Navigation />
       <main className="py-8">
         <div className="container mx-auto px-4">
           <ErrorBoundary fallback={
@@ -32,6 +35,7 @@ const Scanners = () => {
           </ErrorBoundary>
         </div>
       </main>
+      <Footer />
     </div>
   );
 };
