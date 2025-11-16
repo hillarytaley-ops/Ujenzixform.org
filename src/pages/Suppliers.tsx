@@ -58,12 +58,13 @@ const SuppliersContent = () => {
 
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const full = searchParams.get("full");
-    if (full !== "1") {
-      navigate("/suppliers-mobile", { replace: true });
-    }
-  }, []);
+  // Disabled mobile redirect - keeping full version for all users
+  // useEffect(() => {
+  //   const full = searchParams.get("full");
+  //   if (full !== "1") {
+  //     navigate("/suppliers-mobile", { replace: true });
+  //   }
+  // }, []);
 
   
 
