@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Package } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Package, ShoppingCart } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 // Ultra-safe demo materials - guaranteed to work on iPhone
 const SAFE_DEMO_MATERIALS = [
@@ -50,6 +53,77 @@ const SAFE_DEMO_MATERIALS = [
 export const MaterialsGridSafe = () => {
   const [materials, setMaterials] = useState(SAFE_DEMO_MATERIALS);
   const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  const checkAuth = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUser(user);
+        
+        // Get role from user_roles table
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .limit(1)
+          .maybeSingle();
+        
+        const role = roleData?.role || 'builder';
+        setUserRole(role);
+      }
+    } catch (error) {
+      console.error('Auth check error:', error);
+    }
+  };
+
+  const handleRequestQuote = (material: any) => {
+    if (!user) {
+      window.location.href = '/auth?lite=1&redirect=' + encodeURIComponent('/suppliers?tab=purchase');
+      return;
+    }
+
+    if (userRole === 'builder' || userRole === 'professional_builder') {
+      toast({
+        title: 'Quote Request Initiated',
+        description: `Requesting quote for ${material.name}. The supplier will contact you shortly.`,
+      });
+      // TODO: Implement actual quote request to backend
+    } else {
+      toast({
+        title: 'Professional Builders Only',
+        description: 'Request Quote is available for professional builders. Please use Buy Now instead.',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleBuyNow = (material: any) => {
+    if (!user) {
+      window.location.href = '/auth?lite=1&redirect=' + encodeURIComponent('/suppliers?tab=purchase&welcome=private_client');
+      return;
+    }
+
+    if (userRole === 'private_client' || userRole === 'builder') {
+      toast({
+        title: 'Purchase Initiated',
+        description: `Adding ${material.name} to your cart. Proceed to checkout.`,
+      });
+      // TODO: Implement actual buy now functionality
+    } else {
+      toast({
+        title: 'Private Clients Only',
+        description: 'Buy Now is available for private clients. Please use Request Quote instead.',
+        variant: 'destructive'
+      });
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -74,7 +148,7 @@ export const MaterialsGridSafe = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Category:</span>
                     <span className="text-sm font-medium">{material.category}</span>
@@ -94,6 +168,33 @@ export const MaterialsGridSafe = () => {
                       {material.in_stock ? 'In Stock' : 'Out of Stock'}
                     </span>
                   </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex flex-col gap-2 pt-3 border-t">
+                    <Button 
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+                      onClick={() => handleRequestQuote(material)}
+                      disabled={!material.in_stock}
+                    >
+                      <ShoppingCart className="h-4 w-4 mr-2" />
+                      Request Quote
+                    </Button>
+                    <Button 
+                      className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold"
+                      onClick={() => handleBuyNow(material)}
+                      disabled={!material.in_stock}
+                    >
+                      <ShoppingCart className="h-4 w-4 mr-2" />
+                      Buy Now
+                    </Button>
+                  </div>
+
+                  {/* Sign In Notice for Non-Authenticated Users */}
+                  {!user && (
+                    <div className="text-xs text-center text-gray-600 pt-2 border-t">
+                      <p>Sign in to purchase materials</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
