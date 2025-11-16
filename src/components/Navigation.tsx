@@ -16,6 +16,9 @@ const Navigation = () => {
   const location = useLocation();
   const { toast } = useToast();
 
+  // DEBUG: Log to verify Navigation is rendering
+  console.log('🔍 Navigation component rendering');
+
   useEffect(() => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
