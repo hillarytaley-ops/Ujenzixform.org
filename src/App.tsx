@@ -17,7 +17,6 @@ const Builders = lazy(() => import("./pages/Builders"));
 const BuilderRegistration = lazy(() => import("./pages/BuilderRegistration"));
 const ProfessionalBuilderRegistration = lazy(() => import("./pages/ProfessionalBuilderRegistration"));
 const PrivateBuilderRegistration = lazy(() => import("./pages/PrivateBuilderRegistration"));
-import Suppliers from "./pages/Suppliers";
 const SuppliersIPhone = lazy(() => import("./pages/SuppliersIPhone"));
 const SuppliersMobileOptimized = lazy(() => import("./pages/SuppliersMobileOptimized"));
 const BuilderPortal = lazy(() => import("./pages/BuilderPortal"));

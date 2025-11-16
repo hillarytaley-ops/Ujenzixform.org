@@ -53,16 +53,17 @@ const SuppliersMobileOptimized = () => {
               Browse Materials
             </Button>
             
-            {/* View Full Suppliers Page - Opens full desktop version */}
-            <Button 
-              size="lg"
-              variant="secondary"
-              className="w-full h-12 bg-white/20 text-white hover:bg-white/30"
-              onClick={() => window.location.href = '/suppliers'}
-            >
-              <Building className="h-5 w-5 mr-2" />
-              View Full Suppliers Page
-            </Button>
+            {/* Sign In Button */}
+            <Link to="/auth">
+              <Button 
+                size="lg"
+                variant="secondary"
+                className="w-full h-12 bg-white/20 text-white hover:bg-white/30"
+              >
+                <Building className="h-5 w-5 mr-2" />
+                Sign In / Register
+              </Button>
+            </Link>
           </div>
         </div>
       </section>
