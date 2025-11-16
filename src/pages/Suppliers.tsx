@@ -55,9 +55,9 @@ const Suppliers = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+        <div className="min-h-screen bg-background">
       {/* NAVIGATION BAR - AT THE TOP */}
-      <Navigation />
+          <Navigation />
 
       {/* Kenyan-Themed Hero Section */}
       <section className="bg-gradient-to-br from-blue-700 via-blue-800 to-blue-900 text-white py-16 sm:py-20">
@@ -120,46 +120,46 @@ const Suppliers = () => {
               Purchase Materials
             </Button>
           </div>
-        </div>
-      </section>
+          </div>
+         </section>
 
       {/* Main Content Area */}
       <main className="w-full px-4 md:px-6 lg:px-8 py-12 bg-gradient-to-b from-gray-50 to-white">
         {/* Admin Badge (if admin) */}
-        {isAdmin && (
+          {isAdmin && (
           <div className="max-w-6xl mx-auto mb-8">
             <div className="bg-gradient-to-r from-blue-50 to-green-50 border-2 border-blue-300 rounded-xl p-6 text-center">
               <p className="text-lg font-bold text-blue-900">
                 🇰🇪 Admin View - You have full access to all supplier data
-              </p>
-            </div>
-          </div>
+                  </p>
+                </div>
+              </div>
         )}
 
         {/* Materials Marketplace Section */}
         <div className="max-w-7xl mx-auto">
-          <Card className="shadow-xl">
+                  <Card className="shadow-xl">
             <CardHeader className="bg-gradient-to-r from-blue-50 to-white">
               <CardTitle className="text-3xl flex items-center gap-2">
                 {isAdmin ? '🛡️ Admin Materials View' : '📦 Materials Marketplace'}
-              </CardTitle>
-              <CardDescription className="text-base">
+                      </CardTitle>
+                      <CardDescription className="text-base">
                 {isAdmin 
                   ? 'Administrator view of all construction materials from verified suppliers' 
                   : 'Browse construction materials from verified suppliers across Kenya'}
-              </CardDescription>
-            </CardHeader>
+                      </CardDescription>
+                    </CardHeader>
             <CardContent className="p-6">
               {/* 20 Kenyan Construction Materials with Request Quote & Buy Now Buttons */}
               <MaterialsGridSafe />
-            </CardContent>
-          </Card>
-        </div>
+                    </CardContent>
+                  </Card>
+                </div>
       </main>
 
       {/* Footer */}
-      <Footer />
-    </div>
+        <Footer />
+      </div>
   );
 };
 
