@@ -8,6 +8,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Search, ShoppingCart, Store, Package, Filter, PartyPopper } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { QuickPurchaseOrder } from '@/components/builders/QuickPurchaseOrder';
 import { getDefaultCategoryImage } from '@/config/defaultCategoryImages';
 import { LazyImage } from '@/components/ui/LazyImage';
 import { useSearchParams } from 'react-router-dom';
@@ -175,6 +177,8 @@ export const MaterialsGrid = () => {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
+  const [isMultiQuoteOpen, setIsMultiQuoteOpen] = useState(false);
+  const [builderId, setBuilderId] = useState<string>('');
   const { toast } = useToast();
   const gridRef = useRef<HTMLDivElement>(null);
   const [columns, setColumns] = useState(1);
@@ -485,6 +489,24 @@ export const MaterialsGrid = () => {
     }
   };
 
+  const openMultiQuote = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        window.location.href = '/auth?lite=1&redirect=' + encodeURIComponent('/suppliers?tab=purchase');
+        return;
+      }
+      setBuilderId(user.id);
+      setIsMultiQuoteOpen(true);
+    } catch (e) {
+      toast({
+        title: 'Failed to open',
+        description: 'Please try again or contact support',
+        variant: 'destructive'
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -523,10 +545,21 @@ export const MaterialsGrid = () => {
             Browse {filteredMaterials.length} materials from {new Set(materials.map(m => m.supplier_id)).size} suppliers
           </p>
         </div>
-        <Button onClick={loadMaterials} variant="outline">
-          <Package className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          {(userRole === 'builder' || userRole === 'professional_builder') && (
+            <Button 
+              onClick={openMultiQuote} 
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              <PartyPopper className="h-4 w-4 mr-2" />
+              Multi-quote
+            </Button>
+          )}
+          <Button onClick={loadMaterials} variant="outline">
+            <Package className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -748,6 +781,20 @@ export const MaterialsGrid = () => {
           })()}
         </div>
       )}
+      <Dialog open={isMultiQuoteOpen} onOpenChange={setIsMultiQuoteOpen}>
+        <DialogContent className="sm:max-w-[800px]">
+          <DialogHeader>
+            <DialogTitle>Multi-quote Request</DialogTitle>
+            <DialogDescription>Create a purchase order and send quote requests to multiple suppliers.</DialogDescription>
+          </DialogHeader>
+          {builderId && (
+            <QuickPurchaseOrder 
+              builderId={builderId} 
+              onClose={() => setIsMultiQuoteOpen(false)} 
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
