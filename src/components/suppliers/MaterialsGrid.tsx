@@ -9,6 +9,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Search, ShoppingCart, Store, Package, Filter, PartyPopper } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { QuickPurchaseOrder } from '@/components/builders/QuickPurchaseOrder';
 import { getDefaultCategoryImage } from '@/config/defaultCategoryImages';
 import { LazyImage } from '@/components/ui/LazyImage';
@@ -180,6 +183,8 @@ export const MaterialsGrid = () => {
   const [isMultiQuoteOpen, setIsMultiQuoteOpen] = useState(false);
   const [builderId, setBuilderId] = useState<string>('');
   const [preselectedSupplierUserIds, setPreselectedSupplierUserIds] = useState<string[]>([]);
+  const [allSuppliers, setAllSuppliers] = useState<{ id: string; user_id?: string; company_name: string; location?: string; rating?: number }[]>([]);
+  const [selectedSuppliersMap, setSelectedSuppliersMap] = useState<Record<string, string[]>>({});
   const { toast } = useToast();
   const gridRef = useRef<HTMLDivElement>(null);
   const [columns, setColumns] = useState(1);
@@ -227,6 +232,23 @@ export const MaterialsGrid = () => {
       setFilteredMaterials(DEMO_MATERIALS);
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    const fetchSuppliers = async () => {
+      try {
+        const { data } = await supabase
+          .from('suppliers')
+          .select('id, user_id, company_name, location, rating')
+          .eq('status', 'active')
+          .order('rating', { ascending: false })
+          .limit(50);
+        setAllSuppliers(data || []);
+      } catch (e) {
+        setAllSuppliers([]);
+      }
+    };
+    fetchSuppliers();
   }, []);
 
   useEffect(() => {
@@ -414,6 +436,9 @@ export const MaterialsGrid = () => {
         window.location.href = '/auth?lite=1&redirect=' + encodeURIComponent('/suppliers?tab=purchase');
         return;
       }
+      const chosenSupplierIds = selectedSuppliersMap[material.id] && selectedSuppliersMap[material.id].length > 0
+        ? selectedSuppliersMap[material.id]
+        : (material.supplier_id ? [material.supplier_id] : []);
       const { data: orderData, error: orderError } = await supabase
         .from('purchase_orders')
         .insert({
@@ -436,17 +461,18 @@ export const MaterialsGrid = () => {
           notes: ''
         });
       if (itemsError) throw itemsError;
-      await supabase
-        .from('quote_requests')
-        .insert({
+      if (chosenSupplierIds.length > 0) {
+        const quoteRequests = chosenSupplierIds.map(supplierId => ({
           order_id: orderData.id,
-          supplier_id: material.supplier_id,
+          supplier_id,
           status: 'pending',
           created_at: new Date().toISOString()
-        });
+        }));
+        await supabase.from('quote_requests').insert(quoteRequests);
+      }
       toast({
         title: 'Quote Requested',
-        description: `${material.name} sent to ${material.supplier?.company_name}`,
+        description: `${material.name} sent to ${chosenSupplierIds.length || 1} supplier(s)`,
       });
     } catch (e) {
       toast({
@@ -464,11 +490,15 @@ export const MaterialsGrid = () => {
         window.location.href = '/auth?lite=1&redirect=' + encodeURIComponent('/suppliers?tab=purchase');
         return;
       }
+      const chosenSupplierId = selectedSuppliersMap[material.id] && selectedSuppliersMap[material.id].length > 0
+        ? selectedSuppliersMap[material.id][0]
+        : material.supplier_id;
       const { data: orderData, error: orderError } = await supabase
         .from('purchase_orders')
         .insert({
           builder_id: user.id,
           project_name: 'Direct Purchase',
+          supplier_id: chosenSupplierId,
           status: 'pending',
           created_at: new Date().toISOString()
         })
@@ -488,7 +518,7 @@ export const MaterialsGrid = () => {
       if (itemsError) throw itemsError;
       toast({
         title: 'Added to order',
-        description: `${material.name} from ${material.supplier?.company_name}`,
+        description: `${material.name} with supplier preference set`,
       });
     } catch (e) {
       toast({
@@ -779,6 +809,38 @@ export const MaterialsGrid = () => {
                         >
                           <Store className="h-4 w-4" />
                         </Button>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className="sm:flex-none">
+                              Choose Suppliers
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-64">
+                            <div className="space-y-2">
+                              <Label className="text-sm">Select preferred suppliers</Label>
+                              <div className="max-h-48 overflow-y-auto space-y-2">
+                                {allSuppliers.map(s => (
+                                  <div key={`${material.id}-${s.id}`} className="flex items-center space-x-2">
+                                    <Checkbox
+                                      id={`${material.id}-${s.id}`}
+                                      checked={(selectedSuppliersMap[material.id] || []).includes(s.id)}
+                                      onCheckedChange={(checked) => {
+                                        setSelectedSuppliersMap(prev => {
+                                          const current = prev[material.id] || [];
+                                          const next = checked ? [...current, s.id] : current.filter(x => x !== s.id);
+                                          return { ...prev, [material.id]: next };
+                                        });
+                                      }}
+                                    />
+                                    <label htmlFor={`${material.id}-${s.id}`} className="text-sm cursor-pointer truncate">
+                                      {s.company_name}
+                                    </label>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
                       </div>
                     </CardContent>
                   </Card>
