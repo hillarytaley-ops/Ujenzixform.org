@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Building } from "lucide-react";
 import { Link } from "react-router-dom";
+import Navigation from "@/components/Navigation";
+import Footer from "@/components/Footer";
  
 import { MaterialsGrid } from "@/components/suppliers/MaterialsGrid";
 
@@ -20,6 +22,7 @@ const SuppliersMobileOptimized = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <Navigation />
 
       {/* Simple, Highly Visible Hero for iPhone */}
       <section className="bg-gradient-to-br from-blue-600 to-blue-800 text-white py-16 px-4">
@@ -96,7 +99,7 @@ const SuppliersMobileOptimized = () => {
         </div>
       </main>
 
-      
+      <Footer />
     </div>
   );
 };
