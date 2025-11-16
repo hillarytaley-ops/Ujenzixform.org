@@ -740,36 +740,34 @@ export const MaterialsGrid = () => {
                         )}
                       </div>
                       <div className="flex flex-col sm:flex-row gap-2">
-                        {userRole === 'builder' || userRole === 'professional_builder' ? (
-                          <Button 
-                            className="w-full sm:flex-1 bg-blue-600 hover:bg-blue-700 h-12 text-base font-semibold"
-                            onClick={() => handleRequestQuote(material)}
-                            disabled={!material.in_stock}
-                          >
-                            <ShoppingCart className="h-5 w-5 mr-2" />
-                            Request Quote
-                          </Button>
-                        ) : userRole === 'private_client' ? (
-                          <Button 
-                            className="w-full sm:flex-1 bg-green-600 hover:bg-green-700 h-12 text-base font-semibold"
-                            onClick={() => handleBuyNow(material)}
-                            disabled={!material.in_stock}
-                          >
-                            <ShoppingCart className="h-5 w-5 mr-2" />
-                            Buy Now
-                          </Button>
-                        ) : (
-                          <Button 
-                            className="w-full sm:flex-1 bg-orange-600 hover:bg-orange-700 h-12 text-base font-semibold"
-                            onClick={() => {
-                              window.location.href = '/auth?redirect=' + encodeURIComponent('/suppliers?tab=purchase');
-                            }}
-                            disabled={!material.in_stock}
-                          >
-                            <ShoppingCart className="h-5 w-5 mr-2" />
-                            Sign In to Purchase
-                          </Button>
-                        )}
+                        <Button 
+                          className="w-full sm:flex-1 bg-blue-600 hover:bg-blue-700 h-12 text-base font-semibold"
+                          onClick={() => {
+                            if (userRole === 'builder' || userRole === 'professional_builder') {
+                              handleRequestQuote(material);
+                            } else {
+                              window.location.href = '/auth?lite=1&redirect=' + encodeURIComponent('/suppliers?tab=purchase');
+                            }
+                          }}
+                          disabled={!material.in_stock}
+                        >
+                          <ShoppingCart className="h-5 w-5 mr-2" />
+                          Request Quote
+                        </Button>
+                        <Button 
+                          className="w-full sm:flex-1 bg-green-600 hover:bg-green-700 h-12 text-base font-semibold"
+                          onClick={() => {
+                            if (userRole === 'private_client') {
+                              handleBuyNow(material);
+                            } else {
+                              window.location.href = '/auth?lite=1&redirect=' + encodeURIComponent('/suppliers?tab=purchase&welcome=private_client');
+                            }
+                          }}
+                          disabled={!material.in_stock}
+                        >
+                          <ShoppingCart className="h-5 w-5 mr-2" />
+                          Buy Now
+                        </Button>
                         <Button 
                           variant="outline"
                           onClick={() => toast({
