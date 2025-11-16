@@ -15,6 +15,7 @@ import { ShoppingCart, Package, Plus, Trash2, Send, Loader2, CheckCircle, Users,
 interface QuickPurchaseOrderProps {
   builderId: string;
   onClose?: () => void;
+  defaultSupplierUserIds?: string[];
 }
 
 interface OrderItem {
@@ -28,6 +29,7 @@ interface OrderItem {
 
 interface Supplier {
   id: string;
+  user_id?: string;
   company_name: string;
   location: string;
   materials_offered: string[];
@@ -52,7 +54,7 @@ const MATERIAL_CATEGORIES = [
 
 const UNITS = ['bags', 'tonnes', 'pieces', 'meters', 'sqm', 'liters', 'rolls', 'sheets', 'boxes'];
 
-export const QuickPurchaseOrder: React.FC<QuickPurchaseOrderProps> = ({ builderId, onClose }) => {
+export const QuickPurchaseOrder: React.FC<QuickPurchaseOrderProps> = ({ builderId, onClose, defaultSupplierUserIds }) => {
   const [items, setItems] = useState<OrderItem[]>([
     { id: '1', material: '', category: '', quantity: '', unit: '', notes: '' }
   ]);
@@ -72,12 +74,21 @@ export const QuickPurchaseOrder: React.FC<QuickPurchaseOrderProps> = ({ builderI
     fetchSuppliers();
   }, []);
 
+  useEffect(() => {
+    if (defaultSupplierUserIds && defaultSupplierUserIds.length > 0 && suppliers.length > 0) {
+      const matched = suppliers.filter(s => s.user_id && defaultSupplierUserIds.includes(s.user_id));
+      if (matched.length > 0) {
+        setSelectedSuppliers(matched.map(s => s.id));
+      }
+    }
+  }, [suppliers, defaultSupplierUserIds]);
+
   const fetchSuppliers = async () => {
     setLoadingSuppliers(true);
     try {
       const { data, error } = await supabase
         .from('suppliers')
-        .select('id, company_name, location, materials_offered, rating, total_reviews')
+        .select('id, user_id, company_name, location, materials_offered, rating, total_reviews')
         .eq('status', 'active')
         .order('rating', { ascending: false })
         .limit(20);

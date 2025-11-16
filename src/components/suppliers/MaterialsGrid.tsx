@@ -179,6 +179,7 @@ export const MaterialsGrid = () => {
   const [showWelcome, setShowWelcome] = useState(false);
   const [isMultiQuoteOpen, setIsMultiQuoteOpen] = useState(false);
   const [builderId, setBuilderId] = useState<string>('');
+  const [preselectedSupplierUserIds, setPreselectedSupplierUserIds] = useState<string[]>([]);
   const { toast } = useToast();
   const gridRef = useRef<HTMLDivElement>(null);
   const [columns, setColumns] = useState(1);
@@ -505,6 +506,9 @@ export const MaterialsGrid = () => {
         window.location.href = '/auth?lite=1&redirect=' + encodeURIComponent('/suppliers?tab=purchase');
         return;
       }
+      const visibleItems = filteredMaterials.slice(visibleStart, visibleEnd);
+      const supplierIds = Array.from(new Set(visibleItems.map(m => m.supplier_id).filter(Boolean)));
+      setPreselectedSupplierUserIds(supplierIds as string[]);
       setBuilderId(user.id);
       setIsMultiQuoteOpen(true);
     } catch (e) {
@@ -795,6 +799,7 @@ export const MaterialsGrid = () => {
           {builderId && (
             <QuickPurchaseOrder 
               builderId={builderId} 
+              defaultSupplierUserIds={preselectedSupplierUserIds}
               onClose={() => setIsMultiQuoteOpen(false)} 
             />
           )}
