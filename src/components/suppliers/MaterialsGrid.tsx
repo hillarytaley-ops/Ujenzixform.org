@@ -555,15 +555,13 @@ export const MaterialsGrid = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {(userRole === 'builder' || userRole === 'professional_builder') && (
-            <Button 
-              onClick={openMultiQuote} 
-              className="bg-orange-600 hover:bg-orange-700"
-            >
-              <PartyPopper className="h-4 w-4 mr-2" />
-              Multi-quote
-            </Button>
-          )}
+          <Button 
+            onClick={openMultiQuote} 
+            className="bg-orange-600 hover:bg-orange-700"
+          >
+            <PartyPopper className="h-4 w-4 mr-2" />
+            Multi-quote
+          </Button>
           <Button onClick={loadMaterials} variant="outline">
             <Package className="h-4 w-4 mr-2" />
             Refresh
