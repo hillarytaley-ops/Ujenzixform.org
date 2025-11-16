@@ -196,19 +196,19 @@ const SuppliersContent = () => {
   // REMOVED: Mobile admin restriction - Full admin access on all devices now!
 
   return (
-      <ErrorBoundary fallback={
-        <div className="min-h-screen bg-background p-4">
-          <div className="max-w-4xl mx-auto">
-            <h2 className="text-xl font-semibold mb-4">Materials Marketplace</h2>
-            <MaterialsGridSafe />
-          </div>
+    <ErrorBoundary fallback={
+      <div className="min-h-screen bg-background p-4">
+        <div className="max-w-4xl mx-auto">
+          <h2 className="text-xl font-semibold mb-4">Materials Marketplace</h2>
+          <MaterialsGridSafe />
         </div>
-      }>
-        <div className="min-h-screen bg-background">
-          <Navigation />
+      </div>
+    }>
+      <div className="min-h-screen bg-background">
+        <Navigation />
 
-      {/* Kenyan-Themed Hero Section - iPhone Fixed */}
-      <section className="bg-gradient-to-br from-blue-700 via-blue-800 to-blue-900 text-white py-16 sm:py-20 relative overflow-hidden">
+        {/* Kenyan-Themed Hero Section - iPhone Fixed */}
+        <section className="bg-gradient-to-br from-blue-700 via-blue-800 to-blue-900 text-white py-16 sm:py-20 relative overflow-hidden">
         {/* Solid gradient background - always visible on iPhone */}
         
         <div className="container mx-auto px-4 text-center relative z-10">
