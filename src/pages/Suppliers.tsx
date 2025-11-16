@@ -205,10 +205,11 @@ const SuppliersContent = () => {
       </div>
     }>
       <div className="min-h-screen bg-background">
+        {/* NAVIGATION MENU BAR */}
         <Navigation />
 
-        {/* Kenyan-Themed Hero Section - iPhone Fixed */}
-        <section className="bg-gradient-to-br from-blue-700 via-blue-800 to-blue-900 text-white py-16 sm:py-20 relative overflow-hidden">
+        {/* Kenyan-Themed Hero Section */}
+        <section className="bg-gradient-to-br from-blue-700 via-blue-800 to-blue-900 text-white py-16 sm:py-20 relative overflow-hidden mt-0">
         {/* Solid gradient background - always visible on iPhone */}
         
         <div className="container mx-auto px-4 text-center relative z-10">
