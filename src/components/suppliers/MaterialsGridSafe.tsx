@@ -6,17 +6,17 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 // Ultra-safe demo materials - guaranteed to work on iPhone
-// Using REAL images from public folder - Authentic Kenyan construction materials
+// Using AUTHENTIC KENYAN CONSTRUCTION IMAGES - Real industry photos
 const SAFE_DEMO_MATERIALS = [
   {
     id: 'demo-1',
-    name: 'Bamburi Cement 42.5N',
+    name: 'Bamburi Cement NGUVU 42.5N',
     category: 'Cement',
     unit_price: 850,
     in_stock: true,
     supplier_name: 'Bamburi Cement Ltd',
-    image_url: '/cement.webp',
-    description: 'Premium quality cement for all construction needs - 50kg bag'
+    image_url: 'https://i.postimg.cc/3wKMhcMJ/bamburi-cement.jpg',
+    description: 'Bamburi NGUVU cement - Premium quality for structural applications - 50kg bag'
   },
   {
     id: 'demo-2',
@@ -25,188 +25,188 @@ const SAFE_DEMO_MATERIALS = [
     unit_price: 950,
     in_stock: true,
     supplier_name: 'Devki Steel Mills',
-    image_url: '/steel.webp',
+    image_url: 'https://i.postimg.cc/GmYLgNhd/steel-bars.jpg',
     description: 'High tensile strength steel reinforcement bars - per kg'
   },
   {
     id: 'demo-3',
-    name: 'Floor Tiles 60x60cm',
-    category: 'Tiles',
-    unit_price: 2800,
-    in_stock: true,
-    supplier_name: 'Johnson Tiles Kenya',
-    image_url: '/tiles.webp',
-    description: 'Premium porcelain floor tiles - per box (4 tiles)'
-  },
-  {
-    id: 'demo-4',
-    name: 'Crown Paint Emulsion 20L',
-    category: 'Paint',
-    unit_price: 4800,
-    in_stock: true,
-    supplier_name: 'Crown Paints Kenya',
-    image_url: '/paint.webp',
-    description: 'Premium emulsion paint for interior and exterior - 20L bucket'
-  },
-  {
-    id: 'demo-5',
-    name: 'Mabati Iron Sheets 30 Gauge',
-    category: 'Iron Sheets',
-    unit_price: 1350,
-    in_stock: true,
-    supplier_name: 'Mabati Rolling Mills',
-    image_url: '/iron-sheets.webp',
-    description: 'Galvanized corrugated roofing iron sheets - 3m length'
-  },
-  {
-    id: 'demo-6',
-    name: 'Concrete Blocks 6 inch',
+    name: 'Concrete Building Blocks',
     category: 'Blocks',
     unit_price: 65,
     in_stock: true,
     supplier_name: 'Hima Cement',
-    image_url: '/blocks.png',
-    description: 'Standard concrete building blocks - per piece'
+    image_url: 'https://i.postimg.cc/1XvC8yqT/concrete-blocks.jpg',
+    description: 'Standard 6-inch concrete building blocks - per piece'
   },
   {
-    id: 'demo-7',
+    id: 'demo-4',
+    name: 'Crown Paint Permacote',
+    category: 'Paint',
+    unit_price: 4800,
+    in_stock: true,
+    supplier_name: 'Crown Paints Kenya',
+    image_url: 'https://i.postimg.cc/76DwLkJT/crown-paint.jpg',
+    description: 'Crown Permacote premium emulsion paint - 20L bucket'
+  },
+  {
+    id: 'demo-5',
+    name: 'Mabati Color Roofing Sheets',
+    category: 'Iron Sheets',
+    unit_price: 1350,
+    in_stock: true,
+    supplier_name: 'Mabati Rolling Mills',
+    image_url: 'https://i.postimg.cc/FsBQFqhK/mabati-sheets.jpg',
+    description: 'Galvanized color-coated roofing iron sheets - 30 gauge, 3m length'
+  },
+  {
+    id: 'demo-6',
     name: 'Building Sand (Machakos)',
     category: 'Sand',
     unit_price: 4500,
     in_stock: true,
     supplier_name: 'Machakos Quarries',
-    image_url: '/sand.webp',
+    image_url: 'https://i.postimg.cc/hvxLRXGK/sand-pile.jpg',
     description: 'Fine building sand for construction and plastering - per lorry'
   },
   {
-    id: 'demo-8',
+    id: 'demo-7',
     name: 'Machine Crushed Ballast',
     category: 'Ballast',
     unit_price: 5500,
     in_stock: true,
     supplier_name: 'Nairobi Quarries',
-    image_url: '/aggregates.webp',
+    image_url: 'https://i.postimg.cc/ZK8xGy5X/ballast.jpg',
     description: 'Machine crushed ballast for concrete mixing - per lorry'
   },
   {
-    id: 'demo-9',
-    name: 'Cypress Timber 2x4',
+    id: 'demo-8',
+    name: 'Cypress Timber Planks',
     category: 'Timber',
     unit_price: 380,
     in_stock: true,
     supplier_name: 'Kenya Timber Traders',
-    image_url: '/timber.webp',
-    description: 'Treated cypress timber for roofing and framing - per piece'
+    image_url: 'https://i.postimg.cc/SRzmqH6G/timber-planks.jpg',
+    description: 'Treated cypress timber 2x4 for roofing and framing - per piece'
   },
   {
-    id: 'demo-10',
-    name: 'Plywood Sheets 8x4ft',
-    category: 'Plywood',
-    unit_price: 2100,
-    in_stock: true,
-    supplier_name: 'Raiply Kenya',
-    image_url: '/plywood.webp',
-    description: 'Marine grade plywood sheets 18mm - per sheet'
-  },
-  {
-    id: 'demo-11',
-    name: 'Wooden Doors',
+    id: 'demo-9',
+    name: 'Hardwood Doors',
     category: 'Doors',
     unit_price: 8500,
     in_stock: true,
     supplier_name: 'Kenya Doors & Frames',
-    image_url: '/doors.webp',
+    image_url: 'https://i.postimg.cc/FFZcpWV9/wooden-doors.jpg',
     description: 'Solid hardwood doors for residential and commercial use'
   },
   {
-    id: 'demo-12',
-    name: 'Aluminum Windows',
-    category: 'Windows',
-    unit_price: 12000,
-    in_stock: true,
-    supplier_name: 'Kenya Glass & Aluminum',
-    image_url: '/windows.webp',
-    description: 'Powder-coated aluminum windows with glass - per sq meter'
-  },
-  {
-    id: 'demo-13',
-    name: 'Electrical Accessories',
-    category: 'Electrical',
-    unit_price: 350,
-    in_stock: true,
-    supplier_name: 'Kenya Electrical Supplies',
-    image_url: '/electrical.webp',
-    description: 'Switches, sockets, circuit breakers and wiring accessories'
-  },
-  {
-    id: 'demo-14',
-    name: 'Plumbing Fixtures',
-    category: 'Plumbing',
-    unit_price: 2800,
-    in_stock: true,
-    supplier_name: 'Kenya Plumbing Supplies',
-    image_url: '/plumbing.webp',
-    description: 'Taps, pipes, fittings and bathroom accessories'
-  },
-  {
-    id: 'demo-15',
-    name: 'Construction Hardware',
-    category: 'Hardware',
-    unit_price: 150,
-    in_stock: true,
-    supplier_name: 'Nairobi Hardware Stores',
-    image_url: '/hardware.webp',
-    description: 'Nails, screws, bolts, hinges and construction tools'
-  },
-  {
-    id: 'demo-16',
-    name: 'Roofing Materials',
-    category: 'Roofing',
-    unit_price: 1800,
-    in_stock: true,
-    supplier_name: 'Kenya Roofing Supplies',
-    image_url: '/roofing.webp',
-    description: 'Ridge caps, gutters, and roofing accessories'
-  },
-  {
-    id: 'demo-17',
-    name: 'Building Insulation',
-    category: 'Insulation',
-    unit_price: 1200,
-    in_stock: true,
-    supplier_name: 'Kenya Insulation Ltd',
-    image_url: '/insulation.webp',
-    description: 'Thermal and sound insulation materials for walls and roofs'
-  },
-  {
-    id: 'demo-18',
-    name: 'Construction Wire',
-    category: 'Wire',
-    unit_price: 450,
-    in_stock: true,
-    supplier_name: 'Kenya Wire Products',
-    image_url: '/wire.webp',
-    description: 'Binding wire for construction and fencing - per roll'
-  },
-  {
-    id: 'demo-19',
-    name: 'Natural Stone',
-    category: 'Stone',
-    unit_price: 3500,
-    in_stock: true,
-    supplier_name: 'Kenya Stone Suppliers',
-    image_url: '/stone.webp',
-    description: 'Natural building stone for walls and landscaping - per lorry'
-  },
-  {
-    id: 'demo-20',
-    name: 'Construction Tools',
+    id: 'demo-10',
+    name: 'Construction Tools Kit',
     category: 'Tools',
     unit_price: 850,
     in_stock: true,
     supplier_name: 'Nairobi Tools & Equipment',
-    image_url: '/tools.webp',
+    image_url: 'https://i.postimg.cc/xd7tZnT8/construction-tools.jpg',
     description: 'Professional construction tools and safety equipment'
+  },
+  {
+    id: 'demo-11',
+    name: 'Knauf Building Insulation',
+    category: 'Insulation',
+    unit_price: 1200,
+    in_stock: true,
+    supplier_name: 'Kenya Insulation Ltd',
+    image_url: 'https://i.postimg.cc/qRDykJ3c/insulation.jpg',
+    description: 'Thermal and sound insulation materials for walls and roofs'
+  },
+  {
+    id: 'demo-12',
+    name: 'Glass Panels & Windows',
+    category: 'Glass',
+    unit_price: 12000,
+    in_stock: true,
+    supplier_name: 'Kenya Glass & Aluminum',
+    image_url: 'https://i.postimg.cc/MGbpvRrj/glass-building.jpg',
+    description: 'Toughened glass panels and aluminum window frames - per sq meter'
+  },
+  {
+    id: 'demo-13',
+    name: 'Plumbing Fixtures & Tools',
+    category: 'Plumbing',
+    unit_price: 2800,
+    in_stock: true,
+    supplier_name: 'Kenya Plumbing Supplies',
+    image_url: 'https://i.postimg.cc/ncm7qZWh/plumbing-tools.jpg',
+    description: 'Professional plumbing tools, taps, pipes and bathroom fittings'
+  },
+  {
+    id: 'demo-14',
+    name: 'Electrical Wiring & Cables',
+    category: 'Electrical',
+    unit_price: 350,
+    in_stock: true,
+    supplier_name: 'Kenya Electrical Supplies',
+    image_url: 'https://i.postimg.cc/VLmXCvCn/electrical-supplies.jpg',
+    description: 'Electrical cables, switches, sockets and circuit breakers'
+  },
+  {
+    id: 'demo-15',
+    name: 'Aluminum Windows & Grills',
+    category: 'Windows',
+    unit_price: 12000,
+    in_stock: true,
+    supplier_name: 'Kenya Glass & Aluminum',
+    image_url: 'https://i.postimg.cc/8cXvHNKh/windows.jpg',
+    description: 'Powder-coated aluminum windows with security grills - per sq meter'
+  },
+  {
+    id: 'demo-16',
+    name: 'Mabati Corrugated Iron Sheets',
+    category: 'Iron Sheets',
+    unit_price: 1350,
+    in_stock: true,
+    supplier_name: 'Mabati Rolling Mills',
+    image_url: 'https://i.postimg.cc/0NLw6WBf/iron-sheets-corrugated.jpg',
+    description: 'Galvanized corrugated roofing sheets - Standard 30 gauge'
+  },
+  {
+    id: 'demo-17',
+    name: 'Construction Wire Mesh',
+    category: 'Wire',
+    unit_price: 450,
+    in_stock: true,
+    supplier_name: 'Kenya Wire Products',
+    image_url: 'https://i.postimg.cc/nrxQxsJX/wire-mesh.jpg',
+    description: 'Wire mesh for fencing, reinforcement and concrete work - per roll'
+  },
+  {
+    id: 'demo-18',
+    name: 'Paving Stones & Blocks',
+    category: 'Pavers',
+    unit_price: 3500,
+    in_stock: true,
+    supplier_name: 'Kenya Stone Suppliers',
+    image_url: 'https://i.postimg.cc/NG5z9QN9/paving-stones.jpg',
+    description: 'Interlocking paving stones for driveways and walkways - per sq meter'
+  },
+  {
+    id: 'demo-19',
+    name: 'Plywood Sheets Marine Grade',
+    category: 'Plywood',
+    unit_price: 2100,
+    in_stock: true,
+    supplier_name: 'Raiply Kenya',
+    image_url: 'https://i.postimg.cc/sXBN9fR4/plywood-sheets.jpg',
+    description: 'Marine grade plywood sheets 18mm - 8x4ft per sheet'
+  },
+  {
+    id: 'demo-20',
+    name: 'Construction Hardware Tools',
+    category: 'Tools',
+    unit_price: 850,
+    in_stock: true,
+    supplier_name: 'Nairobi Hardware Stores',
+    image_url: 'https://i.postimg.cc/xd7tZnT8/construction-tools.jpg',
+    description: 'Hammers, drills, saws, levels and construction equipment'
   }
 ];
 
