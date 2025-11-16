@@ -53,16 +53,16 @@ const SuppliersMobileOptimized = () => {
               Browse Materials
             </Button>
             
-            {/* Sign-in CTA removed to avoid confusion and issues; purchasing remains available via item flow */}
-            <Link to="/suppliers?full=1" className="w-full">
-              <Button 
-                size="lg"
-                variant="secondary"
-                className="w-full h-12 bg-white/20 text-white hover:bg-white/30"
-              >
-                View Full Suppliers Page
-              </Button>
-            </Link>
+            {/* View Full Suppliers Page - Opens full desktop version */}
+            <Button 
+              size="lg"
+              variant="secondary"
+              className="w-full h-12 bg-white/20 text-white hover:bg-white/30"
+              onClick={() => window.location.href = '/suppliers'}
+            >
+              <Building className="h-5 w-5 mr-2" />
+              View Full Suppliers Page
+            </Button>
           </div>
         </div>
       </section>
