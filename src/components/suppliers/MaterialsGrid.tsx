@@ -274,12 +274,21 @@ export const MaterialsGrid = () => {
       if (isIOSSafari()) {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
+      let completed = false;
+      setTimeout(() => {
+        if (!completed) {
+          setMaterials(DEMO_MATERIALS);
+          setFilteredMaterials(DEMO_MATERIALS);
+          setLoading(false);
+        }
+      }, 2500);
       
       // First, try to load materials without join (in case suppliers table has issues)
       const { data, error } = await supabase
         .from('materials')
         .select('*')
         .order('created_at', { ascending: false });
+      completed = true;
 
       if (error) {
         console.error('Error loading materials:', error);
