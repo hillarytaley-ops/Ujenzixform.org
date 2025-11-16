@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 // Ultra-safe demo materials - guaranteed to work on iPhone
+// Using real Kenyan construction materials with images
 const SAFE_DEMO_MATERIALS = [
   {
     id: 'demo-1',
@@ -13,39 +14,99 @@ const SAFE_DEMO_MATERIALS = [
     category: 'Cement',
     unit_price: 850,
     in_stock: true,
-    supplier_name: 'Demo Supplier'
+    supplier_name: 'Bamburi Cement Ltd',
+    image_url: 'https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?w=400&h=300&fit=crop&q=80',
+    description: 'Premium quality cement for all construction needs - 50kg bag'
   },
   {
     id: 'demo-2',
-    name: 'Y12 Steel Bars',
+    name: 'Y12 Steel Reinforcement Bars',
     category: 'Steel',
     unit_price: 950,
     in_stock: true,
-    supplier_name: 'Demo Supplier'
+    supplier_name: 'Devki Steel Mills',
+    image_url: 'https://images.unsplash.com/photo-1587293852726-70cdb56c2866?w=400&h=300&fit=crop&q=80',
+    description: 'High tensile strength steel reinforcement bars - per kg'
   },
   {
     id: 'demo-3',
-    name: 'Floor Tiles',
+    name: 'Floor Tiles 60x60cm',
     category: 'Tiles',
     unit_price: 2800,
     in_stock: true,
-    supplier_name: 'Demo Supplier'
+    supplier_name: 'Johnson Tiles Kenya',
+    image_url: 'https://images.unsplash.com/photo-1615971677499-5467cbab01c0?w=400&h=300&fit=crop&q=80',
+    description: 'Premium porcelain floor tiles - per box (4 tiles)'
   },
   {
     id: 'demo-4',
-    name: 'Crown Paint 20L',
+    name: 'Crown Paint Emulsion 20L',
     category: 'Paint',
     unit_price: 4800,
     in_stock: true,
-    supplier_name: 'Demo Supplier'
+    supplier_name: 'Crown Paints Kenya',
+    image_url: 'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=400&h=300&fit=crop&q=80',
+    description: 'Premium emulsion paint for interior and exterior - 20L bucket'
   },
   {
     id: 'demo-5',
-    name: 'Mabati Iron Sheets',
+    name: 'Mabati Iron Sheets 30 Gauge',
     category: 'Iron Sheets',
     unit_price: 1350,
     in_stock: true,
-    supplier_name: 'Demo Supplier'
+    supplier_name: 'Mabati Rolling Mills',
+    image_url: 'https://images.unsplash.com/photo-1565008576549-57569a49371d?w=400&h=300&fit=crop&q=80',
+    description: 'Galvanized corrugated roofing iron sheets - 3m length'
+  },
+  {
+    id: 'demo-6',
+    name: 'Concrete Blocks 6 inch',
+    category: 'Blocks',
+    unit_price: 65,
+    in_stock: true,
+    supplier_name: 'Hima Cement',
+    image_url: 'https://images.unsplash.com/photo-1591622180287-045a2fe9159f?w=400&h=300&fit=crop&q=80',
+    description: 'Standard concrete building blocks - per piece'
+  },
+  {
+    id: 'demo-7',
+    name: 'Building Sand (Machakos)',
+    category: 'Sand',
+    unit_price: 4500,
+    in_stock: true,
+    supplier_name: 'Machakos Quarries',
+    image_url: 'https://images.unsplash.com/photo-1513828583688-c52646db42da?w=400&h=300&fit=crop&q=80',
+    description: 'Fine building sand for construction and plastering - per lorry'
+  },
+  {
+    id: 'demo-8',
+    name: 'Machine Crushed Ballast',
+    category: 'Ballast',
+    unit_price: 5500,
+    in_stock: true,
+    supplier_name: 'Nairobi Quarries',
+    image_url: 'https://images.unsplash.com/photo-1618172193622-ae2d025f4032?w=400&h=300&fit=crop&q=80',
+    description: 'Machine crushed ballast for concrete mixing - per lorry'
+  },
+  {
+    id: 'demo-9',
+    name: 'Cypress Timber 2x4',
+    category: 'Timber',
+    unit_price: 380,
+    in_stock: true,
+    supplier_name: 'Kenya Timber Traders',
+    image_url: 'https://images.unsplash.com/photo-1585704032915-c3400ca199e7?w=400&h=300&fit=crop&q=80',
+    description: 'Treated cypress timber for roofing and framing - per piece'
+  },
+  {
+    id: 'demo-10',
+    name: 'Plywood Sheets 8x4ft',
+    category: 'Plywood',
+    unit_price: 2100,
+    in_stock: true,
+    supplier_name: 'Raiply Kenya',
+    image_url: 'https://images.unsplash.com/photo-1563453392212-326f5e854473?w=400&h=300&fit=crop&q=80',
+    description: 'Marine grade plywood sheets 18mm - per sheet'
   }
 ];
 
@@ -142,6 +203,21 @@ export const MaterialsGridSafe = () => {
           {materials.map((material) => (
             <Card key={material.id} className="hover:shadow-lg transition-shadow">
               <CardHeader>
+                {/* Product Image */}
+                {material.image_url && (
+                  <div className="w-full h-48 mb-4 rounded-lg overflow-hidden bg-gray-100">
+                    <img 
+                      src={material.image_url} 
+                      alt={material.name}
+                      className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                      onError={(e) => {
+                        // Fallback if image fails to load
+                        e.currentTarget.src = 'https://placehold.co/400x300/e5e7eb/6b7280?text=No+Image';
+                      }}
+                      loading="lazy"
+                    />
+                  </div>
+                )}
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Package className="h-5 w-5" />
                   {material.name}
@@ -149,6 +225,12 @@ export const MaterialsGridSafe = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
+                  {/* Description */}
+                  {material.description && (
+                    <p className="text-sm text-gray-600 pb-2 border-b">
+                      {material.description}
+                    </p>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Category:</span>
                     <span className="text-sm font-medium">{material.category}</span>
