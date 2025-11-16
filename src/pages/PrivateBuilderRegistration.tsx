@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Shield, Lock, CheckCircle, ArrowLeft, User } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
@@ -71,6 +71,9 @@ const privateClientRegistrationSchema = z.object({
   full_name: z.string().min(2, "Full name must be at least 2 characters"),
   email: z.string().email("Please enter a valid email address"),
   phone: z.string().min(10, "Phone number must be at least 10 digits"),
+  alternative_phone: z.string().min(10, "Alternative phone recommended").optional().or(z.literal("")),
+  whatsapp_number: z.string().min(10, "WhatsApp number for delivery updates").optional().or(z.literal("")),
+  mpesa_number: z.string().min(10, "M-Pesa number for payments").optional().or(z.literal("")),
   location: z.string().min(1, "Please select your location"),
   project_types: z.array(z.string()).min(1, "Please select at least one project type"),
   project_timeline: z.string().min(1, "Please select your project timeline"),
@@ -143,6 +146,9 @@ const PrivateBuilderRegistration = () => {
             user_id: userId,
             full_name: data.full_name,
             phone: data.phone,
+            alternative_phone: data.alternative_phone || null,
+            whatsapp_number: data.whatsapp_number || null,
+            mpesa_number: data.mpesa_number || null,
             location: data.location,
             builder_category: 'private',
             project_types: data.project_types,
@@ -296,15 +302,73 @@ const PrivateBuilderRegistration = () => {
                         name="phone"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Phone Number *</FormLabel>
+                            <FormLabel>Primary Phone Number *</FormLabel>
                             <FormControl>
-                              <Input placeholder="+254 700 000 000" {...field} />
+                              <Input placeholder="07XX XXX XXX or 01XX XXX XXX" {...field} />
                             </FormControl>
+                            <FormDescription className="text-xs">
+                              For delivery tracking and SMS notifications
+                            </FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
 
+                      <FormField
+                        control={form.control}
+                        name="alternative_phone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Alternative Phone (Optional)</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Backup contact number" {...field} />
+                            </FormControl>
+                            <FormDescription className="text-xs">
+                              Backup number for delivery coordination
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="whatsapp_number"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>WhatsApp Number (Optional)</FormLabel>
+                            <FormControl>
+                              <Input placeholder="07XX XXX XXX" {...field} />
+                            </FormControl>
+                            <FormDescription className="text-xs">
+                              Receive delivery updates via WhatsApp
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="mpesa_number"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>M-Pesa Number (Optional)</FormLabel>
+                            <FormControl>
+                              <Input placeholder="07XX XXX XXX" {...field} />
+                            </FormControl>
+                            <FormDescription className="text-xs">
+                              For secure payments and order confirmations
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
                         name="location"
