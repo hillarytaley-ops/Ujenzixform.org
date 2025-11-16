@@ -393,11 +393,96 @@ export const MaterialsGrid = () => {
     setFilteredMaterials(filtered);
   };
 
-  const handleRequestQuote = (material: Material) => {
-    toast({
-      title: 'Quote Request',
-      description: `Request sent for ${material.name} from ${material.supplier?.company_name}`,
-    });
+  const handleRequestQuote = async (material: Material) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        window.location.href = '/auth?lite=1&redirect=' + encodeURIComponent('/suppliers?tab=purchase');
+        return;
+      }
+      const { data: orderData, error: orderError } = await supabase
+        .from('purchase_orders')
+        .insert({
+          builder_id: user.id,
+          project_name: material.category || 'Quick Order',
+          status: 'pending',
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+      if (orderError) throw orderError;
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert({
+          order_id: orderData.id,
+          material_name: material.name,
+          category: material.category,
+          quantity: 1,
+          unit: material.unit,
+          notes: ''
+        });
+      if (itemsError) throw itemsError;
+      await supabase
+        .from('quote_requests')
+        .insert({
+          order_id: orderData.id,
+          supplier_id: material.supplier_id,
+          status: 'pending',
+          created_at: new Date().toISOString()
+        });
+      toast({
+        title: 'Quote Requested',
+        description: `${material.name} sent to ${material.supplier?.company_name}`,
+      });
+    } catch (e) {
+      toast({
+        title: 'Failed to request quote',
+        description: 'Please try again or contact support',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleBuyNow = async (material: Material) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        window.location.href = '/auth?lite=1&redirect=' + encodeURIComponent('/suppliers?tab=purchase');
+        return;
+      }
+      const { data: orderData, error: orderError } = await supabase
+        .from('purchase_orders')
+        .insert({
+          builder_id: user.id,
+          project_name: 'Direct Purchase',
+          status: 'pending',
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+      if (orderError) throw orderError;
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert({
+          order_id: orderData.id,
+          material_name: material.name,
+          category: material.category,
+          quantity: 1,
+          unit: material.unit,
+          notes: ''
+        });
+      if (itemsError) throw itemsError;
+      toast({
+        title: 'Added to order',
+        description: `${material.name} from ${material.supplier?.company_name}`,
+      });
+    } catch (e) {
+      toast({
+        title: 'Failed to add to order',
+        description: 'Please try again or contact support',
+        variant: 'destructive'
+      });
+    }
   };
 
   if (loading) {
@@ -625,10 +710,7 @@ export const MaterialsGrid = () => {
                         ) : userRole === 'private_client' ? (
                           <Button 
                             className="w-full sm:flex-1 bg-green-600 hover:bg-green-700 h-12 text-base font-semibold"
-                            onClick={() => toast({
-                              title: '✅ Adding to Cart',
-                              description: `${material.name} from ${material.supplier?.company_name}. Proceed to checkout to complete purchase.`,
-                            })}
+                            onClick={() => handleBuyNow(material)}
                             disabled={!material.in_stock}
                           >
                             <ShoppingCart className="h-5 w-5 mr-2" />
