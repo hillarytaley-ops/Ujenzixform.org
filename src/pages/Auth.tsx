@@ -50,7 +50,7 @@ const Auth = () => {
           if (redirectTo) {
             window.location.href = redirectTo;
           } else {
-            window.location.href = '/suppliers?tab=purchase';
+            window.location.href = '/';
           }
         }
       }
