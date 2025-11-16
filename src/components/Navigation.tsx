@@ -133,7 +133,7 @@ const Navigation = () => {
   };
 
   return (
-    <header className="shadow-sm border-b sticky top-0 z-50 bg-white dark:bg-gray-900 relative">
+    <header className="shadow-sm border-b sticky top-0 z-50 bg-gradient-primary relative">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between relative z-10">
         <Link to="/" className="flex items-center group">
           <div className="relative">
