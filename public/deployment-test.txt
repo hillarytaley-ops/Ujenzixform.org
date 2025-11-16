@@ -1,0 +1,11 @@
+DEPLOYMENT TIMESTAMP: 2025-11-16 04:30 UTC
+LATEST COMMIT: d536e58
+CHANGES INCLUDED:
+- Full-width suppliers page
+- 20 Kenyan construction materials with images
+- Request Quote and Buy Now buttons
+- Responsive monitoring camera view
+
+If you can read this file at https://ujenzi-pro.vercel.app/deployment-test.txt
+then Vercel IS deploying from GitHub correctly!
+
