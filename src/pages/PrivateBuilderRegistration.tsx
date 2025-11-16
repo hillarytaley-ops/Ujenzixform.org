@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Shield, Lock, CheckCircle, ArrowLeft, User } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 const KENYAN_COUNTIES = [
   "Nairobi", "Mombasa", "Kisumu", "Nakuru", "Eldoret", "Thika", "Malindi",
@@ -93,6 +93,8 @@ const PrivateBuilderRegistration = () => {
   const [progress, setProgress] = useState(0);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectTo = searchParams.get('redirect') || '/suppliers';
 
   const form = useForm<PrivateClientRegistrationFormData>({
     resolver: zodResolver(privateClientRegistrationSchema),
@@ -122,10 +124,11 @@ const PrivateBuilderRegistration = () => {
       duration: 1500,
     });
 
-    // Immediate redirect to suppliers page - where they can buy materials!
+    // Immediate redirect to saved location or suppliers page - where they can buy materials!
     form.reset();
     setSelectedProjectTypes([]);
-    navigate("/suppliers?welcome=private_client&tab=purchase");
+    const welcomeParam = redirectTo.includes('?') ? '&welcome=private_client' : '?welcome=private_client';
+    navigate(`${redirectTo}${welcomeParam}`);
 
     // Save to database in background (user already moved on)
     try {

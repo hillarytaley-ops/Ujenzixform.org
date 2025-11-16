@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Shield, Lock, CheckCircle, ArrowLeft, Building2 } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 const KENYAN_COUNTIES = [
   "Nairobi", "Mombasa", "Kisumu", "Nakuru", "Eldoret", "Thika", "Malindi",
@@ -68,6 +68,8 @@ const ProfessionalBuilderRegistration = () => {
   const [progress, setProgress] = useState(0);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectTo = searchParams.get('redirect') || '/suppliers';
 
   const form = useForm<ProfessionalRegistrationFormData>({
     resolver: zodResolver(professionalRegistrationSchema),
@@ -99,10 +101,11 @@ const ProfessionalBuilderRegistration = () => {
       duration: 1500,
     });
 
-    // Immediate redirect to suppliers page - where they can request quotes!
+    // Immediate redirect to saved location or suppliers page - where they can request quotes!
     form.reset();
     setSelectedSpecialties([]);
-    navigate("/suppliers?welcome=professional_builder&tab=suppliers");
+    const welcomeParam = redirectTo.includes('?') ? '&welcome=professional_builder' : '?welcome=professional_builder';
+    navigate(`${redirectTo}${welcomeParam}`);
 
     // Save to database in background (user already moved on)
     try {

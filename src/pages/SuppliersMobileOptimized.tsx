@@ -82,7 +82,7 @@ const SuppliersMobileOptimized = () => {
             </Button>
             
             {/* Sign In Button */}
-            <Link to="/auth">
+            <Link to="/auth?redirect=/suppliers">
               <Button 
                 size="lg"
                 variant="secondary"
@@ -181,13 +181,13 @@ const SuppliersMobileOptimized = () => {
                             <span>Track deliveries</span>
                           </li>
                         </ul>
-                        <Link to="/professional-builder-registration" className="block">
+                        <Link to="/professional-builder-registration?redirect=/suppliers" className="block">
                           <Button className="w-full bg-blue-600 hover:bg-blue-700">
                             <UserPlus className="h-4 w-4 mr-2" />
                             Register as Builder
                           </Button>
                         </Link>
-                        <Link to="/auth" className="block">
+                        <Link to="/auth?redirect=/suppliers" className="block">
                           <Button variant="outline" className="w-full">
                             <LogIn className="h-4 w-4 mr-2" />
                             Sign In
@@ -219,13 +219,13 @@ const SuppliersMobileOptimized = () => {
                             <span>Home delivery available</span>
                           </li>
                         </ul>
-                        <Link to="/private-client-registration" className="block">
+                        <Link to="/private-client-registration?redirect=/suppliers" className="block">
                           <Button className="w-full bg-green-600 hover:bg-green-700">
                             <UserPlus className="h-4 w-4 mr-2" />
                             Register as Client
                           </Button>
                         </Link>
-                        <Link to="/auth" className="block">
+                        <Link to="/auth?redirect=/suppliers" className="block">
                           <Button variant="outline" className="w-full">
                             <LogIn className="h-4 w-4 mr-2" />
                             Sign In
