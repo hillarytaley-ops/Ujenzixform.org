@@ -62,9 +62,8 @@ interface ProjectMonitoring {
 
 const Monitoring = () => {
   const [activeTab, setActiveTab] = useState("cameras");
-  const [userRole, setUserRole] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>('guest');
   const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   const [selectedCamera, setSelectedCamera] = useState<string | null>(null);
   const { toast } = useToast();
 
@@ -222,8 +221,6 @@ const Monitoring = () => {
     } catch (error) {
       console.error('Error checking user role:', error);
       setUserRole('guest');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -253,17 +250,6 @@ const Monitoring = () => {
       default: return <Monitor className="h-4 w-4" />;
     }
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-construction flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="text-muted-foreground">Loading monitoring system...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-background">
