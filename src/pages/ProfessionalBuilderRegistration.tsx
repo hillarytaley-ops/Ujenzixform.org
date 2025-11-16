@@ -43,9 +43,6 @@ const professionalRegistrationSchema = z.object({
   full_name: z.string().min(2, "Full name must be at least 2 characters"),
   email: z.string().email("Please enter a valid email address"),
   phone: z.string().min(10, "Phone number must be at least 10 digits"),
-  alternative_phone: z.string().min(10, "Alternative phone is required for delivery").optional().or(z.literal("")),
-  whatsapp_number: z.string().min(10, "WhatsApp number recommended for delivery updates").optional().or(z.literal("")),
-  mpesa_number: z.string().min(10, "M-Pesa number for payments").optional().or(z.literal("")),
   company_name: z.string().min(2, "Company name is required"),
   registration_number: z.string().min(1, "Business registration number is required"),
   license_number: z.string().min(1, "Professional license number is required"),
@@ -123,9 +120,6 @@ const ProfessionalBuilderRegistration = () => {
             user_id: userId,
             full_name: data.full_name,
             phone: data.phone,
-            alternative_phone: data.alternative_phone || null,
-            whatsapp_number: data.whatsapp_number || null,
-            mpesa_number: data.mpesa_number || null,
             company_name: data.company_name,
             location: data.location,
             builder_category: 'professional',
@@ -282,73 +276,18 @@ const ProfessionalBuilderRegistration = () => {
                         name="phone"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Primary Phone Number *</FormLabel>
+                            <FormLabel>Phone Number *</FormLabel>
                             <FormControl>
                               <Input placeholder="07XX XXX XXX or 01XX XXX XXX" {...field} />
                             </FormControl>
                             <FormDescription className="text-xs">
-                              Used for delivery tracking SMS notifications
+                              For delivery tracking and SMS notifications
                             </FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
 
-                      <FormField
-                        control={form.control}
-                        name="alternative_phone"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Alternative Phone (Optional)</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Backup contact number" {...field} />
-                            </FormControl>
-                            <FormDescription className="text-xs">
-                              Backup number for delivery coordination
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="whatsapp_number"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>WhatsApp Number (Optional)</FormLabel>
-                            <FormControl>
-                              <Input placeholder="07XX XXX XXX" {...field} />
-                            </FormControl>
-                            <FormDescription className="text-xs">
-                              For receiving delivery updates and location sharing
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="mpesa_number"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>M-Pesa Number (Optional)</FormLabel>
-                            <FormControl>
-                              <Input placeholder="07XX XXX XXX" {...field} />
-                            </FormControl>
-                            <FormDescription className="text-xs">
-                              For payment and order confirmations
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    <div className="grid md:grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
                         name="location"
