@@ -330,3 +330,4 @@ If you need help finding or adding images, I can:
 
 **Ready to add real Kenyan construction images!** 🇰🇪🏗️
 
+

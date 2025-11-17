@@ -9,6 +9,7 @@ import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { prefetchRoutes } from "@/utils/routePrefetch";
  
 import { MaterialsGrid } from "@/components/suppliers/MaterialsGrid";
 
@@ -22,6 +23,8 @@ const SuppliersMobileOptimized = () => {
 
   useEffect(() => {
     checkAuth();
+    // Prefetch likely next pages for instant navigation
+    prefetchRoutes(['/delivery', '/tracking', '/feedback'], 3000, 1000);
   }, []);
 
   const checkAuth = async () => {

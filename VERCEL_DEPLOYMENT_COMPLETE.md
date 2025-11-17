@@ -320,3 +320,4 @@ After deployment, visiting https://ujenzi-pro.vercel.app/suppliers should show:
 
 **Your UjenziPro marketplace is ready with 20 authentic Kenyan construction materials! 🇰🇪🏗️**
 
+

@@ -1,9 +1,24 @@
+import React, { Suspense } from "react";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
-import { FeedbackForm } from "@/components/FeedbackForm";
 import { Badge } from "@/components/ui/badge";
 import { MessageSquare, Star, Shield, Users, Award } from "lucide-react";
 import AnimatedSection from "@/components/AnimatedSection";
+
+// Lazy load FeedbackForm for faster initial page load
+const FeedbackForm = React.lazy(() => 
+  import("@/components/FeedbackForm").then(module => ({ default: module.FeedbackForm }))
+);
+
+// Loading skeleton for feedback form
+const FeedbackFormSkeleton = () => (
+  <div className="animate-pulse space-y-6">
+    <div className="h-12 bg-gray-200 rounded"></div>
+    <div className="h-12 bg-gray-200 rounded"></div>
+    <div className="h-32 bg-gray-200 rounded"></div>
+    <div className="h-12 bg-gray-200 rounded"></div>
+  </div>
+);
 
 export default function Feedback() {
   return (
@@ -17,15 +32,15 @@ export default function Feedback() {
           role="banner"
           aria-labelledby="feedback-hero-heading"
         >
-        {/* Kenyan Construction Teamwork Background */}
+        {/* Kenyan Construction Teamwork Background - Optimized for mobile */}
         <div 
           className="absolute inset-0"
           style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1504307651254-35680f356dfd?ixlib=rb-4.0.3&auto=format&fit=crop&w=2076&q=80')`,
+            backgroundImage: `url('https://images.unsplash.com/photo-1504307651254-35680f356dfd?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=75')`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
-            backgroundAttachment: 'fixed'
+            backgroundAttachment: window.innerWidth > 768 ? 'fixed' : 'scroll' // Fixed only on desktop
           }}
           role="img"
           aria-label="Kenyan construction professionals collaborating and working together on building projects, showcasing teamwork and quality construction practices"
@@ -71,15 +86,15 @@ export default function Feedback() {
       
       {/* Main Feedback Section */}
       <main className="py-20 relative overflow-hidden">
-        {/* Kenyan Construction Progress Background */}
+        {/* Kenyan Construction Progress Background - Optimized for mobile */}
         <div 
           className="absolute inset-0"
           style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1541976590-713941681591?ixlib=rb-4.0.3&auto=format&fit=crop&w=2069&q=80')`,
+            backgroundImage: `url('https://images.unsplash.com/photo-1541976590-713941681591?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=70')`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
-            backgroundAttachment: 'fixed'
+            backgroundAttachment: window.innerWidth > 768 ? 'fixed' : 'scroll' // Fixed only on desktop
           }}
           role="img"
           aria-label="Kenyan construction site showing building progress and development, representing continuous improvement and growth"
@@ -119,7 +134,9 @@ export default function Feedback() {
                 </p>
               </div>
               
-              <FeedbackForm />
+              <Suspense fallback={<FeedbackFormSkeleton />}>
+                <FeedbackForm />
+              </Suspense>
             </div>
             </div>
           </AnimatedSection>

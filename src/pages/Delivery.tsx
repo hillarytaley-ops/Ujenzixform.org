@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import AnimatedSection from "@/components/AnimatedSection";
+import { prefetchRoutes } from "@/utils/routePrefetch";
 import { 
   Package, 
   Truck, 
@@ -33,6 +34,7 @@ import {
   Shield
 } from "lucide-react";
 // Lazy load these components to prevent errors from breaking the page
+// Load only when needed for better performance
 const EnhancedDeliveryAnalytics = React.lazy(() => 
   import("@/components/delivery/EnhancedDeliveryAnalytics")
     .then(module => ({ default: module.EnhancedDeliveryAnalytics }))
@@ -57,6 +59,12 @@ const Delivery = () => {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
+  
+  // Prefetch likely next pages for instant navigation
+  useEffect(() => {
+    // Prefetch Feedback and Tracking pages after 3 seconds
+    prefetchRoutes(['/feedback', '/tracking'], 3000, 1000);
+  }, []);
   
   const [deliveries, setDeliveries] = useState([
     {
@@ -224,17 +232,18 @@ const Delivery = () => {
       {/* Enhanced Hero Section */}
       <AnimatedSection animation="fadeInUp">
         <section className="text-white py-20 relative overflow-hidden">
-          {/* Your Custom Delivery Tracking Image - Yellow Truck & GPS - Zoomed Out */}
+          {/* Your Custom Delivery Tracking Image - Yellow Truck & GPS - Optimized for mobile */}
           <div 
             className="absolute inset-0"
             style={{
               backgroundImage: `url('/delivery-hero-bg.jpg?v=3'), url('/delivery-hero-bg.jpg'), url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080"%3E%3Crect fill="%23f5f5f0" width="1920" height="1080"/%3E%3C/svg%3E')`,
-              backgroundSize: 'contain',
+              backgroundSize: window.innerWidth < 768 ? 'cover' : 'contain', // Cover on mobile, contain on desktop
               backgroundPosition: 'center center',
               backgroundRepeat: 'no-repeat',
-              WebkitBackgroundSize: 'contain',
-              MozBackgroundSize: 'contain',
-              backgroundColor: '#374151'
+              WebkitBackgroundSize: window.innerWidth < 768 ? 'cover' : 'contain',
+              MozBackgroundSize: window.innerWidth < 768 ? 'cover' : 'contain',
+              backgroundColor: '#374151',
+              willChange: 'auto' // Remove will-change for better performance
             }}
             role="img"
             aria-label="Delivery truck and GPS tracking system"

@@ -216,3 +216,4 @@ export const GPSLocationCapture: React.FC<GPSLocationCaptureProps> = ({
 
 export default GPSLocationCapture;
 
+

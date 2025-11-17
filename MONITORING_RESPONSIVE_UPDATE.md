@@ -355,3 +355,4 @@ src/pages/Monitoring.tsx
 **Commit:** `445a121` - "Make monitoring page camera view fully responsive"  
 **Status:** ✅ **DEPLOYED**
 
+
