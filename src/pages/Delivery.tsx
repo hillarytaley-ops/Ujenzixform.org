@@ -60,10 +60,14 @@ const Delivery = () => {
   const [loading, setLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   
-  // Prefetch likely next pages for instant navigation
+  // Prefetch likely next pages for instant navigation - especially critical on mobile
   useEffect(() => {
-    // Prefetch Feedback and Tracking pages after 3 seconds
-    prefetchRoutes(['/feedback', '/tracking'], 3000, 1000);
+    // Prefetch Feedback immediately on mobile (within 1 second), desktop after 2 seconds
+    const isMobileDevice = window.innerWidth < 768 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    const prefetchDelay = isMobileDevice ? 1000 : 2000;
+    
+    // Prefetch Feedback and Tracking pages
+    prefetchRoutes(['/feedback', '/tracking'], prefetchDelay, 500);
   }, []);
   
   const [deliveries, setDeliveries] = useState([

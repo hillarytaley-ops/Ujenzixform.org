@@ -48,7 +48,13 @@ export const prefetchRoute = (
   // Prefetch after delay
   setTimeout(() => {
     const routeMap: { [key: string]: () => Promise<any> } = {
-      '/feedback': () => import('@/pages/Feedback'),
+      '/feedback': () => {
+        // Prefetch both the page and the form component for instant mobile loading
+        return Promise.all([
+          import('@/pages/Feedback'),
+          import('@/components/FeedbackForm')
+        ]);
+      },
       '/tracking': () => import('@/pages/Tracking'),
       '/delivery': () => import('@/pages/Delivery'),
       '/suppliers': () => import('@/pages/SuppliersMobileOptimized'),

@@ -1,10 +1,23 @@
-import React from "react";
+import React, { Suspense } from "react";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { Badge } from "@/components/ui/badge";
 import { MessageSquare, Star, Award } from "lucide-react";
-// Import FeedbackForm directly (no lazy loading) for instant rendering on mobile
-import { FeedbackForm } from "@/components/FeedbackForm";
+
+// Lazy load FeedbackForm to prevent page hanging on mobile
+const FeedbackForm = React.lazy(() => 
+  import("@/components/FeedbackForm").then(module => ({ default: module.FeedbackForm }))
+);
+
+// Lightweight loading fallback for mobile
+const FeedbackFormLoader = () => (
+  <div className="space-y-4">
+    <div className="h-12 bg-gray-100 rounded animate-pulse"></div>
+    <div className="h-12 bg-gray-100 rounded animate-pulse"></div>
+    <div className="h-32 bg-gray-100 rounded animate-pulse"></div>
+    <div className="h-12 bg-gray-100 rounded animate-pulse"></div>
+  </div>
+);
 
 export default function Feedback() {
   return (
@@ -109,7 +122,9 @@ export default function Feedback() {
                 </p>
               </div>
               
-              <FeedbackForm />
+              <Suspense fallback={<FeedbackFormLoader />}>
+                <FeedbackForm />
+              </Suspense>
             </div>
           </div>
           
