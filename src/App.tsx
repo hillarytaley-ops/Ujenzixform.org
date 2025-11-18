@@ -25,7 +25,8 @@ const Contact = lazy(() => import("./pages/Contact"));
 import Auth from "./pages/Auth";
 const AdminAuth = lazy(() => import("./pages/AdminAuth"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
-const Feedback = lazy(() => import("./pages/Feedback"));
+// Import Feedback directly (no lazy loading) for instant navigation from Delivery
+import Feedback from "./pages/Feedback";
 const Tracking = lazy(() => import("./pages/Tracking"));
 const Monitoring = lazy(() => import("./pages/Monitoring"));
 const Delivery = lazy(() => import("./pages/Delivery"));
