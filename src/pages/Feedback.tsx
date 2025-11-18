@@ -1,24 +1,10 @@
-import React, { Suspense } from "react";
+import React from "react";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare, Star, Shield, Users, Award } from "lucide-react";
-import AnimatedSection from "@/components/AnimatedSection";
-
-// Lazy load FeedbackForm for faster initial page load
-const FeedbackForm = React.lazy(() => 
-  import("@/components/FeedbackForm").then(module => ({ default: module.FeedbackForm }))
-);
-
-// Loading skeleton for feedback form
-const FeedbackFormSkeleton = () => (
-  <div className="animate-pulse space-y-6">
-    <div className="h-12 bg-gray-200 rounded"></div>
-    <div className="h-12 bg-gray-200 rounded"></div>
-    <div className="h-32 bg-gray-200 rounded"></div>
-    <div className="h-12 bg-gray-200 rounded"></div>
-  </div>
-);
+import { MessageSquare, Star, Award } from "lucide-react";
+// Import FeedbackForm directly (no lazy loading) for instant rendering on mobile
+import { FeedbackForm } from "@/components/FeedbackForm";
 
 export default function Feedback() {
   return (
@@ -26,8 +12,7 @@ export default function Feedback() {
       <Navigation />
       
       {/* Hero Section */}
-      <AnimatedSection animation="fadeInUp">
-        <header 
+      <header 
           className="text-white py-24 relative overflow-hidden"
           role="banner"
           aria-labelledby="feedback-hero-heading"
@@ -82,7 +67,6 @@ export default function Feedback() {
           </div>
         </div>
         </header>
-      </AnimatedSection>
       
       {/* Main Feedback Section */}
       <main className="py-20 relative overflow-hidden">
@@ -112,17 +96,8 @@ export default function Feedback() {
             </p>
           </div>
           
-          {/* Privacy & Security Notice */}
-          <AnimatedSection animation="fadeInUp">
-            <div className="mb-12">
-              <div className="bg-white/95 backdrop-blur-sm p-8 rounded-2xl border-2 border-white/50 shadow-2xl max-w-4xl mx-auto">
-            </div>
-            </div>
-          </AnimatedSection>
-          
-          {/* Enhanced Feedback Form Container */}
-          <AnimatedSection animation="fadeInUp" delay={200}>
-            <div className="max-w-2xl mx-auto">
+          {/* Enhanced Feedback Form Container - No animation for instant mobile rendering */}
+          <div className="max-w-2xl mx-auto">
             <div className="bg-white/95 backdrop-blur-sm rounded-2xl border-2 border-white/50 shadow-2xl p-8">
               <div className="text-center mb-8">
                 <h3 className="text-3xl font-bold text-gray-900 mb-4 flex items-center justify-center gap-2">
@@ -134,16 +109,12 @@ export default function Feedback() {
                 </p>
               </div>
               
-              <Suspense fallback={<FeedbackFormSkeleton />}>
-                <FeedbackForm />
-              </Suspense>
+              <FeedbackForm />
             </div>
-            </div>
-          </AnimatedSection>
+          </div>
           
-          {/* Feedback Impact Section */}
-          <AnimatedSection animation="fadeInUp" delay={400}>
-            <div className="mt-20 text-center">
+          {/* Feedback Impact Section - No animation for instant mobile rendering */}
+          <div className="mt-20 text-center">
             <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-8 border border-white/30 max-w-4xl mx-auto">
               <h3 className="text-3xl font-bold mb-6 text-gray-900">Your Feedback Creates Impact</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -164,8 +135,7 @@ export default function Feedback() {
                 </div>
               </div>
             </div>
-            </div>
-          </AnimatedSection>
+          </div>
         </div>
       </main>
       
