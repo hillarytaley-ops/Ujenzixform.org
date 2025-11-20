@@ -11,7 +11,7 @@ const Footer = () => {
             <div className="flex items-center space-x-2 mb-4">
               <Building2 className="h-6 w-6" />
               <h3 className="text-lg font-semibold">
-                <span className="text-white">Ujenzi</span>
+                <span className="text-white">Mradi</span>
                 <span className="text-green-400">Pro</span>
               </h3>
             </div>
@@ -48,7 +48,7 @@ const Footer = () => {
           </div>
         </div>
         <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-          <p>&copy; 2024 UjenziPro. All rights reserved. Made with ❤️ in Kenya.</p>
+          <p>&copy; 2024 MradiPro. All rights reserved. Made with ❤️ in Kenya.</p>
         </div>
       </div>
     </footer>
