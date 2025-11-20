@@ -159,7 +159,7 @@ const About: React.FC = () => {
               🇰🇪 Proudly Kenyan - Building the Future
             </Badge>
             <h1 id="hero-heading" className="text-6xl md:text-7xl font-bold mb-8 text-white drop-shadow-2xl">
-              About UjenziPro
+              About MradiPro
             </h1>
             <p className="text-2xl md:text-3xl max-w-4xl mx-auto text-white font-medium drop-shadow-lg leading-relaxed">
               Transforming Kenya's construction industry through technology, 

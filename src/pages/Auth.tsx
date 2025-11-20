@@ -494,7 +494,7 @@ const Auth = () => {
       <div className="min-h-screen flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
-            <CardTitle>Welcome to UjenziPro</CardTitle>
+            <CardTitle>Welcome to MradiPro</CardTitle>
             <CardDescription>Sign in to continue</CardDescription>
           </CardHeader>
           <CardContent>{authTabs}</CardContent>

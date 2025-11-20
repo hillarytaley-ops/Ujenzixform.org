@@ -151,7 +151,7 @@ export const SimpleChatButton = () => {
           <MessageCircle className="h-8 w-8 text-white" />
         </Button>
         <div className="absolute -top-2 -right-2 bg-red-600 text-white text-xs px-2 py-1 rounded-full font-bold">
-          UJ
+          MP
         </div>
       </div>
     );
@@ -167,7 +167,7 @@ export const SimpleChatButton = () => {
           <div className="flex items-center gap-2">
             <Bot className="h-5 w-5" />
             <div>
-              <div className="font-semibold">UjenziPro</div>
+              <div className="font-semibold">MradiPro</div>
               <div className="text-xs">Kenya Construction Expert • AI & Human Support</div>
             </div>
           </div>

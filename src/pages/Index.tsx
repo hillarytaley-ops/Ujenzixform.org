@@ -139,7 +139,7 @@ const Index = () => {
               
               <h1 className="text-5xl md:text-6xl font-bold mb-6 leading-tight">
                 <span className="bg-gradient-to-r from-white via-gray-200 to-white bg-clip-text text-transparent">
-                  UjenziPro
+                  MradiPro
                 </span>
                 <br />
                 <span className="text-3xl md:text-4xl text-blue-400">

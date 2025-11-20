@@ -1,8 +1,8 @@
-# 🏗️ UjenziPro2 - Kenya's Premier Construction Platform
+# 🏗️ MradiPro - Kenya's Premier Construction Platform
 
 ## 📋 Project Overview
 
-**UjenziPro2** is Kenya's leading digital platform connecting builders with verified construction material suppliers across all 47 counties. From Mombasa to Eldoret, from Kisumu to Garissa - we facilitate quality materials, competitive prices, and lasting business partnerships.
+**MradiPro** is Kenya's leading digital platform connecting builders with verified construction material suppliers across all 47 counties. From Mombasa to Eldoret, from Kisumu to Garissa - we facilitate quality materials, competitive prices, and lasting business partnerships.
 
 ### 🎯 **Mission**
 *Kujenga Pamoja* - Building Together Across Kenya
@@ -85,7 +85,7 @@ To revolutionize Kenya's construction industry through digital innovation, trans
 git clone <YOUR_REPOSITORY_URL>
 
 # Navigate to project directory
-cd UjenziPro2
+cd MradiPro
 
 # Install dependencies
 npm install
@@ -125,7 +125,7 @@ npm run security:full     # Complete security test suite
 ## 🏗️ **Project Structure**
 
 ```
-UjenziPro2/
+MradiPro/
 ├── src/
 │   ├── components/          # React components
 │   │   ├── builders/        # Builder-specific components
@@ -191,23 +191,23 @@ UjenziPro2/
 ## 📞 **Support & Contact**
 
 ### **Technical Support**
-- **Email**: support@ujenzipro.co.ke
-- **Phone**: +254-700-UJENZIPRO
+- **Email**: support@mradipro.co.ke
+- **Phone**: +254-700-MRADIPRO
 - **Hours**: 24/7 technical support
 
 ### **Security Contact**
-- **Security Team**: security@ujenzipro.co.ke
-- **Emergency**: security-emergency@ujenzipro.co.ke
+- **Security Team**: security@mradipro.co.ke
+- **Emergency**: security-emergency@mradipro.co.ke
 - **Hotline**: +254-700-SECURE (732873)
 
 ### **Business Inquiries**
-- **Email**: info@ujenzipro.co.ke
+- **Email**: info@mradipro.co.ke
 - **Phone**: +254-700-123-4567
 - **Address**: Nairobi, Kenya
 
 ## 📄 **License**
 
-This project is proprietary software owned by UjenziPro Ltd. All rights reserved.
+This project is proprietary software owned by MradiPro Ltd. All rights reserved.
 
 ## 🎉 **Acknowledgments**
 
@@ -219,7 +219,7 @@ Special thanks to:
 
 ---
 
-**🏆 UjenziPro2 - Building Kenya's Future, One Connection at a Time**
+**🏆 MradiPro - Building Kenya's Future, One Connection at a Time**
 
 *Proudly Kenyan 🇰🇪 | Enterprise Security 🛡️ | World-Class Platform 🌍*
 

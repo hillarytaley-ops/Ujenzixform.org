@@ -60,7 +60,7 @@ const SuppliersMobileOptimized = () => {
           
           {/* Title */}
           <h1 className="text-4xl md:text-5xl font-bold mb-4">
-            UjenziPro Suppliers
+            MradiPro Suppliers
           </h1>
           
           {/* Subtitle */}

@@ -59,7 +59,7 @@ export default function Feedback() {
             </h1>
             <p className="text-2xl md:text-3xl mb-8 text-white/90 font-medium drop-shadow-lg leading-relaxed">
               Help us improve Kenya's construction industry by sharing your thoughts, 
-              suggestions, and experiences with UjenziPro
+              suggestions, and experiences with MradiPro
             </p>
             
             {/* Feedback Highlights */}

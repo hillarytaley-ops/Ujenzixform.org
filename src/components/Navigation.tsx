@@ -143,8 +143,8 @@ const Navigation = () => {
             {/* Kenyan-Themed Circular Logo */}
             <div className="kenyan-circular-logo-container shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:scale-110 z-10">
               <img 
-                src="/ujenzipro-logo-circular.svg" 
-                alt="UjenziPro - Kenya's Premier Construction Platform" 
+                src="/mradipro-logo-circular.svg" 
+                alt="MradiPro - Kenya's Premier Construction Platform" 
                 className="h-14 w-14 object-contain kenyan-circular-logo"
               />
             </div>

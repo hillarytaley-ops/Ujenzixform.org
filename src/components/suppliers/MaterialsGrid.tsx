@@ -568,7 +568,7 @@ export const MaterialsGrid = () => {
         <Alert className="bg-gradient-to-r from-green-50 to-blue-50 border-green-300">
           <PartyPopper className="h-5 w-5 text-green-600" />
           <AlertDescription className="ml-2">
-            <strong className="text-green-800">🎉 Welcome to UjenziPro!</strong>
+            <strong className="text-green-800">🎉 Welcome to MradiPro!</strong>
             <p className="mt-1">
               {searchParams.get('welcome') === 'private_client' ? (
                 <>You can now <strong>purchase materials directly</strong> using the <span className="text-green-600 font-bold">"Buy Now"</span> buttons below. Start shopping!</>
