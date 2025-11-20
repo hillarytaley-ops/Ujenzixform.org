@@ -1,7 +1,7 @@
 // Service Worker for MradiPro - Offline caching and faster loads
-const CACHE_NAME = 'mradipro-v1';
-const STATIC_CACHE = 'mradipro-static-v1';
-const DYNAMIC_CACHE = 'mradipro-dynamic-v1';
+const CACHE_NAME = 'mradipro-v2';
+const STATIC_CACHE = 'mradipro-static-v2';
+const DYNAMIC_CACHE = 'mradipro-dynamic-v2';
 
 // Assets to cache on install
 const STATIC_ASSETS = [
