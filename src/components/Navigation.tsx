@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { User, Session } from '@supabase/supabase-js';
 import { UserGuideMenu } from "@/components/ui/user-guide-menu";
+import { MradiProLogo, UserAvatar } from "@/components/common/ProfilePicture";
 
 const Navigation = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -138,20 +139,12 @@ const Navigation = () => {
   return (
     <header className="shadow-sm border-b sticky top-0 z-50 bg-gradient-primary relative">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between relative z-10">
-        <Link to="/" className="flex items-center group">
-          <div className="relative">
-            {/* Kenyan-Themed Circular Logo */}
-            <div className="kenyan-circular-logo-container shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:scale-110 z-10">
-              <img 
-                src="/mradipro-logo-circular.svg" 
-                alt="MradiPro - Kenya's Premier Construction Platform" 
-                className="h-14 w-14 object-contain kenyan-circular-logo"
-              />
-            </div>
-            {/* Kenyan Flag Colors Glow Effect */}
-            <div className="absolute inset-0 rounded-full bg-gradient-to-r from-green-500 via-red-500 to-black opacity-0 group-hover:opacity-20 transition-opacity duration-500 blur-sm"></div>
-          </div>
-          
+        <Link to="/" className="flex items-center group transition-transform hover:scale-105">
+          <MradiProLogo 
+            size="lg" 
+            showText={true}
+            className="transition-all duration-300"
+          />
         </Link>
 
         {/* Desktop Navigation */}

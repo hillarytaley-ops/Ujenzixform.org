@@ -83,35 +83,27 @@ const App = () => {
 
   React.useEffect(() => {
     const conn: any = typeof navigator !== 'undefined' ? (navigator as any).connection : null;
-    const isLowData = !!conn && (conn.saveData || conn.effectiveType === 'slow-2g' || conn.effectiveType === '2g');
+    const isLowData = !!conn && (conn.saveData || conn.effectiveType === 'slow-2g' || conn.effectiveType === '2g' || conn.effectiveType === '3g');
 
-    // Defer non-critical loads for better first paint
-    // Use requestIdleCallback for even better performance
-    const scheduleTask = (callback: () => void, delay: number) => {
-      if ('requestIdleCallback' in window) {
-        setTimeout(() => {
-          requestIdleCallback(callback);
-        }, delay);
-      } else {
-        setTimeout(callback, delay);
-      }
-    };
-
-    // Get current user for chatbot (heavily deferred)
-    scheduleTask(() => {
+    // Get current user for chatbot (deferred, longer delay on low-data)
+    const timer = setTimeout(() => {
       if (isLowData) return;
       import('@/integrations/supabase/client').then(({ supabase }) => {
         supabase.auth.getUser().then(({ data }) => {
           setUser(data.user);
         });
       });
-    }, isLowData ? 5000 : 2000);
+    }, isLowData ? 4000 : 1000);
 
-    // Load chat widget after page is fully interactive (skip on low-data)
-    scheduleTask(() => {
+    // Load chat widget after page is interactive (skip on low-data)
+    const chatTimer = setTimeout(() => {
       if (!isLowData) setShowChat(true);
-    }, isLowData ? 8000 : 3000);
+    }, isLowData ? 6000 : 2000);
 
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(chatTimer);
+    };
   }, []);
 
   return (
