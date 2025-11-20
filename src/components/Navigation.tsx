@@ -142,7 +142,7 @@ const Navigation = () => {
         <Link to="/" className="flex items-center group transition-transform hover:scale-105">
           <MradiProLogo 
             size="lg" 
-            showText={true}
+            showText={false}
             className="transition-all duration-300"
           />
         </Link>
