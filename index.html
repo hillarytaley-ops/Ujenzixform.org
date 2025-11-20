@@ -5,16 +5,30 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/mradipro-favicon.svg" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#2563eb" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="MradiPro" />
     <title>MradiPro - Connecting Kenya's Construction Industry</title>
     <meta name="description" content="Kenya's premier platform connecting builders with verified construction material suppliers across all 47 counties. Find quality materials, competitive quotes, and build lasting business relationships." />
     <meta name="author" content="MradiPro" />
     
-    <!-- Performance: Preconnect to external domains -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://images.unsplash.com">
-    <link rel="preconnect" href="https://wuuyjjpgzgeimiptuuws.supabase.co">
+    <!-- Performance: Preconnect to external domains for faster loading -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://images.unsplash.com" crossorigin>
+    <link rel="preconnect" href="https://wuuyjjpgzgeimiptuuws.supabase.co" crossorigin>
     <link rel="dns-prefetch" href="https://wuuyjjpgzgeimiptuuws.supabase.co">
     <link rel="dns-prefetch" href="https://hebbkx1anhila5yf.public.blob.vercel-storage.com">
+    
+    <!-- Preload critical resources for instant first paint -->
+    <link rel="modulepreload" href="/src/main.tsx">
+    <link rel="prefetch" href="/src/pages/Index.tsx" as="script">
+    
+    <!-- Optimize font loading -->
+    <link rel="preload" href="https://fonts.gstatic.com" as="font" type="font/woff2" crossorigin>
     
     <!-- Security Headers -->
     <meta http-equiv="X-Frame-Options" content="DENY" />

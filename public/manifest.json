@@ -1,0 +1,24 @@
+{
+  "name": "MradiPro - Kenya's Construction Platform",
+  "short_name": "MradiPro",
+  "description": "Kenya's premier platform connecting builders with verified construction material suppliers across all 47 counties",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/mradipro-logo-circular.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "construction", "productivity"],
+  "lang": "en-KE",
+  "dir": "ltr",
+  "scope": "/",
+  "prefer_related_applications": false
+}
+
