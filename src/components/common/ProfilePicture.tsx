@@ -53,14 +53,21 @@ export const MradiProLogo: React.FC<{
   className?: string;
   showText?: boolean;
 }> = ({ size = 'md', className = '', showText = false }) => {
+  const [imgError, setImgError] = React.useState(false);
+  
+  // Try PNG first, fallback to SVG if it fails
+  const logoSrc = imgError ? '/mradipro-logo-circular.svg' : '/mradipro-logo.png';
+  
   return (
     <div className={`flex items-center gap-2 ${className}`}>
-      <ProfilePicture
-        src="/mradipro-logo.png"
-        alt="MradiPro Logo"
-        size={size}
-        defaultImage="logo"
-      />
+      <div className={`relative ${sizeClasses[size]}`}>
+        <img
+          src={logoSrc}
+          alt="MradiPro Logo"
+          className="w-full h-full rounded-full object-cover border-2 border-gray-200 shadow-sm"
+          onError={() => setImgError(true)}
+        />
+      </div>
       {showText && (
         <div className="flex flex-col">
           <span className="font-bold text-[#0F2C59] text-lg">MRADIPRO</span>
