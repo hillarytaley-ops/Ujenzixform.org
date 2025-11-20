@@ -19,7 +19,7 @@ export const SimpleChatButton = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
 
-  // Hide UjenziPro chat on auth pages (login, signup, password reset)
+  // Hide MradiPro chat on auth pages (login, signup, password reset)
   const authPages = ['/auth', '/admin-login', '/reset-password'];
   if (authPages.includes(location.pathname)) {
     return null;
@@ -84,7 +84,7 @@ export const SimpleChatButton = () => {
     // Help
     if (query.includes('help') || query.includes('how')) {
       return {
-        response: `🆘 **UjenziPro Can Help With:**\n\n📦 Material prices & availability\n🔢 Quantity calculations\n🏪 Finding suppliers\n🚚 Delivery estimates\n📹 Site monitoring & security\n🏗️ Project planning\n💡 Best practices\n👤 **Chat with real human staff**\n\nWhat do you need help with?`,
+        response: `🆘 **MradiPro Can Help With:**\n\n📦 Material prices & availability\n🔢 Quantity calculations\n🏪 Finding suppliers\n🚚 Delivery estimates\n📹 Site monitoring & security\n🏗️ Project planning\n💡 Best practices\n👤 **Chat with real human staff**\n\nWhat do you need help with?`,
         suggestions: ['Material prices', 'Calculate materials', 'Find suppliers', 'Talk to human staff']
       };
     }
@@ -93,14 +93,14 @@ export const SimpleChatButton = () => {
     if (query.includes('human') || query.includes('staff') || query.includes('person') || query.includes('agent') || query.includes('talk to someone')) {
       setShowHumanSupport(true);
       return {
-        response: `👤 **Connect with UjenziPro Staff:**\n\n**Our team is here to help!**\n\n📞 **Call Us:** +254-700-UJENZIPRO\n📧 **Email:** support@ujenzipro.co.ke\n💬 **WhatsApp:** +254-712-345-678\n\n**Office Hours:**\n• Monday - Friday: 8:00 AM - 6:00 PM\n• Saturday: 9:00 AM - 4:00 PM\n• Sunday: Closed\n\n**For urgent matters:** Our 24/7 emergency line is available at +254-700-EMERGENCY\n\n**What can our team help you with?**`,
+        response: `👤 **Connect with MradiPro Staff:**\n\n**Our team is here to help!**\n\n📞 **Call Us:** +254-700-MRADIPRO\n📧 **Email:** support@mradipro.co.ke\n💬 **WhatsApp:** +254-712-345-678\n\n**Office Hours:**\n• Monday - Friday: 8:00 AM - 6:00 PM\n• Saturday: 9:00 AM - 4:00 PM\n• Sunday: Closed\n\n**For urgent matters:** Our 24/7 emergency line is available at +254-700-EMERGENCY\n\n**What can our team help you with?**`,
         suggestions: ['I have a custom order', 'Need project consultation', 'Technical support', 'Back to AI assistant']
       };
     }
 
     // Default response
     return {
-      response: `Hi! I'm UjenziPro 🤖🇰🇪\n\nI can help with:\n• **Prices** - Material costs\n• **Calculate** - Quantities needed\n• **Find** - Suppliers near you\n• **Delivery** - Costs & tracking\n• **Monitoring** - Site security & cameras\n• **Build** - Project estimates\n• **Human Support** - Talk to our staff\n\nWhat would you like to know?`,
+      response: `Hi! I'm MradiPro 🤖🇰🇪\n\nI can help with:\n• **Prices** - Material costs\n• **Calculate** - Quantities needed\n• **Find** - Suppliers near you\n• **Delivery** - Costs & tracking\n• **Monitoring** - Site security & cameras\n• **Build** - Project estimates\n• **Human Support** - Talk to our staff\n\nWhat would you like to know?`,
       suggestions: ['Cement prices', 'Calculate for 3-bedroom house', 'Find suppliers', 'Talk to human staff']
     };
   };
@@ -188,7 +188,7 @@ export const SimpleChatButton = () => {
                 <div className="flex items-start gap-2">
                   <Bot className="h-4 w-4 mt-1 text-blue-600" />
                   <div className="text-sm">
-                    <strong className="text-blue-600">UjenziPro:</strong> Karibu! I can help you with construction materials, prices, suppliers, and deliveries. Need to talk to a real person? Just ask! What would you like to know?
+                    <strong className="text-blue-600">MradiPro:</strong> Karibu! I can help you with construction materials, prices, suppliers, and deliveries. Need to talk to a real person? Just ask! What would you like to know?
                   </div>
                 </div>
               </div>
@@ -245,7 +245,7 @@ export const SimpleChatButton = () => {
                         : 'bg-white'
                     }`}>
                       <div className="text-sm whitespace-pre-line">
-                        {msg.role === 'bot' && <strong className="text-blue-600">UjenziPro: </strong>}
+                        {msg.role === 'bot' && <strong className="text-blue-600">MradiPro: </strong>}
                         {msg.content}
                       </div>
                     </div>
@@ -290,7 +290,7 @@ export const SimpleChatButton = () => {
         <div className="border-t p-4 bg-white">
           <div className="flex gap-2">
             <Input
-              placeholder="Ask UjenziPro or request human support..."
+              placeholder="Ask MradiPro or request human support..."
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyPress={(e) => {
@@ -309,7 +309,7 @@ export const SimpleChatButton = () => {
           </div>
           <div className="text-xs text-gray-500 mt-2 flex items-center gap-1">
             <Sparkles className="h-3 w-3" />
-            Powered by UjenziPro 🇰🇪 • AI & Human Support Available • v2.0
+            Powered by MradiPro 🇰🇪 • AI & Human Support Available • v2.0
           </div>
         </div>
       </Card>
