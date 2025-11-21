@@ -611,33 +611,37 @@ const Monitoring = () => {
                       <CardContent className="p-2 md:p-4">
                         <div className="aspect-video bg-black rounded-lg flex items-center justify-center relative min-h-[200px] sm:min-h-[300px] md:min-h-[400px] lg:min-h-[500px]">
                           {selectedCamera ? (
-                            <div className="text-white text-center p-4">
-                              {selectedCamera.startsWith('drone-') ? (
-                                <>
-                                  <Plane className="h-12 w-12 sm:h-14 sm:w-14 md:h-16 md:w-16 mx-auto mb-2 md:mb-4 opacity-75 text-purple-300" />
-                                  <p className="text-lg sm:text-xl md:text-2xl font-semibold">Drone Aerial Feed</p>
-                                  <p className="text-xs sm:text-sm opacity-75 mt-1">
-                                    {cameras.find(c => c.id === selectedCamera)?.quality} Aerial Stream
-                                  </p>
-                                  <Badge className="mt-2 bg-purple-600 text-white text-xs md:text-sm">
-                                    Aerial View
-                                  </Badge>
-                                </>
-                              ) : (
-                                <>
-                                  <Camera className="h-12 w-12 sm:h-14 sm:w-14 md:h-16 md:w-16 mx-auto mb-2 md:mb-4 opacity-50" />
-                                  <p className="text-lg sm:text-xl md:text-2xl font-semibold">Live Feed</p>
-                                  <p className="text-sm sm:text-base md:text-lg opacity-75 mt-2">
-                                    {cameras.find(c => c.id === selectedCamera)?.quality} Stream
-                                  </p>
-                                </>
-                              )}
+                            <div className="absolute inset-0 flex items-center justify-center text-white text-center p-4">
+                              <div>
+                                {selectedCamera.startsWith('drone-') ? (
+                                  <>
+                                    <Plane className="h-12 w-12 sm:h-14 sm:w-14 md:h-16 md:w-16 mx-auto mb-2 md:mb-4 opacity-75 text-purple-300" />
+                                    <p className="text-lg sm:text-xl md:text-2xl font-semibold">Drone Aerial Feed</p>
+                                    <p className="text-xs sm:text-sm opacity-75 mt-1">
+                                      {cameras.find(c => c.id === selectedCamera)?.quality} Aerial Stream
+                                    </p>
+                                    <Badge className="mt-2 bg-purple-600 text-white text-xs md:text-sm">
+                                      Aerial View
+                                    </Badge>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Camera className="h-12 w-12 sm:h-14 sm:w-14 md:h-16 md:w-16 mx-auto mb-2 md:mb-4 opacity-50" />
+                                    <p className="text-lg sm:text-xl md:text-2xl font-semibold">Live Feed</p>
+                                    <p className="text-sm sm:text-base md:text-lg opacity-75 mt-2">
+                                      {cameras.find(c => c.id === selectedCamera)?.quality} Stream
+                                    </p>
+                                  </>
+                                )}
+                              </div>
                             </div>
                           ) : (
-                            <div className="text-white text-center p-4">
-                              <Monitor className="h-12 w-12 sm:h-16 sm:w-16 md:h-20 md:w-20 mx-auto mb-2 md:mb-4 opacity-50" />
-                              <p className="text-lg sm:text-xl md:text-2xl font-semibold">Select a Camera</p>
-                              <p className="text-sm sm:text-base md:text-lg opacity-75 mt-1 md:mt-2">Choose from the list to view live feed</p>
+                            <div className="absolute inset-0 flex items-center justify-center text-white text-center p-4">
+                              <div>
+                                <Monitor className="h-12 w-12 sm:h-16 sm:w-16 md:h-20 md:w-20 mx-auto mb-2 md:mb-4 opacity-50" />
+                                <p className="text-lg sm:text-xl md:text-2xl font-semibold">Select a Camera</p>
+                                <p className="text-sm sm:text-base md:text-lg opacity-75 mt-1 md:mt-2">Choose from the list to view live feed</p>
+                              </div>
                             </div>
                           )}
                           

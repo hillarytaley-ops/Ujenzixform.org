@@ -490,20 +490,22 @@ export const LiveSiteMonitor: React.FC<LiveSiteMonitorProps> = ({ userRole, user
               {selectedCameraData ? (
                 <div className="space-y-4">
                   {/* Video Player */}
-                  <div className="relative bg-black rounded-lg aspect-video flex items-center justify-center">
-                    {selectedCameraData.status === 'offline' ? (
-                      <div className="text-white text-center">
-                        <WifiOff className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p className="text-lg">Camera Offline</p>
-                        <p className="text-sm opacity-75">Last seen: {format(selectedCameraData.lastActivity, 'HH:mm')}</p>
-                      </div>
-                    ) : (
-                      <div className="text-white text-center">
-                        <Camera className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p className="text-lg">Live Feed</p>
-                        <p className="text-sm opacity-75">Streaming in {selectedCameraData.quality}</p>
-                      </div>
-                    )}
+                  <div className="relative bg-black rounded-lg aspect-video">
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      {selectedCameraData.status === 'offline' ? (
+                        <div className="text-white text-center">
+                          <WifiOff className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                          <p className="text-lg">Camera Offline</p>
+                          <p className="text-sm opacity-75">Last seen: {format(selectedCameraData.lastActivity, 'HH:mm')}</p>
+                        </div>
+                      ) : (
+                        <div className="text-white text-center">
+                          <Camera className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                          <p className="text-lg">Live Feed</p>
+                          <p className="text-sm opacity-75">Streaming in {selectedCameraData.quality}</p>
+                        </div>
+                      )}
+                    </div>
                     
                     {/* Video Controls Overlay - Admin Only Controls */}
                     <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between">
