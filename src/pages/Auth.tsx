@@ -45,13 +45,13 @@ const Auth = () => {
         setSession(session);
         setUser(session?.user ?? null);
         
-        // Redirect authenticated users to dashboard or redirect URL
+        // Redirect authenticated users to home page or redirect URL
         if (session?.user && event === 'SIGNED_IN') {
           if (redirectTo) {
             window.location.href = redirectTo;
           } else {
-            // Redirect to suppliers page (main app) instead of auth page
-            window.location.href = '/suppliers';
+            // Redirect to home page after sign in
+            window.location.href = '/home';
           }
         }
       }
@@ -69,8 +69,8 @@ const Auth = () => {
           sessionStorage.removeItem('returnTo');
           navigate(returnTo);
         } else {
-          // Redirect to suppliers page (main app)
-          navigate("/suppliers");
+          // Redirect to home page (main app)
+          navigate("/home");
         }
       }
     });
