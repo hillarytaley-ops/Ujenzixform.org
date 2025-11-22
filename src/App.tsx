@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect } from "react";
+import React, { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -11,28 +11,28 @@ import { LanguageProvider } from "@/contexts/LanguageContext";
 // import { DataPrivacyService } from "@/services/DataPrivacyService";
 // import { SecurityAudit } from "@/utils/SecurityAudit";
 
-// Lazy load components for better performance
-const Index = lazy(() => import("./pages/Index"));
-const Builders = lazy(() => import("./pages/Builders"));
-const BuilderRegistration = lazy(() => import("./pages/BuilderRegistration"));
-const ProfessionalBuilderRegistration = lazy(() => import("./pages/ProfessionalBuilderRegistration"));
-const PrivateBuilderRegistration = lazy(() => import("./pages/PrivateBuilderRegistration"));
-const SuppliersIPhone = lazy(() => import("./pages/SuppliersIPhone"));
-const SuppliersMobileOptimized = lazy(() => import("./pages/SuppliersMobileOptimized"));
-const BuilderPortal = lazy(() => import("./pages/BuilderPortal"));
-const About = lazy(() => import("./pages/About"));
-const Contact = lazy(() => import("./pages/Contact"));
+// Direct imports - NO lazy loading for instant page loads on all devices (especially iPhone)
+import Index from "./pages/Index";
+import Builders from "./pages/Builders";
+import BuilderRegistration from "./pages/BuilderRegistration";
+import ProfessionalBuilderRegistration from "./pages/ProfessionalBuilderRegistration";
+import PrivateBuilderRegistration from "./pages/PrivateBuilderRegistration";
+import SuppliersIPhone from "./pages/SuppliersIPhone";
+import SuppliersMobileOptimized from "./pages/SuppliersMobileOptimized";
+import BuilderPortal from "./pages/BuilderPortal";
+import About from "./pages/About";
+import Contact from "./pages/Contact";
 import Auth from "./pages/Auth";
-const AdminAuth = lazy(() => import("./pages/AdminAuth"));
-const ResetPassword = lazy(() => import("./pages/ResetPassword"));
-const Feedback = lazy(() => import("./pages/Feedback"));
-const Tracking = lazy(() => import("./pages/Tracking"));
-const Monitoring = lazy(() => import("./pages/Monitoring"));
-const Delivery = lazy(() => import("./pages/Delivery"));
-const Scanners = lazy(() => import("./pages/Scanners"));
-const Analytics = lazy(() => import("./pages/Analytics"));
-const DeliveryProviderApplication = lazy(() => import("./pages/DeliveryProviderApplication"));
-const NotFound = lazy(() => import("./pages/NotFound"));
+import AdminAuth from "./pages/AdminAuth";
+import ResetPassword from "./pages/ResetPassword";
+import Feedback from "./pages/Feedback";
+import Tracking from "./pages/Tracking";
+import Monitoring from "./pages/Monitoring";
+import Delivery from "./pages/Delivery";
+import Scanners from "./pages/Scanners";
+import Analytics from "./pages/Analytics";
+import DeliveryProviderApplication from "./pages/DeliveryProviderApplication";
+import NotFound from "./pages/NotFound";
 
 // Auth Guard
 import { AuthRequired } from "@/components/security/AuthRequired";
@@ -117,8 +117,7 @@ const App = () => {
               {/* AI Chatbot - Deferred load for better performance */}
               {showChat && <SimpleChatButton />}
               
-              <Suspense fallback={<PageLoader />}>
-                <Routes>
+              <Routes>
                     {/* Public Auth Routes */}
                     <Route path="/auth" element={<Auth />} />
                     <Route path="/admin-login" element={<AdminAuth />} />
@@ -155,7 +154,6 @@ const App = () => {
                       </AuthRequired>
                     } />
                 </Routes>
-              </Suspense>
               {/* Privacy features will be re-enabled once dependencies are resolved */}
             </BrowserRouter>
           </TooltipProvider>
