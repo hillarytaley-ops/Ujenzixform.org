@@ -198,7 +198,7 @@ const Auth = () => {
           });
         }
       } else if (isSignUp) {
-        if (result.needsConfirmation) {
+        if ('needsConfirmation' in result && result.needsConfirmation) {
           // Email confirmation is required
           toast({
             title: "📧 Check your email",
@@ -290,7 +290,7 @@ const Auth = () => {
   };
 
   const authTabs = (
-    <Tabs defaultValue="signin" className="w-full">
+    <Tabs defaultValue="signup" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>
@@ -520,8 +520,8 @@ const Auth = () => {
       <AnimatedSection animation="scaleIn" className="relative z-10">
         <Card className="w-full max-w-md bg-white/98 backdrop-blur-sm shadow-2xl border-white/70">
           <CardHeader className="text-center">
-            <CardTitle>Welcome to UjenziPro</CardTitle>
-            <CardDescription>Connect with construction professionals across Kenya</CardDescription>
+            <CardTitle>Welcome to MradiPro</CardTitle>
+            <CardDescription>Jenga na MradiPro - Build with Kenya's Premier Construction Platform</CardDescription>
           </CardHeader>
           <CardContent>{authTabs}</CardContent>
         </Card>
@@ -531,7 +531,7 @@ const Auth = () => {
             className="text-sm text-gray-700 hover:text-blue-600 underline flex items-center justify-center gap-2 transition-colors font-medium"
           >
             <span>🔒</span>
-            <span>UjenziPro Staff? Use Admin Portal</span>
+            <span>MradiPro Staff? Use Admin Portal</span>
           </Link>
         </div>
       </AnimatedSection>
