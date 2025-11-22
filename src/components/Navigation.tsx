@@ -139,19 +139,17 @@ const Navigation = () => {
   return (
     <header className="shadow-sm border-b sticky top-0 z-50 bg-gradient-primary relative">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between relative z-10">
-        <Link to="/" className="flex items-center group">
-          <div className="relative">
-            <div className="w-16 h-16 rounded-full overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-110">
-              <img 
-                src="/mradipro-logo.png" 
-                alt="MradiPro - Kenya's Premier Construction Platform" 
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  // Fallback to existing circular SVG if PNG fails
-                  e.currentTarget.src = '/ujenzipro-logo-circular.svg';
-                }}
-              />
-            </div>
+        <Link to="/home" className="flex items-center group">
+          <div className="relative w-14 h-14 sm:w-16 sm:h-16 flex-shrink-0">
+            <img 
+              src="/ujenzipro-logo-circular.svg" 
+              alt="MradiPro" 
+              width="64"
+              height="64"
+              className="w-full h-full rounded-full object-contain shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110"
+              loading="eager"
+              fetchpriority="high"
+            />
           </div>
         </Link>
 
