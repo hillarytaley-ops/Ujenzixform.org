@@ -45,12 +45,13 @@ const Auth = () => {
         setSession(session);
         setUser(session?.user ?? null);
         
-        // Redirect authenticated users to redirect URL or homepage
-        if (session?.user) {
+        // Redirect authenticated users to dashboard or redirect URL
+        if (session?.user && event === 'SIGNED_IN') {
           if (redirectTo) {
             window.location.href = redirectTo;
           } else {
-            window.location.href = '/';
+            // Redirect to suppliers page (main app) instead of auth page
+            window.location.href = '/suppliers';
           }
         }
       }
@@ -61,20 +62,21 @@ const Auth = () => {
       setSession(session);
       setUser(session?.user ?? null);
       
-      // Redirect if already authenticated
+      // Redirect if already authenticated - don't show auth page
       if (session?.user) {
         const returnTo = sessionStorage.getItem('returnTo');
         if (returnTo) {
           sessionStorage.removeItem('returnTo');
           navigate(returnTo);
         } else {
-          navigate("/");
+          // Redirect to suppliers page (main app)
+          navigate("/suppliers");
         }
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate]);
+  }, [navigate, redirectTo]);
 
   const signUp = async (email: string, password: string) => {
     try {
