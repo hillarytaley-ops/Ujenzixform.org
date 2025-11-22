@@ -118,41 +118,64 @@ const App = () => {
               {showChat && <SimpleChatButton />}
               
               <Routes>
-                    {/* Public Auth Routes */}
+                    {/* Public Routes - Accessible to everyone after single sign in */}
+                    <Route path="/" element={<Auth />} />
                     <Route path="/auth" element={<Auth />} />
                     <Route path="/admin-login" element={<AdminAuth />} />
                     <Route path="/reset-password" element={<ResetPassword />} />
-                    <Route path="/scanners" element={<Scanners />} />
-                    {/* Landing page is now Auth (Sign In/Sign Up) */}
-                    <Route path="/" element={<Auth />} />
-                    {/* Home page moved to /home */}
+                    
+                    {/* All pages accessible after sign in - no repeated auth required */}
                     <Route path="/home" element={<Index />} />
-                    {/* Public Suppliers access - map directly to mobile-optimized for reliability */}
                     <Route path="/suppliers" element={<SuppliersMobileOptimized />} />
                     <Route path="/suppliers-mobile" element={<SuppliersMobileOptimized />} />
+                    <Route path="/builders" element={<Builders />} />
+                    <Route path="/about" element={<About />} />
+                    <Route path="/contact" element={<Contact />} />
+                    <Route path="/monitoring" element={<Monitoring />} />
+                    <Route path="/tracking" element={<Tracking />} />
+                    <Route path="/delivery" element={<Delivery />} />
+                    <Route path="/scanners" element={<Scanners />} />
+                    <Route path="/feedback" element={<Feedback />} />
                     
-                    {/* All other routes require authentication */}
-                    <Route path="/*" element={
+                    {/* Auth required only for sensitive actions */}
+                    <Route path="/portal" element={
                       <AuthRequired>
-                        <Routes>
-                          <Route path="/builders" element={<Builders />} />
-                          <Route path="/builder-registration" element={<BuilderRegistration />} />
-                          <Route path="/builders/register" element={<BuilderRegistration />} />
-                          <Route path="/professional-builder-registration" element={<ProfessionalBuilderRegistration />} />
-                          <Route path="/private-client-registration" element={<PrivateBuilderRegistration />} />
-                          <Route path="/portal" element={<BuilderPortal />} />
-                          <Route path="/about" element={<About />} />
-                          <Route path="/contact" element={<Contact />} />
-                          <Route path="/feedback" element={<Feedback />} />
-                          <Route path="/tracking" element={<Tracking />} />
-                          <Route path="/monitoring" element={<Monitoring />} />
-                          <Route path="/delivery" element={<Delivery />} />
-                          <Route path="/analytics" element={<Analytics />} />
-                          <Route path="/delivery/apply" element={<DeliveryProviderApplication />} />
-                          <Route path="*" element={<NotFound />} />
-                        </Routes>
+                        <BuilderPortal />
                       </AuthRequired>
                     } />
+                    <Route path="/builder-registration" element={
+                      <AuthRequired>
+                        <BuilderRegistration />
+                      </AuthRequired>
+                    } />
+                    <Route path="/builders/register" element={
+                      <AuthRequired>
+                        <BuilderRegistration />
+                      </AuthRequired>
+                    } />
+                    <Route path="/professional-builder-registration" element={
+                      <AuthRequired>
+                        <ProfessionalBuilderRegistration />
+                      </AuthRequired>
+                    } />
+                    <Route path="/private-client-registration" element={
+                      <AuthRequired>
+                        <PrivateBuilderRegistration />
+                      </AuthRequired>
+                    } />
+                    <Route path="/analytics" element={
+                      <AuthRequired>
+                        <Analytics />
+                      </AuthRequired>
+                    } />
+                    <Route path="/delivery/apply" element={
+                      <AuthRequired>
+                        <DeliveryProviderApplication />
+                      </AuthRequired>
+                    } />
+                    
+                    {/* 404 */}
+                    <Route path="*" element={<NotFound />} />
                 </Routes>
               {/* Privacy features will be re-enabled once dependencies are resolved */}
             </BrowserRouter>
