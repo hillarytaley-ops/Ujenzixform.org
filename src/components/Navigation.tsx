@@ -140,15 +140,26 @@ const Navigation = () => {
     <header className="shadow-sm border-b sticky top-0 z-50 bg-gradient-primary relative">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between relative z-10">
         <Link to="/home" className="flex items-center group">
-          <div className="relative w-14 h-14 sm:w-16 sm:h-16 flex-shrink-0">
+          <div className="relative flex-shrink-0" style={{ width: '56px', height: '56px' }}>
             <img 
-              src="/ujenzipro-logo-circular.svg" 
+              src="/mradipro-logo.png" 
               alt="MradiPro" 
-              width="64"
-              height="64"
-              className="w-full h-full rounded-full object-contain shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110"
-              loading="eager"
-              fetchpriority="high"
+              width="56"
+              height="56"
+              style={{
+                width: '56px',
+                height: '56px',
+                borderRadius: '50%',
+                objectFit: 'cover',
+                display: 'block'
+              }}
+              className="shadow-lg"
+              onError={(e) => {
+                // Fallback to SVG if PNG fails
+                const target = e.currentTarget;
+                target.src = '/ujenzipro-logo-circular.svg';
+                target.style.objectFit = 'contain';
+              }}
             />
           </div>
         </Link>
