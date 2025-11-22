@@ -124,8 +124,10 @@ const App = () => {
                     <Route path="/admin-login" element={<AdminAuth />} />
                     <Route path="/reset-password" element={<ResetPassword />} />
                     <Route path="/scanners" element={<Scanners />} />
-                    {/* Public Home and Suppliers access */}
-                    <Route path="/" element={<Index />} />
+                    {/* Landing page is now Auth (Sign In/Sign Up) */}
+                    <Route path="/" element={<Auth />} />
+                    {/* Home page moved to /home */}
+                    <Route path="/home" element={<Index />} />
                     {/* Public Suppliers access - map directly to mobile-optimized for reliability */}
                     <Route path="/suppliers" element={<SuppliersMobileOptimized />} />
                     <Route path="/suppliers-mobile" element={<SuppliersMobileOptimized />} />
