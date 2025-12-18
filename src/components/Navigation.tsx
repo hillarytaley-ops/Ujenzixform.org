@@ -73,7 +73,7 @@ const Navigation = () => {
     { path: "/monitoring", label: "Monitoring" },
     { path: "/about", label: "About" },
     { path: "/contact", label: "Contact" },
-    { path: "/feedback", label: "Feedback" },
+    { path: "/feedback", label: "Rate MradiPro" },
   ];
 
   // Admin-only navigation items (only visible to admin)

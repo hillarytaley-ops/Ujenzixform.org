@@ -106,7 +106,7 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
     let sanitized = input.trim();
     
     // Remove potentially dangerous characters
-    sanitized = sanitized.replace(/[<>\"'&]/g, '');
+    sanitized = sanitized.replace(/[<>"'&]/g, '');
     
     // Field-specific sanitization
     switch (fieldType) {
@@ -117,10 +117,10 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
         sanitized = sanitized.replace(/[^a-zA-Z0-9@.\-_]/g, '');
         break;
       case 'subject':
-        sanitized = sanitized.replace(/[<>\"'&{}[\]]/g, '');
+        sanitized = sanitized.replace(/[<>"'&{}[\]]/g, '');
         break;
       case 'message':
-        sanitized = sanitized.replace(/[<>\"'&{}[\]]/g, '');
+        sanitized = sanitized.replace(/[<>"'&{}[\]]/g, '');
         sanitized = sanitized.slice(0, 2000);
         break;
     }
@@ -431,7 +431,7 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
           <Textarea
             id="message"
             {...register("message")}
-            placeholder="Tell us about your experience with UjenziPro. What did you like? What could we improve? Any suggestions for better serving Kenya's construction industry?"
+            placeholder="Tell us about your experience with MradiPro. What did you like? What could we improve? Any suggestions for better serving Kenya's construction industry?"
             rows={6}
             className="text-lg resize-none"
             onFocus={() => trackInteraction('focus')}

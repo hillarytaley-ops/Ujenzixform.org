@@ -41,6 +41,7 @@ const Footer = () => {
             <h4 className="font-semibold mb-4">Support</h4>
             <ul className="space-y-2 text-gray-400">
               <li>Help Center</li>
+              <li><Link to="/feedback" className="hover:text-white">Rate MradiPro</Link></li>
               <li><Link to="/contact" className="hover:text-white">Contact Us</Link></li>
               <li>Terms of Service</li>
               <li>Privacy Policy</li>
