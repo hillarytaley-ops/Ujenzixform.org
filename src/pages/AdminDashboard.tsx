@@ -91,6 +91,7 @@ import { AdminVideoApproval } from "@/components/admin/AdminVideoApproval";
 import { AdminConversationsViewer } from "@/components/admin/AdminConversationsViewer";
 import { UserRolesManager } from "@/components/admin/UserRolesManager";
 import { AdminMessaging } from "@/components/admin/AdminMessaging";
+import { LiveChatManager } from "@/components/admin/LiveChatManager";
 import { Camera, UserCog, MessageCircle } from "lucide-react";
 import {
   Table,
@@ -3908,14 +3909,21 @@ const AdminDashboard = () => {
 
           {/* Communications Tab - Unified Chatbot, Support & Contact Messages */}
           <TabsContent value="communications" className="space-y-6">
+            {/* Live Chat Manager - Real-time client-staff chat */}
+            <LiveChatManager 
+              staffId={user?.id || 'admin'}
+              staffName={adminEmail?.split('@')[0] || 'Support Team'}
+            />
+
+            {/* Legacy Conversations Viewer */}
             <Card className="bg-gradient-to-r from-purple-900/30 to-pink-900/30 border-purple-800/50">
               <CardHeader>
                 <CardTitle className="text-white flex items-center gap-2">
                   <MessageSquare className="h-5 w-5 text-purple-400" />
-                  Communications Center
+                  Legacy Communications
                 </CardTitle>
                 <CardDescription className="text-gray-400">
-                  Manage chatbot conversations, support chats, and contact form submissions
+                  View older chatbot conversations, support chats, and contact form submissions
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-0">
