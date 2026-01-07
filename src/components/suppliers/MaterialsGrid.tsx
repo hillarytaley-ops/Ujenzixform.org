@@ -23,7 +23,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Search, ShoppingCart, Store, Package, Filter, PartyPopper, Plus, Minus, Check, Scale } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -281,9 +281,6 @@ export const MaterialsGrid = () => {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
       
-      const SUPABASE_URL = "https://wuuyjjpgzgeimiptuuws.supabase.co";
-      const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo";
-      
       // STEP 1: Fetch supplier prices from supplier_product_prices table
       // This is where suppliers set their actual selling prices
       let supplierPrices: Record<string, { price: number; in_stock: boolean; supplier_id: string }> = {};
@@ -293,8 +290,8 @@ export const MaterialsGrid = () => {
           `${SUPABASE_URL}/rest/v1/supplier_product_prices?select=*`,
           {
             headers: {
-              'apikey': SUPABASE_KEY,
-              'Authorization': `Bearer ${SUPABASE_KEY}`,
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
               'Content-Type': 'application/json'
             }
           }
@@ -329,8 +326,8 @@ export const MaterialsGrid = () => {
           `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,image_url&is_approved=eq.true&order=created_at.desc&limit=50`,
           {
             headers: {
-              'apikey': SUPABASE_KEY,
-              'Authorization': `Bearer ${SUPABASE_KEY}`,
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
               'Content-Type': 'application/json'
             }
           }
@@ -377,8 +374,8 @@ export const MaterialsGrid = () => {
           `${SUPABASE_URL}/rest/v1/materials?select=*&order=created_at.desc&limit=50`,
           {
             headers: {
-              'apikey': SUPABASE_KEY,
-              'Authorization': `Bearer ${SUPABASE_KEY}`,
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
               'Content-Type': 'application/json'
             }
           }

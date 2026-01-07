@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Star, MessageSquare, Shield, AlertTriangle, CheckCircle } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 const feedbackSchema = z.object({
@@ -238,9 +238,7 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
       const { data: sessionData } = await supabase.auth.getSession();
       
       // Use direct fetch to Supabase REST API (more reliable than client)
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzI0NTQwNjIsImV4cCI6MjA0ODAzMDA2Mn0.vu4KlLJLKlJmYb2b4R8MxpVKv0izRdkXC_FVwVRT0LM';
-      
+      // SUPABASE_URL and SUPABASE_ANON_KEY imported from centralized client
       const response = await fetch(`${SUPABASE_URL}/rest/v1/feedback`, {
         method: 'POST',
         headers: {

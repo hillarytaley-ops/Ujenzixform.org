@@ -15,6 +15,7 @@ import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { useToast } from "@/hooks/use-toast";
 import AnimatedSection from "@/components/AnimatedSection";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 // import { useContactFormSecurity } from "@/hooks/useContactFormSecurity";
 // import { RecaptchaWrapper } from "@/components/ui/RecaptchaWrapper";
 
@@ -104,8 +105,7 @@ const Contact = () => {
       }
 
       // Use direct fetch to Supabase REST API (more reliable than client)
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzI0NTQwNjIsImV4cCI6MjA0ODAzMDA2Mn0.vu4KlLJLKlJmYb2b4R8MxpVKv0izRdkXC_FVwVRT0LM';
+      // SUPABASE_URL and SUPABASE_ANON_KEY imported from centralized client
       
       // Format the comment with all contact form fields
       const formattedComment = `Name: ${data.firstName} ${data.lastName}\nEmail: ${data.email}\nPhone: ${data.phone}\nSubject: ${data.subject}\n\nMessage:\n${data.message}`;

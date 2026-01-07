@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -219,9 +219,7 @@ const Delivery = () => {
       let builderId = sessionData?.session?.user?.id;
       
       if (!builderId && sessionData?.session?.user?.id) {
-        const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzI0NTQwNjIsImV4cCI6MjA0ODAzMDA2Mn0.vu4KlLJLKlJmYb2b4R8MxpVKv0izRdkXC_FVwVRT0LM';
-        
+        // SUPABASE_URL and SUPABASE_ANON_KEY imported from centralized client
         const profileResponse = await fetch(
           `${SUPABASE_URL}/rest/v1/profiles?id=eq.${sessionData.session.user.id}&select=id`,
           {
@@ -238,9 +236,7 @@ const Delivery = () => {
       }
 
       // Save to deliveries table using direct fetch
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzI0NTQwNjIsImV4cCI6MjA0ODAzMDA2Mn0.vu4KlLJLKlJmYb2b4R8MxpVKv0izRdkXC_FVwVRT0LM';
-      
+      // SUPABASE_URL and SUPABASE_ANON_KEY imported from centralized client
       const response = await fetch(`${SUPABASE_URL}/rest/v1/deliveries`, {
         method: 'POST',
         headers: {
