@@ -328,122 +328,132 @@ const Delivery = () => {
     <div className="min-h-screen bg-gradient-construction">
       <Navigation />
       
-      {/* Enhanced Hero Section - Optimized for fast loading */}
-      <section className="text-white py-20 relative overflow-hidden">
-        {/* Base gradient background (shows immediately) */}
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-800 via-blue-900 to-gray-900" />
+      {/* Professional Hero Section */}
+      <section className="text-white py-16 md:py-24 relative overflow-hidden">
+        {/* Gradient Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900" />
         
-        {/* Background image loads in background */}
-        <img 
-          src="/delivery-hero-bg.jpg"
-          alt=""
-          loading="eager"
-          className={`absolute inset-0 w-full h-full ${isMobile ? 'object-cover' : 'object-contain'}`}
-          onLoad={(e) => (e.target as HTMLImageElement).style.opacity = '1'}
-          style={{ opacity: 0, transition: 'opacity 0.3s ease-in-out', backgroundColor: '#374151' }}
-        />
+        {/* Animated Background Pattern */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-0 left-0 w-full h-full" style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+          }} />
+        </div>
         
-        {/* Light overlay to maintain text readability */}
-        <div className="absolute inset-0 bg-gradient-to-br from-black/40 via-gray-900/30 to-black/40"></div>
+        {/* Gradient Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-slate-900/40" />
+        
         <div className="container mx-auto px-4 text-center relative z-10">
-          <Badge className="mb-6 bg-gradient-to-r from-gray-700 to-blue-600 text-white px-6 py-2 text-lg font-semibold">
-            🇰🇪 Kenya's Premier Delivery Network
-          </Badge>
-          <h1 className="text-5xl md:text-6xl font-bold mb-6 drop-shadow-2xl">
-            <span className="bg-gradient-to-r from-white via-gray-200 to-white bg-clip-text text-transparent">
-              Delivery
-            </span>
-            <br />
-            <span className="text-4xl text-blue-400">
-              Management
-            </span>
+          {/* Badge */}
+          <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-2 mb-6">
+            <span className="text-2xl">🇰🇪</span>
+            <span className="text-white/90 font-medium">Trusted Delivery Network</span>
+          </div>
+          
+          {/* Title */}
+          <h1 className="text-4xl md:text-6xl font-bold mb-4 drop-shadow-lg">
+            <span className="text-white">Smart</span>
+            <span className="bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent"> Delivery</span>
           </h1>
-          <p className="text-xl md:text-2xl mb-8 opacity-90 drop-shadow-lg max-w-4xl mx-auto leading-relaxed">
-            <strong>Smart Delivery Solutions:</strong> Request material deliveries from suppliers to construction sites, 
-            track deliveries in real-time with GPS, calculate delivery costs instantly, manage multiple deliveries, 
-            coordinate with verified transport providers, receive notifications, generate delivery notes, 
-            and ensure materials arrive safely and on time across Kenya.
+          
+          {/* Subtitle */}
+          <p className="text-lg md:text-xl mb-8 max-w-2xl mx-auto text-white/80 leading-relaxed">
+            Real-time GPS tracking, verified transporters, and seamless coordination for your construction materials across all 47 counties.
           </p>
 
-          {/* Action Buttons - Mobile Responsive */}
-          <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 justify-center mb-6 md:mb-8 px-4">
+          {/* Stats Row */}
+          <div className="flex flex-wrap justify-center gap-6 md:gap-10 mb-10">
+            <div className="text-center">
+              <div className="text-3xl md:text-4xl font-bold text-white">1000+</div>
+              <div className="text-sm text-white/60">Monthly Deliveries</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl md:text-4xl font-bold text-blue-400">98%</div>
+              <div className="text-sm text-white/60">On-Time Rate</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl md:text-4xl font-bold text-cyan-400">24/7</div>
+              <div className="text-sm text-white/60">Live Tracking</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl md:text-4xl font-bold text-white">47</div>
+              <div className="text-sm text-white/60">Counties</div>
+            </div>
+          </div>
+
+          {/* Main CTA Buttons */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-10">
             <Button 
               size="lg"
               onClick={() => setActiveTab("request")}
-              className="bg-white text-gray-900 hover:bg-gray-100 font-semibold px-6 sm:px-8 py-4 sm:py-6 text-base sm:text-lg shadow-xl w-full sm:w-auto"
+              className="h-14 px-8 bg-white text-slate-900 hover:bg-gray-100 font-bold text-lg shadow-2xl"
             >
-              <Truck className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-              <span className="whitespace-nowrap">Request Delivery</span>
+              <Truck className="h-5 w-5 mr-2" />
+              Request Delivery
             </Button>
             
             <Link to="/tracking">
-            <Button 
-              size="lg"
-                className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 sm:px-8 py-4 sm:py-6 text-base sm:text-lg shadow-xl w-full sm:w-auto"
-            >
-                <MapPin className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                <span className="whitespace-nowrap">Track Deliveries</span>
-            </Button>
+              <Button 
+                size="lg"
+                className="h-14 px-8 bg-blue-600 hover:bg-blue-700 text-white font-bold text-lg shadow-2xl"
+              >
+                <MapPin className="h-5 w-5 mr-2" />
+                Track Deliveries
+              </Button>
             </Link>
           </div>
 
-          {/* Purchase Action Buttons - Request Quote & Buy Now */}
-          <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 justify-center mb-6 md:mb-8 px-4">
-            <Button 
-              size="lg"
-              onClick={() => handlePurchaseAction('quote')}
-              className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-semibold px-6 sm:px-8 py-4 sm:py-6 text-base sm:text-lg shadow-xl w-full sm:w-auto"
-            >
-              <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-              <span className="whitespace-nowrap">Request Quote</span>
-            </Button>
+          {/* Portal Cards */}
+          <div className="max-w-4xl mx-auto">
+            <p className="text-white/60 text-sm font-medium mb-4 uppercase tracking-wider">Quick Access</p>
             
-            <Button 
-              size="lg"
-              onClick={() => handlePurchaseAction('buy')}
-              className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold px-6 sm:px-8 py-4 sm:py-6 text-base sm:text-lg shadow-xl w-full sm:w-auto"
-            >
-              <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-              <span className="whitespace-nowrap">Buy Now</span>
-            </Button>
-          </div>
-          
-          {/* Info badge for non-builders */}
-          {!authUserRole || (authUserRole !== 'builder' && authUserRole !== 'admin') ? (
-            <div className="text-center mb-4">
-              <Badge className="bg-yellow-500/20 text-yellow-200 border-yellow-400/30 px-4 py-2">
-                💡 Register as a Builder to access our Supplier Marketplace
-              </Badge>
-            </div>
-          ) : (
-            <div className="text-center mb-4">
-              <Badge className="bg-green-500/20 text-green-200 border-green-400/30 px-4 py-2">
-                ✅ You have access to the Supplier Marketplace
-              </Badge>
-            </div>
-          )}
-          
-          {/* Delivery Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-              <div className="text-2xl font-bold text-blue-400">1000+</div>
-              <div className="text-sm opacity-90">Monthly Deliveries</div>
-            </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-              <div className="text-2xl font-bold text-gray-300">47</div>
-              <div className="text-sm opacity-90">Counties Served</div>
-            </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-              <div className="text-2xl font-bold text-orange-400">98%</div>
-              <div className="text-sm opacity-90">On-Time Rate</div>
-            </div>
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4">
-              <div className="text-2xl font-bold text-blue-300">24/7</div>
-              <div className="text-sm opacity-90">Tracking</div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Request Materials */}
+              <div className="group bg-gradient-to-br from-emerald-600/80 to-emerald-700/80 backdrop-blur-sm rounded-2xl p-5 border border-emerald-400/30 hover:border-emerald-400/60 transition-all duration-300 hover:scale-[1.02]">
+                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center mb-3 mx-auto">
+                  <ShoppingCart className="h-5 w-5 text-white" />
+                </div>
+                <h3 className="text-white font-bold mb-1">Buy Materials</h3>
+                <p className="text-emerald-100/70 text-sm mb-3">Browse supplier marketplace</p>
+                <Button 
+                  onClick={() => handlePurchaseAction('buy')}
+                  className="w-full bg-white text-emerald-700 hover:bg-emerald-50 font-semibold"
+                >
+                  Shop Now
+                </Button>
+              </div>
+
+              {/* Delivery Provider */}
+              <div className="group bg-gradient-to-br from-blue-600/80 to-blue-700/80 backdrop-blur-sm rounded-2xl p-5 border border-blue-400/30 hover:border-blue-400/60 transition-all duration-300 hover:scale-[1.02]">
+                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center mb-3 mx-auto">
+                  <Truck className="h-5 w-5 text-white" />
+                </div>
+                <h3 className="text-white font-bold mb-1">Delivery Provider</h3>
+                <p className="text-blue-100/70 text-sm mb-3">Access your dashboard</p>
+                <Link to="/delivery-signin">
+                  <Button className="w-full bg-white text-blue-700 hover:bg-blue-50 font-semibold">
+                    Sign In
+                  </Button>
+                </Link>
+              </div>
+
+              {/* Become Provider */}
+              <div className="group bg-gradient-to-br from-amber-600/80 to-orange-600/80 backdrop-blur-sm rounded-2xl p-5 border border-amber-400/30 hover:border-amber-400/60 transition-all duration-300 hover:scale-[1.02]">
+                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center mb-3 mx-auto">
+                  <Users className="h-5 w-5 text-white" />
+                </div>
+                <h3 className="text-white font-bold mb-1">Join Our Network</h3>
+                <p className="text-amber-100/70 text-sm mb-3">Become a delivery partner</p>
+                <Link to="/delivery/apply">
+                  <Button className="w-full bg-white text-amber-700 hover:bg-amber-50 font-semibold">
+                    Apply Now
+                  </Button>
+                </Link>
+              </div>
             </div>
           </div>
         </div>
-        </section>
+      </section>
 
       <main className="container mx-auto px-4 py-8">
         {/* Header */}

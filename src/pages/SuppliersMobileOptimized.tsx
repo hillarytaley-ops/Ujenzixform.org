@@ -306,94 +306,96 @@ const SuppliersMobileOptimized = () => {
           </svg>
         </div>
         
-        <div className="container mx-auto max-w-4xl text-center relative z-10">
-          {/* Flag */}
-          <div className="text-5xl mb-4">🇰🇪</div>
+        <div className="container mx-auto max-w-5xl text-center relative z-10 px-4">
+          {/* Badge */}
+          <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-2 mb-6">
+            <span className="text-2xl">🇰🇪</span>
+            <span className="text-white/90 font-medium">Kenya's #1 Construction Marketplace</span>
+          </div>
           
           {/* Title */}
-          <h1 className="text-4xl md:text-5xl font-bold mb-4 drop-shadow-lg">
-            <span className="bg-gradient-to-r from-white via-blue-100 to-white bg-clip-text text-transparent">
-            MradiPro Suppliers
-            </span>
+          <h1 className="text-4xl md:text-6xl font-bold mb-4 drop-shadow-lg">
+            <span className="text-white">Materials</span>
+            <span className="bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent"> Marketplace</span>
           </h1>
           
-          {/* Subtitle */}
-          <p className="text-xl md:text-2xl font-semibold text-yellow-300 mb-6 drop-shadow-md">
-            Kenya's Premier Materials Marketplace
-          </p>
-          
           {/* Description */}
-          <p className="text-base md:text-lg mb-8 max-w-2xl mx-auto text-white/90">
-            Browse verified suppliers and quality construction materials across all 47 counties
+          <p className="text-lg md:text-xl mb-8 max-w-2xl mx-auto text-white/80 leading-relaxed">
+            Connect with 500+ verified suppliers. Quality construction materials delivered across all 47 counties.
           </p>
 
-          {/* Action Buttons */}
-          <div className="flex flex-col gap-4 max-w-2xl mx-auto">
-            <Button 
-              size="lg"
-              className="w-full h-14 bg-white text-blue-900 hover:bg-gray-100 font-bold text-lg"
-              onClick={() => window.scrollTo({ top: 600, behavior: 'smooth' })}
-            >
-              <Building className="h-5 w-5 mr-2" />
-              Browse Materials
-            </Button>
+          {/* Main CTA */}
+          <Button 
+            size="lg"
+            className="h-14 px-8 bg-white text-gray-900 hover:bg-gray-100 font-bold text-lg shadow-2xl mb-10"
+            onClick={() => window.scrollTo({ top: 600, behavior: 'smooth' })}
+          >
+            <Building className="h-5 w-5 mr-2" />
+            Browse Materials
+          </Button>
+
+          {/* Professional Sign In Portals */}
+          <div className="max-w-4xl mx-auto" id="portals">
+            <p className="text-white/60 text-sm font-medium mb-4 uppercase tracking-wider">Choose Your Portal</p>
             
-            {/* Organized Sign In & Register Portals */}
-            <div className="grid grid-cols-3 gap-3">
-              {/* Private Client */}
-              <div className="bg-green-500/20 backdrop-blur-sm rounded-lg p-3 border border-green-400/30">
-                <p className="text-green-300 text-xs font-semibold mb-2 flex items-center gap-1">
-                  <ShoppingCart className="h-3 w-3" />
-                  Private Client
-                </p>
-                <div className="flex flex-col gap-1">
-                  <Link to="/private-client-signin">
-                    <Button size="sm" className="w-full h-8 bg-green-600 hover:bg-green-700 text-xs">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Private Client Portal */}
+              <div className="group bg-gradient-to-br from-emerald-600/90 to-emerald-700/90 backdrop-blur-sm rounded-2xl p-6 border border-emerald-400/30 hover:border-emerald-400/60 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-emerald-500/20">
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform">
+                  <ShoppingCart className="h-6 w-6 text-white" />
+                </div>
+                <h3 className="text-white font-bold text-lg mb-1">Private Client</h3>
+                <p className="text-emerald-100/80 text-sm mb-4">Home projects & personal purchases</p>
+                <div className="flex gap-2">
+                  <Link to="/private-client-signin" className="flex-1">
+                    <Button className="w-full bg-white text-emerald-700 hover:bg-emerald-50 font-semibold">
                       Sign In
                     </Button>
                   </Link>
-                  <Link to="/private-builder-registration">
-                    <Button size="sm" variant="outline" className="w-full h-8 border-green-400/50 text-green-300 hover:bg-green-500/20 text-xs">
+                  <Link to="/private-builder-registration" className="flex-1">
+                    <Button variant="outline" className="w-full border-white/40 text-white hover:bg-white/10">
                       Register
                     </Button>
                   </Link>
                 </div>
               </div>
 
-              {/* Professional Builder */}
-              <div className="bg-blue-500/20 backdrop-blur-sm rounded-lg p-3 border border-blue-400/30">
-                <p className="text-blue-300 text-xs font-semibold mb-2 flex items-center gap-1">
-                  <Building className="h-3 w-3" />
-                  Pro Builder
-                </p>
-                <div className="flex flex-col gap-1">
-                  <Link to="/professional-builder-signin">
-                    <Button size="sm" className="w-full h-8 bg-blue-600 hover:bg-blue-700 text-xs">
+              {/* Professional Builder Portal */}
+              <div className="group bg-gradient-to-br from-blue-600/90 to-blue-700/90 backdrop-blur-sm rounded-2xl p-6 border border-blue-400/30 hover:border-blue-400/60 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-blue-500/20">
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform">
+                  <Building className="h-6 w-6 text-white" />
+                </div>
+                <h3 className="text-white font-bold text-lg mb-1">Professional Builder</h3>
+                <p className="text-blue-100/80 text-sm mb-4">Contractors & construction companies</p>
+                <div className="flex gap-2">
+                  <Link to="/professional-builder-signin" className="flex-1">
+                    <Button className="w-full bg-white text-blue-700 hover:bg-blue-50 font-semibold">
                       Sign In
                     </Button>
                   </Link>
-                  <Link to="/professional-builder-registration">
-                    <Button size="sm" variant="outline" className="w-full h-8 border-blue-400/50 text-blue-300 hover:bg-blue-500/20 text-xs">
+                  <Link to="/professional-builder-registration" className="flex-1">
+                    <Button variant="outline" className="w-full border-white/40 text-white hover:bg-white/10">
                       Register
                     </Button>
                   </Link>
                 </div>
               </div>
 
-              {/* Supplier */}
-              <div className="bg-amber-500/20 backdrop-blur-sm rounded-lg p-3 border border-amber-400/30">
-                <p className="text-amber-300 text-xs font-semibold mb-2 flex items-center gap-1">
-                  <Store className="h-3 w-3" />
-                  Supplier
-                </p>
-                <div className="flex flex-col gap-1">
-                  <Link to="/supplier-signin">
-                    <Button size="sm" className="w-full h-8 bg-amber-600 hover:bg-amber-700 text-xs">
+              {/* Supplier Portal */}
+              <div className="group bg-gradient-to-br from-amber-600/90 to-orange-600/90 backdrop-blur-sm rounded-2xl p-6 border border-amber-400/30 hover:border-amber-400/60 transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl hover:shadow-amber-500/20">
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform">
+                  <Store className="h-6 w-6 text-white" />
+                </div>
+                <h3 className="text-white font-bold text-lg mb-1">Supplier</h3>
+                <p className="text-amber-100/80 text-sm mb-4">List & sell your materials</p>
+                <div className="flex gap-2">
+                  <Link to="/supplier-signin" className="flex-1">
+                    <Button className="w-full bg-white text-amber-700 hover:bg-amber-50 font-semibold">
                       Sign In
                     </Button>
                   </Link>
-                  <Link to="/supplier-registration">
-                    <Button size="sm" variant="outline" className="w-full h-8 border-amber-400/50 text-amber-300 hover:bg-amber-500/20 text-xs">
+                  <Link to="/supplier-registration" className="flex-1">
+                    <Button variant="outline" className="w-full border-white/40 text-white hover:bg-white/10">
                       Register
                     </Button>
                   </Link>
