@@ -365,7 +365,7 @@ const Index = () => {
             <p className="text-white/70 max-w-xl mx-auto">Register based on your role to access tailored features</p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 max-w-5xl mx-auto">
             {/* Private Client */}
             <Link to="/private-builder-registration">
               <Card className="h-full hover:scale-[1.02] transition-all duration-300 cursor-pointer bg-gradient-to-br from-emerald-600 to-emerald-700 border-emerald-500/30 hover:border-emerald-400">
@@ -418,20 +418,6 @@ const Index = () => {
                   <h3 className="text-white font-bold mb-1">Delivery</h3>
                   <p className="text-teal-100/70 text-xs mb-3">Transport & logistics</p>
                   <Badge className="bg-white text-teal-700 text-xs">Apply →</Badge>
-                </CardContent>
-              </Card>
-            </Link>
-
-            {/* Legacy Builder */}
-            <Link to="/builder-registration">
-              <Card className="h-full hover:scale-[1.02] transition-all duration-300 cursor-pointer bg-gradient-to-br from-purple-600 to-purple-700 border-purple-500/30 hover:border-purple-400">
-                <CardContent className="p-5 text-center">
-                  <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mx-auto mb-3">
-                    <Users className="h-6 w-6 text-white" />
-                  </div>
-                  <h3 className="text-white font-bold mb-1">Builder</h3>
-                  <p className="text-purple-100/70 text-xs mb-3">General contractor access</p>
-                  <Badge className="bg-white text-purple-700 text-xs">Register →</Badge>
                 </CardContent>
               </Card>
             </Link>

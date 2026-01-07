@@ -28,6 +28,7 @@ import Auth from "./pages/Auth";
 import AdminAuth from "./pages/AdminAuth";
 import ResetPassword from "./pages/ResetPassword";
 import Feedback from "./pages/Feedback";
+import Careers from "./pages/Careers";
 import Tracking from "./pages/Tracking";
 import Monitoring from "./pages/Monitoring";
 import Delivery from "./pages/Delivery";
@@ -169,6 +170,7 @@ const App = () => {
                     <Route path="/delivery" element={<Delivery />} />
                     <Route path="/scanners" element={<Scanners />} />
                     <Route path="/feedback" element={<Feedback />} />
+                    <Route path="/careers" element={<Careers />} />
                     
                     {/* Auth required only for sensitive actions */}
                     <Route path="/portal" element={
