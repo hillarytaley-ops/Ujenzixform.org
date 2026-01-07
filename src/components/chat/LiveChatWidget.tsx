@@ -162,32 +162,45 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
 
   // Save message to database - using existing table structure
   const saveMessage = async (content: string, senderType: 'user' | 'bot' | 'staff') => {
-    try {
-      console.log('💬 Saving chat message:', { conversationId, senderType, content: content.substring(0, 50) });
-      const { data, error } = await supabase
-        .from('chat_messages')
-        .insert({
-          conversation_id: conversationId,
-          sender_id: userId || 'guest',
-          sender_type: senderType,
-          sender_name: userName,
-          content: content,
-          message_type: 'text',
-          read: false
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error('❌ Error saving message:', error);
-        throw error;
-      }
-      console.log('✅ Message saved with ID:', data?.id);
-      return data?.id;
-    } catch (err) {
-      console.error('❌ Error saving message:', err);
+    console.log('💬 Saving chat message:', { conversationId, senderType, content: content.substring(0, 50) });
+    
+    if (!conversationId) {
+      console.error('❌ No conversation ID available');
       return null;
     }
+
+    const messageData = {
+      conversation_id: conversationId,
+      sender_id: userId || 'guest',
+      sender_type: senderType,
+      sender_name: userName,
+      content: content,
+      message_type: 'text',
+      read: false
+    };
+    
+    console.log('📤 Insert data:', messageData);
+
+    const { data, error } = await supabase
+      .from('chat_messages')
+      .insert(messageData)
+      .select()
+      .single();
+
+    console.log('📥 Insert result:', { data, error });
+
+    if (error) {
+      console.error('❌ Supabase error:', error.message, error.details, error.hint);
+      toast({
+        title: "Message not saved",
+        description: error.message || "Failed to save message to server",
+        variant: "destructive"
+      });
+      return null;
+    }
+    
+    console.log('✅ Message saved with ID:', data?.id);
+    return data?.id;
   };
 
   // AI Response Engine
