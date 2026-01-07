@@ -356,6 +356,89 @@ const Index = () => {
         </div>
       </section>
 
+      {/* Registration Section - All User Types */}
+      <section className="py-12 bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 text-white">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-10">
+            <Badge className="mb-4 bg-white/10 text-white border-white/20">New to MradiPro?</Badge>
+            <h2 className="text-3xl font-bold mb-2">Join Our Platform</h2>
+            <p className="text-white/70 max-w-xl mx-auto">Register based on your role to access tailored features</p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 max-w-6xl mx-auto">
+            {/* Private Client */}
+            <Link to="/private-builder-registration">
+              <Card className="h-full hover:scale-[1.02] transition-all duration-300 cursor-pointer bg-gradient-to-br from-emerald-600 to-emerald-700 border-emerald-500/30 hover:border-emerald-400">
+                <CardContent className="p-5 text-center">
+                  <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mx-auto mb-3">
+                    <ShoppingCart className="h-6 w-6 text-white" />
+                  </div>
+                  <h3 className="text-white font-bold mb-1">Private Client</h3>
+                  <p className="text-emerald-100/70 text-xs mb-3">Home projects & personal purchases</p>
+                  <Badge className="bg-white text-emerald-700 text-xs">Register →</Badge>
+                </CardContent>
+              </Card>
+            </Link>
+
+            {/* Professional Builder */}
+            <Link to="/professional-builder-registration">
+              <Card className="h-full hover:scale-[1.02] transition-all duration-300 cursor-pointer bg-gradient-to-br from-blue-600 to-blue-700 border-blue-500/30 hover:border-blue-400">
+                <CardContent className="p-5 text-center">
+                  <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mx-auto mb-3">
+                    <Building2 className="h-6 w-6 text-white" />
+                  </div>
+                  <h3 className="text-white font-bold mb-1">Pro Builder</h3>
+                  <p className="text-blue-100/70 text-xs mb-3">Contractors & companies</p>
+                  <Badge className="bg-white text-blue-700 text-xs">Register →</Badge>
+                </CardContent>
+              </Card>
+            </Link>
+
+            {/* Supplier */}
+            <Link to="/supplier-registration">
+              <Card className="h-full hover:scale-[1.02] transition-all duration-300 cursor-pointer bg-gradient-to-br from-amber-600 to-orange-600 border-amber-500/30 hover:border-amber-400">
+                <CardContent className="p-5 text-center">
+                  <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mx-auto mb-3">
+                    <Store className="h-6 w-6 text-white" />
+                  </div>
+                  <h3 className="text-white font-bold mb-1">Supplier</h3>
+                  <p className="text-amber-100/70 text-xs mb-3">Sell construction materials</p>
+                  <Badge className="bg-white text-amber-700 text-xs">Register →</Badge>
+                </CardContent>
+              </Card>
+            </Link>
+
+            {/* Delivery Provider */}
+            <Link to="/delivery/apply">
+              <Card className="h-full hover:scale-[1.02] transition-all duration-300 cursor-pointer bg-gradient-to-br from-teal-600 to-cyan-600 border-teal-500/30 hover:border-teal-400">
+                <CardContent className="p-5 text-center">
+                  <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mx-auto mb-3">
+                    <Truck className="h-6 w-6 text-white" />
+                  </div>
+                  <h3 className="text-white font-bold mb-1">Delivery</h3>
+                  <p className="text-teal-100/70 text-xs mb-3">Transport & logistics</p>
+                  <Badge className="bg-white text-teal-700 text-xs">Apply →</Badge>
+                </CardContent>
+              </Card>
+            </Link>
+
+            {/* Legacy Builder */}
+            <Link to="/builder-registration">
+              <Card className="h-full hover:scale-[1.02] transition-all duration-300 cursor-pointer bg-gradient-to-br from-purple-600 to-purple-700 border-purple-500/30 hover:border-purple-400">
+                <CardContent className="p-5 text-center">
+                  <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mx-auto mb-3">
+                    <Users className="h-6 w-6 text-white" />
+                  </div>
+                  <h3 className="text-white font-bold mb-1">Builder</h3>
+                  <p className="text-purple-100/70 text-xs mb-3">General contractor access</p>
+                  <Badge className="bg-white text-purple-700 text-xs">Register →</Badge>
+                </CardContent>
+              </Card>
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* Platform Features Grid */}
       <section className="py-20 bg-muted/30">
         <div className="container mx-auto px-4">

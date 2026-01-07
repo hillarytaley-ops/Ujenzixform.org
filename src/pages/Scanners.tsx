@@ -156,8 +156,19 @@ const ScannersAccessGuard = ({ children }: { children: React.ReactNode }) => {
     );
   }
   
-  // Builders are NOT allowed to access scanner camera views
-  if (dbRole === 'builder') {
+  // Builders, Private Clients, and Professional Builders are NOT allowed to access scanner camera views
+  // Only suppliers (dispatch scanners) and delivery providers (receiving scanners) can use this feature
+  const restrictedRoles = ['builder', 'private_client', 'professional_builder'];
+  
+  if (restrictedRoles.includes(dbRole)) {
+    const roleDisplayName = dbRole === 'builder' ? 'Builder' 
+      : dbRole === 'private_client' ? 'Private Client' 
+      : 'Professional Builder';
+    
+    const dashboardLink = dbRole === 'builder' ? '/builder-dashboard'
+      : dbRole === 'private_client' ? '/private-client-dashboard'
+      : '/professional-builder-dashboard';
+    
     return (
       <div className="min-h-screen bg-background">
         <Navigation />
@@ -169,7 +180,7 @@ const ScannersAccessGuard = ({ children }: { children: React.ReactNode }) => {
               </div>
               <h2 className="text-2xl font-bold mb-4 text-red-800 dark:text-red-200">Access Restricted</h2>
               <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                As a <strong>Builder</strong>, you don't have access to scanner cameras. 
+                As a <strong>{roleDisplayName}</strong>, you don't have access to scanner cameras. 
                 Scanning is only available to:
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 max-w-lg mx-auto">
@@ -193,7 +204,7 @@ const ScannersAccessGuard = ({ children }: { children: React.ReactNode }) => {
                     <Truck className="h-4 w-4 mr-2" />
                     Track My Deliveries
                   </Button>
-                  <Button variant="outline" onClick={() => navigate('/builder-dashboard')}>
+                  <Button variant="outline" onClick={() => navigate(dashboardLink)}>
                     <ArrowRight className="h-4 w-4 mr-2" />
                     Go to Dashboard
                   </Button>
@@ -228,8 +239,9 @@ const ScannersContent = () => {
     const localRole = localStorage.getItem('user_role');
     const effectiveRole = userRole || localRole;
     
-    // BLOCK builders - redirect to tracking page
-    if (effectiveRole === 'builder') {
+    // BLOCK builders, private_client, professional_builder - redirect to tracking page
+    const restrictedRoles = ['builder', 'private_client', 'professional_builder'];
+    if (restrictedRoles.includes(effectiveRole || '')) {
       navigate('/tracking', { replace: true });
       return;
     }

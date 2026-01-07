@@ -472,6 +472,67 @@ const Builders = () => {
         </section>
       </AnimatedSection>
 
+      {/* Sign-In Section for Professional Builders & Private Clients */}
+      <section className="py-12 bg-gradient-to-r from-slate-50 to-blue-50">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-8">
+            <Badge className="mb-3 bg-blue-100 text-blue-700">Access Your Dashboard</Badge>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Sign In to Your Account</h2>
+            <p className="text-muted-foreground">Choose your account type to access your personalized dashboard</p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+            {/* Private Client Sign In */}
+            <Card className="hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border-2 border-emerald-200 bg-gradient-to-br from-emerald-50 to-white">
+              <CardContent className="p-8 text-center">
+                <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <ShoppingCart className="h-8 w-8 text-emerald-600" />
+                </div>
+                <h3 className="text-xl font-bold text-emerald-800 mb-2">Private Client</h3>
+                <p className="text-sm text-muted-foreground mb-6">Home projects & personal purchases</p>
+                <div className="space-y-3">
+                  <Link to="/private-client-signin" className="block">
+                    <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold h-12">
+                      <LogIn className="h-4 w-4 mr-2" />
+                      Sign In
+                    </Button>
+                  </Link>
+                  <Link to="/private-builder-registration" className="block">
+                    <Button variant="outline" className="w-full border-emerald-300 text-emerald-700 hover:bg-emerald-50 h-10">
+                      New? Register Here
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Professional Builder Sign In */}
+            <Card className="hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-white">
+              <CardContent className="p-8 text-center">
+                <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <Building2 className="h-8 w-8 text-blue-600" />
+                </div>
+                <h3 className="text-xl font-bold text-blue-800 mb-2">Professional Builder</h3>
+                <p className="text-sm text-muted-foreground mb-6">Contractors & construction companies</p>
+                <div className="space-y-3">
+                  <Link to="/professional-builder-signin" className="block">
+                    <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold h-12">
+                      <LogIn className="h-4 w-4 mr-2" />
+                      Sign In
+                    </Button>
+                  </Link>
+                  <Link to="/professional-builder-registration" className="block">
+                    <Button variant="outline" className="w-full border-blue-300 text-blue-700 hover:bg-blue-50 h-10">
+                      New? Register Here
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
       <main className="py-20 relative overflow-hidden">
         {/* Kenyan Construction Development Background */}
         <div 
