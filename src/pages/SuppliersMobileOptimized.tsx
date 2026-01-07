@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Building, ShoppingCart, FileText, UserPlus, LogIn } from "lucide-react";
+import { Building, ShoppingCart, FileText, UserPlus, LogIn, Store } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
@@ -328,7 +328,7 @@ const SuppliersMobileOptimized = () => {
           </p>
 
           {/* Action Buttons */}
-          <div className="flex flex-col gap-3 max-w-md mx-auto">
+          <div className="flex flex-col gap-4 max-w-2xl mx-auto">
             <Button 
               size="lg"
               className="w-full h-14 bg-white text-blue-900 hover:bg-gray-100 font-bold text-lg"
@@ -338,28 +338,67 @@ const SuppliersMobileOptimized = () => {
               Browse Materials
             </Button>
             
-            {/* Sign In Buttons - Matching Home Page */}
-            <div className="grid grid-cols-2 gap-2">
-              <Link to="/builder-signin?redirect=/builder-dashboard">
-                <Button 
-                  size="lg"
-                  variant="secondary"
-                  className="w-full h-12 bg-white/20 text-white hover:bg-white/30"
-                >
-                  <Building className="h-4 w-4 mr-1" />
-                  Builder Sign In
-                </Button>
-              </Link>
-              <Link to="/supplier-signin?redirect=/supplier-dashboard">
-                <Button 
-                  size="lg"
-                  variant="secondary"
-                  className="w-full h-12 bg-amber-500/20 text-white hover:bg-amber-500/30"
-                >
-                  <ShoppingCart className="h-4 w-4 mr-1" />
-                  Supplier Sign In
-                </Button>
-              </Link>
+            {/* Organized Sign In & Register Portals */}
+            <div className="grid grid-cols-3 gap-3">
+              {/* Private Client */}
+              <div className="bg-green-500/20 backdrop-blur-sm rounded-lg p-3 border border-green-400/30">
+                <p className="text-green-300 text-xs font-semibold mb-2 flex items-center gap-1">
+                  <ShoppingCart className="h-3 w-3" />
+                  Private Client
+                </p>
+                <div className="flex flex-col gap-1">
+                  <Link to="/private-client-signin">
+                    <Button size="sm" className="w-full h-8 bg-green-600 hover:bg-green-700 text-xs">
+                      Sign In
+                    </Button>
+                  </Link>
+                  <Link to="/private-builder-registration">
+                    <Button size="sm" variant="outline" className="w-full h-8 border-green-400/50 text-green-300 hover:bg-green-500/20 text-xs">
+                      Register
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+
+              {/* Professional Builder */}
+              <div className="bg-blue-500/20 backdrop-blur-sm rounded-lg p-3 border border-blue-400/30">
+                <p className="text-blue-300 text-xs font-semibold mb-2 flex items-center gap-1">
+                  <Building className="h-3 w-3" />
+                  Pro Builder
+                </p>
+                <div className="flex flex-col gap-1">
+                  <Link to="/professional-builder-signin">
+                    <Button size="sm" className="w-full h-8 bg-blue-600 hover:bg-blue-700 text-xs">
+                      Sign In
+                    </Button>
+                  </Link>
+                  <Link to="/professional-builder-registration">
+                    <Button size="sm" variant="outline" className="w-full h-8 border-blue-400/50 text-blue-300 hover:bg-blue-500/20 text-xs">
+                      Register
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+
+              {/* Supplier */}
+              <div className="bg-amber-500/20 backdrop-blur-sm rounded-lg p-3 border border-amber-400/30">
+                <p className="text-amber-300 text-xs font-semibold mb-2 flex items-center gap-1">
+                  <Store className="h-3 w-3" />
+                  Supplier
+                </p>
+                <div className="flex flex-col gap-1">
+                  <Link to="/supplier-signin">
+                    <Button size="sm" className="w-full h-8 bg-amber-600 hover:bg-amber-700 text-xs">
+                      Sign In
+                    </Button>
+                  </Link>
+                  <Link to="/supplier-registration">
+                    <Button size="sm" variant="outline" className="w-full h-8 border-amber-400/50 text-amber-300 hover:bg-amber-500/20 text-xs">
+                      Register
+                    </Button>
+                  </Link>
+                </div>
+              </div>
             </div>
           </div>
         </div>

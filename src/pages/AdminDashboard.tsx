@@ -89,7 +89,8 @@ import { PendingProductsManager } from "@/components/admin/PendingProductsManage
 import { MaterialImagesManager } from "@/components/admin/MaterialImagesManager";
 import { AdminVideoApproval } from "@/components/admin/AdminVideoApproval";
 import { AdminConversationsViewer } from "@/components/admin/AdminConversationsViewer";
-import { Camera } from "lucide-react";
+import { UserRolesManager } from "@/components/admin/UserRolesManager";
+import { Camera, UserCog } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -1901,6 +1902,10 @@ const AdminDashboard = () => {
             <TabsTrigger value="settings" className="data-[state=active]:bg-blue-600">
               <Settings className="h-4 w-4 mr-2" />
               Settings
+            </TabsTrigger>
+            <TabsTrigger value="user-roles" className="data-[state=active]:bg-pink-600">
+              <UserCog className="h-4 w-4 mr-2" />
+              User Roles
             </TabsTrigger>
           </TabsList>
 
@@ -4091,6 +4096,11 @@ const AdminDashboard = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* User Roles Management Tab */}
+          <TabsContent value="user-roles" className="space-y-6">
+            <UserRolesManager />
           </TabsContent>
         </Tabs>
       </main>
