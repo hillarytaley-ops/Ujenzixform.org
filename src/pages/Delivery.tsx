@@ -328,20 +328,30 @@ const Delivery = () => {
     <div className="min-h-screen bg-gradient-construction">
       <Navigation />
       
-      {/* Professional Hero Section */}
-      <section className="text-white py-16 md:py-24 relative overflow-hidden">
-        {/* Gradient Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900" />
+      {/* Professional Hero Section with Truck Background */}
+      <section className="text-white py-16 md:py-20 relative overflow-hidden">
+        {/* Truck Background Image */}
+        <div 
+          className="absolute inset-0 bg-cover bg-center"
+          style={{
+            backgroundImage: `url('https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?q=80&w=2070&auto=format&fit=crop')`,
+          }}
+        />
         
-        {/* Animated Background Pattern */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-0 left-0 w-full h-full" style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-          }} />
+        {/* Dark Gradient Overlay for readability */}
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-900/95 via-blue-900/90 to-slate-900/95" />
+        
+        {/* Subtle animated lines to suggest movement/road */}
+        <div className="absolute bottom-0 left-0 right-0 h-24 overflow-hidden">
+          <div className="absolute bottom-8 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-yellow-500/50 to-transparent animate-pulse" />
+          <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-8">
+            <div className="w-16 h-1 bg-white/20 rounded-full" />
+            <div className="w-16 h-1 bg-white/20 rounded-full" />
+            <div className="w-16 h-1 bg-white/20 rounded-full" />
+            <div className="w-16 h-1 bg-white/20 rounded-full" />
+            <div className="w-16 h-1 bg-white/20 rounded-full" />
+          </div>
         </div>
-        
-        {/* Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-slate-900/40" />
         
         <div className="container mx-auto px-4 text-center relative z-10">
           {/* Badge */}
