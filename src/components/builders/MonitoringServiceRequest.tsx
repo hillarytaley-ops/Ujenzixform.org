@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,11 +9,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { 
   Camera, 
-  Drone, 
+  Plane,
   Shield, 
   Clock, 
   MapPin, 
   Users, 
+  User,
   AlertTriangle,
   CheckCircle,
   Eye,
@@ -59,6 +60,9 @@ interface MonitoringService {
 }
 
 interface ServiceRequest {
+  // Builder Type
+  builderType: 'private' | 'professional' | '';
+  
   // Project Information
   projectName: string;
   projectLocation: string;
@@ -88,81 +92,105 @@ interface ServiceRequest {
   additionalNotes: string;
 }
 
-const monitoringServices: MonitoringService[] = [
-  {
-    id: 'ai-cameras',
-    name: 'AI-Powered Camera Monitoring',
-    description: 'Advanced surveillance with AI activity detection and real-time alerts',
-    features: [
-      '24/7 Live monitoring with HD quality',
-      'AI-powered activity and safety detection',
-      'Real-time alerts and notifications',
-      'Cloud storage and playback',
-      'Mobile app access',
-      'Weather-resistant cameras'
-    ],
-    basePrice: 15000,
-    unit: 'per camera/month',
-    category: 'cameras',
-    icon: <Camera className="h-6 w-6" />,
-    popular: true
-  },
-  {
-    id: 'drone-surveillance',
-    name: 'Drone Aerial Surveillance',
-    description: 'Comprehensive aerial monitoring and progress tracking',
-    features: [
-      'High-resolution aerial photography',
-      'Real-time flight monitoring',
-      'Progress tracking and documentation',
-      'Site mapping and surveying',
-      'Emergency response capability',
-      'Professional drone operators'
-    ],
-    basePrice: 25000,
-    unit: 'per flight hour',
-    category: 'drones',
-    icon: <Drone className="h-6 w-6" />
-  },
-  {
-    id: 'security-monitoring',
-    name: '24/7 Security Monitoring',
-    description: 'Round-the-clock security with professional monitoring team',
-    features: [
-      'Professional security team monitoring',
-      'Immediate incident response',
-      'Access control management',
-      'Visitor and vehicle tracking',
-      'Emergency alert system',
-      'Security reports and analytics'
-    ],
-    basePrice: 50000,
-    unit: 'per site/month',
-    category: 'security',
-    icon: <Shield className="h-6 w-6" />
-  },
-  {
-    id: 'analytics-reporting',
-    name: 'Analytics & Reporting',
-    description: 'Comprehensive data analysis and progress reporting',
-    features: [
-      'Daily progress reports',
-      'Performance analytics dashboard',
-      'Resource utilization tracking',
-      'Safety compliance monitoring',
-      'Custom report generation',
-      'Data export capabilities'
-    ],
-    basePrice: 20000,
-    unit: 'per project/month',
-    category: 'analytics',
-    icon: <BarChart3 className="h-6 w-6" />
-  }
-];
+// Pricing discount for private clients (40% lower due to smaller project sizes)
+const PRIVATE_CLIENT_DISCOUNT = 0.4; // 40% discount
+
+// Base prices for professional builders (companies)
+const PROFESSIONAL_BASE_PRICES = {
+  'ai-cameras': 15000,
+  'drone-surveillance': 25000,
+  'security-monitoring': 50000,
+  'analytics-reporting': 20000
+};
+
+// Private client prices (40% lower due to smaller project sizes)
+const PRIVATE_BASE_PRICES = {
+  'ai-cameras': 9000,      // 15000 * 0.6 = 9000
+  'drone-surveillance': 15000, // 25000 * 0.6 = 15000
+  'security-monitoring': 30000, // 50000 * 0.6 = 30000
+  'analytics-reporting': 12000  // 20000 * 0.6 = 12000
+};
+
+const getMonitoringServices = (builderType: 'private' | 'professional' | ''): MonitoringService[] => {
+  const prices = builderType === 'private' ? PRIVATE_BASE_PRICES : PROFESSIONAL_BASE_PRICES;
+  
+  return [
+    {
+      id: 'ai-cameras',
+      name: 'AI-Powered Camera Monitoring',
+      description: 'Advanced surveillance with AI activity detection and real-time alerts',
+      features: [
+        '24/7 Live monitoring with HD quality',
+        'AI-powered activity and safety detection',
+        'Real-time alerts and notifications',
+        'Cloud storage and playback',
+        'Mobile app access',
+        'Weather-resistant cameras'
+      ],
+      basePrice: prices['ai-cameras'],
+      unit: 'per camera/month',
+      category: 'cameras',
+      icon: <Camera className="h-6 w-6" />,
+      popular: true
+    },
+    {
+      id: 'drone-surveillance',
+      name: 'Drone Aerial Surveillance',
+      description: 'Comprehensive aerial monitoring and progress tracking',
+      features: [
+        'High-resolution aerial photography',
+        'Real-time flight monitoring',
+        'Progress tracking and documentation',
+        'Site mapping and surveying',
+        'Emergency response capability',
+        'Professional drone operators'
+      ],
+      basePrice: prices['drone-surveillance'],
+      unit: 'per flight hour',
+      category: 'drones',
+      icon: <Plane className="h-6 w-6" />
+    },
+    {
+      id: 'security-monitoring',
+      name: '24/7 Security Monitoring',
+      description: 'Round-the-clock security with professional monitoring team',
+      features: [
+        'Professional security team monitoring',
+        'Immediate incident response',
+        'Access control management',
+        'Visitor and vehicle tracking',
+        'Emergency alert system',
+        'Security reports and analytics'
+      ],
+      basePrice: prices['security-monitoring'],
+      unit: 'per site/month',
+      category: 'security',
+      icon: <Shield className="h-6 w-6" />
+    },
+    {
+      id: 'analytics-reporting',
+      name: 'Analytics & Reporting',
+      description: 'Comprehensive data analysis and progress reporting',
+      features: [
+        'Daily progress reports',
+        'Performance analytics dashboard',
+        'Resource utilization tracking',
+        'Safety compliance monitoring',
+        'Custom report generation',
+        'Data export capabilities'
+      ],
+      basePrice: prices['analytics-reporting'],
+      unit: 'per project/month',
+      category: 'analytics',
+      icon: <BarChart3 className="h-6 w-6" />
+    }
+  ];
+};
 
 export const MonitoringServiceRequest: React.FC = () => {
   const [activeTab, setActiveTab] = useState('info');
   const [formData, setFormData] = useState<ServiceRequest>({
+    builderType: '',
     projectName: '',
     projectLocation: '',
     projectSize: '',
@@ -186,6 +214,52 @@ export const MonitoringServiceRequest: React.FC = () => {
   const [estimatedCost, setEstimatedCost] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  
+  // Get monitoring services based on builder type
+  const monitoringServices = getMonitoringServices(formData.builderType);
+  
+  // Auto-detect builder type from user profile
+  useEffect(() => {
+    const detectBuilderType = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          // Check user_roles table
+          const { data: roleData } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', user.id)
+            .maybeSingle();
+          
+          if (roleData?.role === 'private_client') {
+            setFormData(prev => ({ ...prev, builderType: 'private' }));
+          } else if (roleData?.role === 'professional_builder' || roleData?.role === 'builder') {
+            // Also check if is_professional in profiles
+            const { data: profileData } = await supabase
+              .from('profiles')
+              .select('is_professional, user_type')
+              .eq('user_id', user.id)
+              .maybeSingle();
+            
+            if (profileData?.is_professional || profileData?.user_type === 'company') {
+              setFormData(prev => ({ ...prev, builderType: 'professional' }));
+            } else if (roleData?.role === 'private_client') {
+              setFormData(prev => ({ ...prev, builderType: 'private' }));
+            }
+          }
+          
+          // Pre-fill contact info
+          if (user.email) {
+            setFormData(prev => ({ ...prev, contactEmail: user.email || '' }));
+          }
+        }
+      } catch (error) {
+        console.error('Error detecting builder type:', error);
+      }
+    };
+    
+    detectBuilderType();
+  }, []);
 
   const updateFormData = (field: keyof ServiceRequest, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -202,27 +276,33 @@ export const MonitoringServiceRequest: React.FC = () => {
 
   const calculateEstimate = () => {
     let total = 0;
+    const prices = formData.builderType === 'private' ? PRIVATE_BASE_PRICES : PROFESSIONAL_BASE_PRICES;
     
     formData.selectedServices.forEach(serviceId => {
-      const service = monitoringServices.find(s => s.id === serviceId);
-      if (!service) return;
+      const basePrice = prices[serviceId as keyof typeof prices];
+      if (!basePrice) return;
       
       switch (serviceId) {
         case 'ai-cameras':
-          total += service.basePrice * formData.cameraCount;
+          total += basePrice * Math.max(formData.cameraCount, 1);
           break;
         case 'drone-surveillance':
-          total += service.basePrice * formData.droneHours;
+          total += basePrice * Math.max(formData.droneHours, 1);
           break;
         case 'security-monitoring':
         case 'analytics-reporting':
-          total += service.basePrice;
+          total += basePrice;
           break;
       }
     });
     
     setEstimatedCost(total);
   };
+  
+  // Recalculate when builder type or services change
+  useEffect(() => {
+    calculateEstimate();
+  }, [formData.builderType, formData.selectedServices, formData.cameraCount, formData.droneHours]);
 
   const handleSubmit = async () => {
     try {
@@ -254,9 +334,11 @@ export const MonitoringServiceRequest: React.FC = () => {
         return;
       }
 
-      // Get current user
+      // Get current user and session
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!user || !session?.access_token) {
         toast({
           title: 'Authentication Required',
           description: 'Please log in to submit a service request',
@@ -265,9 +347,13 @@ export const MonitoringServiceRequest: React.FC = () => {
         return;
       }
 
+      // Generate access code (MON-timestamp-random)
+      const accessCode = `MON-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+
       // Prepare submission data
       const submissionData = {
         user_id: user.id,
+        builder_type: formData.builderType || 'professional', // Default to professional if not set
         project_name: formData.projectName,
         project_location: formData.projectLocation,
         project_size: formData.projectSize,
@@ -287,19 +373,28 @@ export const MonitoringServiceRequest: React.FC = () => {
         urgency: formData.urgency || null,
         estimated_cost: estimatedCost,
         additional_notes: formData.additionalNotes || null,
+        access_code: accessCode,
         status: 'pending'
       };
 
-      // Submit to database
-      const { data, error } = await supabase
-        .from('monitoring_service_requests')
-        .insert([submissionData])
-        .select()
-        .single();
+      // Submit to database using direct fetch to avoid Supabase client hanging
+      const response = await fetch(`${(supabase as any).supabaseUrl}/rest/v1/monitoring_service_requests`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': (supabase as any).supabaseKey,
+          'Authorization': `Bearer ${session.access_token}`,
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify(submissionData),
+      });
 
-      if (error) {
-        throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to submit monitoring request');
       }
+
+      const data = await response.json();
 
       console.log('Service request submitted successfully:', data);
       
@@ -308,8 +403,10 @@ export const MonitoringServiceRequest: React.FC = () => {
         description: 'We will contact you within 24 hours with a detailed quotation.',
       });
       
-      // Reset form
+      // Reset form (but keep builder type)
+      const currentBuilderType = formData.builderType;
       setFormData({
+        builderType: currentBuilderType,
         projectName: '',
         projectLocation: '',
         projectSize: '',
@@ -344,53 +441,71 @@ export const MonitoringServiceRequest: React.FC = () => {
     }
   };
 
-  const ServiceCard = ({ service }: { service: MonitoringService }) => (
-    <Card className={`cursor-pointer transition-all ${
-      formData.selectedServices.includes(service.id) 
-        ? 'ring-2 ring-primary bg-primary/5' 
-        : 'hover:shadow-md'
-    }`}>
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            {service.icon}
-            <div>
-              <CardTitle className="text-lg flex items-center gap-2">
-                {service.name}
-                {service.popular && (
-                  <Badge className="bg-orange-100 text-orange-800">
-                    <Star className="h-3 w-3 mr-1" />
-                    Popular
-                  </Badge>
-                )}
-              </CardTitle>
-              <CardDescription>{service.description}</CardDescription>
+  const ServiceCard = ({ service }: { service: MonitoringService }) => {
+    const professionalPrice = PROFESSIONAL_BASE_PRICES[service.id as keyof typeof PROFESSIONAL_BASE_PRICES];
+    const isPrivate = formData.builderType === 'private';
+    const savings = professionalPrice - service.basePrice;
+    
+    return (
+      <Card className={`cursor-pointer transition-all ${
+        formData.selectedServices.includes(service.id) 
+          ? 'ring-2 ring-primary bg-primary/5' 
+          : 'hover:shadow-md'
+      }`}>
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              {service.icon}
+              <div>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  {service.name}
+                  {service.popular && (
+                    <Badge className="bg-orange-100 text-orange-800">
+                      <Star className="h-3 w-3 mr-1" />
+                      Popular
+                    </Badge>
+                  )}
+                </CardTitle>
+                <CardDescription>{service.description}</CardDescription>
+              </div>
             </div>
+            <Checkbox
+              checked={formData.selectedServices.includes(service.id)}
+              onCheckedChange={() => toggleService(service.id)}
+            />
           </div>
-          <Checkbox
-            checked={formData.selectedServices.includes(service.id)}
-            onCheckedChange={() => toggleService(service.id)}
-          />
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          <div className="text-lg font-semibold text-primary">
-            KES {service.basePrice.toLocaleString()} {service.unit}
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <div className={`text-lg font-semibold ${isPrivate ? 'text-green-600' : 'text-primary'}`}>
+                KES {service.basePrice.toLocaleString()} {service.unit}
+              </div>
+              {isPrivate && savings > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm line-through text-muted-foreground">
+                    KES {professionalPrice.toLocaleString()}
+                  </span>
+                  <Badge className="bg-green-100 text-green-800 text-xs">
+                    Save KES {savings.toLocaleString()}
+                  </Badge>
+                </div>
+              )}
+            </div>
+            
+            <ul className="space-y-1">
+              {service.features.map((feature, index) => (
+                <li key={index} className="flex items-start gap-2 text-sm">
+                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <span>{feature}</span>
+                </li>
+              ))}
+            </ul>
           </div>
-          
-          <ul className="space-y-1">
-            {service.features.map((feature, index) => (
-              <li key={index} className="flex items-start gap-2 text-sm">
-                <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                <span>{feature}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </CardContent>
-    </Card>
-  );
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -423,6 +538,105 @@ export const MonitoringServiceRequest: React.FC = () => {
 
         {/* Service Information Tab */}
         <TabsContent value="info" className="space-y-6">
+          {/* Builder Type Selection */}
+          <Card className="border-2 border-primary/20 bg-gradient-to-r from-blue-50 to-green-50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-primary" />
+                Select Your Builder Type
+              </CardTitle>
+              <CardDescription>
+                Choose your category to see tailored pricing for your project size
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Private Client Option */}
+                <div 
+                  className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                    formData.builderType === 'private' 
+                      ? 'border-green-500 bg-green-50 ring-2 ring-green-200' 
+                      : 'border-gray-200 hover:border-green-300 hover:bg-green-50/50'
+                  }`}
+                  onClick={() => updateFormData('builderType', 'private')}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2 rounded-full ${formData.builderType === 'private' ? 'bg-green-100' : 'bg-gray-100'}`}>
+                      <User className={`h-6 w-6 ${formData.builderType === 'private' ? 'text-green-600' : 'text-gray-500'}`} />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-semibold flex items-center gap-2">
+                        Private Client
+                        <Badge className="bg-green-100 text-green-800 text-xs">40% Lower Prices</Badge>
+                      </h4>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Individual homeowners building or renovating their personal property
+                      </p>
+                      <ul className="mt-2 text-xs text-muted-foreground space-y-1">
+                        <li>• Residential projects</li>
+                        <li>• Home renovations</li>
+                        <li>• Smaller project sites</li>
+                        <li>• Budget-friendly options</li>
+                      </ul>
+                    </div>
+                    {formData.builderType === 'private' && (
+                      <CheckCircle className="h-5 w-5 text-green-500" />
+                    )}
+                  </div>
+                </div>
+                
+                {/* Professional Builder Option */}
+                <div 
+                  className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                    formData.builderType === 'professional' 
+                      ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' 
+                      : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50/50'
+                  }`}
+                  onClick={() => updateFormData('builderType', 'professional')}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2 rounded-full ${formData.builderType === 'professional' ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                      <Building2 className={`h-6 w-6 ${formData.builderType === 'professional' ? 'text-blue-600' : 'text-gray-500'}`} />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-semibold flex items-center gap-2">
+                        Professional Builder / Company
+                        <Badge className="bg-blue-100 text-blue-800 text-xs">Full Features</Badge>
+                      </h4>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Contractors, construction companies, and commercial developers
+                      </p>
+                      <ul className="mt-2 text-xs text-muted-foreground space-y-1">
+                        <li>• Commercial projects</li>
+                        <li>• Multi-site monitoring</li>
+                        <li>• Larger scale operations</li>
+                        <li>• Advanced analytics</li>
+                      </ul>
+                    </div>
+                    {formData.builderType === 'professional' && (
+                      <CheckCircle className="h-5 w-5 text-blue-500" />
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              {formData.builderType && (
+                <Alert className={`mt-4 ${formData.builderType === 'private' ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'}`}>
+                  <DollarSign className={`h-4 w-4 ${formData.builderType === 'private' ? 'text-green-600' : 'text-blue-600'}`} />
+                  <AlertTitle className={formData.builderType === 'private' ? 'text-green-800' : 'text-blue-800'}>
+                    {formData.builderType === 'private' ? 'Private Client Pricing Active' : 'Professional Pricing Active'}
+                  </AlertTitle>
+                  <AlertDescription className={formData.builderType === 'private' ? 'text-green-700' : 'text-blue-700'}>
+                    {formData.builderType === 'private' 
+                      ? 'You\'ll see discounted pricing tailored for smaller residential projects. Save up to 40% on monitoring services!'
+                      : 'You\'ll see full-featured pricing designed for commercial and multi-site operations with comprehensive support.'
+                    }
+                  </AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+        
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Why Choose Our Monitoring Services */}
             <Card>
@@ -494,7 +708,7 @@ export const MonitoringServiceRequest: React.FC = () => {
                   </div>
                   
                   <div className="text-center p-3 border rounded-lg">
-                    <Drone className="h-8 w-8 mx-auto mb-2 text-green-500" />
+                    <Plane className="h-8 w-8 mx-auto mb-2 text-green-500" />
                     <h4 className="font-medium text-sm">Drone Fleet</h4>
                     <p className="text-xs text-muted-foreground">Aerial monitoring</p>
                   </div>

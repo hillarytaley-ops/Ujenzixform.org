@@ -24,26 +24,42 @@ export const ProductImageUpload = ({
   const [previewUrl, setPreviewUrl] = useState(currentImageUrl);
   const { toast } = useToast();
 
+  // Supported image formats
+  const SUPPORTED_IMAGE_TYPES = [
+    'image/jpeg',
+    'image/jpg', 
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'image/avif',
+    'image/svg+xml',
+    'image/bmp',
+    'image/tiff',
+    'image/heic',
+    'image/heif'
+  ];
+
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
       const file = event.target.files?.[0];
       if (!file) return;
 
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
+      // Validate file type - support all common image formats
+      const isValidImage = file.type.startsWith('image/') || SUPPORTED_IMAGE_TYPES.includes(file.type.toLowerCase());
+      if (!isValidImage) {
         toast({
           title: 'Invalid file type',
-          description: 'Please select an image file (JPG, PNG, WEBP)',
+          description: 'Please select an image file (JPG, PNG, GIF, WEBP, AVIF, SVG, BMP, TIFF, HEIC)',
           variant: 'destructive',
         });
         return;
       }
 
-      // Validate file size (5MB max)
-      if (file.size > 5 * 1024 * 1024) {
+      // Validate file size (10MB max for larger formats)
+      if (file.size > 10 * 1024 * 1024) {
         toast({
           title: 'File too large',
-          description: 'Please select an image under 5MB',
+          description: 'Please select an image under 10MB',
           variant: 'destructive',
         });
         return;
@@ -185,7 +201,7 @@ export const ProductImageUpload = ({
             <input
               id={`product-file-input-${supplierId}`}
               type="file"
-              accept="image/*"
+              accept="image/*,.jpg,.jpeg,.png,.gif,.webp,.avif,.svg,.bmp,.tiff,.heic,.heif"
               onChange={handleFileSelect}
               className="hidden"
             />
@@ -193,9 +209,9 @@ export const ProductImageUpload = ({
             <p className="text-xs text-muted-foreground text-center">
               Upload a clear photo of your product
               <br />
-              Recommended: 500x500px, max 5MB
+              Recommended: 500x500px, max 10MB
               <br />
-              Formats: JPG, PNG, WEBP
+              Formats: JPG, PNG, GIF, WEBP, AVIF, SVG, BMP, TIFF, HEIC
             </p>
           </div>
         </div>

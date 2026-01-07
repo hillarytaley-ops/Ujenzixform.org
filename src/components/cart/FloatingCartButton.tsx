@@ -1,0 +1,45 @@
+/**
+ * ╔══════════════════════════════════════════════════════════════════════════════════════╗
+ * ║                                                                                      ║
+ * ║   🛡️ PROTECTED FILE - FLOATINGCARTBUTTON.TSX - DO NOT MODIFY WITHOUT APPROVAL       ║
+ * ║                                                                                      ║
+ * ║   LAST UPDATED: December 27, 2025                                                    ║
+ * ║   PROTECTED FEATURES:                                                                ║
+ * ║   1. Floating cart button showing item count and total                              ║
+ * ║   2. Opens cart sidebar on click                                                    ║
+ * ║                                                                                      ║
+ * ║   ⚠️ WARNING: Any changes to this file require explicit user approval               ║
+ * ║                                                                                      ║
+ * ╚══════════════════════════════════════════════════════════════════════════════════════╝
+ */
+
+import React from 'react';
+import { Button } from '@/components/ui/button';
+import { ShoppingCart } from 'lucide-react';
+import { useCart } from '@/contexts/CartContext';
+
+export const FloatingCartButton: React.FC = () => {
+  const { getTotalItems, setIsCartOpen, getTotalPrice } = useCart();
+  const totalItems = getTotalItems();
+
+  if (totalItems === 0) return null;
+
+  return (
+    <Button
+      onClick={() => setIsCartOpen(true)}
+      className="fixed bottom-6 right-6 z-50 h-14 px-4 bg-green-600 hover:bg-green-700 shadow-lg rounded-full flex items-center gap-2 animate-in slide-in-from-bottom-4"
+    >
+      <div className="relative">
+        <ShoppingCart className="h-5 w-5" />
+        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center">
+          {totalItems > 99 ? '99+' : totalItems}
+        </span>
+      </div>
+      <div className="flex flex-col items-start text-left">
+        <span className="text-xs font-medium">View Cart</span>
+        <span className="text-[10px] opacity-90">KES {getTotalPrice().toLocaleString()}</span>
+      </div>
+    </Button>
+  );
+};
+

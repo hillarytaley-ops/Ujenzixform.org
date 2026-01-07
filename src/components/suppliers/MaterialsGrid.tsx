@@ -1,3 +1,21 @@
+/**
+ * ╔══════════════════════════════════════════════════════════════════════════════════════╗
+ * ║                                                                                      ║
+ * ║   🛡️ PROTECTED FILE - MATERIALGRID.TSX - DO NOT MODIFY WITHOUT APPROVAL             ║
+ * ║                                                                                      ║
+ * ║   LAST UPDATED: December 27, 2025                                                    ║
+ * ║   PROTECTED FEATURES:                                                                ║
+ * ║   1. Price Comparison Feature - "Compare Price" button on each card                 ║
+ * ║   2. Quantity counter starting from 0                                               ║
+ * ║   3. "🔥 Compare Prices (X)" header button with purple glow animation               ║
+ * ║   4. Shopping cart integration via useCart hook                                     ║
+ * ║   5. Only shows approved products (approval_status.eq.approved)                     ║
+ * ║                                                                                      ║
+ * ║   ⚠️ WARNING: Any changes to this file require explicit user approval               ║
+ * ║                                                                                      ║
+ * ╚══════════════════════════════════════════════════════════════════════════════════════╝
+ */
+
 import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,7 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Search, ShoppingCart, Store, Package, Filter, PartyPopper } from 'lucide-react';
+import { Search, ShoppingCart, Store, Package, Filter, PartyPopper, Plus, Minus, Check, Scale } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -16,6 +34,8 @@ import { QuickPurchaseOrder } from '@/components/builders/QuickPurchaseOrder';
 import { getDefaultCategoryImage } from '@/config/defaultCategoryImages';
 import { LazyImage } from '@/components/ui/LazyImage';
 import { useSearchParams } from 'react-router-dom';
+import { useCart } from '@/contexts/CartContext';
+import { PriceComparisonModal } from './PriceComparisonModal';
 
 // iOS/Safari compatibility check
 const isIOSSafari = () => {
@@ -68,110 +88,12 @@ const PRODUCT_CATEGORIES = [
   'Other'
 ];
 
-// Demo materials for when database is empty
-const DEMO_MATERIALS: Material[] = [
-  {
-    id: 'demo-1',
-    supplier_id: 'demo',
-    name: 'Bamburi Cement 42.5N (50kg)',
-    description: 'Premium Portland cement from Bamburi - Kenya\'s most trusted cement brand',
-    category: 'Cement',
-    unit: 'bag',
-    unit_price: 850,
-    in_stock: true,
-    created_at: new Date().toISOString(),
-    supplier: {
-      company_name: 'Demo Supplier - Nairobi',
-      location: 'Nairobi',
-      rating: 4.8
-    }
-  },
-  {
-    id: 'demo-2',
-    supplier_id: 'demo',
-    name: 'Y12 Deformed Steel Bars (6m)',
-    description: 'High tensile deformed bars for concrete reinforcement - KEBS approved',
-    category: 'Steel',
-    unit: 'bar',
-    unit_price: 950,
-    in_stock: true,
-    created_at: new Date().toISOString(),
-    supplier: {
-      company_name: 'Demo Supplier - Mombasa',
-      location: 'Mombasa',
-      rating: 4.9
-    }
-  },
-  {
-    id: 'demo-3',
-    supplier_id: 'demo',
-    name: 'Vitrified Floor Tiles 600x600mm',
-    description: 'Premium vitrified porcelain tiles - high gloss finish, stain resistant',
-    category: 'Tiles',
-    unit: 'sqm',
-    unit_price: 2800,
-    in_stock: true,
-    created_at: new Date().toISOString(),
-    supplier: {
-      company_name: 'Demo Supplier - Nairobi',
-      location: 'Nairobi',
-      rating: 4.7
-    }
-  },
-  {
-    id: 'demo-4',
-    supplier_id: 'demo',
-    name: 'Crown Emulsion Paint 20L',
-    description: 'Crown Paints premium acrylic emulsion - smooth matt finish, washable',
-    category: 'Paint',
-    unit: '20L bucket',
-    unit_price: 4800,
-    in_stock: true,
-    created_at: new Date().toISOString(),
-    supplier: {
-      company_name: 'Demo Supplier - Kisumu',
-      location: 'Kisumu',
-      rating: 4.7
-    }
-  },
-  {
-    id: 'demo-5',
-    supplier_id: 'demo',
-    name: 'Mabati Iron Sheets Gauge 28 (3m)',
-    description: 'Mabati box profile corrugated iron sheets - galvanized steel, 25-year warranty',
-    category: 'Iron Sheets',
-    unit: 'sheet',
-    unit_price: 1350,
-    in_stock: true,
-    created_at: new Date().toISOString(),
-    supplier: {
-      company_name: 'Demo Supplier - Eldoret',
-      location: 'Eldoret',
-      rating: 4.8
-    }
-  },
-  {
-    id: 'demo-6',
-    supplier_id: 'demo',
-    name: 'Treated Cypress Timber 4x2 (12ft)',
-    description: 'Pressure-treated cypress timber - termite and borer resistant',
-    category: 'Timber',
-    unit: 'piece',
-    unit_price: 850,
-    in_stock: true,
-    created_at: new Date().toISOString(),
-    supplier: {
-      company_name: 'Demo Supplier - Nakuru',
-      location: 'Nakuru',
-      rating: 4.6
-    }
-  }
-];
+// No demo materials - only show real data from database
 
 export const MaterialsGrid = () => {
   const [searchParams] = useSearchParams();
-  const [materials, setMaterials] = useState<Material[]>(DEMO_MATERIALS);
-  const [filteredMaterials, setFilteredMaterials] = useState<Material[]>(DEMO_MATERIALS);
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [filteredMaterials, setFilteredMaterials] = useState<Material[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All Categories');
@@ -185,12 +107,71 @@ export const MaterialsGrid = () => {
   const [preselectedSupplierUserIds, setPreselectedSupplierUserIds] = useState<string[]>([]);
   const [allSuppliers, setAllSuppliers] = useState<{ id: string; user_id?: string; company_name: string; location?: string; rating?: number }[]>([]);
   const [selectedSuppliersMap, setSelectedSuppliersMap] = useState<Record<string, string[]>>({});
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [compareItems, setCompareItems] = useState<Set<string>>(new Set());
+  const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
   const { toast } = useToast();
+  const { addToCart, isInCart, getItemQuantity, setIsCartOpen } = useCart();
+  
+  // Toggle item for comparison
+  const toggleCompare = (materialId: string) => {
+    setCompareItems(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(materialId)) {
+        newSet.delete(materialId);
+      } else {
+        if (newSet.size >= 10) {
+          toast({
+            title: 'Maximum items reached',
+            description: 'You can compare up to 10 items at a time.',
+            variant: 'destructive'
+          });
+          return prev;
+        }
+        newSet.add(materialId);
+      }
+      return newSet;
+    });
+  };
+  
+  // Get materials selected for comparison
+  const getComparisonMaterials = () => {
+    return filteredMaterials.filter(m => compareItems.has(m.id));
+  };
+  
+  // Get quantity for a material (default to 0)
+  const getQuantity = (materialId: string) => quantities[materialId] || 0;
+  
+  // Update quantity for a material
+  const updateQuantity = (materialId: string, qty: number) => {
+    setQuantities(prev => ({ ...prev, [materialId]: Math.max(0, qty) }));
+  };
+  
+  // Toggle item selection
+  const toggleItemSelection = (materialId: string) => {
+    setSelectedItems(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(materialId)) {
+        newSet.delete(materialId);
+      } else {
+        newSet.add(materialId);
+      }
+      return newSet;
+    });
+  };
+  
+  // Get selected materials with quantities
+  const getSelectedMaterialsWithQuantities = () => {
+    return filteredMaterials
+      .filter(m => selectedItems.has(m.id))
+      .map(m => ({ ...m, quantity: getQuantity(m.id) }));
+  };
   const gridRef = useRef<HTMLDivElement>(null);
   const [columns, setColumns] = useState(1);
   const [visibleStart, setVisibleStart] = useState(0);
   const [visibleEnd, setVisibleEnd] = useState(24);
-  const CARD_HEIGHT = 420;
+  const CARD_HEIGHT = 520; // Increased to accommodate buttons
   const BUFFER_ROWS = 2;
   
   // Check for welcome message from registration
@@ -209,12 +190,14 @@ export const MaterialsGrid = () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
           setIsAuthenticated(true);
+          setBuilderId(user.id); // Set builderId when user is logged in
           const { data: roleData } = await supabase
             .from('user_roles')
             .select('role')
             .eq('user_id', user.id)
             .maybeSingle();
           setUserRole(roleData?.role || null);
+          console.log('User role:', roleData?.role, 'BuilderId:', user.id);
         }
       } catch (error) {
         console.error('Error checking user role:', error);
@@ -228,8 +211,8 @@ export const MaterialsGrid = () => {
       loadMaterials();
     } catch (error) {
       console.error('Error in loadMaterials effect:', error);
-      setMaterials(DEMO_MATERIALS);
-      setFilteredMaterials(DEMO_MATERIALS);
+      setMaterials([]);
+      setFilteredMaterials([]);
       setLoading(false);
     }
   }, []);
@@ -256,7 +239,7 @@ export const MaterialsGrid = () => {
       filterMaterials();
     } catch (error) {
       console.error('Error in filterMaterials effect:', error);
-      setFilteredMaterials(materials.length > 0 ? materials : DEMO_MATERIALS);
+      setFilteredMaterials(materials);
     }
   }, [materials, searchQuery, selectedCategory, priceRange, stockFilter]);
 
@@ -297,94 +280,159 @@ export const MaterialsGrid = () => {
       if (isIOSSafari()) {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
-      let completed = false;
-      setTimeout(() => {
-        if (!completed) {
-          setMaterials(DEMO_MATERIALS);
-          setFilteredMaterials(DEMO_MATERIALS);
-          setLoading(false);
-        }
-      }, 2500);
       
-      // First, try to load materials without join (in case suppliers table has issues)
-      const { data, error } = await supabase
-        .from('materials')
-        .select('*')
-        .order('created_at', { ascending: false });
-      completed = true;
-
-      if (error) {
-        console.error('Error loading materials:', error);
-        // Don't throw - just use demo materials instead
-        console.log('Database error, using demo materials');
-        setMaterials(DEMO_MATERIALS);
-        setFilteredMaterials(DEMO_MATERIALS);
-        setLoading(false);
-        return;
-      }
-
-      // Transform data with default supplier info
-      // iOS Safari compatible: Avoid optional chaining in maps
-      const transformedData = data ? data.map(item => ({
-        ...item,
-        supplier: {
-          company_name: 'Supplier', // Default - we'll fetch supplier info separately if needed
-          location: 'Kenya',
-          rating: 4.5
-        }
-      })) : [];
-
-      // Use demo materials if database is empty
-      if (transformedData.length === 0) {
-        console.log('No materials in database, using demo materials');
-        setMaterials(DEMO_MATERIALS);
-        setFilteredMaterials(DEMO_MATERIALS);
-        setLoading(false);
-        return;
-      }
-
-      setMaterials(transformedData);
+      const SUPABASE_URL = "https://wuuyjjpgzgeimiptuuws.supabase.co";
+      const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo";
       
-      // Optionally fetch supplier names (but don't fail if this errors)
-      if (data && data.length > 0) {
-        try {
-          const supplierIds = Array.from(new Set(data.map(m => m.supplier_id).filter(Boolean)));
-          
-          if (supplierIds.length > 0) {
-            const { data: suppliersData, error: suppliersError } = await supabase
-              .from('suppliers')
-              .select('id, user_id, company_name, location, rating')
-              .in('user_id', supplierIds);
-
-            if (!suppliersError && suppliersData && suppliersData.length > 0) {
-              // Update materials with supplier info - iOS Safari compatible
-              const updated = transformedData.map(material => {
-                const supplier = suppliersData.find(s => s.user_id === material.supplier_id);
-                return {
-                  ...material,
-                  supplier: supplier ? {
-                    company_name: supplier.company_name || 'Supplier',
-                    location: supplier.location || 'Kenya',
-                    rating: supplier.rating || 4.5
-                  } : material.supplier
-                };
-              });
-              setMaterials(updated);
-            } else {
-              console.log('Could not fetch supplier info, using defaults');
+      // STEP 1: Fetch supplier prices from supplier_product_prices table
+      // This is where suppliers set their actual selling prices
+      let supplierPrices: Record<string, { price: number; in_stock: boolean; supplier_id: string }> = {};
+      
+      try {
+        const pricesResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/supplier_product_prices?select=*`,
+          {
+            headers: {
+              'apikey': SUPABASE_KEY,
+              'Authorization': `Bearer ${SUPABASE_KEY}`,
+              'Content-Type': 'application/json'
             }
           }
-        } catch (suppError) {
-          console.log('Error fetching suppliers, using default supplier info');
-          // Continue with existing data - don't fail
+        );
+        
+        if (pricesResponse.ok) {
+          const pricesData = await pricesResponse.json();
+          if (pricesData && pricesData.length > 0) {
+            // Create a map of product_id -> price info
+            // If multiple suppliers have prices, use the lowest price
+            pricesData.forEach((item: any) => {
+              const existingPrice = supplierPrices[item.product_id];
+              if (!existingPrice || item.price < existingPrice.price) {
+                supplierPrices[item.product_id] = {
+                  price: item.price,
+                  in_stock: item.in_stock,
+                  supplier_id: item.supplier_id
+                };
+              }
+            });
+          }
         }
+      } catch (pricesErr: any) {
+        console.log('Supplier prices table not available');
       }
+      
+      // STEP 2: Fetch admin-uploaded images
+      let adminMaterials: Material[] = [];
+      
+      try {
+        const response = await fetch(
+          `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,image_url&is_approved=eq.true&order=created_at.desc&limit=50`,
+          {
+            headers: {
+              'apikey': SUPABASE_KEY,
+              'Authorization': `Bearer ${SUPABASE_KEY}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        
+        if (response.ok) {
+          const adminData = await response.json();
+          if (adminData && adminData.length > 0) {
+            adminMaterials = adminData.map((item: any) => {
+              // Check if any supplier has set a price for this product
+              const supplierPrice = supplierPrices[item.id];
+              
+              return {
+                id: item.id,
+                name: item.name,
+                category: item.category,
+                description: item.description || '',
+                unit: item.unit || 'unit',
+                // Use supplier price if available, otherwise use admin's suggested price
+                unit_price: supplierPrice?.price || item.suggested_price || 0,
+                image_url: item.image_url,
+                // Use supplier's stock status if available
+                in_stock: supplierPrice?.in_stock ?? true,
+                supplier: {
+                  company_name: supplierPrice ? 'Supplier' : 'Admin Catalog',
+                  location: 'Kenya',
+                  rating: supplierPrice ? 4.5 : 5.0
+                }
+              };
+            });
+          }
+        }
+      } catch (adminErr: any) {
+        // Silent fail - continue with other data sources
+      }
+      
+      // STEP 3: Fetch supplier materials from materials table  
+      let data: any[] | null = null;
+      
+      try {
+        // Fetch materials - filter by approval_status on client side for backward compatibility
+        // (in case the approval_status column hasn't been added to the database yet)
+        const response = await fetch(
+          `${SUPABASE_URL}/rest/v1/materials?select=*&order=created_at.desc&limit=50`,
+          {
+            headers: {
+              'apikey': SUPABASE_KEY,
+              'Authorization': `Bearer ${SUPABASE_KEY}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        
+        if (response.ok) {
+          data = await response.json();
+        }
+      } catch (fetchError: any) {
+        // Silent fail - continue with admin materials
+      }
+
+      // Transform supplier data with default supplier info
+      // Filter to only show approved products (or products without approval_status for backward compatibility)
+      const supplierMaterials = data ? data
+        .filter(item => !item.approval_status || item.approval_status === 'approved')
+        .map(item => ({
+          ...item,
+          supplier: {
+            company_name: 'Supplier',
+            location: 'Kenya',
+            rating: 4.5
+          }
+        })) : [];
+
+      // Combine: Admin materials FIRST, then supplier materials
+      const combinedMaterials = [...adminMaterials, ...supplierMaterials];
+      
+      // Remove duplicates by name (keep first occurrence with a base64 image if available)
+      const seenNames = new Set<string>();
+      const allMaterials = combinedMaterials.filter(m => {
+        // Skip if we've already seen this product name
+        const normalizedName = m.name.toLowerCase().trim();
+        if (seenNames.has(normalizedName)) return false;
+        seenNames.add(normalizedName);
+        return true;
+      });
+
+      // Show empty state if no materials
+      if (allMaterials.length === 0) {
+        setMaterials([]);
+        setFilteredMaterials([]);
+        setLoading(false);
+        return;
+      }
+
+      setMaterials(allMaterials);
+      setFilteredMaterials(allMaterials);
     } catch (error) {
       console.error('Error loading materials:', error);
-      // Don't show error toast - just use demo materials
-      console.log('Falling back to demo materials');
-      setMaterials(DEMO_MATERIALS);
-      setFilteredMaterials(DEMO_MATERIALS);
+      // Show empty state on error
+      console.log('Error loading materials');
+      setMaterials([]);
+      setFilteredMaterials([]);
     } finally {
       setLoading(false);
     }
@@ -433,7 +481,16 @@ export const MaterialsGrid = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        window.location.href = '/auth?lite=1&redirect=' + encodeURIComponent('/suppliers?tab=purchase');
+        window.location.href = '/builder-registration?redirect=/supplier-marketplace';
+        return;
+      }
+      // Check if user is a builder
+      if (userRole && !['builder', 'professional_builder', 'private_client'].includes(userRole)) {
+        toast({
+          title: '⚠️ Builder Account Required',
+          description: 'Only registered builders can request quotes. Please register as a builder.',
+          variant: 'destructive',
+        });
         return;
       }
       const chosenSupplierIds = selectedSuppliersMap[material.id] && selectedSuppliersMap[material.id].length > 0
@@ -552,10 +609,58 @@ export const MaterialsGrid = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="text-muted-foreground">Loading materials catalog...</p>
+      <div className="space-y-6">
+        {/* Skeleton Header */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <div className="h-8 w-72 bg-muted rounded-md animate-pulse mb-2"></div>
+            <div className="h-4 w-48 bg-muted rounded-md animate-pulse"></div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="h-10 w-28 bg-muted rounded-md animate-pulse"></div>
+            <div className="h-10 w-24 bg-muted rounded-md animate-pulse"></div>
+          </div>
+        </div>
+        
+        {/* Skeleton Filters */}
+        <div className="bg-card border rounded-lg p-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="md:col-span-2 h-10 bg-muted rounded-md animate-pulse"></div>
+            <div className="h-10 bg-muted rounded-md animate-pulse"></div>
+            <div className="h-10 bg-muted rounded-md animate-pulse"></div>
+          </div>
+        </div>
+        
+        {/* Skeleton Product Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="bg-card border rounded-lg overflow-hidden">
+              {/* Image skeleton */}
+              <div className="h-48 bg-muted animate-pulse"></div>
+              {/* Content skeleton */}
+              <div className="p-4 space-y-3">
+                <div className="flex justify-between items-start">
+                  <div className="h-5 w-32 bg-muted rounded animate-pulse"></div>
+                  <div className="h-5 w-16 bg-muted rounded animate-pulse"></div>
+                </div>
+                <div className="h-4 w-full bg-muted rounded animate-pulse"></div>
+                <div className="h-4 w-3/4 bg-muted rounded animate-pulse"></div>
+                <div className="flex items-center gap-2 pt-2">
+                  <div className="h-8 w-20 bg-muted rounded animate-pulse"></div>
+                  <div className="h-8 flex-1 bg-muted rounded animate-pulse"></div>
+                </div>
+                <div className="h-10 w-full bg-muted rounded animate-pulse"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        {/* Loading indicator */}
+        <div className="flex items-center justify-center py-4">
+          <div className="flex items-center gap-3">
+            <div className="animate-spin rounded-full h-5 w-5 border-2 border-primary border-t-transparent"></div>
+            <p className="text-muted-foreground text-sm">Loading materials from suppliers...</p>
+          </div>
         </div>
       </div>
     );
@@ -563,6 +668,35 @@ export const MaterialsGrid = () => {
 
   return (
     <div className="space-y-6">
+      {/* Banner for Non-Registered Users - Only builders can buy/request quotes */}
+      {!isAuthenticated && (
+        <Alert className="bg-gradient-to-r from-orange-50 to-amber-50 border-orange-300 border-2">
+          <ShoppingCart className="h-5 w-5 text-orange-600" />
+          <AlertDescription className="ml-2">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <strong className="text-orange-800">🏗️ Want to Buy or Request Quotes?</strong>
+                <p className="text-sm text-orange-700 mt-1">
+                  Register as a <strong>Builder</strong> to purchase materials and request quotes from suppliers.
+                </p>
+              </div>
+              <div className="flex gap-2 flex-shrink-0">
+                <a href="/builder-registration?redirect=/supplier-marketplace">
+                  <Button size="sm" className="bg-orange-600 hover:bg-orange-700 text-white">
+                    Register as Builder
+                  </Button>
+                </a>
+                <a href="/builder-signin?redirect=/supplier-marketplace">
+                  <Button size="sm" variant="outline" className="border-orange-400 text-orange-700 hover:bg-orange-100">
+                    Sign In
+                  </Button>
+                </a>
+              </div>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Welcome Message for New Registrations */}
       {showWelcome && (
         <Alert className="bg-gradient-to-r from-green-50 to-blue-50 border-green-300">
@@ -600,6 +734,15 @@ export const MaterialsGrid = () => {
             <Package className="h-4 w-4 mr-2" />
             Refresh
           </Button>
+          {compareItems.size > 0 && (
+            <Button 
+              onClick={() => setIsCompareModalOpen(true)} 
+              className="bg-purple-600 hover:bg-purple-700 animate-pulse shadow-lg shadow-purple-300"
+            >
+              <Scale className="h-4 w-4 mr-2" />
+              🔥 Compare Prices ({compareItems.size})
+            </Button>
+          )}
         </div>
       </div>
 
@@ -683,173 +826,244 @@ export const MaterialsGrid = () => {
         </Card>
       ) : (
         <div ref={gridRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {(() => {
-            const totalRows = Math.ceil(filteredMaterials.length / columns);
-            const startRow = Math.floor(visibleStart / columns);
-            const endRow = Math.ceil(visibleEnd / columns);
-            const topSpacer = startRow * CARD_HEIGHT;
-            const bottomSpacer = Math.max(0, (totalRows - endRow) * CARD_HEIGHT);
-            const items = filteredMaterials.slice(visibleStart, visibleEnd);
-            const rendered = [] as JSX.Element[];
-            if (topSpacer > 0) rendered.push(<div key="top-spacer" style={{ height: topSpacer }} />);
-            rendered.push(
-              ...items.map((material, idx) => {
+          {filteredMaterials.map((material) => {
                 const imageUrl = material.image_url || getDefaultCategoryImage(material.category);
-                const base = imageUrl && imageUrl.startsWith('/')
-                  ? imageUrl.replace(/^\//, '').replace(/\.(jpg|jpeg|png)$/i, '')
-                  : undefined;
-                const candidates = base
-                  ? [
-                      `/optimized/${base}.avif`,
-                      `/optimized/${base}.webp`,
-                      imageUrl
-                    ]
-                  : undefined;
-                const sources = base
-                  ? [
-                      { type: 'image/avif', srcSet: `/optimized/${base}-400w.avif 400w, /optimized/${base}-800w.avif 800w` },
-                      { type: 'image/webp', srcSet: `/optimized/${base}-400w.webp 400w, /optimized/${base}-800w.webp 800w` }
-                    ]
-                  : undefined;
-                const sizes = '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw';
+                const currentQty = getQuantity(material.id);
+                const itemInCart = isInCart(material.id);
+                const cartQty = getItemQuantity(material.id);
 
+                const handleAddToCart = () => {
+                  // Only authenticated users can add to cart
+                  if (!isAuthenticated) {
+                    toast({
+                      title: '🔐 Sign In Required',
+                      description: 'Please sign in to purchase materials. Redirecting to sign-in portals...',
+                    });
+                    setTimeout(() => {
+                      window.location.href = '/suppliers#portals';
+                    }, 1500);
+                    return;
+                  }
+                  // Check if user is a builder
+                  if (userRole && !['builder', 'professional_builder', 'private_client'].includes(userRole)) {
+                    toast({
+                      title: '⚠️ Builder Account Required',
+                      description: 'Only registered builders can purchase materials. Please register as a builder.',
+                      variant: 'destructive',
+                    });
+                    return;
+                  }
+                  addToCart({
+                    id: material.id,
+                    name: material.name,
+                    category: material.category,
+                    unit: material.unit,
+                    unit_price: material.unit_price,
+                    image_url: imageUrl,
+                    supplier_name: material.supplier?.company_name || 'MradiPro Catalog',
+                    supplier_id: material.supplier_id
+                  }, currentQty);
+                  toast({
+                    title: '🛒 Added to Cart!',
+                    description: `${currentQty} x ${material.name} added to your cart.`,
+                  });
+                };
+
+                const isSelectedForCompare = compareItems.has(material.id);
+                
                 return (
-                  <Card key={`${material.id}-${visibleStart + idx}`} className="overflow-hidden hover:shadow-xl transition-all duration-300 group" style={{ height: CARD_HEIGHT }}>
-                    <div className="relative aspect-square bg-muted overflow-hidden h-64 sm:h-72 md:h-80">
+                  <Card key={material.id} className={`overflow-hidden hover:shadow-xl transition-shadow duration-300 group flex flex-col ${itemInCart ? 'ring-2 ring-green-500' : ''} ${isSelectedForCompare ? 'ring-2 ring-purple-500' : ''}`}>
+                    {/* Image Section - Fixed height */}
+                    <div className="relative bg-white overflow-hidden h-44 flex-shrink-0">
                       {imageUrl ? (
-                        <LazyImage
+                        <img
                           src={imageUrl}
                           alt={material.name}
-                          className="w-full h-full object-contain p-4 bg-white group-hover:scale-105 transition-transform duration-300"
+                          className="w-full h-full object-contain p-3 bg-white"
                           loading="lazy"
-                          decoding="async"
-                          candidates={candidates}
-                          sources={sources}
-                          sizes={sizes}
+                          style={{ imageRendering: 'auto' }}
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center bg-white">
-                          <Package className="h-20 w-20 text-muted-foreground" />
+                          <Package className="h-16 w-16 text-muted-foreground" />
                         </div>
                       )}
-                      <div className="absolute top-2 right-2">
-                        <Badge className={material.in_stock ? 'bg-green-600' : 'bg-red-600'}>
-                          {material.in_stock ? 'In Stock' : 'Out of Stock'}
-                        </Badge>
-                      </div>
+                      {/* Category Badge */}
                       <div className="absolute top-2 left-2">
-                        <Badge variant="secondary" className="bg-black/60 text-white border-none">
+                        <Badge variant="secondary" className="bg-black/60 text-white border-none" style={{ fontSize: '10px' }}>
                           {material.category}
                         </Badge>
                       </div>
+                      <div className="absolute top-2 right-2">
+                        <Badge className={material.in_stock ? 'bg-green-600' : 'bg-red-600'} style={{ fontSize: '10px' }}>
+                          {material.in_stock ? 'In Stock' : 'Out of Stock'}
+                        </Badge>
+                      </div>
+                      {/* In Cart Badge */}
+                      {itemInCart && (
+                        <div className="absolute bottom-2 right-2">
+                          <Badge className="bg-green-600 text-white flex items-center gap-1" style={{ fontSize: '10px' }}>
+                            <Check className="h-3 w-3" />
+                            {cartQty} in cart
+                          </Badge>
+                        </div>
+                      )}
                     </div>
-                    <CardHeader>
-                      <CardTitle className="text-lg line-clamp-2 group-hover:text-blue-600 transition-colors">
+                    
+                    {/* Content Section - Flexible */}
+                    <CardHeader className="py-2 px-4 flex-shrink-0">
+                      <CardTitle className="text-sm line-clamp-1 group-hover:text-blue-600 transition-colors">
                         {material.name}
                       </CardTitle>
-                      <CardDescription className="line-clamp-2">
+                      <CardDescription className="line-clamp-1 text-xs">
                         {material.description || 'No description available'}
                       </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Store className="h-4 w-4" />
-                        <span className="font-medium">{material.supplier?.company_name}</span>
-                      </div>
-                      <div className="flex items-baseline justify-between">
-                        <div>
-                          <div className="text-2xl font-bold text-blue-600">
-                            KES {material.unit_price.toLocaleString()}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            per {material.unit}
-                          </div>
-                        </div>
+                    
+                    <CardContent className="pt-0 px-4 pb-3 space-y-2 flex-grow flex flex-col justify-end">
+                      {/* Supplier Info */}
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Store className="h-3 w-3 flex-shrink-0" />
+                        <span className="font-medium truncate">{material.supplier?.company_name || 'MradiPro Catalog'}</span>
                         {material.supplier?.rating > 0 && (
-                          <Badge variant="outline" className="bg-yellow-50">
-                            ⭐ {material.supplier.rating.toFixed(1)}
-                          </Badge>
+                          <span className="text-yellow-500 ml-auto flex-shrink-0">⭐ {material.supplier.rating.toFixed(1)}</span>
                         )}
                       </div>
-                      <div className="flex flex-col sm:flex-row gap-2">
+                      
+                      {/* Price */}
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-lg font-bold text-blue-600">KES {material.unit_price.toLocaleString()}</span>
+                        <span className="text-xs text-muted-foreground">/{material.unit}</span>
+                      </div>
+                      
+                      {/* Compare Price Checkbox - Simple & Prominent */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleCompare(material.id);
+                        }}
+                        className={`w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg border-2 transition-all ${
+                          isSelectedForCompare 
+                            ? 'bg-purple-100 border-purple-500 text-purple-700' 
+                            : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-purple-300 hover:bg-purple-50'
+                        }`}
+                      >
+                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                          isSelectedForCompare 
+                            ? 'bg-purple-600 border-purple-600' 
+                            : 'bg-white border-gray-400'
+                        }`}>
+                          {isSelectedForCompare && <Check className="h-3 w-3 text-white" />}
+                        </div>
+                        <span className="text-sm font-medium">
+                          {isSelectedForCompare ? '✓ Comparing Price' : 'Compare Price'}
+                        </span>
+                      </button>
+                      
+                      {/* Quantity Selector */}
+                      <div className="flex items-center justify-between bg-gray-50 rounded-lg p-2">
+                        <span className="text-xs text-gray-600">Qty:</span>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => updateQuantity(material.id, currentQty - 1)}
+                            disabled={currentQty <= 0 || !material.in_stock}
+                          >
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={currentQty}
+                            onChange={(e) => updateQuantity(material.id, parseInt(e.target.value) || 0)}
+                            className="w-12 h-7 text-center text-sm px-1"
+                            disabled={!material.in_stock}
+                          />
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => updateQuantity(material.id, currentQty + 1)}
+                            disabled={!material.in_stock}
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </div>
+                        <span className="text-xs font-semibold text-gray-700 min-w-[50px] text-right">
+                          KES {(material.unit_price * currentQty).toLocaleString()}
+                        </span>
+                      </div>
+                      
+                      {/* Add to Cart Button */}
+                      <Button 
+                        className={`w-full h-10 text-sm font-semibold flex items-center justify-center gap-2 ${
+                          itemInCart 
+                            ? 'bg-green-600 hover:bg-green-700' 
+                            : currentQty > 0
+                              ? 'bg-orange-500 hover:bg-orange-600'
+                              : 'bg-gray-400 cursor-not-allowed'
+                        }`}
+                        onClick={handleAddToCart}
+                        disabled={!material.in_stock || currentQty === 0}
+                      >
+                        <ShoppingCart className="h-4 w-4" />
+                        {itemInCart ? `Add More (${cartQty} in cart)` : currentQty === 0 ? 'Select Quantity' : 'Add to Cart'}
+                      </Button>
+                      
+                      {/* Quick Action Buttons - Only for Builders */}
+                      <div className="grid grid-cols-2 gap-2">
                         <Button 
-                          className="w-full sm:flex-1 bg-blue-600 hover:bg-blue-700 h-12 text-base font-semibold"
+                          variant="outline"
+                          className="h-8 text-xs font-medium border-blue-300 text-blue-600 hover:bg-blue-50"
                           onClick={() => {
-                            if (userRole === 'builder' || userRole === 'professional_builder') {
-                              handleRequestQuote(material);
-                            } else {
-                              window.location.href = '/auth?lite=1&redirect=' + encodeURIComponent('/suppliers?tab=purchase');
+                            if (!isAuthenticated) {
+                              window.location.href = '/builder-registration?redirect=/supplier-marketplace';
+                              return;
                             }
+                            if (userRole && !['builder', 'professional_builder', 'private_client'].includes(userRole)) {
+                              toast({
+                                title: '⚠️ Builder Account Required',
+                                description: 'Only registered builders can request quotes.',
+                                variant: 'destructive',
+                              });
+                              return;
+                            }
+                            handleRequestQuote(material);
                           }}
                           disabled={!material.in_stock}
                         >
-                          <ShoppingCart className="h-5 w-5 mr-2" />
                           Request Quote
                         </Button>
                         <Button 
-                          className="w-full sm:flex-1 bg-green-600 hover:bg-green-700 h-12 text-base font-semibold"
+                          variant="outline"
+                          className="h-8 text-xs font-medium border-green-300 text-green-600 hover:bg-green-50"
                           onClick={() => {
-                            if (userRole === 'private_client') {
-                              handleBuyNow(material);
-                            } else {
-                              window.location.href = '/auth?lite=1&redirect=' + encodeURIComponent('/suppliers?tab=purchase&welcome=private_client');
+                            if (!isAuthenticated) {
+                              window.location.href = '/builder-registration?redirect=/supplier-marketplace';
+                              return;
                             }
+                            if (userRole && !['builder', 'professional_builder', 'private_client'].includes(userRole)) {
+                              toast({
+                                title: '⚠️ Builder Account Required',
+                                description: 'Only registered builders can purchase materials.',
+                                variant: 'destructive',
+                              });
+                              return;
+                            }
+                            handleAddToCart();
+                            setIsCartOpen(true);
                           }}
                           disabled={!material.in_stock}
                         >
-                          <ShoppingCart className="h-5 w-5 mr-2" />
                           Buy Now
                         </Button>
-                        <Button 
-                          variant="outline"
-                          onClick={() => toast({
-                            title: 'Supplier Info',
-                            description: `${material.supplier?.company_name} - ${material.supplier?.location}`
-                          })}
-                        >
-                          <Store className="h-4 w-4" />
-                        </Button>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button variant="outline" className="sm:flex-none">
-                              Choose Suppliers
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-64">
-                            <div className="space-y-2">
-                              <Label className="text-sm">Select preferred suppliers</Label>
-                              <div className="max-h-48 overflow-y-auto space-y-2">
-                                {allSuppliers.map(s => (
-                                  <div key={`${material.id}-${s.id}`} className="flex items-center space-x-2">
-                                    <Checkbox
-                                      id={`${material.id}-${s.id}`}
-                                      checked={(selectedSuppliersMap[material.id] || []).includes(s.id)}
-                                      onCheckedChange={(checked) => {
-                                        setSelectedSuppliersMap(prev => {
-                                          const current = prev[material.id] || [];
-                                          const next = checked ? [...current, s.id] : current.filter(x => x !== s.id);
-                                          return { ...prev, [material.id]: next };
-                                        });
-                                      }}
-                                    />
-                                    <label htmlFor={`${material.id}-${s.id}`} className="text-sm cursor-pointer truncate">
-                                      {s.company_name}
-                                    </label>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </PopoverContent>
-                        </Popover>
                       </div>
                     </CardContent>
                   </Card>
                 );
-              })
-            );
-            if (bottomSpacer > 0) rendered.push(<div key="bottom-spacer" style={{ height: bottomSpacer }} />);
-            return rendered;
-          })()}
+              })}
         </div>
       )}
       <Dialog open={isMultiQuoteOpen} onOpenChange={setIsMultiQuoteOpen}>
@@ -867,6 +1081,14 @@ export const MaterialsGrid = () => {
           )}
         </DialogContent>
       </Dialog>
+      
+      {/* Price Comparison Modal */}
+      <PriceComparisonModal
+        isOpen={isCompareModalOpen}
+        onClose={() => setIsCompareModalOpen(false)}
+        selectedMaterials={getComparisonMaterials()}
+        allMaterials={materials}
+      />
     </div>
   );
 };

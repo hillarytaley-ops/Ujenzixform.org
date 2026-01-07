@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Staff Credentials Guide - MradiPro</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      line-height: 1.6;
+      color: #1e293b;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      background: #f8fafc;
+    }
+    
+    @media print {
+      body {
+        background: white;
+        padding: 20px;
+      }
+      .no-print {
+        display: none;
+      }
+      .page-break {
+        page-break-before: always;
+      }
+    }
+    
+    h1 {
+      color: #0f172a;
+      font-size: 2rem;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    h2 {
+      color: #1e40af;
+      font-size: 1.4rem;
+      margin-top: 40px;
+      margin-bottom: 15px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #3b82f6;
+    }
+    
+    h3 {
+      color: #334155;
+      font-size: 1.1rem;
+      margin-top: 25px;
+      margin-bottom: 10px;
+    }
+    
+    .subtitle {
+      color: #64748b;
+      font-size: 1rem;
+      margin-bottom: 30px;
+    }
+    
+    .header {
+      text-align: center;
+      padding: 30px;
+      background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+      color: white;
+      border-radius: 12px;
+      margin-bottom: 40px;
+    }
+    
+    .header h1 {
+      color: white;
+      justify-content: center;
+    }
+    
+    .header .subtitle {
+      color: #bfdbfe;
+    }
+    
+    .step {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .step-number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      background: #3b82f6;
+      color: white;
+      border-radius: 50%;
+      font-weight: bold;
+      margin-right: 10px;
+    }
+    
+    .step h3 {
+      display: flex;
+      align-items: center;
+      margin-top: 0;
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 15px 0;
+      font-size: 0.9rem;
+    }
+    
+    th, td {
+      padding: 12px;
+      text-align: left;
+      border: 1px solid #e2e8f0;
+    }
+    
+    th {
+      background: #f1f5f9;
+      font-weight: 600;
+      color: #475569;
+    }
+    
+    tr:nth-child(even) {
+      background: #f8fafc;
+    }
+    
+    code {
+      background: #1e293b;
+      color: #22c55e;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 0.85rem;
+    }
+    
+    pre {
+      background: #1e293b;
+      color: #e2e8f0;
+      padding: 16px;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-size: 0.85rem;
+      margin: 15px 0;
+    }
+    
+    pre code {
+      background: none;
+      color: inherit;
+      padding: 0;
+    }
+    
+    .warning {
+      background: #fef3c7;
+      border-left: 4px solid #f59e0b;
+      padding: 15px;
+      margin: 15px 0;
+      border-radius: 0 8px 8px 0;
+    }
+    
+    .warning strong {
+      color: #b45309;
+    }
+    
+    .success {
+      background: #dcfce7;
+      border-left: 4px solid #22c55e;
+      padding: 15px;
+      margin: 15px 0;
+      border-radius: 0 8px 8px 0;
+    }
+    
+    .danger {
+      background: #fee2e2;
+      border-left: 4px solid #ef4444;
+      padding: 15px;
+      margin: 15px 0;
+      border-radius: 0 8px 8px 0;
+    }
+    
+    .do-dont {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin: 20px 0;
+    }
+    
+    .do {
+      background: #dcfce7;
+      padding: 20px;
+      border-radius: 8px;
+    }
+    
+    .dont {
+      background: #fee2e2;
+      padding: 20px;
+      border-radius: 8px;
+    }
+    
+    .do h4, .dont h4 {
+      margin-bottom: 10px;
+    }
+    
+    .do h4 {
+      color: #166534;
+    }
+    
+    .dont h4 {
+      color: #b91c1c;
+    }
+    
+    ul {
+      margin: 10px 0;
+      padding-left: 20px;
+    }
+    
+    li {
+      margin: 5px 0;
+    }
+    
+    .credential-box {
+      background: #0f172a;
+      color: #f1f5f9;
+      padding: 20px;
+      border-radius: 8px;
+      font-family: 'Monaco', 'Menlo', monospace;
+      margin: 15px 0;
+    }
+    
+    .credential-box .line {
+      border-top: 1px dashed #475569;
+      margin: 10px 0;
+    }
+    
+    .print-btn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+    }
+    
+    .print-btn:hover {
+      background: #2563eb;
+    }
+    
+    .quick-ref {
+      background: #eff6ff;
+      border: 2px solid #3b82f6;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+    }
+    
+    .quick-ref h3 {
+      color: #1e40af;
+      margin-top: 0;
+    }
+  </style>
+</head>
+<body>
+  <button class="print-btn no-print" onclick="window.print()">🖨️ Print Guide</button>
+
+  <div class="header">
+    <h1>🔐 Admin Staff Credentials Guide</h1>
+    <p class="subtitle">MradiPro / UjenziPro - IT Administrator Manual</p>
+  </div>
+
+  <div class="quick-ref">
+    <h3>📋 Quick Reference</h3>
+    <table>
+      <tr>
+        <th>Step</th>
+        <th>Action</th>
+      </tr>
+      <tr>
+        <td>1</td>
+        <td>Open <code>scripts/generate-admin-hash.html</code></td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>Enter email, name, create staff code</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td>Click "Generate Hash & SQL"</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td>Copy SQL → Run in Supabase</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td>Share staff code with admin securely</td>
+      </tr>
+      <tr>
+        <td>6</td>
+        <td>Admin logs in at <code>/admin-auth</code></td>
+      </tr>
+    </table>
+  </div>
+
+  <h2>📋 Creating New Admin Credentials</h2>
+
+  <div class="step">
+    <h3><span class="step-number">1</span> Open the Hash Generator Tool</h3>
+    <p><strong>Location:</strong> <code>scripts/generate-admin-hash.html</code></p>
+    <p>Navigate to your project folder, find the file, and double-click to open in your browser.</p>
+  </div>
+
+  <div class="step">
+    <h3><span class="step-number">2</span> Enter New Admin Details</h3>
+    <table>
+      <tr>
+        <th>Field</th>
+        <th>Example</th>
+        <th>Required</th>
+      </tr>
+      <tr>
+        <td>Admin Email</td>
+        <td><code>john.kamau@company.com</code></td>
+        <td>✅ Yes</td>
+      </tr>
+      <tr>
+        <td>Full Name</td>
+        <td><code>John Kamau</code></td>
+        <td>✅ Yes</td>
+      </tr>
+      <tr>
+        <td>Staff Code</td>
+        <td><code>UJPRO-2025-JOHN01</code></td>
+        <td>✅ Yes</td>
+      </tr>
+      <tr>
+        <td>Department</td>
+        <td><code>Operations</code></td>
+        <td>❌ Optional</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="step">
+    <h3><span class="step-number">3</span> Generate Hash & SQL</h3>
+    <p>Click the <strong>"Generate Hash & SQL"</strong> button. The tool will display the encrypted hash and a ready-to-use SQL statement.</p>
+  </div>
+
+  <div class="step">
+    <h3><span class="step-number">4</span> Run SQL in Supabase</h3>
+    <ol>
+      <li>Open <strong>Supabase Dashboard</strong></li>
+      <li>Select your project</li>
+      <li>Click <strong>SQL Editor</strong></li>
+      <li>Paste the generated SQL</li>
+      <li>Click <strong>Run</strong></li>
+    </ol>
+  </div>
+
+  <div class="step">
+    <h3><span class="step-number">5</span> Verify the New Admin</h3>
+    <pre><code>SELECT email, full_name, is_active,
+       CASE WHEN staff_code_hash IS NOT NULL 
+            THEN '✅ Ready' ELSE '❌ Missing' END as status
+FROM admin_staff
+ORDER BY created_at DESC;</code></pre>
+  </div>
+
+  <div class="step">
+    <h3><span class="step-number">6</span> Share Credentials Securely</h3>
+    <div class="credential-box">
+      <div>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
+      <div>🔐 YOUR ADMIN LOGIN CREDENTIALS</div>
+      <div>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
+      <br>
+      <div>Login URL: https://your-domain.com/admin-auth</div>
+      <br>
+      <div>Email: john.kamau@company.com</div>
+      <div>Staff Code: UJPRO-2025-JOHN01</div>
+      <br>
+      <div>⚠️ Keep this code private. Do not share.</div>
+      <div>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
+    </div>
+    
+    <div class="warning">
+      <strong>⚠️ Secure Channels Only:</strong>
+      <ul>
+        <li>✅ In person</li>
+        <li>✅ Encrypted messaging (Signal, WhatsApp)</li>
+        <li>❌ Never plain email</li>
+        <li>❌ Never SMS</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="page-break"></div>
+
+  <h2>🔄 Resetting a Staff Code</h2>
+  
+  <p>If an admin forgets their code or it's compromised:</p>
+  
+  <ol>
+    <li>Open <code>scripts/generate-admin-hash.html</code></li>
+    <li>Create a new staff code for the same email</li>
+    <li>Run this SQL in Supabase:</li>
+  </ol>
+  
+  <pre><code>UPDATE admin_staff
+SET staff_code_hash = 'new-64-character-hash-here',
+    updated_at = NOW()
+WHERE email = 'john.kamau@company.com';</code></pre>
+
+  <h2>🚫 Deactivating an Admin</h2>
+  
+  <p><strong>Temporarily disable</strong> (keeps record):</p>
+  <pre><code>UPDATE admin_staff
+SET is_active = false
+WHERE email = 'john.kamau@company.com';</code></pre>
+
+  <p><strong>Reactivate:</strong></p>
+  <pre><code>UPDATE admin_staff
+SET is_active = true
+WHERE email = 'john.kamau@company.com';</code></pre>
+
+  <h2>🗑️ Permanently Removing an Admin</h2>
+  
+  <div class="danger">
+    <strong>⚠️ Warning:</strong> This cannot be undone!
+  </div>
+  
+  <pre><code>DELETE FROM admin_staff
+WHERE email = 'john.kamau@company.com';</code></pre>
+
+  <h2>🔒 Security Best Practices</h2>
+  
+  <div class="do-dont">
+    <div class="do">
+      <h4>✅ DO</h4>
+      <ul>
+        <li>Use unique staff codes for each admin</li>
+        <li>Share codes via secure channels only</li>
+        <li>Deactivate accounts when staff leave</li>
+        <li>Rotate codes every 6-12 months</li>
+        <li>Keep the hash generator tool secure</li>
+      </ul>
+    </div>
+    <div class="dont">
+      <h4>❌ DON'T</h4>
+      <ul>
+        <li>Share staff codes via email</li>
+        <li>Use simple codes like "admin123"</li>
+        <li>Share same code with multiple admins</li>
+        <li>Store plain-text codes anywhere</li>
+        <li>Share the SHA-256 hash</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>🆘 Troubleshooting</h2>
+  
+  <h3>"Access Denied" Error</h3>
+  <ol>
+    <li>Check if email is spelled correctly</li>
+    <li>Verify staff code (case-sensitive)</li>
+    <li>Check if account is active in database</li>
+  </ol>
+
+  <h3>"Account Locked" Error</h3>
+  <ul>
+    <li>Wait 10 minutes for automatic unlock</li>
+    <li>Or clear in browser console (F12 → Console):</li>
+  </ul>
+  <pre><code>localStorage.removeItem("admin_lockout_until");
+localStorage.removeItem("admin_login_attempts");</code></pre>
+
+  <div class="success">
+    <strong>✅ Document Version:</strong> 1.0 | Last Updated: December 2024
+  </div>
+
+</body>
+</html>
+
+
+
+

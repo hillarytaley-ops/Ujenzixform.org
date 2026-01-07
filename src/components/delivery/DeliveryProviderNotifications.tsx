@@ -64,8 +64,8 @@ export const DeliveryProviderNotifications: React.FC<{ providerId: string }> = (
   useEffect(() => {
     loadNotifications();
     
-    // Set up real-time subscription for new delivery requests
-    const subscription = supabase
+    // Set up real-time subscription for new delivery requests (legacy table)
+    const requestsSubscription = supabase
       .channel('delivery-requests')
       .on('postgres_changes', 
         { 
@@ -79,8 +79,42 @@ export const DeliveryProviderNotifications: React.FC<{ providerId: string }> = (
       )
       .subscribe();
 
+    // Set up real-time subscription for deliveries table (new table used by Delivery.tsx)
+    const deliveriesSubscription = supabase
+      .channel('deliveries-notifications')
+      .on('postgres_changes', 
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'deliveries' 
+        }, 
+        (payload: any) => {
+          // Convert deliveries table format to DeliveryRequest format
+          const newDelivery: DeliveryRequest = {
+            id: payload.new.id,
+            delivery_id: payload.new.tracking_number || payload.new.id,
+            material_type: payload.new.material_type || 'Construction Materials',
+            quantity: payload.new.quantity || 'As specified',
+            pickup_address: payload.new.pickup_address || '',
+            delivery_address: payload.new.delivery_address || '',
+            contact_name: payload.new.contact_name || '',
+            contact_phone: payload.new.contact_phone || '',
+            preferred_date: payload.new.preferred_date || new Date().toISOString().split('T')[0],
+            preferred_time: payload.new.preferred_time || '',
+            urgency: payload.new.urgency || 'normal',
+            estimated_cost: payload.new.estimated_cost || 0,
+            distance_km: payload.new.distance_km || 0,
+            status: 'pending',
+            created_at: payload.new.created_at || new Date().toISOString()
+          };
+          handleNewDeliveryRequest(newDelivery);
+        }
+      )
+      .subscribe();
+
     return () => {
-      subscription.unsubscribe();
+      requestsSubscription.unsubscribe();
+      deliveriesSubscription.unsubscribe();
     };
   }, [providerId]);
 

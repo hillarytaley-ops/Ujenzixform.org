@@ -452,15 +452,32 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
                           {item.description}
                         </p>
                         
-                        <div className="flex items-center justify-between pt-2">
-                          <div>
-                            <div className="font-semibold">KSh {item.price.toLocaleString()}</div>
-                            <div className="text-xs text-muted-foreground">per {item.unit}</div>
+                        <div className="flex flex-col gap-2 pt-2">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="font-semibold">KSh {item.price.toLocaleString()}</div>
+                              <div className="text-xs text-muted-foreground">per {item.unit}</div>
+                            </div>
                           </div>
-                          <Button size="sm" variant="outline" disabled={!item.inStock}>
-                            <ShoppingCart className="h-3 w-3 mr-1" />
-                            Add
-                          </Button>
+                          <div className="grid grid-cols-2 gap-1">
+                            <Button 
+                              size="sm" 
+                              className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-8 flex flex-col items-center justify-center py-0.5"
+                              disabled={!item.inStock}
+                              onClick={() => onRequestQuote(supplier)}
+                            >
+                              <span>Request Quote</span>
+                              <span className="text-[9px] opacity-80 font-normal">Pro Suppliers</span>
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              className="bg-green-600 hover:bg-green-700 text-white text-xs h-8 flex flex-col items-center justify-center py-0.5"
+                              disabled={!item.inStock}
+                            >
+                              <span>Buy Now</span>
+                              <span className="text-[9px] opacity-80 font-normal">Private Builders</span>
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </CardContent>
@@ -535,13 +552,26 @@ export const SupplierCatalogModal = ({ supplier, isOpen, onClose, onRequestQuote
                           <p className="text-sm text-muted-foreground">{item.description}</p>
                         </div>
                         
-                        <div className="text-right">
+                        <div className="text-right space-y-2">
                           <div className="font-semibold text-lg">KSh {item.price.toLocaleString()}</div>
                           <div className="text-sm text-muted-foreground">per {item.unit}</div>
-                          <Button size="sm" className="mt-2" disabled={!item.inStock}>
-                            <ShoppingCart className="h-3 w-3 mr-1" />
-                            Add to Quote
-                          </Button>
+                          <div className="flex gap-1 mt-2">
+                            <Button 
+                              size="sm" 
+                              className="bg-blue-600 hover:bg-blue-700 text-white text-xs"
+                              disabled={!item.inStock}
+                              onClick={() => onRequestQuote(supplier)}
+                            >
+                              Request Quote
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              className="bg-green-600 hover:bg-green-700 text-white text-xs"
+                              disabled={!item.inStock}
+                            >
+                              Buy Now
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </CardContent>

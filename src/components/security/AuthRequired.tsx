@@ -1,3 +1,23 @@
+/**
+ * ╔══════════════════════════════════════════════════════════════════════════════════════╗
+ * ║                                                                                      ║
+ * ║   🔒 AUTH REQUIRED COMPONENT - BASIC AUTHENTICATION GATE                            ║
+ * ║                                                                                      ║
+ * ║   ⚠️  SECURITY COMPONENT - DO NOT MODIFY WITHOUT REVIEW  ⚠️                         ║
+ * ║                                                                                      ║
+ * ║   SECURITY AUDIT: December 24, 2025                                                  ║
+ * ║   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ║
+ * ║                                                                                      ║
+ * ║   PURPOSE: Ensures user is authenticated before accessing protected routes          ║
+ * ║   NOTE: This does NOT check roles - use RoleProtectedRoute for role-based access    ║
+ * ║                                                                                      ║
+ * ║   AUTHENTICATION SOURCES (in order):                                                 ║
+ * ║   1. Supabase session (primary)                                                      ║
+ * ║   2. Admin localStorage session (24-hour expiry)                                     ║
+ * ║                                                                                      ║
+ * ╚══════════════════════════════════════════════════════════════════════════════════════╝
+ */
+
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -29,8 +49,12 @@ export const AuthRequired = ({ children }: AuthRequiredProps) => {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setIsAuthenticated(!!session);
-      if (!session && !publicPaths.includes(location.pathname)) {
+      // Check admin localStorage fallback
+      const adminAuthenticated = localStorage.getItem('admin_authenticated') === 'true';
+      const isAuth = !!session || adminAuthenticated;
+      
+      setIsAuthenticated(isAuth);
+      if (!isAuth && !publicPaths.includes(location.pathname)) {
         navigate('/auth');
       }
     });
@@ -41,15 +65,35 @@ export const AuthRequired = ({ children }: AuthRequiredProps) => {
   const checkAuth = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      setIsAuthenticated(!!session);
+      
+      // Also check localStorage for admin authentication (fallback for admin portal)
+      const adminAuthenticated = localStorage.getItem('admin_authenticated') === 'true';
+      const adminLoginTime = localStorage.getItem('admin_login_time');
+      
+      // Check if admin session is still valid (24 hour expiry)
+      const isAdminSessionValid = adminAuthenticated && adminLoginTime && 
+        (Date.now() - parseInt(adminLoginTime)) < 24 * 60 * 60 * 1000;
+      
+      const isAuthenticated = !!session || isAdminSessionValid;
+      
+      setIsAuthenticated(isAuthenticated);
       setLoading(false);
 
       // If not authenticated, redirect to auth page
-      if (!session) {
+      if (!isAuthenticated) {
         navigate('/auth');
       }
     } catch (error) {
       console.error('Auth check error:', error);
+      
+      // Check localStorage fallback even on error
+      const adminAuthenticated = localStorage.getItem('admin_authenticated') === 'true';
+      if (adminAuthenticated) {
+        setIsAuthenticated(true);
+        setLoading(false);
+        return;
+      }
+      
       setIsAuthenticated(false);
       setLoading(false);
       navigate('/auth');

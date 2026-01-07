@@ -1,16 +1,54 @@
 {
   "name": "MradiPro - Kenya's Construction Platform",
   "short_name": "MradiPro",
-  "description": "Kenya's premier platform connecting builders with verified construction material suppliers across all 47 counties",
+  "description": "Kenya's premier platform connecting builders with verified construction material suppliers across all 47 counties. Find quality materials, get competitive quotes, and track deliveries.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#2563eb",
   "orientation": "portrait-primary",
+  "id": "/",
+  "scope": "/",
   "icons": [
     {
       "src": "/mradipro-logo.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/mradipro-logo.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/mradipro-logo.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/mradipro-logo.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/mradipro-logo.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/mradipro-logo.png",
       "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/mradipro-logo.png",
+      "sizes": "384x384",
       "type": "image/png",
       "purpose": "any"
     },
@@ -27,11 +65,79 @@
       "purpose": "any maskable"
     }
   ],
-  "categories": ["business", "construction", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Browse Materials",
+      "short_name": "Materials",
+      "description": "Browse construction materials from verified suppliers",
+      "url": "/supplier-marketplace",
+      "icons": [{ "src": "/mradipro-logo.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Track Delivery",
+      "short_name": "Track",
+      "description": "Track your material deliveries in real-time",
+      "url": "/tracking",
+      "icons": [{ "src": "/mradipro-logo.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "My Orders",
+      "short_name": "Orders",
+      "description": "View your order history and status",
+      "url": "/builder-dashboard",
+      "icons": [{ "src": "/mradipro-logo.png", "sizes": "192x192" }]
+    }
+  ],
+  "categories": ["business", "construction", "productivity", "shopping"],
   "lang": "en-KE",
   "dir": "ltr",
-  "scope": "/",
-  "prefer_related_applications": false
+  "prefer_related_applications": false,
+  "related_applications": [],
+  "handle_links": "preferred",
+  "launch_handler": {
+    "client_mode": ["navigate-existing", "auto"]
+  },
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
+  "share_target": {
+    "action": "/share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "images",
+          "accept": ["image/*"]
+        }
+      ]
+    }
+  },
+  "protocol_handlers": [
+    {
+      "protocol": "web+mradipro",
+      "url": "/handle?type=%s"
+    }
+  ],
+  "file_handlers": [
+    {
+      "action": "/open-file",
+      "accept": {
+        "application/pdf": [".pdf"],
+        "image/*": [".jpg", ".jpeg", ".png", ".webp"]
+      }
+    }
+  ],
+  "display_override": ["window-controls-overlay", "standalone", "browser"],
+  "features": {
+    "push_notifications": true,
+    "background_sync": true,
+    "periodic_background_sync": true,
+    "offline_mode": true,
+    "file_handling": true,
+    "share_target": true
+  }
 }
-
-

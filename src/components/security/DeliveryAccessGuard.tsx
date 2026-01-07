@@ -15,27 +15,32 @@ interface DeliveryAccessGuardProps {
 export const DeliveryAccessGuard = ({ 
   children, 
   requiredAuth = true,
-  allowedRoles = ['builder', 'supplier', 'admin'],
+  allowedRoles = ['builder', 'supplier', 'admin', 'guest'],
   feature = 'delivery services'
 }: DeliveryAccessGuardProps) => {
   const [user, setUser] = useState<any>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [hasAccess, setHasAccess] = useState(false);
+  const [loading, setLoading] = useState(!requiredAuth ? false : true); // Don't load if auth not required
+  const [hasAccess, setHasAccess] = useState(!requiredAuth ? true : false); // Grant access immediately if auth not required
 
   useEffect(() => {
+    // Skip async check if auth is not required - render immediately
+    if (!requiredAuth) {
+      return;
+    }
     checkAccess();
-  }, []);
+  }, [requiredAuth]);
 
   const checkAccess = async () => {
+    // Double-check: if auth not required, grant access immediately
+    if (!requiredAuth) {
+      setHasAccess(true);
+      setLoading(false);
+      return;
+    }
+    
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!requiredAuth) {
-        setHasAccess(true);
-        setLoading(false);
-        return;
-      }
 
       if (!user) {
         setHasAccess(false);
@@ -49,18 +54,21 @@ export const DeliveryAccessGuard = ({
       const { data: userRoles } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .limit(1);
 
       if (userRoles && userRoles.length > 0) {
         const primaryRole = userRoles[0].role;
         setUserRole(primaryRole);
         setHasAccess(allowedRoles.includes(primaryRole));
       } else {
-        setHasAccess(false);
+        // No role found - check if 'guest' is allowed
+        setHasAccess(allowedRoles.includes('guest'));
       }
     } catch (error) {
       console.error('Access check error:', error);
-      setHasAccess(false);
+      // On error, check if guest access is allowed
+      setHasAccess(allowedRoles.includes('guest'));
     } finally {
       setLoading(false);
     }
@@ -114,7 +122,7 @@ export const DeliveryAccessGuard = ({
                   </div>
                   <div className="flex gap-2">
                     <Button variant="outline" asChild>
-                      <Link to="/">Return Home</Link>
+                      <Link to="/home">Return Home</Link>
                     </Button>
                   </div>
                 </div>

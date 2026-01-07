@@ -22,7 +22,7 @@ export interface SearchFilters {
 }
 
 const PRICE_RANGES = [
-  { value: '', label: 'Any Budget' },
+  { value: 'all', label: 'Any Budget' },
   { value: '0-500K', label: 'Under KES 500K' },
   { value: '500K-2M', label: 'KES 500K - 2M' },
   { value: '2M-10M', label: 'KES 2M - 10M' },
@@ -31,7 +31,7 @@ const PRICE_RANGES = [
 ];
 
 const AVAILABILITY_OPTIONS = [
-  { value: '', label: 'Any Availability' },
+  { value: 'all', label: 'Any Availability' },
   { value: 'Available', label: 'Available Now' },
   { value: 'Busy', label: 'Busy' },
   { value: 'Booking', label: 'Taking Bookings' }
@@ -68,7 +68,7 @@ export const EnhancedSearch: React.FC<EnhancedSearchProps> = ({ onSearchChange, 
   };
 
   const activeFiltersCount = Object.values(filters).filter(value => 
-    value !== '' && value !== 0
+    value !== '' && value !== 0 && value !== 'all'
   ).length;
 
   return (
@@ -96,7 +96,7 @@ export const EnhancedSearch: React.FC<EnhancedSearchProps> = ({ onSearchChange, 
               </div>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Counties</SelectItem>
+              <SelectItem value="all">All Counties</SelectItem>
               {KENYAN_COUNTIES.map(county => (
                 <SelectItem key={county} value={county}>{county}</SelectItem>
               ))}
@@ -111,7 +111,7 @@ export const EnhancedSearch: React.FC<EnhancedSearchProps> = ({ onSearchChange, 
               <SelectValue placeholder="All Specialties" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Specialties</SelectItem>
+              <SelectItem value="all">All Specialties</SelectItem>
               {CONSTRUCTION_SPECIALTIES.map(specialty => (
                 <SelectItem key={specialty} value={specialty}>{specialty}</SelectItem>
               ))}
@@ -228,7 +228,7 @@ export const EnhancedSearch: React.FC<EnhancedSearchProps> = ({ onSearchChange, 
               />
             </Badge>
           )}
-          {filters.county && (
+          {filters.county && filters.county !== 'all' && (
             <Badge variant="secondary" className="gap-1">
               {filters.county}
               <X 
@@ -237,7 +237,7 @@ export const EnhancedSearch: React.FC<EnhancedSearchProps> = ({ onSearchChange, 
               />
             </Badge>
           )}
-          {filters.specialty && (
+          {filters.specialty && filters.specialty !== 'all' && (
             <Badge variant="secondary" className="gap-1">
               {filters.specialty}
               <X 
@@ -246,7 +246,7 @@ export const EnhancedSearch: React.FC<EnhancedSearchProps> = ({ onSearchChange, 
               />
             </Badge>
           )}
-          {filters.priceRange && (
+          {filters.priceRange && filters.priceRange !== 'all' && (
             <Badge variant="secondary" className="gap-1">
               {PRICE_RANGES.find(r => r.value === filters.priceRange)?.label}
               <X 
@@ -255,7 +255,7 @@ export const EnhancedSearch: React.FC<EnhancedSearchProps> = ({ onSearchChange, 
               />
             </Badge>
           )}
-          {filters.availability && (
+          {filters.availability && filters.availability !== 'all' && (
             <Badge variant="secondary" className="gap-1">
               {AVAILABILITY_OPTIONS.find(o => o.value === filters.availability)?.label}
               <X 

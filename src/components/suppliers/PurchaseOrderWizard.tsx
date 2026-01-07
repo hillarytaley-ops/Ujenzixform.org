@@ -62,7 +62,7 @@ export const PurchaseOrderWizard: React.FC<PurchaseOrderWizardProps> = ({ userId
         .from('materials')
         .select(`
           *,
-          supplier:suppliers(company_name, location)
+          supplier:suppliers(company_name, address)
         `)
         .eq('in_stock', true)
         .limit(50);

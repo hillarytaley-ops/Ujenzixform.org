@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PackageCheck, Scan, CheckCircle, Camera, Building, HelpCircle } from 'lucide-react';
+import { PackageCheck, Scan, CheckCircle, Camera, Truck, MapPin, Lock, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { BrowserMultiFormatReader } from '@zxing/browser';
@@ -59,6 +59,12 @@ export const ReceivingScanner: React.FC = () => {
 
   const checkAuth = async () => {
     try {
+      // Also check localStorage for role
+      const localRole = localStorage.getItem('user_role');
+      if (localRole) {
+        setUserRole(localRole);
+      }
+      
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
@@ -68,10 +74,12 @@ export const ReceivingScanner: React.FC = () => {
         .eq('user_id', user.id)
         .maybeSingle();
 
-      setUserRole(roleData?.role || null);
+      setUserRole(roleData?.role || localRole || null);
     } catch (err) {
       console.error('Auth check failed (non-fatal):', err);
-      setUserRole(null);
+      // Keep localStorage role if available
+      const localRole = localStorage.getItem('user_role');
+      setUserRole(localRole || null);
     }
   };
 
@@ -202,22 +210,79 @@ export const ReceivingScanner: React.FC = () => {
     processQRScan(manualQRCode, 'physical_scanner');
   };
 
-  const allowAccess = ['admin', 'builder'].includes(userRole || '');
+  // Only delivery providers and admins can access the receiving scanner
+  // Builders are completely blocked - no camera access at all
+  const isBuilder = userRole === 'builder';
+  const allowAccess = ['admin', 'delivery_provider', 'delivery'].includes(userRole || '');
+  const canScan = allowAccess;
+
+  // BLOCK builders from accessing any camera functionality
+  if (isBuilder) {
+    return (
+      <div className="space-y-6">
+        <Card className="border-red-200 bg-red-50 dark:bg-red-900/20">
+          <CardContent className="py-8 text-center">
+            <div className="bg-red-100 dark:bg-red-900/30 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Lock className="h-8 w-8 text-red-600 dark:text-red-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">
+              Access Restricted
+            </h3>
+            <p className="text-sm text-red-700 dark:text-red-300 mb-4 max-w-sm mx-auto">
+              As a <strong>Builder</strong>, you cannot access the receiving scanner. 
+              Only registered <strong>Delivery Providers</strong> can confirm deliveries.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2 justify-center">
+              <a 
+                href="/tracking" 
+                className="inline-flex items-center justify-center px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+              >
+                <Truck className="h-4 w-4 mr-2" />
+                Track My Deliveries
+              </a>
+              <a 
+                href="/builder-dashboard" 
+                className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              >
+                <ArrowRight className="h-4 w-4 mr-2" />
+                Go to Dashboard
+              </a>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
+      {/* Delivery Info Banner */}
+      <Card className="bg-gradient-to-r from-orange-50 to-yellow-50 border-orange-200">
+        <CardContent className="py-4">
+          <div className="flex items-center gap-3">
+            <Truck className="h-8 w-8 text-orange-600" />
+            <div>
+              <h3 className="font-semibold text-orange-800">Delivery Site Scanner</h3>
+              <p className="text-sm text-orange-700">
+                Scan materials upon delivery to confirm handover at construction site
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Camera Scanner */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Building className="h-5 w-5" />
-            Receiving Scanner - Building Site
+            <MapPin className="h-5 w-5 text-green-600" />
+            Delivery Confirmation Scanner
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {!allowAccess && (
             <div className="p-3 rounded-md bg-yellow-50 text-yellow-700 text-sm">
-              Access restricted. Sign in as builder or admin to record scans.
+              <strong>Access restricted.</strong> Sign in as a delivery provider to confirm deliveries.
             </div>
           )}
           
@@ -253,58 +318,60 @@ export const ReceivingScanner: React.FC = () => {
       </Card>
 
       {/* Manual Entry / Physical Scanner */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Scan className="h-5 w-5" />
-            Physical Scanner Input
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="qr-code">QR Code (from physical scanner)</Label>
-            <Input
-              id="qr-code"
-              value={manualQRCode}
-              onChange={(e) => setManualQRCode(e.target.value)}
-              placeholder="Scan or enter QR code"
-              className="font-mono"
-              onKeyDown={(e) => e.key === 'Enter' && handleManualScan()}
-            />
-          </div>
+      {(
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Scan className="h-5 w-5" />
+              Physical Scanner Input
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="qr-code">QR Code (from physical scanner)</Label>
+              <Input
+                id="qr-code"
+                value={manualQRCode}
+                onChange={(e) => setManualQRCode(e.target.value)}
+                placeholder="Scan or enter QR code"
+                className="font-mono"
+                onKeyDown={(e) => e.key === 'Enter' && handleManualScan()}
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="condition">Material Condition on Receipt</Label>
-            <Select value={materialCondition} onValueChange={setMaterialCondition}>
-              <SelectTrigger id="condition">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="good">Good Condition</SelectItem>
-                <SelectItem value="minor_damage">Minor Damage</SelectItem>
-                <SelectItem value="damaged">Damaged</SelectItem>
-                <SelectItem value="excellent">Excellent</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="condition">Material Condition on Receipt</Label>
+              <Select value={materialCondition} onValueChange={setMaterialCondition}>
+                <SelectTrigger id="condition">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="good">Good Condition</SelectItem>
+                  <SelectItem value="minor_damage">Minor Damage</SelectItem>
+                  <SelectItem value="damaged">Damaged</SelectItem>
+                  <SelectItem value="excellent">Excellent</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="notes">Receiving Notes</Label>
-            <Textarea
-              id="notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Optional notes about received material"
-              rows={3}
-            />
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="notes">Receiving Notes</Label>
+              <Textarea
+                id="notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Optional notes about received material"
+                rows={3}
+              />
+            </div>
 
-          <Button onClick={handleManualScan} className="w-full bg-green-600 hover:bg-green-700" disabled={!allowAccess}>
-            <PackageCheck className="h-4 w-4 mr-2" />
-            Record Receipt Scan
-          </Button>
-        </CardContent>
-      </Card>
+            <Button onClick={handleManualScan} className="w-full bg-green-600 hover:bg-green-700" disabled={!canScan}>
+              <PackageCheck className="h-4 w-4 mr-2" />
+              Confirm Delivery
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Scan Results */}
       {scanResults.length > 0 && (
@@ -312,7 +379,7 @@ export const ReceivingScanner: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <CheckCircle className="h-5 w-5 text-green-500" />
-              Received Items ({scanResults.length})
+              Delivered Items ({scanResults.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -331,7 +398,7 @@ export const ReceivingScanner: React.FC = () => {
                   <div className="text-right">
                     <Badge className="bg-green-500 text-white">
                       <PackageCheck className="h-3 w-3 mr-1" />
-                      Received
+                      Delivered
                     </Badge>
                     <p className="text-xs text-muted-foreground mt-1">
                       {result.timestamp.toLocaleTimeString()}

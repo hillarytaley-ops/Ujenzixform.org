@@ -3,12 +3,13 @@ import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
+// FloatingSocialSidebar moved to App.tsx for global availability
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertCircle, Settings, Shield, ShoppingCart, Camera, Building2, Package, Truck, FileText, Eye, CheckCircle, Lock, Smartphone, Star, MessageCircle } from "lucide-react";
+import { AlertCircle, Settings, Shield, ShoppingCart, Camera, Building2, Package, Truck, FileText, Eye, CheckCircle, Lock, Smartphone, Star, MessageCircle, LogIn } from "lucide-react";
 import AnimatedSection from "@/components/AnimatedSection";
 import { BuilderGrid } from "@/components/builders/BuilderGrid";
 import { ContactBuilderModal } from "@/components/modals/ContactBuilderModal";
@@ -42,7 +43,7 @@ import { ErrorBoundary } from "@/components/ui/error-boundary";
 
 const Builders = () => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Start with false for instant display
   const [isAdmin, setIsAdmin] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const [selectedBuilder, setSelectedBuilder] = useState<UserProfile & {
@@ -78,13 +79,14 @@ const Builders = () => {
   }, [userProfile]);
 
   const checkUserProfile = async () => {
+    // Set loading to false immediately - show page while checking auth in background
+    setLoading(false);
+    
     try {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       
       // Handle missing auth session gracefully - this is expected when not logged in
       if (authError || !user) {
-        console.log('No authenticated user, showing public directory');
-        setLoading(false);
         return;
       }
 
@@ -109,8 +111,6 @@ const Builders = () => {
       }
     } catch (error) {
       console.error('Error checking user profile:', error);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -179,34 +179,136 @@ const Builders = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden">
+      {/* FloatingSocialSidebar now in App.tsx */}
       <Navigation />
 
-      {/* Hero Section */}
+      {/* Hero Section - Builders Using Technology */}
       <AnimatedSection animation="fadeInUp">
         <section 
-          className="text-white py-24 relative overflow-hidden"
+          className="text-white py-24 relative overflow-hidden min-h-[600px] flex items-center"
           role="banner"
           aria-labelledby="builders-hero-heading"
         >
-        {/* Professional Kenyan Construction Workers Planning Background - Zoomed Out */}
+        {/* KENYAN Professional Builders at Construction Site (Zoomed Out) */}
         <div 
-          className="absolute inset-0"
+          className="absolute inset-0 bg-no-repeat"
           style={{
-            backgroundImage: `url('/builders-hero-new.jpg?v=3'), url('/builders-hero-bg.jpg?v=1'), url('https://images.unsplash.com/photo-1487958449943-2429e8be8625?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')`,
-            backgroundSize: 'contain',
+            backgroundImage: `url('/builders-hero-bg.jpg')`,
+            backgroundSize: '100%',
             backgroundPosition: 'center center',
-            backgroundRepeat: 'no-repeat',
-            WebkitBackgroundSize: 'contain',
-            MozBackgroundSize: 'contain',
-            backgroundColor: '#2d3748'
           }}
-          role="img"
-          aria-label="Professional Kenyan construction workers in safety vests and hard hats reviewing architectural blueprints at active construction site with crane in background"
+          aria-label="Kenyan professional builders with hard hats reviewing blueprints at construction site"
         />
         
-        {/* Lighter overlay to show your beautiful image */}
-        <div className="absolute inset-0 bg-gradient-to-br from-black/50 via-gray-900/40 to-gray-800/40"></div>
+        {/* Dark Overlay for Text Readability */}
+        <div className="absolute inset-0 bg-gradient-to-r from-gray-900/90 via-gray-900/70 to-gray-900/80" />
+        
+        {/* Tech Grid Overlay */}
+        <div className="absolute inset-0 opacity-30" style={{
+          backgroundImage: `
+            linear-gradient(90deg, rgba(59, 130, 246, 0.3) 1px, transparent 1px),
+            linear-gradient(rgba(59, 130, 246, 0.3) 1px, transparent 1px)
+          `,
+          backgroundSize: '50px 50px'
+        }} />
+        
+        {/* Glowing Tech Accents */}
+        <div className="absolute top-20 left-20 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-20 right-20 w-72 h-72 bg-orange-500/20 rounded-full blur-3xl animate-pulse delay-500" />
+        
+        {/* Tech Icons Floating - Left Side */}
+        <div className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 flex flex-col gap-4 z-10">
+          <div className="p-3 bg-blue-600/80 rounded-xl backdrop-blur-sm shadow-lg shadow-blue-500/30 animate-bounce" style={{animationDuration: '3s'}}>
+            <Smartphone className="h-8 w-8 md:h-10 md:w-10 text-white" />
+          </div>
+          <div className="p-3 bg-orange-600/80 rounded-xl backdrop-blur-sm shadow-lg shadow-orange-500/30 animate-bounce" style={{animationDuration: '3.5s', animationDelay: '0.5s'}}>
+            <Settings className="h-8 w-8 md:h-10 md:w-10 text-white" />
+          </div>
+          <div className="p-3 bg-green-600/80 rounded-xl backdrop-blur-sm shadow-lg shadow-green-500/30 animate-bounce" style={{animationDuration: '4s', animationDelay: '1s'}}>
+            <CheckCircle className="h-8 w-8 md:h-10 md:w-10 text-white" />
+          </div>
+        </div>
+        
+        {/* Tech Icons Floating - Right Side */}
+        <div className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 flex flex-col gap-4 z-10">
+          <div className="p-3 bg-purple-600/80 rounded-xl backdrop-blur-sm shadow-lg shadow-purple-500/30 animate-bounce" style={{animationDuration: '3.2s'}}>
+            <Building2 className="h-8 w-8 md:h-10 md:w-10 text-white" />
+          </div>
+          <div className="p-3 bg-cyan-600/80 rounded-xl backdrop-blur-sm shadow-lg shadow-cyan-500/30 animate-bounce" style={{animationDuration: '3.7s', animationDelay: '0.3s'}}>
+            <Star className="h-8 w-8 md:h-10 md:w-10 text-white" />
+          </div>
+          <div className="p-3 bg-amber-600/80 rounded-xl backdrop-blur-sm shadow-lg shadow-amber-500/30 animate-bounce" style={{animationDuration: '4.2s', animationDelay: '0.7s'}}>
+            <Shield className="h-8 w-8 md:h-10 md:w-10 text-white" />
+          </div>
+        </div>
+        
+        {/* App Screenshot/Phone Mockup - Shows builders using the app */}
+        <div className="absolute bottom-8 right-8 md:right-16 hidden md:block z-10">
+          <div className="relative">
+            {/* Phone Frame */}
+            <div className="w-48 h-80 bg-gray-900 rounded-3xl p-2 shadow-2xl shadow-blue-500/30 border-4 border-gray-700 transform rotate-6 hover:rotate-0 transition-transform duration-500">
+              {/* Phone Screen */}
+              <div className="w-full h-full bg-gradient-to-b from-blue-600 to-blue-800 rounded-2xl overflow-hidden relative">
+                {/* App Header */}
+                <div className="bg-blue-700 p-3 text-center">
+                  <p className="text-white text-xs font-bold">MradiPro Builder App</p>
+                </div>
+                {/* App Content */}
+                <div className="p-3 space-y-2">
+                  <div className="bg-white/20 rounded-lg p-2">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4 text-white" />
+                      <span className="text-white text-xs">Active Projects: 5</span>
+                    </div>
+                  </div>
+                  <div className="bg-white/20 rounded-lg p-2">
+                    <div className="flex items-center gap-2">
+                      <Package className="h-4 w-4 text-orange-300" />
+                      <span className="text-white text-xs">Materials Ordered</span>
+                    </div>
+                  </div>
+                  <div className="bg-white/20 rounded-lg p-2">
+                    <div className="flex items-center gap-2">
+                      <Truck className="h-4 w-4 text-green-300" />
+                      <span className="text-white text-xs">2 Deliveries Today</span>
+                    </div>
+                  </div>
+                  <div className="bg-white/20 rounded-lg p-2">
+                    <div className="flex items-center gap-2">
+                      <Camera className="h-4 w-4 text-yellow-300" />
+                      <span className="text-white text-xs">Site Monitoring</span>
+                    </div>
+                  </div>
+                </div>
+                {/* Notification Badge */}
+                <div className="absolute top-2 right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center animate-pulse">
+                  <span className="text-white text-xs font-bold">3</span>
+                </div>
+              </div>
+            </div>
+            {/* "Builders Use This" Label */}
+            <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-orange-500 text-white px-4 py-1 rounded-full text-xs font-bold whitespace-nowrap shadow-lg">
+              📱 Builders Use This App!
+            </div>
+          </div>
+        </div>
+        
+        {/* Tech Features Banner - Bottom Left */}
+        <div className="absolute bottom-4 left-4 md:left-8 flex flex-col gap-2 z-10">
+          <div className="flex items-center gap-2 bg-blue-600/90 backdrop-blur-md px-4 py-2 rounded-lg border border-blue-400/50 shadow-lg">
+            <Smartphone className="h-5 w-5 text-white" />
+            <span className="text-sm font-bold text-white">Mobile App</span>
+          </div>
+          <div className="flex items-center gap-2 bg-orange-600/90 backdrop-blur-md px-4 py-2 rounded-lg border border-orange-400/50 shadow-lg">
+            <Eye className="h-5 w-5 text-white" />
+            <span className="text-sm font-bold text-white">Site Monitoring</span>
+          </div>
+          <div className="flex items-center gap-2 bg-green-600/90 backdrop-blur-md px-4 py-2 rounded-lg border border-green-400/50 shadow-lg">
+            <Package className="h-5 w-5 text-white" />
+            <span className="text-sm font-bold text-white">Material Tracking</span>
+          </div>
+        </div>
         
         <div className="container mx-auto px-4 text-center relative z-10">
           <div className="max-w-5xl mx-auto">
@@ -254,27 +356,51 @@ const Builders = () => {
               </Link>
               
               {!loading && (
-                userProfile ? (
-                  <Link to="/suppliers?tab=purchase">
-                <Button 
-                  size="lg"
-                  className="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
-                >
-                  <ShoppingCart className="h-5 w-5 mr-2" />
-                  Purchase Materials
-                </Button>
-              </Link>
-                ) : (
-                  <Link to="/auth">
+                // Only show Dashboard button to builders - not to suppliers or delivery providers
+                userProfile && userRoleState === 'builder' ? (
+                  <Link to="/builder-dashboard">
                     <Button 
                       size="lg"
-                      className="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
+                      className="bg-green-600 hover:bg-green-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
                     >
-                      <ShoppingCart className="h-5 w-5 mr-2" />
-                      Sign In to Purchase
+                      <Settings className="h-5 w-5 mr-2" />
+                      My Dashboard
                     </Button>
                   </Link>
-                )
+                ) : userProfile && userRoleState === 'supplier' ? (
+                  // Supplier is on Builders page - direct them to supplier dashboard
+                  <Link to="/supplier-dashboard">
+                    <Button 
+                      size="lg"
+                      className="bg-amber-600 hover:bg-amber-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
+                    >
+                      <Settings className="h-5 w-5 mr-2" />
+                      Supplier Dashboard
+                    </Button>
+                  </Link>
+                ) : userProfile && userRoleState === 'delivery' ? (
+                  // Delivery provider is on Builders page - direct them to delivery dashboard
+                  <Link to="/delivery-dashboard">
+                    <Button 
+                      size="lg"
+                      className="bg-purple-600 hover:bg-purple-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
+                    >
+                      <Settings className="h-5 w-5 mr-2" />
+                      Delivery Dashboard
+                    </Button>
+                  </Link>
+                ) : !userProfile ? (
+                  // Not logged in - show sign in for builder dashboard
+                  <Link to="/builder-signin?redirect=/builder-dashboard">
+                    <Button 
+                      size="lg"
+                      className="bg-green-600 hover:bg-green-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
+                    >
+                      <Lock className="h-5 w-5 mr-2" />
+                      Sign In to Dashboard
+                    </Button>
+                  </Link>
+                ) : null
               )}
             </div>
 
@@ -626,12 +752,27 @@ const Builders = () => {
         ) : (
           /* Public Directory with Enhanced Search */
           <div className="space-y-8">
-            {/* Login Portal for Builders - Only show if not logged in */}
+            {/* Login Portal for Builders - Only show to non-logged-in users */}
             {!userProfile && (
               <div className="bg-white/95 backdrop-blur-sm rounded-2xl border-2 border-white/50 shadow-2xl p-6">
                 <LoginPortal 
                   type="builder"
+                  redirectTo="/builder-dashboard"
+                  title="Builder Dashboard Access"
+                  description="Sign in to access your builder dashboard, manage projects, and track deliveries"
                 />
+              </div>
+            )}
+            
+            {/* Show notice to suppliers/delivery providers that this is a builders directory */}
+            {userProfile && userRoleState && userRoleState !== 'builder' && userRoleState !== 'admin' && (
+              <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-6 text-center">
+                <p className="text-amber-800 font-medium">
+                  👋 You're viewing the Builders Directory as a <strong className="capitalize">{userRoleState}</strong>.
+                </p>
+                <p className="text-amber-700 text-sm mt-1">
+                  Browse and connect with certified builders for your construction projects.
+                </p>
               </div>
             )}
 
@@ -639,7 +780,7 @@ const Builders = () => {
               <div className="bg-white/95 backdrop-blur-sm rounded-2xl border-2 border-white/50 shadow-2xl p-6">
                 <EnhancedSearch 
                   onSearchChange={(filters) => {
-                    console.log('Search filters:', filters);
+                    // Search filters updated
                   }}
                 />
               </div>

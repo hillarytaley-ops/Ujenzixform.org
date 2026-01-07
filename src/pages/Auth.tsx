@@ -36,7 +36,8 @@ const Auth = () => {
   const urlParams = new URLSearchParams(window.location.search);
   const redirectTo = urlParams.get('redirect') || null;
   const liteParam = urlParams.get('lite');
-  const liteMode = (liteParam === '1') || !!redirectTo;
+  // Only use lite mode if explicitly requested with lite=1, NOT just because there's a redirect
+  const liteMode = liteParam === '1';
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -527,15 +528,30 @@ const Auth = () => {
           </CardHeader>
           <CardContent>{authTabs}</CardContent>
         </Card>
-        <div className="mt-6 text-center bg-white/90 backdrop-blur-sm rounded-lg p-4 border border-white/50">
-          <Link 
-            to="/admin-login"
-            className="text-sm text-gray-700 hover:text-blue-600 underline flex items-center justify-center gap-2 transition-colors font-medium"
-          >
-            <span>🔒</span>
-            <span>MradiPro Staff? Use Admin Portal</span>
-          </Link>
-        </div>
+        {/* Admin Access Card - Compact & Centered */}
+        <Card className="mt-4 max-w-xs mx-auto bg-gradient-to-br from-slate-900 to-slate-800 border-slate-700 shadow-xl">
+          <CardContent className="p-4 text-center">
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg">
+                <KeyRound className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold text-white">Admin Access</h4>
+                <p className="text-xs text-slate-400 mt-0.5">MradiPro Staff Only</p>
+              </div>
+              <Link to="/admin-login" className="w-full mt-1">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="w-full bg-transparent border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white hover:border-slate-500 text-xs h-8"
+                >
+                  <KeyRound className="h-3 w-3 mr-1.5" />
+                  Staff Portal
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
       </AnimatedSection>
     </div>
   );

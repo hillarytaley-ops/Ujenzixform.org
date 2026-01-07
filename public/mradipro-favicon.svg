@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Background circle -->
+  <circle cx="32" cy="32" r="30" fill="#0F2C59"/>
+  
+  <!-- Inner circle -->
+  <circle cx="32" cy="32" r="24" fill="#ffffff"/>
+  
+  <!-- M letter with swoosh -->
+  <g transform="translate(14, 18)">
+    <!-- Main M shape -->
+    <path d="M4 28V8h4l8 12 8-12h4v20h-4V14l-6 9h-4l-6-9v14H4z" fill="#0F2C59"/>
+    
+    <!-- Blue swoosh/arc -->
+    <path d="M2 22c4-6 12-8 20-6 4 1 8 3 12 6" stroke="#4A9FD8" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    
+    <!-- Light blue accent lines -->
+    <path d="M18 6c2-1 4-1 6 0" stroke="#7BB8E0" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <path d="M16 8c3-1 6-1 9 0" stroke="#9ECAE9" stroke-width="1" fill="none" stroke-linecap="round"/>
+  </g>
+</svg>
+
+
+
+
+
+
+

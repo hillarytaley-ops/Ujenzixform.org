@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { SectionLoader } from '@/components/ui/DashboardLoader';
 import { BarChart, Package, TrendingUp, Clock, CheckCircle, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -105,7 +106,7 @@ export const AdminScanDashboard: React.FC = () => {
   };
 
   if (loading) {
-    return <div className="p-6">Loading dashboard...</div>;
+    return <SectionLoader message="Loading scan dashboard..." className="p-6 h-48" />;
   }
 
   if (userRole !== 'admin') {

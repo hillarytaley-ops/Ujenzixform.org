@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,7 +33,9 @@ import {
   BarChart3,
   Users,
   Zap,
-  Shield
+  Shield,
+  ShoppingCart,
+  MessageSquare
 } from "lucide-react";
 // Lazy load these components to prevent errors from breaking the page
 // Load only when needed for better performance
@@ -54,11 +58,29 @@ const DeliverySecurityDashboard = React.lazy(() =>
 );
 
 const Delivery = () => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const { userRole: authUserRole, user: authUser } = useAuth();
   const [activeTab, setActiveTab] = useState("request");
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [isMobile, setIsMobile] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(authUserRole);
+  const [user, setUser] = useState<any>(authUser);
+  const [loading, setLoading] = useState(false); // Start with false - show content immediately
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 768);
+
+  // Handler for Request Quote and Buy Now buttons
+  // Builders go to supplier marketplace, others go to builder registration
+  const handlePurchaseAction = (action: 'quote' | 'buy') => {
+    if (authUserRole === 'builder' || authUserRole === 'admin') {
+      // Builders and admins go to supplier marketplace
+      navigate('/supplier-marketplace');
+    } else if (authUser) {
+      // Logged in but not a builder - redirect to builder registration
+      navigate('/builder-registration');
+    } else {
+      // Not logged in - redirect to builder registration (will need to sign up first)
+      navigate('/builder-registration');
+    }
+  };
   
   // Prefetch likely next pages for instant navigation - especially critical on mobile
   useEffect(() => {
@@ -121,9 +143,24 @@ const Delivery = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Use auth context values first, then check database in background
   useEffect(() => {
+    // If we already have role from context, use it
+    if (authUserRole) {
+      setUserRole(authUserRole);
+      setUser(authUser);
+      return;
+    }
+    
+    // Check localStorage for cached role
+    const cachedRole = localStorage.getItem('user_role');
+    if (cachedRole) {
+      setUserRole(cachedRole);
+    }
+    
+    // Background check for database role (non-blocking)
     checkUserRole();
-  }, []);
+  }, [authUserRole, authUser]);
 
   const checkUserRole = async () => {
     try {
@@ -131,11 +168,7 @@ const Delivery = () => {
       
       // Handle no user gracefully (public access allowed)
       if (authError || !user) {
-        console.log('No authenticated user, showing public delivery page');
-        setUser(null);
-        setUserRole(null);
-        setLoading(false);
-        return;
+        return; // Don't update state, keep showing public view
       }
 
       setUser(user);
@@ -146,14 +179,12 @@ const Delivery = () => {
         .limit(1)
         .maybeSingle();
       
-      setUserRole((roleData?.role as any) || null);
+      if (roleData?.role) {
+        setUserRole(roleData.role as any);
+      }
     } catch (error) {
       console.error('Error checking user role:', error);
-      // Don't crash, just set defaults
-      setUser(null);
-      setUserRole(null);
-    } finally {
-      setLoading(false);
+      // Don't crash, keep current state
     }
   };
 
@@ -163,9 +194,12 @@ const Delivery = () => {
     setDeliveryForm(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmitRequest = () => {
+  const handleSubmitRequest = async () => {
+    // Generate tracking number
+    const trackingNumber = `DEL-${Date.now()}`;
+    
     const newDelivery = {
-      id: `DEL-${String(deliveries.length + 1).padStart(3, '0')}`,
+      id: trackingNumber,
       materialType: deliveryForm.materialType,
       quantity: `${deliveryForm.quantity} ${deliveryForm.unit}`,
       status: "pending" as const,
@@ -177,7 +211,83 @@ const Delivery = () => {
       progress: 0
     };
 
-    setDeliveries(prev => [newDelivery, ...prev]);
+    try {
+      // Get current user session
+      const { data: sessionData } = await supabase.auth.getSession();
+      
+      // Get user's profile ID
+      let builderId = sessionData?.session?.user?.id;
+      
+      if (!builderId && sessionData?.session?.user?.id) {
+        const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzI0NTQwNjIsImV4cCI6MjA0ODAzMDA2Mn0.vu4KlLJLKlJmYb2b4R8MxpVKv0izRdkXC_FVwVRT0LM';
+        
+        const profileResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/profiles?id=eq.${sessionData.session.user.id}&select=id`,
+          {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${sessionData.session.access_token}`
+            }
+          }
+        );
+        const profileData = await profileResponse.json();
+        if (profileData && profileData[0]) {
+          builderId = profileData[0].id;
+        }
+      }
+
+      // Save to deliveries table using direct fetch
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzI0NTQwNjIsImV4cCI6MjA0ODAzMDA2Mn0.vu4KlLJLKlJmYb2b4R8MxpVKv0izRdkXC_FVwVRT0LM';
+      
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/deliveries`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${sessionData?.session?.access_token || SUPABASE_ANON_KEY}`,
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({
+          tracking_number: trackingNumber,
+          builder_id: builderId,
+          pickup_address: deliveryForm.pickupAddress,
+          delivery_address: deliveryForm.deliveryAddress,
+          material_type: deliveryForm.materialType,
+          quantity: `${deliveryForm.quantity} ${deliveryForm.unit}`,
+          contact_name: deliveryForm.contactName,
+          contact_phone: deliveryForm.contactPhone,
+          preferred_date: deliveryForm.preferredDate || null,
+          preferred_time: deliveryForm.preferredTime || null,
+          special_instructions: deliveryForm.specialInstructions || null,
+          urgency: deliveryForm.urgency,
+          status: 'pending'
+        })
+      });
+
+      if (!response.ok) {
+        console.error('Delivery submission error:', await response.text());
+        throw new Error('Failed to submit delivery request');
+      }
+
+      // Update local state
+      setDeliveries(prev => [newDelivery, ...prev]);
+      
+      toast({
+        title: "Delivery Request Submitted!",
+        description: `Tracking number: ${trackingNumber}`,
+      });
+      
+    } catch (error) {
+      console.error('Error submitting delivery:', error);
+      toast({
+        title: "Error",
+        description: "Failed to submit delivery request. Please try again.",
+        variant: "destructive"
+      });
+      return;
+    }
     
     setDeliveryForm({
       materialType: "",
@@ -218,42 +328,27 @@ const Delivery = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-construction flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="text-muted-foreground">Loading delivery services...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gradient-construction">
       <Navigation />
       
-      {/* Enhanced Hero Section */}
-      <AnimatedSection animation="fadeInUp">
-        <section className="text-white py-20 relative overflow-hidden">
-          {/* Your Custom Delivery Tracking Image - Yellow Truck & GPS - Optimized for mobile */}
-          <div 
-            className="absolute inset-0"
-            style={{
-              backgroundImage: `url('/delivery-hero-bg.jpg?v=3'), url('/delivery-hero-bg.jpg'), url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080"%3E%3Crect fill="%23f5f5f0" width="1920" height="1080"/%3E%3C/svg%3E')`,
-              backgroundSize: window.innerWidth < 768 ? 'cover' : 'contain', // Cover on mobile, contain on desktop
-              backgroundPosition: 'center center',
-              backgroundRepeat: 'no-repeat',
-              WebkitBackgroundSize: window.innerWidth < 768 ? 'cover' : 'contain',
-              MozBackgroundSize: window.innerWidth < 768 ? 'cover' : 'contain',
-              backgroundColor: '#374151',
-              willChange: 'auto' // Remove will-change for better performance
-            }}
-            role="img"
-            aria-label="Delivery truck and GPS tracking system"
-          />
-          {/* Light overlay to maintain text readability */}
-          <div className="absolute inset-0 bg-gradient-to-br from-black/40 via-gray-900/30 to-black/40"></div>
+      {/* Enhanced Hero Section - Optimized for fast loading */}
+      <section className="text-white py-20 relative overflow-hidden">
+        {/* Base gradient background (shows immediately) */}
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-800 via-blue-900 to-gray-900" />
+        
+        {/* Background image loads in background */}
+        <img 
+          src="/delivery-hero-bg.jpg"
+          alt=""
+          loading="eager"
+          className={`absolute inset-0 w-full h-full ${isMobile ? 'object-cover' : 'object-contain'}`}
+          onLoad={(e) => (e.target as HTMLImageElement).style.opacity = '1'}
+          style={{ opacity: 0, transition: 'opacity 0.3s ease-in-out', backgroundColor: '#374151' }}
+        />
+        
+        {/* Light overlay to maintain text readability */}
+        <div className="absolute inset-0 bg-gradient-to-br from-black/40 via-gray-900/30 to-black/40"></div>
         <div className="container mx-auto px-4 text-center relative z-10">
           <Badge className="mb-6 bg-gradient-to-r from-gray-700 to-blue-600 text-white px-6 py-2 text-lg font-semibold">
             🇰🇪 Kenya's Premier Delivery Network
@@ -295,6 +390,42 @@ const Delivery = () => {
             </Button>
             </Link>
           </div>
+
+          {/* Purchase Action Buttons - Request Quote & Buy Now */}
+          <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 justify-center mb-6 md:mb-8 px-4">
+            <Button 
+              size="lg"
+              onClick={() => handlePurchaseAction('quote')}
+              className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-semibold px-6 sm:px-8 py-4 sm:py-6 text-base sm:text-lg shadow-xl w-full sm:w-auto"
+            >
+              <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+              <span className="whitespace-nowrap">Request Quote</span>
+            </Button>
+            
+            <Button 
+              size="lg"
+              onClick={() => handlePurchaseAction('buy')}
+              className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold px-6 sm:px-8 py-4 sm:py-6 text-base sm:text-lg shadow-xl w-full sm:w-auto"
+            >
+              <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+              <span className="whitespace-nowrap">Buy Now</span>
+            </Button>
+          </div>
+          
+          {/* Info badge for non-builders */}
+          {!authUserRole || (authUserRole !== 'builder' && authUserRole !== 'admin') ? (
+            <div className="text-center mb-4">
+              <Badge className="bg-yellow-500/20 text-yellow-200 border-yellow-400/30 px-4 py-2">
+                💡 Register as a Builder to access our Supplier Marketplace
+              </Badge>
+            </div>
+          ) : (
+            <div className="text-center mb-4">
+              <Badge className="bg-green-500/20 text-green-200 border-green-400/30 px-4 py-2">
+                ✅ You have access to the Supplier Marketplace
+              </Badge>
+            </div>
+          )}
           
           {/* Delivery Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -317,32 +448,60 @@ const Delivery = () => {
           </div>
         </div>
         </section>
-      </AnimatedSection>
 
       <main className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-8">
         </div>
 
-        {/* Become a Provider Call-to-Action */}
-        <Card className="max-w-4xl mx-auto mb-8 border-primary bg-primary/5">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-xl font-semibold mb-2">Become a Delivery Provider</h3>
-                <p className="text-muted-foreground">
-                  Join our network of trusted delivery partners and grow your business with UjenziPro
-                </p>
+        {/* Delivery Provider Portal Cards */}
+        <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto mb-8">
+          {/* Sign In Portal */}
+          <Card className="border-teal-200 bg-gradient-to-br from-teal-50 to-white">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-teal-100 rounded-full flex items-center justify-center">
+                  <User className="h-7 w-7 text-teal-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-semibold mb-1 text-teal-800">Delivery Provider Portal</h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Already a provider? Sign in to access your dashboard
+                  </p>
+                  <Link to="/delivery-signin">
+                    <Button className="bg-teal-600 hover:bg-teal-700 text-white">
+                      <Truck className="h-4 w-4 mr-2" />
+                      Sign In to Dashboard
+                    </Button>
+                  </Link>
+                </div>
               </div>
-              <Button asChild className="flex items-center gap-2">
-                <a href="/delivery/apply">
-                  <Truck className="h-4 w-4" />
-                  Apply Now
-                </a>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+
+          {/* Become a Provider */}
+          <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-white">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center">
+                  <Truck className="h-7 w-7 text-blue-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-semibold mb-1 text-blue-800">Become a Delivery Provider</h3>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Join our network of trusted delivery partners
+                  </p>
+                  <Link to="/delivery/apply">
+                    <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                      <Users className="h-4 w-4 mr-2" />
+                      Apply Now
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Main Content */}
         {isAdmin ? (

@@ -18,14 +18,23 @@ export const SimpleChatButton = () => {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
+  const [showHumanSupport, setShowHumanSupport] = useState(false);
 
   // Hide MradiPro chat on auth pages (login, signup, password reset)
-  const authPages = ['/auth', '/admin-login', '/reset-password'];
+  // Must be AFTER all hooks are defined
+  const authPages = [
+    '/',
+    '/auth',
+    '/admin-auth',
+    '/admin-login',
+    '/builder-signin',
+    '/supplier-signin',
+    '/delivery-signin',
+    '/reset-password',
+  ];
   if (authPages.includes(location.pathname)) {
     return null;
   }
-  
-  const [showHumanSupport, setShowHumanSupport] = useState(false);
 
   // Enhanced AI Response Engine - Kenya Construction Knowledge
   const getAIResponse = async (userQuery: string): Promise<{ response: string; suggestions?: string[] }> => {
@@ -159,10 +168,10 @@ export const SimpleChatButton = () => {
 
   return (
     <div 
-      className="fixed bottom-6 right-6 z-[9999]"
+      className="fixed bottom-6 right-6 z-[9999] max-w-[calc(100vw-48px)]"
       style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 9999 }}
     >
-      <Card className="w-96 shadow-2xl">
+      <Card className="w-96 max-w-[calc(100vw-48px)] shadow-2xl">
         <div className="bg-blue-600 text-white p-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Bot className="h-5 w-5" />

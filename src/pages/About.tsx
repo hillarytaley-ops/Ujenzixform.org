@@ -2,7 +2,28 @@ import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Users, Target, Award, Globe, Shield, ExternalLink, SkipForward } from "lucide-react";
+import { 
+  Users, 
+  Target, 
+  Award, 
+  Globe, 
+  Shield, 
+  ExternalLink, 
+  SkipForward,
+  Building2,
+  Truck,
+  MapPin,
+  CheckCircle2,
+  Star,
+  TrendingUp,
+  Heart,
+  Lightbulb,
+  Handshake,
+  ArrowRight,
+  Play,
+  Quote
+} from "lucide-react";
+import { Link } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import AnimatedSection from "@/components/AnimatedSection";
@@ -16,57 +37,50 @@ const About: React.FC = () => {
   });
 
   useEffect(() => {
-    // Performance monitoring
     const startTime = performance.now();
     
-    // Track page load performance
     const handleLoad = () => {
       const loadTime = performance.now() - startTime;
       setPerformanceMetrics(prev => ({ ...prev, loadTime }));
     };
     
     window.addEventListener('load', handleLoad);
-
-    // Track render performance
     const renderTime = performance.now() - startTime;
     setPerformanceMetrics(prev => ({ ...prev, renderTime }));
 
-    // Basic page view tracking (privacy-conscious)
     const views = parseInt(localStorage.getItem('about-page-views') || '0') + 1;
     setPageViews(views);
     localStorage.setItem('about-page-views', views.toString());
-
-    // Security monitoring - log page access
-    console.info('About page accessed', {
-      timestamp: new Date().toISOString(),
-      userAgent: navigator.userAgent.slice(0, 50), // Limited for privacy
-      referrer: document.referrer ? 'has-referrer' : 'direct', // Privacy-safe
-    });
 
     return () => {
       window.removeEventListener('load', handleLoad);
     };
   }, []);
+
   const values = [
     {
       icon: Target,
       title: "Our Mission", 
-      description: "To revolutionize Kenya's construction industry by creating seamless connections between builders and suppliers, fostering growth and innovation."
+      description: "To revolutionize Kenya's construction industry by creating seamless connections between builders and suppliers, fostering growth and innovation.",
+      color: "from-blue-500 to-cyan-500"
     },
     {
       icon: Users,
       title: "Community First",
-      description: "We believe in building strong relationships and supporting local businesses to create a thriving construction ecosystem."
+      description: "We believe in building strong relationships and supporting local businesses to create a thriving construction ecosystem.",
+      color: "from-green-500 to-emerald-500"
     },
     {
       icon: Award,
       title: "Quality Assurance",
-      description: "Every supplier and builder on our platform is verified to ensure the highest standards of quality and reliability."
+      description: "Every supplier and builder on our platform is verified to ensure the highest standards of quality and reliability.",
+      color: "from-orange-500 to-amber-500"
     },
     {
       icon: Globe,
       title: "National Reach",
-      description: "Connecting construction professionals across all 47 counties of Kenya, from Nairobi to remote rural areas."
+      description: "Connecting construction professionals across all 47 counties of Kenya, from Nairobi to remote rural areas.",
+      color: "from-purple-500 to-pink-500"
     }
   ];
 
@@ -91,37 +105,12 @@ const About: React.FC = () => {
     }
   ];
 
-  // Structured data for SEO
-  const structuredData = {
-    "@context": "https://schema.org",
-    "@type": "Organization",
-    "name": "UjenziPro",
-    "description": "Kenya's leading construction platform connecting builders with trusted suppliers",
-    "url": "https://ujenzipro.com",
-    "logo": "https://ujenzipro.com/logo.png",
-    "foundingDate": "2023",
-    "founders": [
-      {
-        "@type": "Person",
-        "name": "Sila Kapting'ei",
-        "jobTitle": "CEO"
-      },
-      {
-        "@type": "Person", 
-        "name": "Hillary Kaptng'ei",
-        "jobTitle": "CTO & Founder"
-      }
-    ],
-    "address": {
-      "@type": "PostalAddress",
-      "addressCountry": "Kenya",
-      "addressLocality": "Nairobi"
-    },
-    "sameAs": [
-      "https://linkedin.com/company/ujenzipro",
-      "https://twitter.com/ujenzipro"
-    ]
-  };
+  const milestones = [
+    { year: "2023", title: "Founded", description: "MradiPro was born in Nairobi" },
+    { year: "2023", title: "100+ Users", description: "First hundred builders joined" },
+    { year: "2024", title: "47 Counties", description: "Nationwide coverage achieved" },
+    { year: "2024", title: "1000+ Projects", description: "Milestone projects completed" },
+  ];
 
   return (
     <>
@@ -141,172 +130,283 @@ const About: React.FC = () => {
       <div className="min-h-screen bg-background">
         <Navigation />
 
-        {/* Hero Section */}
-        <AnimatedSection animation="fadeInUp">
-          <section 
-            className="text-white py-24 relative overflow-hidden"
-            role="banner"
-            aria-labelledby="hero-heading"
-          >
-          {/* Clean professional background */}
-          <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-blue-900 to-gray-800"></div>
-          
-          {/* Overlay with Kenyan flag colors gradient */}
-          <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-gray-900/40 to-gray-800/40"></div>
-          
-          <div className="container mx-auto px-4 text-center relative z-10">
-            <Badge className="mb-6 bg-gradient-to-r from-green-600 to-red-600 text-white border-white/30 px-4 py-2 text-lg font-semibold" aria-label="Proudly Kenyan company">
-              🇰🇪 Proudly Kenyan - Building the Future
-            </Badge>
-            <h1 id="hero-heading" className="text-6xl md:text-7xl font-bold mb-8 text-white drop-shadow-2xl">
-              About MradiPro
-            </h1>
-            <p className="text-2xl md:text-3xl max-w-4xl mx-auto text-white font-medium drop-shadow-lg leading-relaxed">
-              Transforming Kenya's construction industry through technology, 
-              connecting builders with trusted suppliers across all 47 counties
-            </p>
-            <div className="mt-8 flex flex-wrap justify-center gap-4 text-white/90">
-              <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full backdrop-blur-sm">
-                <Globe className="h-5 w-5" />
-                <span className="font-medium">All 47 Counties</span>
-              </div>
-              <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full backdrop-blur-sm">
-                <Users className="h-5 w-5" />
-                <span className="font-medium">1,000+ Builders</span>
-              </div>
-              <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full backdrop-blur-sm">
-                <Award className="h-5 w-5" />
-                <span className="font-medium">500+ Suppliers</span>
-              </div>
+        {/* Hero Section - Professional with Construction Theme */}
+        <section className="relative overflow-hidden">
+          {/* Background Image with Overlay */}
+          <div className="absolute inset-0">
+            <div 
+              className="absolute inset-0 bg-cover bg-center"
+              style={{
+                backgroundImage: `url('https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=1920&q=80')`,
+              }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-br from-slate-900/95 via-blue-900/90 to-slate-900/95" />
+          </div>
+
+          {/* Animated Elements */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl animate-pulse" />
+            <div className="absolute bottom-20 right-10 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+          </div>
+
+          {/* Grid Pattern Overlay */}
+          <div 
+            className="absolute inset-0 opacity-5"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+            }}
+          />
+
+          <div className="relative container mx-auto px-4 py-20 md:py-32">
+            <div className="max-w-5xl mx-auto text-center">
+              {/* Badge */}
+              <AnimatedSection animation="fadeInUp">
+                <Badge className="mb-6 bg-gradient-to-r from-green-600 to-emerald-600 text-white border-0 px-6 py-2 text-base font-semibold shadow-lg">
+                  🇰🇪 Proudly Kenyan - Building the Future
+                </Badge>
+              </AnimatedSection>
+
+              {/* Main Heading */}
+              <AnimatedSection animation="fadeInUp" delay={100}>
+                <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight">
+                  <span className="bg-gradient-to-r from-white via-blue-200 to-white bg-clip-text text-transparent">
+                    About MradiPro
+                  </span>
+                </h1>
+              </AnimatedSection>
+
+              {/* Subtitle */}
+              <AnimatedSection animation="fadeInUp" delay={200}>
+                <p className="text-xl md:text-2xl text-gray-300 mb-8 max-w-3xl mx-auto leading-relaxed">
+                  Transforming Kenya's construction industry through technology, 
+                  connecting <span className="text-cyan-400 font-semibold">builders</span> with trusted{" "}
+                  <span className="text-green-400 font-semibold">suppliers</span> across all 47 counties
+                </p>
+              </AnimatedSection>
+
+              {/* CTA Buttons */}
+              <AnimatedSection animation="fadeInUp" delay={300}>
+                <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
+                  <Button 
+                    size="lg"
+                    className="bg-white text-slate-900 hover:bg-gray-100 font-semibold px-8 py-6 text-lg shadow-xl"
+                    asChild
+                  >
+                    <Link to="/builder-registration">
+                      <Building2 className="h-5 w-5 mr-2" />
+                      Join as Builder
+                    </Link>
+                  </Button>
+                  <Button 
+                    size="lg"
+                    variant="outline"
+                    className="border-white/30 text-white hover:bg-white/10 font-semibold px-8 py-6 text-lg"
+                    asChild
+                  >
+                    <Link to="/supplier-registration">
+                      <Truck className="h-5 w-5 mr-2" />
+                      Join as Supplier
+                    </Link>
+                  </Button>
+                </div>
+              </AnimatedSection>
+
+              {/* Hero Stats */}
+              <AnimatedSection animation="fadeInUp" delay={400}>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 max-w-4xl mx-auto">
+                  <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 md:p-6">
+                    <div className="text-3xl md:text-4xl font-bold text-white mb-1">47</div>
+                    <div className="text-sm text-gray-400">Counties Covered</div>
+                  </div>
+                  <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 md:p-6">
+                    <div className="text-3xl md:text-4xl font-bold text-green-400 mb-1">1000+</div>
+                    <div className="text-sm text-gray-400">Active Builders</div>
+                  </div>
+                  <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 md:p-6">
+                    <div className="text-3xl md:text-4xl font-bold text-blue-400 mb-1">500+</div>
+                    <div className="text-sm text-gray-400">Verified Suppliers</div>
+                  </div>
+                  <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 md:p-6">
+                    <div className="text-3xl md:text-4xl font-bold text-yellow-400 mb-1">KSh 2B+</div>
+                    <div className="text-sm text-gray-400">Transactions</div>
+                  </div>
+                </div>
+              </AnimatedSection>
             </div>
           </div>
-          </section>
-        </AnimatedSection>
+
+          {/* Bottom Wave */}
+          <div className="absolute bottom-0 left-0 right-0">
+            <svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full">
+              <path d="M0 120L60 110C120 100 240 80 360 70C480 60 600 60 720 65C840 70 960 80 1080 85C1200 90 1320 90 1380 90L1440 90V120H1380C1320 120 1200 120 1080 120C960 120 840 120 720 120C600 120 480 120 360 120C240 120 120 120 60 120H0Z" fill="currentColor" className="text-background"/>
+            </svg>
+          </div>
+        </section>
 
         {/* Our Story Section */}
-        <AnimatedSection animation="fadeInUp">
-          <section className="py-20 bg-muted" role="main" aria-labelledby="story-heading" id="main-content" tabIndex={-1}>
-            <div className="container mx-auto px-4">
-              <div className="max-w-4xl mx-auto">
-                <h2 id="story-heading" className="text-4xl font-bold text-center mb-12">Our Story</h2>
-              <div className="prose prose-lg mx-auto">
-                <p className="text-lg leading-relaxed mb-6 text-muted-foreground">
-                  MradiPro was born from a simple observation: Kenya's construction industry needed
-                  not just better connections, but complete project visibility. As builders struggled to find 
-                  reliable suppliers and track their material deliveries, while suppliers couldn't efficiently 
-                  reach their ideal customers, we saw an opportunity to revolutionize the entire construction workflow.
-                </p>
-                <p className="text-lg leading-relaxed mb-6 text-muted-foreground">
-                  Founded in 2023 by a team of construction industry veterans and technology experts, 
-                  we've quickly grown to become Kenya's leading platform for construction professionals. 
-                  Our comprehensive solution goes beyond simple connections - we provide real-time project tracking, 
-                  delivery management, and complete transparency throughout the construction supply chain.
-                </p>
-                <p className="text-lg leading-relaxed text-muted-foreground">
-                  Today, we're proud to serve thousands of builders and suppliers across all 47 counties, 
-                  facilitating millions of shillings in transactions, tracking thousands of deliveries, 
-                  and providing complete project visibility that's helping build the Kenya of tomorrow.
-                </p>
-              </div>
-            </div>
-          </div>
-          </section>
-        </AnimatedSection>
-
-        {/* Values Section */}
-        <section className="py-24 relative overflow-hidden" aria-labelledby="values-heading">
-          {/* Clean values background */}
-          <div className="absolute inset-0 bg-gradient-to-br from-gray-50 via-blue-50/30 to-gray-100"></div>
-          
-          <div className="container mx-auto px-4 relative z-10">
-            <h2 id="values-heading" className="text-5xl font-bold text-center mb-4 text-gray-900 drop-shadow-sm">Our Values</h2>
-            <p className="text-xl text-center mb-16 text-gray-700 max-w-3xl mx-auto">
-              Built on the foundation of Kenyan values: Ubuntu, integrity, and community strength
-            </p>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-              {values.map((value, index) => (
-                <AnimatedSection key={`value-${index}`} animation="fadeInUp" delay={index * 100}>
-                  <Card 
-                    className="text-center hover:shadow-2xl transition-all duration-300 focus-within:ring-2 focus-within:ring-primary bg-white/90 backdrop-blur-sm border-2 border-white/50 hover:bg-white/95"
-                    tabIndex={0}
-                  >
-                  <CardHeader className="pb-4">
-                    <div className="mx-auto mb-6 p-6 bg-gradient-to-br from-green-500 to-red-500 rounded-full w-fit shadow-lg">
-                      <value.icon className="h-10 w-10 text-white" aria-hidden="true" />
+        <section className="py-20 bg-background" id="main-content" tabIndex={-1}>
+          <div className="container mx-auto px-4">
+            <div className="max-w-6xl mx-auto">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                {/* Story Content */}
+                <AnimatedSection animation="fadeInUp">
+                  <div>
+                    <Badge variant="outline" className="mb-4">Our Story</Badge>
+                    <h2 className="text-4xl md:text-5xl font-bold mb-6">
+                      Building Kenya's <span className="text-primary">Future</span> Together
+                    </h2>
+                    <div className="space-y-4 text-lg text-muted-foreground">
+                      <p>
+                        MradiPro was born from a simple observation: Kenya's construction industry needed
+                        not just better connections, but complete project visibility.
+                      </p>
+                      <p>
+                        Founded in 2023 by a team of construction industry veterans and technology experts, 
+                        we've quickly grown to become Kenya's leading platform for construction professionals.
+                      </p>
+                      <p>
+                        Today, we're proud to serve thousands of builders and suppliers across all 47 counties, 
+                        facilitating millions of shillings in transactions and helping build the Kenya of tomorrow.
+                      </p>
                     </div>
-                    <CardTitle className="text-2xl font-bold text-gray-900 mb-2">{value.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription className="text-lg text-gray-700 leading-relaxed">{value.description}</CardDescription>
-                  </CardContent>
-                  </Card>
+                    <div className="mt-8 flex flex-wrap gap-4">
+                      <div className="flex items-center gap-2 text-sm">
+                        <CheckCircle2 className="h-5 w-5 text-green-500" />
+                        <span>Trusted Platform</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <CheckCircle2 className="h-5 w-5 text-green-500" />
+                        <span>Verified Partners</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <CheckCircle2 className="h-5 w-5 text-green-500" />
+                        <span>Secure Transactions</span>
+                      </div>
+                    </div>
+                  </div>
                 </AnimatedSection>
-              ))}
-            </div>
-            
-            {/* Kenyan Construction Philosophy */}
-            <div className="mt-16 text-center">
-              <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-8 border border-white/30 max-w-3xl mx-auto">
-                <h3 className="text-2xl font-bold mb-4 text-gray-900">Ubuntu in Construction</h3>
-                <p className="text-lg text-gray-800 italic">
-                  "I am because we are" - Our success is built on the success of every builder, 
-                  supplier, and construction professional in Kenya.
-                </p>
+
+                {/* Timeline */}
+                <AnimatedSection animation="fadeInUp" delay={200}>
+                  <div className="bg-muted/50 rounded-2xl p-8">
+                    <h3 className="text-xl font-semibold mb-6">Our Journey</h3>
+                    <div className="space-y-6">
+                      {milestones.map((milestone, index) => (
+                        <div key={index} className="flex gap-4">
+                          <div className="flex flex-col items-center">
+                            <div className="w-10 h-10 bg-primary text-primary-foreground rounded-full flex items-center justify-center font-bold text-sm">
+                              {milestone.year.slice(2)}
+                            </div>
+                            {index < milestones.length - 1 && (
+                              <div className="w-0.5 h-full bg-border mt-2" />
+                            )}
+                          </div>
+                          <div className="pb-6">
+                            <div className="font-semibold">{milestone.title}</div>
+                            <div className="text-sm text-muted-foreground">{milestone.description}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </AnimatedSection>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Team Section */}
-        <section className="py-24 relative overflow-hidden" aria-labelledby="team-heading">
-          {/* Clean team background */}
-          <div className="absolute inset-0 bg-gradient-to-br from-gray-50 via-blue-50/30 to-gray-100"></div>
-          
-          <div className="container mx-auto px-4 relative z-10">
-            <h2 id="team-heading" className="text-5xl font-bold text-center mb-6 text-gray-900 drop-shadow-lg">Meet Our Team</h2>
-            <p className="text-xl text-center mb-16 text-gray-700 max-w-3xl mx-auto font-medium">
-              Experienced professionals dedicated to transforming Kenya's construction landscape
-            </p>
+        {/* Values Section */}
+        <section className="py-20 bg-muted/30">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-16">
+              <Badge variant="outline" className="mb-4">Our Values</Badge>
+              <h2 className="text-4xl md:text-5xl font-bold mb-4">What Drives Us</h2>
+              <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+                Built on the foundation of Kenyan values: Ubuntu, integrity, and community strength
+              </p>
+            </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto justify-items-center">
-              {team.map((member, index) => (
-                <AnimatedSection key={`team-member-${index}`} animation="scaleIn" delay={index * 100}>
-                  <Card 
-                    className="text-center hover:shadow-2xl transition-all duration-300 focus-within:ring-2 focus-within:ring-white bg-white/90 backdrop-blur-sm border-2 border-white/50 hover:bg-white/95 hover:scale-105"
-                    tabIndex={0}
-                  >
-                  <CardHeader>
-                    <div 
-                      className="w-24 h-24 mx-auto mb-4 bg-muted rounded-full flex items-center justify-center overflow-hidden"
-                      role="img"
-                      aria-label={`Photo placeholder for ${member.name}`}
-                    >
-                      {member.image && member.image !== '/placeholder.svg' ? (
-                        <img
-                          src={member.image}
-                          alt={`${member.name} - ${member.role}`}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                          decoding="async"
-                          crossOrigin="anonymous"
-                          referrerPolicy="no-referrer"
-                          onError={(e) => {
-                            // Fallback to icon on image error
-                            e.currentTarget.style.display = 'none';
-                          }}
-                        />
-                      ) : null}
-                      <Users className="h-12 w-12 text-muted-foreground" aria-hidden="true" />
-                    </div>
-                    <CardTitle className="text-lg">{member.name}</CardTitle>
-                    <CardDescription className="text-primary font-medium">
-                      {member.role}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">{member.description}</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
+              {values.map((value, index) => (
+                <AnimatedSection key={index} animation="fadeInUp" delay={index * 100}>
+                  <Card className="h-full hover:shadow-xl transition-all duration-300 border-0 bg-background">
+                    <CardHeader className="pb-4">
+                      <div className={`w-14 h-14 bg-gradient-to-br ${value.color} rounded-xl flex items-center justify-center mb-4 shadow-lg`}>
+                        <value.icon className="h-7 w-7 text-white" />
+                      </div>
+                      <CardTitle className="text-xl">{value.title}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <CardDescription className="text-base leading-relaxed">
+                        {value.description}
+                      </CardDescription>
+                    </CardContent>
+                  </Card>
+                </AnimatedSection>
+              ))}
+            </div>
+
+            {/* Ubuntu Quote */}
+            <AnimatedSection animation="fadeInUp" delay={400}>
+              <div className="mt-16 max-w-3xl mx-auto">
+                <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+                  <CardContent className="p-8 text-center">
+                    <Quote className="h-10 w-10 text-primary/40 mx-auto mb-4" />
+                    <p className="text-xl md:text-2xl font-medium italic mb-4">
+                      "I am because we are"
+                    </p>
+                    <p className="text-muted-foreground">
+                      Our success is built on the success of every builder, supplier, and construction professional in Kenya.
+                    </p>
                   </CardContent>
+                </Card>
+              </div>
+            </AnimatedSection>
+          </div>
+        </section>
+
+        {/* Team Section */}
+        <section className="py-20 bg-background">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-16">
+              <Badge variant="outline" className="mb-4">Our Team</Badge>
+              <h2 className="text-4xl md:text-5xl font-bold mb-4">Meet the Visionaries</h2>
+              <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+                Experienced professionals dedicated to transforming Kenya's construction landscape
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+              {team.map((member, index) => (
+                <AnimatedSection key={index} animation="scaleIn" delay={index * 150}>
+                  <Card className="text-center hover:shadow-2xl transition-all duration-300 group overflow-hidden">
+                    <CardHeader className="pb-4">
+                      <div className="relative mx-auto mb-4">
+                        <div className="w-32 h-32 bg-gradient-to-br from-primary/20 to-primary/5 rounded-full flex items-center justify-center overflow-hidden ring-4 ring-background shadow-xl group-hover:ring-primary/20 transition-all">
+                          {member.image && member.image !== '/placeholder.svg' ? (
+                            <img
+                              src={member.image}
+                              alt={`${member.name} - ${member.role}`}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
+                          ) : null}
+                          <Users className="h-16 w-16 text-primary/40" />
+                        </div>
+                      </div>
+                      <CardTitle className="text-xl">{member.name}</CardTitle>
+                      <Badge variant="secondary" className="mt-2">
+                        {member.role}
+                      </Badge>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        {member.description}
+                      </p>
+                    </CardContent>
                   </Card>
                 </AnimatedSection>
               ))}
@@ -315,64 +415,76 @@ const About: React.FC = () => {
         </section>
 
         {/* Stats Section */}
-        <section 
-          className="py-24 text-white relative overflow-hidden"
-          aria-labelledby="stats-heading"
-        >
-          {/* Clean stats background */}
-          <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-blue-900 to-gray-800"></div>
-          
+        <section className="py-20 relative overflow-hidden">
+          {/* Background */}
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900" />
+          <div className="absolute inset-0 opacity-10">
+            <div 
+              className="h-full w-full"
+              style={{
+                backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23ffffff' fill-opacity='1' fill-rule='evenodd'/%3E%3C/svg%3E")`,
+              }}
+            />
+          </div>
+
           <div className="container mx-auto px-4 relative z-10">
-            <h2 id="stats-heading" className="text-5xl font-bold text-center mb-4 drop-shadow-2xl">Our Impact Across Kenya</h2>
-            <p className="text-xl text-center mb-16 text-white/90 max-w-3xl mx-auto drop-shadow-lg">
-              From Mombasa to Kisumu, from Nairobi to Eldoret - we're building Kenya's future together
-            </p>
+            <div className="text-center mb-16">
+              <Badge className="mb-4 bg-white/10 text-white border-white/20">Our Impact</Badge>
+              <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">Impact Across Kenya</h2>
+              <p className="text-xl text-gray-300 max-w-2xl mx-auto">
+                From Mombasa to Kisumu, from Nairobi to Eldoret - we're building Kenya's future together
+              </p>
+            </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 text-center">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
               <AnimatedSection animation="fadeInUp" delay={0}>
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-300 focus-within:ring-2 focus-within:ring-white rounded-lg" tabIndex={0}>
-                  <div className="text-5xl font-bold mb-3 text-green-400 drop-shadow-lg" aria-label="One thousand plus">
+                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20 text-center hover:bg-white/15 transition-all">
+                  <div className="text-5xl font-bold text-green-400 mb-2">
                     <AnimatedCounter end={1000} suffix="+" />
                   </div>
-                  <div className="text-xl font-semibold text-white mb-2">Active Builders</div>
-                  <div className="text-sm text-white/80">Across all 47 counties</div>
+                  <div className="text-xl font-semibold text-white mb-1">Active Builders</div>
+                  <div className="text-sm text-gray-400">Across all 47 counties</div>
                 </div>
               </AnimatedSection>
+              
               <AnimatedSection animation="fadeInUp" delay={100}>
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-300 focus-within:ring-2 focus-within:ring-white rounded-lg" tabIndex={0}>
-                  <div className="text-5xl font-bold mb-3 text-blue-400 drop-shadow-lg" aria-label="Five hundred plus">
+                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20 text-center hover:bg-white/15 transition-all">
+                  <div className="text-5xl font-bold text-blue-400 mb-2">
                     <AnimatedCounter end={500} suffix="+" />
                   </div>
-                  <div className="text-xl font-semibold text-white mb-2">Verified Suppliers</div>
-                  <div className="text-sm text-white/80">Quality-assured partners</div>
+                  <div className="text-xl font-semibold text-white mb-1">Verified Suppliers</div>
+                  <div className="text-sm text-gray-400">Quality-assured partners</div>
                 </div>
               </AnimatedSection>
+              
               <AnimatedSection animation="fadeInUp" delay={200}>
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-300 focus-within:ring-2 focus-within:ring-white rounded-lg" tabIndex={0}>
-                  <div className="text-5xl font-bold mb-3 text-yellow-400 drop-shadow-lg" aria-label="Ten thousand plus">
+                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20 text-center hover:bg-white/15 transition-all">
+                  <div className="text-5xl font-bold text-yellow-400 mb-2">
                     <AnimatedCounter end={10000} suffix="+" />
                   </div>
-                  <div className="text-xl font-semibold text-white mb-2">Successful Projects</div>
-                  <div className="text-sm text-white/80">Completed nationwide</div>
+                  <div className="text-xl font-semibold text-white mb-1">Successful Projects</div>
+                  <div className="text-sm text-gray-400">Completed nationwide</div>
                 </div>
               </AnimatedSection>
+              
               <AnimatedSection animation="fadeInUp" delay={300}>
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-300 focus-within:ring-2 focus-within:ring-white rounded-lg" tabIndex={0}>
-                  <div className="text-5xl font-bold mb-3 text-red-400 drop-shadow-lg" aria-label="Two billion Kenyan Shillings plus">
+                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20 text-center hover:bg-white/15 transition-all">
+                  <div className="text-5xl font-bold text-red-400 mb-2">
                     KSh <AnimatedCounter end={2} suffix="B+" />
                   </div>
-                  <div className="text-xl font-semibold text-white mb-2">Total Transactions</div>
-                  <div className="text-sm text-white/80">Economic impact</div>
+                  <div className="text-xl font-semibold text-white mb-1">Total Transactions</div>
+                  <div className="text-sm text-gray-400">Economic impact</div>
                 </div>
               </AnimatedSection>
             </div>
             
-            {/* Kenyan Cities Showcase */}
+            {/* Cities */}
             <div className="mt-16 text-center">
-              <h3 className="text-2xl font-bold mb-6 text-white drop-shadow-lg">Serving Kenya's Major Construction Hubs</h3>
-              <div className="flex flex-wrap justify-center gap-4">
-                {['Nairobi', 'Mombasa', 'Kisumu', 'Nakuru', 'Eldoret', 'Thika', 'Machakos', 'Nyeri'].map((city) => (
-                  <Badge key={city} className="bg-white/20 text-white border-white/30 px-3 py-1 text-sm font-medium backdrop-blur-sm">
+              <h3 className="text-xl font-semibold mb-6 text-white">Serving Kenya's Major Construction Hubs</h3>
+              <div className="flex flex-wrap justify-center gap-3">
+                {['Nairobi', 'Mombasa', 'Kisumu', 'Nakuru', 'Eldoret', 'Thika', 'Machakos', 'Nyeri', 'Malindi', 'Kitale'].map((city) => (
+                  <Badge key={city} className="bg-white/10 text-white border-white/20 px-4 py-2 text-sm font-medium">
+                    <MapPin className="h-3 w-3 mr-1" />
                     {city}
                   </Badge>
                 ))}
@@ -381,9 +493,43 @@ const About: React.FC = () => {
           </div>
         </section>
 
-        {/* Privacy and Security Section */}
+        {/* CTA Section */}
+        <section className="py-20 bg-gradient-to-r from-primary to-blue-600 text-white">
+          <div className="container mx-auto px-4 text-center">
+            <AnimatedSection animation="fadeInUp">
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to Build Something Great?</h2>
+              <p className="text-lg text-white/90 mb-8 max-w-2xl mx-auto">
+                Join thousands of builders and suppliers transforming Kenya's construction industry
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Button 
+                  size="lg" 
+                  variant="secondary"
+                  className="font-semibold px-8"
+                  asChild
+                >
+                  <Link to="/builder-registration">
+                    <Building2 className="h-5 w-5 mr-2" />
+                    Get Started Today
+                  </Link>
+                </Button>
+                <Button 
+                  size="lg" 
+                  variant="outline"
+                  className="border-white text-white hover:bg-white/10 font-semibold px-8"
+                  asChild
+                >
+                  <Link to="/contact">
+                    <ArrowRight className="h-5 w-5 mr-2" />
+                    Contact Us
+                  </Link>
+                </Button>
+              </div>
+            </AnimatedSection>
+          </div>
+        </section>
 
-        {/* Performance & Security Footer */}
+        {/* Dev Performance Metrics */}
         {process.env.NODE_ENV === 'development' && (
           <section className="py-4 bg-muted border-t">
             <div className="container mx-auto px-4">

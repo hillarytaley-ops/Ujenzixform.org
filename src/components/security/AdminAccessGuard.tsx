@@ -233,7 +233,7 @@ export const AdminAccessGuard: React.FC<AdminAccessGuardProps> = ({
                 Go Back
               </Button>
               <Button 
-                onClick={() => window.location.href = '/'}
+                onClick={() => window.location.href = '/home'}
                 className="flex-1"
               >
                 Return to Home

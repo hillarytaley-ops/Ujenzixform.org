@@ -28,10 +28,14 @@ import {
   RefreshCw,
   Monitor,
   Zap,
-  Plane
+  Plane,
+  Truck
 } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { DeliveryRouteTracker } from '@/components/delivery/DeliveryRouteTracker';
+import { CameraAccessRequest } from '@/components/builders/CameraAccessRequest';
+import { MonitoringServiceRequest } from '@/components/builders/MonitoringServiceRequest';
 
 interface CameraFeed {
   id: string;
@@ -62,9 +66,15 @@ interface ProjectMonitoring {
 
 const Monitoring = () => {
   const [activeTab, setActiveTab] = useState("cameras");
-  const [userRole, setUserRole] = useState<string | null>('guest');
+  // DEFAULT TO NULL - don't trust any role until verified from database
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
   const [selectedCamera, setSelectedCamera] = useState<string | null>(null);
+  const [hasMonitoringAccess, setHasMonitoringAccess] = useState<boolean>(false);
+  const [checkingAccess, setCheckingAccess] = useState<boolean>(true);
+  const [monitoringRequest, setMonitoringRequest] = useState<any>(null);
+  const [showRequestForm, setShowRequestForm] = useState<boolean>(false);
+  const [dbVerified, setDbVerified] = useState<boolean>(false); // Track if DB check is complete
   const { toast } = useToast();
 
   // Sample monitoring data
@@ -203,30 +213,105 @@ const Monitoring = () => {
   }, [userRole]);
 
   const checkUserRole = async () => {
+    setCheckingAccess(true);
+    setDbVerified(false);
+    console.log('🔐 Monitoring - Checking access in DATABASE...');
+    
+    // Add timeout to prevent infinite loading - but still block access
+    const timeout = setTimeout(() => {
+      console.log('🚫 Monitoring - Timeout reached, blocking access');
+      setCheckingAccess(false);
+      setUserRole(null); // NULL = no role = blocked
+      setHasMonitoringAccess(false);
+      setDbVerified(true);
+    }, 5000); // 5 second timeout
+    
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setUser(user);
-        const { data: roleData } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .limit(1)
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      
+      if (!authUser) {
+        // No user - block access
+        console.log('🚫 Monitoring - No authenticated user');
+        setUser(null);
+        setUserRole(null);
+        setHasMonitoringAccess(false);
+        clearTimeout(timeout);
+        setDbVerified(true);
+        setCheckingAccess(false);
+        return;
+      }
+      
+      setUser(authUser);
+      
+      // ALWAYS check database for role - NEVER trust localStorage!
+      const { data: roleData, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', authUser.id)
+        .maybeSingle();
+      
+      const dbRole = roleData?.role || null;
+      console.log('🔐 Monitoring - DB role:', dbRole, 'error:', error?.message);
+      
+      // NO ROLE IN DATABASE = BLOCK ACCESS
+      if (!dbRole) {
+        console.log('🚫 Monitoring - NO ROLE IN DATABASE - Blocking access');
+        localStorage.removeItem('user_role');
+        localStorage.removeItem('user_role_id');
+        setUserRole(null);
+        setHasMonitoringAccess(false);
+        clearTimeout(timeout);
+        setDbVerified(true);
+        setCheckingAccess(false);
+        return;
+      }
+      
+      // Role found in database - set it
+      setUserRole(dbRole);
+      localStorage.setItem('user_role', dbRole);
+      localStorage.setItem('user_role_id', authUser.id);
+      
+      // For builders, check if they have an approved/active monitoring request
+      if (dbRole === 'builder') {
+        const { data: monitoringData, error: monitoringError } = await supabase
+          .from('monitoring_service_requests')
+          .select('*')
+          .eq('user_id', authUser.id)
+          .in('status', ['approved', 'active'])
           .maybeSingle();
         
-        setUserRole((roleData?.role as any) || 'guest');
+        if (monitoringData && !monitoringError) {
+          setHasMonitoringAccess(true);
+          setMonitoringRequest(monitoringData);
+        } else {
+          setHasMonitoringAccess(false);
+        }
+      } else if (dbRole === 'admin') {
+        // Admins always have access
+        setHasMonitoringAccess(true);
       } else {
-        setUserRole('guest');
+        // Other roles (suppliers, delivery) don't have monitoring access
+        setHasMonitoringAccess(false);
       }
+      
+      clearTimeout(timeout);
     } catch (error) {
-      console.error('Error checking user role:', error);
-      setUserRole('guest');
+      console.error('🚫 Monitoring - Error checking role:', error);
+      // ON ERROR: Block access - don't trust localStorage!
+      setUserRole(null);
+      setHasMonitoringAccess(false);
+      clearTimeout(timeout);
+    } finally {
+      setDbVerified(true);
+      setCheckingAccess(false);
     }
   };
 
   const isAdmin = userRole === 'admin';
   const isBuilder = userRole === 'builder';
-  const canViewCameras = isAdmin || isBuilder;
+  const isDeliveryProvider = userRole === 'delivery_provider' || userRole === 'delivery';
+  // Builders can only view cameras if they have an approved/active monitoring request
+  const canViewCameras = isAdmin || (isBuilder && hasMonitoringAccess);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -251,113 +336,524 @@ const Monitoring = () => {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-background">
-      <Navigation />
-      
-      {/* Hero Section */}
-      <AnimatedSection animation="fadeInUp">
-        <section 
-          className="text-white py-24 relative overflow-hidden"
-          role="banner"
-          aria-labelledby="monitoring-hero-heading"
-        >
-        {/* Security Camera & Drone Surveillance Background - Fully Responsive */}
-        <div 
-          className="absolute inset-0"
-          style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1508614999368-9260051292e5?w=1920&h=1080&fit=crop&q=80')`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center center',
-            backgroundRepeat: 'no-repeat',
-            WebkitBackgroundSize: 'cover',
-            MozBackgroundSize: 'cover'
-          }}
-          role="img"
-          aria-label="Professional security surveillance cameras and monitoring technology for construction site security"
-        />
+  // Show loading while checking access - MUST wait for DB verification
+  if (checkingAccess || !dbVerified) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="text-center space-y-4">
+            <div className="animate-spin rounded-full h-10 w-10 border-4 border-primary border-t-transparent mx-auto" />
+            <p className="text-muted-foreground">Verifying monitoring access...</p>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  // STRICT CHECK: Block users without any role - database verification is complete
+  // userRole is NULL if: no user, no role in DB, or DB error
+  if (!userRole) {
+    return (
+      <div className="min-h-screen bg-slate-950">
+        <Navigation />
         
-        {/* Kenyan flag colors overlay with monitoring theme */}
-        <div className="absolute inset-0 bg-gradient-to-br from-black/80 via-gray-900/70 to-gray-800/70"></div>
-        
-        <div className="container mx-auto px-4 text-center relative z-10">
-          <div className="max-w-5xl mx-auto">
-            <div className="mb-8 flex justify-center">
-              <Badge className="bg-gradient-to-r from-gray-700 to-blue-600 text-white px-8 py-3 text-xl font-bold border border-white/30 shadow-lg">
-                🇰🇪 Advanced Construction Monitoring
-              </Badge>
-            </div>
-            
-            <h1 id="monitoring-hero-heading" className="text-6xl md:text-8xl font-bold mb-8 text-white drop-shadow-2xl flex items-center justify-center gap-4">
-              <Shield className="h-16 w-16 md:h-20 md:w-20 text-primary" />
-              Monitoring Center
-            </h1>
-            
-            <p className="text-2xl md:text-4xl mb-12 text-white/90 font-medium drop-shadow-lg leading-relaxed">
-              <strong>24/7 Site Surveillance:</strong> Monitor construction sites with live camera feeds and aerial drone views, 
-              watch progress in real-time, review recorded footage, detect security issues, track worker safety, 
-              verify material deliveries, check project milestones, receive instant alerts, access multiple projects, 
-              and maintain complete oversight of your construction sites from anywhere in Kenya.
-            </p>
-            
-            {/* Monitoring Technology Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
-                <div className="text-4xl font-bold text-green-400 mb-2">Live</div>
-                <div className="text-white font-medium">Camera Feeds</div>
+        <section className="py-16 relative overflow-hidden">
+          <div className="absolute inset-0">
+            <div 
+              className="absolute inset-0"
+              style={{
+                backgroundImage: `url('https://images.unsplash.com/photo-1473968512647-3e447244af8f?w=1920&h=1080&fit=crop&q=80')`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+              }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-br from-red-900/90 via-red-800/85 to-orange-900/90"></div>
+          </div>
+          
+          <div className="container mx-auto px-4 text-center relative z-10">
+            <div className="max-w-2xl mx-auto">
+              <div className="mb-6 p-4 bg-red-500/20 rounded-full w-24 h-24 mx-auto flex items-center justify-center backdrop-blur-md border border-red-400/30">
+                <Shield className="h-12 w-12 text-red-300" />
               </div>
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
-                <div className="text-4xl font-bold text-blue-400 mb-2">Ultra-Strict</div>
-                <div className="text-white font-medium">Access Control</div>
+              <h1 className="text-4xl md:text-5xl font-bold mb-4 text-white">
+                Registration Required
+              </h1>
+              <p className="text-xl text-white/80 mb-6">
+                You need to register with a specific role to access monitoring features.
+                Please sign up through one of our role-specific portals.
+              </p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-2xl mx-auto">
+                <a 
+                  href="/builder-signin"
+                  className="p-6 bg-blue-600/30 backdrop-blur rounded-xl border border-blue-400/30 hover:bg-blue-600/50 transition text-center"
+                >
+                  <Users className="h-10 w-10 text-blue-300 mx-auto mb-3" />
+                  <h3 className="font-semibold text-white">Builder</h3>
+                  <p className="text-xs text-blue-200 mt-1">For construction monitoring</p>
+                </a>
+                <a 
+                  href="/supplier-signin"
+                  className="p-6 bg-orange-600/30 backdrop-blur rounded-xl border border-orange-400/30 hover:bg-orange-600/50 transition text-center"
+                >
+                  <Camera className="h-10 w-10 text-orange-300 mx-auto mb-3" />
+                  <h3 className="font-semibold text-white">Supplier</h3>
+                  <p className="text-xs text-orange-200 mt-1">For material tracking</p>
+                </a>
+                <a 
+                  href="/delivery-signin"
+                  className="p-6 bg-teal-600/30 backdrop-blur rounded-xl border border-teal-400/30 hover:bg-teal-600/50 transition text-center"
+                >
+                  <Truck className="h-10 w-10 text-teal-300 mx-auto mb-3" />
+                  <h3 className="font-semibold text-white">Delivery</h3>
+                  <p className="text-xs text-teal-200 mt-1">For delivery tracking</p>
+                </a>
               </div>
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
-                <div className="text-4xl font-bold text-yellow-400 mb-2">Complete</div>
-                <div className="text-white font-medium">Supplier Lockout</div>
-              </div>
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
-                <div className="text-4xl font-bold text-red-400 mb-2">Real-Time</div>
-                <div className="text-white font-medium">Surveillance</div>
-              </div>
-            </div>
-            
-            {/* Monitoring Features Highlight */}
-            <div className="flex flex-wrap justify-center gap-4 text-white/90">
-              <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full backdrop-blur-sm">
-                <Eye className="h-5 w-5" />
-                <span className="font-medium">Live Monitoring</span>
-              </div>
-              <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full backdrop-blur-sm">
-                <Shield className="h-5 w-5" />
-                <span className="font-medium">Access Control</span>
-              </div>
-              <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full backdrop-blur-sm">
-                <Video className="h-5 w-5" />
-                <span className="font-medium">Camera Systems</span>
+              
+              <div className="mt-8">
+                <a href="/home" className="text-white/60 hover:text-white text-sm">
+                  ← Back to Home
+                </a>
               </div>
             </div>
           </div>
-        </div>
+        </section>
+        
+        <Footer />
+      </div>
+    );
+  }
+
+  // BLOCK DELIVERY PROVIDERS - They should not access monitoring page
+  if (isDeliveryProvider) {
+    return (
+      <div className="min-h-screen bg-slate-950">
+        <Navigation />
+        
+        <section className="py-16 relative overflow-hidden">
+          <div className="absolute inset-0">
+            <div 
+              className="absolute inset-0"
+              style={{
+                backgroundImage: `url('https://images.unsplash.com/photo-1473968512647-3e447244af8f?w=1920&h=1080&fit=crop&q=80')`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+              }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-br from-amber-900/90 via-orange-800/85 to-red-900/90"></div>
+          </div>
+          
+          <div className="container mx-auto px-4 text-center relative z-10">
+            <div className="max-w-2xl mx-auto">
+              <div className="mb-6 p-4 bg-amber-500/20 rounded-full w-24 h-24 mx-auto flex items-center justify-center backdrop-blur-md border border-amber-400/30">
+                <Truck className="h-12 w-12 text-amber-300" />
+              </div>
+              <h1 className="text-4xl md:text-5xl font-bold mb-4 text-white">
+                Delivery Provider Access
+              </h1>
+              <p className="text-xl text-white/80 mb-6">
+                Site monitoring features are not available for delivery providers.
+                Please use your dedicated delivery dashboard for tracking and managing deliveries.
+              </p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-xl mx-auto">
+                <a 
+                  href="/delivery-dashboard"
+                  className="p-6 bg-teal-600/30 backdrop-blur rounded-xl border border-teal-400/30 hover:bg-teal-600/50 transition text-center"
+                >
+                  <Truck className="h-10 w-10 text-teal-300 mx-auto mb-3" />
+                  <h3 className="font-semibold text-white">Delivery Dashboard</h3>
+                  <p className="text-xs text-teal-200 mt-1">Manage your deliveries</p>
+                </a>
+                <a 
+                  href="/tracking"
+                  className="p-6 bg-blue-600/30 backdrop-blur rounded-xl border border-blue-400/30 hover:bg-blue-600/50 transition text-center"
+                >
+                  <MapPin className="h-10 w-10 text-blue-300 mx-auto mb-3" />
+                  <h3 className="font-semibold text-white">Delivery Tracking</h3>
+                  <p className="text-xs text-blue-200 mt-1">Track active deliveries</p>
+                </a>
+              </div>
+              
+              <div className="mt-8">
+                <a href="/home" className="text-white/60 hover:text-white text-sm">
+                  ← Back to Home
+                </a>
+              </div>
+            </div>
+          </div>
+        </section>
+        
+        <Footer />
+      </div>
+    );
+  }
+
+  // Show access denied for builders without approved monitoring requests
+  if (isBuilder && !hasMonitoringAccess) {
+    return (
+      <div className="min-h-screen bg-slate-950">
+        <Navigation />
+        
+        {/* Futuristic Hero for Access Required */}
+        <section className="py-16 relative overflow-hidden">
+          {/* Background */}
+          <div className="absolute inset-0">
+            <div 
+              className="absolute inset-0"
+              style={{
+                backgroundImage: `url('https://images.unsplash.com/photo-1473968512647-3e447244af8f?w=1920&h=1080&fit=crop&q=80')`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+              }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-br from-amber-900/90 via-orange-900/85 to-red-900/90"></div>
+          </div>
+          
+          <div className="container mx-auto px-4 text-center relative z-10">
+            <div className="max-w-2xl mx-auto">
+              <div className="mb-6 p-4 bg-amber-500/20 rounded-full w-24 h-24 mx-auto flex items-center justify-center backdrop-blur-md border border-amber-400/30">
+                <AlertTriangle className="h-12 w-12 text-amber-300" />
+              </div>
+              <h1 className="text-4xl md:text-5xl font-bold mb-4 text-white">
+                {showRequestForm ? 'Request Monitoring Service' : 'Monitoring Access Required'}
+              </h1>
+              <p className="text-xl text-white/80 mb-6">
+                {showRequestForm 
+                  ? 'Fill out the form below to request 24/7 surveillance for your construction site'
+                  : 'To access the Site Monitoring features, you need an approved monitoring service subscription.'
+                }
+              </p>
+              {showRequestForm && (
+                <Button 
+                  variant="outline" 
+                  className="border-white/30 text-white hover:bg-white/10"
+                  onClick={() => setShowRequestForm(false)}
+                >
+                  ← Back to Overview
+                </Button>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* Request Form or Info Section */}
+        <section className="py-12 bg-gradient-to-b from-slate-950 to-slate-900">
+          <div className="container mx-auto px-4">
+            {showRequestForm ? (
+              /* Show the Monitoring Service Request Form */
+              <div className="max-w-5xl mx-auto">
+                <Card className="bg-slate-900/80 border-cyan-500/30 backdrop-blur-xl shadow-2xl">
+                  <CardContent className="p-6 md:p-8">
+                    <MonitoringServiceRequest />
+                  </CardContent>
+                </Card>
+              </div>
+            ) : (
+              /* Show Info and CTA */
+              <div className="max-w-3xl mx-auto">
+                <Card className="bg-slate-900/80 border-amber-500/30 backdrop-blur-xl shadow-2xl">
+                  <CardHeader className="text-center bg-gradient-to-r from-amber-950/50 to-orange-950/50 border-b border-amber-500/20">
+                    <CardTitle className="text-2xl flex items-center justify-center gap-3 text-white">
+                      <div className="p-2 bg-amber-500/20 rounded-lg">
+                        <Camera className="h-6 w-6 text-amber-400" />
+                      </div>
+                      Request Monitoring Service
+                    </CardTitle>
+                    <CardDescription className="text-base text-slate-400">
+                      Get 24/7 surveillance for your construction site with professional camera monitoring
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-8">
+                    <div className="space-y-6">
+                      {/* Benefits */}
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div className="flex items-start gap-3 p-4 bg-green-500/10 rounded-xl border border-green-500/20">
+                          <div className="p-2 bg-green-500/20 rounded-lg">
+                            <CheckCircle className="h-5 w-5 text-green-400" />
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-green-300">Live Camera Feeds</h4>
+                            <p className="text-sm text-green-400/70">Watch your construction site in real-time from anywhere</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-3 p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
+                          <div className="p-2 bg-blue-500/20 rounded-lg">
+                            <Shield className="h-5 w-5 text-blue-400" />
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-blue-300">Security Alerts</h4>
+                            <p className="text-sm text-blue-400/70">Get instant notifications for any suspicious activity</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-3 p-4 bg-purple-500/10 rounded-xl border border-purple-500/20">
+                          <div className="p-2 bg-purple-500/20 rounded-lg">
+                            <Video className="h-5 w-5 text-purple-400" />
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-purple-300">Recorded Footage</h4>
+                            <p className="text-sm text-purple-400/70">Access recordings for progress review and documentation</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-3 p-4 bg-amber-500/10 rounded-xl border border-amber-500/20">
+                          <div className="p-2 bg-amber-500/20 rounded-lg">
+                            <Plane className="h-5 w-5 text-amber-400" />
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-amber-300">Drone Surveillance</h4>
+                            <p className="text-sm text-amber-400/70">Aerial views for comprehensive site monitoring</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* How it Works */}
+                      <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700/50">
+                        <h4 className="font-semibold text-lg mb-4 flex items-center gap-2 text-white">
+                          <Clock className="h-5 w-5 text-cyan-400" />
+                          How to Get Access
+                        </h4>
+                        <ol className="space-y-3 text-sm">
+                          <li className="flex items-start gap-3">
+                            <span className="bg-amber-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
+                            <span className="text-slate-300">Submit a monitoring service request with your project details</span>
+                          </li>
+                          <li className="flex items-start gap-3">
+                            <span className="bg-amber-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
+                            <span className="text-slate-300">Receive a detailed quotation within 24 hours</span>
+                          </li>
+                          <li className="flex items-start gap-3">
+                            <span className="bg-amber-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">3</span>
+                            <span className="text-slate-300">Accept the quotation and complete payment</span>
+                          </li>
+                          <li className="flex items-start gap-3">
+                            <span className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">✓</span>
+                            <span className="text-slate-300">Access your monitoring dashboard with your unique access code</span>
+                          </li>
+                        </ol>
+                      </div>
+
+                      {/* CTA Button */}
+                      <div className="text-center space-y-4">
+                        <Button 
+                          size="lg" 
+                          className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white px-10 py-6 text-lg shadow-lg shadow-amber-500/20"
+                          onClick={() => setShowRequestForm(true)}
+                        >
+                          <Camera className="h-5 w-5 mr-2" />
+                          Request Monitoring Service
+                        </Button>
+                        <p className="text-sm text-slate-500">
+                          Already have an access code? Contact support to activate your subscription.
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Contact Support */}
+                <div className="mt-8 text-center">
+                  <p className="text-slate-500 mb-2">Need help or have questions?</p>
+                  <Button 
+                    variant="outline" 
+                    className="border-slate-700 text-slate-300 hover:bg-slate-800"
+                    onClick={() => window.location.href = '/contact'}
+                  >
+                    Contact Support
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <Footer />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-950">
+      <Navigation />
+      
+      {/* Futuristic Hero Section with Drone & Camera Theme */}
+      <AnimatedSection animation="fadeInUp">
+        <section 
+          className="text-white py-28 md:py-36 relative overflow-hidden"
+          role="banner"
+          aria-labelledby="monitoring-hero-heading"
+        >
+          {/* Multi-layer Drone & Camera Background */}
+          <div className="absolute inset-0">
+            {/* Primary Background - Drone flying over construction site */}
+            <div 
+              className="absolute inset-0"
+              style={{
+                backgroundImage: `url('https://images.unsplash.com/photo-1473968512647-3e447244af8f?w=1920&h=1080&fit=crop&q=80')`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center center',
+                backgroundRepeat: 'no-repeat',
+              }}
+            />
+            
+            {/* Secondary overlay - Security camera array */}
+            <div 
+              className="absolute inset-0 opacity-30"
+              style={{
+                backgroundImage: `url('https://images.unsplash.com/photo-1557597774-9d273605dfa9?w=1920&h=1080&fit=crop&q=80')`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                mixBlendMode: 'overlay',
+              }}
+            />
+          </div>
+          
+          {/* Futuristic Gradient Overlay */}
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-900/95 via-blue-950/85 to-cyan-950/90"></div>
+          
+          {/* Animated Grid Pattern Overlay */}
+          <div 
+            className="absolute inset-0 opacity-20"
+            style={{
+              backgroundImage: `
+                linear-gradient(rgba(34, 211, 238, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(34, 211, 238, 0.1) 1px, transparent 1px)
+              `,
+              backgroundSize: '50px 50px',
+            }}
+          />
+          
+          {/* Scanning Line Animation Effect */}
+          <div className="absolute inset-0 overflow-hidden">
+            <div 
+              className="absolute w-full h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-60"
+              style={{
+                animation: 'scan 4s ease-in-out infinite',
+                top: '0%',
+              }}
+            />
+          </div>
+          
+          {/* Corner Brackets - Futuristic UI Element */}
+          <div className="absolute top-8 left-8 w-20 h-20 border-l-2 border-t-2 border-cyan-400/50"></div>
+          <div className="absolute top-8 right-8 w-20 h-20 border-r-2 border-t-2 border-cyan-400/50"></div>
+          <div className="absolute bottom-8 left-8 w-20 h-20 border-l-2 border-b-2 border-cyan-400/50"></div>
+          <div className="absolute bottom-8 right-8 w-20 h-20 border-r-2 border-b-2 border-cyan-400/50"></div>
+          
+          <div className="container mx-auto px-4 text-center relative z-10">
+            <div className="max-w-6xl mx-auto">
+              {/* Futuristic Badge */}
+              <div className="mb-10 flex justify-center">
+                <Badge className="bg-cyan-500/20 backdrop-blur-md text-cyan-300 px-6 py-3 text-lg font-mono border border-cyan-400/30 shadow-lg shadow-cyan-500/20 uppercase tracking-wider">
+                  <span className="inline-block w-2 h-2 bg-cyan-400 rounded-full mr-3 animate-pulse"></span>
+                  Advanced Surveillance System • Active
+                </Badge>
+              </div>
+              
+              {/* Main Title with Glowing Effect */}
+              <h1 
+                id="monitoring-hero-heading" 
+                className="text-5xl md:text-7xl lg:text-8xl font-bold mb-8 tracking-tight"
+                style={{
+                  textShadow: '0 0 40px rgba(34, 211, 238, 0.5), 0 0 80px rgba(34, 211, 238, 0.3)',
+                }}
+              >
+                <span className="bg-gradient-to-r from-white via-cyan-200 to-white bg-clip-text text-transparent">
+                  MONITORING
+                </span>
+                <br />
+                <span className="text-4xl md:text-5xl lg:text-6xl bg-gradient-to-r from-cyan-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent">
+                  COMMAND CENTER
+                </span>
+              </h1>
+              
+              <p className="text-lg md:text-xl lg:text-2xl mb-12 text-slate-300 font-light max-w-4xl mx-auto leading-relaxed">
+                <strong className="text-cyan-300">24/7 AI-Powered Surveillance</strong> — Real-time drone aerial views, 
+                HD camera feeds, motion detection, instant security alerts, and complete construction site oversight 
+                from anywhere in Kenya.
+              </p>
+              
+              {/* Futuristic Stats Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-12">
+                <div className="group relative bg-slate-900/60 backdrop-blur-xl rounded-2xl p-6 border border-cyan-500/30 hover:border-cyan-400/60 transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/20">
+                  <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  <Camera className="h-8 w-8 text-cyan-400 mx-auto mb-3" />
+                  <div className="text-3xl md:text-4xl font-bold text-white mb-1 font-mono">4K</div>
+                  <div className="text-cyan-300 text-sm font-medium uppercase tracking-wide">HD Cameras</div>
+                </div>
+                <div className="group relative bg-slate-900/60 backdrop-blur-xl rounded-2xl p-6 border border-purple-500/30 hover:border-purple-400/60 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/20">
+                  <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  <Plane className="h-8 w-8 text-purple-400 mx-auto mb-3" />
+                  <div className="text-3xl md:text-4xl font-bold text-white mb-1 font-mono">LIVE</div>
+                  <div className="text-purple-300 text-sm font-medium uppercase tracking-wide">Drone Views</div>
+                </div>
+                <div className="group relative bg-slate-900/60 backdrop-blur-xl rounded-2xl p-6 border border-green-500/30 hover:border-green-400/60 transition-all duration-300 hover:shadow-lg hover:shadow-green-500/20">
+                  <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  <Shield className="h-8 w-8 text-green-400 mx-auto mb-3" />
+                  <div className="text-3xl md:text-4xl font-bold text-white mb-1 font-mono">24/7</div>
+                  <div className="text-green-300 text-sm font-medium uppercase tracking-wide">Security</div>
+                </div>
+                <div className="group relative bg-slate-900/60 backdrop-blur-xl rounded-2xl p-6 border border-amber-500/30 hover:border-amber-400/60 transition-all duration-300 hover:shadow-lg hover:shadow-amber-500/20">
+                  <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  <Zap className="h-8 w-8 text-amber-400 mx-auto mb-3" />
+                  <div className="text-3xl md:text-4xl font-bold text-white mb-1 font-mono">AI</div>
+                  <div className="text-amber-300 text-sm font-medium uppercase tracking-wide">Detection</div>
+                </div>
+              </div>
+              
+              {/* Feature Pills */}
+              <div className="flex flex-wrap justify-center gap-3">
+                {[
+                  { icon: Eye, label: 'Live Monitoring', color: 'cyan' },
+                  { icon: Video, label: 'HD Recording', color: 'blue' },
+                  { icon: Plane, label: 'Aerial Surveillance', color: 'purple' },
+                  { icon: Shield, label: 'Access Control', color: 'green' },
+                  { icon: Activity, label: 'Motion Detection', color: 'amber' },
+                ].map((feature, index) => (
+                  <div 
+                    key={index}
+                    className={`flex items-center gap-2 bg-slate-800/60 backdrop-blur-md px-4 py-2 rounded-full border border-${feature.color}-500/30 hover:border-${feature.color}-400/60 transition-all`}
+                  >
+                    <feature.icon className={`h-4 w-4 text-${feature.color}-400`} />
+                    <span className="text-sm font-medium text-slate-200">{feature.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          
+          {/* CSS for scanning animation */}
+          <style>{`
+            @keyframes scan {
+              0%, 100% { top: 0%; opacity: 0; }
+              10% { opacity: 0.6; }
+              50% { top: 100%; opacity: 0.6; }
+              60% { opacity: 0; }
+            }
+          `}</style>
         </section>
       </AnimatedSection>
 
-      <main className="py-20 relative overflow-hidden">
-        {/* Kenyan Construction Site Monitoring Background - Fully Responsive */}
-        <div 
-          className="absolute inset-0"
-          style={{
-            backgroundImage: `url('/monitoring-bg.jpg')`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center center',
-            backgroundRepeat: 'no-repeat',
-            WebkitBackgroundSize: 'cover',
-            MozBackgroundSize: 'cover'
-          }}
-          role="img"
-          aria-label="Professional Kenyan construction site with monitoring systems and surveillance technology for comprehensive project oversight"
-        />
-        
-        {/* Light overlay for monitoring interface readability */}
-        <div className="absolute inset-0 bg-white/30 backdrop-blur-[0.5px]"></div>
+      <main className="py-16 relative overflow-hidden bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
+        {/* Futuristic Background Elements */}
+        <div className="absolute inset-0">
+          {/* Grid Pattern */}
+          <div 
+            className="absolute inset-0 opacity-5"
+            style={{
+              backgroundImage: `
+                linear-gradient(rgba(34, 211, 238, 0.3) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(34, 211, 238, 0.3) 1px, transparent 1px)
+              `,
+              backgroundSize: '100px 100px',
+            }}
+          />
+          
+          {/* Radial Glow */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-cyan-500/10 rounded-full blur-3xl"></div>
+          <div className="absolute bottom-0 right-0 w-[600px] h-[300px] bg-purple-500/10 rounded-full blur-3xl"></div>
+        </div>
         
         <div className="container mx-auto px-4 relative z-10">
           {/* Access Notice for Suppliers Only */}
@@ -374,10 +870,10 @@ const Monitoring = () => {
           )}
 
           {userRole !== 'supplier' && (
-            <div className="bg-white/30 backdrop-blur-md rounded-2xl border-2 border-white/20 shadow-2xl p-6">
+            <div className="bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-cyan-500/20 shadow-2xl shadow-cyan-500/5 p-6">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className={`grid w-full max-w-4xl mx-auto mb-8 bg-gray-100/40 backdrop-blur-md ${
-                  isAdmin ? 'grid-cols-4' : 'grid-cols-1'
+                <TabsList className={`grid w-full max-w-6xl mx-auto mb-8 bg-slate-800/60 backdrop-blur-md border border-slate-700/50 ${
+                  isAdmin ? 'grid-cols-6' : isDeliveryProvider ? 'grid-cols-2' : 'grid-cols-2'
                 }`}>
               {isAdmin && (
                 <TabsTrigger value="overview" className="flex items-center gap-2">
@@ -389,6 +885,20 @@ const Monitoring = () => {
                 <Video className="h-4 w-4" />
                 Live Cameras
               </TabsTrigger>
+              {/* Delivery Routes - for delivery providers and admins */}
+              {(isDeliveryProvider || isAdmin) && (
+                <TabsTrigger value="routes" className="flex items-center gap-2">
+                  <Truck className="h-4 w-4" />
+                  Delivery Routes
+                </TabsTrigger>
+              )}
+              {/* Camera Access Requests - for builders */}
+              {(isBuilder || isAdmin) && (
+                <TabsTrigger value="access-requests" className="flex items-center gap-2">
+                  <Camera className="h-4 w-4" />
+                  Camera Access
+                </TabsTrigger>
+              )}
               {isAdmin && (
                 <TabsTrigger value="projects" className="flex items-center gap-2">
                   <Monitor className="h-4 w-4" />
@@ -530,58 +1040,82 @@ const Monitoring = () => {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 md:gap-6">
-                  {/* Camera List - Smaller - Mobile Optimized */}
+                  {/* Camera List - Futuristic Style */}
                   <div className="lg:col-span-1">
-                    <Card>
-                      <CardHeader className="p-4 md:p-6">
-                        <CardTitle className="text-base md:text-lg">Camera Feeds</CardTitle>
-                        <CardDescription className="text-xs md:text-sm">Select camera</CardDescription>
+                    <Card className="bg-slate-800/60 border-slate-700/50 backdrop-blur-xl">
+                      <CardHeader className="p-4 md:p-6 border-b border-slate-700/50">
+                        <CardTitle className="text-base md:text-lg text-white flex items-center gap-2">
+                          <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></div>
+                          Camera Feeds
+                        </CardTitle>
+                        <CardDescription className="text-xs md:text-sm text-slate-400">Select camera to view</CardDescription>
                       </CardHeader>
                       <CardContent className="p-4 md:p-6">
                         <div className="space-y-2 md:space-y-3">
                           {cameras.map((camera) => {
                             const isDrone = camera.id.startsWith('drone-');
+                            const isOnline = camera.status === 'online' || camera.status === 'recording';
                             return (
                               <div
                                 key={camera.id}
-                                className={`p-2 md:p-3 border rounded-lg cursor-pointer transition-colors backdrop-blur-sm ${
-                                  selectedCamera === camera.id ? 'border-primary bg-primary/10' : 'hover:bg-white/20'
+                                className={`p-3 md:p-4 rounded-xl cursor-pointer transition-all duration-300 ${
+                                  selectedCamera === camera.id 
+                                    ? 'bg-cyan-500/20 border border-cyan-400/50 shadow-lg shadow-cyan-500/10' 
+                                    : 'bg-slate-700/30 border border-slate-600/30 hover:bg-slate-700/50 hover:border-slate-500/50'
                                 } ${isDrone ? 'border-l-4 border-l-purple-500' : ''}`}
                                 onClick={() => setSelectedCamera(camera.id)}
                               >
-                                <div className="flex items-center justify-between mb-1 md:mb-2">
-                                  <div className="flex items-center gap-1 md:gap-2">
-                                    {isDrone && <Plane className="h-3 w-3 md:h-4 md:w-4 text-purple-500" />}
-                                    <span className="font-medium text-xs md:text-sm">{camera.name}</span>
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="flex items-center gap-2">
+                                    {isDrone ? (
+                                      <Plane className="h-4 w-4 text-purple-400" />
+                                    ) : (
+                                      <Camera className="h-4 w-4 text-cyan-400" />
+                                    )}
+                                    <span className="font-medium text-xs md:text-sm text-white">{camera.name}</span>
                                   </div>
-                                  <Badge className={`text-xs ${getStatusColor(camera.status)}`}>
+                                  <Badge className={`text-xs ${
+                                    isOnline ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 
+                                    camera.status === 'offline' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
+                                    'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                  }`}>
+                                    <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1.5 ${isOnline ? 'bg-green-400 animate-pulse' : camera.status === 'offline' ? 'bg-red-400' : 'bg-amber-400'}`}></span>
                                     {camera.status}
                                   </Badge>
                                 </div>
-                                <div className="text-xs md:text-sm text-muted-foreground mb-1 md:mb-2 truncate">
+                                <div className="text-xs md:text-sm text-slate-400 mb-1 truncate">
                                   {camera.projectSite}
                                 </div>
-                                <div className="text-xs text-muted-foreground mb-1 md:mb-2 truncate">
+                                <div className="text-xs text-slate-500 mb-2 truncate">
                                   {camera.location}
                                 </div>
-                                <div className="flex items-center justify-between text-xs">
-                                  <div className="flex items-center gap-1 md:gap-2">
-                                    <span className={isDrone ? 'font-medium text-purple-600' : ''}>{camera.quality}</span>
-                                    {camera.isRecording && <Video className="h-3 w-3 text-red-500" />}
-                                    {isDrone && <Badge variant="outline" className="text-xs bg-purple-50/40 text-purple-700 hidden md:inline-flex">Aerial</Badge>}
+                                <div className="flex items-center justify-between text-xs text-slate-400">
+                                  <div className="flex items-center gap-2">
+                                    <span className={`font-mono ${isDrone ? 'text-purple-400' : 'text-cyan-400'}`}>{camera.quality}</span>
+                                    {camera.isRecording && (
+                                      <span className="flex items-center gap-1 text-red-400">
+                                        <span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-pulse"></span>
+                                        REC
+                                      </span>
+                                    )}
                                   </div>
-                                  <div className="flex items-center gap-1 md:gap-2">
-                                    <Eye className="h-3 w-3" />
+                                  <div className="flex items-center gap-2">
+                                    <Eye className="h-3 w-3 text-slate-500" />
                                     <span>{camera.viewers}</span>
-                                    <Wifi className="h-3 w-3" />
+                                    <Wifi className={`h-3 w-3 ${camera.signalStrength > 70 ? 'text-green-400' : camera.signalStrength > 40 ? 'text-amber-400' : 'text-red-400'}`} />
                                     <span>{camera.signalStrength}%</span>
                                   </div>
                                 </div>
-                                {camera.batteryLevel && (
-                                  <div className="flex items-center gap-1 mt-2">
-                                    <Battery className="h-3 w-3" />
-                                    <Progress value={camera.batteryLevel} className="h-1 flex-1" />
-                                    <span className="text-xs">{camera.batteryLevel}%</span>
+                                {camera.batteryLevel !== undefined && (
+                                  <div className="flex items-center gap-2 mt-2 text-xs">
+                                    <Battery className={`h-3 w-3 ${camera.batteryLevel > 50 ? 'text-green-400' : camera.batteryLevel > 20 ? 'text-amber-400' : 'text-red-400'}`} />
+                                    <div className="flex-1 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                                      <div 
+                                        className={`h-full rounded-full ${camera.batteryLevel > 50 ? 'bg-green-400' : camera.batteryLevel > 20 ? 'bg-amber-400' : 'bg-red-400'}`}
+                                        style={{ width: `${camera.batteryLevel}%` }}
+                                      ></div>
+                                    </div>
+                                    <span className="text-slate-400 font-mono">{camera.batteryLevel}%</span>
                                   </div>
                                 )}
                               </div>
@@ -592,85 +1126,156 @@ const Monitoring = () => {
                     </Card>
                   </div>
 
-                  {/* Main Video Feed - Larger - Mobile Responsive */}
+                  {/* Main Video Feed - Futuristic Style */}
                   <div className="lg:col-span-3">
-                    <Card>
-                      <CardHeader className="p-4 md:p-6">
+                    <Card className="bg-slate-800/60 border-slate-700/50 backdrop-blur-xl overflow-hidden">
+                      <CardHeader className="p-4 md:p-6 border-b border-slate-700/50">
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                           <div className="flex-1 min-w-0">
-                            <CardTitle className="text-lg md:text-xl lg:text-2xl truncate">{selectedCamera ? cameras.find(c => c.id === selectedCamera)?.name : 'Select Camera'}</CardTitle>
-                            <CardDescription className="text-sm md:text-base truncate">{selectedCamera ? cameras.find(c => c.id === selectedCamera)?.projectSite : 'Choose a camera to view live feed'}</CardDescription>
+                            <CardTitle className="text-lg md:text-xl lg:text-2xl text-white truncate flex items-center gap-2">
+                              {selectedCamera && (
+                                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                              )}
+                              {selectedCamera ? cameras.find(c => c.id === selectedCamera)?.name : 'Select Camera'}
+                            </CardTitle>
+                            <CardDescription className="text-sm md:text-base text-slate-400 truncate">
+                              {selectedCamera ? cameras.find(c => c.id === selectedCamera)?.projectSite : 'Choose a camera to view live feed'}
+                            </CardDescription>
                           </div>
                           {selectedCamera && (
-                            <Badge className={`text-xs md:text-sm flex-shrink-0 ${getStatusColor(cameras.find(c => c.id === selectedCamera)?.status || '')}`}>
+                            <Badge className={`text-xs md:text-sm flex-shrink-0 ${
+                              cameras.find(c => c.id === selectedCamera)?.status === 'online' || cameras.find(c => c.id === selectedCamera)?.status === 'recording'
+                                ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                                : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                            }`}>
+                              <span className="w-1.5 h-1.5 rounded-full bg-current mr-1.5 animate-pulse"></span>
                               {cameras.find(c => c.id === selectedCamera)?.status}
                             </Badge>
                           )}
                         </div>
                       </CardHeader>
-                      <CardContent className="p-2 md:p-4">
-                        <div className="aspect-video bg-black rounded-lg relative min-h-[200px] sm:min-h-[300px] md:min-h-[400px] lg:min-h-[500px]">
+                      <CardContent className="p-0">
+                        <div className="aspect-video bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 relative min-h-[200px] sm:min-h-[300px] md:min-h-[400px] lg:min-h-[500px]">
+                          {/* Grid Overlay Effect */}
+                          <div 
+                            className="absolute inset-0 opacity-20 pointer-events-none"
+                            style={{
+                              backgroundImage: `
+                                linear-gradient(rgba(34, 211, 238, 0.1) 1px, transparent 1px),
+                                linear-gradient(90deg, rgba(34, 211, 238, 0.1) 1px, transparent 1px)
+                              `,
+                              backgroundSize: '30px 30px',
+                            }}
+                          />
+                          
+                          {/* Corner UI Elements */}
+                          <div className="absolute top-3 left-3 w-8 h-8 border-l-2 border-t-2 border-cyan-400/50"></div>
+                          <div className="absolute top-3 right-3 w-8 h-8 border-r-2 border-t-2 border-cyan-400/50"></div>
+                          <div className="absolute bottom-14 left-3 w-8 h-8 border-l-2 border-b-2 border-cyan-400/50"></div>
+                          <div className="absolute bottom-14 right-3 w-8 h-8 border-r-2 border-b-2 border-cyan-400/50"></div>
+                          
+                          {/* Recording Indicator */}
+                          {selectedCamera && cameras.find(c => c.id === selectedCamera)?.isRecording && (
+                            <div className="absolute top-4 right-4 flex items-center gap-2 bg-red-500/20 backdrop-blur-md px-3 py-1.5 rounded-full border border-red-500/30">
+                              <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                              <span className="text-xs font-mono text-red-400">REC</span>
+                            </div>
+                          )}
+                          
+                          {/* Timestamp */}
+                          {selectedCamera && (
+                            <div className="absolute top-4 left-4 bg-slate-900/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-700/50">
+                              <span className="text-xs font-mono text-cyan-400">{new Date().toLocaleTimeString()}</span>
+                            </div>
+                          )}
+                          
                           <div className="absolute inset-0 flex items-center justify-center">
                             <div className="text-white text-center px-4">
                               {selectedCamera ? (
                                 <>
                                   {selectedCamera.startsWith('drone-') ? (
                                     <>
-                                      <Plane className="h-12 w-12 sm:h-14 sm:w-14 md:h-16 md:w-16 mx-auto mb-2 md:mb-4 opacity-75 text-purple-300" />
-                                      <p className="text-lg sm:text-xl md:text-2xl font-semibold">Drone Aerial Feed</p>
-                                      <p className="text-xs sm:text-sm opacity-75 mt-1">
-                                        {cameras.find(c => c.id === selectedCamera)?.quality} Aerial Stream
+                                      <div className="relative mb-4">
+                                        <Plane className="h-16 w-16 md:h-20 md:w-20 mx-auto text-purple-400 animate-pulse" />
+                                        <div className="absolute inset-0 h-16 w-16 md:h-20 md:w-20 mx-auto rounded-full bg-purple-500/20 blur-xl animate-pulse"></div>
+                                      </div>
+                                      <p className="text-xl md:text-2xl font-bold bg-gradient-to-r from-purple-300 to-purple-100 bg-clip-text text-transparent">
+                                        Drone Aerial Feed
                                       </p>
-                                      <Badge className="mt-2 bg-purple-600 text-white text-xs md:text-sm">
-                                        Aerial View
+                                      <p className="text-sm font-mono text-purple-300/70 mt-2">
+                                        {cameras.find(c => c.id === selectedCamera)?.quality} • Live Stream
+                                      </p>
+                                      <Badge className="mt-3 bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                                        <Plane className="h-3 w-3 mr-1.5" />
+                                        Aerial View Active
                                       </Badge>
                                     </>
                                   ) : (
                                     <>
-                                      <Camera className="h-12 w-12 sm:h-14 sm:w-14 md:h-16 md:w-16 mx-auto mb-2 md:mb-4 opacity-50" />
-                                      <p className="text-lg sm:text-xl md:text-2xl font-semibold">Live Feed</p>
-                                      <p className="text-sm sm:text-base md:text-lg opacity-75 mt-2">
-                                        {cameras.find(c => c.id === selectedCamera)?.quality} Stream
+                                      <div className="relative mb-4">
+                                        <Camera className="h-16 w-16 md:h-20 md:w-20 mx-auto text-cyan-400 animate-pulse" />
+                                        <div className="absolute inset-0 h-16 w-16 md:h-20 md:w-20 mx-auto rounded-full bg-cyan-500/20 blur-xl animate-pulse"></div>
+                                      </div>
+                                      <p className="text-xl md:text-2xl font-bold bg-gradient-to-r from-cyan-300 to-cyan-100 bg-clip-text text-transparent">
+                                        Live Camera Feed
+                                      </p>
+                                      <p className="text-sm font-mono text-cyan-300/70 mt-2">
+                                        {cameras.find(c => c.id === selectedCamera)?.quality} • Streaming
                                       </p>
                                     </>
                                   )}
                                 </>
                               ) : (
                                 <>
-                                  <Monitor className="h-12 w-12 sm:h-16 sm:w-16 md:h-20 md:w-20 mx-auto mb-2 md:mb-4 opacity-50" />
-                                  <p className="text-lg sm:text-xl md:text-2xl font-semibold">Select a Camera</p>
-                                  <p className="text-sm sm:text-base md:text-lg opacity-75 mt-1 md:mt-2">Choose from the list to view live feed</p>
+                                  <div className="relative mb-4">
+                                    <Monitor className="h-16 w-16 md:h-20 md:w-20 mx-auto text-slate-500" />
+                                  </div>
+                                  <p className="text-xl md:text-2xl font-semibold text-slate-400">Select a Camera</p>
+                                  <p className="text-sm text-slate-500 mt-2">Choose from the list to view live feed</p>
                                 </>
                               )}
                             </div>
                           </div>
                           
-                          {/* Video Controls - Mobile Responsive */}
+                          {/* Futuristic Video Controls */}
                           {selectedCamera && (
-                            <div className="absolute bottom-2 md:bottom-4 left-2 md:left-4 right-2 md:right-4 flex items-center justify-between">
-                              <div className="flex items-center gap-1 md:gap-2">
-                                <Button size="sm" variant="secondary" className="h-8 w-8 md:h-9 md:w-9 p-0">
-                                  <Play className="h-3 w-3 md:h-4 md:w-4" />
-                                </Button>
-                                <Button size="sm" variant="secondary" className="h-8 w-8 md:h-9 md:w-9 p-0">
-                                  <Pause className="h-3 w-3 md:h-4 md:w-4" />
-                                </Button>
-                              </div>
-                              
-                              <div className="flex items-center gap-1 md:gap-2">
-                                {isAdmin && (
-                                  <Button size="sm" variant="secondary" className="h-8 w-8 md:h-9 md:w-9 p-0">
-                                    <Settings className="h-3 w-3 md:h-4 md:w-4" />
+                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-950/90 to-transparent p-4">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <Button size="sm" className="h-9 w-9 p-0 bg-slate-800/80 border border-slate-600/50 hover:bg-cyan-500/30 hover:border-cyan-400/50 text-slate-300 hover:text-cyan-300">
+                                    <Play className="h-4 w-4" />
                                   </Button>
-                                )}
-                                {selectedCamera.startsWith('drone-') && isAdmin && (
-                                  <Button size="sm" variant="secondary" title="Drone Controls" className="h-8 w-8 md:h-9 md:w-9 p-0">
-                                    <Plane className="h-3 w-3 md:h-4 md:w-4" />
+                                  <Button size="sm" className="h-9 w-9 p-0 bg-slate-800/80 border border-slate-600/50 hover:bg-slate-700/80 text-slate-300">
+                                    <Pause className="h-4 w-4" />
                                   </Button>
-                                )}
-                                <Button size="sm" variant="secondary" className="h-8 w-8 md:h-9 md:w-9 p-0">
-                                  <RefreshCw className="h-3 w-3 md:h-4 md:w-4" />
-                                </Button>
+                                </div>
+                                
+                                {/* Quality & Info */}
+                                <div className="hidden md:flex items-center gap-3 text-xs font-mono text-slate-400">
+                                  <span className="bg-slate-800/80 px-2 py-1 rounded border border-slate-600/50">
+                                    {cameras.find(c => c.id === selectedCamera)?.quality}
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <Eye className="h-3 w-3" />
+                                    {cameras.find(c => c.id === selectedCamera)?.viewers} watching
+                                  </span>
+                                </div>
+                                
+                                <div className="flex items-center gap-2">
+                                  {isAdmin && (
+                                    <Button size="sm" className="h-9 w-9 p-0 bg-slate-800/80 border border-slate-600/50 hover:bg-slate-700/80 text-slate-300">
+                                      <Settings className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                  {selectedCamera.startsWith('drone-') && isAdmin && (
+                                    <Button size="sm" className="h-9 w-9 p-0 bg-purple-500/20 border border-purple-500/30 hover:bg-purple-500/40 text-purple-300" title="Drone Controls">
+                                      <Plane className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                  <Button size="sm" className="h-9 w-9 p-0 bg-slate-800/80 border border-slate-600/50 hover:bg-slate-700/80 text-slate-300">
+                                    <RefreshCw className="h-4 w-4" />
+                                  </Button>
+                                </div>
                               </div>
                             </div>
                           )}
@@ -852,50 +1457,80 @@ const Monitoring = () => {
                 </div>
               </TabsContent>
             )}
+
+            {/* Delivery Routes Tab - for delivery providers and admins */}
+            {(isDeliveryProvider || isAdmin) && (
+              <TabsContent value="routes" className="space-y-6">
+                <div className="max-w-6xl mx-auto">
+                  <DeliveryRouteTracker />
+                </div>
+              </TabsContent>
+            )}
+
+            {/* Camera Access Requests Tab - for builders and admins */}
+            {(isBuilder || isAdmin) && (
+              <TabsContent value="access-requests" className="space-y-6">
+                <div className="max-w-6xl mx-auto">
+                  <CameraAccessRequest />
+                </div>
+              </TabsContent>
+            )}
               </Tabs>
             </div>
           )}
 
-          {/* Scanner Integration Notice */}
+          {/* Futuristic Scanner Integration Notice */}
           <div className="max-w-5xl mx-auto mt-16">
-            <Card className="bg-white/95 backdrop-blur-sm border-2 border-white/50 shadow-2xl">
-              <CardHeader className="bg-gradient-to-r from-green-50 via-blue-50 to-red-50 border-b border-gray-200">
-                <CardTitle className="flex items-center gap-3 text-3xl font-bold text-gray-900">
-                  <div className="p-3 bg-gradient-to-br from-green-500 to-red-500 rounded-full shadow-lg">
-                    <Eye className="h-8 w-8 text-white" />
+            <Card className="bg-slate-900/80 backdrop-blur-xl border border-cyan-500/30 shadow-2xl shadow-cyan-500/10 overflow-hidden">
+              <CardHeader className="bg-gradient-to-r from-cyan-950/50 via-slate-900/50 to-purple-950/50 border-b border-cyan-500/20">
+                <CardTitle className="flex items-center gap-4 text-2xl md:text-3xl font-bold text-white">
+                  <div className="p-3 bg-gradient-to-br from-cyan-500 to-purple-500 rounded-xl shadow-lg shadow-cyan-500/30">
+                    <Eye className="h-7 w-7 text-white" />
                   </div>
-                  Integrated Monitoring System
+                  <span className="bg-gradient-to-r from-cyan-300 to-purple-300 bg-clip-text text-transparent">
+                    Integrated Monitoring System
+                  </span>
                 </CardTitle>
-                <CardDescription className="text-lg text-gray-700">
+                <CardDescription className="text-lg text-slate-400">
                   Complete construction site monitoring with advanced security and access controls
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h4 className="font-semibold mb-3">Camera Monitoring</h4>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Live surveillance of construction sites with AI-powered monitoring and real-time alerts.
-                </p>
-                <Button variant="outline" size="sm">
-                  <Video className="h-4 w-4 mr-2" />
-                  View Live Feeds
-                </Button>
-              </div>
-              
-              <div>
-                <h4 className="font-semibold mb-3">Material Scanning</h4>
-                <p className="text-sm text-muted-foreground mb-3">
-                  QR code scanning system for material verification and tracking across the supply chain.
-                </p>
-                <Button variant="outline" size="sm" asChild>
-                  <a href="/scanners">
-                    <Camera className="h-4 w-4 mr-2" />
-                    Access Scanners
-                  </a>
-                </Button>
-              </div>
-            </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="p-6 bg-slate-800/50 rounded-xl border border-cyan-500/20 hover:border-cyan-500/40 transition-all">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="p-2 bg-cyan-500/20 rounded-lg">
+                        <Video className="h-5 w-5 text-cyan-400" />
+                      </div>
+                      <h4 className="font-semibold text-white text-lg">Camera Monitoring</h4>
+                    </div>
+                    <p className="text-sm text-slate-400 mb-4">
+                      Live surveillance of construction sites with AI-powered monitoring and real-time alerts.
+                    </p>
+                    <Button variant="outline" size="sm" className="border-cyan-500/50 text-cyan-300 hover:bg-cyan-500/20 hover:text-cyan-200">
+                      <Video className="h-4 w-4 mr-2" />
+                      View Live Feeds
+                    </Button>
+                  </div>
+                  
+                  <div className="p-6 bg-slate-800/50 rounded-xl border border-purple-500/20 hover:border-purple-500/40 transition-all">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="p-2 bg-purple-500/20 rounded-lg">
+                        <Camera className="h-5 w-5 text-purple-400" />
+                      </div>
+                      <h4 className="font-semibold text-white text-lg">Material Scanning</h4>
+                    </div>
+                    <p className="text-sm text-slate-400 mb-4">
+                      QR code scanning system for material verification and tracking across the supply chain.
+                    </p>
+                    <Button variant="outline" size="sm" className="border-purple-500/50 text-purple-300 hover:bg-purple-500/20 hover:text-purple-200" asChild>
+                      <a href="/scanners">
+                        <Camera className="h-4 w-4 mr-2" />
+                        Access Scanners
+                      </a>
+                    </Button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>

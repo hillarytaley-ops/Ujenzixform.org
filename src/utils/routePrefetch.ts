@@ -35,13 +35,11 @@ export const prefetchRoute = (
   
   // Skip prefetching on very slow connections to save bandwidth
   if (isSlowConnection) {
-    console.log(`[Prefetch] Skipped ${route} (slow connection)`);
     return;
   }
   
   // Check optional condition
   if (condition && !condition()) {
-    console.log(`[Prefetch] Skipped ${route} (condition not met)`);
     return;
   }
   
@@ -66,15 +64,9 @@ export const prefetchRoute = (
     
     const importFn = routeMap[route];
     if (importFn) {
-      importFn()
-        .then(() => {
-          console.log(`[Prefetch] ✅ ${route} loaded successfully`);
-        })
-        .catch((error) => {
-          console.warn(`[Prefetch] ⚠️ Failed to prefetch ${route}:`, error);
-        });
-    } else {
-      console.warn(`[Prefetch] ⚠️ Unknown route: ${route}`);
+      importFn().catch(() => {
+        // Silently fail - prefetch is optional optimization
+      });
     }
   }, delay);
 };
@@ -116,7 +108,6 @@ export const smartPrefetch = (currentRoute: string): void => {
   
   const routesToPrefetch = prefetchMap[currentRoute];
   if (routesToPrefetch) {
-    console.log(`[SmartPrefetch] Prefetching for ${currentRoute}:`, routesToPrefetch);
     prefetchRoutes(routesToPrefetch, 3000, 1000);
   }
 };

@@ -12,6 +12,7 @@ const Analytics = () => {
   const [user, setUser] = useState<any>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isAdminSession, setIsAdminSession] = useState(false);
 
   useEffect(() => {
     checkAuth();
@@ -19,6 +20,22 @@ const Analytics = () => {
 
   const checkAuth = async () => {
     try {
+      // First check for admin session from localStorage (admin dashboard login)
+      const isAdminAuthenticated = localStorage.getItem('admin_authenticated') === 'true';
+      const adminEmail = localStorage.getItem('admin_email');
+      const storedRole = localStorage.getItem('user_role');
+      
+      if (isAdminAuthenticated && adminEmail && storedRole === 'admin') {
+        console.log('✅ Admin session detected from localStorage');
+        setIsAdminSession(true);
+        setUserRole('admin');
+        // Create a mock user object for admin
+        setUser({ id: 'admin', email: adminEmail });
+        setLoading(false);
+        return;
+      }
+
+      // Check Supabase auth
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       
       if (authError || !user) {
@@ -59,7 +76,8 @@ const Analytics = () => {
   }
 
   // ADMIN ONLY ACCESS - Block all non-admin users
-  if (!user || userRole !== 'admin') {
+  // Allow access if admin session from localStorage OR admin role from database
+  if (!user || (userRole !== 'admin' && !isAdminSession)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Navigation />

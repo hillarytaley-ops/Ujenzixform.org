@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -33,6 +33,7 @@ import {
   Info
 } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CompanyApplication {
   // Company Information
@@ -63,7 +64,7 @@ interface CompanyApplication {
   certifications: string[];
   
   // Additional Information
-  whyJoinUjenziPro: string;
+  whyJoinMradiPro: string;
   additionalServices: string;
 }
 
@@ -99,10 +100,52 @@ interface PrivateApplication {
   additionalSkills: string;
 }
 
+interface ExistingApplication {
+  id: string;
+  status: 'pending' | 'approved' | 'rejected' | 'under_review';
+  full_name: string;
+  company_name?: string;
+  is_company: boolean;
+  created_at: string;
+  updated_at: string;
+  admin_notes?: string;
+}
+
 const DeliveryProviderApplication = () => {
   const [activeTab, setActiveTab] = useState("company");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [existingApplication, setExistingApplication] = useState<ExistingApplication | null>(null);
+  const [isLoadingApplication, setIsLoadingApplication] = useState(true);
   const { toast } = useToast();
+
+  // Get current user and check for existing application
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUser(user);
+      if (user?.email) {
+        // Pre-fill email fields
+        setCompanyForm(prev => ({ ...prev, contactEmail: user.email || '' }));
+        setPrivateForm(prev => ({ ...prev, email: user.email || '' }));
+      }
+      
+      // Check for existing application
+      if (user?.id) {
+        const { data: application, error } = await supabase
+          .from('delivery_provider_registrations')
+          .select('id, status, full_name, company_name, is_company, created_at, updated_at, admin_notes')
+          .eq('auth_user_id', user.id)
+          .maybeSingle();
+        
+        if (application && !error) {
+          setExistingApplication(application as ExistingApplication);
+        }
+      }
+      setIsLoadingApplication(false);
+    };
+    getUser();
+  }, []);
 
   const [companyForm, setCompanyForm] = useState<CompanyApplication>({
     companyName: "",
@@ -124,7 +167,7 @@ const DeliveryProviderApplication = () => {
     previousClients: "",
     insuranceCoverage: "",
     certifications: [],
-    whyJoinUjenziPro: "",
+    whyJoinMradiPro: "",
     additionalServices: ""
   });
 
@@ -176,10 +219,46 @@ const DeliveryProviderApplication = () => {
   };
 
   const handleCompanySubmit = async () => {
+    if (!currentUser) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to submit your application.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Insert into delivery_provider_registrations table
+      const { error } = await supabase
+        .from('delivery_provider_registrations')
+        .insert({
+          auth_user_id: currentUser.id,
+          full_name: companyForm.contactPerson,
+          email: companyForm.contactEmail,
+          phone: companyForm.contactPhone,
+          company_name: companyForm.companyName,
+          business_registration_number: companyForm.businessRegistration,
+          is_company: true,
+          county: companyForm.operatingAreas[0] || 'Nairobi',
+          physical_address: companyForm.businessAddress,
+          service_areas: companyForm.operatingAreas.length > 0 ? companyForm.operatingAreas : ['Nairobi'],
+          vehicle_type: 'lorry_medium', // Company fleet default
+          vehicle_registration: 'Fleet - Multiple Vehicles',
+          vehicle_capacity_description: companyForm.deliveryCapacity,
+          driving_license_number: 'Company Fleet',
+          insurance_provider: companyForm.insuranceCoverage,
+          pricing_notes: `Operating Hours: ${companyForm.operatingHours}. Service Types: ${companyForm.serviceTypes.join(', ')}. Specializations: ${companyForm.specializations.join(', ')}. Why join: ${companyForm.whyJoinMradiPro}`,
+          available_hours_start: '06:00',
+          available_hours_end: '20:00',
+          terms_accepted: true,
+          privacy_accepted: true,
+          background_check_consent: true,
+          status: 'pending'
+        });
+
+      if (error) throw error;
       
       toast({
         title: "Application Submitted Successfully",
@@ -194,7 +273,7 @@ const DeliveryProviderApplication = () => {
         yearEstablished: "",
         companySize: "",
         contactPerson: "",
-        contactEmail: "",
+        contactEmail: currentUser?.email || "",
         contactPhone: "",
         businessAddress: "",
         operatingAreas: [],
@@ -207,13 +286,14 @@ const DeliveryProviderApplication = () => {
         previousClients: "",
         insuranceCoverage: "",
         certifications: [],
-        whyJoinUjenziPro: "",
+        whyJoinMradiPro: "",
         additionalServices: ""
       });
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Company application error:', error);
       toast({
         title: "Submission Failed",
-        description: "There was an error submitting your application. Please try again.",
+        description: error.message || "There was an error submitting your application. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -222,10 +302,48 @@ const DeliveryProviderApplication = () => {
   };
 
   const handlePrivateSubmit = async () => {
+    if (!currentUser) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to submit your application.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Insert into delivery_provider_registrations table
+      const { error } = await supabase
+        .from('delivery_provider_registrations')
+        .insert({
+          auth_user_id: currentUser.id,
+          full_name: privateForm.fullName,
+          email: privateForm.email,
+          phone: privateForm.phoneNumber,
+          id_number: privateForm.idNumber,
+          is_company: false,
+          county: privateForm.availableAreas[0] || 'Nairobi',
+          physical_address: privateForm.address,
+          service_areas: privateForm.availableAreas.length > 0 ? privateForm.availableAreas : ['Nairobi'],
+          vehicle_type: privateForm.vehicleType || 'motorcycle',
+          vehicle_registration: privateForm.licensePlate || 'Pending',
+          vehicle_capacity_description: `${privateForm.vehicleModel} (${privateForm.vehicleYear})`,
+          driving_license_number: privateForm.drivingLicense || 'Pending',
+          years_driving_experience: privateForm.experience === 'beginner' ? 1 : 
+                                    privateForm.experience === 'intermediate' ? 2 : 
+                                    privateForm.experience === 'experienced' ? 4 : 6,
+          ntsa_compliance: privateForm.hasInsurance,
+          pricing_notes: `Working Hours: ${privateForm.workingHours}. Motivation: ${privateForm.motivation}. Skills: ${privateForm.additionalSkills}. Emergency: ${privateForm.emergencyContact} (${privateForm.emergencyPhone})`,
+          available_hours_start: '08:00',
+          available_hours_end: '18:00',
+          terms_accepted: true,
+          privacy_accepted: true,
+          background_check_consent: privateForm.hasGoodConductCert,
+          status: 'pending'
+        });
+
+      if (error) throw error;
       
       toast({
         title: "Application Submitted Successfully",
@@ -237,7 +355,7 @@ const DeliveryProviderApplication = () => {
         fullName: "",
         idNumber: "",
         phoneNumber: "",
-        email: "",
+        email: currentUser?.email || "",
         address: "",
         vehicleType: "",
         vehicleModel: "",
@@ -255,10 +373,11 @@ const DeliveryProviderApplication = () => {
         motivation: "",
         additionalSkills: ""
       });
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Private application error:', error);
       toast({
         title: "Submission Failed",
-        description: "There was an error submitting your application. Please try again.",
+        description: error.message || "There was an error submitting your application. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -276,8 +395,15 @@ const DeliveryProviderApplication = () => {
     "Bulk delivery", "Fragile items", "Heavy materials", "Long-distance delivery"
   ];
 
+  // Vehicle types must match database constraint exactly
   const vehicleTypes = [
-    "Motorcycle", "Pickup truck", "Small truck", "Medium truck", "Large truck", "Van"
+    { value: "motorcycle", label: "Motorcycle" },
+    { value: "tuk_tuk", label: "Tuk Tuk / Bajaj" },
+    { value: "pickup", label: "Pickup Truck" },
+    { value: "lorry_small", label: "Small Lorry (up to 3 tons)" },
+    { value: "lorry_medium", label: "Medium Lorry (3-7 tons)" },
+    { value: "lorry_large", label: "Large Lorry (7+ tons)" },
+    { value: "trailer", label: "Trailer" }
   ];
 
   const deliverySpecializations = [
@@ -296,7 +422,7 @@ const DeliveryProviderApplication = () => {
             Become a Delivery Provider
           </h1>
           <p className="text-lg text-muted-foreground mb-6">
-            Join UjenziPro's network of trusted delivery partners and grow your business
+            Join MradiPro's network of trusted delivery partners and grow your business
           </p>
           
           {/* Benefits Overview */}
@@ -321,13 +447,173 @@ const DeliveryProviderApplication = () => {
           <Alert className="max-w-2xl mx-auto mb-6 border-green-200 bg-green-50">
             <CheckCircle className="h-4 w-4" />
             <AlertDescription>
-              <strong>Join Kenya's Leading Construction Platform:</strong> Partner with UjenziPro to access 
+              <strong>Join Kenya's Leading Construction Platform:</strong> Partner with MradiPro to access 
               thousands of builders and suppliers who need reliable delivery services across all 47 counties.
             </AlertDescription>
           </Alert>
         </div>
 
-        {/* Application Tabs */}
+        {/* Application Status Banner */}
+        {isLoadingApplication ? (
+          <div className="max-w-4xl mx-auto mb-8">
+            <Card className="border-gray-200 bg-gray-50">
+              <CardContent className="py-6">
+                <div className="flex items-center justify-center gap-2 text-gray-500">
+                  <Clock className="h-5 w-5 animate-spin" />
+                  <span>Checking application status...</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        ) : existingApplication ? (
+          <div className="max-w-4xl mx-auto mb-8">
+            {existingApplication.status === 'approved' && (
+              <Card className="border-green-300 bg-green-50">
+                <CardContent className="py-6">
+                  <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 rounded-full bg-green-100">
+                        <CheckCircle className="h-8 w-8 text-green-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-green-800">🎉 Congratulations! Your Application is Approved</h3>
+                        <p className="text-green-700">
+                          Welcome to MradiPro's delivery network, {existingApplication.company_name || existingApplication.full_name}!
+                        </p>
+                        <p className="text-sm text-green-600 mt-1">
+                          Approved on: {new Date(existingApplication.updated_at).toLocaleDateString('en-KE', { 
+                            year: 'numeric', month: 'long', day: 'numeric' 
+                          })}
+                        </p>
+                        {existingApplication.admin_notes && (
+                          <p className="text-sm text-green-600 mt-2 italic">
+                            Note: {existingApplication.admin_notes}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Badge className="bg-green-600 text-white text-lg px-4 py-2">
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        APPROVED
+                      </Badge>
+                      <Button 
+                        className="bg-green-600 hover:bg-green-700"
+                        onClick={() => window.location.href = '/delivery-dashboard'}
+                      >
+                        Go to Dashboard
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {existingApplication.status === 'rejected' && (
+              <Card className="border-red-300 bg-red-50">
+                <CardContent className="py-6">
+                  <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 rounded-full bg-red-100">
+                        <AlertTriangle className="h-8 w-8 text-red-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-red-800">Application Not Approved</h3>
+                        <p className="text-red-700">
+                          Unfortunately, your application was not approved at this time.
+                        </p>
+                        <p className="text-sm text-red-600 mt-1">
+                          Reviewed on: {new Date(existingApplication.updated_at).toLocaleDateString('en-KE', { 
+                            year: 'numeric', month: 'long', day: 'numeric' 
+                          })}
+                        </p>
+                        {existingApplication.admin_notes && (
+                          <p className="text-sm text-red-600 mt-2 italic">
+                            Reason: {existingApplication.admin_notes}
+                          </p>
+                        )}
+                        <p className="text-sm text-red-600 mt-2">
+                          You may contact support at <a href="mailto:delivery@mradipro.com" className="underline">delivery@mradipro.com</a> for more information.
+                        </p>
+                      </div>
+                    </div>
+                    <Badge className="bg-red-600 text-white text-lg px-4 py-2">
+                      <AlertTriangle className="h-4 w-4 mr-2" />
+                      NOT APPROVED
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {existingApplication.status === 'pending' && (
+              <Card className="border-yellow-300 bg-yellow-50">
+                <CardContent className="py-6">
+                  <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 rounded-full bg-yellow-100">
+                        <Clock className="h-8 w-8 text-yellow-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-yellow-800">Application Pending Review</h3>
+                        <p className="text-yellow-700">
+                          Your application for {existingApplication.company_name || existingApplication.full_name} is being reviewed.
+                        </p>
+                        <p className="text-sm text-yellow-600 mt-1">
+                          Submitted on: {new Date(existingApplication.created_at).toLocaleDateString('en-KE', { 
+                            year: 'numeric', month: 'long', day: 'numeric' 
+                          })}
+                        </p>
+                        <p className="text-sm text-yellow-600 mt-2">
+                          We typically review applications within 2-5 business days. You'll receive an email notification once reviewed.
+                        </p>
+                      </div>
+                    </div>
+                    <Badge className="bg-yellow-600 text-white text-lg px-4 py-2">
+                      <Clock className="h-4 w-4 mr-2" />
+                      PENDING
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {existingApplication.status === 'under_review' && (
+              <Card className="border-blue-300 bg-blue-50">
+                <CardContent className="py-6">
+                  <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 rounded-full bg-blue-100">
+                        <Info className="h-8 w-8 text-blue-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-blue-800">Application Under Review</h3>
+                        <p className="text-blue-700">
+                          Your application is currently being reviewed by our team.
+                        </p>
+                        <p className="text-sm text-blue-600 mt-1">
+                          Submitted on: {new Date(existingApplication.created_at).toLocaleDateString('en-KE', { 
+                            year: 'numeric', month: 'long', day: 'numeric' 
+                          })}
+                        </p>
+                        <p className="text-sm text-blue-600 mt-2">
+                          A member of our team is actively reviewing your application. Expect a decision within 1-2 business days.
+                        </p>
+                      </div>
+                    </div>
+                    <Badge className="bg-blue-600 text-white text-lg px-4 py-2">
+                      <Info className="h-4 w-4 mr-2" />
+                      UNDER REVIEW
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        ) : null}
+
+        {/* Application Tabs - Only show if no existing application or if rejected */}
+        {(!existingApplication || existingApplication.status === 'rejected') && (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full max-w-6xl mx-auto">
           <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto mb-8">
             <TabsTrigger value="company" className="flex items-center gap-2">
@@ -349,7 +635,7 @@ const DeliveryProviderApplication = () => {
                   Delivery Company Application
                 </CardTitle>
                 <CardDescription>
-                  Apply as a registered delivery company to join UjenziPro's network of trusted partners
+                  Apply as a registered delivery company to join MradiPro's network of trusted partners
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -556,12 +842,12 @@ const DeliveryProviderApplication = () => {
                   <h3 className="text-lg font-semibold">Additional Information</h3>
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="whyJoinUjenziPro">Why do you want to join UjenziPro? *</Label>
+                      <Label htmlFor="whyJoinMradiPro">Why do you want to join MradiPro? *</Label>
                       <Textarea
-                        id="whyJoinUjenziPro"
+                        id="whyJoinMradiPro"
                         placeholder="Tell us about your motivation and how you can contribute to our platform"
-                        value={companyForm.whyJoinUjenziPro}
-                        onChange={(e) => handleCompanyFormChange('whyJoinUjenziPro', e.target.value)}
+                        value={companyForm.whyJoinMradiPro}
+                        onChange={(e) => handleCompanyFormChange('whyJoinMradiPro', e.target.value)}
                       />
                     </div>
                     <div className="space-y-2">
@@ -680,7 +966,7 @@ const DeliveryProviderApplication = () => {
                         </SelectTrigger>
                         <SelectContent>
                           {vehicleTypes.map((type) => (
-                            <SelectItem key={type} value={type}>{type}</SelectItem>
+                            <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -823,7 +1109,7 @@ const DeliveryProviderApplication = () => {
 
                 {/* Motivation */}
                 <div className="space-y-2">
-                  <Label htmlFor="motivation">Why do you want to join UjenziPro? *</Label>
+                  <Label htmlFor="motivation">Why do you want to join MradiPro? *</Label>
                   <Textarea
                     id="motivation"
                     placeholder="Tell us about your motivation and goals as a delivery provider"
@@ -857,6 +1143,7 @@ const DeliveryProviderApplication = () => {
             </Card>
           </TabsContent>
         </Tabs>
+        )}
 
         {/* Application Process */}
         <Card className="max-w-4xl mx-auto mt-8">

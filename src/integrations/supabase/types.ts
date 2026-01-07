@@ -4329,6 +4329,102 @@ export type Database = {
         }
         Relationships: []
       }
+      cart_items: {
+        Row: {
+          id: string
+          user_id: string
+          product_id: string
+          supplier_id: string | null
+          product_name: string
+          product_image: string | null
+          price: number
+          quantity: number
+          unit: string | null
+          category: string | null
+          notes: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          product_id: string
+          supplier_id?: string | null
+          product_name: string
+          product_image?: string | null
+          price: number
+          quantity?: number
+          unit?: string | null
+          category?: string | null
+          notes?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          product_id?: string
+          supplier_id?: string | null
+          product_name?: string
+          product_image?: string | null
+          price?: number
+          quantity?: number
+          unit?: string | null
+          category?: string | null
+          notes?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          id: string
+          user_id: string
+          type: string
+          title: string
+          message: string
+          data: Json | null
+          read: boolean | null
+          read_at: string | null
+          action_url: string | null
+          action_label: string | null
+          priority: string | null
+          expires_at: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          type?: string
+          title: string
+          message: string
+          data?: Json | null
+          read?: boolean | null
+          read_at?: string | null
+          action_url?: string | null
+          action_label?: string | null
+          priority?: string | null
+          expires_at?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          type?: string
+          title?: string
+          message?: string
+          data?: Json | null
+          read?: boolean | null
+          read_at?: string | null
+          action_url?: string | null
+          action_label?: string | null
+          priority?: string | null
+          expires_at?: string | null
+          created_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -6148,6 +6244,76 @@ export type Database = {
       verify_supplier_self_access: {
         Args: { target_user_id: string }
         Returns: boolean
+      }
+      upsert_cart_item: {
+        Args: {
+          p_product_id: string
+          p_product_name: string
+          p_price: number
+          p_quantity?: number
+          p_supplier_id?: string | null
+          p_product_image?: string | null
+          p_unit?: string
+          p_category?: string | null
+          p_notes?: string | null
+        }
+        Returns: string
+      }
+      get_cart_total: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          total_items: number
+          total_quantity: number
+          total_price: number
+        }[]
+      }
+      clear_cart: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      create_notification: {
+        Args: {
+          p_user_id: string
+          p_type: string
+          p_title: string
+          p_message: string
+          p_data?: Json
+          p_action_url?: string | null
+          p_action_label?: string | null
+          p_priority?: string
+          p_expires_at?: string | null
+        }
+        Returns: string
+      }
+      mark_notification_read: {
+        Args: { p_notification_id: string }
+        Returns: boolean
+      }
+      mark_all_notifications_read: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      get_unread_notification_count: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      get_recent_notifications: {
+        Args: {
+          p_limit?: number
+          p_unread_only?: boolean
+        }
+        Returns: {
+          id: string
+          type: string
+          title: string
+          message: string
+          data: Json
+          read: boolean
+          action_url: string | null
+          action_label: string | null
+          priority: string
+          created_at: string
+        }[]
       }
     }
     Enums: {

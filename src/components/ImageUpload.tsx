@@ -28,26 +28,42 @@ export const ImageUpload = ({
   const [previewUrl, setPreviewUrl] = useState(currentImageUrl);
   const { toast } = useToast();
 
+  // Supported image formats
+  const SUPPORTED_IMAGE_TYPES = [
+    'image/jpeg',
+    'image/jpg', 
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'image/avif',
+    'image/svg+xml',
+    'image/bmp',
+    'image/tiff',
+    'image/heic',
+    'image/heif'
+  ];
+
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
       const file = event.target.files?.[0];
       if (!file) return;
 
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
+      // Validate file type - support all common image formats
+      const isValidImage = file.type.startsWith('image/') || SUPPORTED_IMAGE_TYPES.includes(file.type.toLowerCase());
+      if (!isValidImage) {
         toast({
           title: 'Invalid file type',
-          description: 'Please select an image file',
+          description: 'Please select an image file (JPG, PNG, GIF, WEBP, AVIF, SVG, BMP, TIFF, HEIC)',
           variant: 'destructive',
         });
         return;
       }
 
-      // Validate file size (5MB max)
-      if (file.size > 5 * 1024 * 1024) {
+      // Validate file size (10MB max for larger formats)
+      if (file.size > 10 * 1024 * 1024) {
         toast({
           title: 'File too large',
-          description: 'Please select an image under 5MB',
+          description: 'Please select an image under 10MB',
           variant: 'destructive',
         });
         return;
@@ -175,15 +191,15 @@ export const ImageUpload = ({
       <input
         id={`file-input-${bucket}`}
         type="file"
-        accept="image/*"
+        accept="image/*,.jpg,.jpeg,.png,.gif,.webp,.avif,.svg,.bmp,.tiff,.heic,.heif"
         onChange={handleFileSelect}
         className="hidden"
       />
 
       <p className="text-xs text-muted-foreground text-center">
-        Recommended: Square image, max 5MB
+        Recommended: Square image, max 10MB
         <br />
-        Formats: JPG, PNG, WEBP
+        Formats: JPG, PNG, GIF, WEBP, AVIF, SVG, BMP, TIFF, HEIC
       </p>
     </div>
   );

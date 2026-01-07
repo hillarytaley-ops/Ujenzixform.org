@@ -1,0 +1,127 @@
+warning: in the working copy of 'src/App.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/pages/Auth.tsx', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/src/App.tsx b/src/App.tsx[m
+[1mindex 47b8912..ad79646 100644[m
+[1m--- a/src/App.tsx[m
+[1m+++ b/src/App.tsx[m
+[36m@@ -1,189 +1,252 @@[m
+[31m-import React, { useEffect } from "react";[m
+[32m+[m[32mimport React, { lazy, Suspense } from "react";[m
+ import { Toaster } from "@/components/ui/toaster";[m
+ import { Toaster as Sonner } from "@/components/ui/sonner";[m
+ import { TooltipProvider } from "@/components/ui/tooltip";[m
+ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";[m
+ import { BrowserRouter, Routes, Route } from "react-router-dom";[m
+[31m-import { ErrorBoundary } from "@/components/ui/error-boundary";[m
+ import { ThemeProvider } from "@/contexts/ThemeContext";[m
+ import { LanguageProvider } from "@/contexts/LanguageContext";[m
+[31m-// import { PrivacyPolicyBanner } from "@/components/PrivacyPolicyBanner";[m
+[31m-// import { DataPrivacyService } from "@/services/DataPrivacyService";[m
+[31m-// import { SecurityAudit } from "@/utils/SecurityAudit";[m
+[32m+[m[32mimport { AuthProvider } from "@/contexts/AuthContext";[m
+[32m+[m[32mimport { ProtectedRoute } from "@/components/security/ProtectedRoute";[m
+ [m
+[31m-// Direct imports - NO lazy loading for instant page loads on all devices (especially iPhone)[m
+[32m+[m[32m// Critical pages - load immediately for fast initial render[m
+ import Index from "./pages/Index";[m
+[31m-import Builders from "./pages/Builders";[m
+[31m-import BuilderRegistration from "./pages/BuilderRegistration";[m
+[31m-import ProfessionalBuilderRegistration from "./pages/ProfessionalBuilderRegistration";[m
+[31m-import PrivateBuilderRegistration from "./pages/PrivateBuilderRegistration";[m
+[31m-import SuppliersIPhone from "./pages/SuppliersIPhone";[m
+[31m-import SuppliersMobileOptimized from "./pages/SuppliersMobileOptimized";[m
+[31m-import BuilderPortal from "./pages/BuilderPortal";[m
+[31m-import About from "./pages/About";[m
+[31m-import Contact from "./pages/Contact";[m
+ import Auth from "./pages/Auth";[m
+[31m-import AdminAuth from "./pages/AdminAuth";[m
+[31m-import ResetPassword from "./pages/ResetPassword";[m
+[31m-import Feedback from "./pages/Feedback";[m
+[31m-import Tracking from "./pages/Tracking";[m
+[31m-import Monitoring from "./pages/Monitoring";[m
+[31m-import Delivery from "./pages/Delivery";[m
+[31m-import Scanners from "./pages/Scanners";[m
+[31m-import Analytics from "./pages/Analytics";[m
+[31m-import DeliveryProviderApplication from "./pages/DeliveryProviderApplication";[m
+ import NotFound from "./pages/NotFound";[m
+ [m
+[31m-// Auth Guard[m
+[31m-import { AuthRequired } from "@/components/security/AuthRequired";[m
+[32m+[m[32m// Lazy load non-critical pages for better initial bundle size[m
+[32m+[m[32mconst Builders = lazy(() => import("./pages/Builders"));[m
+[32m+[m[32mconst BuilderRegistration = lazy(() => import("./pages/BuilderRegistration"));[m
+[32m+[m[32mconst ProfessionalBuilderRegistration = lazy(() => import("./pages/ProfessionalBuilderRegistration"));[m
+[32m+[m[32mconst PrivateBuilderRegistration = lazy(() => import("./pages/PrivateBuilderRegistration"));[m
+[32m+[m[32mconst SuppliersMobileOptimized = lazy(() => import("./pages/SuppliersMobileOptimized"));[m
+[32m+[m[32mconst SupplierRegistration = lazy(() => import("./pages/SupplierRegistration"));[m
+[32m+[m[32mconst SupplierMarketplace = lazy(() => import("./pages/SupplierMarketplace"));[m
+[32m+[m[32mconst BuilderPortal = lazy(() => import("./pages/BuilderPortal"));[m
+[32m+[m[32mconst About = lazy(() => import("./pages/About"));[m
+[32m+[m[32mconst Contact = lazy(() => import("./pages/Contact"));[m
+[32m+[m[32mconst AdminAuth = lazy(() => import("./pages/AdminAuth"));[m
+[32m+[m[32mconst BuilderSignIn = lazy(() => import("./pages/BuilderSignIn"));[m
+[32m+[m[32mconst SupplierSignIn = lazy(() => import("./pages/SupplierSignIn"));[m
+[32m+[m[32mconst SignInChoice = lazy(() => import("./pages/SignInChoice"));[m
+[32m+[m[32mconst ResetPassword = lazy(() => import("./pages/ResetPassword"));[m
+[32m+[m[32mconst Feedback = lazy(() => import("./pages/Feedback"));[m
+[32m+[m[32mconst Tracking = lazy(() => import("./pages/Tracking"));[m
+[32m+[m[32mconst Monitoring = lazy(() => import("./pages/Monitoring"));[m
+[32m+[m[32mconst Delivery = lazy(() => import("./pages/Delivery"));[m
+[32m+[m[32mconst Scanners = lazy(() => import("./pages/Scanners"));[m
+[32m+[m[32mconst Analytics = lazy(() => import("./pages/Analytics"));[m
+[32m+[m[32mconst DeliveryProviderApplication = lazy(() => import("./pages/DeliveryProviderApplication"));[m
+[32m+[m[32mconst TermsOfService = lazy(() => import("./pages/TermsOfService"));[m
+[32m+[m[32mconst PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));[m
+ [m
+[31m-// AI Chatbot[m
+[31m-import { AIConstructionChatbot } from "@/components/chat/AIConstructionChatbot";[m
+[31m-import { SimpleChatButton } from "@/components/chat/SimpleChatButton";[m
+[32m+[m[32m// Auth Guard - lazy loaded[m
+[32m+[m[32mconst AuthRequired = lazy(() => import("@/components/security/AuthRequired").then(m => ({ default: m.AuthRequired })));[m
+ [m
+[31m-// Optimized loading component[m
+[32m+[m[32m// AI Chatbot - lazy loaded for performance[m
+[32m+[m[32mconst SimpleChatButton = lazy(() => import("@/components/chat/SimpleChatButton").then(m => ({ default: m.SimpleChatButton })));[m
+[32m+[m
+[32m+[m[32m// Floating Social Media - lazy loaded[m
+[32m+[m[32mconst FloatingSocialMedia = lazy(() => import("@/components/FloatingSocialMedia").then(m => ({ default: m.FloatingSocialMedia })));[m
+[32m+[m
+[32m+[m[32m// Page loading component with skeleton[m
+ const PageLoader = () => ([m
+   <div className="flex items-center justify-center min-h-screen bg-background">[m
+[31m-    <div className="animate-spin rounded-full h-8 w-8 border-2 border-muted border-t-primary"></div>[m
+[32m+[m[32m    <div className="text-center">[m
+[32m+[m[32m      <div className="animate-spin rounded-full h-10 w-10 border-3 border-muted border-t-primary mx-auto mb-4" />[m
+[32m+[m[32m      <p className="text-muted-foreground text-sm">Loading...</p>[m
+[32m+[m[32m    </div>[m
+   </div>[m
+ );[m
+ [m
+[31m-// Error fallback component[m
+[31m-const ErrorFallback = ({ error, resetErrorBoundary }: { error: Error; resetErrorBoundary: () => void }) => ([m
+[32m+[m[32m// Error Boundary Fallback[m
+[32m+[m[32mconst ErrorFallback = ({ error }: { error?: Error }) => ([m
+   <div className="flex items-center justify-center min-h-screen bg-background">[m
+[31m-    <div className="text-center max-w-md mx-auto p-6">[m
+[31m-      <h2 className="text-2xl font-bold text-destructive mb-4">Oops! Something went wrong</h2>[m
+[31m-      <p className="text-muted-foreground mb-4">{error.message}</p>[m
+[32m+[m[32m    <div className="text-center max-w-md mx-auto p-6 bg-card rounded-lg shadow-lg border">[m
+[32m+[m[32m      <div className="text-4xl mb-4">⚠️</div>[m
+[32m+[m[32m      <h2 className="text-xl font-bold text-destructive mb-2">Something went wrong</h2>[m
+[32m+[m[32m      <p className="text-muted-foreground mb-4 text-sm">[m
+[32m+[m[32m        {error?.message || "An unexpected error occurred. Please try again."}[m
+[32m+[m[32m      </p>[m
+       <button [m
+[31m-        onClick={resetErrorBoundary}[m
+[31m-        className="bg-primary text-primary-foreground px-4 py-2 rounded hover:bg-primary/90"[m
+[32m+[m[32m        onClick={() => window.location.reload()}[m
+[32m+[m[32m        className="bg-primary text-primary-foreground px-6 py-2 rounded-lg hover:bg-primary/90 transition-colors"[m
+       >[m
+[31m-        Try Again[m
+[32m+[m[32m        Reload Page[m
+       </button>[m
+     </div>[m
+   </div>[m
+ );[m
+ [m
+[31m-// Optimized QueryClient with aggressive caching for better performance

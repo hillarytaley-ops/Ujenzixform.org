@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <!-- Outer decorative ring with geometric pattern -->
+  <circle cx="100" cy="100" r="98" fill="#C8D4E3" opacity="0.5"/>
+  
+  <!-- Geometric accent shapes -->
+  <g opacity="0.3">
+    <polygon points="100,2 120,30 100,25 80,30" fill="#8BA3BE"/>
+    <polygon points="198,100 170,120 175,100 170,80" fill="#8BA3BE"/>
+    <polygon points="100,198 80,170 100,175 120,170" fill="#8BA3BE"/>
+    <polygon points="2,100 30,80 25,100 30,120" fill="#8BA3BE"/>
+  </g>
+  
+  <!-- Main navy ring -->
+  <circle cx="100" cy="100" r="85" fill="none" stroke="#0F2C59" stroke-width="8"/>
+  
+  <!-- White inner circle -->
+  <circle cx="100" cy="100" r="70" fill="#ffffff"/>
+  
+  <!-- Inner subtle ring -->
+  <circle cx="100" cy="100" r="65" fill="none" stroke="#E8EDF3" stroke-width="2"/>
+  
+  <!-- M Logo centered -->
+  <g transform="translate(55, 55)">
+    <!-- Main M shape -->
+    <path d="M15 70V20h12l18 28 18-28h12v50h-12V38l-14 22h-8l-14-22v32H15z" fill="#0F2C59"/>
+    
+    <!-- Blue swoosh/arc -->
+    <path d="M8 58c10-14 28-18 46-14 10 2 18 8 28 14" stroke="#4A9FD8" stroke-width="5" fill="none" stroke-linecap="round"/>
+    
+    <!-- Light blue accent lines at top -->
+    <path d="M42 12c5-2 10-2 16 0" stroke="#7BB8E0" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M38 18c8-3 16-3 24 0" stroke="#9ECAE9" stroke-width="2" fill="none" stroke-linecap="round"/>
+  </g>
+  
+  <!-- Text: MRADIPRO -->
+  <text x="100" y="148" text-anchor="middle" font-family="Arial, sans-serif" font-weight="bold" font-size="14" fill="#0F2C59">MRADIPRO</text>
+  
+  <!-- Tagline: JENGA NA MRADIPRO -->
+  <text x="100" y="162" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#4A9FD8" letter-spacing="1">JENGA NA MRADIPRO</text>
+</svg>
+
+
+
+
+
+
+

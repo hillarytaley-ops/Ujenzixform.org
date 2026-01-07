@@ -61,7 +61,7 @@ export const QuoteComparison: React.FC<QuoteComparisonProps> = ({ orderId, build
         .from('quotes')
         .select(`
           *,
-          supplier:suppliers(company_name, location, rating),
+          supplier:suppliers(company_name, address, rating),
           quote_items(*)
         `)
         .eq('order_id', orderId)
@@ -74,7 +74,7 @@ export const QuoteComparison: React.FC<QuoteComparisonProps> = ({ orderId, build
         id: quote.id,
         supplier_id: quote.supplier_id,
         supplier_name: quote.supplier?.company_name || 'Unknown Supplier',
-        supplier_location: quote.supplier?.location || 'Kenya',
+        supplier_location: quote.supplier?.address || 'Kenya',
         supplier_rating: quote.supplier?.rating || 0,
         total_price: quote.total_price || 0,
         delivery_days: quote.delivery_days || 7,

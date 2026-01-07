@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Offline - MradiPro</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      color: white;
+    }
+    
+    .container {
+      text-align: center;
+      max-width: 500px;
+    }
+    
+    .logo {
+      width: 120px;
+      height: 120px;
+      margin-bottom: 30px;
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.8; transform: scale(0.95); }
+    }
+    
+    .offline-icon {
+      width: 80px;
+      height: 80px;
+      margin-bottom: 20px;
+      opacity: 0.8;
+    }
+    
+    h1 {
+      font-size: 28px;
+      margin-bottom: 15px;
+      color: #60a5fa;
+    }
+    
+    p {
+      font-size: 16px;
+      line-height: 1.6;
+      color: #94a3b8;
+      margin-bottom: 30px;
+    }
+    
+    .btn {
+      display: inline-block;
+      padding: 14px 28px;
+      background: #2563eb;
+      color: white;
+      text-decoration: none;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 16px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    .btn:hover {
+      background: #1d4ed8;
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(37, 99, 235, 0.3);
+    }
+    
+    .btn-outline {
+      background: transparent;
+      border: 2px solid #475569;
+      margin-left: 10px;
+    }
+    
+    .btn-outline:hover {
+      background: #1e293b;
+      border-color: #60a5fa;
+    }
+    
+    .tips {
+      margin-top: 40px;
+      padding: 20px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      text-align: left;
+    }
+    
+    .tips h3 {
+      font-size: 14px;
+      color: #60a5fa;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    
+    .tips ul {
+      list-style: none;
+      padding: 0;
+    }
+    
+    .tips li {
+      padding: 8px 0;
+      color: #94a3b8;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .tips li::before {
+      content: "→";
+      color: #22c55e;
+    }
+    
+    .status {
+      margin-top: 30px;
+      padding: 12px 20px;
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+    }
+    
+    .status.online {
+      background: rgba(34, 197, 94, 0.1);
+      border-color: rgba(34, 197, 94, 0.3);
+    }
+    
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #ef4444;
+      animation: blink 1.5s infinite;
+    }
+    
+    .status.online .status-dot {
+      background: #22c55e;
+      animation: none;
+    }
+    
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+    
+    .footer {
+      margin-top: 40px;
+      color: #64748b;
+      font-size: 12px;
+    }
+    
+    @media (max-width: 480px) {
+      h1 { font-size: 24px; }
+      p { font-size: 14px; }
+      .btn { display: block; width: 100%; margin: 10px 0; }
+      .btn-outline { margin-left: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Offline Icon -->
+    <svg class="offline-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0119 12.55M5 12.55a10.94 10.94 0 015.17-2.39M10.71 5.05A16 16 0 0122.58 9M1.42 9a15.91 15.91 0 014.7-2.88M8.53 16.11a6 6 0 016.95 0M12 20h.01"/>
+    </svg>
+    
+    <h1>You're Offline</h1>
+    
+    <p>
+      It looks like you've lost your internet connection. 
+      Don't worry - MradiPro will automatically reconnect when you're back online.
+    </p>
+    
+    <div>
+      <button class="btn" onclick="location.reload()">
+        🔄 Try Again
+      </button>
+      <button class="btn btn-outline" onclick="goHome()">
+        🏠 Go Home
+      </button>
+    </div>
+    
+    <div class="status" id="connectionStatus">
+      <span class="status-dot"></span>
+      <span>No internet connection</span>
+    </div>
+    
+    <div class="tips">
+      <h3>💡 While you're offline</h3>
+      <ul>
+        <li>Check your WiFi or mobile data connection</li>
+        <li>Move to an area with better signal</li>
+        <li>Try switching between WiFi and mobile data</li>
+        <li>Your pending actions will sync automatically when online</li>
+      </ul>
+    </div>
+    
+    <div class="footer">
+      <p>🇰🇪 MradiPro - Kenya's Construction Platform</p>
+      <p style="margin-top: 5px;">Need help? Call +254 700 123 456</p>
+    </div>
+  </div>
+  
+  <script>
+    // Check online status
+    function updateOnlineStatus() {
+      const statusEl = document.getElementById('connectionStatus');
+      if (navigator.onLine) {
+        statusEl.classList.add('online');
+        statusEl.innerHTML = '<span class="status-dot"></span><span>Connection restored! Reloading...</span>';
+        setTimeout(() => location.reload(), 1500);
+      } else {
+        statusEl.classList.remove('online');
+        statusEl.innerHTML = '<span class="status-dot"></span><span>No internet connection</span>';
+      }
+    }
+    
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+    
+    function goHome() {
+      window.location.href = '/';
+    }
+    
+    // Auto-retry every 10 seconds
+    setInterval(() => {
+      if (navigator.onLine) {
+        location.reload();
+      }
+    }, 10000);
+  </script>
+</body>
+</html>

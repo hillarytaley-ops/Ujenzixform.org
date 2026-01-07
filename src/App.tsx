@@ -7,6 +7,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { CartProvider } from "@/contexts/CartContext";
 // import { PrivacyPolicyBanner } from "@/components/PrivacyPolicyBanner";
 // import { DataPrivacyService } from "@/services/DataPrivacyService";
 // import { SecurityAudit } from "@/utils/SecurityAudit";
@@ -34,12 +36,38 @@ import Analytics from "./pages/Analytics";
 import DeliveryProviderApplication from "./pages/DeliveryProviderApplication";
 import NotFound from "./pages/NotFound";
 
+// Dashboard imports
+import AdminDashboard from "./pages/AdminDashboard";
+import BuilderDashboard from "./pages/BuilderDashboard";
+import SupplierDashboard from "./pages/SupplierDashboard";
+import DeliveryDashboard from "./pages/DeliveryDashboard";
+
+// Additional pages
+import SupplierRegistration from "./pages/SupplierRegistration";
+import SupplierMarketplace from "./pages/SupplierMarketplace";
+import SupplierSignIn from "./pages/SupplierSignIn";
+import BuilderSignIn from "./pages/BuilderSignIn";
+import DeliverySignIn from "./pages/DeliverySignIn";
+import DeliveryReceivingScanner from "./pages/DeliveryReceivingScanner";
+import SupplierDispatchScanner from "./pages/SupplierDispatchScanner";
+
+// New Sign-in pages for Private Clients and Professional Builders
+import PrivateClientSignIn from "./pages/PrivateClientSignIn";
+import ProfessionalBuilderSignIn from "./pages/ProfessionalBuilderSignIn";
+import PrivateClientDashboard from "./pages/PrivateClientDashboard";
+import ProfessionalBuilderDashboardPage from "./pages/ProfessionalBuilderDashboard";
+
 // Auth Guard
 import { AuthRequired } from "@/components/security/AuthRequired";
+import { RoleProtectedRoute } from "@/components/security/RoleProtectedRoute";
+import { Navigate, useSearchParams } from "react-router-dom";
 
 // AI Chatbot
 import { AIConstructionChatbot } from "@/components/chat/AIConstructionChatbot";
 import { SimpleChatButton } from "@/components/chat/SimpleChatButton";
+
+// Floating Social Media Button
+import { FloatingSocialSidebar } from "@/components/FloatingSocialSidebar";
 
 // Optimized loading component
 const PageLoader = () => (
@@ -110,14 +138,19 @@ const App = () => {
     <ThemeProvider>
       <LanguageProvider>
         <QueryClientProvider client={queryClient}>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              {/* AI Chatbot - Deferred load for better performance */}
-              {showChat && <SimpleChatButton />}
-              
-              <Routes>
+          <AuthProvider>
+          <CartProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+                {/* AI Chatbot - Deferred load for better performance */}
+                {showChat && <SimpleChatButton />}
+                
+                {/* Floating Social Media Button - Global, hides on auth pages */}
+                {showChat && <FloatingSocialSidebar />}
+                
+                <Routes>
                     {/* Public Routes - Accessible to everyone after single sign in */}
                     <Route path="/" element={<Auth />} />
                     <Route path="/auth" element={<Auth />} />
@@ -174,12 +207,73 @@ const App = () => {
                       </AuthRequired>
                     } />
                     
+                    {/* Sign-in Routes for specific roles */}
+                    <Route path="/supplier-signin" element={<SupplierSignIn />} />
+                    <Route path="/builder-signin" element={<BuilderSignIn />} />
+                    <Route path="/delivery-signin" element={<DeliverySignIn />} />
+                    <Route path="/private-client-signin" element={<PrivateClientSignIn />} />
+                    <Route path="/professional-builder-signin" element={<ProfessionalBuilderSignIn />} />
+                    
+                    {/* Registration Routes */}
+                    <Route path="/supplier-registration" element={<SupplierRegistration />} />
+                    <Route path="/supplier-marketplace" element={<SupplierMarketplace />} />
+                    
+                    {/* Admin Sub-Routes - Redirect to dashboard with tab param */}
+                    <Route path="/admin/pending-registrations" element={<Navigate to="/admin-dashboard?tab=registrations" replace />} />
+                    <Route path="/admin/pending-products" element={<Navigate to="/admin-dashboard?tab=pending-products" replace />} />
+                    <Route path="/admin/users" element={<Navigate to="/admin-dashboard?tab=users" replace />} />
+                    <Route path="/admin/analytics" element={<Navigate to="/admin-dashboard?tab=analytics" replace />} />
+                    
+                    {/* Dashboard Routes - Protected */}
+                    <Route path="/admin-dashboard" element={
+                      <RoleProtectedRoute allowedRoles={['admin']}>
+                        <AdminDashboard />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/builder-dashboard" element={
+                      <RoleProtectedRoute allowedRoles={['builder', 'professional_builder', 'private_client', 'admin']}>
+                        <BuilderDashboard />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/supplier-dashboard" element={
+                      <RoleProtectedRoute allowedRoles={['supplier', 'admin']}>
+                        <SupplierDashboard />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/delivery-dashboard" element={
+                      <RoleProtectedRoute allowedRoles={['delivery', 'delivery_provider', 'admin']}>
+                        <DeliveryDashboard />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/private-client-dashboard" element={
+                      <RoleProtectedRoute allowedRoles={['private_client', 'admin']}>
+                        <PrivateClientDashboard />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/professional-builder-dashboard" element={
+                      <RoleProtectedRoute allowedRoles={['professional_builder', 'admin']}>
+                        <ProfessionalBuilderDashboardPage />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/delivery-receiving-scanner" element={
+                      <RoleProtectedRoute allowedRoles={['delivery', 'delivery_provider', 'admin']}>
+                        <DeliveryReceivingScanner />
+                      </RoleProtectedRoute>
+                    } />
+                    <Route path="/supplier-dispatch-scanner" element={
+                      <RoleProtectedRoute allowedRoles={['supplier', 'admin']}>
+                        <SupplierDispatchScanner />
+                      </RoleProtectedRoute>
+                    } />
+                    
                     {/* 404 */}
                     <Route path="*" element={<NotFound />} />
                 </Routes>
-              {/* Privacy features will be re-enabled once dependencies are resolved */}
-            </BrowserRouter>
-          </TooltipProvider>
+                {/* Privacy features will be re-enabled once dependencies are resolved */}
+              </BrowserRouter>
+            </TooltipProvider>
+            </CartProvider>
+          </AuthProvider>
         </QueryClientProvider>
       </LanguageProvider>
     </ThemeProvider>

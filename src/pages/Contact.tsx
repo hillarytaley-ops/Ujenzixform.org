@@ -103,8 +103,33 @@ const Contact = () => {
         return;
       }
 
-      // Simulate secure form submission
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Use direct fetch to Supabase REST API (more reliable than client)
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzI0NTQwNjIsImV4cCI6MjA0ODAzMDA2Mn0.vu4KlLJLKlJmYb2b4R8MxpVKv0izRdkXC_FVwVRT0LM';
+      
+      // Format the comment with all contact form fields
+      const formattedComment = `Name: ${data.firstName} ${data.lastName}\nEmail: ${data.email}\nPhone: ${data.phone}\nSubject: ${data.subject}\n\nMessage:\n${data.message}`;
+      
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/feedback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({
+          category: '[CONTACT FORM]',
+          comment: formattedComment,
+          rating: null
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Contact form submission error:', errorText);
+        throw new Error('Failed to submit contact form');
+      }
       
       toast({
         title: "Message sent successfully!",

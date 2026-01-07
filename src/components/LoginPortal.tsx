@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { LogIn, UserPlus, Building2, Store, Home } from 'lucide-react';
+import { LogIn, UserPlus, Building2, Store, Home, ShoppingCart } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 interface LoginPortalProps {
@@ -9,23 +9,32 @@ interface LoginPortalProps {
   title?: string;
   description?: string;
   className?: string;
+  redirectTo?: string;
 }
 
 export const LoginPortal: React.FC<LoginPortalProps> = ({ 
   type = 'general',
   title,
   description,
-  className = ''
+  className = '',
+  redirectTo
 }) => {
+  // Determine if redirect is to a dashboard or marketplace
+  const isDashboardRedirect = redirectTo?.includes('dashboard');
+  const isMarketplaceRedirect = redirectTo?.includes('marketplace') || redirectTo?.includes('supplier');
+
   const getPortalConfig = () => {
     switch (type) {
       case 'builder':
         return {
-          icon: Building2,
-          defaultTitle: 'Builder Portal',
-          defaultDescription: 'Access your builder dashboard, manage projects, track materials, and monitor construction sites.',
-          loginText: 'Login as Builder',
+          icon: isDashboardRedirect ? Building2 : ShoppingCart,
+          defaultTitle: isDashboardRedirect ? 'Builder Dashboard Portal' : 'Builder Purchase Portal',
+          defaultDescription: isDashboardRedirect 
+            ? 'Access your builder dashboard, manage projects, track materials, and monitor construction sites.'
+            : 'Sign in to browse and purchase quality construction materials from verified suppliers.',
+          loginText: isDashboardRedirect ? 'Sign In to Dashboard' : 'Sign In to Purchase',
           registerText: 'Register as Builder',
+          loginLink: redirectTo ? `/builder-signin?redirect=${encodeURIComponent(redirectTo)}` : '/builder-signin',
           registerLink: '/builder-registration',
           iconColor: 'text-blue-600',
           gradientFrom: 'from-blue-600',
@@ -38,7 +47,8 @@ export const LoginPortal: React.FC<LoginPortalProps> = ({
           defaultDescription: 'Manage your inventory, process orders, track deliveries, and grow your supplier business.',
           loginText: 'Login as Supplier',
           registerText: 'Register as Supplier',
-          registerLink: '/suppliers',
+          loginLink: '/auth',
+          registerLink: '/supplier-registration',
           iconColor: 'text-orange-600',
           gradientFrom: 'from-orange-600',
           gradientTo: 'to-orange-700'
@@ -50,6 +60,7 @@ export const LoginPortal: React.FC<LoginPortalProps> = ({
           defaultDescription: 'Login to access your personalized dashboard, manage projects, and connect with Kenya\'s construction community.',
           loginText: 'Login',
           registerText: 'Create Account',
+          loginLink: '/auth',
           registerLink: '/auth',
           iconColor: 'text-primary',
           gradientFrom: 'from-primary',
@@ -75,7 +86,7 @@ export const LoginPortal: React.FC<LoginPortalProps> = ({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        <Link to="/auth" className="block">
+        <Link to={config.loginLink} className="block">
           <Button 
             className={`w-full bg-gradient-to-r ${config.gradientFrom} ${config.gradientTo} hover:opacity-90 text-white font-semibold py-6 text-lg`}
             size="lg"
@@ -104,17 +115,16 @@ export const LoginPortal: React.FC<LoginPortalProps> = ({
             {config.registerText}
           </Button>
         </Link>
-
-        {type !== 'general' && (
-          <div className="pt-2 text-center">
-            <Link to="/" className="text-sm text-muted-foreground hover:text-primary hover:underline">
-              ← Back to Home
-            </Link>
-          </div>
+        
+        {/* Show redirect info if applicable */}
+        {redirectTo && (
+          <p className="text-xs text-center text-muted-foreground mt-2">
+            You'll be redirected to {isMarketplaceRedirect ? 'Supplier Marketplace' : 'your Dashboard'} after signing in
+          </p>
         )}
       </CardContent>
     </Card>
   );
 };
 
-
+export default LoginPortal;

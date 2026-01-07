@@ -1,0 +1,535 @@
+import React, { useState } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { 
+  Truck, Package, MapPin, Clock, DollarSign, Users, Phone,
+  CheckCircle, XCircle, AlertCircle, Navigation as NavigationIcon,
+  Timer, Route, Camera, MessageSquare, ThumbsUp, ThumbsDown,
+  Loader2, AlertTriangle
+} from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { trackingNumberService } from '@/services/TrackingNumberService';
+
+interface DeliveryRequest {
+  id: string;
+  pickup_location: string;
+  delivery_location: string;
+  material_type: string;
+  quantity: string;
+  customer_name: string;
+  customer_phone: string;
+  status: string;
+  estimated_time: string;
+  price: number;
+  distance: number;
+  urgency?: 'normal' | 'urgent' | 'emergency';
+  special_instructions?: string;
+  created_at?: string;
+}
+
+interface DeliveryRequestCardProps {
+  delivery: DeliveryRequest;
+  isDarkMode?: boolean;
+  onAccept?: (deliveryId: string) => void;
+  onReject?: (deliveryId: string, reason: string) => void;
+  onNavigate?: (delivery: DeliveryRequest) => void;
+  onCall?: (phone: string) => void;
+  onCaptureProof?: (deliveryId: string) => void;
+}
+
+export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
+  delivery,
+  isDarkMode = false,
+  onAccept,
+  onReject,
+  onNavigate,
+  onCall,
+  onCaptureProof
+}) => {
+  const [isAccepting, setIsAccepting] = useState(false);
+  const [isRejecting, setIsRejecting] = useState(false);
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [showAcceptDialog, setShowAcceptDialog] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const { toast } = useToast();
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+      case 'assigned': return 'bg-blue-100 text-blue-800 border-blue-300';
+      case 'accepted': return 'bg-green-100 text-green-800 border-green-300';
+      case 'pending_pickup': return 'bg-orange-100 text-orange-800 border-orange-300';
+      case 'in_transit': return 'bg-purple-100 text-purple-800 border-purple-300';
+      case 'delivered': return 'bg-green-100 text-green-800 border-green-300';
+      case 'rejected': return 'bg-red-100 text-red-800 border-red-300';
+      case 'cancelled': return 'bg-gray-100 text-gray-800 border-gray-300';
+      default: return 'bg-gray-100 text-gray-800 border-gray-300';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'pending': return <Clock className="h-4 w-4" />;
+      case 'assigned': return <Users className="h-4 w-4" />;
+      case 'accepted': return <CheckCircle className="h-4 w-4" />;
+      case 'pending_pickup': return <Package className="h-4 w-4" />;
+      case 'in_transit': return <Truck className="h-4 w-4" />;
+      case 'delivered': return <CheckCircle className="h-4 w-4" />;
+      case 'rejected': return <XCircle className="h-4 w-4" />;
+      case 'cancelled': return <AlertCircle className="h-4 w-4" />;
+      default: return <Clock className="h-4 w-4" />;
+    }
+  };
+
+  const getUrgencyBadge = (urgency?: string) => {
+    switch (urgency) {
+      case 'emergency':
+        return <Badge className="bg-red-500 text-white animate-pulse">🚨 Emergency</Badge>;
+      case 'urgent':
+        return <Badge className="bg-orange-500 text-white">⚡ Urgent</Badge>;
+      default:
+        return null;
+    }
+  };
+
+  const formatStatus = (status: string) => {
+    return status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-KE', {
+      style: 'currency',
+      currency: 'KES',
+      minimumFractionDigits: 0
+    }).format(amount);
+  };
+
+  const handleAccept = async () => {
+    setIsAccepting(true);
+    try {
+      // Get current user (delivery provider)
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Get provider ID
+      const { data: providerData } = await supabase
+        .from('delivery_providers')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!providerData) throw new Error('Provider not found');
+
+      // Use TrackingNumberService to handle acceptance and generate tracking number
+      const result = await trackingNumberService.onProviderAcceptsDelivery(
+        delivery.id,
+        providerData.id
+      );
+
+      if (!result) {
+        throw new Error('Failed to generate tracking number');
+      }
+
+      toast({
+        title: "✅ Delivery Accepted!",
+        description: result.isNew 
+          ? `Tracking number ${result.trackingNumber} generated and sent to builder. Start navigation to pickup!`
+          : `Using existing tracking number ${result.trackingNumber}. Start navigation to pickup!`,
+      });
+
+      onAccept?.(delivery.id);
+      setShowAcceptDialog(false);
+    } catch (error) {
+      console.error('Error accepting delivery:', error);
+      toast({
+        title: "Error",
+        description: "Failed to accept delivery. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsAccepting(false);
+    }
+  };
+
+  const handleReject = async () => {
+    if (!rejectReason.trim()) {
+      toast({
+        title: "Reason Required",
+        description: "Please provide a reason for rejecting this delivery.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsRejecting(true);
+    try {
+      // Get current user (delivery provider)
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Get provider ID
+      const { data: providerData } = await supabase
+        .from('delivery_providers')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      // Check if this delivery was previously accepted (has tracking number)
+      const { data: deliveryData } = await supabase
+        .from('delivery_requests')
+        .select('tracking_number, status')
+        .eq('id', delivery.id)
+        .single();
+
+      if (deliveryData?.tracking_number && deliveryData?.status === 'accepted') {
+        // Provider is cancelling after accepting - use service to handle reassignment
+        await trackingNumberService.onProviderCancelsDelivery(
+          delivery.id,
+          providerData?.id || '',
+          rejectReason
+        );
+
+        toast({
+          title: "Delivery Cancelled",
+          description: "The delivery will be reassigned to another provider. Builder has been notified.",
+        });
+      } else {
+        // Simple rejection (never accepted)
+        const { error } = await supabase
+          .from('delivery_requests')
+          .update({ 
+            status: 'rejected',
+            rejection_reason: rejectReason,
+            rejected_at: new Date().toISOString()
+          })
+          .eq('id', delivery.id);
+
+        if (error) throw error;
+
+        toast({
+          title: "Delivery Rejected",
+          description: "The delivery request has been rejected.",
+        });
+      }
+
+      onReject?.(delivery.id, rejectReason);
+      setShowRejectDialog(false);
+      setRejectReason('');
+    } catch (error) {
+      console.error('Error rejecting delivery:', error);
+      toast({
+        title: "Error",
+        description: "Failed to reject delivery. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsRejecting(false);
+    }
+  };
+
+  const isPendingRequest = delivery.status === 'pending' || delivery.status === 'assigned';
+  const isAccepted = delivery.status === 'accepted' || delivery.status === 'pending_pickup' || delivery.status === 'in_transit';
+
+  return (
+    <>
+      <Card className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'} hover:shadow-lg transition-all ${
+        delivery.urgency === 'emergency' ? 'ring-2 ring-red-500 ring-opacity-50' : 
+        delivery.urgency === 'urgent' ? 'ring-2 ring-orange-500 ring-opacity-50' : ''
+      }`}>
+        <CardContent className="p-6">
+          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+            {/* Left Section - Delivery Details */}
+            <div className="flex-1">
+              {/* Status and ID Row */}
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                <Badge className={`${getStatusColor(delivery.status)} flex items-center gap-1`}>
+                  {getStatusIcon(delivery.status)}
+                  {formatStatus(delivery.status)}
+                </Badge>
+                {getUrgencyBadge(delivery.urgency)}
+                <span className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  {delivery.id}
+                </span>
+                {delivery.created_at && (
+                  <span className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                    • {new Date(delivery.created_at).toLocaleTimeString()}
+                  </span>
+                )}
+              </div>
+              
+              {/* Locations */}
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <div className="flex items-start gap-2 mb-2">
+                    <div className="w-3 h-3 bg-green-500 rounded-full mt-1.5 flex-shrink-0"></div>
+                    <div>
+                      <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Pickup Location</p>
+                      <p className={`text-sm font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                        {delivery.pickup_location}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <div className="w-3 h-3 bg-red-500 rounded-full mt-1.5 flex-shrink-0"></div>
+                    <div>
+                      <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Delivery Location</p>
+                      <p className={`text-sm font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                        {delivery.delivery_location}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Details */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Package className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                    <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      {delivery.material_type} - {delivery.quantity}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                    <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      {delivery.customer_name}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Phone className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                    <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      {delivery.customer_phone}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Special Instructions */}
+              {delivery.special_instructions && (
+                <div className={`mt-3 p-2 rounded-lg ${isDarkMode ? 'bg-gray-700' : 'bg-yellow-50'}`}>
+                  <p className={`text-xs font-medium ${isDarkMode ? 'text-yellow-400' : 'text-yellow-700'}`}>
+                    <MessageSquare className="h-3 w-3 inline mr-1" />
+                    Special Instructions:
+                  </p>
+                  <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    {delivery.special_instructions}
+                  </p>
+                </div>
+              )}
+            </div>
+            
+            {/* Right Section - Price and Actions */}
+            <div className="flex flex-col items-end gap-3 min-w-[200px]">
+              {/* Price and Distance */}
+              <div className="text-right">
+                <p className="text-2xl font-bold text-teal-600">{formatCurrency(delivery.price)}</p>
+                <div className={`flex items-center gap-2 text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  <Timer className="h-4 w-4" />
+                  {delivery.estimated_time}
+                  <span className="mx-1">•</span>
+                  <Route className="h-4 w-4" />
+                  {delivery.distance} km
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col gap-2 w-full">
+                {/* Accept/Reject Buttons for Pending Requests */}
+                {isPendingRequest && (
+                  <div className="flex gap-2 w-full">
+                    <Button 
+                      className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                      onClick={() => setShowAcceptDialog(true)}
+                    >
+                      <ThumbsUp className="h-4 w-4 mr-1" />
+                      Accept
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      className="flex-1 border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700"
+                      onClick={() => setShowRejectDialog(true)}
+                    >
+                      <ThumbsDown className="h-4 w-4 mr-1" />
+                      Reject
+                    </Button>
+                  </div>
+                )}
+
+                {/* Action Buttons for Accepted Deliveries */}
+                {isAccepted && (
+                  <div className="flex flex-wrap gap-2">
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => onCall?.(delivery.customer_phone)}
+                    >
+                      <Phone className="h-4 w-4 mr-1" />
+                      Call
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => onCaptureProof?.(delivery.id)}
+                    >
+                      <Camera className="h-4 w-4 mr-1" />
+                      Proof
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      className="bg-teal-600 hover:bg-teal-700"
+                      onClick={() => onNavigate?.(delivery)}
+                    >
+                      <NavigationIcon className="h-4 w-4 mr-1" />
+                      Navigate
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Accept Confirmation Dialog */}
+      <Dialog open={showAcceptDialog} onOpenChange={setShowAcceptDialog}>
+        <DialogContent className={isDarkMode ? 'bg-gray-800 text-white' : ''}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-green-500" />
+              Accept Delivery Request?
+            </DialogTitle>
+            <DialogDescription className={isDarkMode ? 'text-gray-400' : ''}>
+              You are about to accept this delivery request. Once accepted, you should proceed to the pickup location.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Material:</span>
+                <span className={`font-medium ${isDarkMode ? 'text-white' : ''}`}>{delivery.material_type}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Distance:</span>
+                <span className={`font-medium ${isDarkMode ? 'text-white' : ''}`}>{delivery.distance} km</span>
+              </div>
+              <div className="flex justify-between">
+                <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Earnings:</span>
+                <span className="font-medium text-green-600">{formatCurrency(delivery.price)}</span>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAcceptDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              className="bg-green-600 hover:bg-green-700"
+              onClick={handleAccept}
+              disabled={isAccepting}
+            >
+              {isAccepting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Accepting...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Accept Delivery
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reject Confirmation Dialog */}
+      <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
+        <DialogContent className={isDarkMode ? 'bg-gray-800 text-white' : ''}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+              Reject Delivery Request?
+            </DialogTitle>
+            <DialogDescription className={isDarkMode ? 'text-gray-400' : ''}>
+              Please provide a reason for rejecting this delivery. This helps us improve our service.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="rejectReason">Reason for Rejection *</Label>
+              <Textarea
+                id="rejectReason"
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="e.g., Too far, Vehicle unavailable, Already have another delivery..."
+                className={isDarkMode ? 'bg-gray-700 border-gray-600' : ''}
+                rows={3}
+              />
+            </div>
+
+            {/* Quick Reject Reasons */}
+            <div className="flex flex-wrap gap-2">
+              {['Too far', 'Vehicle unavailable', 'Already busy', 'Route not feasible', 'Personal emergency'].map((reason) => (
+                <Badge 
+                  key={reason}
+                  variant="outline"
+                  className="cursor-pointer hover:bg-gray-100"
+                  onClick={() => setRejectReason(reason)}
+                >
+                  {reason}
+                </Badge>
+              ))}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowRejectDialog(false);
+              setRejectReason('');
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={handleReject}
+              disabled={isRejecting || !rejectReason.trim()}
+            >
+              {isRejecting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Rejecting...
+                </>
+              ) : (
+                <>
+                  <XCircle className="h-4 w-4 mr-2" />
+                  Reject Delivery
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+};
+
+export default DeliveryRequestCard;
+
+
+
+

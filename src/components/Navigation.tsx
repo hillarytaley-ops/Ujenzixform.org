@@ -14,18 +14,30 @@ const Navigation = () => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const location = useLocation();
   const { toast } = useToast();
 
-  // DEBUG: Log to verify Navigation is rendering
-  console.log('🔍 Navigation component rendering');
 
   useEffect(() => {
+    // DON'T use cached role - always fetch fresh from database
+    // This prevents stale role data from causing issues
+    const cachedEmail = localStorage.getItem('user_email');
+    if (cachedEmail) {
+      // Only use cached email for display, NOT the role
+      setUser({ email: cachedEmail } as any);
+    }
+
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
+        
+        // Cache email for instant display on next page load
+        if (session?.user?.email) {
+          localStorage.setItem('user_email', session.user.email);
+        }
         
         // Get user role when session changes
         if (session?.user) {
@@ -35,7 +47,11 @@ const Navigation = () => {
             .eq('user_id', session.user.id)
             .limit(1)
             .maybeSingle();
-          setUserRole(roleData?.role || null);
+          const role = roleData?.role || null;
+          setUserRole(role);
+          if (role) {
+            localStorage.setItem('user_role', role);
+          }
         } else {
           setUserRole(null);
         }
@@ -47,6 +63,11 @@ const Navigation = () => {
       setSession(session);
       setUser(session?.user ?? null);
       
+      // Cache email for instant display
+      if (session?.user?.email) {
+        localStorage.setItem('user_email', session.user.email);
+      }
+      
       // Get user role on initial load
       if (session?.user) {
         const { data: roleData } = await supabase
@@ -55,7 +76,11 @@ const Navigation = () => {
           .eq('user_id', session.user.id)
           .limit(1)
           .maybeSingle();
-        setUserRole(roleData?.role || null);
+        const role = roleData?.role || null;
+        setUserRole(role);
+        if (role) {
+          localStorage.setItem('user_role', role);
+        }
       }
     });
 
@@ -64,7 +89,7 @@ const Navigation = () => {
 
   // Public navigation items (visible to everyone)
   const publicNavItems = [
-    { path: "/", label: "Home" },
+    { path: "/home", label: "Home" },
     { path: "/builders", label: "Builders" },
     { path: "/suppliers", label: "Suppliers" },
     { path: "/delivery", label: "Delivery" },
@@ -73,6 +98,7 @@ const Navigation = () => {
     { path: "/monitoring", label: "Monitoring" },
     { path: "/about", label: "About" },
     { path: "/contact", label: "Contact" },
+    { path: "/careers", label: "Careers" },
     { path: "/feedback", label: "Feedback" },
   ];
 
@@ -89,66 +115,44 @@ const Navigation = () => {
   const isActive = (path: string) => location.pathname === path;
 
   const handleSignOut = async () => {
-    try {
-      // First check if there's an active session
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
-      
-      if (!currentSession) {
-        // No active session, just clear local state and redirect
-        setSession(null);
-        setUser(null);
-        toast({
-          title: "Signed out successfully"
-        });
-        window.location.href = '/auth';
-        return;
-      }
-      
-      // If there's a session, sign out normally
-      const { error } = await supabase.auth.signOut();
-      
-      if (error) {
-        // Even if signOut fails, clear local state and redirect
-        console.error('Sign out error:', error);
-        setSession(null);
-        setUser(null);
-        toast({
-          title: "Signed out successfully",
-          description: "Session cleared"
-        });
-        window.location.href = '/auth';
-      } else {
-        toast({
-          title: "Signed out successfully"
-        });
-        window.location.href = '/auth';
-      }
-    } catch (error) {
-      // Catch any unexpected errors
-      console.error('Unexpected sign out error:', error);
-      setSession(null);
-      setUser(null);
-      toast({
-        title: "Signed out successfully",
-        description: "Session cleared"
-      });
-      window.location.href = '/auth';
-    }
+    // Set signing out state FIRST to prevent UI flash
+    setIsSigningOut(true);
+    
+    // Redirect IMMEDIATELY before any async operations
+    // This ensures user sees auth page instantly
+    window.location.href = '/auth';
+    
+    // Then clear everything in background (page is already redirecting)
+    localStorage.clear();
+    sessionStorage.clear();
+    await supabase.auth.signOut();
   };
 
+  // Show full-screen signing out overlay to prevent any UI flash
+  if (isSigningOut) {
+    return (
+      <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-white border-t-transparent mx-auto mb-4"></div>
+          <p className="text-white text-lg font-medium">Signing out...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <header className="shadow-sm border-b sticky top-0 z-50 bg-gradient-primary relative">
-      <div className="container mx-auto px-4 py-4 flex items-center justify-between relative z-10">
-        <Link to="/home" className="flex items-center group">
-          <div className="relative flex-shrink-0" style={{ width: '56px', height: '56px' }}>
+    <header className="shadow-sm border-b sticky top-0 z-50 bg-gradient-primary relative overflow-visible">
+      <div className="container mx-auto px-4 py-3 flex items-center justify-between relative z-10 gap-4">
+        <Link to="/home" className="flex items-center group flex-shrink-0">
+          <div className="relative flex-shrink-0" style={{ width: '48px', height: '48px' }}>
             <img 
               src="/mradipro-logo.png" 
               alt="MradiPro" 
-              width="56"
-              height="56"
+              width="48"
+              height="48"
               style={{
-                width: '56px',
-                height: '56px',
+                width: '48px',
+                height: '48px',
                 borderRadius: '50%',
                 objectFit: 'cover',
                 display: 'block'
@@ -165,12 +169,12 @@ const Navigation = () => {
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center space-x-6">
+        <nav className="hidden lg:flex items-center space-x-4 flex-1 justify-center">
           {navItems.map((item) => (
             <Link
               key={item.path}
               to={item.path}
-              className={`text-sm font-medium transition-colors hover:text-construction-orange ${
+              className={`text-xs font-medium transition-colors hover:text-construction-orange whitespace-nowrap ${
                 isActive(item.path) ? "text-construction-orange font-bold" : "text-text-on-dark"
               }`}
             >
@@ -179,7 +183,7 @@ const Navigation = () => {
           ))}
         </nav>
 
-        <div className="hidden md:flex items-center space-x-4">
+        <div className="hidden lg:flex items-center space-x-3 flex-shrink-0">
           <UserGuideMenu 
             trigger={
               <Button variant="outline" size="sm" className="text-text-on-dark border-border hover:bg-background hover:text-foreground">
@@ -189,27 +193,28 @@ const Navigation = () => {
             }
           />
           {user ? (
-            <div className="flex items-center space-x-4">
-              <span className="text-text-on-dark">
-                Welcome, {user.email}
+            <div className="flex items-center gap-4">
+              <span className="text-white text-sm font-medium">
+                {user.email?.split('@')[0] || 'User'}
               </span>
-              <Button 
-                variant="outline" 
+              <button 
+                type="button"
                 onClick={handleSignOut}
-                className="text-text-on-dark border-border hover:bg-background hover:text-foreground"
+                className="bg-red-600 hover:bg-red-700 text-white font-bold px-5 py-2 rounded-md cursor-pointer transition-colors"
+                style={{ minWidth: '100px' }}
               >
-                Sign Out
-              </Button>
+                LOG OUT
+              </button>
             </div>
           ) : (
             <>
               <Link to="/auth">
-                <Button variant="outline" className="text-foreground bg-background/90 border-border hover:bg-background hover:text-foreground font-semibold shadow-lg">
+                <Button variant="outline" size="sm" className="text-foreground bg-background/90 border-border hover:bg-background hover:text-foreground font-semibold shadow-lg">
                   Sign In
                 </Button>
               </Link>
               <Link to="/auth">
-                <Button className="bg-construction-orange text-foreground hover:bg-construction-orange/90 font-semibold shadow-lg">
+                <Button size="sm" className="bg-construction-orange text-foreground hover:bg-construction-orange/90 font-semibold shadow-lg">
                   Get Started
                 </Button>
               </Link>
@@ -219,7 +224,7 @@ const Navigation = () => {
 
         {/* Mobile Menu Button */}
         <button
-          className="md:hidden text-text-on-dark bg-background/20 p-2 rounded-lg border border-white/30 backdrop-blur-sm hover:bg-background/30 transition-all duration-200 z-50"
+          className="lg:hidden text-text-on-dark bg-background/20 p-2 rounded-lg border border-white/30 backdrop-blur-sm hover:bg-background/30 transition-all duration-200 z-50"
           onClick={() => setIsMenuOpen(!isMenuOpen)}
         >
           {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
@@ -228,7 +233,7 @@ const Navigation = () => {
 
         {/* Mobile Navigation */}
       {isMenuOpen && (
-        <div className="md:hidden bg-background border-t shadow-lg z-50 absolute top-full left-0 right-0">
+        <div className="lg:hidden bg-background border-t shadow-lg z-50 absolute top-full left-0 right-0">
           <nav className="px-4 py-4 space-y-4">
             {navItems.map((item) => (
               <Link
@@ -245,16 +250,16 @@ const Navigation = () => {
             <div className="pt-4 space-y-2">
               {user ? (
                 <div className="space-y-4">
-                  <p className="text-muted-foreground text-center">
-                    Welcome, {user.email}
+                  <p className="text-gray-700 text-center font-medium">
+                    {user.email?.split('@')[0] || 'User'}
                   </p>
-                  <Button 
-                    variant="outline" 
+                  <button 
+                    type="button"
                     onClick={handleSignOut}
-                    className="w-full text-primary border-primary hover:bg-primary hover:text-primary-foreground"
+                    className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-md cursor-pointer transition-colors"
                   >
-                    Sign Out
-                  </Button>
+                    LOG OUT
+                  </button>
                 </div>
               ) : (
                 <>

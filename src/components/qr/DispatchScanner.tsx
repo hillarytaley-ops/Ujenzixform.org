@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Truck, Scan, CheckCircle, AlertCircle, Camera } from 'lucide-react';
+import { Truck, Scan, CheckCircle, AlertCircle, Camera, Lock, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { BrowserMultiFormatReader } from '@zxing/browser';
@@ -59,6 +59,12 @@ export const DispatchScanner: React.FC = () => {
 
   const checkAuth = async () => {
     try {
+      // Also check localStorage for role
+      const localRole = localStorage.getItem('user_role');
+      if (localRole) {
+        setUserRole(localRole);
+      }
+      
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
@@ -68,10 +74,12 @@ export const DispatchScanner: React.FC = () => {
         .eq('user_id', user.id)
         .maybeSingle();
 
-      setUserRole(roleData?.role || null);
+      setUserRole(roleData?.role || localRole || null);
     } catch (err) {
       console.error('Auth check failed (non-fatal):', err);
-      setUserRole(null);
+      // Keep localStorage role if available
+      const localRole = localStorage.getItem('user_role');
+      setUserRole(localRole || null);
     }
   };
 
@@ -202,10 +210,53 @@ export const DispatchScanner: React.FC = () => {
     processQRScan(manualQRCode, 'physical_scanner');
   };
 
+  // Only suppliers and admins can access the dispatch scanner
+  // Builders are completely blocked - no camera access at all
+  const isBuilder = userRole === 'builder';
   const allowAccess = ['supplier', 'admin'].includes(userRole || '');
+  const canScan = allowAccess;
+
+  // BLOCK builders from accessing any camera functionality
+  if (isBuilder) {
+    return (
+      <div className="space-y-6">
+        <Card className="border-red-200 bg-red-50 dark:bg-red-900/20">
+          <CardContent className="py-8 text-center">
+            <div className="bg-red-100 dark:bg-red-900/30 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Lock className="h-8 w-8 text-red-600 dark:text-red-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">
+              Access Restricted
+            </h3>
+            <p className="text-sm text-red-700 dark:text-red-300 mb-4 max-w-sm mx-auto">
+              As a <strong>Builder</strong>, you cannot access the dispatch scanner. 
+              Only registered <strong>Suppliers</strong> can dispatch materials.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2 justify-center">
+              <a 
+                href="/tracking" 
+                className="inline-flex items-center justify-center px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+              >
+                <Truck className="h-4 w-4 mr-2" />
+                Track My Deliveries
+              </a>
+              <a 
+                href="/builder-dashboard" 
+                className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              >
+                <ArrowRight className="h-4 w-4 mr-2" />
+                Go to Dashboard
+              </a>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
+
       {/* Camera Scanner */}
       <Card>
         <CardHeader>
@@ -255,58 +306,60 @@ export const DispatchScanner: React.FC = () => {
       </Card>
 
       {/* Manual Entry / Physical Scanner */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Scan className="h-5 w-5" />
-            Physical Scanner Input
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="qr-code">QR Code (from physical scanner)</Label>
-            <Input
-              id="qr-code"
-              value={manualQRCode}
-              onChange={(e) => setManualQRCode(e.target.value)}
-              placeholder="Scan or enter QR code"
-              className="font-mono"
-              onKeyDown={(e) => e.key === 'Enter' && handleManualScan()}
-            />
-          </div>
+      {(
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Scan className="h-5 w-5" />
+              Physical Scanner Input
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="qr-code">QR Code (from physical scanner)</Label>
+              <Input
+                id="qr-code"
+                value={manualQRCode}
+                onChange={(e) => setManualQRCode(e.target.value)}
+                placeholder="Scan or enter QR code"
+                className="font-mono"
+                onKeyDown={(e) => e.key === 'Enter' && handleManualScan()}
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="condition">Material Condition</Label>
-            <Select value={materialCondition} onValueChange={setMaterialCondition}>
-              <SelectTrigger id="condition">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="good">Good Condition</SelectItem>
-                <SelectItem value="minor_damage">Minor Damage</SelectItem>
-                <SelectItem value="damaged">Damaged</SelectItem>
-                <SelectItem value="excellent">Excellent</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="condition">Material Condition</Label>
+              <Select value={materialCondition} onValueChange={setMaterialCondition}>
+                <SelectTrigger id="condition">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="good">Good Condition</SelectItem>
+                  <SelectItem value="minor_damage">Minor Damage</SelectItem>
+                  <SelectItem value="damaged">Damaged</SelectItem>
+                  <SelectItem value="excellent">Excellent</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="notes">Dispatch Notes</Label>
-            <Textarea
-              id="notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Optional notes about this dispatch"
-              rows={3}
-            />
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="notes">Dispatch Notes</Label>
+              <Textarea
+                id="notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Optional notes about this dispatch"
+                rows={3}
+              />
+            </div>
 
-          <Button onClick={handleManualScan} className="w-full" disabled={!allowAccess}>
-            <Scan className="h-4 w-4 mr-2" />
-            Record Dispatch Scan
-          </Button>
-        </CardContent>
-      </Card>
+            <Button onClick={handleManualScan} className="w-full" disabled={!canScan}>
+              <Scan className="h-4 w-4 mr-2" />
+              Record Dispatch Scan
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Scan Results */}
       {scanResults.length > 0 && (

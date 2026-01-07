@@ -47,6 +47,7 @@ import { format } from "date-fns";
 interface MonitoringRequest {
   id: string;
   user_id: string;
+  builder_type?: 'private' | 'professional';
   project_name: string;
   project_location: string;
   project_size?: string;
@@ -73,6 +74,22 @@ interface MonitoringRequest {
   created_at: string;
   updated_at: string;
 }
+
+// Pricing reference for admin
+const PRICING_REFERENCE = {
+  professional: {
+    'ai-cameras': 15000,
+    'drone-surveillance': 25000,
+    'security-monitoring': 50000,
+    'analytics-reporting': 20000
+  },
+  private: {
+    'ai-cameras': 9000,
+    'drone-surveillance': 15000,
+    'security-monitoring': 30000,
+    'analytics-reporting': 12000
+  }
+};
 
 export const MonitoringRequestsManager: React.FC = () => {
   const [requests, setRequests] = useState<MonitoringRequest[]>([]);
@@ -220,6 +237,50 @@ export const MonitoringRequestsManager: React.FC = () => {
     }
   };
 
+  const getBuilderTypeColor = (builderType?: string) => {
+    switch (builderType) {
+      case 'private': return 'bg-green-100 text-green-800';
+      case 'professional': return 'bg-blue-100 text-blue-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getBuilderTypeLabel = (builderType?: string) => {
+    switch (builderType) {
+      case 'private': return '🏠 Private Client';
+      case 'professional': return '🏢 Professional';
+      default: return 'Not Specified';
+    }
+  };
+
+  // Calculate suggested quote based on builder type
+  const calculateSuggestedQuote = (request: MonitoringRequest): number => {
+    const pricing = request.builder_type === 'private' 
+      ? PRICING_REFERENCE.private 
+      : PRICING_REFERENCE.professional;
+    
+    let total = 0;
+    request.selected_services.forEach(serviceId => {
+      const basePrice = pricing[serviceId as keyof typeof pricing];
+      if (!basePrice) return;
+      
+      switch (serviceId) {
+        case 'ai-cameras':
+          total += basePrice * Math.max(request.camera_count, 1);
+          break;
+        case 'drone-surveillance':
+          total += basePrice * Math.max(request.drone_hours, 1);
+          break;
+        case 'security-monitoring':
+        case 'analytics-reporting':
+          total += basePrice;
+          break;
+      }
+    });
+    
+    return total;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -294,6 +355,11 @@ export const MonitoringRequestsManager: React.FC = () => {
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
+              {/* Builder Type Badge */}
+              <Badge className={getBuilderTypeColor(request.builder_type)} variant="secondary">
+                {getBuilderTypeLabel(request.builder_type)}
+              </Badge>
+              
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div className="flex items-center gap-1">
                   <Users className="h-3 w-3" />
@@ -453,6 +519,53 @@ export const MonitoringRequestsManager: React.FC = () => {
                         </TabsContent>
 
                         <TabsContent value="quote" className="space-y-4">
+                          {/* Builder Type & Suggested Pricing Card */}
+                          <Card className={selectedRequest.builder_type === 'private' ? 'border-green-200 bg-green-50' : 'border-blue-200 bg-blue-50'}>
+                            <CardHeader className="pb-2">
+                              <CardTitle className="text-lg flex items-center gap-2">
+                                <DollarSign className="h-5 w-5" />
+                                Pricing Reference
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <div className="text-sm text-muted-foreground mb-1">Builder Type</div>
+                                  <Badge className={getBuilderTypeColor(selectedRequest.builder_type)} variant="secondary">
+                                    {getBuilderTypeLabel(selectedRequest.builder_type)}
+                                  </Badge>
+                                </div>
+                                <div>
+                                  <div className="text-sm text-muted-foreground mb-1">Suggested Quote</div>
+                                  <div className={`text-xl font-bold ${selectedRequest.builder_type === 'private' ? 'text-green-600' : 'text-blue-600'}`}>
+                                    KES {calculateSuggestedQuote(selectedRequest).toLocaleString()}
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              <div className="mt-3 pt-3 border-t text-xs text-muted-foreground">
+                                {selectedRequest.builder_type === 'private' ? (
+                                  <span className="text-green-700">
+                                    💡 Private client pricing applied (40% lower than professional rates)
+                                  </span>
+                                ) : (
+                                  <span className="text-blue-700">
+                                    💼 Professional/Company pricing applied (standard commercial rates)
+                                  </span>
+                                )}
+                              </div>
+                              
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="mt-3"
+                                onClick={() => setQuoteAmount(calculateSuggestedQuote(selectedRequest))}
+                              >
+                                Use Suggested Amount
+                              </Button>
+                            </CardContent>
+                          </Card>
+                        
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <Card>
                               <CardHeader>
@@ -468,6 +581,15 @@ export const MonitoringRequestsManager: React.FC = () => {
                                     onChange={(e) => setQuoteAmount(parseFloat(e.target.value) || 0)}
                                     placeholder="Enter quote amount"
                                   />
+                                  {quoteAmount > 0 && (
+                                    <p className="text-xs text-muted-foreground">
+                                      {quoteAmount !== calculateSuggestedQuote(selectedRequest) && (
+                                        <span className="text-amber-600">
+                                          ⚠️ Different from suggested: KES {calculateSuggestedQuote(selectedRequest).toLocaleString()}
+                                        </span>
+                                      )}
+                                    </p>
+                                  )}
                                 </div>
                                 
                                 <div className="space-y-2">

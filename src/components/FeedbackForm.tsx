@@ -235,25 +235,33 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
         rating: data.rating
       };
 
-      const { data: userData } = await supabase.auth.getUser();
+      const { data: sessionData } = await supabase.auth.getSession();
       
-      // Enhanced database insertion with security metadata
-      const { error } = await supabase.from("feedback").insert({
-        user_id: userData.user?.id || null,
-        name: sanitizedData.name,
-        email: sanitizedData.email,
-        subject: sanitizedData.subject,
-        message: sanitizedData.message,
-        rating: sanitizedData.rating,
-        // Security metadata
-        ip_address: await fetch('https://api.ipify.org?format=json').then(r => r.json()).then(d => d.ip).catch(() => 'unknown'),
-        user_agent: navigator.userAgent.slice(0, 200),
-        submission_time_ms: Date.now() - submissionStartTime,
-        form_interactions: formInteractions,
-        security_score: securityScore
+      // Use direct fetch to Supabase REST API (more reliable than client)
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzI0NTQwNjIsImV4cCI6MjA0ODAzMDA2Mn0.vu4KlLJLKlJmYb2b4R8MxpVKv0izRdkXC_FVwVRT0LM';
+      
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/feedback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${sessionData?.session?.access_token || SUPABASE_ANON_KEY}`,
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({
+          user_id: sessionData?.session?.user?.id || null,
+          category: sanitizedData.subject,
+          comment: `[${sanitizedData.email}] ${sanitizedData.name || 'Anonymous'}: ${sanitizedData.message}`,
+          rating: sanitizedData.rating
+        })
       });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Feedback submission error:', errorText);
+        throw new Error('Failed to submit feedback');
+      }
 
       // Update rate limit counter
       const storageKey = 'feedback-rate-limit';

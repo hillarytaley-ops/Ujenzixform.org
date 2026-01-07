@@ -153,7 +153,7 @@ export const AuthGuard = ({
             </Button>
             <Button 
               variant="outline" 
-              onClick={() => navigate('/')}
+              onClick={() => navigate('/home')}
               className="w-full"
             >
               Return Home
@@ -214,7 +214,7 @@ export const AuthGuard = ({
             <div className="flex gap-3">
               <Button 
                 variant="outline" 
-                onClick={() => navigate('/')}
+                onClick={() => navigate('/home')}
                 className="flex-1"
               >
                 Return Home

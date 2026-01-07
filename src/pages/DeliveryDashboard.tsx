@@ -1,0 +1,925 @@
+import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import Navigation from "@/components/Navigation";
+import Footer from "@/components/Footer";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { DashboardLoader } from "@/components/ui/DashboardLoader";
+import { 
+  Truck, 
+  Package, 
+  MapPin,
+  Clock,
+  DollarSign,
+  Users,
+  Star,
+  CheckCircle,
+  AlertCircle,
+  Navigation as NavigationIcon,
+  Plus,
+  Eye,
+  BarChart3,
+  Bell,
+  Settings,
+  Calendar,
+  Phone,
+  TrendingUp,
+  Route,
+  Fuel,
+  Timer,
+  Moon,
+  Sun,
+  Camera,
+  Trophy,
+  Map,
+  Zap,
+  Headphones
+} from "lucide-react";
+import { DeliveryCharts } from "@/components/delivery/DeliveryCharts";
+import { DeliveryMap } from "@/components/delivery/DeliveryMap";
+import { DeliveryPhotoProof } from "@/components/delivery/DeliveryPhotoProof";
+import { DeliveryNotifications } from "@/components/delivery/DeliveryNotifications";
+import { RouteOptimizer } from "@/components/delivery/RouteOptimizer";
+import { DriverGamification } from "@/components/delivery/DriverGamification";
+import { DeliveryRequestCard } from "@/components/delivery/DeliveryRequestCard";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { useToast } from "@/hooks/use-toast";
+import { useDeliveryProviderData, logDataAccessAttempt } from "@/hooks/useDataIsolation";
+import { SupportChat } from "@/components/support/SupportChat";
+
+interface DashboardStats {
+  totalDeliveries: number;
+  completedToday: number;
+  pendingDeliveries: number;
+  totalEarnings: number;
+  averageRating: number;
+  totalDistance: number;
+}
+
+interface ActiveDelivery {
+  id: string;
+  pickup_location: string;
+  delivery_location: string;
+  material_type: string;
+  quantity: string;
+  customer_name: string;
+  customer_phone: string;
+  status: string;
+  estimated_time: string;
+  price: number;
+  distance: number;
+  urgency?: 'normal' | 'urgent' | 'emergency';
+  special_instructions?: string;
+  created_at?: string;
+}
+
+interface DeliveryHistory {
+  id: string;
+  pickup_location: string;
+  delivery_location: string;
+  material_type: string;
+  status: string;
+  completed_at: string;
+  price: number;
+  rating: number;
+}
+
+const DeliveryDashboard = () => {
+  const { user } = useAuth();
+  const { t } = useLanguage();
+  const { toast } = useToast();
+  
+  // NOTE: Role check is already done by RoleProtectedRoute in App.tsx
+  // No need for duplicate verification here - this speeds up loading!
+  
+  // Use data isolation hook - ensures only THIS provider's data is fetched
+  const {
+    profile: isolatedProfile,
+    activeDeliveries: isolatedActiveDeliveries,
+    deliveryHistory: isolatedHistory,
+    pendingRequests: isolatedPendingRequests,
+    stats: isolatedStats,
+    loading: dataLoading,
+    error: dataError,
+    refetch: refetchData,
+    acceptDelivery: handleAcceptDelivery,
+    rejectDelivery: handleRejectDelivery,
+    updateDeliveryStatus
+  } = useDeliveryProviderData();
+  
+  const [loading, setLoading] = useState(true);
+  const [providerProfile, setProviderProfile] = useState<any>(null);
+  const [stats, setStats] = useState<DashboardStats>({
+    totalDeliveries: 0,
+    completedToday: 0,
+    pendingDeliveries: 0,
+    totalEarnings: 0,
+    averageRating: 0,
+    totalDistance: 0
+  });
+  const [activeDeliveries, setActiveDeliveries] = useState<ActiveDelivery[]>([]);
+  const [deliveryHistory, setDeliveryHistory] = useState<DeliveryHistory[]>([]);
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  const [isOnline, setIsOnline] = useState(true);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [showProofCapture, setShowProofCapture] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("active");
+
+  // Chart data
+  const [deliveryTrends, setDeliveryTrends] = useState([
+    { date: 'Mon', deliveries: 12, completed: 10, earnings: 45000 },
+    { date: 'Tue', deliveries: 15, completed: 14, earnings: 52000 },
+    { date: 'Wed', deliveries: 8, completed: 8, earnings: 28000 },
+    { date: 'Thu', deliveries: 18, completed: 16, earnings: 62000 },
+    { date: 'Fri', deliveries: 22, completed: 20, earnings: 78000 },
+    { date: 'Sat', deliveries: 25, completed: 23, earnings: 92000 },
+    { date: 'Sun', deliveries: 10, completed: 9, earnings: 35000 }
+  ]);
+
+  const statusDistribution = [
+    { name: 'Completed', value: 156, color: '#22c55e' },
+    { name: 'In Transit', value: 3, color: '#f59e0b' },
+    { name: 'Pending', value: 5, color: '#3b82f6' },
+    { name: 'Cancelled', value: 2, color: '#ef4444' }
+  ];
+
+  const earningsData = [
+    { day: 'Mon', earnings: 45000, deliveries: 12 },
+    { day: 'Tue', earnings: 52000, deliveries: 15 },
+    { day: 'Wed', earnings: 28000, deliveries: 8 },
+    { day: 'Thu', earnings: 62000, deliveries: 18 },
+    { day: 'Fri', earnings: 78000, deliveries: 22 },
+    { day: 'Sat', earnings: 92000, deliveries: 25 },
+    { day: 'Sun', earnings: 35000, deliveries: 10 }
+  ];
+
+  // Map locations
+  const mapLocations = [
+    { id: '1', type: 'pickup' as const, name: 'Bamburi Cement', address: 'Industrial Area, Nairobi', lat: -1.3028, lng: 36.8219, status: 'pending', estimatedTime: '15 min' },
+    { id: '2', type: 'delivery' as const, name: 'Kilimani Site', address: 'Kilimani, Nairobi', lat: -1.2921, lng: 36.7858, status: 'in_transit', estimatedTime: '30 min' },
+    { id: '3', type: 'delivery' as const, name: 'Karen Project', address: 'Karen, Nairobi', lat: -1.3197, lng: 36.7114, status: 'pending', estimatedTime: '45 min' }
+  ];
+
+  // Route optimizer deliveries
+  const routeDeliveries = [
+    { id: '1', name: 'Cement Delivery', address: 'Kilimani Construction Site', type: 'delivery' as const, priority: 'high' as const, estimatedTime: 30, distance: 8.5, timeWindow: { start: '09:00', end: '11:00' } },
+    { id: '2', name: 'Steel Pickup', address: 'Steel Masters, Mombasa Road', type: 'pickup' as const, priority: 'urgent' as const, estimatedTime: 20, distance: 12, timeWindow: { start: '08:00', end: '10:00' } },
+    { id: '3', name: 'Timber Delivery', address: 'Westlands Office Block', type: 'delivery' as const, priority: 'medium' as const, estimatedTime: 25, distance: 6 },
+    { id: '4', name: 'Sand Delivery', address: 'Parklands Site', type: 'delivery' as const, priority: 'low' as const, estimatedTime: 35, distance: 10 }
+  ];
+
+  // Update local state when isolated data loads - ENSURES DATA ISOLATION
+  useEffect(() => {
+    if (isolatedProfile) {
+      setProviderProfile(isolatedProfile);
+    }
+    if (isolatedStats) {
+      setStats(isolatedStats);
+    }
+    // Transform active deliveries - ONLY THIS PROVIDER'S DELIVERIES
+    if (isolatedActiveDeliveries && isolatedActiveDeliveries.length > 0) {
+      const formattedActive: ActiveDelivery[] = isolatedActiveDeliveries.map((d: any) => ({
+        id: d.id,
+        pickup_location: d.pickup_location || d.pickup_address || 'N/A',
+        delivery_location: d.delivery_location || d.delivery_address || 'N/A',
+        material_type: d.material_type || d.item_description || 'Materials',
+        quantity: d.quantity || d.estimated_weight || 'N/A',
+        customer_name: d.builder_name || d.builder_email?.split('@')[0] || 'Customer',
+        customer_phone: d.builder_phone || '+254 700 000 000',
+        status: d.status,
+        estimated_time: d.estimated_time || '30 mins',
+        price: d.price || d.delivery_fee || d.estimated_cost || 0,
+        distance: d.distance || 0,
+        urgency: d.urgency,
+        special_instructions: d.special_instructions,
+        created_at: d.created_at
+      }));
+      setActiveDeliveries(formattedActive);
+    }
+    // Transform delivery history - ONLY THIS PROVIDER'S HISTORY
+    if (isolatedHistory && isolatedHistory.length > 0) {
+      const formattedHistory: DeliveryHistory[] = isolatedHistory.map((d: any) => ({
+        id: d.id,
+        pickup_location: d.pickup_location || d.pickup_address || 'N/A',
+        delivery_location: d.delivery_location || d.delivery_address || 'N/A',
+        material_type: d.material_type || d.item_description || 'Materials',
+        status: d.status,
+        completed_at: d.updated_at || d.completed_at || d.created_at,
+        price: d.price || d.delivery_fee || d.estimated_cost || 0,
+        rating: d.rating || 0
+      }));
+      setDeliveryHistory(formattedHistory);
+    }
+    // Set pending requests that this provider can accept
+    if (isolatedPendingRequests) {
+      setPendingRequests(isolatedPendingRequests);
+    }
+  }, [isolatedProfile, isolatedStats, isolatedActiveDeliveries, isolatedHistory, isolatedPendingRequests]);
+
+  // Show UI immediately - don't wait for data
+  useEffect(() => {
+    if (user) {
+      setLoading(false);
+    }
+  }, [user]);
+
+  // Log data access for security audit
+  useEffect(() => {
+    if (user?.id) {
+      logDataAccessAttempt(user.id, 'view', 'delivery_dashboard', true, 'Dashboard loaded');
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      if (!user) return;
+
+      try {
+        // Fetch provider profile
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        setProviderProfile(profile);
+
+        // Fetch real delivery stats - use driver_id (ACTUAL column name in database)
+        const { data: deliveries, error: deliveriesError } = await supabase
+          .from('delivery_requests')
+          .select('*')
+          .eq('driver_id', user.id);
+
+        if (!deliveriesError && deliveries) {
+          const today = new Date().toDateString();
+          const completedToday = deliveries.filter(d => 
+            d.status === 'delivered' && 
+            d.delivered_at && new Date(d.delivered_at).toDateString() === today
+          ).length;
+
+          // Use estimated_cost from database, fallback to 2500
+          const totalEarnings = deliveries
+            .filter(d => d.status === 'delivered')
+            .reduce((sum, d) => sum + (d.final_cost || d.estimated_cost || 2500), 0);
+
+          setStats({
+            totalDeliveries: deliveries.length,
+            completedToday,
+            pendingDeliveries: deliveries.filter(d => d.status === 'pending' || d.status === 'in_transit').length,
+            totalEarnings,
+            averageRating: 4.8, // Would come from reviews table
+            totalDistance: 0 // No distance column in schema
+          });
+
+          // Set active deliveries - use ACTUAL database column names
+          setActiveDeliveries(deliveries
+            .filter(d => d.status !== 'delivered' && d.status !== 'cancelled')
+            .map(d => ({
+              id: d.id,
+              pickup_location: d.pickup_location || d.pickup_address || 'N/A',
+              delivery_location: d.dropoff_location || d.dropoff_address || 'N/A',
+              material_type: d.item_description || 'Materials',
+              quantity: d.estimated_weight || 'N/A',
+              customer_name: d.builder_email?.split('@')[0] || 'Customer',
+              customer_phone: '+254 700 000 000',
+              status: d.status,
+              estimated_time: '30 mins',
+              price: d.estimated_cost || 2500,
+              distance: 0,
+              urgency: d.urgency || 'normal',
+              special_instructions: d.special_instructions
+            })));
+
+          // Set delivery history - use ACTUAL database column names
+          setDeliveryHistory(deliveries
+            .filter(d => d.status === 'delivered')
+            .map(d => ({
+              id: d.id,
+              pickup_location: d.pickup_location || d.pickup_address || 'N/A',
+              delivery_location: d.dropoff_location || d.dropoff_address || 'N/A',
+              material_type: d.item_description || 'Materials',
+              status: d.status,
+              completed_at: d.delivered_at || d.updated_at || d.created_at,
+              price: d.final_cost || d.estimated_cost || 2500,
+              rating: 5
+            })));
+        } else {
+          // Fallback to placeholder data
+          setStats({
+            totalDeliveries: 156,
+            completedToday: 8,
+            pendingDeliveries: 3,
+            totalEarnings: 245000,
+            averageRating: 4.8,
+            totalDistance: 2450
+          });
+
+          setActiveDeliveries([
+            {
+              id: 'DEL-001',
+              pickup_location: 'Bamburi Cement Factory, Industrial Area',
+              delivery_location: 'Kilimani Construction Site, Nairobi',
+              material_type: 'Cement',
+              quantity: '100 bags',
+              customer_name: 'John Kamau',
+              customer_phone: '+254 712 345 678',
+              status: 'pending',
+              estimated_time: '45 mins',
+              price: 8500,
+              distance: 15,
+              urgency: 'urgent',
+              special_instructions: 'Deliver to site entrance. Ask for foreman Peter.',
+              created_at: new Date().toISOString()
+            },
+            {
+              id: 'DEL-002',
+              pickup_location: 'Steel Masters Kenya, Mombasa Road',
+              delivery_location: 'Karen Villa Project, Karen',
+              material_type: 'Steel Bars',
+              quantity: '2 tons',
+              customer_name: 'Mary Wanjiku',
+              customer_phone: '+254 722 456 789',
+              status: 'pending',
+              estimated_time: '1 hour 30 mins',
+              price: 12000,
+              distance: 25,
+              urgency: 'normal',
+              created_at: new Date(Date.now() - 30 * 60000).toISOString()
+            },
+            {
+              id: 'DEL-003',
+              pickup_location: 'Nairobi Timber, Ngong Road',
+              delivery_location: 'Westlands Office Block',
+              material_type: 'Timber',
+              quantity: '200 pieces',
+              customer_name: 'Peter Ochieng',
+              customer_phone: '+254 733 567 890',
+              status: 'accepted',
+              estimated_time: '2 hours',
+              price: 6500,
+              distance: 12,
+              urgency: 'normal',
+              created_at: new Date(Date.now() - 60 * 60000).toISOString()
+            },
+            {
+              id: 'DEL-004',
+              pickup_location: 'Industrial Area Depot',
+              delivery_location: 'Lavington Mall Construction',
+              material_type: 'Roofing Sheets',
+              quantity: '50 sheets',
+              customer_name: 'Grace Achieng',
+              customer_phone: '+254 700 123 456',
+              status: 'pending',
+              estimated_time: '30 mins',
+              price: 4500,
+              distance: 8,
+              urgency: 'emergency',
+              special_instructions: 'URGENT: Rain expected. Deliver ASAP!',
+              created_at: new Date(Date.now() - 5 * 60000).toISOString()
+            }
+          ]);
+
+          setDeliveryHistory([
+            {
+              id: 'DEL-098',
+              pickup_location: 'Industrial Area',
+              delivery_location: 'Lavington',
+              material_type: 'Roofing Sheets',
+              status: 'completed',
+              completed_at: new Date(Date.now() - 86400000).toISOString(),
+              price: 5500,
+              rating: 5
+            },
+            {
+              id: 'DEL-097',
+              pickup_location: 'Mombasa Road',
+              delivery_location: 'Kileleshwa',
+              material_type: 'Sand',
+              status: 'completed',
+              completed_at: new Date(Date.now() - 172800000).toISOString(),
+              price: 4500,
+              rating: 4
+            }
+          ]);
+        }
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+      }
+    };
+
+    if (user) {
+      fetchDashboardData();
+    }
+  }, [user]);
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-KE', {
+      style: 'currency',
+      currency: 'KES',
+      minimumFractionDigits: 0
+    }).format(amount);
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'assigned': return 'bg-blue-100 text-blue-800';
+      case 'pending_pickup': return 'bg-yellow-100 text-yellow-800';
+      case 'in_transit': return 'bg-purple-100 text-purple-800';
+      case 'delivered': return 'bg-green-100 text-green-800';
+      case 'completed': return 'bg-green-100 text-green-800';
+      case 'cancelled': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'assigned': return <Clock className="h-4 w-4" />;
+      case 'pending_pickup': return <Package className="h-4 w-4" />;
+      case 'in_transit': return <Truck className="h-4 w-4" />;
+      case 'delivered': return <CheckCircle className="h-4 w-4" />;
+      case 'completed': return <CheckCircle className="h-4 w-4" />;
+      case 'cancelled': return <AlertCircle className="h-4 w-4" />;
+      default: return <Clock className="h-4 w-4" />;
+    }
+  };
+
+  const formatStatus = (status: string) => {
+    return status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+  };
+
+  if (loading) {
+    return <DashboardLoader type="delivery" />;
+  }
+
+  return (
+    <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-teal-50 via-white to-cyan-50'}`}>
+      <Navigation />
+
+      {/* Hero Section */}
+      <section className={`${isDarkMode ? 'bg-gray-800' : 'bg-gradient-to-r from-teal-600 to-cyan-600'} text-white py-8`}>
+        <div className="container mx-auto px-4">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <h1 className="text-3xl font-bold flex items-center gap-3">
+                <Truck className="h-8 w-8" />
+                Delivery Dashboard
+              </h1>
+              <p className="text-teal-100 mt-1">
+                Welcome back, {providerProfile?.full_name || providerProfile?.company_name || user?.email}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3 items-center">
+              {/* Dark Mode Toggle */}
+              <div className="flex items-center gap-2 bg-white/10 rounded-full px-4 py-2">
+                <Sun className="h-4 w-4" />
+                <Switch
+                  checked={isDarkMode}
+                  onCheckedChange={setIsDarkMode}
+                />
+                <Moon className="h-4 w-4" />
+              </div>
+              
+              {/* Online/Offline Toggle */}
+              <div className="flex items-center gap-2 bg-white/10 rounded-full px-4 py-2">
+                <div className={`w-3 h-3 rounded-full ${isOnline ? 'bg-green-400 animate-pulse' : 'bg-gray-400'}`}></div>
+                <span className="text-sm font-medium">{isOnline ? 'Online' : 'Offline'}</span>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  className="text-white hover:bg-white/20 h-6 px-2"
+                  onClick={() => setIsOnline(!isOnline)}
+                >
+                  {isOnline ? 'Go Offline' : 'Go Online'}
+                </Button>
+              </div>
+              <Button variant="outline" className="bg-white/10 border-white/30 text-white hover:bg-white/20">
+                <Bell className="h-4 w-4 mr-2" />
+                Notifications
+              </Button>
+              <Button variant="outline" className="bg-white/10 border-white/30 text-white hover:bg-white/20">
+                <Settings className="h-4 w-4 mr-2" />
+                Settings
+              </Button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <main className="container mx-auto px-4 py-8">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+          <Card className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'} shadow-lg hover:shadow-xl transition-shadow`}>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Total Deliveries</p>
+                  <p className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{stats.totalDeliveries}</p>
+                </div>
+                <div className="p-3 bg-teal-100 rounded-full">
+                  <Truck className="h-6 w-6 text-teal-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'} shadow-lg hover:shadow-xl transition-shadow`}>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Today</p>
+                  <p className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{stats.completedToday}</p>
+                </div>
+                <div className="p-3 bg-green-100 rounded-full">
+                  <CheckCircle className="h-6 w-6 text-green-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'} shadow-lg hover:shadow-xl transition-shadow`}>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Pending</p>
+                  <p className="text-2xl font-bold text-yellow-600">{stats.pendingDeliveries}</p>
+                </div>
+                <div className="p-3 bg-yellow-100 rounded-full">
+                  <Clock className="h-6 w-6 text-yellow-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'} shadow-lg hover:shadow-xl transition-shadow`}>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Earnings</p>
+                  <p className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{formatCurrency(stats.totalEarnings)}</p>
+                </div>
+                <div className="p-3 bg-emerald-100 rounded-full">
+                  <DollarSign className="h-6 w-6 text-emerald-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'} shadow-lg hover:shadow-xl transition-shadow`}>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Rating</p>
+                  <p className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{stats.averageRating}</p>
+                </div>
+                <div className="p-3 bg-amber-100 rounded-full">
+                  <Star className="h-6 w-6 text-amber-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'} shadow-lg hover:shadow-xl transition-shadow`}>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Distance</p>
+                  <p className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{stats.totalDistance} km</p>
+                </div>
+                <div className="p-3 bg-blue-100 rounded-full">
+                  <Route className="h-6 w-6 text-blue-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="grid md:grid-cols-5 gap-4 mb-8">
+          <Button className="h-auto py-4 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600">
+            <div className="flex flex-col items-center gap-2">
+              <NavigationIcon className="h-6 w-6" />
+              <span>Start Navigation</span>
+            </div>
+          </Button>
+          <Button variant="outline" className={`h-auto py-4 border-2 ${isDarkMode ? 'border-gray-600 hover:bg-gray-800' : 'hover:bg-teal-50'}`}>
+            <div className="flex flex-col items-center gap-2">
+              <Package className="h-6 w-6 text-teal-600" />
+              <span>View Deliveries</span>
+            </div>
+          </Button>
+          <Button variant="outline" className={`h-auto py-4 border-2 ${isDarkMode ? 'border-gray-600 hover:bg-gray-800' : 'hover:bg-teal-50'}`}>
+            <div className="flex flex-col items-center gap-2">
+              <BarChart3 className="h-6 w-6 text-teal-600" />
+              <span>Earnings Report</span>
+            </div>
+          </Button>
+          <Button variant="outline" className={`h-auto py-4 border-2 ${isDarkMode ? 'border-gray-600 hover:bg-gray-800' : 'hover:bg-teal-50'}`}>
+            <div className="flex flex-col items-center gap-2">
+              <Trophy className="h-6 w-6 text-teal-600" />
+              <span>Achievements</span>
+            </div>
+          </Button>
+          <Button variant="outline" className={`h-auto py-4 border-2 ${isDarkMode ? 'border-gray-600 hover:bg-gray-800' : 'hover:bg-teal-50'}`}>
+            <div className="flex flex-col items-center gap-2">
+              <Calendar className="h-6 w-6 text-teal-600" />
+              <span>Schedule</span>
+            </div>
+          </Button>
+        </div>
+
+        {/* Main Content Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} shadow-md p-1 rounded-lg flex-wrap h-auto`}>
+            <TabsTrigger value="active" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
+              Active ({activeDeliveries.length})
+            </TabsTrigger>
+            <TabsTrigger value="map" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
+              <Map className="h-4 w-4 mr-1" />
+              Map
+            </TabsTrigger>
+            <TabsTrigger value="route" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
+              <Route className="h-4 w-4 mr-1" />
+              Route
+            </TabsTrigger>
+            <TabsTrigger value="history" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
+              History
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
+              <BarChart3 className="h-4 w-4 mr-1" />
+              Analytics
+            </TabsTrigger>
+            <TabsTrigger value="achievements" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
+              <Trophy className="h-4 w-4 mr-1" />
+              Achievements
+            </TabsTrigger>
+            <TabsTrigger value="notifications" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
+              <Bell className="h-4 w-4 mr-1" />
+              Alerts
+            </TabsTrigger>
+            <TabsTrigger value="support" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white">
+              <Headphones className="h-4 w-4 mr-1" />
+              Support
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Active Deliveries Tab */}
+          <TabsContent value="active">
+            <div className="space-y-4">
+              {/* Pending Requests Section */}
+              {activeDeliveries.filter(d => d.status === 'pending' || d.status === 'assigned').length > 0 && (
+                <div className="mb-6">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="h-2 w-2 bg-yellow-500 rounded-full animate-pulse"></div>
+                    <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      New Delivery Requests ({activeDeliveries.filter(d => d.status === 'pending' || d.status === 'assigned').length})
+                    </h3>
+                  </div>
+                  <div className="space-y-4">
+                    {activeDeliveries
+                      .filter(d => d.status === 'pending' || d.status === 'assigned')
+                      .sort((a, b) => {
+                        // Sort by urgency first
+                        const urgencyOrder = { emergency: 0, urgent: 1, normal: 2 };
+                        return (urgencyOrder[a.urgency || 'normal'] || 2) - (urgencyOrder[b.urgency || 'normal'] || 2);
+                      })
+                      .map((delivery) => (
+                        <DeliveryRequestCard
+                          key={delivery.id}
+                          delivery={delivery}
+                          isDarkMode={isDarkMode}
+                          onAccept={(id) => {
+                            setActiveDeliveries(prev => 
+                              prev.map(d => d.id === id ? { ...d, status: 'accepted' } : d)
+                            );
+                            toast({
+                              title: "✅ Delivery Accepted",
+                              description: `Delivery ${id} has been accepted. Navigate to pickup location.`,
+                            });
+                          }}
+                          onReject={(id, reason) => {
+                            setActiveDeliveries(prev => prev.filter(d => d.id !== id));
+                            toast({
+                              title: "Delivery Rejected",
+                              description: `Delivery ${id} has been rejected. Reason: ${reason}`,
+                            });
+                          }}
+                          onNavigate={(delivery) => console.log('Navigate to:', delivery)}
+                          onCall={(phone) => window.open(`tel:${phone}`)}
+                          onCaptureProof={(id) => setShowProofCapture(id)}
+                        />
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Accepted/In Progress Section */}
+              {activeDeliveries.filter(d => ['accepted', 'pending_pickup', 'in_transit'].includes(d.status)).length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="h-2 w-2 bg-green-500 rounded-full"></div>
+                    <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      Active Deliveries ({activeDeliveries.filter(d => ['accepted', 'pending_pickup', 'in_transit'].includes(d.status)).length})
+                    </h3>
+                  </div>
+                  <div className="space-y-4">
+                    {activeDeliveries
+                      .filter(d => ['accepted', 'pending_pickup', 'in_transit'].includes(d.status))
+                      .map((delivery) => (
+                        <DeliveryRequestCard
+                          key={delivery.id}
+                          delivery={delivery}
+                          isDarkMode={isDarkMode}
+                          onNavigate={(delivery) => console.log('Navigate to:', delivery)}
+                          onCall={(phone) => window.open(`tel:${phone}`)}
+                          onCaptureProof={(id) => setShowProofCapture(id)}
+                        />
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {activeDeliveries.length === 0 && (
+                <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : ''}>
+                  <CardContent className="py-12 text-center">
+                    <Truck className={`h-12 w-12 ${isDarkMode ? 'text-gray-600' : 'text-gray-300'} mx-auto mb-4`} />
+                    <p className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>No active deliveries</p>
+                    <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>New delivery requests will appear here</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Map Tab */}
+          <TabsContent value="map">
+            <DeliveryMap 
+              locations={mapLocations}
+              driverLocation={{ lat: -1.2864, lng: 36.8172 }}
+              onNavigate={(location) => console.log('Navigate to:', location)}
+              onRefresh={() => console.log('Refresh map')}
+            />
+          </TabsContent>
+
+          {/* Route Optimizer Tab */}
+          <TabsContent value="route">
+            <RouteOptimizer 
+              deliveries={routeDeliveries}
+              onRouteOptimized={(route) => console.log('Optimized route:', route)}
+              onStartNavigation={(stop) => console.log('Start navigation to:', stop)}
+            />
+          </TabsContent>
+
+          {/* History Tab */}
+          <TabsContent value="history">
+            <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : ''}>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle className={isDarkMode ? 'text-white' : ''}>Delivery History</CardTitle>
+                    <CardDescription className={isDarkMode ? 'text-gray-400' : ''}>Your completed deliveries</CardDescription>
+                  </div>
+                  <Button variant="outline" size="sm">
+                    Export Report
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {deliveryHistory.map((delivery) => (
+                    <div key={delivery.id} className={`flex items-center justify-between p-4 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg hover:${isDarkMode ? 'bg-gray-600' : 'bg-gray-100'} transition-colors`}>
+                      <div className="flex items-center gap-4">
+                        <div className={`p-2 ${isDarkMode ? 'bg-gray-600' : 'bg-white'} rounded-lg shadow-sm`}>
+                          <CheckCircle className="h-8 w-8 text-green-500" />
+                        </div>
+                        <div>
+                          <p className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{delivery.material_type}</p>
+                          <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                            {delivery.pickup_location} → {delivery.delivery_location}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{formatCurrency(delivery.price)}</p>
+                          <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                            {new Date(delivery.completed_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Star className="h-4 w-4 text-amber-400 fill-amber-400" />
+                          <span className={`font-medium ${isDarkMode ? 'text-white' : ''}`}>{delivery.rating}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Analytics Tab */}
+          <TabsContent value="analytics">
+            <DeliveryCharts 
+              deliveryTrends={deliveryTrends}
+              statusDistribution={statusDistribution}
+              earningsData={earningsData}
+            />
+          </TabsContent>
+
+          {/* Achievements Tab */}
+          <TabsContent value="achievements">
+            <DriverGamification 
+              driverId={user?.id || ''}
+              driverName={providerProfile?.full_name || user?.email?.split('@')[0] || 'Driver'}
+            />
+          </TabsContent>
+
+          {/* Notifications Tab */}
+          <TabsContent value="notifications">
+            <DeliveryNotifications 
+              userId={user?.id || ''}
+              onNotificationClick={(notification) => console.log('Notification clicked:', notification)}
+            />
+          </TabsContent>
+
+          {/* Support Tab */}
+          <TabsContent value="support">
+            <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : ''}>
+              <CardHeader>
+                <CardTitle className={isDarkMode ? 'text-white' : ''}>
+                  <Headphones className="h-5 w-5 inline-block mr-2 text-purple-500" />
+                  Support Center
+                </CardTitle>
+                <CardDescription className={isDarkMode ? 'text-gray-400' : ''}>
+                  Get help from our support team
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8">
+                  <Headphones className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                  <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>
+                    Need help? Click the support button in the bottom right corner to start a chat with our team.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        {/* Support Chat Widget */}
+        {user && (
+          <SupportChat 
+            userId={user.id}
+            userRole="delivery_provider"
+            userName={profile?.full_name || user.email?.split('@')[0] || 'Delivery Provider'}
+          />
+        )}
+
+        {/* Photo Proof Modal */}
+        {showProofCapture && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="max-w-lg w-full">
+              <DeliveryPhotoProof
+                deliveryId={showProofCapture}
+                deliveryType="delivery"
+                customerName={activeDeliveries.find(d => d.id === showProofCapture)?.customer_name || 'Customer'}
+                onComplete={(proof) => {
+                  console.log('Proof captured:', proof);
+                  setShowProofCapture(null);
+                }}
+              />
+              <Button 
+                variant="outline" 
+                className="w-full mt-4"
+                onClick={() => setShowProofCapture(null)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Tips Section */}
+        <Alert className={`mt-8 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-teal-50 border-teal-200'}`}>
+          <Zap className={`h-4 w-4 ${isDarkMode ? 'text-teal-400' : 'text-teal-600'}`} />
+          <AlertDescription className={isDarkMode ? 'text-gray-300' : ''}>
+            <strong>Pro Tip:</strong> Complete more deliveries during peak hours (6AM-9AM and 4PM-7PM) to maximize your earnings. 
+            Maintain a high rating by being punctual and communicating with customers.
+          </AlertDescription>
+        </Alert>
+      </main>
+
+      <Footer />
+    </div>
+  );
+};
+
+export default DeliveryDashboard;

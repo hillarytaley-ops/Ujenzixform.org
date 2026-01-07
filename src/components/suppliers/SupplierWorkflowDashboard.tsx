@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { SectionLoader } from "@/components/ui/DashboardLoader";
 import { 
   Package, 
   Clock, 
@@ -254,12 +255,7 @@ export const SupplierWorkflowDashboard: React.FC = () => {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="h-8 w-8 animate-spin" />
-        <span className="ml-2">Loading workflow dashboard...</span>
-      </div>
-    );
+    return <SectionLoader message="Loading workflow dashboard..." className="h-64" />;
   }
 
   return (

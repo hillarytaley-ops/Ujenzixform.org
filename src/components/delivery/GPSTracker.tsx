@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,11 +20,13 @@ import {
   AlertTriangle,
   CheckCircle,
   Eye,
-  EyeOff
+  EyeOff,
+  Radio
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import { realTimeGPSService, GPSLocation as RealTimeGPSLocation, TrackingSubscription } from "@/services/RealTimeGPSService";
 
 interface GPSLocation {
   latitude: number;
@@ -81,14 +83,93 @@ export const GPSTracker: React.FC<GPSTrackerProps> = ({
   const [mapExpanded, setMapExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isLiveConnected, setIsLiveConnected] = useState(false);
+  const [trackingHistory, setTrackingHistory] = useState<RealTimeGPSLocation[]>([]);
   const mapRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
+  // Handle real-time location updates
+  const handleLocationUpdate = useCallback((location: RealTimeGPSLocation) => {
+    // Update current location
+    setRoute(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        current_location: {
+          latitude: location.latitude,
+          longitude: location.longitude,
+          accuracy: location.accuracy || 10,
+          timestamp: location.recorded_at,
+          speed: location.speed_kmh || 0,
+          heading: location.heading_degrees || 0,
+          altitude: location.altitude || undefined
+        },
+        route_status: location.status === 'completed' ? 'completed' : 'active'
+      };
+    });
+
+    // Update vehicle info
+    setVehicle(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        current_location: {
+          latitude: location.latitude,
+          longitude: location.longitude,
+          accuracy: location.accuracy || 10,
+          timestamp: location.recorded_at,
+          speed: location.speed_kmh || 0,
+          heading: location.heading_degrees || 0
+        },
+        battery_level: location.battery_level || prev.battery_level,
+        signal_strength: location.signal_strength || prev.signal_strength,
+        is_online: true,
+        last_update: location.recorded_at
+      };
+    });
+
+    // Add to tracking history
+    setTrackingHistory(prev => [location, ...prev.slice(0, 49)]);
+  }, []);
+
+  // Set up real-time subscription
+  useEffect(() => {
+    let subscription: TrackingSubscription | null = null;
+
+    const setupRealTimeTracking = async () => {
+      if (!deliveryId || !isTracking) return;
+
+      try {
+        subscription = await realTimeGPSService.subscribeToDelivery(deliveryId, handleLocationUpdate);
+        setIsLiveConnected(true);
+        toast({
+          title: 'Live Tracking Active',
+          description: 'Receiving real-time GPS updates for this delivery',
+        });
+      } catch (error) {
+        console.error('Failed to set up real-time tracking:', error);
+        setIsLiveConnected(false);
+      }
+    };
+
+    if (isTracking) {
+      setupRealTimeTracking();
+    }
+
+    return () => {
+      if (subscription) {
+        subscription.unsubscribe();
+        setIsLiveConnected(false);
+      }
+    };
+  }, [deliveryId, isTracking, handleLocationUpdate, toast]);
+
+  // Initial data load
   useEffect(() => {
     loadTrackingData();
     
     if (autoRefresh) {
-      const interval = setInterval(loadTrackingData, 15000); // Update every 15 seconds
+      const interval = setInterval(loadTrackingData, 15000); // Update every 15 seconds as fallback
       return () => clearInterval(interval);
     }
   }, [deliveryId, autoRefresh]);
@@ -98,74 +179,154 @@ export const GPSTracker: React.FC<GPSTrackerProps> = ({
       setLoading(true);
       setError(null);
 
-      // Mock GPS tracking data - in production this would come from real GPS devices
-      const mockRoute: DeliveryRoute = {
-        id: 'route-001',
-        delivery_id: deliveryId,
-        start_location: {
-          latitude: -1.2921,
-          longitude: 36.8219,
-          accuracy: 10,
-          timestamp: new Date(Date.now() - 3600000).toISOString(),
-          speed: 0,
-          heading: 0
-        },
-        end_location: {
-          latitude: -1.3032,
-          longitude: 36.8856,
-          accuracy: 10,
-          timestamp: new Date().toISOString(),
-          speed: 0,
-          heading: 0
-        },
-        current_location: {
-          latitude: -1.2976,
-          longitude: 36.8537,
-          accuracy: 8,
-          timestamp: new Date(Date.now() - 300000).toISOString(),
-          speed: 45,
-          heading: 135,
-          altitude: 1650
-        },
-        waypoints: [
-          {
-            latitude: -1.2950,
-            longitude: 36.8400,
-            accuracy: 12,
-            timestamp: new Date(Date.now() - 1800000).toISOString(),
-            speed: 35
+      // Fetch real GPS data from database
+      const currentLocation = await realTimeGPSService.getDeliveryLocation(deliveryId);
+      const history = await realTimeGPSService.getTrackingHistory(deliveryId, 20);
+      
+      if (currentLocation) {
+        // We have real data
+        const realRoute: DeliveryRoute = {
+          id: `route-${deliveryId}`,
+          delivery_id: deliveryId,
+          start_location: history.length > 0 ? {
+            latitude: history[history.length - 1].latitude,
+            longitude: history[history.length - 1].longitude,
+            accuracy: history[history.length - 1].accuracy || 10,
+            timestamp: history[history.length - 1].recorded_at,
+            speed: history[history.length - 1].speed_kmh || 0,
+            heading: history[history.length - 1].heading_degrees || 0
+          } : {
+            latitude: currentLocation.latitude,
+            longitude: currentLocation.longitude,
+            accuracy: currentLocation.accuracy || 10,
+            timestamp: currentLocation.recorded_at,
+            speed: 0,
+            heading: 0
           },
-          {
-            latitude: -1.2980,
-            longitude: 36.8500,
-            accuracy: 9,
-            timestamp: new Date(Date.now() - 900000).toISOString(),
-            speed: 40
-          }
-        ],
-        total_distance: 12.5,
-        estimated_duration: 35,
-        actual_duration: 25,
-        traffic_conditions: 'moderate',
-        route_status: 'active'
-      };
+          end_location: {
+            latitude: 0, // Would need delivery destination from deliveries table
+            longitude: 0,
+            accuracy: 10,
+            timestamp: new Date().toISOString(),
+            speed: 0,
+            heading: 0
+          },
+          current_location: {
+            latitude: currentLocation.latitude,
+            longitude: currentLocation.longitude,
+            accuracy: currentLocation.accuracy || 10,
+            timestamp: currentLocation.recorded_at,
+            speed: currentLocation.speed_kmh || 0,
+            heading: currentLocation.heading_degrees || 0,
+            altitude: currentLocation.altitude || undefined
+          },
+          waypoints: history.slice(1).map(h => ({
+            latitude: h.latitude,
+            longitude: h.longitude,
+            accuracy: h.accuracy || 10,
+            timestamp: h.recorded_at,
+            speed: h.speed_kmh || 0
+          })),
+          total_distance: 0, // Would need route calculation
+          estimated_duration: 0,
+          actual_duration: 0,
+          traffic_conditions: (currentLocation.traffic_conditions as 'light' | 'moderate' | 'heavy') || 'moderate',
+          route_status: currentLocation.status === 'completed' ? 'completed' : 'active'
+        };
 
-      const mockVehicle: Vehicle = {
-        id: 'vehicle-001',
-        vehicle_number: 'KCA 123A',
-        driver_name: showDriverContact ? 'John Kamau' : 'Driver Available',
-        driver_phone: showDriverContact ? '+254 712 345 678' : 'Contact via Admin',
-        current_location: mockRoute.current_location,
-        battery_level: 78,
-        signal_strength: 85,
-        is_online: true,
-        last_update: new Date(Date.now() - 300000).toISOString()
-      };
+        // Fetch vehicle/provider details
+        const { data: providerData } = await supabase
+          .from('delivery_providers')
+          .select('company_name, contact_name, contact_phone, vehicle_registration')
+          .eq('id', currentLocation.provider_id)
+          .single();
 
-      setRoute(mockRoute);
-      setVehicle(mockVehicle);
-      setIsTracking(mockRoute.route_status === 'active');
+        const realVehicle: Vehicle = {
+          id: currentLocation.provider_id,
+          vehicle_number: providerData?.vehicle_registration || 'Unknown',
+          driver_name: showDriverContact ? (providerData?.contact_name || 'Driver') : 'Driver Available',
+          driver_phone: showDriverContact ? (providerData?.contact_phone || 'N/A') : 'Contact via Admin',
+          current_location: realRoute.current_location,
+          battery_level: currentLocation.battery_level || 100,
+          signal_strength: currentLocation.signal_strength || 100,
+          is_online: true,
+          last_update: currentLocation.recorded_at
+        };
 
+        setRoute(realRoute);
+        setVehicle(realVehicle);
+        setTrackingHistory(history);
+        setIsTracking(realRoute.route_status === 'active');
+
+      } else {
+        // No real data - use mock data as fallback
+        const mockRoute: DeliveryRoute = {
+          id: 'route-001',
+          delivery_id: deliveryId,
+          start_location: {
+            latitude: -1.2921,
+            longitude: 36.8219,
+            accuracy: 10,
+            timestamp: new Date(Date.now() - 3600000).toISOString(),
+            speed: 0,
+            heading: 0
+          },
+          end_location: {
+            latitude: -1.3032,
+            longitude: 36.8856,
+            accuracy: 10,
+            timestamp: new Date().toISOString(),
+            speed: 0,
+            heading: 0
+          },
+          current_location: {
+            latitude: -1.2976,
+            longitude: 36.8537,
+            accuracy: 8,
+            timestamp: new Date(Date.now() - 300000).toISOString(),
+            speed: 45,
+            heading: 135,
+            altitude: 1650
+          },
+          waypoints: [
+            {
+              latitude: -1.2950,
+              longitude: 36.8400,
+              accuracy: 12,
+              timestamp: new Date(Date.now() - 1800000).toISOString(),
+              speed: 35
+            },
+            {
+              latitude: -1.2980,
+              longitude: 36.8500,
+              accuracy: 9,
+              timestamp: new Date(Date.now() - 900000).toISOString(),
+              speed: 40
+            }
+          ],
+          total_distance: 12.5,
+          estimated_duration: 35,
+          actual_duration: 25,
+          traffic_conditions: 'moderate',
+          route_status: 'active'
+        };
+
+        const mockVehicle: Vehicle = {
+          id: 'vehicle-001',
+          vehicle_number: 'KCA 123A',
+          driver_name: showDriverContact ? 'John Kamau' : 'Driver Available',
+          driver_phone: showDriverContact ? '+254 712 345 678' : 'Contact via Admin',
+          current_location: mockRoute.current_location,
+          battery_level: 78,
+          signal_strength: 85,
+          is_online: true,
+          last_update: new Date(Date.now() - 300000).toISOString()
+        };
+
+        setRoute(mockRoute);
+        setVehicle(mockVehicle);
+        setIsTracking(mockRoute.route_status === 'active');
+      }
     } catch (error) {
       console.error('Error loading tracking data:', error);
       setError('Failed to load GPS tracking data');

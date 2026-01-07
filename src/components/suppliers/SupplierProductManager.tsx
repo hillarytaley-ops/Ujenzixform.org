@@ -1,3 +1,20 @@
+/**
+ * ╔══════════════════════════════════════════════════════════════════════════════════════╗
+ * ║                                                                                      ║
+ * ║   🛡️ PROTECTED FILE - SUPPLIERPRODUCTMANAGER.TSX - DO NOT MODIFY WITHOUT APPROVAL   ║
+ * ║                                                                                      ║
+ * ║   LAST UPDATED: December 27, 2025                                                    ║
+ * ║   PROTECTED FEATURES:                                                                ║
+ * ║   1. Supplier product submission with image and price                               ║
+ * ║   2. approval_status field: 'pending' | 'approved' | 'rejected'                     ║
+ * ║   3. New products submit as 'pending' for admin approval                            ║
+ * ║   4. Status badges showing pending/approved/rejected                                ║
+ * ║                                                                                      ║
+ * ║   ⚠️ WARNING: Any changes to this file require explicit user approval               ║
+ * ║                                                                                      ║
+ * ╚══════════════════════════════════════════════════════════════════════════════════════╝
+ */
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,7 +25,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Edit, Trash2, Package, Image as ImageIcon } from 'lucide-react';
+import { Plus, Edit, Trash2, Package, Image as ImageIcon, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { CategoryImageSelector } from './CategoryImageSelector';
 import { getDefaultCategoryImage } from '@/config/defaultCategoryImages';
 import {
@@ -32,6 +49,8 @@ interface Product {
   in_stock: boolean;
   created_at: string;
   updated_at: string;
+  approval_status?: 'pending' | 'approved' | 'rejected';
+  rejection_reason?: string;
 }
 
 interface SupplierProductManagerProps {
@@ -157,29 +176,38 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
       };
 
       if (editingProduct) {
-        // Update existing product
+        // Update existing product - if changing image/price, set back to pending
+        const needsReapproval = editingProduct.image_url !== formData.image_url || 
+                               editingProduct.unit_price !== parseFloat(formData.unit_price);
+        
+        const updateData = needsReapproval 
+          ? { ...productData, approval_status: 'pending' }
+          : productData;
+
         const { error } = await supabase
           .from('materials')
-          .update(productData)
+          .update(updateData)
           .eq('id', editingProduct.id);
 
         if (error) throw error;
 
         toast({
           title: 'Product updated',
-          description: 'Your product has been updated successfully'
+          description: needsReapproval 
+            ? 'Your product has been submitted for admin approval'
+            : 'Your product has been updated successfully'
         });
       } else {
-        // Create new product
+        // Create new product - always set to pending for admin approval
         const { error } = await supabase
           .from('materials')
-          .insert([productData]);
+          .insert([{ ...productData, approval_status: 'pending' }]);
 
         if (error) throw error;
 
         toast({
-          title: 'Product added',
-          description: 'Your product has been added to your catalog'
+          title: 'Product submitted',
+          description: 'Your product has been submitted for admin approval. You will be notified once approved.'
         });
       }
 
@@ -279,143 +307,31 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
               Add Product
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Package className="h-5 w-5" />
-                {editingProduct ? 'Edit Product' : 'Add New Product'}
-              </DialogTitle>
-              <DialogDescription>
-                Add product details and upload a clear image for buyers to see
-              </DialogDescription>
-            </DialogHeader>
-
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Category Selection - Must be first to enable default images */}
-              <div className="space-y-2">
-                <Label htmlFor="category">Product Category *</Label>
-                <Select
-                  value={formData.category}
-                  onValueChange={(value) => setFormData({ ...formData, category: value })}
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PRODUCT_CATEGORIES.map((cat) => (
-                      <SelectItem key={cat} value={cat}>
-                        {cat}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
+          <DialogContent compact>
+            <form onSubmit={handleSubmit} className="flex flex-col gap-1.5">
+              {/* Row 1: Image + Category + Unit + Price */}
+              <div className="flex gap-1.5 items-center">
+                <div className="w-9 h-9 rounded border bg-muted flex-shrink-0 overflow-hidden cursor-pointer" onClick={() => document.getElementById(`up-${supplierId}`)?.click()}>
+                  {formData.image_url ? <img src={formData.image_url} className="w-full h-full object-cover" /> : <ImageIcon className="w-full h-full p-1.5 text-muted-foreground" />}
+                </div>
+                <input id={`up-${supplierId}`} type="file" accept="image/*" className="hidden" onChange={async(e)=>{const f=e.target.files?.[0];if(!f)return;try{const n=`${supplierId}/${Date.now()}.${f.name.split('.').pop()}`;await supabase.storage.from('product-images').upload(n,f);const{data:{publicUrl}}=supabase.storage.from('product-images').getPublicUrl(n);setFormData({...formData,image_url:publicUrl});}catch(err){console.error(err);}}} />
+                <Select value={formData.category} onValueChange={(v) => setFormData({ ...formData, category: v })}>
+                  <SelectTrigger className="h-6 text-[10px] flex-1"><SelectValue placeholder="Category" /></SelectTrigger>
+                  <SelectContent>{PRODUCT_CATEGORIES.map((c) => <SelectItem key={c} value={c} className="text-[10px]">{c}</SelectItem>)}</SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">
-                  Select category first to see default images
-                </p>
+                <Select value={formData.unit} onValueChange={(v) => setFormData({ ...formData, unit: v })}>
+                  <SelectTrigger className="h-6 text-[10px] w-12"><SelectValue placeholder="Unit" /></SelectTrigger>
+                  <SelectContent>{UNITS.map((u) => <SelectItem key={u} value={u} className="text-[10px]">{u}</SelectItem>)}</SelectContent>
+                </Select>
+                <Input type="number" placeholder="KES" value={formData.unit_price} onChange={(e) => setFormData({ ...formData, unit_price: e.target.value })} className="h-6 text-[10px] w-14" required />
               </div>
-
-              {/* Product Image Upload with Category Support */}
-              <div>
-                <Label className="text-lg font-semibold mb-4 block">Product Image *</Label>
-                <CategoryImageSelector
-                  currentImageUrl={formData.image_url}
-                  onImageSelect={(url) => setFormData({ ...formData, image_url: url })}
-                  category={formData.category}
-                  productName={formData.name || 'product'}
-                  supplierId={supplierId}
-                />
-              </div>
-
-              {/* Product Name */}
-              <div className="space-y-2">
-                <Label htmlFor="product-name">Product Name *</Label>
-                <Input
-                  id="product-name"
-                  placeholder="e.g., Bamburi Cement 42.5N (50kg)"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                />
-              </div>
-
-              {/* Description */}
-              <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  placeholder="Detailed product description, specifications, and features"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows={3}
-                />
-              </div>
-
-              {/* Unit and Price */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-                <div className="space-y-2">
-                  <Label htmlFor="unit">Unit *</Label>
-                  <Select
-                    value={formData.unit}
-                    onValueChange={(value) => setFormData({ ...formData, unit: value })}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select unit" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {UNITS.map((unit) => (
-                        <SelectItem key={unit} value={unit}>
-                          {unit}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* Price and Stock */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="price">Unit Price (KES) *</Label>
-                  <Input
-                    id="price"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="e.g., 850.00"
-                    value={formData.unit_price}
-                    onChange={(e) => setFormData({ ...formData, unit_price: e.target.value })}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="stock">Stock Status *</Label>
-                  <Select
-                    value={formData.in_stock ? 'in-stock' : 'out-of-stock'}
-                    onValueChange={(value) => setFormData({ ...formData, in_stock: value === 'in-stock' })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="in-stock">In Stock</SelectItem>
-                      <SelectItem value="out-of-stock">Out of Stock</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* Submit Buttons */}
-              <div className="flex justify-end gap-3">
-                <Button type="button" variant="outline" onClick={resetForm}>
-                  Cancel
-                </Button>
-                <Button type="submit">
-                  {editingProduct ? 'Update Product' : 'Add Product'}
-                </Button>
+              {/* Row 2: Name */}
+              <Input placeholder="Product name *" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="h-6 text-[10px]" required />
+              {/* Row 3: Buttons */}
+              <div className="flex justify-end gap-1">
+                {formData.category && !formData.image_url && <Button type="button" variant="link" className="h-5 text-[9px] p-0 mr-auto" onClick={() => { const d = getDefaultCategoryImage(formData.category); if(d) setFormData({...formData, image_url: d}); }}>Default img</Button>}
+                <Button type="button" variant="ghost" className="h-5 text-[9px] px-1.5" onClick={resetForm}>Cancel</Button>
+                <Button type="submit" className="h-5 text-[9px] px-2">{editingProduct ? 'Save' : 'Submit'}</Button>
               </div>
             </form>
           </DialogContent>
@@ -471,10 +387,40 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
 
               {/* Product Info */}
               <CardHeader>
-                <CardTitle className="text-lg line-clamp-2">{product.name}</CardTitle>
+                <div className="flex items-center justify-between mb-2">
+                  <CardTitle className="text-lg line-clamp-2">{product.name}</CardTitle>
+                  {/* Approval Status Badge */}
+                  {product.approval_status === 'pending' && (
+                    <Badge className="bg-yellow-500 text-white">
+                      <Clock className="h-3 w-3 mr-1" />
+                      Pending
+                    </Badge>
+                  )}
+                  {product.approval_status === 'approved' && (
+                    <Badge className="bg-green-600 text-white">
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      Approved
+                    </Badge>
+                  )}
+                  {product.approval_status === 'rejected' && (
+                    <Badge className="bg-red-600 text-white">
+                      <XCircle className="h-3 w-3 mr-1" />
+                      Rejected
+                    </Badge>
+                  )}
+                </div>
                 <CardDescription className="line-clamp-2">
                   {product.description || 'No description'}
                 </CardDescription>
+                {/* Show rejection reason if rejected */}
+                {product.approval_status === 'rejected' && product.rejection_reason && (
+                  <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-md">
+                    <p className="text-xs text-red-700 flex items-start gap-1">
+                      <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                      <span><strong>Rejection reason:</strong> {product.rejection_reason}</span>
+                    </p>
+                  </div>
+                )}
               </CardHeader>
 
               <CardContent className="space-y-4">

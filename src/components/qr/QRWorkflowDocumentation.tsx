@@ -146,22 +146,23 @@ export const QRWorkflowDocumentation: React.FC<QRWorkflowDocumentationProps> = (
               </div>
             </div>
 
-            {/* Step 4: Receiving */}
+            {/* Step 4: Delivery Confirmation */}
             <div className="flex items-start gap-4 p-4 border rounded-lg bg-green-50">
               <div className="bg-green-600 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold flex-shrink-0">
                 4
               </div>
               <div className="flex-1">
-                <h4 className="font-semibold text-green-800">Site Receiving & Verification</h4>
+                <h4 className="font-semibold text-green-800">Delivery Provider Confirmation</h4>
                 <p className="text-sm text-green-700 mb-2">
-                  UjenziPro staff scan materials upon arrival, verify condition, and update status to "received".
+                  Delivery providers scan materials at the construction site to confirm successful delivery and handover.
                 </p>
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="text-xs">
-                    <CheckCircle className="h-3 w-3 mr-1" />
-                    Quality Check
+                    <Truck className="h-3 w-3 mr-1" />
+                    Delivery Provider
                   </Badge>
                   <Badge variant="outline" className="text-xs">
+                    <CheckCircle className="h-3 w-3 mr-1" />
                     Condition Recording
                   </Badge>
                 </div>
@@ -254,13 +255,17 @@ export const QRWorkflowDocumentation: React.FC<QRWorkflowDocumentationProps> = (
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
-            <div className="flex items-center justify-between p-2 bg-blue-50 rounded">
+            <div className="flex items-center justify-between p-2 bg-orange-50 rounded">
               <span className="text-sm font-medium">Suppliers</span>
-              <span className="text-xs text-muted-foreground">View own items only</span>
+              <span className="text-xs text-muted-foreground">Dispatch scanning only</span>
             </div>
-            <div className="flex items-center justify-between p-2 bg-green-50 rounded">
+            <div className="flex items-center justify-between p-2 bg-yellow-50 rounded">
+              <span className="text-sm font-medium">Delivery Providers</span>
+              <span className="text-xs text-muted-foreground">Delivery confirmation scanning</span>
+            </div>
+            <div className="flex items-center justify-between p-2 bg-blue-50 rounded">
               <span className="text-sm font-medium">Builders</span>
-              <span className="text-xs text-muted-foreground">View items from their POs</span>
+              <span className="text-xs text-muted-foreground">View delivery status & history</span>
             </div>
             <div className="flex items-center justify-between p-2 bg-purple-50 rounded">
               <span className="text-sm font-medium">Admins</span>

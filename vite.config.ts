@@ -1,13 +1,16 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 
 export default defineConfig(({ mode }) => {
+  // Load env file based on mode (ensures .env.local is properly loaded)
+  loadEnv(mode, process.cwd(), '');
+  
   return {
     server: {
       host: "::",
       port: 5173,
-      strictPort: false, // Allow fallback to other ports if 5173 is in use
+      strictPort: false,
     },
     plugins: [
       react(),
@@ -16,19 +19,35 @@ export default defineConfig(({ mode }) => {
       alias: {
         "@": path.resolve(__dirname, "./src"),
       },
+      // CRITICAL: Dedupe React to prevent multiple instances
+      dedupe: [
+        'react',
+        'react-dom',
+        'react-router-dom',
+        'react-router',
+      ],
     },
     // Performance Optimizations for faster initial load
     build: {
       // Code splitting for better caching and faster loads
       rollupOptions: {
         output: {
-          manualChunks: {
-            // Separate vendor chunks for better caching
-            'react-core': ['react', 'react-dom', 'react-router-dom'],
-            'supabase': ['@supabase/supabase-js'],
-            'ui-components': ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-tabs'],
-            'icons': ['lucide-react'],
-            'forms': ['react-hook-form', '@hookform/resolvers', 'zod'],
+          manualChunks(id) {
+            // Force all React-related code into a single chunk
+            if (id.includes('node_modules')) {
+              if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
+                return 'react-vendor';
+              }
+              if (id.includes('@supabase')) {
+                return 'supabase';
+              }
+              if (id.includes('@radix-ui')) {
+                return 'ui-vendor';
+              }
+              if (id.includes('lucide-react')) {
+                return 'icons';
+              }
+            }
           },
           // Optimize chunk names for better caching
           chunkFileNames: 'assets/[name]-[hash].js',
@@ -47,16 +66,30 @@ export default defineConfig(({ mode }) => {
       // Enable CSS code splitting
       cssCodeSplit: true,
       // Optimize assets
-      assetsInlineLimit: 4096, // Inline assets smaller than 4kb
+      assetsInlineLimit: 4096,
     },
-    // Optimize dependencies pre-bundling
+    // Optimize dependencies pre-bundling - CRITICAL for React singleton
     optimizeDeps: {
+      // Include all React-related packages in the same optimization pass
       include: [
         'react',
         'react-dom',
+        'react-dom/client',
         'react-router-dom',
+        'react-router',
         '@supabase/supabase-js',
         'lucide-react',
+        '@radix-ui/react-dialog',
+        '@radix-ui/react-dropdown-menu',
+        '@radix-ui/react-tooltip',
+        '@radix-ui/react-slot',
+        '@tanstack/react-query',
+        'framer-motion',
+        'sonner',
+      ],
+      // Use the main entry point to discover all dependencies
+      entries: [
+        'src/main.tsx',
       ],
     },
   };

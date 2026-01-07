@@ -31,57 +31,57 @@ export interface CategoryImage {
 export const DEFAULT_CATEGORY_IMAGES: Record<string, CategoryImage> = {
   'Cement': {
     category: 'Cement',
-    imageUrl: '/cement.jpg',
+    imageUrl: '/cement.png',
     description: 'Cement - Bamburi, Savannah, Mombasa Cement (50kg bags)'
   },
   'Steel': {
     category: 'Steel',
-    imageUrl: '/steel.jpg',
+    imageUrl: '/steel.png',
     description: 'Steel Bars - Y8, Y10, Y12, Y16 KEBS approved rebar'
   },
   'Tiles': {
     category: 'Tiles',
-    imageUrl: '/tiles.jpg',
+    imageUrl: '/tiles.png',
     description: 'Floor and wall tiles'
   },
   'Paint': {
     category: 'Paint',
-    imageUrl: '/paint.jpg',
+    imageUrl: '/paint.png',
     description: 'Paints - Crown, Basco, Galaxy Paints Kenya'
   },
   'Timber': {
     category: 'Timber',
-    imageUrl: '/timber.jpg',
+    imageUrl: '/timber.png',
     description: 'Timber - Cypress, Pine, Hardwood (treated & untreated)'
   },
   'Hardware': {
     category: 'Hardware',
-    imageUrl: '/hardware.jpg',
+    imageUrl: '/hardware.png',
     description: 'Construction hardware and tools'
   },
   'Plumbing': {
     category: 'Plumbing',
-    imageUrl: '/plumbing.jpg',
+    imageUrl: '/plumbing.png',
     description: 'Plumbing - Kenpipe, PVC pipes & fittings KEBS approved'
   },
   'Electrical': {
     category: 'Electrical',
-    imageUrl: '/electrical.jpg',
+    imageUrl: '/electrical.png',
     description: 'Electrical - Nyayo, Kinga cables KEBS certified'
   },
   'Aggregates': {
     category: 'Aggregates',
-    imageUrl: '/aggregates.jpg',
+    imageUrl: '/aggregates.png',
     description: 'Gravel and construction aggregates'
   },
   'Roofing': {
     category: 'Roofing',
-    imageUrl: '/roofing.jpg',
+    imageUrl: '/roofing.png',
     description: 'Roofing - Mabati, Safal, Corrugated Iron Sheets Kenya'
   },
   'Insulation': {
     category: 'Insulation',
-    imageUrl: '/insulation.jpg',
+    imageUrl: '/insulation.png',
     description: 'Insulation materials'
   },
   'Tools': {
@@ -91,47 +91,47 @@ export const DEFAULT_CATEGORY_IMAGES: Record<string, CategoryImage> = {
   },
   'Stone': {
     category: 'Stone',
-    imageUrl: '/aggregates.jpg',
+    imageUrl: '/stone.png',
     description: 'Building stones and rocks'
   },
   'Sand': {
     category: 'Sand',
-    imageUrl: '/sand.jpg',
+    imageUrl: '/sand.png',
     description: 'Construction sand'
   },
   'Plywood': {
     category: 'Plywood',
-    imageUrl: '/plywood.jpg',
+    imageUrl: '/plywood.png',
     description: 'Plywood sheets and panels'
   },
   'Doors': {
     category: 'Doors',
-    imageUrl: '/doors.jpg',
+    imageUrl: '/doors.png',
     description: 'Doors and door frames'
   },
   'Wire': {
     category: 'Wire',
-    imageUrl: '/wire.jpg',
+    imageUrl: '/wire.png',
     description: 'Construction wire and cables'
   },
   'Iron Sheets': {
     category: 'Iron Sheets',
-    imageUrl: '/iron-sheets.jpg',
+    imageUrl: '/iron-sheets.png',
     description: 'Iron Sheets - Mabati Box Profile, Gauge 28-32'
   },
   'Blocks': {
     category: 'Blocks',
-    imageUrl: '/blocks.jpg',
+    imageUrl: '/blocks.png',
     description: 'Concrete blocks and bricks'
   },
   'Glass': {
     category: 'Glass',
-    imageUrl: '/glass.jpg',
+    imageUrl: '/glass.png',
     description: 'Glass sheets and panels'
   },
   'Windows': {
     category: 'Windows',
-    imageUrl: '/windows.jpg',
+    imageUrl: '/windows.png',
     description: 'Windows and window frames'
   },
   'Other': {

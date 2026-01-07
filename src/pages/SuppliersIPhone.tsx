@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Package, Shield, Database, Users, FileText } from "lucide-react";
+import { Package, Shield, Database, Users, FileText, Truck, Building, UserPlus } from "lucide-react";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { MaterialsGridSafe } from "@/components/suppliers/MaterialsGridSafe";
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from "@/hooks/use-toast";
+import { DashboardLoader } from "@/components/ui/DashboardLoader";
 
 // Ultra-safe iPhone-optimized Suppliers page for admin
 const SuppliersIPhone = () => {
@@ -16,6 +18,7 @@ const SuppliersIPhone = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     checkAuth();
@@ -45,13 +48,78 @@ const SuppliersIPhone = () => {
     }
   };
 
+  // Check if user is a delivery provider - they cannot access this marketplace
+  const isDeliveryProvider = userRole === 'delivery' || userRole === 'delivery_provider';
+
   if (loading) {
+    return <DashboardLoader message="Loading marketplace..." />;
+  }
+
+  // Block delivery providers from accessing the suppliers marketplace
+  if (user && isDeliveryProvider) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
+      <div className="min-h-screen bg-gray-50 overflow-x-hidden">
+        <Navigation />
+        
+        <section className="bg-gradient-to-br from-teal-600 via-teal-700 to-cyan-800 text-white py-16">
+          <div className="container mx-auto px-4">
+            <div className="max-w-2xl mx-auto text-center">
+              <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Shield className="h-10 w-10 text-white" />
+              </div>
+              <h1 className="text-3xl font-bold mb-4">Marketplace Access Restricted</h1>
+              <p className="text-lg text-teal-100 mb-6">
+                The Suppliers Marketplace is exclusively for registered builders and suppliers. 
+                As a delivery provider, you have access to delivery management features instead.
+              </p>
+              <div className="bg-white/10 backdrop-blur rounded-lg p-4 mb-8">
+                <p className="text-sm">
+                  You are currently signed in as: <strong className="capitalize">Delivery Provider</strong>
+                </p>
+              </div>
+              
+              <div className="space-y-4">
+                <p className="text-teal-100">
+                  Access your delivery dashboard to manage pickups and deliveries.
+                </p>
+                <Button 
+                  size="lg"
+                  className="bg-white text-teal-700 hover:bg-gray-100"
+                  onClick={() => navigate('/delivery-dashboard')}
+                >
+                  <Truck className="h-5 w-5 mr-2" />
+                  Go to Delivery Dashboard
+                </Button>
+              </div>
+              
+              <div className="mt-8 pt-6 border-t border-white/20">
+                <p className="text-sm text-teal-100 mb-4">
+                  Want to purchase materials? Register as a builder:
+                </p>
+                <div className="flex flex-wrap justify-center gap-3">
+                  <Button 
+                    variant="outline" 
+                    className="border-white text-white hover:bg-white/20"
+                    onClick={() => navigate('/professional-builder-registration')}
+                  >
+                    <Building className="h-4 w-4 mr-2" />
+                    Professional Builder
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="border-white text-white hover:bg-white/20"
+                    onClick={() => navigate('/private-builder-registration')}
+                  >
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Private Client
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+        
+        <Footer />
       </div>
     );
   }
@@ -95,7 +163,7 @@ const SuppliersIPhone = () => {
         {isAdmin && (
           <div className="grid grid-cols-2 gap-4">
             <Card 
-              className="cursor-pointer hover:shadow-lg transition-shadow"
+              className="cursor-pointer shadow-md"
               onClick={() => toast({ title: 'Applications', description: 'Supplier applications - coming soon on mobile' })}
             >
               <CardContent className="p-6 text-center">
@@ -106,7 +174,7 @@ const SuppliersIPhone = () => {
             </Card>
 
             <Card 
-              className="cursor-pointer hover:shadow-lg transition-shadow"
+              className="cursor-pointer shadow-md"
               onClick={() => toast({ title: 'Users', description: 'User management - coming soon on mobile' })}
             >
               <CardContent className="p-6 text-center">
@@ -117,7 +185,7 @@ const SuppliersIPhone = () => {
             </Card>
 
             <Card 
-              className="cursor-pointer hover:shadow-lg transition-shadow"
+              className="cursor-pointer shadow-md"
               onClick={() => window.location.href = '/analytics'}
             >
               <CardContent className="p-6 text-center">
@@ -128,7 +196,7 @@ const SuppliersIPhone = () => {
             </Card>
 
             <Card 
-              className="cursor-pointer hover:shadow-lg transition-shadow"
+              className="cursor-pointer shadow-md"
               onClick={() => toast({ title: 'Security', description: 'Security dashboard - coming soon on mobile' })}
             >
               <CardContent className="p-6 text-center">

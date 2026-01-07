@@ -64,26 +64,42 @@ export const CategoryImageSelector = ({
     }
   };
 
+  // Supported image formats
+  const SUPPORTED_IMAGE_TYPES = [
+    'image/jpeg',
+    'image/jpg', 
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'image/avif',
+    'image/svg+xml',
+    'image/bmp',
+    'image/tiff',
+    'image/heic',
+    'image/heif'
+  ];
+
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
       const file = event.target.files?.[0];
       if (!file) return;
 
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
+      // Validate file type - support all common image formats
+      const isValidImage = file.type.startsWith('image/') || SUPPORTED_IMAGE_TYPES.includes(file.type.toLowerCase());
+      if (!isValidImage) {
         toast({
           title: 'Invalid file type',
-          description: 'Please select an image file (JPG, PNG, WEBP)',
+          description: 'Please select an image file (JPG, PNG, GIF, WEBP, AVIF, SVG, BMP, TIFF, HEIC)',
           variant: 'destructive',
         });
         return;
       }
 
-      // Validate file size (5MB max)
-      if (file.size > 5 * 1024 * 1024) {
+      // Validate file size (10MB max for larger formats)
+      if (file.size > 10 * 1024 * 1024) {
         toast({
           title: 'File too large',
-          description: 'Please select an image under 5MB',
+          description: 'Please select an image under 10MB',
           variant: 'destructive',
         });
         return;
@@ -176,22 +192,22 @@ export const CategoryImageSelector = ({
   };
 
   return (
-    <Card className="overflow-hidden">
-      <CardContent className="p-4">
+    <Card className="overflow-hidden border-dashed">
+      <CardContent className="p-2">
         <Tabs value={selectedTab} onValueChange={(val) => setSelectedTab(val as 'default' | 'custom')} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-4">
-            <TabsTrigger value="default" disabled={!defaultImageUrl}>
-              {defaultImageUrl ? '📦 Use Default' : '📦 No Default'}
+          <TabsList className="grid w-full grid-cols-2 h-8 mb-2">
+            <TabsTrigger value="default" disabled={!defaultImageUrl} className="text-xs py-1">
+              {defaultImageUrl ? '📦 Default' : '📦 None'}
             </TabsTrigger>
-            <TabsTrigger value="custom">
-              📸 Custom Upload
+            <TabsTrigger value="custom" className="text-xs py-1">
+              📸 Upload
             </TabsTrigger>
           </TabsList>
 
           {/* Default Image Tab */}
-          <TabsContent value="default" className="space-y-4">
-            {/* Image Preview */}
-            <div className="relative w-full aspect-square bg-muted rounded-lg overflow-hidden flex items-center justify-center">
+          <TabsContent value="default" className="space-y-2 mt-0">
+            {/* Image Preview - Compact */}
+            <div className="relative w-full h-24 bg-muted rounded-md overflow-hidden flex items-center justify-center">
               {defaultImageUrl ? (
                 <>
                   <img 
@@ -200,16 +216,16 @@ export const CategoryImageSelector = ({
                     className="w-full h-full object-cover"
                   />
                   {isUsingDefault && (
-                    <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-1">
-                      <CheckCircle2 className="h-5 w-5" />
+                    <div className="absolute top-1 right-1 bg-green-500 text-white rounded-full p-0.5">
+                      <CheckCircle2 className="h-3 w-3" />
                     </div>
                   )}
                 </>
               ) : (
-                <div className="text-center p-8">
-                  <ImageIcon className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">
-                    {category ? `No default image for ${category}` : 'Select a category first'}
+                <div className="text-center p-2">
+                  <ImageIcon className="h-6 w-6 mx-auto mb-1 text-muted-foreground" />
+                  <p className="text-xs text-muted-foreground">
+                    {category ? `No default for ${category}` : 'Select category'}
                   </p>
                 </div>
               )}
@@ -218,36 +234,30 @@ export const CategoryImageSelector = ({
             {defaultImageUrl && (
               <Button
                 variant="default"
-                className="w-full"
+                size="sm"
+                className="w-full h-7 text-xs"
                 onClick={handleUseDefaultImage}
                 disabled={isUsingDefault}
               >
                 {isUsingDefault ? (
                   <>
-                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                    Using Default Image
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Using Default
                   </>
                 ) : (
                   <>
-                    <ImageIcon className="h-4 w-4 mr-2" />
-                    Use This Default Image
+                    <ImageIcon className="h-3 w-3 mr-1" />
+                    Use Default
                   </>
                 )}
               </Button>
             )}
-
-            <p className="text-xs text-muted-foreground text-center">
-              {defaultImageUrl 
-                ? `Default ${category} image - quick and easy option`
-                : 'Please select a product category to see default images'
-              }
-            </p>
           </TabsContent>
 
           {/* Custom Upload Tab */}
-          <TabsContent value="custom" className="space-y-4">
-            {/* Image Preview */}
-            <div className="relative w-full aspect-square bg-muted rounded-lg overflow-hidden flex items-center justify-center">
+          <TabsContent value="custom" className="space-y-2 mt-0">
+            {/* Image Preview - Compact */}
+            <div className="relative w-full h-24 bg-muted rounded-md overflow-hidden flex items-center justify-center">
               {previewUrl && !isUsingDefault ? (
                 <>
                   <img 
@@ -258,73 +268,52 @@ export const CategoryImageSelector = ({
                   {!uploading && (
                     <Button
                       variant="destructive"
-                      size="sm"
-                      className="absolute top-2 right-2"
+                      size="icon"
+                      className="absolute top-1 right-1 h-5 w-5"
                       onClick={handleRemoveCustomImage}
                     >
-                      <X className="h-4 w-4" />
+                      <X className="h-3 w-3" />
                     </Button>
                   )}
                 </>
               ) : (
-                <div className="text-center p-8">
-                  <ImageIcon className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">
-                    No custom image uploaded
-                  </p>
+                <div className="text-center p-2">
+                  <ImageIcon className="h-6 w-6 mx-auto mb-1 text-muted-foreground" />
+                  <p className="text-xs text-muted-foreground">No custom image</p>
                 </div>
               )}
             </div>
 
-            {/* Upload Button */}
-            <div className="w-full space-y-2">
-              <Label htmlFor={`product-image-${supplierId}`} className="text-sm font-medium">
-                Upload Your Own Image
-              </Label>
-              <Button
-                variant="outline"
-                className="w-full"
-                disabled={uploading}
-                onClick={() => document.getElementById(`product-file-input-${supplierId}`)?.click()}
-              >
-                {uploading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Uploading...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="h-4 w-4 mr-2" />
-                    {previewUrl && !isUsingDefault ? 'Change Custom Image' : 'Upload Custom Image'}
-                  </>
-                )}
-              </Button>
+            {/* Upload Button - Compact */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full h-7 text-xs"
+              disabled={uploading}
+              onClick={() => document.getElementById(`product-file-input-${supplierId}`)?.click()}
+            >
+              {uploading ? (
+                <>
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Upload className="h-3 w-3 mr-1" />
+                  {previewUrl && !isUsingDefault ? 'Change' : 'Upload Image'}
+                </>
+              )}
+            </Button>
 
-              <input
-                id={`product-file-input-${supplierId}`}
-                type="file"
-                accept="image/*"
-                onChange={handleFileSelect}
-                className="hidden"
-              />
-
-              <p className="text-xs text-muted-foreground text-center">
-                Upload a clear photo of your specific product
-                <br />
-                Recommended: 800x800px, max 5MB
-                <br />
-                Formats: JPG, PNG, WEBP
-              </p>
-            </div>
+            <input
+              id={`product-file-input-${supplierId}`}
+              type="file"
+              accept="image/*,.jpg,.jpeg,.png,.gif,.webp,.avif,.svg,.bmp,.tiff,.heic,.heif"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
           </TabsContent>
         </Tabs>
-
-        {/* Help Text */}
-        <div className="mt-4 p-3 bg-muted rounded-md">
-          <p className="text-xs text-muted-foreground">
-            <strong>💡 Tip:</strong> Use the default image for quick setup, or upload your own product photo for better visibility and sales!
-          </p>
-        </div>
       </CardContent>
     </Card>
   );

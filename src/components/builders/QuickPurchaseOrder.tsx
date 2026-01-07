@@ -88,14 +88,19 @@ export const QuickPurchaseOrder: React.FC<QuickPurchaseOrderProps> = ({ builderI
     try {
       const { data, error } = await supabase
         .from('suppliers')
-        .select('id, user_id, company_name, location, materials_offered, rating, total_reviews')
-        .eq('status', 'active')
+        .select('id, user_id, company_name, address, materials_offered, rating')
         .order('rating', { ascending: false })
         .limit(20);
 
       if (error) throw error;
 
-      setSuppliers(data || []);
+      // Map address to location for compatibility
+      const mappedData = (data || []).map(s => ({
+        ...s,
+        location: s.address || 'Kenya',
+        total_reviews: 0
+      }));
+      setSuppliers(mappedData);
     } catch (error) {
       console.error('Error fetching suppliers:', error);
       toast({

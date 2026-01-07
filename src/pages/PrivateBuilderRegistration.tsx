@@ -26,7 +26,7 @@ const KENYAN_COUNTIES = [
   "Murang'a", "Kirinyaga", "Nyandarua", "Laikipia", "Samburu", "Trans Nzoia",
   "Uasin Gishu", "Elgeyo Marakwet", "Nandi", "Baringo", "West Pokot", 
   "Turkana", "Bomet", "Narok", "Makueni", "Kitui", "Mwingi", "Tharaka Nithi", 
-  "Isiolo", "Mandera", "Garissa"
+  "Isiolo", "Mandera"
 ];
 
 const PROJECT_TYPES = [
@@ -138,33 +138,66 @@ const PrivateBuilderRegistration = () => {
 
       const userId = session.user.id;
       
-      // Background save - user doesn't wait for this
-      await Promise.all([
-        supabase
-          .from('profiles')
-          .upsert({
-            user_id: userId,
-            full_name: data.full_name,
-            phone: data.phone,
-            location: data.location,
-            builder_category: 'private',
-            project_types: data.project_types,
-            project_timeline: data.project_timeline,
-            budget_range: data.budget_range,
-            project_description: data.project_description,
-            property_type: data.property_type,
-          }, {
-            onConflict: 'user_id'
-          }),
-        supabase
-          .from('user_roles')
-          .upsert({
+      // Use direct fetch to Supabase REST API (more reliable than client)
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzI0NTQwNjIsImV4cCI6MjA0ODAzMDA2Mn0.vu4KlLJLKlJmYb2b4R8MxpVKv0izRdkXC_FVwVRT0LM';
+      
+      // Update profile using direct fetch with access_token (no 'email' column in profiles)
+      const profileResponse = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${session.access_token}`,
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({
+          full_name: data.full_name,
+          phone: data.phone,
+          location: data.location,
+          builder_category: 'private',
+          project_types: data.project_types,
+          project_timeline: data.project_timeline,
+          budget_range: data.budget_range,
+          project_description: data.project_description,
+          property_type: data.property_type,
+        })
+      });
+
+      if (!profileResponse.ok) {
+        console.error('Profile update error:', await profileResponse.text());
+      }
+
+      // Update user role
+      const roleResponse = await fetch(`${SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${userId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${session.access_token}`,
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({
+          role: 'private_client'
+        })
+      });
+
+      if (!roleResponse.ok) {
+        // Try INSERT if PATCH failed (new user)
+        await fetch(`${SUPABASE_URL}/rest/v1/user_roles`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${session.access_token}`,
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify({
             user_id: userId,
             role: 'private_client'
-          }, {
-            onConflict: 'user_id'
           })
-      ]);
+        });
+      }
 
       console.log("✅ Profile saved successfully in background");
 
