@@ -185,91 +185,81 @@ const Index = () => {
         </div>
 
         <div className="relative container mx-auto px-4 py-16">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            {/* Left Content */}
-            <div className="text-white">
-              <AnimatedSection animation="fadeInUp">
-                <Badge className="mb-6 bg-gradient-to-r from-green-600 to-emerald-600 text-white border-0 px-4 py-2 text-sm font-semibold">
-                  🇰🇪 Kenya's #1 Construction Platform
-                </Badge>
-              </AnimatedSection>
+          {/* Centered Hero Content */}
+          <div className="text-center text-white max-w-4xl mx-auto">
+            <AnimatedSection animation="fadeInUp">
+              <Badge className="mb-6 bg-gradient-to-r from-green-600 to-emerald-600 text-white border-0 px-4 py-2 text-sm font-semibold">
+                🇰🇪 Kenya's #1 Construction Platform
+              </Badge>
+            </AnimatedSection>
 
-              <AnimatedSection animation="fadeInUp" delay={100}>
-                <h3 className="text-2xl md:text-3xl font-semibold mb-4 text-orange-400">
-                  Welcome to MradiPro
-                </h3>
-                <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
-                  <span className="text-white">Building Kenya's</span>
-                  <br />
-                  <span className="bg-gradient-to-r from-orange-400 via-amber-400 to-orange-400 bg-clip-text text-transparent">
-                    Digital Construction
-                  </span>
-                  <br />
-                  <span className="text-white">Future</span>
-                </h1>
-              </AnimatedSection>
+            <AnimatedSection animation="fadeInUp" delay={100}>
+              <h3 className="text-2xl md:text-3xl font-semibold mb-4 text-orange-400">
+                Welcome to MradiPro
+              </h3>
+              <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
+                <span className="text-white">Building Kenya's</span>
+                <br />
+                <span className="bg-gradient-to-r from-orange-400 via-amber-400 to-orange-400 bg-clip-text text-transparent">
+                  Digital Construction
+                </span>
+                <br />
+                <span className="text-white">Future</span>
+              </h1>
+            </AnimatedSection>
 
-              <AnimatedSection animation="fadeInUp" delay={200}>
-                <p className="text-lg md:text-xl text-gray-300 mb-8 leading-relaxed max-w-xl">
-                  The complete construction management platform. Find builders, source materials, 
-                  track deliveries with GPS, scan QR codes, and monitor sites with live cameras — 
-                  all in one powerful ecosystem.
-                </p>
-              </AnimatedSection>
+            <AnimatedSection animation="fadeInUp" delay={200}>
+              <p className="text-lg md:text-xl text-gray-300 mb-8 leading-relaxed max-w-2xl mx-auto">
+                The complete construction management platform. Find builders, source materials, 
+                track deliveries with GPS, scan QR codes, and monitor sites with live cameras — 
+                all in one powerful ecosystem.
+              </p>
+            </AnimatedSection>
 
-              <AnimatedSection animation="fadeInUp" delay={300}>
-                <div className="flex flex-wrap gap-4 mb-8">
-                  <Link to="/builder-registration">
-                    <Button size="lg" className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white font-semibold px-8 py-6 text-lg shadow-xl">
-                      <Building2 className="h-5 w-5 mr-2" />
-                      Get Started Free
-                      <ArrowRight className="h-5 w-5 ml-2" />
-                    </Button>
-                  </Link>
-                  <Link to="/suppliers">
-                    <Button size="lg" variant="outline" className="border-2 border-white/30 text-white hover:bg-white/10 font-semibold px-8 py-6 text-lg backdrop-blur-sm">
-                      <Play className="h-5 w-5 mr-2" />
-                      See How It Works
-                    </Button>
-                  </Link>
-                </div>
-              </AnimatedSection>
-
-              {/* Tech Features Pills */}
-              <AnimatedSection animation="fadeInUp" delay={400}>
-                <div className="flex flex-wrap gap-3">
-                  {techFeatures.map((feature, index) => (
-                    <div key={index} className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full">
-                      <feature.icon className="h-4 w-4 text-cyan-400" />
-                      <span className="text-sm text-white">{feature.label}</span>
-                    </div>
-                  ))}
-                </div>
-              </AnimatedSection>
-            </div>
-
-            {/* Right Content - Stats Card */}
             <AnimatedSection animation="fadeInUp" delay={300}>
-              <div className="hidden lg:block">
-                <Card className="bg-white/10 backdrop-blur-xl border-white/20 shadow-2xl">
-                  <CardContent className="p-8">
-                    <div className="grid grid-cols-2 gap-6">
-                      {stats.map((stat, index) => (
-                        <div key={index} className="text-center p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-all">
-                          <stat.icon className="h-8 w-8 text-cyan-400 mx-auto mb-2" />
-                          <div className="text-3xl font-bold text-white mb-1">{stat.value}</div>
-                          <div className="text-sm text-gray-300">{stat.label}</div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-6 pt-6 border-t border-white/10">
-                      <div className="flex items-center justify-center gap-2 text-gray-300">
-                        <CheckCircle2 className="h-5 w-5 text-green-400" />
-                        <span>Trusted by 5,200+ construction professionals</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+              <div className="flex flex-wrap gap-4 mb-8 justify-center">
+                <Link to="/builder-registration">
+                  <Button size="lg" className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white font-semibold px-8 py-6 text-lg shadow-xl">
+                    <Building2 className="h-5 w-5 mr-2" />
+                    Get Started Free
+                    <ArrowRight className="h-5 w-5 ml-2" />
+                  </Button>
+                </Link>
+                <Link to="/suppliers">
+                  <Button size="lg" variant="outline" className="border-2 border-white/30 text-white hover:bg-white/10 font-semibold px-8 py-6 text-lg backdrop-blur-sm">
+                    <Play className="h-5 w-5 mr-2" />
+                    See How It Works
+                  </Button>
+                </Link>
+              </div>
+            </AnimatedSection>
+
+            {/* Tech Features Pills */}
+            <AnimatedSection animation="fadeInUp" delay={400}>
+              <div className="flex flex-wrap gap-3 justify-center">
+                {techFeatures.map((feature, index) => (
+                  <div key={index} className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full">
+                    <feature.icon className="h-4 w-4 text-cyan-400" />
+                    <span className="text-sm text-white">{feature.label}</span>
+                  </div>
+                ))}
+              </div>
+            </AnimatedSection>
+
+            {/* Stats Row - Centered below hero */}
+            <AnimatedSection animation="fadeInUp" delay={500}>
+              <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto">
+                {stats.map((stat, index) => (
+                  <div key={index} className="text-center p-4 rounded-xl bg-white/10 backdrop-blur-sm hover:bg-white/15 transition-all">
+                    <stat.icon className="h-6 w-6 text-cyan-400 mx-auto mb-2" />
+                    <div className="text-2xl font-bold text-white mb-1">{stat.value}</div>
+                    <div className="text-xs text-gray-300">{stat.label}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-6 flex items-center justify-center gap-2 text-gray-300">
+                <CheckCircle2 className="h-5 w-5 text-green-400" />
+                <span>Trusted by 5,200+ construction professionals</span>
               </div>
             </AnimatedSection>
           </div>
@@ -368,59 +358,59 @@ const Index = () => {
             <p className="text-white/70 max-w-xl mx-auto">Register based on your role to access tailored features</p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
             {/* Private Client */}
             <Link to="/private-builder-registration">
-              <Card className="h-full hover:scale-[1.02] transition-all duration-300 cursor-pointer bg-gradient-to-br from-emerald-600 to-emerald-700 border-emerald-500/30 hover:border-emerald-400">
-                <CardContent className="p-5 text-center">
-                  <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mx-auto mb-3">
-                    <ShoppingCart className="h-6 w-6 text-white" />
+              <Card className="h-full hover:scale-[1.03] transition-all duration-300 cursor-pointer bg-gradient-to-br from-emerald-600 to-emerald-700 border-2 border-emerald-500/30 hover:border-emerald-400 shadow-xl hover:shadow-2xl">
+                <CardContent className="p-8 text-center">
+                  <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <ShoppingCart className="h-8 w-8 text-white" />
                   </div>
-                  <h3 className="text-white font-bold mb-1">Private Client</h3>
-                  <p className="text-emerald-100/70 text-xs mb-3">Home projects & personal purchases</p>
-                  <Badge className="bg-white text-emerald-700 text-xs">Register →</Badge>
+                  <h3 className="text-white font-bold text-xl mb-2">Private Client</h3>
+                  <p className="text-emerald-100/80 text-sm mb-4">Home projects & personal purchases</p>
+                  <Badge className="bg-white text-emerald-700 px-4 py-1">Register →</Badge>
                 </CardContent>
               </Card>
             </Link>
 
             {/* Professional Builder */}
             <Link to="/professional-builder-registration">
-              <Card className="h-full hover:scale-[1.02] transition-all duration-300 cursor-pointer bg-gradient-to-br from-blue-600 to-blue-700 border-blue-500/30 hover:border-blue-400">
-                <CardContent className="p-5 text-center">
-                  <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mx-auto mb-3">
-                    <Building2 className="h-6 w-6 text-white" />
+              <Card className="h-full hover:scale-[1.03] transition-all duration-300 cursor-pointer bg-gradient-to-br from-blue-600 to-blue-700 border-2 border-blue-500/30 hover:border-blue-400 shadow-xl hover:shadow-2xl">
+                <CardContent className="p-8 text-center">
+                  <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <Building2 className="h-8 w-8 text-white" />
                   </div>
-                  <h3 className="text-white font-bold mb-1">Pro Builder</h3>
-                  <p className="text-blue-100/70 text-xs mb-3">Contractors & companies</p>
-                  <Badge className="bg-white text-blue-700 text-xs">Register →</Badge>
+                  <h3 className="text-white font-bold text-xl mb-2">Pro Builder</h3>
+                  <p className="text-blue-100/80 text-sm mb-4">Contractors & construction companies</p>
+                  <Badge className="bg-white text-blue-700 px-4 py-1">Register →</Badge>
                 </CardContent>
               </Card>
             </Link>
 
             {/* Supplier */}
             <Link to="/supplier-registration">
-              <Card className="h-full hover:scale-[1.02] transition-all duration-300 cursor-pointer bg-gradient-to-br from-amber-600 to-orange-600 border-amber-500/30 hover:border-amber-400">
-                <CardContent className="p-5 text-center">
-                  <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mx-auto mb-3">
-                    <Store className="h-6 w-6 text-white" />
+              <Card className="h-full hover:scale-[1.03] transition-all duration-300 cursor-pointer bg-gradient-to-br from-amber-600 to-orange-600 border-2 border-amber-500/30 hover:border-amber-400 shadow-xl hover:shadow-2xl">
+                <CardContent className="p-8 text-center">
+                  <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <Store className="h-8 w-8 text-white" />
                   </div>
-                  <h3 className="text-white font-bold mb-1">Supplier</h3>
-                  <p className="text-amber-100/70 text-xs mb-3">Sell construction materials</p>
-                  <Badge className="bg-white text-amber-700 text-xs">Register →</Badge>
+                  <h3 className="text-white font-bold text-xl mb-2">Supplier</h3>
+                  <p className="text-amber-100/80 text-sm mb-4">Sell construction materials</p>
+                  <Badge className="bg-white text-amber-700 px-4 py-1">Register →</Badge>
                 </CardContent>
               </Card>
             </Link>
 
             {/* Delivery Provider */}
             <Link to="/delivery/apply">
-              <Card className="h-full hover:scale-[1.02] transition-all duration-300 cursor-pointer bg-gradient-to-br from-teal-600 to-cyan-600 border-teal-500/30 hover:border-teal-400">
-                <CardContent className="p-5 text-center">
-                  <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mx-auto mb-3">
-                    <Truck className="h-6 w-6 text-white" />
+              <Card className="h-full hover:scale-[1.03] transition-all duration-300 cursor-pointer bg-gradient-to-br from-teal-600 to-cyan-600 border-2 border-teal-500/30 hover:border-teal-400 shadow-xl hover:shadow-2xl">
+                <CardContent className="p-8 text-center">
+                  <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <Truck className="h-8 w-8 text-white" />
                   </div>
-                  <h3 className="text-white font-bold mb-1">Delivery</h3>
-                  <p className="text-teal-100/70 text-xs mb-3">Transport & logistics</p>
-                  <Badge className="bg-white text-teal-700 text-xs">Apply →</Badge>
+                  <h3 className="text-white font-bold text-xl mb-2">Delivery</h3>
+                  <p className="text-teal-100/80 text-sm mb-4">Transport & logistics services</p>
+                  <Badge className="bg-white text-teal-700 px-4 py-1">Apply →</Badge>
                 </CardContent>
               </Card>
             </Link>
