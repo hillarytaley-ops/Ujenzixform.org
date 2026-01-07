@@ -65,10 +65,13 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
 
   const fetchSessions = useCallback(async () => {
     try {
+      console.log('📨 Fetching chat messages...');
       const { data, error } = await supabase
         .from('chat_messages')
         .select('*')
         .order('created_at', { ascending: false });
+
+      console.log('📨 Chat messages result:', { count: data?.length, error });
 
       if (error) {
         console.error('Error fetching chat messages:', error);

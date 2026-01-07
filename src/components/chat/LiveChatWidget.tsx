@@ -163,6 +163,7 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
   // Save message to database - using existing table structure
   const saveMessage = async (content: string, senderType: 'user' | 'bot' | 'staff') => {
     try {
+      console.log('💬 Saving chat message:', { conversationId, senderType, content: content.substring(0, 50) });
       const { data, error } = await supabase
         .from('chat_messages')
         .insert({
@@ -177,10 +178,14 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error saving message:', error);
+        throw error;
+      }
+      console.log('✅ Message saved with ID:', data?.id);
       return data?.id;
     } catch (err) {
-      console.error('Error saving message:', err);
+      console.error('❌ Error saving message:', err);
       return null;
     }
   };
