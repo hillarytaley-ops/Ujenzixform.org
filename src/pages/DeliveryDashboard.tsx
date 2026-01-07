@@ -879,7 +879,7 @@ const DeliveryDashboard = () => {
           <SupportChat 
             userId={user.id}
             userRole="delivery_provider"
-            userName={profile?.full_name || user.email?.split('@')[0] || 'Delivery Provider'}
+            userName={isolatedProfile?.full_name || providerProfile?.full_name || user.email?.split('@')[0] || 'Delivery Provider'}
           />
         )}
 
