@@ -181,26 +181,34 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
     
     console.log('📤 Insert data:', messageData);
 
-    const { data, error } = await supabase
-      .from('chat_messages')
-      .insert(messageData)
-      .select()
-      .single();
+    try {
+      // Add timeout to detect hanging requests
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Request timeout after 10s')), 10000)
+      );
 
-    console.log('📥 Insert result:', { data, error });
+      const insertPromise = supabase
+        .from('chat_messages')
+        .insert(messageData)
+        .select()
+        .single();
 
-    if (error) {
-      console.error('❌ Supabase error:', error.message, error.details, error.hint);
-      toast({
-        title: "Message not saved",
-        description: error.message || "Failed to save message to server",
-        variant: "destructive"
-      });
+      const result = await Promise.race([insertPromise, timeoutPromise]) as any;
+      
+      console.log('📥 Insert result:', result);
+
+      if (result.error) {
+        console.error('❌ Supabase error:', result.error.message, result.error.details, result.error.hint);
+        return null;
+      }
+      
+      console.log('✅ Message saved with ID:', result.data?.id);
+      return result.data?.id;
+    } catch (err: any) {
+      console.error('❌ Exception:', err.message || err);
+      // Don't show toast for timeout - message still shows locally
       return null;
     }
-    
-    console.log('✅ Message saved with ID:', data?.id);
-    return data?.id;
   };
 
   // AI Response Engine
