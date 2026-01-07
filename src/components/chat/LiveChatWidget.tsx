@@ -43,12 +43,19 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
   useEffect(() => {
     const storedConversationId = localStorage.getItem('mradipro_chat_conversation');
     if (storedConversationId) {
+      console.log('🔑 Using existing conversation ID:', storedConversationId);
       setConversationId(storedConversationId);
     } else {
       const newConversationId = crypto.randomUUID();
+      console.log('🔑 Generated new conversation ID:', newConversationId);
       localStorage.setItem('mradipro_chat_conversation', newConversationId);
       setConversationId(newConversationId);
     }
+    
+    // Test Supabase connection
+    supabase.from('chat_messages').select('count').limit(1).then(({ data, error }) => {
+      console.log('🔌 Supabase connection test:', { connected: !error, error: error?.message });
+    });
   }, []);
 
   // Load previous messages and set up real-time subscription
