@@ -90,7 +90,8 @@ import { MaterialImagesManager } from "@/components/admin/MaterialImagesManager"
 import { AdminVideoApproval } from "@/components/admin/AdminVideoApproval";
 import { AdminConversationsViewer } from "@/components/admin/AdminConversationsViewer";
 import { UserRolesManager } from "@/components/admin/UserRolesManager";
-import { Camera, UserCog } from "lucide-react";
+import { AdminMessaging } from "@/components/admin/AdminMessaging";
+import { Camera, UserCog, MessageCircle } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -1906,6 +1907,10 @@ const AdminDashboard = () => {
             <TabsTrigger value="user-roles" className="data-[state=active]:bg-pink-600">
               <UserCog className="h-4 w-4 mr-2" />
               User Roles
+            </TabsTrigger>
+            <TabsTrigger value="messaging" className="data-[state=active]:bg-cyan-600">
+              <MessageCircle className="h-4 w-4 mr-2" />
+              Messaging
             </TabsTrigger>
           </TabsList>
 
@@ -4101,6 +4106,10 @@ const AdminDashboard = () => {
           {/* User Roles Management Tab */}
           <TabsContent value="user-roles" className="space-y-6">
             <UserRolesManager />
+          </TabsContent>
+
+          <TabsContent value="messaging" className="space-y-6">
+            <AdminMessaging />
           </TabsContent>
         </Tabs>
       </main>

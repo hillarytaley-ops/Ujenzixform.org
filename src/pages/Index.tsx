@@ -147,37 +147,40 @@ const Index = () => {
           {/* Base gradient (shows immediately) */}
           <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800" />
           
-          {/* Background image (loads and fades in) */}
+          {/* Background image - Construction site with workers and machinery */}
           <img 
-            src="https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=1920&q=80"
-            alt=""
+            src="https://images.unsplash.com/photo-1541888946425-d81bb19240f5?w=1920&q=80"
+            alt="Construction site with workers"
             loading="eager"
             className="absolute inset-0 w-full h-full object-cover"
             onLoad={(e) => (e.target as HTMLImageElement).style.opacity = '1'}
-            style={{ opacity: 0, transition: 'opacity 0.5s ease-in-out' }}
+            style={{ opacity: 0, transition: 'opacity 0.6s ease-in-out' }}
           />
           
-          {/* Overlay gradient */}
-          <div className="absolute inset-0 bg-gradient-to-br from-slate-900/95 via-blue-900/85 to-slate-900/90" />
+          {/* Overlay gradient - darker for better text readability */}
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-900/90 via-blue-900/80 to-slate-900/85" />
+          
+          {/* Additional dark overlay on left for text area */}
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-900/60 via-transparent to-transparent" />
         </div>
 
         {/* Animated Tech Elements */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           {/* Floating orbs - orange accent */}
-          <div className="absolute top-20 left-10 w-72 h-72 bg-orange-500/10 rounded-full blur-3xl animate-pulse" />
-          <div className="absolute bottom-20 right-10 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-          <div className="absolute top-1/2 left-1/4 w-64 h-64 bg-orange-500/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
+          <div className="absolute top-20 left-10 w-72 h-72 bg-orange-500/15 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute bottom-20 right-10 w-96 h-96 bg-amber-500/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+          <div className="absolute top-1/2 left-1/4 w-64 h-64 bg-orange-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
           
-          {/* Tech grid pattern */}
+          {/* Construction-themed grid pattern */}
           <div 
-            className="absolute inset-0 opacity-[0.03]"
+            className="absolute inset-0 opacity-[0.04]"
             style={{
               backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
             }}
           />
 
           {/* Animated lines */}
-          <div className="absolute top-0 left-1/4 w-px h-full bg-gradient-to-b from-transparent via-blue-500/20 to-transparent" />
+          <div className="absolute top-0 left-1/4 w-px h-full bg-gradient-to-b from-transparent via-orange-500/20 to-transparent" />
           <div className="absolute top-0 right-1/3 w-px h-full bg-gradient-to-b from-transparent via-cyan-500/20 to-transparent" />
         </div>
 

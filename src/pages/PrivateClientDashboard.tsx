@@ -21,8 +21,10 @@ import {
   CheckCircle,
   AlertCircle,
   TrendingUp,
-  Heart
+  Heart,
+  Headphones
 } from "lucide-react";
+import { UserMessaging } from "@/components/support/UserMessaging";
 
 const PrivateClientDashboard = () => {
   const [user, setUser] = useState<any>(null);
@@ -219,6 +221,10 @@ const PrivateClientDashboard = () => {
               <Heart className="h-4 w-4 mr-2" />
               Wishlist
             </TabsTrigger>
+            <TabsTrigger value="support" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white">
+              <Headphones className="h-4 w-4 mr-2" />
+              Support
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="orders">
@@ -305,6 +311,28 @@ const PrivateClientDashboard = () => {
                     </Button>
                   </Link>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="support">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Headphones className="h-5 w-5 text-purple-600" />
+                  Admin Support
+                </CardTitle>
+                <CardDescription>Direct communication with MradiPro team</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {user && (
+                  <UserMessaging 
+                    userId={user.id}
+                    userRole="private_client"
+                    userName={profile?.full_name || user.email?.split('@')[0]}
+                    themeColor="green"
+                  />
+                )}
               </CardContent>
             </Card>
           </TabsContent>

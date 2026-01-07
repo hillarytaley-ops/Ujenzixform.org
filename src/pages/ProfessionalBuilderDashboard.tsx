@@ -24,8 +24,10 @@ import {
   FileText,
   Building2,
   Users,
-  Briefcase
+  Briefcase,
+  Headphones
 } from "lucide-react";
+import { UserMessaging } from "@/components/support/UserMessaging";
 
 const ProfessionalBuilderDashboardPage = () => {
   const [user, setUser] = useState<any>(null);
@@ -226,6 +228,10 @@ const ProfessionalBuilderDashboardPage = () => {
               <Users className="h-4 w-4 mr-2" />
               Team
             </TabsTrigger>
+            <TabsTrigger value="support" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white">
+              <Headphones className="h-4 w-4 mr-2" />
+              Support
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="projects">
@@ -333,6 +339,28 @@ const ProfessionalBuilderDashboardPage = () => {
                     Invite Team Member
                   </Button>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="support">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Headphones className="h-5 w-5 text-purple-600" />
+                  Admin Support
+                </CardTitle>
+                <CardDescription>Direct communication with MradiPro team</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {user && (
+                  <UserMessaging 
+                    userId={user.id}
+                    userRole="professional_builder"
+                    userName={profile?.full_name || user.email?.split('@')[0]}
+                    themeColor="blue"
+                  />
+                )}
               </CardContent>
             </Card>
           </TabsContent>
