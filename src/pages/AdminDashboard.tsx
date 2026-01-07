@@ -3911,7 +3911,7 @@ const AdminDashboard = () => {
           <TabsContent value="communications" className="space-y-6">
             {/* Live Chat Manager - Real-time client-staff chat */}
             <LiveChatManager 
-              staffId={user?.id || 'admin'}
+              staffId={adminEmail || 'admin'}
               staffName={adminEmail?.split('@')[0] || 'Support Team'}
             />
 
