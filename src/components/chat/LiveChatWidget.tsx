@@ -34,40 +34,40 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
   const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [mode, setMode] = useState<'ai' | 'human'>('ai');
-  const [sessionId, setSessionId] = useState<string>('');
+  const [conversationId, setConversationId] = useState<string>('');
   const [waitingForStaff, setWaitingForStaff] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Generate or retrieve session ID
+  // Generate or retrieve conversation ID
   useEffect(() => {
-    const storedSessionId = localStorage.getItem('mradipro_chat_session');
-    if (storedSessionId) {
-      setSessionId(storedSessionId);
+    const storedConversationId = localStorage.getItem('mradipro_chat_conversation');
+    if (storedConversationId) {
+      setConversationId(storedConversationId);
     } else {
-      const newSessionId = `chat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      localStorage.setItem('mradipro_chat_session', newSessionId);
-      setSessionId(newSessionId);
+      const newConversationId = crypto.randomUUID();
+      localStorage.setItem('mradipro_chat_conversation', newConversationId);
+      setConversationId(newConversationId);
     }
   }, []);
 
   // Load previous messages and set up real-time subscription
   useEffect(() => {
-    if (!sessionId) return;
+    if (!conversationId) return;
 
     const loadMessages = async () => {
       try {
         const { data, error } = await supabase
           .from('chat_messages')
           .select('*')
-          .eq('session_id', sessionId)
+          .eq('conversation_id', conversationId)
           .order('created_at', { ascending: true });
 
         if (!error && data) {
           const loadedMessages: Message[] = data.map((msg: any) => ({
             id: msg.id,
             role: msg.sender_type as 'user' | 'bot' | 'staff',
-            content: msg.message,
+            content: msg.content,
             timestamp: new Date(msg.created_at)
           }));
           setMessages(loadedMessages);
@@ -87,14 +87,14 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
 
     // Real-time subscription for new messages
     const channel = supabase
-      .channel(`chat_${sessionId}`)
+      .channel(`chat_${conversationId}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'chat_messages',
-          filter: `session_id=eq.${sessionId}`
+          filter: `conversation_id=eq.${conversationId}`
         },
         (payload) => {
           const newMsg = payload.new as any;
@@ -106,7 +106,7 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
               return [...prev, {
                 id: newMsg.id,
                 role: 'staff',
-                content: newMsg.message,
+                content: newMsg.content,
                 timestamp: new Date(newMsg.created_at)
               }];
             });
@@ -118,7 +118,7 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
               setUnreadCount(prev => prev + 1);
               toast({
                 title: "New message from MradiPro Staff",
-                description: newMsg.message.substring(0, 50) + '...',
+                description: newMsg.content.substring(0, 50) + '...',
               });
             }
           }
@@ -129,7 +129,7 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [sessionId, isOpen, toast]);
+  }, [conversationId, isOpen, toast]);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -160,19 +160,19 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
     return null;
   }
 
-  // Save message to database
+  // Save message to database - using existing table structure
   const saveMessage = async (content: string, senderType: 'user' | 'bot' | 'staff') => {
     try {
       const { data, error } = await supabase
         .from('chat_messages')
         .insert({
-          session_id: sessionId,
-          user_id: userId || null,
-          user_name: userName,
-          user_email: userEmail || null,
-          message: content,
+          conversation_id: conversationId,
+          sender_id: userId || 'guest',
           sender_type: senderType,
-          needs_staff_reply: senderType === 'user' && mode === 'human'
+          sender_name: userName,
+          content: content,
+          message_type: 'text',
+          read: false
         })
         .select()
         .single();
@@ -556,4 +556,3 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
 };
 
 export default LiveChatWidget;
-

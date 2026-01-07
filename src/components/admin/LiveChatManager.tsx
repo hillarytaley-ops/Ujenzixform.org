@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -10,12 +9,8 @@ import {
   Send, 
   RefreshCw, 
   User, 
-  Clock, 
-  CheckCircle,
-  AlertCircle,
   Bot,
   Headphones,
-  Bell,
   Volume2,
   VolumeX
 } from "lucide-react";
@@ -23,23 +18,20 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface ChatMessage {
   id: string;
-  session_id: string;
-  user_id?: string;
-  user_name?: string;
-  user_email?: string;
-  message: string;
-  sender_type: 'user' | 'bot' | 'staff';
-  staff_id?: string;
-  needs_staff_reply: boolean;
-  read_by_staff: boolean;
+  conversation_id: string;
+  sender_id: string;
+  sender_type: string;
+  sender_name: string;
+  content: string;
+  message_type: string;
+  read: boolean;
   created_at: string;
 }
 
 interface ChatSession {
-  session_id: string;
+  conversation_id: string;
   messages: ChatMessage[];
-  user_name?: string;
-  user_email?: string;
+  sender_name: string;
   last_message_at: string;
   needs_reply: boolean;
   unread_count: number;
@@ -80,24 +72,25 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
 
       if (error) {
         console.error('Error fetching chat messages:', error);
+        setLoading(false);
         return;
       }
 
-      // Group messages by session_id
+      // Group messages by conversation_id
       const sessionsMap = new Map<string, ChatMessage[]>();
       (data || []).forEach((msg: ChatMessage) => {
-        const existing = sessionsMap.get(msg.session_id) || [];
+        const existing = sessionsMap.get(msg.conversation_id) || [];
         existing.push(msg);
-        sessionsMap.set(msg.session_id, existing);
+        sessionsMap.set(msg.conversation_id, existing);
       });
 
-      const sessionsList: ChatSession[] = Array.from(sessionsMap.entries()).map(([session_id, messages]) => {
+      const sessionsList: ChatSession[] = Array.from(sessionsMap.entries()).map(([conversation_id, messages]) => {
         const sortedMessages = messages.sort((a, b) => 
           new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
         );
         
-        // Get user info from first message with user data
-        const userMessage = messages.find(m => m.user_name || m.user_email);
+        // Get user info from first user message
+        const userMessage = messages.find(m => m.sender_type === 'user');
         
         // Check if needs reply (last user message without staff reply after it)
         const lastUserMsgIndex = sortedMessages.map(m => m.sender_type).lastIndexOf('user');
@@ -105,13 +98,12 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
         const needsReply = lastUserMsgIndex >= 0 && !hasStaffReplyAfter;
         
         // Count unread messages
-        const unreadCount = sortedMessages.filter(m => m.sender_type === 'user' && !m.read_by_staff).length;
+        const unreadCount = sortedMessages.filter(m => m.sender_type === 'user' && !m.read).length;
 
         return {
-          session_id,
+          conversation_id,
           messages: sortedMessages,
-          user_name: userMessage?.user_name || 'Guest',
-          user_email: userMessage?.user_email,
+          sender_name: userMessage?.sender_name || 'Guest',
           last_message_at: sortedMessages[sortedMessages.length - 1]?.created_at || '',
           needs_reply: needsReply,
           unread_count: unreadCount
@@ -150,7 +142,7 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
             playNotificationSound();
             toast({
               title: "New Chat Message",
-              description: `${newMsg.user_name || 'Guest'}: ${newMsg.message.substring(0, 50)}...`,
+              description: `${newMsg.sender_name || 'Guest'}: ${newMsg.content.substring(0, 50)}...`,
             });
           }
           
@@ -182,14 +174,13 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
       const { error } = await supabase
         .from('chat_messages')
         .insert({
-          session_id: selectedSession,
-          message: replyMessage.trim(),
+          conversation_id: selectedSession,
+          sender_id: staffId,
           sender_type: 'staff',
-          staff_id: staffId,
-          user_name: staffName,
-          needs_staff_reply: false,
-          read_by_staff: true,
-          read_by_user: false
+          sender_name: staffName,
+          content: replyMessage.trim(),
+          message_type: 'text',
+          read: true
         });
 
       if (error) throw error;
@@ -197,8 +188,8 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
       // Mark previous messages as read
       await supabase
         .from('chat_messages')
-        .update({ read_by_staff: true })
-        .eq('session_id', selectedSession)
+        .update({ read: true })
+        .eq('conversation_id', selectedSession)
         .eq('sender_type', 'user');
 
       toast({
@@ -218,12 +209,12 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
     }
   };
 
-  const markSessionAsRead = async (sessionId: string) => {
+  const markSessionAsRead = async (conversationId: string) => {
     try {
       await supabase
         .from('chat_messages')
-        .update({ read_by_staff: true })
-        .eq('session_id', sessionId)
+        .update({ read: true })
+        .eq('conversation_id', conversationId)
         .eq('sender_type', 'user');
       
       fetchSessions();
@@ -232,7 +223,7 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
     }
   };
 
-  const selectedChatSession = sessions.find(s => s.session_id === selectedSession);
+  const selectedChatSession = sessions.find(s => s.conversation_id === selectedSession);
   const totalUnread = sessions.reduce((sum, s) => sum + s.unread_count, 0);
   const needsReplyCount = sessions.filter(s => s.needs_reply).length;
 
@@ -288,13 +279,13 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
             ) : (
               sessions.map((session) => (
                 <div
-                  key={session.session_id}
+                  key={session.conversation_id}
                   onClick={() => {
-                    setSelectedSession(session.session_id);
-                    markSessionAsRead(session.session_id);
+                    setSelectedSession(session.conversation_id);
+                    markSessionAsRead(session.conversation_id);
                   }}
                   className={`p-3 rounded-lg mb-2 cursor-pointer transition-all ${
-                    selectedSession === session.session_id 
+                    selectedSession === session.conversation_id 
                       ? 'bg-purple-600/30 border border-purple-500' 
                       : 'hover:bg-gray-700/50 border border-transparent'
                   }`}
@@ -303,7 +294,7 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
                     <div className="flex items-center gap-2">
                       <div className={`w-2 h-2 rounded-full ${session.needs_reply ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`} />
                       <span className="text-sm font-medium text-white">
-                        {session.user_name}
+                        {session.sender_name}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -319,11 +310,6 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
                       )}
                     </div>
                   </div>
-                  {session.user_email && (
-                    <p className="text-xs text-gray-400 mt-1 truncate">
-                      {session.user_email}
-                    </p>
-                  )}
                   <div className="flex items-center justify-between mt-2">
                     <p className="text-xs text-gray-500">
                       {session.messages.length} messages
@@ -334,7 +320,7 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
                   </div>
                   {/* Preview last message */}
                   <p className="text-xs text-gray-400 mt-1 truncate italic">
-                    {session.messages[session.messages.length - 1]?.message.substring(0, 40)}...
+                    {session.messages[session.messages.length - 1]?.content.substring(0, 40)}...
                   </p>
                 </div>
               ))
@@ -351,11 +337,11 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
                 <div>
                   <h4 className="font-semibold text-white flex items-center gap-2">
                     <User className="w-4 h-4" />
-                    {selectedChatSession.user_name}
+                    {selectedChatSession.sender_name}
                   </h4>
-                  {selectedChatSession.user_email && (
-                    <p className="text-sm text-gray-400">{selectedChatSession.user_email}</p>
-                  )}
+                  <p className="text-sm text-gray-400">
+                    {selectedChatSession.messages.length} messages
+                  </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge className={selectedChatSession.needs_reply ? 'bg-yellow-500' : 'bg-green-500'}>
@@ -380,14 +366,14 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
                           : 'bg-blue-600 text-white'
                       }`}
                     >
-                      <p className="text-sm whitespace-pre-line">{msg.message}</p>
+                      <p className="text-sm whitespace-pre-line">{msg.content}</p>
                       <p className="text-xs opacity-70 mt-1 flex items-center gap-1">
                         {msg.sender_type === 'staff' ? (
                           <><Headphones className="w-3 h-3" /> Staff</>
                         ) : msg.sender_type === 'bot' ? (
                           <><Bot className="w-3 h-3" /> AI Bot</>
                         ) : (
-                          <><User className="w-3 h-3" /> User</>
+                          <><User className="w-3 h-3" /> {msg.sender_name}</>
                         )}
                         {' • '}
                         {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -430,4 +416,3 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
 }
 
 export default LiveChatManager;
-
