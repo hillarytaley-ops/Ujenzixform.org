@@ -92,16 +92,16 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
           new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
         );
         
-        // Get user info from first user message
-        const userMessage = messages.find(m => m.sender_type === 'user');
+        // Get user info from first client message (user messages are stored as 'client' in DB)
+        const userMessage = messages.find(m => m.sender_type === 'client');
         
-        // Check if needs reply (last user message without staff reply after it)
-        const lastUserMsgIndex = sortedMessages.map(m => m.sender_type).lastIndexOf('user');
+        // Check if needs reply (last client message without staff reply after it)
+        const lastUserMsgIndex = sortedMessages.map(m => m.sender_type).lastIndexOf('client');
         const hasStaffReplyAfter = sortedMessages.slice(lastUserMsgIndex + 1).some(m => m.sender_type === 'staff');
         const needsReply = lastUserMsgIndex >= 0 && !hasStaffReplyAfter;
         
-        // Count unread messages
-        const unreadCount = sortedMessages.filter(m => m.sender_type === 'user' && !m.read).length;
+        // Count unread messages from clients
+        const unreadCount = sortedMessages.filter(m => m.sender_type === 'client' && !m.read).length;
 
         return {
           conversation_id,
@@ -140,8 +140,8 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
         (payload) => {
           const newMsg = payload.new as ChatMessage;
           
-          // Play sound for new user messages
-          if (newMsg.sender_type === 'user') {
+          // Play sound for new client messages
+          if (newMsg.sender_type === 'client') {
             playNotificationSound();
             toast({
               title: "New Chat Message",
@@ -193,7 +193,7 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
         .from('chat_messages')
         .update({ read: true })
         .eq('conversation_id', selectedSession)
-        .eq('sender_type', 'user');
+        .eq('sender_type', 'client');
 
       toast({
         title: "Reply Sent",
@@ -218,7 +218,7 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
         .from('chat_messages')
         .update({ read: true })
         .eq('conversation_id', conversationId)
-        .eq('sender_type', 'user');
+        .eq('sender_type', 'client');
       
       fetchSessions();
     } catch (error) {
@@ -358,11 +358,11 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
                 {selectedChatSession.messages.map((msg) => (
                   <div
                     key={msg.id}
-                    className={`mb-3 ${msg.sender_type === 'user' ? 'text-left' : 'text-right'}`}
+                    className={`mb-3 ${msg.sender_type === 'client' ? 'text-left' : 'text-right'}`}
                   >
                     <div
                       className={`inline-block max-w-[80%] p-3 rounded-lg ${
-                        msg.sender_type === 'user'
+                        msg.sender_type === 'client'
                           ? 'bg-gray-700 text-white'
                           : msg.sender_type === 'staff'
                           ? 'bg-purple-600 text-white'
@@ -373,7 +373,7 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
                       <p className="text-xs opacity-70 mt-1 flex items-center gap-1">
                         {msg.sender_type === 'staff' ? (
                           <><Headphones className="w-3 h-3" /> Staff</>
-                        ) : msg.sender_type === 'bot' ? (
+                        ) : msg.sender_type === 'system' ? (
                           <><Bot className="w-3 h-3" /> AI Bot</>
                         ) : (
                           <><User className="w-3 h-3" /> {msg.sender_name}</>

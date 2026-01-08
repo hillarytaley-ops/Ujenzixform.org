@@ -71,9 +71,10 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
           .order('created_at', { ascending: true });
 
         if (!error && data) {
+          // Map DB sender types back to UI types: client -> user, system -> bot
           const loadedMessages: Message[] = data.map((msg: any) => ({
             id: msg.id,
-            role: msg.sender_type as 'user' | 'bot' | 'staff',
+            role: (msg.sender_type === 'client' ? 'user' : msg.sender_type === 'system' ? 'bot' : 'staff') as 'user' | 'bot' | 'staff',
             content: msg.content,
             timestamp: new Date(msg.created_at)
           }));
@@ -168,8 +169,12 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
   }
 
   // Save message to database - using existing table structure
+  // Map sender types: user -> client, bot -> system (to match DB constraint)
   const saveMessage = async (content: string, senderType: 'user' | 'bot' | 'staff') => {
-    console.log('💬 Saving chat message:', { conversationId, senderType, content: content.substring(0, 50) });
+    // Map to allowed DB values: 'staff' | 'client' | 'system'
+    const dbSenderType = senderType === 'user' ? 'client' : senderType === 'bot' ? 'system' : 'staff';
+    
+    console.log('💬 Saving chat message:', { conversationId, senderType: dbSenderType, content: content.substring(0, 50) });
     
     if (!conversationId) {
       console.error('❌ No conversation ID available');
@@ -179,8 +184,8 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
     const messageData = {
       conversation_id: conversationId,
       sender_id: userId || 'guest',
-      sender_type: senderType,
-      sender_name: userName,
+      sender_type: dbSenderType,
+      sender_name: senderType === 'bot' ? 'MradiPro AI' : userName,
       content: content,
       message_type: 'text',
       read: false
