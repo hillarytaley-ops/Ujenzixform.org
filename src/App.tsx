@@ -240,7 +240,7 @@ const App = () => {
                       </RoleProtectedRoute>
                     } />
                     <Route path="/builder-dashboard" element={
-                      <RoleProtectedRoute allowedRoles={['builder', 'professional_builder', 'private_client', 'admin']}>
+                      <RoleProtectedRoute allowedRoles={['professional_builder', 'private_client', 'admin']}>
                         <BuilderDashboard />
                       </RoleProtectedRoute>
                     } />
