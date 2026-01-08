@@ -39,24 +39,64 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
   const [unreadCount, setUnreadCount] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Generate or retrieve conversation ID
+  // Generate or retrieve conversation ID and ensure conversation exists
   useEffect(() => {
-    const storedConversationId = localStorage.getItem('mradipro_chat_conversation');
-    if (storedConversationId) {
-      console.log('🔑 Using existing conversation ID:', storedConversationId);
-      setConversationId(storedConversationId);
-    } else {
+    const initConversation = async () => {
+      const storedConversationId = localStorage.getItem('mradipro_chat_conversation');
+      
+      if (storedConversationId) {
+        console.log('🔑 Using existing conversation ID:', storedConversationId);
+        // Verify the conversation still exists in DB
+        const { data: existing } = await supabase
+          .from('conversations')
+          .select('id')
+          .eq('id', storedConversationId)
+          .single();
+        
+        if (existing) {
+          setConversationId(storedConversationId);
+          return;
+        }
+        // Conversation doesn't exist, create a new one
+        console.log('⚠️ Stored conversation not found in DB, creating new one');
+      }
+      
+      // Create a new conversation
       const newConversationId = crypto.randomUUID();
-      console.log('🔑 Generated new conversation ID:', newConversationId);
+      console.log('🔑 Creating new conversation:', newConversationId);
+      
+      const { error } = await supabase
+        .from('conversations')
+        .insert({
+          id: newConversationId,
+          client_id: userId || 'guest',
+          client_name: userName,
+          client_email: userEmail || 'guest@mradipro.co.ke',
+          client_role: 'guest',
+          status: 'open',
+          priority: 'normal',
+          subject: 'Chat Support',
+          unread_count: 0
+        });
+      
+      if (error) {
+        console.error('❌ Failed to create conversation:', error.message);
+        // Still set the ID locally for UI purposes
+      } else {
+        console.log('✅ Conversation created successfully');
+      }
+      
       localStorage.setItem('mradipro_chat_conversation', newConversationId);
       setConversationId(newConversationId);
-    }
+    };
+    
+    initConversation();
     
     // Test Supabase connection
     supabase.from('chat_messages').select('count').limit(1).then(({ data, error }) => {
       console.log('🔌 Supabase connection test:', { connected: !error, error: error?.message });
     });
-  }, []);
+  }, [userId, userName, userEmail]);
 
   // Load previous messages and set up real-time subscription
   useEffect(() => {
