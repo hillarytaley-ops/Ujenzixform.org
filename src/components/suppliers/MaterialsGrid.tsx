@@ -522,8 +522,8 @@ export const MaterialsGrid = () => {
           total_amount: material.unit_price * qty,
           delivery_address: 'To be confirmed',
           delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          status: 'quote_requested',
-          project_name: material.category || 'Quote Request',
+          status: 'pending', // Quote requests start as pending
+          project_name: `Quote Request - ${material.category || 'Materials'}`,
           items: [{
             material_id: material.id,
             material_name: material.name,
