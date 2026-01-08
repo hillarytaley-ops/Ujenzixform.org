@@ -13,7 +13,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { DashboardLoader } from '@/components/ui/DashboardLoader';
-import { SupportChat } from '@/components/support/SupportChat';
 import {
   Building2,
   Package,
@@ -618,27 +617,69 @@ export default function UnifiedBuilderDashboard() {
               <CardHeader>
                 <CardTitle className="text-white flex items-center gap-2">
                   <Headphones className="w-5 h-5 text-blue-400" />
-                  Support Center
+                  Live Support
                 </CardTitle>
                 <CardDescription className="text-gray-400">
-                  Get help from our support team
+                  Chat directly with MradiPro support team
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="text-center py-8">
-                  <p className="text-gray-300 mb-4">
-                    Need help? Click the support button in the bottom right corner to start a chat with our team.
-                  </p>
-                  <div className="flex justify-center gap-4">
-                    <Button variant="outline">
-                      <FileText className="w-4 h-4 mr-2" />
-                      View FAQs
-                    </Button>
-                    <Button className="bg-blue-600 hover:bg-blue-700">
-                      <MessageSquare className="w-4 h-4 mr-2" />
-                      Contact Support
-                    </Button>
+              <CardContent className="space-y-6">
+                {/* Live Chat Guide */}
+                <div className="rounded-lg p-6 border bg-gradient-to-r from-blue-900/30 to-purple-900/30 border-blue-800">
+                  <div className="flex items-start gap-4">
+                    <div className="p-3 bg-blue-600 rounded-full text-white">
+                      <MessageSquare className="h-6 w-6" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold mb-2 text-white">💬 Live Chat Available</h3>
+                      <p className="text-gray-400 mb-4">
+                        Click the <strong className="text-blue-400">"Live"</strong> chat button in the bottom-right corner of your screen to:
+                      </p>
+                      <ul className="space-y-2 text-sm">
+                        <li className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <span className="text-gray-400">Chat with our AI assistant for instant answers</span>
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <span className="text-gray-400">Request human support from our team</span>
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <span className="text-gray-400">Get help with projects, orders, and monitoring</span>
+                        </li>
+                      </ul>
+                    </div>
                   </div>
+                </div>
+
+                {/* Quick Contact Info */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Card className="bg-blue-900/20 border-blue-800">
+                    <CardContent className="p-4">
+                      <h4 className="font-semibold mb-2 flex items-center gap-2 text-white">
+                        <Clock className="h-4 w-4 text-blue-400" />
+                        Support Hours
+                      </h4>
+                      <p className="text-sm text-gray-400">
+                        Mon - Fri: 8AM - 6PM<br />
+                        Saturday: 9AM - 4PM<br />
+                        Sunday: Closed
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-purple-900/20 border-purple-800">
+                    <CardContent className="p-4">
+                      <h4 className="font-semibold mb-2 flex items-center gap-2 text-white">
+                        <Bell className="h-4 w-4 text-purple-400" />
+                        Builder Hotline
+                      </h4>
+                      <p className="text-sm text-gray-400">
+                        Call: +254 700 000 000<br />
+                        Email: builders@mradipro.co.ke
+                      </p>
+                    </CardContent>
+                  </Card>
                 </div>
               </CardContent>
             </Card>
@@ -683,14 +724,6 @@ export default function UnifiedBuilderDashboard() {
 
       <Footer />
 
-      {/* Support Chat Widget */}
-      {profile && (
-        <SupportChat 
-          userId={profile.id} 
-          userRole={profile.builder_category || 'builder'}
-          userName={profile.full_name}
-        />
-      )}
     </div>
   );
 }

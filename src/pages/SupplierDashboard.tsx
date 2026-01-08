@@ -43,7 +43,7 @@ import { OrderManagement } from "@/components/supplier/OrderManagement";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { SupplierAnalyticsDashboard } from "@/components/suppliers/SupplierAnalyticsDashboard";
 import { SupplierProductManager } from "@/components/suppliers/SupplierProductManager";
-import { SupportChat } from "@/components/support/SupportChat";
+import { MessageSquare } from "lucide-react";
 
 interface DashboardStats {
   totalProducts: number;
@@ -539,32 +539,74 @@ const SupplierDashboard = () => {
               <CardHeader>
                 <CardTitle className={textColor}>
                   <Headphones className="h-5 w-5 inline-block mr-2 text-purple-500" />
-                  Support Center
+                  Live Support
                 </CardTitle>
                 <CardDescription className={mutedText}>
-                  Get help from our support team
+                  Chat directly with MradiPro support team
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="text-center py-8">
-                  <Headphones className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                  <p className={mutedText}>
-                    Need help? Click the support button in the bottom right corner to start a chat with our team.
-                  </p>
+              <CardContent className="space-y-6">
+                {/* Live Chat Guide */}
+                <div className={`rounded-lg p-6 border ${isDarkMode ? 'bg-gradient-to-r from-purple-900/30 to-orange-900/30 border-purple-800' : 'bg-gradient-to-r from-purple-50 to-orange-50 border-purple-200'}`}>
+                  <div className="flex items-start gap-4">
+                    <div className="p-3 bg-purple-600 rounded-full text-white">
+                      <MessageSquare className="h-6 w-6" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className={`text-lg font-semibold mb-2 ${textColor}`}>💬 Live Chat Available</h3>
+                      <p className={`${mutedText} mb-4`}>
+                        Click the <strong className="text-purple-500">"Live"</strong> chat button in the bottom-right corner of your screen to:
+                      </p>
+                      <ul className="space-y-2 text-sm">
+                        <li className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <span className={mutedText}>Chat with our AI assistant for instant answers</span>
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <span className={mutedText}>Request human support from our team</span>
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <span className={mutedText}>Get help with orders, products, and payments</span>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Contact Info */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Card className={isDarkMode ? 'bg-orange-900/20 border-orange-800' : 'bg-orange-50 border-orange-200'}>
+                    <CardContent className="p-4">
+                      <h4 className={`font-semibold mb-2 flex items-center gap-2 ${textColor}`}>
+                        <Clock className="h-4 w-4 text-orange-500" />
+                        Support Hours
+                      </h4>
+                      <p className={`text-sm ${mutedText}`}>
+                        Mon - Fri: 8AM - 6PM<br />
+                        Saturday: 9AM - 4PM<br />
+                        Sunday: Closed
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card className={isDarkMode ? 'bg-purple-900/20 border-purple-800' : 'bg-purple-50 border-purple-200'}>
+                    <CardContent className="p-4">
+                      <h4 className={`font-semibold mb-2 flex items-center gap-2 ${textColor}`}>
+                        <AlertCircle className="h-4 w-4 text-purple-500" />
+                        Supplier Hotline
+                      </h4>
+                      <p className={`text-sm ${mutedText}`}>
+                        Call: +254 700 000 000<br />
+                        Email: suppliers@mradipro.co.ke
+                      </p>
+                    </CardContent>
+                  </Card>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
-
-        {/* Support Chat Widget */}
-        {user && (
-          <SupportChat 
-            userId={user.id}
-            userRole="supplier"
-            userName={supplierProfile?.company_name || user.email?.split('@')[0] || 'Supplier'}
-          />
-        )}
       </main>
 
       <Footer />
