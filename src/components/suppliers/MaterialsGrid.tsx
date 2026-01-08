@@ -478,57 +478,66 @@ export const MaterialsGrid = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        window.location.href = '/builder-registration?redirect=/supplier-marketplace';
+        window.location.href = '/home';
         return;
       }
-      // Check if user is a builder
-      if (userRole && !['builder', 'professional_builder', 'private_client'].includes(userRole)) {
+      // Only Professional Builders can request quotes
+      if (userRole !== 'professional_builder' && userRole !== 'admin') {
         toast({
-          title: '⚠️ Builder Account Required',
-          description: 'Only registered builders can request quotes. Please register as a builder.',
+          title: '📋 Professional Builder Required',
+          description: 'Only Professional Builders can request quotes. Private Clients can buy directly.',
           variant: 'destructive',
         });
         return;
       }
-      const chosenSupplierIds = selectedSuppliersMap[material.id] && selectedSuppliersMap[material.id].length > 0
-        ? selectedSuppliersMap[material.id]
-        : (material.supplier_id ? [material.supplier_id] : []);
+      
+      const supplierId = material.supplier_id || (selectedSuppliersMap[material.id]?.[0]);
+      if (!supplierId) {
+        toast({
+          title: '⚠️ No Supplier Selected',
+          description: 'Please select a supplier for this quote request.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const qty = getQuantity(material.id) || 1;
+      const poNumber = `QR-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+      
       const { data: orderData, error: orderError } = await supabase
         .from('purchase_orders')
         .insert({
+          po_number: poNumber,
           buyer_id: user.id,
-          project_name: material.category || 'Quick Order',
-          status: 'pending',
-          created_at: new Date().toISOString()
+          supplier_id: supplierId,
+          total_amount: material.unit_price * qty,
+          delivery_address: 'To be confirmed',
+          delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 days from now
+          status: 'quote_requested',
+          project_name: material.category || 'Quote Request',
+          items: [{
+            material_id: material.id,
+            material_name: material.name,
+            category: material.category,
+            quantity: qty,
+            unit: material.unit,
+            unit_price: material.unit_price
+          }]
         })
         .select()
         .single();
-      if (orderError) throw orderError;
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert({
-          order_id: orderData.id,
-          material_name: material.name,
-          category: material.category,
-          quantity: 1,
-          unit: material.unit,
-          notes: ''
-        });
-      if (itemsError) throw itemsError;
-      if (chosenSupplierIds.length > 0) {
-        const quoteRequests = chosenSupplierIds.map(supplierId => ({
-          order_id: orderData.id,
-          supplier_id,
-          status: 'pending',
-          created_at: new Date().toISOString()
-        }));
-        await supabase.from('quote_requests').insert(quoteRequests);
+        
+      if (orderError) {
+        console.error('Quote request error:', orderError);
+        throw orderError;
       }
+      
       toast({
-        title: 'Quote Requested',
-        description: `${material.name} sent to ${chosenSupplierIds.length || 1} supplier(s)`,
+        title: '📋 Quote Requested!',
+        description: `Quote request for ${material.name} sent to supplier. They will respond with pricing.`,
       });
     } catch (e) {
+      console.error('Failed to request quote:', e);
       toast({
         title: 'Failed to request quote',
         description: 'Please try again or contact support',
@@ -541,42 +550,69 @@ export const MaterialsGrid = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        window.location.href = '/auth?lite=1&redirect=' + encodeURIComponent('/suppliers?tab=purchase');
+        window.location.href = '/home';
         return;
       }
-      const chosenSupplierId = selectedSuppliersMap[material.id] && selectedSuppliersMap[material.id].length > 0
-        ? selectedSuppliersMap[material.id][0]
-        : material.supplier_id;
+      
+      // Only Private Clients can buy directly
+      if (userRole !== 'private_client' && userRole !== 'admin') {
+        toast({
+          title: '🛒 Private Client Required',
+          description: 'Only Private Clients can purchase directly. Professional Builders should request quotes.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const supplierId = material.supplier_id || (selectedSuppliersMap[material.id]?.[0]);
+      if (!supplierId) {
+        toast({
+          title: '⚠️ No Supplier Available',
+          description: 'This product does not have a supplier assigned.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const qty = getQuantity(material.id) || 1;
+      const poNumber = `PO-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+      
       const { data: orderData, error: orderError } = await supabase
         .from('purchase_orders')
         .insert({
+          po_number: poNumber,
           buyer_id: user.id,
+          supplier_id: supplierId,
+          total_amount: material.unit_price * qty,
+          delivery_address: 'To be confirmed',
+          delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          status: 'confirmed',
           project_name: 'Direct Purchase',
-          supplier_id: chosenSupplierId,
-          status: 'pending',
-          created_at: new Date().toISOString()
+          items: [{
+            material_id: material.id,
+            material_name: material.name,
+            category: material.category,
+            quantity: qty,
+            unit: material.unit,
+            unit_price: material.unit_price
+          }]
         })
         .select()
         .single();
-      if (orderError) throw orderError;
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert({
-          order_id: orderData.id,
-          material_name: material.name,
-          category: material.category,
-          quantity: 1,
-          unit: material.unit,
-          notes: ''
-        });
-      if (itemsError) throw itemsError;
+        
+      if (orderError) {
+        console.error('Purchase order error:', orderError);
+        throw orderError;
+      }
+      
       toast({
-        title: 'Added to order',
-        description: `${material.name} with supplier preference set`,
+        title: '🛒 Order Placed!',
+        description: `Order for ${qty}x ${material.name} has been placed. PO#: ${poNumber}`,
       });
     } catch (e) {
+      console.error('Failed to create order:', e);
       toast({
-        title: 'Failed to add to order',
+        title: 'Failed to place order',
         description: 'Please try again or contact support',
         variant: 'destructive'
       });
