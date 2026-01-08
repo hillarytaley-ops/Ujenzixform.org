@@ -35,12 +35,28 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
   const [isTyping, setIsTyping] = useState(false);
   const [mode, setMode] = useState<'ai' | 'human'>('ai');
   const [conversationId, setConversationId] = useState<string>('');
+  const conversationIdRef = useRef<string>(''); // Sync ref for immediate access
+  const initializingRef = useRef<boolean>(false); // Guard against double-init
   const [waitingForStaff, setWaitingForStaff] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Generate or retrieve conversation ID and ensure conversation exists
   useEffect(() => {
+    // Guard against React Strict Mode double-mounting
+    if (initializingRef.current) {
+      console.log('🔄 Skipping duplicate init (already in progress)');
+      return;
+    }
+    
+    // Check if we already have a conversation ID set
+    if (conversationIdRef.current) {
+      console.log('✅ Already have conversation ID:', conversationIdRef.current);
+      return;
+    }
+    
+    initializingRef.current = true;
+    
     const initConversation = async () => {
       const storedConversationId = localStorage.getItem('mradipro_chat_conversation');
       
@@ -51,10 +67,12 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
           .from('conversations')
           .select('id')
           .eq('id', storedConversationId)
-          .maybeSingle(); // Use maybeSingle() instead of single() to avoid 406 error when not found
+          .maybeSingle();
         
         if (!error && existing) {
+          conversationIdRef.current = storedConversationId;
           setConversationId(storedConversationId);
+          initializingRef.current = false;
           return;
         }
         // Conversation doesn't exist, create a new one
@@ -65,12 +83,16 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
       const newConversationId = crypto.randomUUID();
       console.log('🔑 Creating new conversation:', newConversationId);
       
+      // Set immediately to prevent race conditions
+      conversationIdRef.current = newConversationId;
+      localStorage.setItem('mradipro_chat_conversation', newConversationId);
+      
       // For guest users, use NULL for client_id (foreign key allows NULL)
       const { error } = await supabase
         .from('conversations')
         .insert({
           id: newConversationId,
-          client_id: userId || null, // NULL for guests - FK allows this
+          client_id: userId || null,
           client_name: userName || 'Guest',
           client_email: userEmail || 'guest@mradipro.co.ke',
           client_role: userId ? 'builder' : 'guest',
@@ -82,13 +104,12 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
       
       if (error) {
         console.error('❌ Failed to create conversation:', error.message);
-        // Still set the ID locally for UI purposes
       } else {
         console.log('✅ Conversation created successfully');
       }
       
-      localStorage.setItem('mradipro_chat_conversation', newConversationId);
       setConversationId(newConversationId);
+      initializingRef.current = false;
     };
     
     initConversation();
@@ -215,9 +236,12 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
     // Map to allowed DB values: 'staff' | 'client' | 'system'
     const dbSenderType = senderType === 'user' ? 'client' : senderType === 'bot' ? 'system' : 'staff';
     
-    console.log('💬 Saving chat message:', { conversationId, senderType: dbSenderType, content: content.substring(0, 50) });
+    // Use ref for immediate access, fallback to state, then localStorage
+    const currentConversationId = conversationIdRef.current || conversationId || localStorage.getItem('mradipro_chat_conversation');
     
-    if (!conversationId) {
+    console.log('💬 Saving chat message:', { conversationId: currentConversationId, senderType: dbSenderType, content: content.substring(0, 50) });
+    
+    if (!currentConversationId) {
       console.error('❌ No conversation ID available');
       return null;
     }
@@ -231,7 +255,7 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
     })();
     
     const messageData = {
-      conversation_id: conversationId,
+      conversation_id: currentConversationId,
       sender_id: userId || guestSenderId, // TEXT field, not UUID FK
       sender_type: dbSenderType,
       sender_name: senderType === 'bot' ? 'MradiPro AI' : userName,
