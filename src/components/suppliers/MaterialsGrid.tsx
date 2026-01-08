@@ -491,11 +491,18 @@ export const MaterialsGrid = () => {
         return;
       }
       
-      const supplierId = material.supplier_id || (selectedSuppliersMap[material.id]?.[0]);
+      // Get supplier ID - from material, selected map, or first available supplier
+      let supplierId = material.supplier_id || (selectedSuppliersMap[material.id]?.[0]);
+      
+      // If no supplier on material, try to get first available supplier
+      if (!supplierId && allSuppliers.length > 0) {
+        supplierId = allSuppliers[0].id;
+      }
+      
       if (!supplierId) {
         toast({
-          title: '⚠️ No Supplier Selected',
-          description: 'Please select a supplier for this quote request.',
+          title: '⚠️ No Suppliers Available',
+          description: 'No suppliers are currently available. Please try again later.',
           variant: 'destructive',
         });
         return;
@@ -503,6 +510,8 @@ export const MaterialsGrid = () => {
 
       const qty = getQuantity(material.id) || 1;
       const poNumber = `QR-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+      
+      console.log('Creating quote request:', { poNumber, buyerId: user.id, supplierId, material: material.name, qty });
       
       const { data: orderData, error: orderError } = await supabase
         .from('purchase_orders')
@@ -512,7 +521,7 @@ export const MaterialsGrid = () => {
           supplier_id: supplierId,
           total_amount: material.unit_price * qty,
           delivery_address: 'To be confirmed',
-          delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 days from now
+          delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           status: 'quote_requested',
           project_name: material.category || 'Quote Request',
           items: [{
@@ -532,9 +541,11 @@ export const MaterialsGrid = () => {
         throw orderError;
       }
       
+      console.log('Quote request created:', orderData);
+      
       toast({
         title: '📋 Quote Requested!',
-        description: `Quote request for ${material.name} sent to supplier. They will respond with pricing.`,
+        description: `Quote request for ${qty}x ${material.name} sent to supplier. PO#: ${poNumber}`,
       });
     } catch (e) {
       console.error('Failed to request quote:', e);
