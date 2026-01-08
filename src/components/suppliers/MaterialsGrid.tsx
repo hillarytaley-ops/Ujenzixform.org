@@ -496,7 +496,7 @@ export const MaterialsGrid = () => {
       const { data: orderData, error: orderError } = await supabase
         .from('purchase_orders')
         .insert({
-          builder_id: user.id,
+          buyer_id: user.id,
           project_name: material.category || 'Quick Order',
           status: 'pending',
           created_at: new Date().toISOString()
@@ -550,7 +550,7 @@ export const MaterialsGrid = () => {
       const { data: orderData, error: orderError } = await supabase
         .from('purchase_orders')
         .insert({
-          builder_id: user.id,
+          buyer_id: user.id,
           project_name: 'Direct Purchase',
           supplier_id: chosenSupplierId,
           status: 'pending',
