@@ -36,6 +36,8 @@ import { LazyImage } from '@/components/ui/LazyImage';
 import { useSearchParams } from 'react-router-dom';
 import { useCart } from '@/contexts/CartContext';
 import { PriceComparisonModal } from './PriceComparisonModal';
+import { QuoteCart, QuoteCartButton, QuoteCartItem } from './QuoteCart';
+import { FileText } from 'lucide-react';
 
 // iOS/Safari compatibility check
 const isIOSSafari = () => {
@@ -111,8 +113,59 @@ export const MaterialsGrid = () => {
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [compareItems, setCompareItems] = useState<Set<string>>(new Set());
   const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
+  const [quoteCartItems, setQuoteCartItems] = useState<QuoteCartItem[]>([]);
+  const [isQuoteCartOpen, setIsQuoteCartOpen] = useState(false);
   const { toast } = useToast();
   const { addToCart, isInCart, getItemQuantity, setIsCartOpen } = useCart();
+
+  // Quote Cart functions for Professional Builders
+  const addToQuoteCart = (material: Material) => {
+    const qty = getQuantity(material.id) || 1;
+    const imageUrl = material.image_url || getDefaultCategoryImage(material.category);
+    
+    setQuoteCartItems(prev => {
+      const existing = prev.find(item => item.id === material.id);
+      if (existing) {
+        return prev.map(item => 
+          item.id === material.id 
+            ? { ...item, quantity: item.quantity + qty }
+            : item
+        );
+      }
+      return [...prev, {
+        id: material.id,
+        name: material.name,
+        category: material.category,
+        unit: material.unit,
+        unit_price: material.unit_price,
+        quantity: qty,
+        image_url: imageUrl,
+        supplier_id: material.supplier_id,
+        supplier_name: material.supplier?.company_name
+      }];
+    });
+    
+    toast({
+      title: '📋 Added to Quote Cart!',
+      description: `${qty}x ${material.name} added. Click the Quote Cart to review and submit.`,
+    });
+  };
+
+  const updateQuoteCartQuantity = (id: string, quantity: number) => {
+    setQuoteCartItems(prev => 
+      prev.map(item => item.id === id ? { ...item, quantity } : item)
+    );
+  };
+
+  const removeFromQuoteCart = (id: string) => {
+    setQuoteCartItems(prev => prev.filter(item => item.id !== id));
+  };
+
+  const clearQuoteCart = () => {
+    setQuoteCartItems([]);
+  };
+
+  const isInQuoteCart = (id: string) => quoteCartItems.some(item => item.id === id);
   
   // Toggle item for comparison
   const toggleCompare = (materialId: string) => {
@@ -1115,15 +1168,27 @@ export const MaterialsGrid = () => {
                         </>
                       )}
 
-                      {/* Professional Builders: Show Quote Request button only */}
+                      {/* Professional Builders: Show Add to Quote Cart button */}
                       {userRole === 'professional_builder' && (
-                        <Button 
-                          className="w-full h-10 text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2"
-                          onClick={() => handleRequestQuote(material)}
-                          disabled={!material.in_stock}
-                        >
-                          📋 Request Quote
-                        </Button>
+                        <div className="space-y-2">
+                          <Button 
+                            className={`w-full h-10 text-sm font-semibold flex items-center justify-center gap-2 ${
+                              isInQuoteCart(material.id)
+                                ? 'bg-green-600 hover:bg-green-700 text-white'
+                                : 'bg-blue-600 hover:bg-blue-700 text-white'
+                            }`}
+                            onClick={() => addToQuoteCart(material)}
+                            disabled={!material.in_stock}
+                          >
+                            <FileText className="h-4 w-4" />
+                            {isInQuoteCart(material.id) ? '✓ In Quote Cart' : 'Add to Quote'}
+                          </Button>
+                          {currentQty === 0 && (
+                            <p className="text-xs text-center text-muted-foreground">
+                              Set quantity above, then add to quote
+                            </p>
+                          )}
+                        </div>
                       )}
 
                       {/* Not authenticated: Show sign-in prompt */}
@@ -1181,6 +1246,24 @@ export const MaterialsGrid = () => {
         selectedMaterials={getComparisonMaterials()}
         allMaterials={materials}
       />
+
+      {/* Quote Cart for Professional Builders */}
+      {userRole === 'professional_builder' && (
+        <>
+          <QuoteCartButton 
+            itemCount={quoteCartItems.reduce((sum, item) => sum + item.quantity, 0)}
+            onClick={() => setIsQuoteCartOpen(true)}
+          />
+          <QuoteCart
+            items={quoteCartItems}
+            onUpdateQuantity={updateQuoteCartQuantity}
+            onRemoveItem={removeFromQuoteCart}
+            onClearCart={clearQuoteCart}
+            isOpen={isQuoteCartOpen}
+            onOpenChange={setIsQuoteCartOpen}
+          />
+        </>
+      )}
     </div>
   );
 };
