@@ -63,13 +63,15 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
       
       // Create a new conversation
       const newConversationId = crypto.randomUUID();
+      // Generate a guest UUID if no user ID provided
+      const guestId = crypto.randomUUID();
       console.log('🔑 Creating new conversation:', newConversationId);
       
       const { error } = await supabase
         .from('conversations')
         .insert({
           id: newConversationId,
-          client_id: userId || 'guest',
+          client_id: userId || guestId,
           client_name: userName,
           client_email: userEmail || 'guest@mradipro.co.ke',
           client_role: 'guest',
@@ -221,9 +223,16 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
       return null;
     }
 
+    // Use a consistent guest ID from localStorage or generate one
+    const guestSenderId = localStorage.getItem('mradipro_guest_id') || (() => {
+      const id = crypto.randomUUID();
+      localStorage.setItem('mradipro_guest_id', id);
+      return id;
+    })();
+    
     const messageData = {
       conversation_id: conversationId,
-      sender_id: userId || 'guest',
+      sender_id: userId || guestSenderId,
       sender_type: dbSenderType,
       sender_name: senderType === 'bot' ? 'MradiPro AI' : userName,
       content: content,
