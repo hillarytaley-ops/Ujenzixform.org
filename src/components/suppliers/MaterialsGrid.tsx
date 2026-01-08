@@ -665,7 +665,7 @@ export const MaterialsGrid = () => {
 
   return (
     <div className="space-y-6">
-      {/* Banner for Non-Registered Users - Only builders can buy/request quotes */}
+      {/* Banner for Non-Registered Users */}
       {!isAuthenticated && (
         <Alert className="bg-gradient-to-r from-orange-50 to-amber-50 border-orange-300 border-2">
           <ShoppingCart className="h-5 w-5 text-orange-600" />
@@ -674,22 +674,58 @@ export const MaterialsGrid = () => {
               <div>
                 <strong className="text-orange-800">🏗️ Want to Buy or Request Quotes?</strong>
                 <p className="text-sm text-orange-700 mt-1">
-                  Register as a <strong>Builder</strong> to purchase materials and request quotes from suppliers.
+                  <strong>Private Clients</strong> can buy directly | <strong>Professional Builders</strong> can request quotes
                 </p>
               </div>
               <div className="flex gap-2 flex-shrink-0">
-                <a href="/builder-registration?redirect=/supplier-marketplace">
+                <a href="/home">
                   <Button size="sm" className="bg-orange-600 hover:bg-orange-700 text-white">
-                    Register as Builder
+                    Register Now
                   </Button>
                 </a>
-                <a href="/builder-signin?redirect=/supplier-marketplace">
+                <a href="/home">
                   <Button size="sm" variant="outline" className="border-orange-400 text-orange-700 hover:bg-orange-100">
                     Sign In
                   </Button>
                 </a>
               </div>
             </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Role-specific guidance banner */}
+      {isAuthenticated && userRole === 'professional_builder' && (
+        <Alert className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-300 border-2">
+          <Package className="h-5 w-5 text-blue-600" />
+          <AlertDescription className="ml-2">
+            <strong className="text-blue-800">📋 Professional Builder Mode</strong>
+            <p className="text-sm text-blue-700 mt-1">
+              As a Professional Builder, you can <strong>request quotes</strong> from suppliers for bulk orders and competitive pricing.
+            </p>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {isAuthenticated && userRole === 'private_client' && (
+        <Alert className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-300 border-2">
+          <ShoppingCart className="h-5 w-5 text-green-600" />
+          <AlertDescription className="ml-2">
+            <strong className="text-green-800">🛒 Private Client Mode</strong>
+            <p className="text-sm text-green-700 mt-1">
+              As a Private Client, you can <strong>buy materials directly</strong> from suppliers. Add items to your cart and checkout!
+            </p>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {isAuthenticated && userRole && !['professional_builder', 'private_client', 'admin'].includes(userRole) && (
+        <Alert className="bg-gradient-to-r from-red-50 to-orange-50 border-red-300 border-2">
+          <AlertDescription className="ml-2">
+            <strong className="text-red-800">⚠️ Purchasing Not Available</strong>
+            <p className="text-sm text-red-700 mt-1">
+              Your account type ({userRole}) cannot purchase materials. Please register as a <strong>Private Client</strong> or <strong>Professional Builder</strong>.
+            </p>
           </AlertDescription>
         </Alert>
       )}
@@ -834,20 +870,28 @@ export const MaterialsGrid = () => {
                   if (!isAuthenticated) {
                     toast({
                       title: '🔐 Sign In Required',
-                      description: 'Please sign in to purchase materials. Redirecting to sign-in portals...',
+                      description: 'Please sign in to purchase materials.',
                     });
                     setTimeout(() => {
-                      window.location.href = '/suppliers#portals';
+                      window.location.href = '/home';
                     }, 1500);
                     return;
                   }
-                  // Check if user is a builder
-                  if (userRole && !['builder', 'professional_builder', 'private_client'].includes(userRole)) {
-                    toast({
-                      title: '⚠️ Builder Account Required',
-                      description: 'Only registered builders can purchase materials. Please register as a builder.',
-                      variant: 'destructive',
-                    });
+                  // Only Private Clients can buy directly
+                  if (userRole !== 'private_client' && userRole !== 'admin') {
+                    if (userRole === 'professional_builder') {
+                      toast({
+                        title: '📋 Use Request Quote Instead',
+                        description: 'As a Professional Builder, please use "Request Quote" for bulk orders and competitive pricing.',
+                        variant: 'destructive',
+                      });
+                    } else {
+                      toast({
+                        title: '⚠️ Private Client Account Required',
+                        description: 'Only Private Clients can purchase materials directly. Please register as a Private Client.',
+                        variant: 'destructive',
+                      });
+                    }
                     return;
                   }
                   addToCart({
@@ -993,70 +1037,74 @@ export const MaterialsGrid = () => {
                         </span>
                       </div>
                       
-                      {/* Add to Cart Button */}
-                      <Button 
-                        className={`w-full h-10 text-sm font-semibold flex items-center justify-center gap-2 ${
-                          itemInCart 
-                            ? 'bg-green-600 hover:bg-green-700' 
-                            : currentQty > 0
-                              ? 'bg-orange-500 hover:bg-orange-600'
-                              : 'bg-gray-400 cursor-not-allowed'
-                        }`}
-                        onClick={handleAddToCart}
-                        disabled={!material.in_stock || currentQty === 0}
-                      >
-                        <ShoppingCart className="h-4 w-4" />
-                        {itemInCart ? `Add More (${cartQty} in cart)` : currentQty === 0 ? 'Select Quantity' : 'Add to Cart'}
-                      </Button>
-                      
-                      {/* Quick Action Buttons - Only for Builders */}
-                      <div className="grid grid-cols-2 gap-2">
+                      {/* Role-Based Action Buttons */}
+                      {/* Private Clients: Show Buy/Cart buttons */}
+                      {(userRole === 'private_client' || userRole === 'admin') && (
+                        <>
+                          <Button 
+                            className={`w-full h-10 text-sm font-semibold flex items-center justify-center gap-2 ${
+                              itemInCart 
+                                ? 'bg-green-600 hover:bg-green-700' 
+                                : currentQty > 0
+                                  ? 'bg-orange-500 hover:bg-orange-600'
+                                  : 'bg-gray-400 cursor-not-allowed'
+                            }`}
+                            onClick={handleAddToCart}
+                            disabled={!material.in_stock || currentQty === 0}
+                          >
+                            <ShoppingCart className="h-4 w-4" />
+                            {itemInCart ? `Add More (${cartQty} in cart)` : currentQty === 0 ? 'Select Quantity' : 'Add to Cart'}
+                          </Button>
+                          <Button 
+                            className="w-full h-8 text-xs font-medium bg-green-600 hover:bg-green-700 text-white"
+                            onClick={() => {
+                              handleAddToCart();
+                              setIsCartOpen(true);
+                            }}
+                            disabled={!material.in_stock || currentQty === 0}
+                          >
+                            🛒 Buy Now
+                          </Button>
+                        </>
+                      )}
+
+                      {/* Professional Builders: Show Quote Request button only */}
+                      {userRole === 'professional_builder' && (
                         <Button 
-                          variant="outline"
-                          className="h-8 text-xs font-medium border-blue-300 text-blue-600 hover:bg-blue-50"
-                          onClick={() => {
-                            if (!isAuthenticated) {
-                              window.location.href = '/builder-registration?redirect=/supplier-marketplace';
-                              return;
-                            }
-                            if (userRole && !['builder', 'professional_builder', 'private_client'].includes(userRole)) {
-                              toast({
-                                title: '⚠️ Builder Account Required',
-                                description: 'Only registered builders can request quotes.',
-                                variant: 'destructive',
-                              });
-                              return;
-                            }
-                            handleRequestQuote(material);
-                          }}
+                          className="w-full h-10 text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2"
+                          onClick={() => handleRequestQuote(material)}
                           disabled={!material.in_stock}
                         >
-                          Request Quote
+                          📋 Request Quote
                         </Button>
-                        <Button 
-                          variant="outline"
-                          className="h-8 text-xs font-medium border-green-300 text-green-600 hover:bg-green-50"
-                          onClick={() => {
-                            if (!isAuthenticated) {
-                              window.location.href = '/builder-registration?redirect=/supplier-marketplace';
-                              return;
-                            }
-                            if (userRole && !['builder', 'professional_builder', 'private_client'].includes(userRole)) {
-                              toast({
-                                title: '⚠️ Builder Account Required',
-                                description: 'Only registered builders can purchase materials.',
-                                variant: 'destructive',
-                              });
-                              return;
-                            }
-                            handleAddToCart();
-                            setIsCartOpen(true);
-                          }}
-                          disabled={!material.in_stock}
-                        >
-                          Buy Now
-                        </Button>
-                      </div>
+                      )}
+
+                      {/* Not authenticated: Show sign-in prompt */}
+                      {!isAuthenticated && (
+                        <div className="space-y-2">
+                          <Button 
+                            className="w-full h-10 text-sm font-semibold bg-orange-500 hover:bg-orange-600 text-white"
+                            onClick={() => window.location.href = '/home'}
+                          >
+                            Sign In to Purchase
+                          </Button>
+                          <p className="text-xs text-center text-muted-foreground">
+                            Private Clients buy directly • Pro Builders request quotes
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Other roles: Show restriction message */}
+                      {isAuthenticated && userRole && !['private_client', 'professional_builder', 'admin'].includes(userRole) && (
+                        <div className="text-center py-2">
+                          <p className="text-xs text-red-600 font-medium">
+                            ⚠️ Your account type cannot purchase materials
+                          </p>
+                          <a href="/home" className="text-xs text-blue-600 underline">
+                            Register as Private Client or Pro Builder
+                          </a>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 );
