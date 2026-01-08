@@ -72,6 +72,7 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
         .order('created_at', { ascending: false });
 
       console.log('📨 Chat messages result:', { count: data?.length, error });
+      console.log('📨 Raw messages:', data);
 
       if (error) {
         console.error('Error fetching chat messages:', error);
@@ -86,6 +87,8 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
         existing.push(msg);
         sessionsMap.set(msg.conversation_id, existing);
       });
+      
+      console.log('📨 Sessions map size:', sessionsMap.size);
 
       const sessionsList: ChatSession[] = Array.from(sessionsMap.entries()).map(([conversation_id, messages]) => {
         const sortedMessages = messages.sort((a, b) => 
@@ -120,6 +123,7 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
         return new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime();
       });
 
+      console.log('📨 Final sessions list:', sessionsList.length, sessionsList);
       setSessions(sessionsList);
       setLoading(false);
     } catch (error) {

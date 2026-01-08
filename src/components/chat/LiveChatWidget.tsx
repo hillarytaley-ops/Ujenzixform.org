@@ -47,13 +47,13 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
       if (storedConversationId) {
         console.log('🔑 Using existing conversation ID:', storedConversationId);
         // Verify the conversation still exists in DB
-        const { data: existing } = await supabase
+        const { data: existing, error } = await supabase
           .from('conversations')
           .select('id')
           .eq('id', storedConversationId)
-          .single();
+          .maybeSingle(); // Use maybeSingle() instead of single() to avoid 406 error when not found
         
-        if (existing) {
+        if (!error && existing) {
           setConversationId(storedConversationId);
           return;
         }
@@ -63,18 +63,17 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
       
       // Create a new conversation
       const newConversationId = crypto.randomUUID();
-      // Generate a guest UUID if no user ID provided
-      const guestId = crypto.randomUUID();
       console.log('🔑 Creating new conversation:', newConversationId);
       
+      // For guest users, use NULL for client_id (foreign key allows NULL)
       const { error } = await supabase
         .from('conversations')
         .insert({
           id: newConversationId,
-          client_id: userId || guestId,
-          client_name: userName,
+          client_id: userId || null, // NULL for guests - FK allows this
+          client_name: userName || 'Guest',
           client_email: userEmail || 'guest@mradipro.co.ke',
-          client_role: 'guest',
+          client_role: userId ? 'builder' : 'guest',
           status: 'open',
           priority: 'normal',
           subject: 'Chat Support',
@@ -223,16 +222,17 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
       return null;
     }
 
-    // Use a consistent guest ID from localStorage or generate one
+    // sender_id is TEXT in the database, so we can use any string
+    // Use a consistent guest ID from localStorage for tracking
     const guestSenderId = localStorage.getItem('mradipro_guest_id') || (() => {
-      const id = crypto.randomUUID();
+      const id = `guest_${crypto.randomUUID()}`;
       localStorage.setItem('mradipro_guest_id', id);
       return id;
     })();
     
     const messageData = {
       conversation_id: conversationId,
-      sender_id: userId || guestSenderId,
+      sender_id: userId || guestSenderId, // TEXT field, not UUID FK
       sender_type: dbSenderType,
       sender_name: senderType === 'bot' ? 'MradiPro AI' : userName,
       content: content,
