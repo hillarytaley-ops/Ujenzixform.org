@@ -373,7 +373,7 @@ export function QuoteCart({
   );
 }
 
-// Floating Quote Cart Button
+// Floating Quote Cart Button - Always visible for Professional Builders
 export function QuoteCartButton({ 
   itemCount, 
   onClick 
@@ -381,16 +381,22 @@ export function QuoteCartButton({
   itemCount: number; 
   onClick: () => void;
 }) {
-  if (itemCount === 0) return null;
-
   return (
     <Button
       onClick={onClick}
-      className="fixed bottom-24 right-6 h-14 px-5 bg-blue-600 hover:bg-blue-700 shadow-lg rounded-full z-40 animate-bounce"
+      className={`fixed bottom-24 right-6 h-14 px-5 shadow-xl rounded-full z-40 ${
+        itemCount > 0 
+          ? 'bg-blue-600 hover:bg-blue-700 animate-bounce' 
+          : 'bg-gray-600 hover:bg-gray-700'
+      }`}
     >
       <FileText className="h-5 w-5 mr-2" />
       Quote Cart
-      <Badge className="ml-2 bg-white text-blue-600">{itemCount}</Badge>
+      {itemCount > 0 ? (
+        <Badge className="ml-2 bg-white text-blue-600 font-bold">{itemCount}</Badge>
+      ) : (
+        <Badge className="ml-2 bg-gray-400 text-white">0</Badge>
+      )}
     </Button>
   );
 }

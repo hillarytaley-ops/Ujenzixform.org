@@ -855,7 +855,18 @@ export const MaterialsGrid = () => {
             Browse {filteredMaterials.length} materials from {new Set(materials.map(m => m.supplier_id)).size} suppliers
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Quote Cart Button for Professional Builders - in header */}
+          {userRole === 'professional_builder' && (
+            <Button 
+              onClick={() => setIsQuoteCartOpen(true)} 
+              className={`${quoteCartItems.length > 0 ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-500 hover:bg-gray-600'}`}
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Quote Cart
+              <Badge className="ml-2 bg-white text-blue-600">{quoteCartItems.reduce((sum, item) => sum + item.quantity, 0)}</Badge>
+            </Button>
+          )}
           <Button 
             onClick={openMultiQuote} 
             className="bg-orange-600 hover:bg-orange-700"
