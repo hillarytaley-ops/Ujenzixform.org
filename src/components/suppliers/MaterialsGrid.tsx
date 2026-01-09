@@ -64,30 +64,228 @@ interface Material {
   };
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMPREHENSIVE KENYA CONSTRUCTION MATERIALS CATEGORIES
+// Based on complete analysis of Kenya's construction industry
+// Includes all materials from foundation to finishing
+// ═══════════════════════════════════════════════════════════════════════════════
+
 const PRODUCT_CATEGORIES = [
   'All Categories',
-  'Cement',
-  'Steel',
-  'Tiles',
-  'Paint',
-  'Timber',
-  'Hardware',
-  'Plumbing',
-  'Electrical',
-  'Aggregates',
-  'Roofing',
-  'Insulation',
-  'Tools',
-  'Stone',
-  'Sand',
-  'Plywood',
-  'Doors',
-  'Wire',
-  'Iron Sheets',
-  'Blocks',
-  'Glass',
-  'Windows',
-  'Other'
+  
+  // ─────────────────────────────────────────────────────────────────────────────
+  // STRUCTURAL & FOUNDATION MATERIALS
+  // ─────────────────────────────────────────────────────────────────────────────
+  'Cement',                    // Bamburi, Savannah, Mombasa, Simba, Athi River cement
+  'Steel',                     // Y8, Y10, Y12, Y16, Y20, Y25, Y32 rebar, BRC mesh
+  'Aggregates',                // Ballast, gravel, crushed stone
+  'Sand',                      // River sand, pit sand, plastering sand, building sand
+  'Stone',                     // Machine cut stones, natural stones, foundation stones
+  'Blocks',                    // Concrete blocks, hollow blocks, solid blocks, cabro
+  'Bricks',                    // Clay bricks, fire bricks, decorative bricks
+  'Ready Mix Concrete',        // Pre-mixed concrete, screed
+  
+  // ─────────────────────────────────────────────────────────────────────────────
+  // ROOFING MATERIALS
+  // ─────────────────────────────────────────────────────────────────────────────
+  'Roofing',                   // General roofing materials
+  'Iron Sheets',               // Mabati, corrugated iron sheets, box profile
+  'Roofing Tiles',             // Clay tiles, concrete tiles, slate tiles
+  'Gutters & Downpipes',       // PVC gutters, metal gutters, downpipes
+  'Roofing Accessories',       // Ridge caps, flashing, roofing nails, screws
+  'Waterproofing',             // Damp proof membrane, bitumen, roof sealants
+  
+  // ─────────────────────────────────────────────────────────────────────────────
+  // TIMBER & WOOD PRODUCTS
+  // ─────────────────────────────────────────────────────────────────────────────
+  'Timber',                    // Cypress, pine, hardwood, mahogany, mvule
+  'Plywood',                   // Marine plywood, shuttering plywood, MDF
+  'Particle Board',            // Chipboard, OSB, hardboard
+  'Timber Trusses',            // Roof trusses, prefab trusses
+  'Formwork',                  // Shuttering boards, formwork panels
+  'Treated Poles',             // Fence posts, power poles, building poles
+  
+  // ─────────────────────────────────────────────────────────────────────────────
+  // DOORS, WINDOWS & OPENINGS
+  // ─────────────────────────────────────────────────────────────────────────────
+  'Doors',                     // Wooden doors, flush doors, panel doors, security doors
+  'Steel Doors',               // Metal doors, security grills, roller shutters
+  'Windows',                   // Wooden windows, steel windows
+  'Aluminium Windows',         // Sliding windows, casement windows, louvers
+  'Glass',                     // Float glass, tinted glass, frosted glass
+  'Door Frames',               // Wooden frames, metal frames, architraves
+  'Door Hardware',             // Locks, handles, hinges, door closers
+  'Window Hardware',           // Window stays, handles, locks, hinges
+  
+  // ─────────────────────────────────────────────────────────────────────────────
+  // PLUMBING & WATER SYSTEMS
+  // ─────────────────────────────────────────────────────────────────────────────
+  'Plumbing',                  // General plumbing supplies
+  'PVC Pipes',                 // Pressure pipes, drainage pipes, conduits
+  'PPR Pipes',                 // Hot water pipes, cold water pipes
+  'GI Pipes',                  // Galvanized iron pipes, fittings
+  'HDPE Pipes',                // High density polyethylene pipes
+  'Pipe Fittings',             // Elbows, tees, reducers, couplings, unions
+  'Valves',                    // Gate valves, ball valves, check valves, float valves
+  'Water Tanks',               // Plastic tanks, steel tanks, underground tanks
+  'Pumps',                     // Water pumps, booster pumps, submersible pumps
+  'Taps & Mixers',             // Kitchen taps, bathroom taps, shower mixers
+  'Sanitary Ware',             // Toilets, sinks, basins, bidets
+  'Bathroom Accessories',      // Towel rails, soap dishes, mirrors, shower heads
+  'Septic Tanks',              // Bio-digesters, septic systems
+  'Water Heaters',             // Electric heaters, solar heaters, instant heaters
+  
+  // ─────────────────────────────────────────────────────────────────────────────
+  // ELECTRICAL MATERIALS
+  // ─────────────────────────────────────────────────────────────────────────────
+  'Electrical',                // General electrical supplies
+  'Cables & Wires',            // Twin & earth, single core, armored cables
+  'Switches & Sockets',        // Light switches, power sockets, dimmers
+  'Distribution Boards',       // DB boxes, MCBs, RCCBs, isolators
+  'Lighting',                  // Bulbs, tubes, LED lights, chandeliers
+  'Conduits',                  // PVC conduits, metal conduits, trunking
+  'Electrical Accessories',    // Junction boxes, cable clips, terminals
+  'Solar Equipment',           // Solar panels, inverters, batteries, charge controllers
+  'Generators',                // Diesel generators, petrol generators
+  'UPS & Stabilizers',         // Power backup, voltage stabilizers
+  
+  // ─────────────────────────────────────────────────────────────────────────────
+  // TILES & FLOORING
+  // ─────────────────────────────────────────────────────────────────────────────
+  'Tiles',                     // General tiles
+  'Ceramic Tiles',             // Wall tiles, floor tiles
+  'Porcelain Tiles',           // Polished, matte, anti-slip tiles
+  'Granite Tiles',             // Natural granite, engineered stone
+  'Marble',                    // Natural marble, cultured marble
+  'Terrazzo',                  // Terrazzo tiles, terrazzo chips
+  'Vinyl Flooring',            // PVC flooring, LVT, vinyl tiles
+  'Wooden Flooring',           // Parquet, laminate, engineered wood
+  'Carpet',                    // Wall to wall carpet, carpet tiles
+  'Tile Adhesive',             // Cement-based, ready-mixed adhesives
+  'Tile Grout',                // Colored grout, epoxy grout
+  'Skirting',                  // Wooden skirting, PVC skirting, tile skirting
+  
+  // ─────────────────────────────────────────────────────────────────────────────
+  // PAINT & FINISHES
+  // ─────────────────────────────────────────────────────────────────────────────
+  'Paint',                     // Crown, Basco, Sadolin, Dulux paints
+  'Emulsion Paint',            // Interior wall paint, ceiling paint
+  'Gloss Paint',               // Oil-based paint, enamel paint
+  'Exterior Paint',            // Weather shield, textured paint
+  'Wood Finish',               // Varnish, wood stain, lacquer
+  'Metal Paint',               // Hammerite, rust-proof paint
+  'Primers',                   // Wall primer, metal primer, wood primer
+  'Putty & Fillers',           // Wall putty, wood filler, crack filler
+  'Thinners & Solvents',       // Paint thinner, turpentine, spirit
+  'Brushes & Rollers',         // Paint brushes, rollers, spray guns
+  
+  // ─────────────────────────────────────────────────────────────────────────────
+  // WALL & CEILING FINISHES
+  // ─────────────────────────────────────────────────────────────────────────────
+  'Gypsum',                    // Gypsum boards, gypsum plaster
+  'Ceiling Boards',            // PVC ceiling, T&G boards, acoustic ceiling
+  'Plaster',                   // Cement plaster, lime plaster
+  'Wallpaper',                 // Vinyl wallpaper, fabric wallpaper
+  'Wall Cladding',             // Stone cladding, wood cladding, PVC panels
+  'Insulation',                // Thermal insulation, acoustic insulation
+  'Cornices',                  // Gypsum cornices, decorative moldings
+  
+  // ─────────────────────────────────────────────────────────────────────────────
+  // HARDWARE & FASTENERS
+  // ─────────────────────────────────────────────────────────────────────────────
+  'Hardware',                  // General hardware
+  'Nails',                     // Wire nails, masonry nails, roofing nails
+  'Screws',                    // Wood screws, self-tapping, drywall screws
+  'Bolts & Nuts',              // Hex bolts, anchor bolts, expansion bolts
+  'Hinges',                    // Butt hinges, piano hinges, gate hinges
+  'Locks',                     // Padlocks, mortise locks, rim locks
+  'Chains',                    // Galvanized chain, stainless chain
+  'Wire',                      // Binding wire, fencing wire, barbed wire
+  'Wire Mesh',                 // BRC mesh, chicken mesh, welded mesh
+  'Brackets & Supports',       // Shelf brackets, joist hangers, angles
+  
+  // ─────────────────────────────────────────────────────────────────────────────
+  // TOOLS & EQUIPMENT
+  // ─────────────────────────────────────────────────────────────────────────────
+  'Tools',                     // General tools
+  'Hand Tools',                // Hammers, screwdrivers, pliers, spanners
+  'Power Tools',               // Drills, grinders, saws, sanders
+  'Measuring Tools',           // Tape measures, levels, squares
+  'Cutting Tools',             // Hacksaws, tile cutters, bolt cutters
+  'Masonry Tools',             // Trowels, floats, jointers
+  'Painting Tools',            // Brushes, rollers, spray equipment
+  'Safety Equipment',          // Helmets, boots, gloves, harnesses
+  'Scaffolding',               // Steel scaffolding, wooden scaffolding
+  'Ladders',                   // Aluminium ladders, wooden ladders
+  'Wheelbarrows',              // Construction wheelbarrows, concrete mixers
+  
+  // ─────────────────────────────────────────────────────────────────────────────
+  // ADHESIVES & SEALANTS
+  // ─────────────────────────────────────────────────────────────────────────────
+  'Adhesives',                 // Construction adhesive, wood glue, contact cement
+  'Sealants',                  // Silicone sealant, acrylic sealant, PU sealant
+  'Caulking',                  // Gap filler, expansion joint filler
+  'Epoxy',                     // Epoxy resin, epoxy grout, anchoring epoxy
+  
+  // ─────────────────────────────────────────────────────────────────────────────
+  // FENCING & SECURITY
+  // ─────────────────────────────────────────────────────────────────────────────
+  'Fencing',                   // Chain link, welded mesh, palisade
+  'Barbed Wire',               // Razor wire, concertina wire
+  'Electric Fence',            // Energizers, insulators, fence wire
+  'Gates',                     // Steel gates, sliding gates, swing gates
+  'Security Systems',          // CCTV, alarms, access control
+  
+  // ─────────────────────────────────────────────────────────────────────────────
+  // LANDSCAPING & OUTDOOR
+  // ─────────────────────────────────────────────────────────────────────────────
+  'Paving',                    // Cabro, pavers, kerbs, edging
+  'Outdoor Tiles',             // Non-slip tiles, pool tiles
+  'Drainage',                  // Drainage channels, manholes, gratings
+  'Retaining Walls',           // Gabions, retaining blocks
+  'Garden Materials',          // Topsoil, compost, mulch, pebbles
+  
+  // ─────────────────────────────────────────────────────────────────────────────
+  // KITCHEN & BUILT-IN
+  // ─────────────────────────────────────────────────────────────────────────────
+  'Kitchen Cabinets',          // Base units, wall units, pantry
+  'Countertops',               // Granite tops, quartz, solid surface
+  'Kitchen Sinks',             // Stainless steel, ceramic, granite sinks
+  'Kitchen Hardware',          // Drawer slides, soft close hinges
+  'Wardrobes',                 // Built-in wardrobes, closet systems
+  
+  // ─────────────────────────────────────────────────────────────────────────────
+  // HVAC & VENTILATION
+  // ─────────────────────────────────────────────────────────────────────────────
+  'Air Conditioning',          // Split units, cassette, ducted AC
+  'Ventilation',               // Exhaust fans, air vents, ducting
+  'Ceiling Fans',              // Decorative fans, industrial fans
+  
+  // ─────────────────────────────────────────────────────────────────────────────
+  // FIRE SAFETY
+  // ─────────────────────────────────────────────────────────────────────────────
+  'Fire Safety',               // Fire extinguishers, fire blankets
+  'Fire Doors',                // Fire rated doors, smoke seals
+  'Fire Alarm',                // Smoke detectors, fire alarm panels
+  'Sprinkler Systems',         // Fire sprinklers, hose reels
+  
+  // ─────────────────────────────────────────────────────────────────────────────
+  // SPECIALTY MATERIALS
+  // ─────────────────────────────────────────────────────────────────────────────
+  'Damp Proofing',             // DPC, DPM, tanking slurry
+  'Expansion Joints',          // Joint fillers, movement joints
+  'Reinforcement Accessories', // Spacers, chairs, tie wire
+  'Curing Compounds',          // Concrete curing, membrane curing
+  'Admixtures',                // Plasticizers, accelerators, retarders
+  
+  // ─────────────────────────────────────────────────────────────────────────────
+  // MISCELLANEOUS
+  // ─────────────────────────────────────────────────────────────────────────────
+  'Geotextiles',               // Woven, non-woven geotextiles
+  'Polythene',                 // DPM sheets, packaging, covers
+  'Tarpaulins',                // Waterproof covers, shade nets
+  'Signage',                   // Safety signs, construction signs
+  'Other'                      // Other construction materials
 ];
 
 // No demo materials - only show real data from database

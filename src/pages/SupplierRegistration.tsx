@@ -54,23 +54,48 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { User } from "@supabase/supabase-js";
 
-// Material categories available
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMPREHENSIVE KENYA CONSTRUCTION MATERIALS CATEGORIES
+// ═══════════════════════════════════════════════════════════════════════════════
 const MATERIAL_CATEGORIES = [
-  "Cement & Concrete",
-  "Steel & Iron",
-  "Bricks & Blocks",
-  "Sand & Aggregates",
-  "Roofing Materials",
-  "Tiles & Flooring",
-  "Paint & Finishes",
-  "Plumbing Supplies",
-  "Electrical Supplies",
-  "Timber & Wood",
-  "Glass & Aluminum",
-  "Hardware & Tools",
-  "Doors & Windows",
-  "Insulation Materials",
-  "Other Materials"
+  // STRUCTURAL & FOUNDATION
+  "Cement & Concrete", "Steel & Reinforcement", "Aggregates & Ballast", "Sand", "Building Stones", "Blocks & Bricks", "Ready Mix Concrete",
+  // ROOFING
+  "Roofing Materials", "Iron Sheets (Mabati)", "Roofing Tiles", "Gutters & Downpipes", "Waterproofing",
+  // TIMBER & WOOD
+  "Timber & Wood", "Plywood & Boards", "Formwork & Shuttering", "Treated Poles",
+  // DOORS, WINDOWS & OPENINGS
+  "Doors & Frames", "Windows & Glass", "Aluminium Works", "Door & Window Hardware",
+  // PLUMBING & WATER
+  "Plumbing Supplies", "Pipes & Fittings", "Water Tanks & Pumps", "Sanitary Ware", "Taps & Mixers", "Water Heaters",
+  // ELECTRICAL
+  "Electrical Supplies", "Cables & Wires", "Switches & Sockets", "Lighting", "Solar Equipment", "Generators",
+  // TILES & FLOORING
+  "Tiles & Flooring", "Ceramic & Porcelain", "Granite & Marble", "Vinyl & Carpet", "Tile Adhesive & Grout",
+  // PAINT & FINISHES
+  "Paint & Finishes", "Emulsion Paint", "Exterior Paint", "Varnish & Wood Finish", "Primers & Putty",
+  // WALL & CEILING
+  "Gypsum & Ceiling", "Insulation Materials", "Wall Cladding",
+  // HARDWARE & FASTENERS
+  "Hardware & Fasteners", "Nails & Screws", "Bolts & Nuts", "Locks & Hinges", "Wire & Mesh",
+  // TOOLS & EQUIPMENT
+  "Tools & Equipment", "Power Tools", "Hand Tools", "Safety Equipment", "Scaffolding & Ladders",
+  // ADHESIVES & SEALANTS
+  "Adhesives & Sealants", "Epoxy & Grout",
+  // FENCING & SECURITY
+  "Fencing Materials", "Gates & Security", "Security Systems",
+  // LANDSCAPING & OUTDOOR
+  "Paving & Cabro", "Drainage Systems", "Garden Materials",
+  // KITCHEN & BUILT-IN
+  "Kitchen Fittings", "Countertops", "Wardrobes & Closets",
+  // HVAC & VENTILATION
+  "HVAC & Ventilation", "Air Conditioning",
+  // FIRE SAFETY
+  "Fire Safety Equipment", "Fire Doors & Alarms",
+  // SPECIALTY MATERIALS
+  "Damp Proofing", "Concrete Admixtures", "Reinforcement Accessories",
+  // MISCELLANEOUS
+  "Geotextiles & Covers", "Signage", "Other Materials"
 ];
 
 const SupplierRegistration = () => {

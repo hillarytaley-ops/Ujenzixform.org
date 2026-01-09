@@ -57,43 +57,81 @@ interface SupplierProductManagerProps {
   supplierId: string;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMPREHENSIVE KENYA CONSTRUCTION MATERIALS CATEGORIES
+// ═══════════════════════════════════════════════════════════════════════════════
 const PRODUCT_CATEGORIES = [
-  'Cement',
-  'Steel',
-  'Tiles',
-  'Paint',
-  'Timber',
-  'Hardware',
-  'Plumbing',
-  'Electrical',
-  'Aggregates',
-  'Roofing',
-  'Insulation',
-  'Tools',
-  'Stone',
-  'Sand',
-  'Plywood',
-  'Doors',
-  'Wire',
-  'Iron Sheets',
-  'Blocks',
-  'Glass',
-  'Windows',
-  'Other'
+  // STRUCTURAL & FOUNDATION
+  'Cement', 'Steel', 'Aggregates', 'Sand', 'Stone', 'Blocks', 'Bricks', 'Ready Mix Concrete',
+  // ROOFING
+  'Roofing', 'Iron Sheets', 'Roofing Tiles', 'Gutters & Downpipes', 'Roofing Accessories', 'Waterproofing',
+  // TIMBER & WOOD
+  'Timber', 'Plywood', 'Particle Board', 'Timber Trusses', 'Formwork', 'Treated Poles',
+  // DOORS, WINDOWS & OPENINGS
+  'Doors', 'Steel Doors', 'Windows', 'Aluminium Windows', 'Glass', 'Door Frames', 'Door Hardware', 'Window Hardware',
+  // PLUMBING & WATER
+  'Plumbing', 'PVC Pipes', 'PPR Pipes', 'GI Pipes', 'HDPE Pipes', 'Pipe Fittings', 'Valves',
+  'Water Tanks', 'Pumps', 'Taps & Mixers', 'Sanitary Ware', 'Bathroom Accessories', 'Septic Tanks', 'Water Heaters',
+  // ELECTRICAL
+  'Electrical', 'Cables & Wires', 'Switches & Sockets', 'Distribution Boards', 'Lighting', 'Conduits',
+  'Electrical Accessories', 'Solar Equipment', 'Generators', 'UPS & Stabilizers',
+  // TILES & FLOORING
+  'Tiles', 'Ceramic Tiles', 'Porcelain Tiles', 'Granite Tiles', 'Marble', 'Terrazzo', 'Vinyl Flooring',
+  'Wooden Flooring', 'Carpet', 'Tile Adhesive', 'Tile Grout', 'Skirting',
+  // PAINT & FINISHES
+  'Paint', 'Emulsion Paint', 'Gloss Paint', 'Exterior Paint', 'Wood Finish', 'Metal Paint',
+  'Primers', 'Putty & Fillers', 'Thinners & Solvents', 'Brushes & Rollers',
+  // WALL & CEILING
+  'Gypsum', 'Ceiling Boards', 'Plaster', 'Wallpaper', 'Wall Cladding', 'Insulation', 'Cornices',
+  // HARDWARE & FASTENERS
+  'Hardware', 'Nails', 'Screws', 'Bolts & Nuts', 'Hinges', 'Locks', 'Chains', 'Wire', 'Wire Mesh', 'Brackets & Supports',
+  // TOOLS & EQUIPMENT
+  'Tools', 'Hand Tools', 'Power Tools', 'Measuring Tools', 'Cutting Tools', 'Masonry Tools',
+  'Painting Tools', 'Safety Equipment', 'Scaffolding', 'Ladders', 'Wheelbarrows',
+  // ADHESIVES & SEALANTS
+  'Adhesives', 'Sealants', 'Caulking', 'Epoxy',
+  // FENCING & SECURITY
+  'Fencing', 'Barbed Wire', 'Electric Fence', 'Gates', 'Security Systems',
+  // LANDSCAPING & OUTDOOR
+  'Paving', 'Outdoor Tiles', 'Drainage', 'Retaining Walls', 'Garden Materials',
+  // KITCHEN & BUILT-IN
+  'Kitchen Cabinets', 'Countertops', 'Kitchen Sinks', 'Kitchen Hardware', 'Wardrobes',
+  // HVAC & VENTILATION
+  'Air Conditioning', 'Ventilation', 'Ceiling Fans',
+  // FIRE SAFETY
+  'Fire Safety', 'Fire Doors', 'Fire Alarm', 'Sprinkler Systems',
+  // SPECIALTY MATERIALS
+  'Damp Proofing', 'Expansion Joints', 'Reinforcement Accessories', 'Curing Compounds', 'Admixtures',
+  // MISCELLANEOUS
+  'Geotextiles', 'Polythene', 'Tarpaulins', 'Signage', 'Other'
 ];
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMPREHENSIVE UNITS OF MEASUREMENT FOR KENYA CONSTRUCTION
+// ═══════════════════════════════════════════════════════════════════════════════
 const UNITS = [
-  'bag',
-  'piece',
-  'meter',
-  'sqm',
-  'tonne',
-  'kg',
-  'liter',
-  'roll',
-  'sheet',
-  'box',
-  'set'
+  // WEIGHT & MASS
+  'kg', 'gram', 'tonne', 'ton',
+  // VOLUME
+  'liter', 'ml', 'cubic meter', 'cubic foot',
+  // LENGTH
+  'meter', 'mm', 'cm', 'foot', 'inch',
+  // AREA
+  'sqm', 'sqft', 'acre',
+  // COUNT/QUANTITY
+  'piece', 'unit', 'pair', 'dozen', 'set', 'bundle',
+  // PACKAGING
+  'bag', 'packet', 'carton', 'box', 'pallet', 'container',
+  // SHEETS & ROLLS
+  'sheet', 'roll', 'coil', 'reel',
+  // BUILDING SPECIFIC
+  'trip', 'lorry', 'wheelbarrow', 'head load',
+  // LENGTH BUNDLES
+  'length', 'bar', 'rod', 'pole',
+  // LIQUID CONTAINERS
+  'drum', 'jerrycan', 'bucket', 'tin',
+  // OTHER
+  'lot', 'job', 'day', 'hour'
 ];
 
 export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ supplierId }) => {

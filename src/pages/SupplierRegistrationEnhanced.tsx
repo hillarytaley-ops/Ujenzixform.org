@@ -31,20 +31,122 @@ import { Link } from "react-router-dom";
 // FloatingSocialSidebar moved to App.tsx for global availability
 import { useToast } from "@/hooks/use-toast";
 
-// Material Categories
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMPREHENSIVE KENYA CONSTRUCTION MATERIALS CATEGORIES
+// Based on complete analysis of Kenya's construction industry
+// ═══════════════════════════════════════════════════════════════════════════════
 const MATERIAL_CATEGORIES = [
+  // STRUCTURAL & FOUNDATION
   { id: 'cement', name: 'Cement & Concrete', icon: '🏗️' },
   { id: 'steel', name: 'Steel & Reinforcement', icon: '🔩' },
   { id: 'blocks', name: 'Blocks & Bricks', icon: '🧱' },
+  { id: 'sand', name: 'Sand & Aggregates', icon: '🪨' },
+  { id: 'stone', name: 'Building Stones', icon: '🪨' },
+  { id: 'ready-mix', name: 'Ready Mix Concrete', icon: '🏗️' },
+  
+  // ROOFING
   { id: 'roofing', name: 'Roofing Materials', icon: '🏠' },
+  { id: 'iron-sheets', name: 'Iron Sheets (Mabati)', icon: '🏠' },
+  { id: 'gutters', name: 'Gutters & Downpipes', icon: '🌧️' },
+  { id: 'waterproofing', name: 'Waterproofing', icon: '💧' },
+  
+  // TIMBER & WOOD
   { id: 'timber', name: 'Timber & Wood', icon: '🪵' },
-  { id: 'paint', name: 'Paint & Finishes', icon: '🎨' },
-  { id: 'plumbing', name: 'Plumbing Materials', icon: '🚰' },
+  { id: 'plywood', name: 'Plywood & Boards', icon: '🪵' },
+  { id: 'formwork', name: 'Formwork & Shuttering', icon: '🪵' },
+  { id: 'poles', name: 'Treated Poles', icon: '🪵' },
+  
+  // DOORS, WINDOWS & OPENINGS
+  { id: 'doors', name: 'Doors & Frames', icon: '🚪' },
+  { id: 'windows', name: 'Windows & Glass', icon: '🪟' },
+  { id: 'aluminium', name: 'Aluminium Works', icon: '🪟' },
+  { id: 'door-hardware', name: 'Door & Window Hardware', icon: '🔐' },
+  
+  // PLUMBING & WATER
+  { id: 'plumbing', name: 'Plumbing Supplies', icon: '🚰' },
+  { id: 'pipes', name: 'Pipes & Fittings', icon: '🔧' },
+  { id: 'tanks', name: 'Water Tanks & Pumps', icon: '💧' },
+  { id: 'sanitary', name: 'Sanitary Ware', icon: '🚽' },
+  { id: 'taps', name: 'Taps & Mixers', icon: '🚿' },
+  { id: 'heaters', name: 'Water Heaters', icon: '🔥' },
+  
+  // ELECTRICAL
   { id: 'electrical', name: 'Electrical Supplies', icon: '⚡' },
-  { id: 'hardware', name: 'Hardware & Tools', icon: '🔧' },
+  { id: 'cables', name: 'Cables & Wires', icon: '🔌' },
+  { id: 'switches', name: 'Switches & Sockets', icon: '🔘' },
+  { id: 'lighting', name: 'Lighting', icon: '💡' },
+  { id: 'solar', name: 'Solar Equipment', icon: '☀️' },
+  { id: 'generators', name: 'Generators & UPS', icon: '🔋' },
+  
+  // TILES & FLOORING
   { id: 'tiles', name: 'Tiles & Flooring', icon: '⬜' },
-  { id: 'doors', name: 'Doors & Windows', icon: '🚪' },
-  { id: 'sand', name: 'Sand & Aggregates', icon: '🪨' }
+  { id: 'ceramic', name: 'Ceramic & Porcelain', icon: '⬜' },
+  { id: 'granite', name: 'Granite & Marble', icon: '🪨' },
+  { id: 'vinyl', name: 'Vinyl & Carpet', icon: '🟫' },
+  { id: 'tile-accessories', name: 'Tile Adhesive & Grout', icon: '🧴' },
+  
+  // PAINT & FINISHES
+  { id: 'paint', name: 'Paint & Finishes', icon: '🎨' },
+  { id: 'emulsion', name: 'Emulsion Paint', icon: '🎨' },
+  { id: 'exterior', name: 'Exterior Paint', icon: '🎨' },
+  { id: 'varnish', name: 'Varnish & Wood Finish', icon: '🪵' },
+  { id: 'primers', name: 'Primers & Putty', icon: '🧴' },
+  
+  // WALL & CEILING
+  { id: 'gypsum', name: 'Gypsum & Ceiling', icon: '⬜' },
+  { id: 'insulation', name: 'Insulation', icon: '🧱' },
+  { id: 'cladding', name: 'Wall Cladding', icon: '🧱' },
+  
+  // HARDWARE & FASTENERS
+  { id: 'hardware', name: 'Hardware & Fasteners', icon: '🔧' },
+  { id: 'nails', name: 'Nails & Screws', icon: '🔩' },
+  { id: 'bolts', name: 'Bolts & Nuts', icon: '🔩' },
+  { id: 'locks', name: 'Locks & Hinges', icon: '🔐' },
+  { id: 'wire', name: 'Wire & Mesh', icon: '🔗' },
+  
+  // TOOLS & EQUIPMENT
+  { id: 'tools', name: 'Tools & Equipment', icon: '🛠️' },
+  { id: 'power-tools', name: 'Power Tools', icon: '🔌' },
+  { id: 'hand-tools', name: 'Hand Tools', icon: '🔨' },
+  { id: 'safety', name: 'Safety Equipment', icon: '🦺' },
+  { id: 'scaffolding', name: 'Scaffolding & Ladders', icon: '🪜' },
+  
+  // ADHESIVES & SEALANTS
+  { id: 'adhesives', name: 'Adhesives & Sealants', icon: '🧴' },
+  { id: 'epoxy', name: 'Epoxy & Grout', icon: '🧴' },
+  
+  // FENCING & SECURITY
+  { id: 'fencing', name: 'Fencing Materials', icon: '🔗' },
+  { id: 'gates', name: 'Gates & Security', icon: '🚧' },
+  { id: 'security-systems', name: 'Security Systems', icon: '📹' },
+  
+  // LANDSCAPING & OUTDOOR
+  { id: 'paving', name: 'Paving & Cabro', icon: '🧱' },
+  { id: 'drainage', name: 'Drainage Systems', icon: '🕳️' },
+  { id: 'garden', name: 'Garden Materials', icon: '🌿' },
+  
+  // KITCHEN & BUILT-IN
+  { id: 'kitchen', name: 'Kitchen Fittings', icon: '🍳' },
+  { id: 'countertops', name: 'Countertops', icon: '🪨' },
+  { id: 'wardrobes', name: 'Wardrobes & Closets', icon: '🚪' },
+  
+  // HVAC & VENTILATION
+  { id: 'hvac', name: 'HVAC & Ventilation', icon: '❄️' },
+  { id: 'fans', name: 'Fans & Air Conditioning', icon: '🌀' },
+  
+  // FIRE SAFETY
+  { id: 'fire-safety', name: 'Fire Safety', icon: '🔥' },
+  { id: 'fire-doors', name: 'Fire Doors & Alarms', icon: '🚨' },
+  
+  // SPECIALTY MATERIALS
+  { id: 'damp-proofing', name: 'Damp Proofing', icon: '💧' },
+  { id: 'admixtures', name: 'Concrete Admixtures', icon: '🧪' },
+  { id: 'reinforcement', name: 'Reinforcement Accessories', icon: '🔩' },
+  
+  // MISCELLANEOUS
+  { id: 'geotextiles', name: 'Geotextiles & Covers', icon: '📦' },
+  { id: 'signage', name: 'Signage', icon: '⚠️' },
+  { id: 'other', name: 'Other Materials', icon: '📦' }
 ];
 
 interface ProductItem {
