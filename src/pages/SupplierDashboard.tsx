@@ -33,8 +33,24 @@ import {
   Moon,
   Sun,
   Globe,
-  Headphones
+  Headphones,
+  FileCheck,
+  XCircle,
+  Send,
+  MapPin,
+  Building2
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { useSupplierData, logDataAccessAttempt } from "@/hooks/useDataIsolation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { SupplierCharts } from "@/components/supplier/SupplierCharts";
@@ -108,6 +124,15 @@ const SupplierDashboard = () => {
   });
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [activeTab, setActiveTab] = useState('overview');
+  const [quoteRequests, setQuoteRequests] = useState<any[]>([]);
+  const [selectedQuote, setSelectedQuote] = useState<any>(null);
+  const [quoteDialogOpen, setQuoteDialogOpen] = useState(false);
+  const [quoteResponse, setQuoteResponse] = useState({
+    quoteAmount: '',
+    validUntil: '',
+    supplierNotes: ''
+  });
+  const [processingQuote, setProcessingQuote] = useState(false);
 
   // Show UI immediately - don't wait for data
   useEffect(() => {
@@ -145,6 +170,86 @@ const SupplierDashboard = () => {
       logDataAccessAttempt(user.id, 'view', 'supplier_dashboard', true, 'Dashboard loaded');
     }
   }, [user?.id]);
+
+  // Fetch quote requests for this supplier
+  useEffect(() => {
+    const fetchQuoteRequests = async () => {
+      if (!user?.id) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('quotation_requests')
+          .select('*')
+          .eq('supplier_id', user.id)
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        setQuoteRequests(data || []);
+      } catch (error) {
+        console.error('Error fetching quote requests:', error);
+      }
+    };
+
+    fetchQuoteRequests();
+  }, [user?.id]);
+
+  const handleQuoteAction = async (action: 'approve' | 'reject') => {
+    if (!selectedQuote) return;
+    
+    setProcessingQuote(true);
+    try {
+      const updateData: any = {
+        status: action === 'approve' ? 'quoted' : 'rejected',
+        updated_at: new Date().toISOString()
+      };
+
+      if (action === 'approve') {
+        if (!quoteResponse.quoteAmount) {
+          throw new Error('Please enter a quote amount');
+        }
+        updateData.quote_amount = parseFloat(quoteResponse.quoteAmount);
+        updateData.quote_valid_until = quoteResponse.validUntil || null;
+        updateData.supplier_notes = quoteResponse.supplierNotes || null;
+      } else {
+        updateData.supplier_notes = quoteResponse.supplierNotes || 'Quote request rejected';
+      }
+
+      const { error } = await supabase
+        .from('quotation_requests')
+        .update(updateData)
+        .eq('id', selectedQuote.id);
+
+      if (error) throw error;
+
+      // Refresh quote requests
+      const { data: newData } = await supabase
+        .from('quotation_requests')
+        .select('*')
+        .eq('supplier_id', user?.id)
+        .order('created_at', { ascending: false });
+      
+      setQuoteRequests(newData || []);
+      setQuoteDialogOpen(false);
+      setSelectedQuote(null);
+      setQuoteResponse({ quoteAmount: '', validUntil: '', supplierNotes: '' });
+
+    } catch (error: any) {
+      console.error('Error processing quote:', error);
+      alert(error.message || 'Failed to process quote');
+    } finally {
+      setProcessingQuote(false);
+    }
+  };
+
+  const openQuoteDialog = (quote: any) => {
+    setSelectedQuote(quote);
+    setQuoteResponse({
+      quoteAmount: quote.quote_amount?.toString() || '',
+      validUntil: quote.quote_valid_until || '',
+      supplierNotes: quote.supplier_notes || ''
+    });
+    setQuoteDialogOpen(true);
+  };
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -431,6 +536,15 @@ const SupplierDashboard = () => {
             <TabsTrigger value="analytics" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
               {t('supplier.tabs.analytics')}
             </TabsTrigger>
+            <TabsTrigger value="quotes" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
+              <FileCheck className="h-4 w-4 mr-1" />
+              Quote Requests
+              {quoteRequests.filter(q => q.status === 'pending').length > 0 && (
+                <span className="ml-1 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5">
+                  {quoteRequests.filter(q => q.status === 'pending').length}
+                </span>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="add-products" className="data-[state=active]:bg-green-500 data-[state=active]:text-white">
               <Plus className="h-4 w-4 mr-1" />
               Add New Products
@@ -516,6 +630,244 @@ const SupplierDashboard = () => {
           {/* Analytics Tab - Enhanced Dashboard */}
           <TabsContent value="analytics">
             <SupplierAnalyticsDashboard supplierId={user?.id || ''} />
+          </TabsContent>
+
+          {/* Quote Requests Tab */}
+          <TabsContent value="quotes">
+            <Card className={cardBg}>
+              <CardHeader>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div>
+                    <CardTitle className={`flex items-center gap-2 ${textColor}`}>
+                      <FileCheck className="h-5 w-5 text-blue-500" />
+                      Quote Requests from Professional Builders
+                    </CardTitle>
+                    <CardDescription className={mutedText}>
+                      Review and respond to quote requests from professional builders
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge className="bg-amber-100 text-amber-700 border border-amber-300">
+                      {quoteRequests.filter(q => q.status === 'pending').length} Pending
+                    </Badge>
+                    <Badge className="bg-green-100 text-green-700 border border-green-300">
+                      {quoteRequests.filter(q => q.status === 'quoted').length} Quoted
+                    </Badge>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {quoteRequests.length > 0 ? (
+                  <div className="space-y-4">
+                    {quoteRequests.map((quote) => (
+                      <div 
+                        key={quote.id} 
+                        className={`border rounded-lg p-4 transition-colors ${
+                          isDarkMode ? 'border-slate-600 hover:bg-slate-700/50' : 'hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                          {/* Quote Details */}
+                          <div className="flex-1">
+                            <div className="flex items-start gap-3">
+                              <div className={`p-2 rounded-lg ${
+                                quote.status === 'pending' ? 'bg-amber-100 text-amber-600' :
+                                quote.status === 'quoted' ? 'bg-green-100 text-green-600' :
+                                quote.status === 'accepted' ? 'bg-blue-100 text-blue-600' :
+                                'bg-red-100 text-red-600'
+                              }`}>
+                                <Package className="h-5 w-5" />
+                              </div>
+                              <div className="flex-1">
+                                <h4 className={`font-semibold ${textColor}`}>{quote.material_name}</h4>
+                                <div className="flex flex-wrap items-center gap-3 mt-1 text-sm">
+                                  <span className={mutedText}>
+                                    <strong>Qty:</strong> {quote.quantity} {quote.unit}
+                                  </span>
+                                  <span className={mutedText}>•</span>
+                                  <span className={`flex items-center gap-1 ${mutedText}`}>
+                                    <MapPin className="h-3 w-3" />
+                                    {quote.delivery_address}
+                                  </span>
+                                </div>
+                                {quote.project_description && (
+                                  <p className={`text-sm mt-2 ${mutedText}`}>
+                                    <strong>Project:</strong> {quote.project_description}
+                                  </p>
+                                )}
+                                {quote.special_requirements && (
+                                  <p className={`text-sm mt-1 ${mutedText}`}>
+                                    <strong>Requirements:</strong> {quote.special_requirements}
+                                  </p>
+                                )}
+                                {quote.preferred_delivery_date && (
+                                  <p className={`text-sm mt-1 ${mutedText}`}>
+                                    <strong>Preferred Delivery:</strong> {new Date(quote.preferred_delivery_date).toLocaleDateString()}
+                                  </p>
+                                )}
+                                <p className={`text-xs mt-2 ${mutedText}`}>
+                                  Requested: {new Date(quote.created_at).toLocaleString()}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Status & Actions */}
+                          <div className="flex flex-col items-end gap-3">
+                            <Badge className={`${
+                              quote.status === 'pending' ? 'bg-amber-100 text-amber-700 border-amber-300' :
+                              quote.status === 'quoted' ? 'bg-green-100 text-green-700 border-green-300' :
+                              quote.status === 'accepted' ? 'bg-blue-100 text-blue-700 border-blue-300' :
+                              'bg-red-100 text-red-700 border-red-300'
+                            }`}>
+                              {quote.status === 'pending' && <Clock className="h-3 w-3 mr-1" />}
+                              {quote.status === 'quoted' && <CheckCircle className="h-3 w-3 mr-1" />}
+                              {quote.status === 'accepted' && <CheckCircle className="h-3 w-3 mr-1" />}
+                              {quote.status === 'rejected' && <XCircle className="h-3 w-3 mr-1" />}
+                              {quote.status.charAt(0).toUpperCase() + quote.status.slice(1)}
+                            </Badge>
+
+                            {quote.quote_amount && (
+                              <div className="text-right">
+                                <p className={`text-lg font-bold ${textColor}`}>
+                                  KES {quote.quote_amount.toLocaleString()}
+                                </p>
+                                {quote.quote_valid_until && (
+                                  <p className={`text-xs ${mutedText}`}>
+                                    Valid until: {new Date(quote.quote_valid_until).toLocaleDateString()}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+
+                            {quote.status === 'pending' && (
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  className="bg-green-500 hover:bg-green-600"
+                                  onClick={() => openQuoteDialog(quote)}
+                                >
+                                  <CheckCircle className="h-4 w-4 mr-1" />
+                                  Respond
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-red-300 text-red-600 hover:bg-red-50"
+                                  onClick={() => {
+                                    setSelectedQuote(quote);
+                                    handleQuoteAction('reject');
+                                  }}
+                                >
+                                  <XCircle className="h-4 w-4 mr-1" />
+                                  Reject
+                                </Button>
+                              </div>
+                            )}
+
+                            {quote.status === 'quoted' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openQuoteDialog(quote)}
+                              >
+                                <Edit className="h-4 w-4 mr-1" />
+                                Edit Quote
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+
+                        {quote.supplier_notes && quote.status !== 'pending' && (
+                          <div className={`mt-3 pt-3 border-t ${isDarkMode ? 'border-slate-600' : 'border-gray-200'}`}>
+                            <p className={`text-sm ${mutedText}`}>
+                              <strong>Your Response:</strong> {quote.supplier_notes}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <FileCheck className={`h-16 w-16 mx-auto mb-4 ${isDarkMode ? 'text-slate-600' : 'text-gray-300'}`} />
+                    <p className={`text-lg font-medium ${textColor}`}>No Quote Requests Yet</p>
+                    <p className={mutedText}>Quote requests from professional builders will appear here</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Quote Response Dialog */}
+            <Dialog open={quoteDialogOpen} onOpenChange={setQuoteDialogOpen}>
+              <DialogContent className="sm:max-w-[500px]">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <FileCheck className="h-5 w-5 text-blue-500" />
+                    Respond to Quote Request
+                  </DialogTitle>
+                  <DialogDescription>
+                    {selectedQuote && (
+                      <span>
+                        Provide your quote for <strong>{selectedQuote.material_name}</strong> ({selectedQuote.quantity} {selectedQuote.unit})
+                      </span>
+                    )}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="quoteAmount">Quote Amount (KES) *</Label>
+                    <Input
+                      id="quoteAmount"
+                      type="number"
+                      placeholder="Enter your quote amount"
+                      value={quoteResponse.quoteAmount}
+                      onChange={(e) => setQuoteResponse(prev => ({ ...prev, quoteAmount: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="validUntil">Quote Valid Until</Label>
+                    <Input
+                      id="validUntil"
+                      type="date"
+                      value={quoteResponse.validUntil}
+                      onChange={(e) => setQuoteResponse(prev => ({ ...prev, validUntil: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="supplierNotes">Notes to Builder</Label>
+                    <Textarea
+                      id="supplierNotes"
+                      placeholder="Add any notes about pricing, delivery terms, etc."
+                      value={quoteResponse.supplierNotes}
+                      onChange={(e) => setQuoteResponse(prev => ({ ...prev, supplierNotes: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setQuoteDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={() => handleQuoteAction('approve')}
+                    disabled={processingQuote}
+                    className="bg-green-500 hover:bg-green-600"
+                  >
+                    {processingQuote ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="h-4 w-4 mr-2" />
+                        Send Quote
+                      </>
+                    )}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           {/* Add New Products Tab - For supplier-uploaded products (pending admin approval) */}
