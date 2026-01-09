@@ -1039,9 +1039,9 @@ const Monitoring = () => {
                   </Badge>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 md:gap-6">
+                <div className="grid grid-cols-1 xl:grid-cols-5 lg:grid-cols-4 gap-4 md:gap-6">
                   {/* Camera List - Futuristic Style */}
-                  <div className="lg:col-span-1">
+                  <div className="xl:col-span-1 lg:col-span-1">
                     <Card className="bg-slate-800/60 border-slate-700/50 backdrop-blur-xl">
                       <CardHeader className="p-4 md:p-6 border-b border-slate-700/50">
                         <CardTitle className="text-base md:text-lg text-white flex items-center gap-2">
@@ -1126,8 +1126,8 @@ const Monitoring = () => {
                     </Card>
                   </div>
 
-                  {/* Main Video Feed - Futuristic Style */}
-                  <div className="lg:col-span-3">
+                  {/* Main Video Feed - Large View for Client Convenience */}
+                  <div className="xl:col-span-4 lg:col-span-3">
                     <Card className="bg-slate-800/60 border-slate-700/50 backdrop-blur-xl overflow-hidden">
                       <CardHeader className="p-4 md:p-6 border-b border-slate-700/50">
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
@@ -1155,7 +1155,8 @@ const Monitoring = () => {
                         </div>
                       </CardHeader>
                       <CardContent className="p-0">
-                        <div className="aspect-video bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 relative min-h-[200px] sm:min-h-[300px] md:min-h-[400px] lg:min-h-[500px]">
+                        {/* Large Camera View for Client Convenience */}
+                        <div className="aspect-video bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 relative min-h-[300px] sm:min-h-[400px] md:min-h-[500px] lg:min-h-[600px] xl:min-h-[700px]">
                           {/* Grid Overlay Effect */}
                           <div 
                             className="absolute inset-0 opacity-20 pointer-events-none"
