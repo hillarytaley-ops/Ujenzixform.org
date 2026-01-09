@@ -32,7 +32,8 @@ import Careers from "./pages/Careers";
 import Tracking from "./pages/Tracking";
 import Monitoring from "./pages/Monitoring";
 import Delivery from "./pages/Delivery";
-import Scanners from "./pages/Scanners";
+// Lazy load Scanners page for better performance (large component with camera access)
+const Scanners = React.lazy(() => import("./pages/Scanners"));
 import Analytics from "./pages/Analytics";
 import DeliveryProviderApplication from "./pages/DeliveryProviderApplication";
 import NotFound from "./pages/NotFound";
@@ -175,7 +176,11 @@ const App = () => {
                     <Route path="/monitoring" element={<Monitoring />} />
                     <Route path="/tracking" element={<Tracking />} />
                     <Route path="/delivery" element={<Delivery />} />
-                    <Route path="/scanners" element={<Scanners />} />
+                    <Route path="/scanners" element={
+                      <React.Suspense fallback={<PageLoader />}>
+                        <Scanners />
+                      </React.Suspense>
+                    } />
                     <Route path="/feedback" element={<Feedback />} />
                     <Route path="/careers" element={<Careers />} />
                     
