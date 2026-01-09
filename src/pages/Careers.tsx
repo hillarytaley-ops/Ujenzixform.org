@@ -303,8 +303,8 @@ const Careers = () => {
           
           {/* Content */}
           <div className="container mx-auto px-4 relative z-10 py-20">
-            <div className="max-w-3xl">
-              <div className="flex items-center gap-3 mb-6">
+            <div className="max-w-4xl mx-auto text-center">
+              <div className="flex items-center justify-center gap-3 mb-6">
                 <Badge className="bg-primary/20 text-primary border-primary/30 backdrop-blur-sm px-4 py-1.5 text-sm">
                   <Sparkles className="h-4 w-4 mr-2" />
                   We're Hiring!
@@ -321,13 +321,13 @@ const Careers = () => {
                 </span>
               </h1>
               
-              <p className="text-xl text-white/80 mb-8 leading-relaxed max-w-2xl">
+              <p className="text-xl text-white/80 mb-8 leading-relaxed max-w-2xl mx-auto">
                 Join MradiPro and help transform how builders, suppliers, and delivery providers 
                 connect across all 47 counties. We're looking for passionate people who want to 
                 make a real impact on Africa's largest industry.
               </p>
               
-              <div className="flex flex-wrap gap-4">
+              <div className="flex flex-wrap justify-center gap-4">
                 <Button 
                   size="lg" 
                   className="bg-primary hover:bg-primary/90 text-white gap-2 text-lg px-8 py-6 shadow-lg shadow-primary/25"
@@ -347,16 +347,16 @@ const Careers = () => {
               </div>
               
               {/* Stats */}
-              <div className="grid grid-cols-3 gap-8 mt-12 pt-8 border-t border-white/10">
-                <div>
+              <div className="grid grid-cols-3 gap-8 mt-12 pt-8 border-t border-white/10 max-w-xl mx-auto">
+                <div className="text-center">
                   <p className="text-4xl font-bold text-white">47</p>
                   <p className="text-white/60 text-sm">Counties Covered</p>
                 </div>
-                <div>
+                <div className="text-center">
                   <p className="text-4xl font-bold text-white">10K+</p>
                   <p className="text-white/60 text-sm">Active Users</p>
                 </div>
-                <div>
+                <div className="text-center">
                   <p className="text-4xl font-bold text-white">25</p>
                   <p className="text-white/60 text-sm">Team Members</p>
                 </div>
