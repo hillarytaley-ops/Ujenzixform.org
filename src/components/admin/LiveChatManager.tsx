@@ -132,6 +132,9 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
     }
   }, []);
 
+  // Track message counts for polling comparison
+  const lastTotalMessagesRef = useRef<number>(0);
+
   useEffect(() => {
     fetchSessions();
 
@@ -211,13 +214,61 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
         console.log('📡 Admin chat subscription status:', status);
       });
 
-    // Auto-refresh every 60 seconds as backup (reduced from 30s since we have real-time)
-    const interval = setInterval(fetchSessions, 60000);
+    // POLLING FALLBACK: Check for new messages every 2 seconds
+    // This ensures instant messaging even if real-time fails
+    const pollingInterval = setInterval(async () => {
+      try {
+        const { data, error } = await supabase
+          .from('chat_messages')
+          .select('id, conversation_id, sender_type, sender_name, content, created_at')
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        if (!error && data) {
+          const totalMessages = data.length;
+          
+          // Check if we have new messages
+          if (totalMessages > lastTotalMessagesRef.current) {
+            const newClientMessages = data.filter((msg: any) => 
+              msg.sender_type === 'client'
+            );
+            
+            // If there are new client messages, notify and refresh
+            if (newClientMessages.length > 0) {
+              const latestClientMsg = newClientMessages[0];
+              
+              // Check if this is actually new (not already in sessions)
+              setSessions(prevSessions => {
+                const existingSession = prevSessions.find(s => s.conversation_id === latestClientMsg.conversation_id);
+                const messageExists = existingSession?.messages.some(m => m.id === latestClientMsg.id);
+                
+                if (!messageExists && lastTotalMessagesRef.current > 0) {
+                  playNotificationSound();
+                  toast({
+                    title: "💬 New Chat Message",
+                    description: `${latestClientMsg.sender_name || 'Guest'}: ${latestClientMsg.content.substring(0, 50)}...`,
+                  });
+                }
+                
+                return prevSessions;
+              });
+              
+              // Refresh sessions to get updated data
+              fetchSessions();
+            }
+            
+            lastTotalMessagesRef.current = totalMessages;
+          }
+        }
+      } catch (err) {
+        // Silent fail for polling
+      }
+    }, 2000);
 
     return () => {
       console.log('🔌 Unsubscribing from admin chat channel');
       supabase.removeChannel(channel);
-      clearInterval(interval);
+      clearInterval(pollingInterval);
     };
   }, [fetchSessions, playNotificationSound, toast]);
 

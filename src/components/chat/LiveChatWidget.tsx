@@ -120,11 +120,15 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
     });
   }, [userId, userName, userEmail]);
 
-  // Load previous messages and set up real-time subscription
+  // Track last message count for polling comparison
+  const lastMessageCountRef = useRef<number>(0);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Load previous messages and set up real-time subscription + polling fallback
   useEffect(() => {
     if (!conversationId) return;
 
-    const loadMessages = async () => {
+    const loadMessages = async (isPolling = false) => {
       try {
         const { data, error } = await supabase
           .from('chat_messages')
@@ -133,6 +137,14 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
           .order('created_at', { ascending: true });
 
         if (!error && data) {
+          // Check if we have new messages (for polling)
+          const hasNewMessages = data.length > lastMessageCountRef.current;
+          const hasNewStaffMessage = hasNewMessages && data.some((msg: any, idx: number) => 
+            idx >= lastMessageCountRef.current && msg.sender_type === 'staff'
+          );
+          
+          lastMessageCountRef.current = data.length;
+
           // Map DB sender types back to UI types: client -> user, system -> bot
           const loadedMessages: Message[] = data.map((msg: any) => ({
             id: msg.id,
@@ -140,6 +152,7 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
             content: msg.content,
             timestamp: new Date(msg.created_at)
           }));
+          
           setMessages(loadedMessages);
           
           // Check if there are staff messages (switch to human mode)
@@ -147,13 +160,32 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
             setMode('human');
             setWaitingForStaff(false);
           }
+
+          // If polling detected new staff message, show notification
+          if (isPolling && hasNewStaffMessage && !isOpen) {
+            const lastStaffMsg = data.filter((m: any) => m.sender_type === 'staff').pop();
+            if (lastStaffMsg) {
+              setUnreadCount(prev => prev + 1);
+              toast({
+                title: "💬 New message from MradiPro Staff",
+                description: lastStaffMsg.content.substring(0, 50) + '...',
+              });
+              
+              // Play notification sound
+              try {
+                const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleQoAHIreli4AAAB4nJ8sAAAA');
+                audio.play().catch(() => {});
+              } catch (e) {}
+            }
+          }
         }
       } catch (err) {
         console.error('Error loading chat messages:', err);
       }
     };
 
-    loadMessages();
+    // Initial load
+    loadMessages(false);
 
     // Real-time subscription for new messages - instant delivery
     const channel = supabase
@@ -175,6 +207,7 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
             setMessages(prev => {
               // Check if message already exists
               if (prev.some(m => m.id === newMsg.id)) return prev;
+              lastMessageCountRef.current = prev.length + 1;
               return [...prev, {
                 id: newMsg.id,
                 role: 'staff',
@@ -206,9 +239,18 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
         console.log('📡 Chat subscription status:', status);
       });
 
+    // POLLING FALLBACK: Check for new messages every 2 seconds
+    // This ensures instant messaging even if real-time fails due to RLS
+    pollingIntervalRef.current = setInterval(() => {
+      loadMessages(true);
+    }, 2000);
+
     return () => {
       console.log('🔌 Unsubscribing from chat channel');
       supabase.removeChannel(channel);
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
     };
   }, [conversationId, isOpen, toast]);
 
