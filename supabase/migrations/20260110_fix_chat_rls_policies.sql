@@ -22,14 +22,15 @@ CREATE POLICY "Anyone can create conversations" ON conversations
   FOR INSERT WITH CHECK (true);
 
 -- Allow anyone to view conversations they're part of OR admins can view all
+-- NOTE: profiles table uses user_type not role, user_roles table uses role
 CREATE POLICY "View own or admin view all conversations" ON conversations
   FOR SELECT USING (
     client_id = auth.uid()
     OR client_id IS NULL  -- Guest conversations
     OR EXISTS (
       SELECT 1 FROM profiles 
-      WHERE id = auth.uid() 
-      AND role = 'admin'
+      WHERE user_id = auth.uid() 
+      AND user_type = 'admin'
     )
     OR EXISTS (
       SELECT 1 FROM user_roles 
@@ -43,8 +44,8 @@ CREATE POLICY "Staff can update conversations" ON conversations
   FOR UPDATE USING (
     EXISTS (
       SELECT 1 FROM profiles 
-      WHERE id = auth.uid() 
-      AND role = 'admin'
+      WHERE user_id = auth.uid() 
+      AND user_type = 'admin'
     )
     OR EXISTS (
       SELECT 1 FROM user_roles 
@@ -63,6 +64,7 @@ CREATE POLICY "Anyone can insert chat messages" ON chat_messages
   FOR INSERT WITH CHECK (true);
 
 -- Allow viewing messages: own conversation OR admin
+-- Make it very permissive - allow viewing if conversation exists
 CREATE POLICY "View messages in conversations" ON chat_messages
   FOR SELECT USING (
     -- Check if user owns the conversation
@@ -74,16 +76,17 @@ CREATE POLICY "View messages in conversations" ON chat_messages
         OR c.client_id IS NULL  -- Guest conversations visible to all
       )
     )
-    -- OR user is admin (check both profiles and user_roles tables)
-    OR EXISTS (
-      SELECT 1 FROM profiles 
-      WHERE id = auth.uid() 
-      AND role = 'admin'
-    )
+    -- OR user is admin (check user_roles table - this is where admin role is stored)
     OR EXISTS (
       SELECT 1 FROM user_roles 
       WHERE user_id = auth.uid() 
       AND role = 'admin'
+    )
+    -- OR user has admin user_type in profiles
+    OR EXISTS (
+      SELECT 1 FROM profiles 
+      WHERE user_id = auth.uid() 
+      AND user_type = 'admin'
     )
   );
 
@@ -91,14 +94,14 @@ CREATE POLICY "View messages in conversations" ON chat_messages
 CREATE POLICY "Admin can update chat messages" ON chat_messages
   FOR UPDATE USING (
     EXISTS (
-      SELECT 1 FROM profiles 
-      WHERE id = auth.uid() 
-      AND role = 'admin'
-    )
-    OR EXISTS (
       SELECT 1 FROM user_roles 
       WHERE user_id = auth.uid() 
       AND role = 'admin'
+    )
+    OR EXISTS (
+      SELECT 1 FROM profiles 
+      WHERE user_id = auth.uid() 
+      AND user_type = 'admin'
     )
   );
 
