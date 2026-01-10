@@ -116,12 +116,17 @@ const PrivateClientDashboard = () => {
         totalSpent: 245000,
       });
 
-      // Fetch monitoring requests
-      const { data: monitoringData } = await supabase
+      // Fetch monitoring requests - use user_id (original schema column)
+      const { data: monitoringData, error: monitoringError } = await supabase
         .from('monitoring_service_requests')
         .select('*')
-        .eq('requester_id', user.id)
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
+      
+      if (monitoringError) {
+        console.log('Monitoring requests fetch info:', monitoringError.message);
+        // Table might not exist yet - not critical
+      }
       
       if (monitoringData) {
         setMonitoringRequests(monitoringData);
@@ -150,15 +155,15 @@ const PrivateClientDashboard = () => {
       const { error } = await supabase
         .from('monitoring_service_requests')
         .insert({
-          requester_id: user.id,
-          requester_name: profile?.full_name || user?.email,
-          requester_type: 'private_client',
+          user_id: user.id,
+          contact_name: profile?.full_name || user?.email?.split('@')[0] || 'User',
+          contact_email: user?.email || '',
+          contact_phone: profile?.phone || '',
           project_name: monitoringRequest.projectName,
           project_location: monitoringRequest.projectLocation,
-          project_description: monitoringRequest.projectDescription,
-          preferred_start_date: monitoringRequest.preferredStartDate || null,
-          number_of_cameras: parseInt(monitoringRequest.numberOfCameras) || 1,
-          additional_notes: monitoringRequest.additionalNotes,
+          selected_services: ['cctv'],
+          camera_count: parseInt(monitoringRequest.numberOfCameras) || 1,
+          additional_requirements: monitoringRequest.additionalNotes,
           status: 'pending'
         });
 
@@ -183,7 +188,7 @@ const PrivateClientDashboard = () => {
       const { data: newData } = await supabase
         .from('monitoring_service_requests')
         .select('*')
-        .eq('requester_id', user.id)
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
       
       if (newData) setMonitoringRequests(newData);
