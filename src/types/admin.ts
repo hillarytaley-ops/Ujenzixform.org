@@ -44,9 +44,8 @@ export interface AdminDashboardStats {
   total_delivery_providers: number;
   
   // Pending approvals
-  pending_supplier_registrations: number;
-  pending_builder_registrations: number;
-  pending_delivery_registrations: number;
+  pending_supplier_applications: number;
+  pending_delivery_providers: number;
   
   // Activity stats
   total_orders: number;

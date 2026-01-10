@@ -464,13 +464,13 @@ const AdminDashboard = () => {
       )
       .subscribe();
 
-    // Subscribe to registration changes
-    const builderRegsSub = supabase
-      .channel('admin-builder-registrations')
+    // Subscribe to profile changes (for builder registrations)
+    const profilesSub = supabase
+      .channel('admin-profiles')
       .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'builder_registrations' },
+        { event: '*', schema: 'public', table: 'profiles' },
         (payload) => {
-          console.log('👷 Builder registration change:', payload);
+          console.log('👤 Profile change:', payload);
           loadRegistrations();
           loadDashboardData();
         }
@@ -478,11 +478,11 @@ const AdminDashboard = () => {
       .subscribe();
 
     const supplierRegsSub = supabase
-      .channel('admin-supplier-registrations')
+      .channel('admin-supplier-applications')
       .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'supplier_registrations' },
+        { event: '*', schema: 'public', table: 'supplier_applications' },
         (payload) => {
-          console.log('🏪 Supplier registration change:', payload);
+          console.log('🏪 Supplier application change:', payload);
           loadRegistrations();
           loadDashboardData();
         }
@@ -490,11 +490,11 @@ const AdminDashboard = () => {
       .subscribe();
 
     const deliveryProviderRegsSub = supabase
-      .channel('admin-delivery-provider-registrations')
+      .channel('admin-delivery-providers')
       .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'delivery_provider_registrations' },
+        { event: '*', schema: 'public', table: 'delivery_providers' },
         (payload) => {
-          console.log('🚚 Delivery provider registration change:', payload);
+          console.log('🚚 Delivery provider change:', payload);
           loadDeliveryApplications();
           loadRegistrations();
           loadDashboardData();
@@ -620,15 +620,13 @@ const AdminDashboard = () => {
         }));
       }
 
-      // Get pending registrations count
-      const [builderRegs, supplierRegs, deliveryRegs] = await Promise.all([
-        client.from('builder_registrations').select('id, status').eq('status', 'pending'),
-        client.from('supplier_registrations').select('id, status').eq('status', 'pending'),
-        client.from('delivery_provider_registrations').select('id, status').eq('status', 'pending')
+      // Get pending registrations count from correct tables
+      const [supplierRegs, deliveryRegs] = await Promise.all([
+        client.from('supplier_applications').select('id, status').eq('status', 'pending'),
+        client.from('delivery_providers').select('id, status').eq('status', 'pending')
       ]);
 
       const pendingCount = 
-        (builderRegs.data?.length || 0) + 
         (supplierRegs.data?.length || 0) + 
         (deliveryRegs.data?.length || 0);
 
@@ -748,55 +746,17 @@ const AdminDashboard = () => {
       // Collect documents from all registration tables
       const allDocuments: DocumentRecord[] = [];
       
-      // Get builder documents
+      // Get builder documents from profiles table
       const { data: builderDocs } = await client
-        .from('builder_registrations')
-        .select('id, email, full_name, id_document_url, business_certificate_url, nca_certificate_url, profile_photo_url, created_at, status');
+        .from('profiles')
+        .select('id, email, full_name, avatar_url, created_at, role')
+        .in('role', ['professional_builder', 'private_client']);
       
       if (builderDocs) {
         builderDocs.forEach((reg: any) => {
-          if (reg.id_document_url) {
+          if (reg.avatar_url) {
             allDocuments.push({
-              id: `builder-id-${reg.id}`,
-              name: `ID Document - ${reg.full_name}`,
-              type: 'id_document',
-              uploadedBy: reg.full_name || 'Unknown',
-              userEmail: reg.email,
-              userRole: 'builder',
-              size: 'N/A',
-              status: reg.status === 'approved' ? 'verified' : 'pending',
-              uploadedAt: reg.created_at
-            });
-          }
-          if (reg.business_certificate_url) {
-            allDocuments.push({
-              id: `builder-cert-${reg.id}`,
-              name: `Business Certificate - ${reg.full_name}`,
-              type: 'business_certificate',
-              uploadedBy: reg.full_name || 'Unknown',
-              userEmail: reg.email,
-              userRole: 'builder',
-              size: 'N/A',
-              status: reg.status === 'approved' ? 'verified' : 'pending',
-              uploadedAt: reg.created_at
-            });
-          }
-          if (reg.nca_certificate_url) {
-            allDocuments.push({
-              id: `builder-nca-${reg.id}`,
-              name: `NCA Certificate - ${reg.full_name}`,
-              type: 'nca_certificate',
-              uploadedBy: reg.full_name || 'Unknown',
-              userEmail: reg.email,
-              userRole: 'builder',
-              size: 'N/A',
-              status: reg.status === 'approved' ? 'verified' : 'pending',
-              uploadedAt: reg.created_at
-            });
-          }
-          if (reg.profile_photo_url) {
-            allDocuments.push({
-              id: `builder-photo-${reg.id}`,
+              id: `builder-avatar-${reg.id}`,
               name: `Profile Photo - ${reg.full_name}`,
               type: 'profile_photo',
               uploadedBy: reg.full_name || 'Unknown',
@@ -810,19 +770,19 @@ const AdminDashboard = () => {
         });
       }
       
-      // Get supplier documents
+      // Get supplier documents from supplier_applications table
       const { data: supplierDocs } = await client
-        .from('supplier_registrations')
-        .select('id, email, contact_person, company_name, business_registration_url, kra_pin_url, profile_photo_url, created_at, status');
+        .from('supplier_applications')
+        .select('id, email, company_name, business_registration_url, kra_pin_url, profile_photo_url, created_at, status');
       
       if (supplierDocs) {
         supplierDocs.forEach((reg: any) => {
           if (reg.business_registration_url) {
             allDocuments.push({
               id: `supplier-cert-${reg.id}`,
-              name: `Business Registration - ${reg.company_name || reg.contact_person}`,
+              name: `Business Registration - ${reg.company_name || 'Unknown'}`,
               type: 'business_certificate',
-              uploadedBy: reg.contact_person || 'Unknown',
+              uploadedBy: reg.company_name || 'Unknown',
               userEmail: reg.email,
               userRole: 'supplier',
               size: 'N/A',
@@ -833,7 +793,7 @@ const AdminDashboard = () => {
           if (reg.kra_pin_url) {
             allDocuments.push({
               id: `supplier-kra-${reg.id}`,
-              name: `KRA PIN - ${reg.company_name || reg.contact_person}`,
+              name: `KRA PIN - ${reg.company_name || 'Unknown'}`,
               type: 'id_document',
               uploadedBy: reg.contact_person || 'Unknown',
               userEmail: reg.email,
@@ -846,9 +806,9 @@ const AdminDashboard = () => {
         });
       }
       
-      // Get delivery documents
+      // Get delivery documents from delivery_providers table
       const { data: deliveryDocs } = await client
-        .from('delivery_provider_registrations')
+        .from('delivery_providers')
         .select('id, email, full_name, id_document_url, driving_license_url, vehicle_logbook_url, insurance_certificate_url, created_at, status');
       
       if (deliveryDocs) {
@@ -1389,7 +1349,7 @@ const AdminDashboard = () => {
       const client = getAdminClient() || supabase;
       
       const { data: deliveryApps, error } = await client
-        .from('delivery_provider_registrations')
+        .from('delivery_providers')
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -1435,43 +1395,15 @@ const AdminDashboard = () => {
       
       const allRegistrations: RegistrationRecord[] = [];
 
-      // Load builder registrations
-      const { data: builders, error: buildersError } = await client
-        .from('builder_registrations')
-        .select('id, full_name, email, phone, company_name, county, builder_category, status, created_at')
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (buildersError) {
-        console.error('Error loading builder registrations:', buildersError);
-      }
-
-      if (builders) {
-        builders.forEach((b: any) => {
-          allRegistrations.push({
-            id: b.id,
-            type: 'builder',
-            name: b.full_name || 'N/A',
-            email: b.email || 'N/A',
-            phone: b.phone,
-            company_name: b.company_name,
-            county: b.county,
-            builder_category: b.builder_category,
-            status: b.status || 'pending',
-            created_at: b.created_at
-          });
-        });
-      }
-
-      // Load supplier registrations
+      // Load supplier applications (correct table name)
       const { data: suppliers, error: suppliersError } = await client
-        .from('supplier_registrations')
-        .select('id, company_name, contact_person, email, phone, county, material_categories, status, created_at')
+        .from('supplier_applications')
+        .select('id, company_name, email, phone, county, material_categories, status, created_at')
         .order('created_at', { ascending: false })
         .limit(50);
 
       if (suppliersError) {
-        console.error('Error loading supplier registrations:', suppliersError);
+        console.error('Error loading supplier applications:', suppliersError);
       }
 
       if (suppliers) {
@@ -1479,7 +1411,7 @@ const AdminDashboard = () => {
           allRegistrations.push({
             id: s.id,
             type: 'supplier',
-            name: s.company_name || s.contact_person || 'N/A',
+            name: s.company_name || 'N/A',
             email: s.email || 'N/A',
             phone: s.phone,
             company_name: s.company_name,
@@ -1491,9 +1423,9 @@ const AdminDashboard = () => {
         });
       }
 
-      // Load delivery registrations
+      // Load delivery providers (correct table name)
       const { data: delivery, error: deliveryError } = await client
-        .from('delivery_provider_registrations')
+        .from('delivery_providers')
         .select('id, full_name, email, phone, county, vehicle_type, vehicle_registration, service_areas, company_name, status, created_at')
         .order('created_at', { ascending: false })
         .limit(50);
@@ -1534,13 +1466,14 @@ const AdminDashboard = () => {
 
   const handleApproveRegistration = async (registration: RegistrationRecord) => {
     try {
+      // Map registration type to correct table name
       const tableName = registration.type === 'delivery' 
-        ? 'delivery_provider_registrations' 
-        : `${registration.type}_registrations` as 'builder_registrations' | 'supplier_registrations';
+        ? 'delivery_providers' 
+        : 'supplier_applications';
       
       const { error } = await supabase
         .from(tableName)
-        .update({ status: 'approved' })
+        .update({ status: 'approved', updated_at: new Date().toISOString() })
         .eq('id', registration.id);
 
       if (error) throw error;
@@ -1566,13 +1499,14 @@ const AdminDashboard = () => {
 
   const handleRejectRegistration = async (registration: RegistrationRecord) => {
     try {
+      // Map registration type to correct table name
       const tableName = registration.type === 'delivery' 
-        ? 'delivery_provider_registrations' 
-        : `${registration.type}_registrations` as 'builder_registrations' | 'supplier_registrations';
+        ? 'delivery_providers' 
+        : 'supplier_applications';
       
       const { error } = await supabase
         .from(tableName)
-        .update({ status: 'rejected' })
+        .update({ status: 'rejected', updated_at: new Date().toISOString() })
         .eq('id', registration.id);
 
       if (error) throw error;
@@ -2503,8 +2437,8 @@ const AdminDashboard = () => {
                               onClick={async () => {
                                 try {
                                   await supabase
-                                    .from('delivery_provider_registrations')
-                                    .update({ status: 'approved', reviewed_at: new Date().toISOString() })
+                                    .from('delivery_providers')
+                                    .update({ status: 'approved', updated_at: new Date().toISOString() })
                                     .eq('id', app.id);
                                   
                                   toast({
@@ -2530,8 +2464,8 @@ const AdminDashboard = () => {
                               onClick={async () => {
                                 try {
                                   await supabase
-                                    .from('delivery_provider_registrations')
-                                    .update({ status: 'rejected', reviewed_at: new Date().toISOString() })
+                                    .from('delivery_providers')
+                                    .update({ status: 'rejected', updated_at: new Date().toISOString() })
                                     .eq('id', app.id);
                                   
                                   toast({

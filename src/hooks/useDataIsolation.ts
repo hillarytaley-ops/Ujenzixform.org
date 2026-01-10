@@ -213,11 +213,11 @@ export const useSupplierData = () => {
       if (profileError) throw profileError;
       setProfile(profileData);
 
-      // Fetch supplier registration - ONLY for current user (uses auth_user_id)
+      // Fetch supplier application - ONLY for current user (uses applicant_user_id)
       const { data: supplierReg } = await supabase
-        .from('supplier_registrations')
+        .from('supplier_applications')
         .select('*')
-        .eq('auth_user_id', user.id)
+        .eq('applicant_user_id', user.id)
         .maybeSingle();
 
       // Fetch orders where this supplier is the vendor - ONLY for current user

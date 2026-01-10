@@ -470,45 +470,40 @@ const SupplierRegistration = () => {
         console.warn("Metadata update error (non-blocking):", metaErr);
       }
 
-      // 5. Save to supplier_registrations table for consistent role verification
-      console.log("📝 Saving to supplier_registrations table...");
+      // 5. Save to supplier_applications table for consistent role verification
+      console.log("📝 Saving to supplier_applications table...");
       try {
-        // Check if registration already exists
-        const { data: existingReg } = await supabase
-          .from('supplier_registrations')
+        // Check if application already exists
+        const { data: existingApp } = await supabase
+          .from('supplier_applications')
           .select('id')
-          .eq('auth_user_id', userId)
+          .eq('applicant_user_id', userId)
           .maybeSingle();
         
-        if (existingReg) {
-          console.log("✅ Supplier registration already exists");
+        if (existingApp) {
+          console.log("✅ Supplier application already exists");
         } else {
-          const { error: supplierRegError } = await supabase
-            .from('supplier_registrations')
+          const { error: supplierAppError } = await supabase
+            .from('supplier_applications')
             .insert({
-              auth_user_id: userId,
+              applicant_user_id: userId,
               email: email.trim().toLowerCase(),
               company_name: businessName,
-              contact_person: businessName,
               phone: phone,
               county: county,
-              town: town || null,
-              physical_address: physicalAddress,
-              business_type: 'retailer',
+              address: physicalAddress,
               material_categories: selectedCategories.length > 0 ? selectedCategories : ['General'],
-              status: 'approved',
-              terms_accepted: acceptTerms,
-              privacy_accepted: acceptPrivacy
+              status: 'approved'
             });
           
-          if (supplierRegError) {
-            console.warn("supplier_registrations insert warning:", supplierRegError);
+          if (supplierAppError) {
+            console.warn("supplier_applications insert warning:", supplierAppError);
           } else {
-            console.log("✅ Saved to supplier_registrations table");
+            console.log("✅ Saved to supplier_applications table");
           }
         }
       } catch (regErr) {
-        console.warn("supplier_registrations save error (non-blocking):", regErr);
+        console.warn("supplier_applications save error (non-blocking):", regErr);
       }
       
       // 5. Save supplier materials (for future implementation)
