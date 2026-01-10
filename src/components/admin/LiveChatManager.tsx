@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getAdminClient } from "@/integrations/supabase/adminClient";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -12,9 +13,11 @@ import {
   Bot,
   Headphones,
   Volume2,
-  VolumeX
+  VolumeX,
+  AlertCircle
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface ChatMessage {
   id: string;
@@ -48,6 +51,7 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
   const [replyMessage, setReplyMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const { toast } = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -66,18 +70,40 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
   const fetchSessions = useCallback(async () => {
     try {
       console.log('📨 Fetching chat messages...');
-      const { data, error } = await supabase
+      
+      // Try admin client first (bypasses RLS), fall back to regular client
+      const client = getAdminClient() || supabase;
+      const isUsingAdminClient = !!getAdminClient();
+      console.log('📨 Using admin client:', isUsingAdminClient);
+      
+      const { data, error } = await client
         .from('chat_messages')
         .select('*')
         .order('created_at', { ascending: false });
 
       console.log('📨 Chat messages result:', { count: data?.length, error });
-      console.log('📨 Raw messages:', data);
-
+      
       if (error) {
         console.error('Error fetching chat messages:', error);
+        // If RLS error, show helpful message
+        if (error.code === 'PGRST301' || error.message?.includes('permission') || error.message?.includes('denied')) {
+          setFetchError('RLS policy is blocking access. Please apply the chat RLS fix in Supabase SQL Editor.');
+          console.error('❌ RLS is blocking access. Please run the RLS fix migration in Supabase.');
+        } else {
+          setFetchError(`Database error: ${error.message}`);
+        }
         setLoading(false);
         return;
+      }
+      
+      // Clear any previous error
+      setFetchError(null);
+      
+      // Log if no messages found
+      if (!data || data.length === 0) {
+        console.log('📨 No messages found in database');
+      } else {
+        console.log('📨 Raw messages sample:', data.slice(0, 3));
       }
 
       // Group messages by conversation_id
@@ -457,6 +483,20 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
         </div>
       </div>
 
+      {/* Error Alert */}
+      {fetchError && (
+        <Alert className="mb-4 bg-red-900/30 border-red-500">
+          <AlertCircle className="h-4 w-4 text-red-400" />
+          <AlertDescription className="text-red-300">
+            <strong>Chat Error:</strong> {fetchError}
+            <br />
+            <span className="text-xs text-red-400 mt-1 block">
+              Run this SQL in Supabase: DROP POLICY IF EXISTS ... (see console for full SQL)
+            </span>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Sessions List */}
         <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
@@ -465,10 +505,17 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
             Chat Sessions ({sessions.length})
           </h3>
           <ScrollArea className="h-[500px]">
-            {sessions.length === 0 ? (
+            {sessions.length === 0 && !fetchError ? (
               <div className="text-center py-8 text-gray-500">
                 <MessageSquare className="w-12 h-12 mx-auto mb-2 opacity-50" />
                 <p>No chat sessions yet</p>
+                <p className="text-xs mt-2">Messages from the chat widget will appear here</p>
+              </div>
+            ) : sessions.length === 0 && fetchError ? (
+              <div className="text-center py-8 text-red-400">
+                <AlertCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>Unable to load messages</p>
+                <p className="text-xs mt-2">Check the error above</p>
               </div>
             ) : (
               sessions.map((session) => (
