@@ -120,9 +120,16 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
     });
   }, [userId, userName, userEmail]);
 
-  // Track last message count for polling comparison
+  // Track last message count and IDs for polling comparison
   const lastMessageCountRef = useRef<number>(0);
+  const lastMessageIdsRef = useRef<Set<string>>(new Set());
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isOpenRef = useRef<boolean>(isOpen); // Track isOpen without causing re-renders
+  
+  // Keep isOpenRef in sync
+  useEffect(() => {
+    isOpenRef.current = isOpen;
+  }, [isOpen]);
 
   // Load previous messages and set up real-time subscription + polling fallback
   useEffect(() => {
@@ -136,14 +143,20 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
           .eq('conversation_id', conversationId)
           .order('created_at', { ascending: true });
 
-        if (!error && data) {
-          // Check if we have new messages (for polling)
-          const hasNewMessages = data.length > lastMessageCountRef.current;
-          const hasNewStaffMessage = hasNewMessages && data.some((msg: any, idx: number) => 
-            idx >= lastMessageCountRef.current && msg.sender_type === 'staff'
-          );
+        if (error) {
+          console.error('Error loading chat messages:', error);
+          return;
+        }
+
+        if (data) {
+          // Check for new messages by comparing IDs
+          const currentIds = new Set(data.map((m: any) => m.id));
+          const newMessages = data.filter((m: any) => !lastMessageIdsRef.current.has(m.id));
+          const hasNewStaffMessage = newMessages.some((m: any) => m.sender_type === 'staff');
           
+          // Update tracking refs
           lastMessageCountRef.current = data.length;
+          lastMessageIdsRef.current = currentIds;
 
           // Map DB sender types back to UI types: client -> user, system -> bot
           const loadedMessages: Message[] = data.map((msg: any) => ({
@@ -153,7 +166,14 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
             timestamp: new Date(msg.created_at)
           }));
           
-          setMessages(loadedMessages);
+          // Only update if messages actually changed
+          setMessages(prev => {
+            if (prev.length === loadedMessages.length && 
+                prev.every((m, i) => m.id === loadedMessages[i]?.id)) {
+              return prev; // No change, don't update
+            }
+            return loadedMessages;
+          });
           
           // Check if there are staff messages (switch to human mode)
           if (data.some((msg: any) => msg.sender_type === 'staff')) {
@@ -161,9 +181,9 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
             setWaitingForStaff(false);
           }
 
-          // If polling detected new staff message, show notification
-          if (isPolling && hasNewStaffMessage && !isOpen) {
-            const lastStaffMsg = data.filter((m: any) => m.sender_type === 'staff').pop();
+          // If polling detected new staff message, show notification (only if chat is closed)
+          if (isPolling && hasNewStaffMessage && !isOpenRef.current) {
+            const lastStaffMsg = newMessages.filter((m: any) => m.sender_type === 'staff').pop();
             if (lastStaffMsg) {
               setUnreadCount(prev => prev + 1);
               toast({
@@ -202,6 +222,9 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
           const newMsg = payload.new as any;
           console.log('📩 Real-time message received:', newMsg.sender_type, newMsg.content?.substring(0, 30));
           
+          // Add message to tracking
+          lastMessageIdsRef.current.add(newMsg.id);
+          
           // Only add if it's a staff message (user messages are added locally)
           if (newMsg.sender_type === 'staff') {
             setMessages(prev => {
@@ -219,7 +242,7 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
             setMode('human');
             
             // Show notification if chat is closed
-            if (!isOpen) {
+            if (!isOpenRef.current) {
               setUnreadCount(prev => prev + 1);
               toast({
                 title: "💬 New message from MradiPro Staff",
@@ -252,7 +275,7 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
         clearInterval(pollingIntervalRef.current);
       }
     };
-  }, [conversationId, isOpen, toast]);
+  }, [conversationId, toast]); // Removed isOpen from dependencies to prevent re-subscription
 
   // Auto-scroll to bottom
   useEffect(() => {
