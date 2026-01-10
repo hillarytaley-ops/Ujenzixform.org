@@ -221,6 +221,25 @@ const SupplierDashboard = () => {
 
       if (error) throw error;
 
+      // Update purchase order status to 'quoted' (NOT 'confirmed' yet)
+      // QR codes will be generated when BUILDER accepts the quote
+      if (action === 'approve' && selectedQuote.purchase_order_id) {
+        const { error: poError } = await supabase
+          .from('purchase_orders')
+          .update({ 
+            status: 'quoted',
+            quote_amount: parseFloat(quoteResponse.quoteAmount),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', selectedQuote.purchase_order_id);
+        
+        if (poError) {
+          console.error('Error updating purchase order:', poError);
+        } else {
+          console.log('Quote sent to builder - awaiting builder acceptance');
+        }
+      }
+
       // Refresh quote requests
       const { data: newData } = await supabase
         .from('quotation_requests')

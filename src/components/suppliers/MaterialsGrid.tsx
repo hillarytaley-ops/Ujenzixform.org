@@ -1280,35 +1280,44 @@ export const MaterialsGrid = () => {
                         )}
                       </div>
                       
-                      {/* Price */}
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-lg font-bold text-blue-600">KES {material.unit_price.toLocaleString()}</span>
-                        <span className="text-xs text-muted-foreground">/{material.unit}</span>
-                      </div>
-                      
-                      {/* Compare Price Checkbox - Simple & Prominent */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleCompare(material.id);
-                        }}
-                        className={`w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg border-2 transition-all ${
-                          isSelectedForCompare 
-                            ? 'bg-purple-100 border-purple-500 text-purple-700' 
-                            : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-purple-300 hover:bg-purple-50'
-                        }`}
-                      >
-                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-                          isSelectedForCompare 
-                            ? 'bg-purple-600 border-purple-600' 
-                            : 'bg-white border-gray-400'
-                        }`}>
-                          {isSelectedForCompare && <Check className="h-3 w-3 text-white" />}
+                      {/* Price - Hidden for Professional Builders who get pricing via quotes */}
+                      {userRole === 'professional_builder' ? (
+                        <div className="flex items-center gap-1 bg-blue-50 rounded-lg px-2 py-1">
+                          <FileText className="h-3 w-3 text-blue-600" />
+                          <span className="text-xs font-medium text-blue-700">Request quote for pricing</span>
                         </div>
-                        <span className="text-sm font-medium">
-                          {isSelectedForCompare ? '✓ Comparing Price' : 'Compare Price'}
-                        </span>
-                      </button>
+                      ) : (
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-lg font-bold text-blue-600">KES {material.unit_price.toLocaleString()}</span>
+                          <span className="text-xs text-muted-foreground">/{material.unit}</span>
+                        </div>
+                      )}
+                      
+                      {/* Compare Price Checkbox - Hidden for Professional Builders (they get pricing via quotes) */}
+                      {userRole !== 'professional_builder' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleCompare(material.id);
+                          }}
+                          className={`w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg border-2 transition-all ${
+                            isSelectedForCompare 
+                              ? 'bg-purple-100 border-purple-500 text-purple-700' 
+                              : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-purple-300 hover:bg-purple-50'
+                          }`}
+                        >
+                          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                            isSelectedForCompare 
+                              ? 'bg-purple-600 border-purple-600' 
+                              : 'bg-white border-gray-400'
+                          }`}>
+                            {isSelectedForCompare && <Check className="h-3 w-3 text-white" />}
+                          </div>
+                          <span className="text-sm font-medium">
+                            {isSelectedForCompare ? '✓ Comparing Price' : 'Compare Price'}
+                          </span>
+                        </button>
+                      )}
                       
                       {/* Quantity Selector */}
                       <div className="flex items-center justify-between bg-gray-50 rounded-lg p-2">
@@ -1341,9 +1350,16 @@ export const MaterialsGrid = () => {
                             <Plus className="h-3 w-3" />
                           </Button>
                         </div>
-                        <span className="text-xs font-semibold text-gray-700 min-w-[50px] text-right">
-                          KES {(material.unit_price * currentQty).toLocaleString()}
-                        </span>
+                        {/* Hide subtotal for Professional Builders - they get pricing via quotes */}
+                        {userRole === 'professional_builder' ? (
+                          <span className="text-xs text-blue-600 min-w-[50px] text-right">
+                            {currentQty} {material.unit}
+                          </span>
+                        ) : (
+                          <span className="text-xs font-semibold text-gray-700 min-w-[50px] text-right">
+                            KES {(material.unit_price * currentQty).toLocaleString()}
+                          </span>
+                        )}
                       </div>
                       
                       {/* Role-Based Action Buttons */}

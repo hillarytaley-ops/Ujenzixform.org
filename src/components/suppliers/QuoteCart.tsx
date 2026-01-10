@@ -60,7 +60,7 @@ export function QuoteCart({
   const { toast } = useToast();
 
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
-  const estimatedTotal = items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
+  // Note: We don't show estimated prices to Professional Builders - they get pricing via supplier quotes
 
   const handleSubmitQuoteRequest = async () => {
     if (items.length === 0) {
@@ -228,8 +228,9 @@ export function QuoteCart({
                         <div className="flex-1 min-w-0">
                           <h4 className="font-medium text-sm truncate">{item.name}</h4>
                           <p className="text-xs text-muted-foreground">{item.category}</p>
-                          <p className="text-sm font-semibold text-blue-600">
-                            KES {item.unit_price.toLocaleString()}/{item.unit}
+                          {/* Note: Price shown here is catalog reference - actual pricing comes from supplier quote */}
+                          <p className="text-xs text-gray-500 italic">
+                            {item.unit} • Pricing via quote
                           </p>
                           {item.supplier_name && (
                             <p className="text-xs text-gray-500">{item.supplier_name}</p>
@@ -263,8 +264,8 @@ export function QuoteCart({
                               <Plus className="h-3 w-3" />
                             </Button>
                           </div>
-                          <p className="text-xs font-medium">
-                            KES {(item.unit_price * item.quantity).toLocaleString()}
+                          <p className="text-xs text-blue-600 font-medium">
+                            {item.quantity} {item.unit}
                           </p>
                         </div>
                       </div>
@@ -329,14 +330,16 @@ export function QuoteCart({
             </ScrollArea>
 
             <div className="border-t pt-4 space-y-3">
-              {/* Summary */}
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Estimated Total:</span>
-                <span className="font-bold text-lg">KES {estimatedTotal.toLocaleString()}</span>
+              {/* Summary - No price shown for Professional Builders */}
+              <div className="bg-blue-50 rounded-lg p-3">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-blue-700 font-medium">Total Items:</span>
+                  <span className="font-bold text-lg text-blue-800">{totalItems} items</span>
+                </div>
+                <p className="text-xs text-blue-600 mt-1">
+                  📋 Suppliers will provide competitive pricing in their quotes
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground">
-                * Final pricing will be provided by suppliers in their quotes
-              </p>
 
               {/* Actions */}
               <div className="flex gap-2">

@@ -53,6 +53,7 @@ class TrackingNumberService {
 
   /**
    * Called when a delivery provider ACCEPTS a delivery request.
+   * Implements FIRST-COME-FIRST-SERVED: Only the first provider to accept gets the job.
    * Generates a tracking number (or reuses existing one) and notifies the builder.
    */
   async onProviderAcceptsDelivery(
@@ -60,10 +61,10 @@ class TrackingNumberService {
     providerId: string
   ): Promise<TrackingNumberResult | null> {
     try {
-      // First, check if this delivery request already has a tracking number
+      // First, check if this delivery request is still available (FIRST-COME-FIRST-SERVED check)
       const { data: existingRequest, error: fetchError } = await supabase
         .from('delivery_requests')
-        .select('*, tracking_number, builder_id')
+        .select('*, tracking_number, builder_id, status, provider_id')
         .eq('id', deliveryRequestId)
         .single();
 
@@ -72,11 +73,23 @@ class TrackingNumberService {
         throw fetchError;
       }
 
+      // FIRST-COME-FIRST-SERVED: Check if another provider already accepted
+      if (existingRequest.status === 'accepted' && existingRequest.provider_id && existingRequest.provider_id !== providerId) {
+        console.log(`Delivery ${deliveryRequestId} already accepted by provider ${existingRequest.provider_id}`);
+        throw new Error('This delivery has already been accepted by another provider. First-come-first-served!');
+      }
+
+      // Also check if status is not pending (could be cancelled, completed, etc.)
+      if (!['pending', 'assigned', 'accepted'].includes(existingRequest.status)) {
+        console.log(`Delivery ${deliveryRequestId} is no longer available (status: ${existingRequest.status})`);
+        throw new Error(`This delivery is no longer available (status: ${existingRequest.status})`);
+      }
+
       let trackingNumber: string;
       let isNew = false;
 
       if (existingRequest.tracking_number) {
-        // Reuse existing tracking number (provider may have changed)
+        // Reuse existing tracking number (provider may have changed due to reassignment)
         trackingNumber = existingRequest.tracking_number;
         console.log(`Reusing existing tracking number: ${trackingNumber}`);
       } else {
@@ -86,8 +99,9 @@ class TrackingNumberService {
         console.log(`Generated new tracking number: ${trackingNumber}`);
       }
 
-      // Update delivery request with tracking number, provider, and status
-      const { error: updateError } = await supabase
+      // ATOMIC UPDATE: Use a conditional update to ensure first-come-first-served
+      // Only update if the status is still 'pending' or 'assigned' OR if we're the same provider
+      const { data: updateResult, error: updateError } = await supabase
         .from('delivery_requests')
         .update({
           tracking_number: trackingNumber,
@@ -97,12 +111,24 @@ class TrackingNumberService {
           response_date: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
-        .eq('id', deliveryRequestId);
+        .eq('id', deliveryRequestId)
+        .or(`status.eq.pending,status.eq.assigned,provider_id.eq.${providerId}`)
+        .select();
 
-      if (updateError) {
-        console.error('Error updating delivery request:', updateError);
-        throw updateError;
+      // Check if update was successful (row was actually updated)
+      if (!updateResult || updateResult.length === 0) {
+        console.log(`Failed to accept delivery ${deliveryRequestId} - likely already accepted by another provider`);
+        throw new Error('This delivery has already been accepted by another provider. First-come-first-served!');
       }
+
+      const { error: checkError } = { error: updateError };
+
+      if (checkError) {
+        console.error('Error updating delivery request:', checkError);
+        throw checkError;
+      }
+
+      console.log(`✅ Provider ${providerId} successfully accepted delivery ${deliveryRequestId} (First-come-first-served)`);
 
       // Fetch builder info and provider info for notification
       const [builderResult, providerResult] = await Promise.all([

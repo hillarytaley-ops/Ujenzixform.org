@@ -3,8 +3,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { DeliveryPromptDialog } from './DeliveryPromptDialog';
 import { 
   CheckCircle, 
   Loader2, 
@@ -16,7 +18,8 @@ import {
   Award,
   TrendingDown,
   MessageSquare,
-  Phone
+  Phone,
+  Truck
 } from 'lucide-react';
 
 interface QuoteComparisonProps {
@@ -48,6 +51,8 @@ export const QuoteComparison: React.FC<QuoteComparisonProps> = ({ orderId, build
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [accepting, setAccepting] = useState<string | null>(null);
+  const [showDeliveryPrompt, setShowDeliveryPrompt] = useState(false);
+  const [acceptedPurchaseOrder, setAcceptedPurchaseOrder] = useState<any>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -97,7 +102,7 @@ export const QuoteComparison: React.FC<QuoteComparisonProps> = ({ orderId, build
     }
   };
 
-  const acceptQuote = async (quoteId: string, supplierName: string) => {
+  const acceptQuote = async (quoteId: string, supplierName: string, quote: Quote) => {
     setAccepting(quoteId);
     try {
       // Update quote status to accepted
@@ -108,18 +113,119 @@ export const QuoteComparison: React.FC<QuoteComparisonProps> = ({ orderId, build
 
       if (quoteError) throw quoteError;
 
-      // Update order status
-      const { error: orderError } = await supabase
+      // Update order status to 'confirmed' - this triggers QR code auto-generation
+      const { data: orderData, error: orderError } = await supabase
         .from('purchase_orders')
-        .update({ status: 'accepted', accepted_quote_id: quoteId })
-        .eq('id', orderId);
+        .update({ 
+          status: 'confirmed',
+          accepted_quote_id: quoteId,
+          supplier_id: quote.supplier_id,
+          total_amount: quote.total_price
+        })
+        .eq('id', orderId)
+        .select('*')
+        .single();
 
       if (orderError) throw orderError;
 
+      // Get supplier info for pickup address
+      let pickupAddress = quote.supplier_location || 'Supplier location';
+      if (quote.supplier_id) {
+        const { data: supplierData } = await supabase
+          .from('suppliers')
+          .select('address, company_name')
+          .eq('id', quote.supplier_id)
+          .maybeSingle();
+        
+        if (supplierData) {
+          pickupAddress = supplierData.address || `${supplierData.company_name} - Pickup Location`;
+        }
+      }
+
+      // AUTOMATICALLY create delivery request and notify providers (First-come-first-served)
+      const deliveryAddress = orderData?.delivery_address || '';
+      const deliveryDate = orderData?.delivery_date || new Date().toISOString().split('T')[0];
+      
+      const { data: deliveryRequest, error: deliveryError } = await supabase
+        .from('delivery_requests')
+        .insert({
+          builder_id: builderId,
+          purchase_order_id: orderId,
+          pickup_address: pickupAddress,
+          delivery_address: deliveryAddress,
+          pickup_date: deliveryDate,
+          material_type: 'mixed',
+          quantity: quote.items?.length || 1,
+          weight_kg: (quote.items?.reduce((sum, item) => sum + (item.quantity || 1), 0) || 1) * 50,
+          special_instructions: null,
+          budget_range: '10000-20000',
+          status: 'pending',
+          auto_rotation_enabled: true,
+          max_rotation_attempts: 5,
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (deliveryError) {
+        console.error('Error creating delivery request:', deliveryError);
+      }
+
+      // Notify nearby delivery providers via edge function (First-come-first-served)
+      if (deliveryRequest) {
+        try {
+          await supabase.functions.invoke('notify-delivery-providers', {
+            body: {
+              request_type: 'quote_accepted',
+              request_id: deliveryRequest.id,
+              builder_id: builderId,
+              pickup_address: pickupAddress,
+              delivery_address: deliveryAddress,
+              material_details: quote.items?.map(item => ({
+                material_type: item.material_name,
+                quantity: item.quantity,
+                unit: item.unit || 'units'
+              })),
+              priority_level: 'normal',
+              po_number: orderData?.po_number
+            }
+          });
+          console.log('Delivery providers notified successfully');
+        } catch (notifyError) {
+          console.error('Error notifying delivery providers:', notifyError);
+        }
+      }
+
       toast({
         title: '✅ Quote Accepted!',
-        description: `You've accepted the quote from ${supplierName}. They'll contact you to finalize the order.`,
+        description: `Quote accepted! QR codes generated. Nearby delivery providers notified (first-come-first-served).`,
       });
+
+      // Prepare purchase order data for delivery prompt
+      const purchaseOrderForDelivery = {
+        id: orderId,
+        po_number: orderData?.po_number || `PO-${orderId.slice(0, 8)}`,
+        supplier_id: quote.supplier_id,
+        supplier_name: supplierName,
+        supplier_address: quote.supplier_location,
+        total_amount: quote.total_price,
+        delivery_address: deliveryAddress,
+        delivery_date: deliveryDate,
+        items: quote.items.map(item => ({
+          material_name: item.material_name,
+          quantity: item.quantity,
+          unit: item.unit,
+          unit_price: item.unit_price
+        })),
+        project_name: orderData?.project_name
+      };
+
+      setAcceptedPurchaseOrder(purchaseOrderForDelivery);
+      
+      // Show delivery confirmation dialog
+      setTimeout(() => {
+        setShowDeliveryPrompt(true);
+      }, 500);
 
       // Refresh quotes
       fetchQuotes();
@@ -312,7 +418,7 @@ export const QuoteComparison: React.FC<QuoteComparisonProps> = ({ orderId, build
                   {!isAccepted ? (
                     <>
                       <Button
-                        onClick={() => acceptQuote(quote.id, quote.supplier_name)}
+                        onClick={() => acceptQuote(quote.id, quote.supplier_name, quote)}
                         disabled={accepting !== null}
                         className="flex-1 bg-green-600 hover:bg-green-700"
                       >
@@ -343,11 +449,38 @@ export const QuoteComparison: React.FC<QuoteComparisonProps> = ({ orderId, build
                       </Button>
                     </>
                   ) : (
-                    <div className="w-full text-center py-2">
-                      <Badge className="bg-green-100 text-green-800 border-green-300 text-sm">
+                    <div className="w-full space-y-2">
+                      <Badge className="bg-green-100 text-green-800 border-green-300 text-sm w-full justify-center py-2">
                         <CheckCircle className="h-4 w-4 mr-1" />
-                        Quote Accepted - Supplier will contact you
+                        Quote Accepted - QR codes generated
                       </Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full border-blue-300 text-blue-600 hover:bg-blue-50"
+                        onClick={() => {
+                          setAcceptedPurchaseOrder({
+                            id: orderId,
+                            po_number: `PO-${orderId.slice(0, 8)}`,
+                            supplier_id: quote.supplier_id,
+                            supplier_name: quote.supplier_name,
+                            supplier_address: quote.supplier_location,
+                            total_amount: quote.total_price,
+                            delivery_address: '',
+                            delivery_date: '',
+                            items: quote.items.map(item => ({
+                              material_name: item.material_name,
+                              quantity: item.quantity,
+                              unit: item.unit,
+                              unit_price: item.unit_price
+                            })),
+                          });
+                          setShowDeliveryPrompt(true);
+                        }}
+                      >
+                        <Truck className="h-4 w-4 mr-2" />
+                        Request Delivery
+                      </Button>
                     </div>
                   )}
                 </div>
@@ -393,6 +526,25 @@ export const QuoteComparison: React.FC<QuoteComparisonProps> = ({ orderId, build
           </Alert>
         </CardContent>
       </Card>
+
+      {/* Delivery Prompt Dialog - Shows after quote acceptance */}
+      <DeliveryPromptDialog
+        isOpen={showDeliveryPrompt}
+        onOpenChange={setShowDeliveryPrompt}
+        purchaseOrder={acceptedPurchaseOrder}
+        onDeliveryRequested={() => {
+          toast({
+            title: '🚚 Delivery Arranged!',
+            description: 'Nearby delivery providers have been notified.',
+          });
+        }}
+        onDeclined={() => {
+          toast({
+            title: 'No Problem!',
+            description: 'You can request delivery anytime from the Delivery page.',
+          });
+        }}
+      />
     </div>
   );
 };

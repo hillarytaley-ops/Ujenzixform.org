@@ -45,6 +45,7 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { SupplierQuoteReview } from "@/components/builders/SupplierQuoteReview";
 
 const ProfessionalBuilderDashboardPage = () => {
   const [user, setUser] = useState<any>(null);
@@ -311,10 +312,14 @@ const ProfessionalBuilderDashboardPage = () => {
       {/* Main Content */}
       <div className="container mx-auto max-w-7xl px-4 py-8">
         <Tabs defaultValue="projects" className="space-y-6">
-          <TabsList className="bg-white shadow-sm border">
+          <TabsList className="bg-white shadow-sm border flex-wrap h-auto p-1">
             <TabsTrigger value="projects" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
               <Building2 className="h-4 w-4 mr-2" />
               Projects
+            </TabsTrigger>
+            <TabsTrigger value="quotes" className="data-[state=active]:bg-green-500 data-[state=active]:text-white">
+              <CreditCard className="h-4 w-4 mr-2" />
+              Quotes
             </TabsTrigger>
             <TabsTrigger value="orders" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
               <Package className="h-4 w-4 mr-2" />
@@ -363,6 +368,11 @@ const ProfessionalBuilderDashboardPage = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Quotes Tab - Review supplier pricing */}
+          <TabsContent value="quotes">
+            <SupplierQuoteReview builderId={user?.id || ''} />
           </TabsContent>
 
           <TabsContent value="orders">
