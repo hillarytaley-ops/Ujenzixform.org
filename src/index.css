@@ -193,3 +193,25 @@ body {
   );
   background-size: 200% 100%;
 }
+
+/* QR Scanner scanning line animation */
+@keyframes scan-line {
+  0% {
+    top: 10%;
+    opacity: 1;
+  }
+  50% {
+    top: 85%;
+    opacity: 0.8;
+  }
+  100% {
+    top: 10%;
+    opacity: 1;
+  }
+}
+
+.animate-scan-line {
+  animation: scan-line 2s ease-in-out infinite;
+  position: absolute;
+  box-shadow: 0 0 8px 2px rgba(34, 197, 94, 0.6);
+}

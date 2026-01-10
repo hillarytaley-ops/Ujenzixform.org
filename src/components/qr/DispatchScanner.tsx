@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -6,10 +6,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Truck, Scan, CheckCircle, AlertCircle, Camera, Lock, ArrowRight } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Truck, Scan, CheckCircle, AlertCircle, Camera, Lock, ArrowRight, RotateCcw, Smartphone, Flashlight, ZoomIn } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { BrowserMultiFormatReader } from '@zxing/browser';
+import { BrowserMultiFormatReader, BrowserCodeReader } from '@zxing/browser';
+import { DecodeHintType, BarcodeFormat } from '@zxing/library';
 
 
 interface ScanResult {
@@ -24,6 +26,7 @@ interface ScanResult {
 
 export const DispatchScanner: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scanResults, setScanResults] = useState<ScanResult[]>([]);
   const [manualQRCode, setManualQRCode] = useState('');
@@ -32,34 +35,88 @@ export const DispatchScanner: React.FC = () => {
   const [codeReader, setCodeReader] = useState<BrowserMultiFormatReader | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [facing, setFacing] = useState<'environment' | 'user'>('environment');
+  const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
+  const [selectedCameraId, setSelectedCameraId] = useState<string>('');
+  const [hasFlash, setHasFlash] = useState(false);
+  const [flashOn, setFlashOn] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [deviceInfo, setDeviceInfo] = useState<string>('');
   const CAMERA_CONSENT_KEY = 'scanner_camera_consent';
-  
+
+  // Detect device type
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const isAndroid = /Android/i.test(navigator.userAgent);
 
   useEffect(() => {
     checkAuth();
-    const reader = new BrowserMultiFormatReader();
-    setCodeReader(reader);
-    try {
-      const consent = localStorage.getItem(CAMERA_CONSENT_KEY);
-      const isiOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-      if (consent && !isiOS) {
-        setTimeout(() => { startCameraScanning().catch(() => {}); }, 300);
-      }
-    } catch {}
+    initializeScanner();
+    detectDeviceInfo();
     
-
     return () => {
-      if (videoRef.current?.srcObject) {
-        const stream = videoRef.current.srcObject as MediaStream;
-        stream.getTracks().forEach(track => track.stop());
-      }
-      try { reader.reset(); } catch {}
+      cleanupCamera();
     };
   }, []);
 
+  const detectDeviceInfo = () => {
+    const ua = navigator.userAgent;
+    if (isIOS) {
+      setDeviceInfo('iOS Device');
+    } else if (isAndroid) {
+      setDeviceInfo('Android Device');
+    } else {
+      setDeviceInfo('Desktop/Laptop');
+    }
+  };
+
+  const initializeScanner = async () => {
+    try {
+      // Configure hints for better QR code detection
+      const hints = new Map();
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.QR_CODE]);
+      hints.set(DecodeHintType.TRY_HARDER, true);
+      
+      const reader = new BrowserMultiFormatReader(hints);
+      setCodeReader(reader);
+
+      // Get available cameras
+      await listAvailableCameras();
+    } catch (error) {
+      console.error('Scanner initialization error:', error);
+    }
+  };
+
+  const listAvailableCameras = async () => {
+    try {
+      // Request permission first to get full device list
+      await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      
+      const devices = await BrowserCodeReader.listVideoInputDevices();
+      setAvailableCameras(devices);
+      
+      // Prefer back camera on mobile devices
+      const backCamera = devices.find(d => 
+        d.label.toLowerCase().includes('back') || 
+        d.label.toLowerCase().includes('rear') ||
+        d.label.toLowerCase().includes('environment')
+      );
+      
+      if (backCamera) {
+        setSelectedCameraId(backCamera.deviceId);
+      } else if (devices.length > 0) {
+        // On mobile, usually the last camera is the back camera
+        setSelectedCameraId(isMobile && devices.length > 1 ? devices[devices.length - 1].deviceId : devices[0].deviceId);
+      }
+      
+      console.log('Available cameras:', devices.map(d => d.label));
+    } catch (error) {
+      console.error('Error listing cameras:', error);
+      setCameraError('Unable to access camera list. Please grant camera permissions.');
+    }
+  };
+
   const checkAuth = async () => {
     try {
-      // Also check localStorage for role
       const localRole = localStorage.getItem('user_role');
       if (localRole) {
         setUserRole(localRole);
@@ -77,77 +134,206 @@ export const DispatchScanner: React.FC = () => {
       setUserRole(roleData?.role || localRole || null);
     } catch (err) {
       console.error('Auth check failed (non-fatal):', err);
-      // Keep localStorage role if available
       const localRole = localStorage.getItem('user_role');
       setUserRole(localRole || null);
     }
   };
 
+  const cleanupCamera = useCallback(() => {
+    try {
+      codeReader?.reset();
+    } catch {}
+    
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => {
+        track.stop();
+      });
+      streamRef.current = null;
+    }
+    
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  }, [codeReader]);
+
   const startCameraScanning = async () => {
-    if (!codeReader) return;
+    if (!codeReader) {
+      toast.error('Scanner not initialized. Please refresh the page.');
+      return;
+    }
+
+    setCameraError(null);
 
     try {
-      if (!window.isSecureContext && !/^(localhost|127\.0\.0\.1)$/.test(window.location.hostname)) {
+      // Check for secure context (HTTPS or localhost)
+      if (!window.isSecureContext && !['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+        setCameraError('Camera requires HTTPS connection. Please use a secure URL.');
         toast.error('Camera requires HTTPS or localhost');
         return;
       }
+
+      // Check for camera API support
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        toast.error('Camera not supported');
+        setCameraError('Your browser does not support camera access. Please use a modern browser.');
+        toast.error('Camera not supported on this browser');
         return;
       }
-      if (videoRef.current) {
-        videoRef.current.setAttribute('playsinline', 'true');
-        setIsScanning(true);
-        toast.success('Camera scanner started');
-        codeReader.decodeFromConstraints({
-          video: { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 720 } }
-        } as any, videoRef.current, (result, error) => {
-          if (result) {
-            processQRScan(result.getText(), 'mobile_camera');
-          }
-        });
-        try {
-          videoRef.current.muted = true;
-          videoRef.current.onloadedmetadata = () => {
-            try { videoRef.current?.play?.(); } catch {}
-          };
-          await videoRef.current.play?.();
-          try { localStorage.setItem(CAMERA_CONSENT_KEY, 'true'); } catch {}
-        } catch {}
 
-        setTimeout(async () => {
-          try {
-            if (videoRef.current && (videoRef.current.readyState < 2 || videoRef.current.videoWidth === 0)) {
-              const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
-              videoRef.current.srcObject = stream;
-              try { await videoRef.current.play?.(); } catch {}
-            }
-          } catch {}
-        }, 1200);
+      // Clean up any existing stream
+      cleanupCamera();
+
+      if (!videoRef.current) return;
+
+      // Configure video element for mobile compatibility
+      videoRef.current.setAttribute('playsinline', 'true');
+      videoRef.current.setAttribute('webkit-playsinline', 'true');
+      videoRef.current.setAttribute('muted', 'true');
+      videoRef.current.muted = true;
+
+      setIsScanning(true);
+
+      // Build constraints optimized for mobile devices
+      const constraints: MediaStreamConstraints = {
+        audio: false,
+        video: selectedCameraId ? {
+          deviceId: { exact: selectedCameraId },
+          width: { ideal: 1920, min: 640 },
+          height: { ideal: 1080, min: 480 },
+          aspectRatio: { ideal: 16/9 },
+          frameRate: { ideal: 30, min: 15 }
+        } : {
+          facingMode: { ideal: facing },
+          width: { ideal: 1920, min: 640 },
+          height: { ideal: 1080, min: 480 },
+          aspectRatio: { ideal: 16/9 },
+          frameRate: { ideal: 30, min: 15 }
+        }
+      };
+
+      // Get media stream
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      streamRef.current = stream;
+      videoRef.current.srcObject = stream;
+
+      // Check for flash/torch capability
+      const videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack) {
+        const capabilities = videoTrack.getCapabilities?.() as any;
+        if (capabilities?.torch) {
+          setHasFlash(true);
+        }
       }
-    } catch (error) {
+
+      // Wait for video to be ready
+      await new Promise<void>((resolve) => {
+        if (videoRef.current) {
+          videoRef.current.onloadedmetadata = () => {
+            resolve();
+          };
+        }
+      });
+
+      await videoRef.current.play();
+      
+      // Start continuous QR code scanning
+      codeReader.decodeFromVideoElement(videoRef.current, (result, error) => {
+        if (result) {
+          // Vibrate on successful scan (mobile)
+          if (navigator.vibrate) {
+            navigator.vibrate(200);
+          }
+          processQRScan(result.getText(), 'mobile_camera');
+        }
+      });
+
+      localStorage.setItem(CAMERA_CONSENT_KEY, 'true');
+      toast.success('📷 Camera ready! Point at QR code to scan.');
+
+    } catch (error: any) {
       console.error('Camera error:', error);
-      toast.error('Failed to access camera');
+      setIsScanning(false);
+      
+      // Provide helpful error messages
+      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        setCameraError('Camera permission denied. Please allow camera access in your browser settings.');
+        toast.error('Camera permission denied');
+      } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+        setCameraError('No camera found on this device.');
+        toast.error('No camera found');
+      } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+        setCameraError('Camera is in use by another application. Please close other apps using the camera.');
+        toast.error('Camera is busy');
+      } else if (error.name === 'OverconstrainedError') {
+        // Try with simpler constraints
+        try {
+          const simpleStream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: facing }, 
+            audio: false 
+          });
+          streamRef.current = simpleStream;
+          if (videoRef.current) {
+            videoRef.current.srcObject = simpleStream;
+            await videoRef.current.play();
+            codeReader.decodeFromVideoElement(videoRef.current, (result) => {
+              if (result) {
+                if (navigator.vibrate) navigator.vibrate(200);
+                processQRScan(result.getText(), 'mobile_camera');
+              }
+            });
+            setIsScanning(true);
+            toast.success('Camera started with basic settings');
+          }
+        } catch (fallbackError) {
+          setCameraError('Could not start camera with available settings.');
+          toast.error('Camera settings not supported');
+        }
+      } else {
+        setCameraError(`Camera error: ${error.message || 'Unknown error'}`);
+        toast.error('Failed to access camera');
+      }
     }
   };
 
   const stopScanning = () => {
-    try { codeReader?.reset(); } catch {}
-    if (videoRef.current?.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach(track => track.stop());
-      videoRef.current.srcObject = null;
-    }
+    cleanupCamera();
     setIsScanning(false);
+    setFlashOn(false);
     toast.info('Scanner stopped');
   };
 
   const toggleCamera = async () => {
-    const next = facing === 'environment' ? 'user' : 'environment';
-    setFacing(next);
+    if (availableCameras.length <= 1) {
+      // If only one camera, toggle facing mode
+      const next = facing === 'environment' ? 'user' : 'environment';
+      setFacing(next);
+    } else {
+      // Cycle through available cameras
+      const currentIndex = availableCameras.findIndex(c => c.deviceId === selectedCameraId);
+      const nextIndex = (currentIndex + 1) % availableCameras.length;
+      setSelectedCameraId(availableCameras[nextIndex].deviceId);
+    }
+    
     if (isScanning) {
       stopScanning();
-      await startCameraScanning();
+      setTimeout(() => startCameraScanning(), 300);
+    }
+  };
+
+  const toggleFlash = async () => {
+    if (!streamRef.current) return;
+    
+    const videoTrack = streamRef.current.getVideoTracks()[0];
+    if (videoTrack) {
+      try {
+        await videoTrack.applyConstraints({
+          advanced: [{ torch: !flashOn } as any]
+        });
+        setFlashOn(!flashOn);
+        toast.success(flashOn ? 'Flash off' : 'Flash on');
+      } catch (error) {
+        console.error('Flash toggle error:', error);
+        toast.error('Could not toggle flash');
+      }
     }
   };
 
@@ -257,6 +443,17 @@ export const DispatchScanner: React.FC = () => {
   return (
     <div className="space-y-6">
 
+      {/* Device Info Banner */}
+      {isMobile && (
+        <Alert className="bg-blue-50 border-blue-200">
+          <Smartphone className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="text-blue-800 text-sm">
+            <strong>Mobile Device Detected:</strong> {deviceInfo}. 
+            For best results, hold your phone steady and ensure good lighting.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Camera Scanner */}
       <Card>
         <CardHeader>
@@ -265,6 +462,11 @@ export const DispatchScanner: React.FC = () => {
               <Truck className="h-5 w-5" />
               Dispatch Scanner - Supplier
             </div>
+            {availableCameras.length > 0 && (
+              <Badge variant="outline" className="text-xs">
+                {availableCameras.length} camera{availableCameras.length > 1 ? 's' : ''} available
+              </Badge>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -273,35 +475,150 @@ export const DispatchScanner: React.FC = () => {
               Access restricted. Sign in as supplier or admin to record scans.
             </div>
           )}
+
+          {/* Camera Error Display */}
+          {cameraError && (
+            <Alert className="bg-red-50 border-red-200">
+              <AlertCircle className="h-4 w-4 text-red-600" />
+              <AlertDescription className="text-red-800 text-sm">
+                {cameraError}
+                <Button 
+                  variant="link" 
+                  className="text-red-700 p-0 h-auto ml-2"
+                  onClick={() => {
+                    setCameraError(null);
+                    listAvailableCameras();
+                  }}
+                >
+                  Try Again
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
           
+          {/* Camera View */}
           <div className="relative bg-black rounded-lg overflow-hidden">
             <video
               ref={videoRef}
               autoPlay
               playsInline
               muted
-              className="w-full h-64 object-cover"
+              webkit-playsinline="true"
+              className="w-full h-72 md:h-80 object-cover"
+              style={{ transform: facing === 'user' ? 'scaleX(-1)' : 'none' }}
             />
+            
+            {/* Scanning overlay */}
             {isScanning && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="border-4 border-primary rounded-lg w-48 h-48 animate-pulse" />
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                {/* Scanning frame */}
+                <div className="relative w-56 h-56 md:w-64 md:h-64">
+                  {/* Corner brackets */}
+                  <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-green-500 rounded-tl-lg" />
+                  <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-green-500 rounded-tr-lg" />
+                  <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-green-500 rounded-bl-lg" />
+                  <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-green-500 rounded-br-lg" />
+                  
+                  {/* Scanning line animation */}
+                  <div className="absolute inset-x-4 h-0.5 bg-green-500 animate-scan-line" 
+                       style={{ animation: 'scan-line 2s ease-in-out infinite' }} />
+                </div>
+                
+                {/* Instruction text */}
+                <div className="absolute bottom-4 left-0 right-0 text-center">
+                  <span className="bg-black/70 text-white text-sm px-3 py-1 rounded-full">
+                    📱 Point camera at QR code
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Not scanning overlay */}
+            {!isScanning && !cameraError && (
+              <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80">
+                <div className="text-center text-white">
+                  <Camera className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm opacity-70">Camera not active</p>
+                  <p className="text-xs opacity-50">Tap "Start Scanner" to begin</p>
+                </div>
               </div>
             )}
           </div>
 
-          <div className="flex gap-2">
+          {/* Camera Controls */}
+          <div className="flex flex-wrap gap-2">
             {!isScanning ? (
-              <Button onClick={startCameraScanning}>
-                <Camera className="h-4 w-4 mr-2" />
-                Start Camera Scanner
+              <Button onClick={startCameraScanning} className="flex-1 sm:flex-none" size="lg">
+                <Camera className="h-5 w-5 mr-2" />
+                Start Scanner
               </Button>
             ) : (
-              <Button onClick={stopScanning} variant="outline">
+              <Button onClick={stopScanning} variant="destructive" className="flex-1 sm:flex-none" size="lg">
+                <RotateCcw className="h-5 w-5 mr-2" />
                 Stop Scanner
               </Button>
             )}
-            <Button onClick={toggleCamera} variant="outline">Switch Camera</Button>
+            
+            <Button 
+              onClick={toggleCamera} 
+              variant="outline" 
+              size="lg"
+              disabled={!isScanning && availableCameras.length <= 1}
+              title={availableCameras.length > 1 ? 'Switch between cameras' : 'Toggle front/back camera'}
+            >
+              <RotateCcw className="h-5 w-5 mr-2" />
+              {isMobile ? 'Flip' : 'Switch Camera'}
+            </Button>
+
+            {hasFlash && isScanning && (
+              <Button 
+                onClick={toggleFlash} 
+                variant={flashOn ? 'default' : 'outline'}
+                size="lg"
+                title="Toggle flashlight"
+              >
+                <Flashlight className={`h-5 w-5 ${flashOn ? 'text-yellow-300' : ''}`} />
+              </Button>
+            )}
           </div>
+
+          {/* Camera Selection (for devices with multiple cameras) */}
+          {availableCameras.length > 1 && (
+            <div className="space-y-2">
+              <Label className="text-sm text-muted-foreground">Select Camera</Label>
+              <Select value={selectedCameraId} onValueChange={(value) => {
+                setSelectedCameraId(value);
+                if (isScanning) {
+                  stopScanning();
+                  setTimeout(() => startCameraScanning(), 300);
+                }
+              }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose camera" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableCameras.map((camera, index) => (
+                    <SelectItem key={camera.deviceId} value={camera.deviceId}>
+                      {camera.label || `Camera ${index + 1}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Mobile Tips */}
+          {isMobile && isScanning && (
+            <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3">
+              <p className="font-medium mb-1">📱 Mobile Scanning Tips:</p>
+              <ul className="list-disc list-inside space-y-0.5">
+                <li>Hold phone 6-12 inches from QR code</li>
+                <li>Ensure QR code is well-lit</li>
+                <li>Keep phone steady while scanning</li>
+                <li>Use flash in low light conditions</li>
+              </ul>
+            </div>
+          )}
         </CardContent>
       </Card>
 
