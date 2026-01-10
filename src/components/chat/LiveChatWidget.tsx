@@ -239,11 +239,11 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
         console.log('📡 Chat subscription status:', status);
       });
 
-    // POLLING FALLBACK: Check for new messages every 2 seconds
+    // POLLING FALLBACK: Check for new messages every 1 second
     // This ensures instant messaging even if real-time fails due to RLS
     pollingIntervalRef.current = setInterval(() => {
       loadMessages(true);
-    }, 2000);
+    }, 1000);
 
     return () => {
       console.log('🔌 Unsubscribing from chat channel');

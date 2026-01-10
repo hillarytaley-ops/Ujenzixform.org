@@ -214,7 +214,7 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
         console.log('📡 Admin chat subscription status:', status);
       });
 
-    // POLLING FALLBACK: Check for new messages every 2 seconds
+    // POLLING FALLBACK: Check for new messages every 1 second
     // This ensures instant messaging even if real-time fails
     const pollingInterval = setInterval(async () => {
       try {
@@ -263,7 +263,7 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
       } catch (err) {
         // Silent fail for polling
       }
-    }, 2000);
+    }, 1000);
 
     return () => {
       console.log('🔌 Unsubscribing from admin chat channel');
