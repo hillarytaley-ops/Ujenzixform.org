@@ -59,7 +59,8 @@ import { OrderManagement } from "@/components/supplier/OrderManagement";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { SupplierAnalyticsDashboard } from "@/components/suppliers/SupplierAnalyticsDashboard";
 import { SupplierProductManager } from "@/components/suppliers/SupplierProductManager";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, QrCode } from "lucide-react";
+import { EnhancedQRCodeManager } from "@/components/qr/EnhancedQRCodeManager";
 
 interface DashboardStats {
   totalProducts: number;
@@ -564,6 +565,10 @@ const SupplierDashboard = () => {
                 </span>
               )}
             </TabsTrigger>
+            <TabsTrigger value="qr-codes" className="data-[state=active]:bg-cyan-500 data-[state=active]:text-white">
+              <QrCode className="h-4 w-4 mr-1" />
+              QR Codes
+            </TabsTrigger>
             <TabsTrigger value="add-products" className="data-[state=active]:bg-green-500 data-[state=active]:text-white">
               <Plus className="h-4 w-4 mr-1" />
               Add New Products
@@ -887,6 +892,36 @@ const SupplierDashboard = () => {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+          </TabsContent>
+
+          {/* QR Codes Tab - View and download QR codes for confirmed orders */}
+          <TabsContent value="qr-codes">
+            <Card className={cardBg}>
+              <CardHeader>
+                <CardTitle className={`flex items-center gap-2 ${textColor}`}>
+                  <QrCode className="h-5 w-5 text-cyan-500" />
+                  QR Code Management
+                </CardTitle>
+                <CardDescription className={mutedText}>
+                  View and download QR codes for confirmed orders. Attach these to materials before dispatch.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Alert className="mb-4 bg-cyan-50 border-cyan-200">
+                  <QrCode className="h-4 w-4 text-cyan-600" />
+                  <AlertTitle className="text-cyan-800">How QR Codes Work</AlertTitle>
+                  <AlertDescription className="text-cyan-700 text-sm">
+                    <ul className="list-disc ml-4 mt-2 space-y-1">
+                      <li>QR codes are <strong>automatically generated</strong> when a professional builder accepts your quote</li>
+                      <li>Download and print QR codes to attach to each material item</li>
+                      <li>Delivery providers and builders scan these codes to verify materials</li>
+                      <li>Track the full journey: Dispatch → In Transit → Delivered</li>
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+                <EnhancedQRCodeManager />
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Add New Products Tab - For supplier-uploaded products (pending admin approval) */}

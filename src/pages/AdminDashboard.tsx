@@ -82,6 +82,7 @@ import {
   Scan
 } from "lucide-react";
 import { AdminScanDashboard } from "@/components/qr/AdminScanDashboard";
+import { EnhancedQRCodeManager } from "@/components/qr/EnhancedQRCodeManager";
 import { AdminChatWidget } from "@/components/chat/AdminChatWidget";
 import { DeliveryAnalytics } from "@/components/admin/DeliveryAnalytics";
 import { MonitoringRequestsManager } from "@/components/admin/MonitoringRequestsManager";
@@ -1885,8 +1886,12 @@ const AdminDashboard = () => {
               Activity Log
             </TabsTrigger>
             <TabsTrigger value="scanning" className="data-[state=active]:bg-cyan-600">
-              <QrCode className="h-4 w-4 mr-2" />
+              <Scan className="h-4 w-4 mr-2" />
               QR Scanning
+            </TabsTrigger>
+            <TabsTrigger value="qr-codes" className="data-[state=active]:bg-teal-600">
+              <QrCode className="h-4 w-4 mr-2" />
+              QR Codes
             </TabsTrigger>
             <TabsTrigger value="communications" className="data-[state=active]:bg-purple-600">
               <MessageSquare className="h-4 w-4 mr-2" />
@@ -3904,6 +3909,33 @@ const AdminDashboard = () => {
             
             {/* Embedded Admin Scan Dashboard */}
             <AdminScanDashboard />
+          </TabsContent>
+
+          {/* QR Codes Management Tab - View all QR codes across platform */}
+          <TabsContent value="qr-codes" className="space-y-6">
+            <Card className="bg-gradient-to-r from-teal-900/30 to-cyan-900/30 border-teal-800/50">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <QrCode className="h-5 w-5 text-teal-400" />
+                  QR Code Management - All Orders
+                </CardTitle>
+                <CardDescription className="text-gray-400">
+                  View and manage all QR codes generated across the platform for confirmed orders
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="bg-teal-900/20 border border-teal-700/50 rounded-lg p-4 mb-6">
+                  <h4 className="text-teal-300 font-medium mb-2">📋 QR Code Workflow</h4>
+                  <ul className="text-sm text-gray-300 space-y-1">
+                    <li>• QR codes are <strong className="text-teal-400">auto-generated</strong> when a professional builder accepts a supplier's quote</li>
+                    <li>• Suppliers download QR codes and attach them to materials before dispatch</li>
+                    <li>• Delivery providers scan at pickup and delivery for verification</li>
+                    <li>• Builders scan to confirm receipt and verify materials</li>
+                  </ul>
+                </div>
+                <EnhancedQRCodeManager />
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Communications Tab - Live Chat with Clients */}
