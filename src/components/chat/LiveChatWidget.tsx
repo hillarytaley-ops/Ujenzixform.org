@@ -337,6 +337,12 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
 
       if (result.error) {
         console.error('❌ Supabase error:', result.error.message, result.error.details, result.error.hint);
+        // Show error to user
+        toast({
+          variant: "destructive",
+          title: "Message not saved",
+          description: `Error: ${result.error.message}. Your message is shown locally but may not reach staff.`,
+        });
         return null;
       }
       
@@ -344,7 +350,11 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
       return result.data?.id;
     } catch (err: any) {
       console.error('❌ Exception:', err.message || err);
-      // Don't show toast for timeout - message still shows locally
+      toast({
+        variant: "destructive",
+        title: "Connection issue",
+        description: "Message may not have been saved. Please try again.",
+      });
       return null;
     }
   };
