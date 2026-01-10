@@ -169,13 +169,13 @@ const Navigation = () => {
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden lg:flex items-center space-x-4 flex-1 justify-center">
+        <nav className="hidden lg:flex items-center space-x-6 flex-1 justify-center">
           {navItems.map((item) => (
             <Link
               key={item.path}
               to={item.path}
-              className={`text-xs font-medium transition-colors hover:text-construction-orange whitespace-nowrap ${
-                isActive(item.path) ? "text-construction-orange font-bold" : "text-text-on-dark"
+              className={`text-sm font-semibold transition-colors hover:text-construction-orange whitespace-nowrap py-2 px-1 ${
+                isActive(item.path) ? "text-construction-orange font-bold border-b-2 border-construction-orange" : "text-text-on-dark"
               }`}
             >
               {item.label}
@@ -234,13 +234,13 @@ const Navigation = () => {
         {/* Mobile Navigation */}
       {isMenuOpen && (
         <div className="lg:hidden bg-background border-t shadow-lg z-50 absolute top-full left-0 right-0">
-          <nav className="px-4 py-4 space-y-4">
+          <nav className="px-4 py-4 space-y-1">
             {navItems.map((item) => (
               <Link
                 key={item.path}
                 to={item.path}
-                className={`block text-sm font-medium transition-colors hover:text-primary ${
-                  isActive(item.path) ? "text-primary" : "text-muted-foreground"
+                className={`block text-base font-semibold py-3 px-3 rounded-lg transition-colors hover:bg-primary/10 hover:text-primary ${
+                  isActive(item.path) ? "text-primary bg-primary/10" : "text-foreground"
                 }`}
                 onClick={() => setIsMenuOpen(false)}
               >
