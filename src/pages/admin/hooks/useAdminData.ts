@@ -36,7 +36,7 @@ export const useAdminStats = () => {
       setLoading(true);
       const client = getAdminClient() || supabase;
 
-      // Fetch counts in parallel
+      // Fetch counts in parallel using correct table names
       const [
         { count: usersCount },
         { count: buildersCount },
@@ -46,10 +46,10 @@ export const useAdminStats = () => {
         { count: feedbackCount },
       ] = await Promise.all([
         client.from('profiles').select('*', { count: 'exact', head: true }),
-        client.from('builder_registrations').select('*', { count: 'exact', head: true }),
-        client.from('supplier_registrations').select('*', { count: 'exact', head: true }),
-        client.from('delivery_provider_registrations').select('*', { count: 'exact', head: true }),
-        client.from('builder_registrations').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        client.from('user_roles').select('*', { count: 'exact', head: true }).in('role', ['professional_builder', 'private_client']),
+        client.from('suppliers').select('*', { count: 'exact', head: true }),
+        client.from('delivery_providers').select('*', { count: 'exact', head: true }),
+        client.from('supplier_applications').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         client.from('feedback').select('*', { count: 'exact', head: true }),
       ]);
 
@@ -150,34 +150,15 @@ export const useRegistrations = () => {
       setLoading(true);
       const client = getAdminClient() || supabase;
 
-      // Fetch all registration types in parallel
-      const [buildersRes, suppliersRes, deliveryRes] = await Promise.all([
-        client.from('builder_registrations').select('*').order('created_at', { ascending: false }),
-        client.from('supplier_registrations').select('*').order('created_at', { ascending: false }),
-        client.from('delivery_provider_registrations').select('*').order('created_at', { ascending: false }),
+      // Fetch all registration/application types in parallel using correct table names
+      const [suppliersRes, deliveryRes] = await Promise.all([
+        client.from('supplier_applications').select('*').order('created_at', { ascending: false }),
+        client.from('delivery_providers').select('*').order('created_at', { ascending: false }),
       ]);
 
       const allRegistrations: RegistrationRecord[] = [];
 
-      // Format builders
-      if (buildersRes.data) {
-        buildersRes.data.forEach((b: Record<string, unknown>) => {
-          allRegistrations.push({
-            id: b.id as string,
-            type: 'builder',
-            name: (b.full_name as string) || 'N/A',
-            email: (b.email as string) || 'N/A',
-            phone: b.phone as string | undefined,
-            company_name: b.company_name as string | undefined,
-            county: b.county as string | undefined,
-            builder_category: b.builder_category as string | undefined,
-            status: (b.status as string) || 'pending',
-            created_at: b.created_at as string,
-          });
-        });
-      }
-
-      // Format suppliers
+      // Format suppliers from supplier_applications
       if (suppliersRes.data) {
         suppliersRes.data.forEach((s: Record<string, unknown>) => {
           allRegistrations.push({
@@ -187,8 +168,8 @@ export const useRegistrations = () => {
             email: (s.email as string) || 'N/A',
             phone: s.phone as string | undefined,
             company_name: s.company_name as string | undefined,
-            county: s.county as string | undefined,
-            material_categories: s.material_categories as string[] | undefined,
+            county: s.address as string | undefined,
+            material_categories: s.materials_offered as string[] | undefined,
             status: (s.status as string) || 'pending',
             created_at: s.created_at as string,
           });
@@ -205,10 +186,10 @@ export const useRegistrations = () => {
             email: (d.email as string) || 'N/A',
             phone: d.phone as string | undefined,
             company_name: d.company_name as string | undefined,
-            county: d.county as string | undefined,
+            county: d.service_area as string | undefined,
             vehicle_type: d.vehicle_type as string | undefined,
             service_areas: d.service_areas as string[] | undefined,
-            status: (d.status as string) || 'pending',
+            status: (d.is_verified as boolean) ? 'approved' : 'pending',
             created_at: d.created_at as string,
           });
         });
@@ -240,18 +221,32 @@ export const useRegistrations = () => {
   ) => {
     try {
       const client = getAdminClient() || supabase;
-      const tableName = type === 'builder' 
-        ? 'builder_registrations' 
-        : type === 'supplier' 
-          ? 'supplier_registrations' 
-          : 'delivery_provider_registrations';
-
-      const { error } = await client
-        .from(tableName)
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
-        .eq('id', id);
-
-      if (error) throw error;
+      
+      // Use correct table names
+      if (type === 'supplier') {
+        const { error } = await client
+          .from('supplier_applications')
+          .update({ status: newStatus, updated_at: new Date().toISOString() })
+          .eq('id', id);
+        if (error) throw error;
+      } else if (type === 'delivery') {
+        // For delivery providers, update is_verified field
+        const { error } = await client
+          .from('delivery_providers')
+          .update({ 
+            is_verified: newStatus === 'approved', 
+            updated_at: new Date().toISOString() 
+          })
+          .eq('id', id);
+        if (error) throw error;
+      } else {
+        // For other types, try to update profiles or user_roles
+        const { error } = await client
+          .from('profiles')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', id);
+        if (error) throw error;
+      }
 
       toast({
         title: 'Status Updated',

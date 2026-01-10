@@ -36,8 +36,9 @@ export function AdminVideoApproval() {
   const fetchVideos = async () => {
     setLoading(true);
     try {
+      // Note: builder_videos table may not exist yet - handle gracefully
       let query = supabase
-        .from('builder_videos')
+        .from('builder_videos' as any)
         .select(`
           *,
           profiles:builder_id (
@@ -53,7 +54,15 @@ export function AdminVideoApproval() {
 
       const { data, error } = await query;
 
-      if (error) throw error;
+      // If table doesn't exist, just show empty state
+      if (error) {
+        if (error.code === '42P01' || error.message?.includes('does not exist')) {
+          console.log('builder_videos table not yet created - showing empty state');
+          setVideos([]);
+          return;
+        }
+        throw error;
+      }
 
       const formattedVideos = (data || []).map((video: any) => ({
         ...video,
@@ -62,13 +71,17 @@ export function AdminVideoApproval() {
       }));
 
       setVideos(formattedVideos);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching videos:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch videos",
-        variant: "destructive"
-      });
+      // Don't show error toast for missing table - just show empty state
+      if (!error.message?.includes('does not exist')) {
+        toast({
+          title: "Error",
+          description: "Failed to fetch videos",
+          variant: "destructive"
+        });
+      }
+      setVideos([]);
     } finally {
       setLoading(false);
     }

@@ -151,22 +151,21 @@ export const RegistersTab: React.FC = () => {
       
       console.log('📊 Fetching registered users data ONLY from registration tables...');
 
-      // Fetch ONLY from registration tables - these are users who registered through the app
-      const [suppliersRes, buildersRes, deliveryRes] = await Promise.all([
-        client.from('supplier_registrations').select('*').order('created_at', { ascending: false }),
-        client.from('builder_registrations').select('*').order('created_at', { ascending: false }),
-        client.from('delivery_provider_registrations').select('*').order('created_at', { ascending: false }),
+      // Fetch from correct tables - supplier_applications and delivery_providers
+      const [suppliersRes, deliveryRes] = await Promise.all([
+        client.from('supplier_applications').select('*').order('created_at', { ascending: false }),
+        client.from('delivery_providers').select('*').order('created_at', { ascending: false }),
       ]);
+      
+      // Builders are registered via profiles table with user_roles
+      const buildersRes = { data: [], error: null };
 
       // Log any errors
       if (suppliersRes.error) {
-        console.error('Error fetching supplier registrations:', suppliersRes.error);
-      }
-      if (buildersRes.error) {
-        console.error('Error fetching builder registrations:', buildersRes.error);
+        console.error('Error fetching supplier applications:', suppliersRes.error);
       }
       if (deliveryRes.error) {
-        console.error('Error fetching delivery provider registrations:', deliveryRes.error);
+        console.error('Error fetching delivery providers:', deliveryRes.error);
       }
 
       // Get data from registration tables only
@@ -185,7 +184,7 @@ export const RegistersTab: React.FC = () => {
       setDeliveryProviders(deliveryProvidersData);
 
       // Show warning if any fetch failed but others succeeded
-      const hasErrors = suppliersRes.error || buildersRes.error || deliveryRes.error;
+      const hasErrors = suppliersRes.error || deliveryRes.error;
       const hasData = suppliersData.length > 0 || buildersData.length > 0 || deliveryProvidersData.length > 0;
       
       if (hasErrors && !hasData) {
@@ -222,7 +221,7 @@ export const RegistersTab: React.FC = () => {
     try {
       const client = getAdminClient() || supabase;
       const { error } = await client
-        .from('supplier_registrations')
+        .from('supplier_applications')
         .update({ status, updated_at: new Date().toISOString() })
         .eq('id', id);
 
@@ -231,7 +230,7 @@ export const RegistersTab: React.FC = () => {
       setSuppliers(prev => prev.map(s => s.id === id ? { ...s, status } : s));
       toast({
         title: 'Status Updated',
-        description: `Supplier status changed to ${status}`,
+        description: `Supplier application status changed to ${status}`,
       });
     } catch (error) {
       console.error('Error updating supplier status:', error);
