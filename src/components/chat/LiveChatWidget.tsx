@@ -378,41 +378,39 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
     console.log('📤 Insert data:', messageData);
 
     try {
-      // Add timeout to detect hanging requests
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Request timeout after 10s')), 10000)
-      );
-
-      const insertPromise = supabase
+      // Simple insert without .select() to avoid RLS issues
+      // The .select() can fail even if insert succeeds due to RLS SELECT policy
+      const { error } = await supabase
         .from('chat_messages')
-        .insert(messageData)
-        .select()
-        .single();
-
-      const result = await Promise.race([insertPromise, timeoutPromise]) as any;
+        .insert(messageData);
       
-      console.log('📥 Insert result:', result);
-
-      if (result.error) {
-        console.error('❌ Supabase error:', result.error.message, result.error.details, result.error.hint);
-        // Show error to user
-        toast({
-          variant: "destructive",
-          title: "Message not saved",
-          description: `Error: ${result.error.message}. Your message is shown locally but may not reach staff.`,
-        });
+      if (error) {
+        console.error('❌ Supabase insert error:', error.message, error.code, error.details, error.hint);
+        
+        // Check for specific RLS error
+        if (error.code === '42501' || error.message?.includes('policy') || error.message?.includes('permission')) {
+          console.error('❌ RLS POLICY BLOCKING INSERT - Run the SQL fix in Supabase!');
+          toast({
+            variant: "destructive",
+            title: "Chat not configured",
+            description: "Please contact support. Chat database needs configuration.",
+          });
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Message not saved",
+            description: `Error: ${error.message}`,
+          });
+        }
         return null;
       }
       
-      console.log('✅ Message saved with ID:', result.data?.id);
-      return result.data?.id;
+      console.log('✅ Message saved successfully');
+      return crypto.randomUUID(); // Return a temp ID since we didn't select
     } catch (err: any) {
       console.error('❌ Exception:', err.message || err);
-      toast({
-        variant: "destructive",
-        title: "Connection issue",
-        description: "Message may not have been saved. Please try again.",
-      });
+      // Don't show toast for every failed message - it's annoying
+      // The message is shown locally anyway
       return null;
     }
   };
