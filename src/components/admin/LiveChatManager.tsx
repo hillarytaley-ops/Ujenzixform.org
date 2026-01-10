@@ -135,33 +135,87 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
   useEffect(() => {
     fetchSessions();
 
-    // Real-time subscription
+    // Real-time subscription for instant message delivery
     const channel = supabase
-      .channel('chat_messages_admin')
+      .channel('chat_messages_admin_realtime')
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'chat_messages' },
         (payload) => {
           const newMsg = payload.new as ChatMessage;
+          console.log('📩 Admin received real-time message:', newMsg.sender_type, newMsg.content?.substring(0, 30));
           
           // Play sound for new client messages
           if (newMsg.sender_type === 'client') {
             playNotificationSound();
             toast({
-              title: "New Chat Message",
+              title: "💬 New Chat Message",
               description: `${newMsg.sender_name || 'Guest'}: ${newMsg.content.substring(0, 50)}...`,
             });
           }
           
+          // Immediately update the sessions list with the new message
+          setSessions(prevSessions => {
+            const existingSessionIndex = prevSessions.findIndex(
+              s => s.conversation_id === newMsg.conversation_id
+            );
+            
+            if (existingSessionIndex >= 0) {
+              // Update existing session
+              const updatedSessions = [...prevSessions];
+              const session = { ...updatedSessions[existingSessionIndex] };
+              
+              // Check if message already exists
+              if (!session.messages.some(m => m.id === newMsg.id)) {
+                session.messages = [...session.messages, newMsg].sort(
+                  (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+                );
+                session.last_message_at = newMsg.created_at;
+                
+                // Update needs_reply status
+                if (newMsg.sender_type === 'client') {
+                  session.needs_reply = true;
+                  session.unread_count = (session.unread_count || 0) + 1;
+                } else if (newMsg.sender_type === 'staff') {
+                  session.needs_reply = false;
+                }
+                
+                updatedSessions[existingSessionIndex] = session;
+                
+                // Re-sort sessions
+                updatedSessions.sort((a, b) => {
+                  if (a.needs_reply && !b.needs_reply) return -1;
+                  if (!a.needs_reply && b.needs_reply) return 1;
+                  return new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime();
+                });
+              }
+              
+              return updatedSessions;
+            } else {
+              // New session - fetch all sessions to get complete data
+              fetchSessions();
+              return prevSessions;
+            }
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'chat_messages' },
+        () => {
+          // Refresh when messages are marked as read
           fetchSessions();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('📡 Admin chat subscription status:', status);
+      });
 
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(fetchSessions, 30000);
+    // Auto-refresh every 60 seconds as backup (reduced from 30s since we have real-time)
+    const interval = setInterval(fetchSessions, 60000);
 
     return () => {
+      console.log('🔌 Unsubscribing from admin chat channel');
       supabase.removeChannel(channel);
       clearInterval(interval);
     };
@@ -177,37 +231,94 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
   const handleSendReply = async () => {
     if (!selectedSession || !replyMessage.trim()) return;
 
+    const messageContent = replyMessage.trim();
+    const messageId = crypto.randomUUID();
+    const timestamp = new Date().toISOString();
+    
+    // Optimistically add the message to UI immediately
+    const optimisticMessage: ChatMessage = {
+      id: messageId,
+      conversation_id: selectedSession,
+      sender_id: staffId,
+      sender_type: 'staff',
+      sender_name: staffName,
+      content: messageContent,
+      message_type: 'text',
+      read: true,
+      created_at: timestamp
+    };
+    
+    // Update UI immediately (optimistic update)
+    setSessions(prevSessions => {
+      const updatedSessions = [...prevSessions];
+      const sessionIndex = updatedSessions.findIndex(s => s.conversation_id === selectedSession);
+      
+      if (sessionIndex >= 0) {
+        const session = { ...updatedSessions[sessionIndex] };
+        session.messages = [...session.messages, optimisticMessage];
+        session.last_message_at = timestamp;
+        session.needs_reply = false;
+        updatedSessions[sessionIndex] = session;
+      }
+      
+      return updatedSessions;
+    });
+    
+    // Clear input immediately for better UX
+    setReplyMessage('');
+
     try {
+      console.log('📤 Sending staff reply to conversation:', selectedSession);
+      
       const { error } = await supabase
         .from('chat_messages')
         .insert({
+          id: messageId, // Use same ID for consistency
           conversation_id: selectedSession,
           sender_id: staffId,
           sender_type: 'staff',
           sender_name: staffName,
-          content: replyMessage.trim(),
+          content: messageContent,
           message_type: 'text',
           read: true
         });
 
       if (error) throw error;
 
-      // Mark previous messages as read
-      await supabase
+      console.log('✅ Staff reply sent successfully');
+
+      // Mark previous messages as read (don't wait for this)
+      supabase
         .from('chat_messages')
         .update({ read: true })
         .eq('conversation_id', selectedSession)
-        .eq('sender_type', 'client');
+        .eq('sender_type', 'client')
+        .then(() => console.log('✅ Messages marked as read'));
 
       toast({
-        title: "Reply Sent",
-        description: "Your message has been sent to the user.",
+        title: "✅ Reply Sent",
+        description: "Your message has been delivered instantly.",
       });
-
-      setReplyMessage('');
-      fetchSessions();
     } catch (error) {
       console.error('Error sending reply:', error);
+      
+      // Revert optimistic update on error
+      setSessions(prevSessions => {
+        const updatedSessions = [...prevSessions];
+        const sessionIndex = updatedSessions.findIndex(s => s.conversation_id === selectedSession);
+        
+        if (sessionIndex >= 0) {
+          const session = { ...updatedSessions[sessionIndex] };
+          session.messages = session.messages.filter(m => m.id !== messageId);
+          updatedSessions[sessionIndex] = session;
+        }
+        
+        return updatedSessions;
+      });
+      
+      // Restore the message in input
+      setReplyMessage(messageContent);
+      
       toast({
         title: "Error",
         description: "Failed to send reply. Please try again.",

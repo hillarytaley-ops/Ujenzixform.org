@@ -155,9 +155,9 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
 
     loadMessages();
 
-    // Real-time subscription for new messages
+    // Real-time subscription for new messages - instant delivery
     const channel = supabase
-      .channel(`chat_${conversationId}`)
+      .channel(`chat_realtime_${conversationId}`)
       .on(
         'postgres_changes',
         {
@@ -168,6 +168,8 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
         },
         (payload) => {
           const newMsg = payload.new as any;
+          console.log('📩 Real-time message received:', newMsg.sender_type, newMsg.content?.substring(0, 30));
+          
           // Only add if it's a staff message (user messages are added locally)
           if (newMsg.sender_type === 'staff') {
             setMessages(prev => {
@@ -187,16 +189,25 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
             if (!isOpen) {
               setUnreadCount(prev => prev + 1);
               toast({
-                title: "New message from MradiPro Staff",
+                title: "💬 New message from MradiPro Staff",
                 description: newMsg.content.substring(0, 50) + '...',
               });
+              
+              // Play notification sound
+              try {
+                const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleQoAHIreli4AAAB4nJ8sAAAA');
+                audio.play().catch(() => {});
+              } catch (e) {}
             }
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('📡 Chat subscription status:', status);
+      });
 
     return () => {
+      console.log('🔌 Unsubscribing from chat channel');
       supabase.removeChannel(channel);
     };
   }, [conversationId, isOpen, toast]);
