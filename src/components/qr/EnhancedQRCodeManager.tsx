@@ -85,49 +85,97 @@ export const EnhancedQRCodeManager: React.FC = () => {
 
   const downloadQRCode = async (qrCode: string, materialType: string, itemSeq: number) => {
     try {
-      const size = 420;
+      // Large QR code size for easy scanning on any device
+      // 800x800 pixels - optimal for printing on A4/Letter paper or stickers
+      const qrSize = 800;
+      const padding = 60; // White border around QR code
+      const labelHeight = 180; // Space for text labels below QR
+      
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
-      canvas.width = size;
-      canvas.height = size + 80;
+      const totalWidth = qrSize + (padding * 2);
+      const totalHeight = qrSize + (padding * 2) + labelHeight;
+      
+      canvas.width = totalWidth;
+      canvas.height = totalHeight;
 
       if (!ctx) return;
 
       const writer = new QRCodeWriter();
       const hints = new Map();
-      hints.set(EncodeHintType.MARGIN, 1);
-      const matrix = writer.encode(qrCode, BarcodeFormat.QR_CODE, size, size, hints);
+      hints.set(EncodeHintType.MARGIN, 2); // Slightly larger margin for better scanning
+      hints.set(EncodeHintType.ERROR_CORRECTION, 2); // High error correction (L=0, M=1, Q=2, H=3)
+      
+      // Generate QR matrix at a smaller size, then scale up for crisp rendering
+      const matrixSize = 200;
+      const matrix = writer.encode(qrCode, BarcodeFormat.QR_CODE, matrixSize, matrixSize, hints);
 
+      // Fill white background
       ctx.fillStyle = 'white';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Draw QR code scaled up for large, crisp output
       ctx.fillStyle = 'black';
-
-      const scale = 1;
+      const scale = qrSize / matrix.getWidth();
+      
       for (let x = 0; x < matrix.getWidth(); x++) {
         for (let y = 0; y < matrix.getHeight(); y++) {
           if (matrix.get(x, y)) {
-            ctx.fillRect(x * scale, y * scale, scale, scale);
+            ctx.fillRect(
+              padding + (x * scale), 
+              padding + (y * scale), 
+              Math.ceil(scale), 
+              Math.ceil(scale)
+            );
           }
         }
       }
 
-      ctx.fillStyle = 'black';
-      ctx.font = 'bold 16px Arial';
+      // Draw border around QR code area
+      ctx.strokeStyle = '#e5e7eb';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(padding - 10, padding - 10, qrSize + 20, qrSize + 20);
+
+      // Add label section with background
+      const labelY = padding + qrSize + 20;
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillRect(padding - 10, labelY, qrSize + 20, labelHeight - 30);
+      ctx.strokeRect(padding - 10, labelY, qrSize + 20, labelHeight - 30);
+
+      // Material type - large and bold
+      ctx.fillStyle = '#1e293b';
+      ctx.font = 'bold 36px Arial, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(materialType, size / 2, size + 20);
-      ctx.font = '14px Arial';
-      ctx.fillText(`Item #${itemSeq}`, size / 2, size + 40);
-      ctx.font = '11px monospace';
-      ctx.fillText(qrCode, size / 2, size + 60);
+      ctx.fillText(materialType.toUpperCase(), totalWidth / 2, labelY + 45);
+      
+      // Item number
+      ctx.fillStyle = '#3b82f6';
+      ctx.font = 'bold 28px Arial, sans-serif';
+      ctx.fillText(`ITEM #${itemSeq}`, totalWidth / 2, labelY + 85);
+      
+      // QR code string - monospace for readability
+      ctx.fillStyle = '#64748b';
+      ctx.font = '18px "Courier New", monospace';
+      ctx.fillText(qrCode, totalWidth / 2, labelY + 120);
+
+      // Add "SCAN ME" indicator at top
+      ctx.fillStyle = '#059669';
+      ctx.font = 'bold 24px Arial, sans-serif';
+      ctx.fillText('📱 SCAN ME', totalWidth / 2, 35);
+
+      // Add company branding at bottom
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '14px Arial, sans-serif';
+      ctx.fillText('UjenziPro Material Tracking', totalWidth / 2, totalHeight - 15);
 
       const link = document.createElement('a');
       link.download = `QR_${qrCode}.png`;
-      link.href = canvas.toDataURL('image/png');
+      link.href = canvas.toDataURL('image/png', 1.0); // Maximum quality
       link.click();
 
       toast({
-        title: "QR Code Downloaded",
-        description: `${materialType} - Item #${itemSeq}`,
+        title: "✅ QR Code Downloaded",
+        description: `Large format QR (${qrSize}x${qrSize}px) - ${materialType} Item #${itemSeq}`,
       });
     } catch (error) {
       console.error('Error generating QR code:', error);
