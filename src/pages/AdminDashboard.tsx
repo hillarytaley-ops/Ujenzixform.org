@@ -580,36 +580,118 @@ const AdminDashboard = () => {
         return;
       }
 
-      // Check for Supabase session (optional - RLS is disabled for admin access)
-      const { data: { session } } = await supabase.auth.getSession();
-      console.log('🔐 Supabase session:', session?.user?.email || 'No session (RLS disabled, admin access OK)');
-
+      // Set admin email immediately to show UI faster
       setAdminEmail(adminEmailLS);
-
-      // Load dashboard data
-      await loadDashboardData();
+      
+      // Show UI immediately, load data in background
       setLoading(false);
+
+      // Check for Supabase session (optional - RLS is disabled for admin access)
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        console.log('🔐 Supabase session:', session?.user?.email || 'No session (RLS disabled, admin access OK)');
+      });
+
+      // Load only essential dashboard stats first (fast)
+      loadDashboardStats();
+      
+      // Load other data lazily based on active tab
+      // This prevents loading ALL data at once
 
     } catch (error) {
       console.error('Admin access check error:', error);
       navigate('/admin-login');
     }
   };
+  
+  // Fast stats loading - only counts, no full data
+  const loadDashboardStats = async () => {
+    try {
+      const client = getAdminClient() || supabase;
+      
+      // Parallel count queries - very fast
+      const [rolesRes, supplierPendingRes, deliveryPendingRes, feedbackRes] = await Promise.all([
+        client.from('user_roles').select('role', { count: 'exact', head: true }),
+        client.from('supplier_applications').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        client.from('delivery_providers').select('*', { count: 'exact', head: true }).eq('is_verified', false),
+        client.from('feedback').select('*', { count: 'exact', head: true })
+      ]);
+
+      setStats(prev => ({
+        ...prev,
+        totalUsers: rolesRes.count || 0,
+        pendingRegistrations: (supplierPendingRes.count || 0) + (deliveryPendingRes.count || 0),
+        totalFeedback: feedbackRes.count || 0
+      }));
+    } catch (error) {
+      console.error('Error loading stats:', error);
+    }
+  };
+
+  // Track which tabs have been loaded to avoid re-fetching
+  const [loadedTabs, setLoadedTabs] = useState<Set<string>>(new Set());
+  
+  // Load data for specific tab (lazy loading)
+  const loadTabData = async (tab: string) => {
+    if (loadedTabs.has(tab)) return; // Already loaded
+    
+    console.log(`📊 Loading data for tab: ${tab}`);
+    
+    try {
+      switch (tab) {
+        case 'overview':
+          await loadDashboardData();
+          break;
+        case 'registrations':
+          await loadRegistrations();
+          break;
+        case 'feedback':
+          await loadFeedback();
+          break;
+        case 'cameras':
+          await loadCameras();
+          break;
+        case 'documents':
+          await loadDocuments();
+          break;
+        case 'delivery':
+          await loadDeliveryApplications();
+          await loadBuilderDeliveryRequests();
+          break;
+        case 'financial':
+          await loadFinancialData();
+          break;
+        case 'ml':
+          loadMLActivities();
+          break;
+      }
+      
+      setLoadedTabs(prev => new Set([...prev, tab]));
+    } catch (error) {
+      console.error(`Error loading ${tab} data:`, error);
+    }
+  };
+  
+  // Load data when tab changes
+  useEffect(() => {
+    if (!loading && activeTab) {
+      loadTabData(activeTab);
+    }
+  }, [activeTab, loading]);
 
   const loadDashboardData = async () => {
     try {
       // Use admin client if available (bypasses RLS), otherwise use regular client
       const client = getAdminClient() || supabase;
       
-      // Get user counts by role
+      // Get user counts by role - single query
       const { data: rolesData, error: rolesError } = await client
         .from('user_roles')
         .select('role');
 
       if (!rolesError && rolesData) {
-        const builderCount = rolesData.filter(r => r.role === 'builder').length;
+        const builderCount = rolesData.filter(r => r.role === 'builder' || r.role === 'professional_builder' || r.role === 'private_client').length;
         const supplierCount = rolesData.filter(r => r.role === 'supplier').length;
-        const deliveryCount = rolesData.filter(r => r.role === 'delivery_provider').length;
+        const deliveryCount = rolesData.filter(r => r.role === 'delivery_provider' || r.role === 'delivery').length;
 
         setStats(prev => ({
           ...prev,
@@ -620,44 +702,18 @@ const AdminDashboard = () => {
         }));
       }
 
-      // Get pending registrations count from correct tables
+      // Get pending registrations count from correct tables - parallel
       const [supplierRegs, deliveryRegs] = await Promise.all([
-        client.from('supplier_applications').select('id, status').eq('status', 'pending'),
-        client.from('delivery_providers').select('id, status').eq('status', 'pending')
+        client.from('supplier_applications').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+        client.from('delivery_providers').select('id', { count: 'exact', head: true }).eq('is_verified', false)
       ]);
 
-      const pendingCount = 
-        (supplierRegs.data?.length || 0) + 
-        (deliveryRegs.data?.length || 0);
+      const pendingCount = (supplierRegs.count || 0) + (deliveryRegs.count || 0);
 
       setStats(prev => ({
         ...prev,
         pendingRegistrations: pendingCount
       }));
-
-      // Load all registrations for the table
-      await loadRegistrations();
-      
-      // Load feedback data
-      await loadFeedback();
-      
-      // Load cameras
-      await loadCameras();
-      
-      // Load documents
-      await loadDocuments();
-      
-      // Load delivery applications
-      await loadDeliveryApplications();
-      
-      // Load builder delivery requests
-      await loadBuilderDeliveryRequests();
-      
-      // Load financial data
-      await loadFinancialData();
-      
-      // Load ML activities
-      loadMLActivities();
 
     } catch (error) {
       console.error('Error loading dashboard data:', error);
