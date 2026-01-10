@@ -358,24 +358,37 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
               </Alert>
             </div>
 
-            <DialogFooter className="flex gap-2 sm:gap-2">
-              <Button 
-                variant="outline" 
-                onClick={() => setStep('form')}
-                className="flex-1"
-              >
-                <MapPin className="h-4 w-4 mr-2" />
-                Update Delivery Details
-              </Button>
+            <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:gap-2">
+              {/* Primary action - Accept delivery */}
               <Button 
                 onClick={() => {
                   if (onDeliveryRequested) onDeliveryRequested();
                   onOpenChange(false);
                 }}
-                className="flex-1 bg-green-600 hover:bg-green-700"
+                className="w-full sm:flex-1 bg-green-600 hover:bg-green-700"
               >
                 <CheckCircle className="h-4 w-4 mr-2" />
-                Got It!
+                Yes, Proceed with Delivery
+              </Button>
+              
+              {/* Secondary - Update details */}
+              <Button 
+                variant="outline" 
+                onClick={() => setStep('form')}
+                className="w-full sm:flex-1"
+              >
+                <MapPin className="h-4 w-4 mr-2" />
+                Update Details
+              </Button>
+              
+              {/* Reject - No delivery needed */}
+              <Button 
+                variant="ghost" 
+                onClick={handleDecline}
+                className="w-full sm:w-auto text-gray-500 hover:text-red-600"
+              >
+                <XCircle className="h-4 w-4 mr-2" />
+                No Delivery Needed
               </Button>
             </DialogFooter>
           </>

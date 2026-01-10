@@ -7,8 +7,9 @@ const corsHeaders = {
 };
 
 interface DeliveryNotificationRequest {
-  request_type: 'purchase_order' | 'private_purchase';
+  request_type: 'purchase_order' | 'private_purchase' | 'quote_accepted';
   request_id: string;
+  builder_id?: string;
   pickup_address: string;
   delivery_address: string;
   pickup_latitude?: number;
@@ -18,7 +19,20 @@ interface DeliveryNotificationRequest {
   material_details: any[];
   special_instructions?: string;
   priority_level?: 'low' | 'normal' | 'high' | 'urgent';
+  po_number?: string;
+  estimated_weight_kg?: number;
 }
+
+// Vehicle capacity mapping (in kg)
+const VEHICLE_CAPACITY: Record<string, number> = {
+  'motorcycle': 50,
+  'tuk_tuk': 300,
+  'pickup': 1000,
+  'small_truck': 3000,
+  'medium_truck': 7000,
+  'large_truck': 15000,
+  'trailer': 30000
+};
 
 const handler = async (req: Request): Promise<Response> => {
   // Handle CORS preflight requests
@@ -35,6 +49,7 @@ const handler = async (req: Request): Promise<Response> => {
     const {
       request_type,
       request_id,
+      builder_id: provided_builder_id,
       pickup_address,
       delivery_address,
       pickup_latitude,
@@ -43,13 +58,57 @@ const handler = async (req: Request): Promise<Response> => {
       delivery_longitude,
       material_details,
       special_instructions,
-      priority_level = 'normal'
+      priority_level = 'normal',
+      po_number,
+      estimated_weight_kg
     }: DeliveryNotificationRequest = await req.json();
 
     console.log('Creating delivery notification for:', request_type, request_id);
 
+    // Calculate total weight from materials if not provided
+    let totalWeightKg = estimated_weight_kg || 0;
+    if (!totalWeightKg && material_details && material_details.length > 0) {
+      // Estimate weight based on material type and quantity
+      const MATERIAL_WEIGHTS: Record<string, number> = {
+        'cement': 50, // 50kg per bag
+        'steel': 10, // 10kg per bar average
+        'timber': 20, // 20kg per piece average
+        'blocks': 15, // 15kg per block
+        'sand': 1500, // 1500kg per cubic meter
+        'aggregates': 1400, // 1400kg per cubic meter
+        'tiles': 25, // 25kg per box
+        'default': 50 // default 50kg per item
+      };
+      
+      totalWeightKg = material_details.reduce((sum: number, item: any) => {
+        const materialType = (item.material_type || item.name || '').toLowerCase();
+        let weightPerUnit = MATERIAL_WEIGHTS['default'];
+        
+        for (const [key, weight] of Object.entries(MATERIAL_WEIGHTS)) {
+          if (materialType.includes(key)) {
+            weightPerUnit = weight;
+            break;
+          }
+        }
+        
+        return sum + (item.quantity || 1) * weightPerUnit;
+      }, 0);
+    }
+
+    console.log('Estimated total weight:', totalWeightKg, 'kg');
+
+    // Determine minimum vehicle type needed based on weight
+    let requiredVehicleType = 'motorcycle';
+    for (const [vehicleType, capacity] of Object.entries(VEHICLE_CAPACITY)) {
+      if (totalWeightKg <= capacity) {
+        requiredVehicleType = vehicleType;
+        break;
+      }
+    }
+    console.log('Minimum required vehicle type:', requiredVehicleType);
+
     // Get request details based on type
-    let builder_id: string;
+    let builder_id: string = provided_builder_id || '';
     let supplier_id: string | null = null;
 
     if (request_type === 'purchase_order') {
@@ -62,7 +121,7 @@ const handler = async (req: Request): Promise<Response> => {
       if (poError) throw poError;
       builder_id = po.buyer_id;
       supplier_id = po.supplier_id;
-    } else {
+    } else if (request_type === 'private_purchase') {
       const { data: receipt, error: receiptError } = await supabaseClient
         .from('purchase_receipts')
         .select('buyer_id, supplier_id')
@@ -73,6 +132,7 @@ const handler = async (req: Request): Promise<Response> => {
       builder_id = receipt.buyer_id;
       supplier_id = receipt.supplier_id;
     }
+    // For 'quote_accepted', builder_id is already provided
 
     // Create delivery notification
     const { data: notification, error: notificationError } = await supabaseClient
@@ -117,38 +177,84 @@ const handler = async (req: Request): Promise<Response> => {
       console.log(`Found ${nearbyProviders?.length || 0} nearby delivery providers`);
     }
 
-    // Create notifications for nearby providers
+    // Filter and notify providers based on vehicle capacity
     if (nearbyProviders && nearbyProviders.length > 0) {
-      const providerNotifications = nearbyProviders.map((provider: any) => ({
-        sender_id: builder_id,
-        sender_type: 'builder',
-        sender_name: 'Builder',
-        message_type: 'delivery_request',
-        content: `New delivery request available. Distance: ${provider.distance_km.toFixed(1)}km. Priority: ${priority_level}. ${special_instructions ? `Instructions: ${special_instructions}` : ''}`,
-        metadata: {
-          notification_id: notification.id,
-          distance_km: provider.distance_km,
-          priority_level,
-          pickup_address,
-          delivery_address,
-          material_details
+      // Get provider vehicle types to filter by capacity
+      const providerIds = nearbyProviders.map((p: any) => p.provider_id);
+      
+      const { data: providerDetails } = await supabaseClient
+        .from('delivery_providers')
+        .select('id, vehicle_type, full_name, company_name')
+        .in('id', providerIds);
+
+      // Filter providers whose vehicle can handle the load
+      const capableProviders = nearbyProviders.filter((provider: any) => {
+        const details = providerDetails?.find((d: any) => d.id === provider.provider_id);
+        if (!details) return false;
+        
+        const vehicleType = (details.vehicle_type || 'pickup').toLowerCase().replace(/\s+/g, '_');
+        const vehicleCapacity = VEHICLE_CAPACITY[vehicleType] || VEHICLE_CAPACITY['pickup'];
+        
+        // Only notify if vehicle can handle at least 80% of the load (some buffer)
+        const canHandle = vehicleCapacity >= totalWeightKg * 0.8;
+        
+        if (!canHandle) {
+          console.log(`Provider ${details.full_name || details.company_name} (${vehicleType}) capacity ${vehicleCapacity}kg < required ${totalWeightKg}kg - SKIPPED`);
         }
-      }));
+        
+        return canHandle;
+      });
 
-      const { error: commError } = await supabaseClient
-        .from('delivery_communications')
-        .insert(providerNotifications);
+      console.log(`${capableProviders.length} of ${nearbyProviders.length} providers have adequate vehicle capacity`);
 
-      if (commError) {
-        console.error('Error creating provider notifications:', commError);
+      if (capableProviders.length > 0) {
+        const providerNotifications = capableProviders.map((provider: any) => {
+          const details = providerDetails?.find((d: any) => d.id === provider.provider_id);
+          return {
+            sender_id: builder_id,
+            sender_type: 'builder',
+            sender_name: 'Builder',
+            message_type: 'delivery_request',
+            content: `🚚 New delivery request! Distance: ${provider.distance_km.toFixed(1)}km | Weight: ${totalWeightKg}kg | Priority: ${priority_level}${po_number ? ` | PO: ${po_number}` : ''}. ${special_instructions ? `Instructions: ${special_instructions}` : ''}`,
+            metadata: {
+              notification_id: notification.id,
+              distance_km: provider.distance_km,
+              priority_level,
+              pickup_address,
+              delivery_address,
+              material_details,
+              total_weight_kg: totalWeightKg,
+              required_vehicle_type: requiredVehicleType,
+              po_number
+            }
+          };
+        });
+
+        const { error: commError } = await supabaseClient
+          .from('delivery_communications')
+          .insert(providerNotifications);
+
+        if (commError) {
+          console.error('Error creating provider notifications:', commError);
+        } else {
+          console.log(`Notified ${capableProviders.length} capable delivery providers`);
+        }
       } else {
-        console.log(`Notified ${nearbyProviders.length} delivery providers`);
+        console.log('No providers with adequate vehicle capacity found nearby');
       }
 
       // Update notification status
       await supabaseClient
         .from('delivery_notifications')
-        .update({ status: 'notified' })
+        .update({ 
+          status: capableProviders.length > 0 ? 'notified' : 'no_capable_providers',
+          metadata: {
+            total_weight_kg: totalWeightKg,
+            required_vehicle_type: requiredVehicleType,
+            providers_found: nearbyProviders.length,
+            capable_providers: capableProviders.length
+          }
+        })
         .eq('id', notification.id);
     }
 
