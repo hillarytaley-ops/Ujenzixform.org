@@ -132,11 +132,32 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
     }
   }, []);
 
-  // Track message counts for polling comparison
-  const lastTotalMessagesRef = useRef<number>(0);
+  // Track known message IDs to detect truly new messages
+  const knownMessageIdsRef = useRef<Set<string>>(new Set());
+  const isMountedRef = useRef<boolean>(true);
+  const lastFetchTimeRef = useRef<number>(0);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
-    fetchSessions();
+    let isSubscribed = true;
+    
+    // Initial fetch
+    fetchSessions().then(() => {
+      // Initialize known message IDs from fetched sessions
+      setSessions(prev => {
+        prev.forEach(session => {
+          session.messages.forEach(msg => knownMessageIdsRef.current.add(msg.id));
+        });
+        return prev;
+      });
+    });
 
     // Real-time subscription for instant message delivery
     const channel = supabase
@@ -145,8 +166,16 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'chat_messages' },
         (payload) => {
+          if (!isSubscribed || !isMountedRef.current) return;
+          
           const newMsg = payload.new as ChatMessage;
           console.log('📩 Admin received real-time message:', newMsg.sender_type, newMsg.content?.substring(0, 30));
+          
+          // Skip if we've already seen this message
+          if (knownMessageIdsRef.current.has(newMsg.id)) {
+            return;
+          }
+          knownMessageIdsRef.current.add(newMsg.id);
           
           // Play sound for new client messages
           if (newMsg.sender_type === 'client') {
@@ -168,8 +197,8 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
               const updatedSessions = [...prevSessions];
               const session = { ...updatedSessions[existingSessionIndex] };
               
-              // Check if message already exists
-              if (!session.messages.some(m => m.id === newMsg.id)) {
+              // Check if message already exists (by ID or content)
+              if (!session.messages.some(m => m.id === newMsg.id || m.content === newMsg.content)) {
                 session.messages = [...session.messages, newMsg].sort(
                   (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
                 );
@@ -206,66 +235,62 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'chat_messages' },
         () => {
-          // Refresh when messages are marked as read
-          fetchSessions();
+          if (!isSubscribed || !isMountedRef.current) return;
+          // Refresh when messages are marked as read (throttled)
+          const now = Date.now();
+          if (now - lastFetchTimeRef.current > 2000) {
+            lastFetchTimeRef.current = now;
+            fetchSessions();
+          }
         }
       )
       .subscribe((status) => {
         console.log('📡 Admin chat subscription status:', status);
       });
 
-    // POLLING FALLBACK: Check for new messages every 1 second
-    // This ensures instant messaging even if real-time fails
+    // POLLING FALLBACK: Check for new messages every 2 seconds
+    // Slightly slower to reduce server load but still responsive
     const pollingInterval = setInterval(async () => {
+      if (!isSubscribed || !isMountedRef.current) return;
+      
       try {
         const { data, error } = await supabase
           .from('chat_messages')
           .select('id, conversation_id, sender_type, sender_name, content, created_at')
           .order('created_at', { ascending: false })
-          .limit(50);
+          .limit(100); // Increased limit to catch more messages
 
-        if (!error && data) {
-          const totalMessages = data.length;
+        if (!error && data && data.length > 0) {
+          // Find truly new messages
+          const newMessages = data.filter((msg: any) => !knownMessageIdsRef.current.has(msg.id));
           
-          // Check if we have new messages
-          if (totalMessages > lastTotalMessagesRef.current) {
-            const newClientMessages = data.filter((msg: any) => 
-              msg.sender_type === 'client'
-            );
+          if (newMessages.length > 0) {
+            // Add to known IDs
+            newMessages.forEach((msg: any) => knownMessageIdsRef.current.add(msg.id));
             
-            // If there are new client messages, notify and refresh
+            // Check for new client messages
+            const newClientMessages = newMessages.filter((msg: any) => msg.sender_type === 'client');
+            
             if (newClientMessages.length > 0) {
               const latestClientMsg = newClientMessages[0];
-              
-              // Check if this is actually new (not already in sessions)
-              setSessions(prevSessions => {
-                const existingSession = prevSessions.find(s => s.conversation_id === latestClientMsg.conversation_id);
-                const messageExists = existingSession?.messages.some(m => m.id === latestClientMsg.id);
-                
-                if (!messageExists && lastTotalMessagesRef.current > 0) {
-                  playNotificationSound();
-                  toast({
-                    title: "💬 New Chat Message",
-                    description: `${latestClientMsg.sender_name || 'Guest'}: ${latestClientMsg.content.substring(0, 50)}...`,
-                  });
-                }
-                
-                return prevSessions;
+              playNotificationSound();
+              toast({
+                title: "💬 New Chat Message",
+                description: `${latestClientMsg.sender_name || 'Guest'}: ${latestClientMsg.content.substring(0, 50)}...`,
               });
-              
-              // Refresh sessions to get updated data
-              fetchSessions();
             }
             
-            lastTotalMessagesRef.current = totalMessages;
+            // Refresh sessions to get updated data
+            fetchSessions();
           }
         }
       } catch (err) {
         // Silent fail for polling
       }
-    }, 1000);
+    }, 2000);
 
     return () => {
+      isSubscribed = false;
       console.log('🔌 Unsubscribing from admin chat channel');
       supabase.removeChannel(channel);
       clearInterval(pollingInterval);

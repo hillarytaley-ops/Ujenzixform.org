@@ -120,22 +120,36 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
     });
   }, [userId, userName, userEmail]);
 
-  // Track last message count and IDs for polling comparison
-  const lastMessageCountRef = useRef<number>(0);
-  const lastMessageIdsRef = useRef<Set<string>>(new Set());
+  // Track message IDs we've seen (from DB) to detect truly new messages
+  const knownMessageIdsRef = useRef<Set<string>>(new Set());
+  // Track local message IDs (before they get DB IDs) to prevent duplicates
+  const pendingLocalIdsRef = useRef<Map<string, string>>(new Map()); // localId -> content hash
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const isOpenRef = useRef<boolean>(isOpen); // Track isOpen without causing re-renders
+  const isOpenRef = useRef<boolean>(isOpen);
+  const isMountedRef = useRef<boolean>(true);
   
   // Keep isOpenRef in sync
   useEffect(() => {
     isOpenRef.current = isOpen;
   }, [isOpen]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   // Load previous messages and set up real-time subscription + polling fallback
   useEffect(() => {
     if (!conversationId) return;
 
+    let isSubscribed = true;
+
     const loadMessages = async (isPolling = false) => {
+      if (!isSubscribed || !isMountedRef.current) return;
+      
       try {
         const { data, error } = await supabase
           .from('chat_messages')
@@ -148,17 +162,17 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
           return;
         }
 
-        if (data) {
-          // Check for new messages by comparing IDs
-          const currentIds = new Set(data.map((m: any) => m.id));
-          const newMessages = data.filter((m: any) => !lastMessageIdsRef.current.has(m.id));
-          const hasNewStaffMessage = newMessages.some((m: any) => m.sender_type === 'staff');
-          
-          // Update tracking refs
-          lastMessageCountRef.current = data.length;
-          lastMessageIdsRef.current = currentIds;
+        if (!isSubscribed || !isMountedRef.current) return;
 
-          // Map DB sender types back to UI types: client -> user, system -> bot
+        if (data && data.length > 0) {
+          // Find truly new messages (not in our known set)
+          const newDbMessages = data.filter((m: any) => !knownMessageIdsRef.current.has(m.id));
+          const hasNewStaffMessage = newDbMessages.some((m: any) => m.sender_type === 'staff');
+          
+          // Update known IDs
+          data.forEach((m: any) => knownMessageIdsRef.current.add(m.id));
+
+          // Map DB messages to UI format
           const loadedMessages: Message[] = data.map((msg: any) => ({
             id: msg.id,
             role: (msg.sender_type === 'client' ? 'user' : msg.sender_type === 'system' ? 'bot' : 'staff') as 'user' | 'bot' | 'staff',
@@ -166,13 +180,30 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
             timestamp: new Date(msg.created_at)
           }));
           
-          // Only update if messages actually changed
+          // Replace messages state with DB truth, but preserve any pending local messages
           setMessages(prev => {
-            if (prev.length === loadedMessages.length && 
-                prev.every((m, i) => m.id === loadedMessages[i]?.id)) {
-              return prev; // No change, don't update
-            }
-            return loadedMessages;
+            // Get pending local messages (those with local_ prefix that aren't in DB yet)
+            const pendingLocal = prev.filter(m => 
+              m.id.startsWith('local_') || m.id.startsWith('bot_')
+            );
+            
+            // Check if any pending local messages now have DB equivalents (by content match)
+            const dbContents = new Set(data.map((m: any) => m.content));
+            const stillPending = pendingLocal.filter(m => !dbContents.has(m.content));
+            
+            // Combine: DB messages + still-pending local messages
+            const combined = [...loadedMessages];
+            stillPending.forEach(pending => {
+              // Only add if not already in combined (by content)
+              if (!combined.some(c => c.content === pending.content)) {
+                combined.push(pending);
+              }
+            });
+            
+            // Sort by timestamp
+            combined.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+            
+            return combined;
           });
           
           // Check if there are staff messages (switch to human mode)
@@ -181,9 +212,9 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
             setWaitingForStaff(false);
           }
 
-          // If polling detected new staff message, show notification (only if chat is closed)
+          // Notify for new staff messages when chat is closed
           if (isPolling && hasNewStaffMessage && !isOpenRef.current) {
-            const lastStaffMsg = newMessages.filter((m: any) => m.sender_type === 'staff').pop();
+            const lastStaffMsg = newDbMessages.filter((m: any) => m.sender_type === 'staff').pop();
             if (lastStaffMsg) {
               setUnreadCount(prev => prev + 1);
               toast({
@@ -191,7 +222,6 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
                 description: lastStaffMsg.content.substring(0, 50) + '...',
               });
               
-              // Play notification sound
               try {
                 const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleQoAHIreli4AAAB4nJ8sAAAA');
                 audio.play().catch(() => {});
@@ -207,7 +237,7 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
     // Initial load
     loadMessages(false);
 
-    // Real-time subscription for new messages - instant delivery
+    // Real-time subscription for instant staff message delivery
     const channel = supabase
       .channel(`chat_realtime_${conversationId}`)
       .on(
@@ -219,18 +249,21 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
           filter: `conversation_id=eq.${conversationId}`
         },
         (payload) => {
+          if (!isSubscribed || !isMountedRef.current) return;
+          
           const newMsg = payload.new as any;
           console.log('📩 Real-time message received:', newMsg.sender_type, newMsg.content?.substring(0, 30));
           
-          // Add message to tracking
-          lastMessageIdsRef.current.add(newMsg.id);
+          // Track this message ID
+          knownMessageIdsRef.current.add(newMsg.id);
           
-          // Only add if it's a staff message (user messages are added locally)
+          // Only add staff messages via real-time (user/bot messages are added locally)
           if (newMsg.sender_type === 'staff') {
             setMessages(prev => {
-              // Check if message already exists
-              if (prev.some(m => m.id === newMsg.id)) return prev;
-              lastMessageCountRef.current = prev.length + 1;
+              // Check if already exists (by ID or content)
+              if (prev.some(m => m.id === newMsg.id || m.content === newMsg.content)) {
+                return prev;
+              }
               return [...prev, {
                 id: newMsg.id,
                 role: 'staff',
@@ -241,7 +274,6 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
             setWaitingForStaff(false);
             setMode('human');
             
-            // Show notification if chat is closed
             if (!isOpenRef.current) {
               setUnreadCount(prev => prev + 1);
               toast({
@@ -249,7 +281,6 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
                 description: newMsg.content.substring(0, 50) + '...',
               });
               
-              // Play notification sound
               try {
                 const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleQoAHIreli4AAAB4nJ8sAAAA');
                 audio.play().catch(() => {});
@@ -262,20 +293,24 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
         console.log('📡 Chat subscription status:', status);
       });
 
-    // POLLING FALLBACK: Check for new messages every 1 second
-    // This ensures instant messaging even if real-time fails due to RLS
+    // POLLING FALLBACK: Check for new messages every 2 seconds
+    // Slightly slower than before to reduce load but still responsive
     pollingIntervalRef.current = setInterval(() => {
-      loadMessages(true);
-    }, 1000);
+      if (isMountedRef.current) {
+        loadMessages(true);
+      }
+    }, 2000);
 
     return () => {
+      isSubscribed = false;
       console.log('🔌 Unsubscribing from chat channel');
       supabase.removeChannel(channel);
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
       }
     };
-  }, [conversationId, toast]); // Removed isOpen from dependencies to prevent re-subscription
+  }, [conversationId, toast]);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -439,18 +474,28 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
     const userMessage = message.trim();
     setMessage('');
 
-    // Add user message locally
-    const userMsgId = `local_${Date.now()}`;
+    // Generate unique local ID with content hash for deduplication
+    const userMsgId = `local_user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const newUserMessage: Message = {
       id: userMsgId,
       role: 'user',
       content: userMessage,
       timestamp: new Date()
     };
-    setMessages(prev => [...prev, newUserMessage]);
+    
+    // Add user message locally (will be replaced by DB version on next poll)
+    setMessages(prev => {
+      // Prevent duplicate if same content was just added
+      if (prev.some(m => m.content === userMessage && Date.now() - m.timestamp.getTime() < 5000)) {
+        return prev;
+      }
+      return [...prev, newUserMessage];
+    });
 
-    // Save to database
-    await saveMessage(userMessage, 'user');
+    // Save to database (don't await - let it happen in background)
+    saveMessage(userMessage, 'user').catch(err => {
+      console.error('Failed to save user message:', err);
+    });
 
     // Check if requesting human support
     const query = userMessage.toLowerCase();
@@ -461,16 +506,28 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
       // Get AI transition response
       setIsTyping(true);
       setTimeout(async () => {
+        if (!isMountedRef.current) return;
+        
         const { response, suggestions } = await getAIResponse(userMessage);
-        const botMsgId = `bot_${Date.now()}`;
-        setMessages(prev => [...prev, {
-          id: botMsgId,
-          role: 'bot',
-          content: response,
-          suggestions,
-          timestamp: new Date()
-        }]);
-        await saveMessage(response, 'bot');
+        const botMsgId = `local_bot_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        
+        setMessages(prev => {
+          // Prevent duplicate bot messages
+          if (prev.some(m => m.content === response && Date.now() - m.timestamp.getTime() < 5000)) {
+            return prev;
+          }
+          return [...prev, {
+            id: botMsgId,
+            role: 'bot',
+            content: response,
+            suggestions,
+            timestamp: new Date()
+          }];
+        });
+        
+        saveMessage(response, 'bot').catch(err => {
+          console.error('Failed to save bot message:', err);
+        });
         setIsTyping(false);
       }, 800);
       return;
@@ -485,16 +542,28 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
     // AI mode - get response
     setIsTyping(true);
     setTimeout(async () => {
+      if (!isMountedRef.current) return;
+      
       const { response, suggestions } = await getAIResponse(userMessage);
-      const botMsgId = `bot_${Date.now()}`;
-      setMessages(prev => [...prev, {
-        id: botMsgId,
-        role: 'bot',
-        content: response,
-        suggestions,
-        timestamp: new Date()
-      }]);
-      await saveMessage(response, 'bot');
+      const botMsgId = `local_bot_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      setMessages(prev => {
+        // Prevent duplicate bot messages
+        if (prev.some(m => m.content === response && Date.now() - m.timestamp.getTime() < 5000)) {
+          return prev;
+        }
+        return [...prev, {
+          id: botMsgId,
+          role: 'bot',
+          content: response,
+          suggestions,
+          timestamp: new Date()
+        }];
+      });
+      
+      saveMessage(response, 'bot').catch(err => {
+        console.error('Failed to save bot message:', err);
+      });
       setIsTyping(false);
     }, 800);
   };
