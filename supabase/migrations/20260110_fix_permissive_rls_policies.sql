@@ -196,11 +196,7 @@ CREATE POLICY "goods_received_notes_insert"
   ON goods_received_notes FOR INSERT
   TO authenticated
   WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM purchase_orders po
-      WHERE po.id = goods_received_notes.purchase_order_id
-      AND po.buyer_id = auth.uid()
-    )
+    builder_id = auth.uid()
     OR is_admin()
   );
 
@@ -208,11 +204,7 @@ CREATE POLICY "goods_received_notes_select"
   ON goods_received_notes FOR SELECT
   TO authenticated
   USING (
-    EXISTS (
-      SELECT 1 FROM purchase_orders po
-      WHERE po.id = goods_received_notes.purchase_order_id
-      AND po.buyer_id = auth.uid()
-    )
+    builder_id = auth.uid()
     OR is_admin()
   );
 
@@ -322,9 +314,9 @@ CREATE POLICY "order_materials_insert"
   TO authenticated
   WITH CHECK (
     EXISTS (
-      SELECT 1 FROM purchase_orders po
-      WHERE po.id = order_materials.purchase_order_id
-      AND po.buyer_id = auth.uid()
+      SELECT 1 FROM delivery_orders do
+      WHERE do.id = order_materials.order_id
+      AND do.builder_id = auth.uid()
     )
     OR is_admin()
   );
@@ -334,9 +326,9 @@ CREATE POLICY "order_materials_select"
   TO authenticated
   USING (
     EXISTS (
-      SELECT 1 FROM purchase_orders po
-      WHERE po.id = order_materials.purchase_order_id
-      AND po.buyer_id = auth.uid()
+      SELECT 1 FROM delivery_orders do
+      WHERE do.id = order_materials.order_id
+      AND do.builder_id = auth.uid()
     )
     OR is_admin()
   );
