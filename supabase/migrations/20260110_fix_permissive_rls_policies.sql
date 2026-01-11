@@ -314,9 +314,9 @@ CREATE POLICY "order_materials_insert"
   TO authenticated
   WITH CHECK (
     EXISTS (
-      SELECT 1 FROM delivery_orders do
-      WHERE do.id = order_materials.order_id
-      AND do.builder_id = auth.uid()
+      SELECT 1 FROM delivery_orders del_ord
+      WHERE del_ord.id = order_materials.order_id
+      AND del_ord.builder_id = auth.uid()
     )
     OR is_admin()
   );
@@ -326,9 +326,9 @@ CREATE POLICY "order_materials_select"
   TO authenticated
   USING (
     EXISTS (
-      SELECT 1 FROM delivery_orders do
-      WHERE do.id = order_materials.order_id
-      AND do.builder_id = auth.uid()
+      SELECT 1 FROM delivery_orders del_ord
+      WHERE del_ord.id = order_materials.order_id
+      AND del_ord.builder_id = auth.uid()
     )
     OR is_admin()
   );
