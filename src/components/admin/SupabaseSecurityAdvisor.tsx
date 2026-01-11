@@ -200,9 +200,8 @@ export function SupabaseSecurityAdvisor() {
       // 7. Check for views with SECURITY DEFINER (fallback)
       if (allIssues.length === 0 || !allIssues.some(i => i.category === 'View Security')) {
         try {
-          const { data: securityDefinerViews, error: viewError } = await (client as any)
-            .rpc('get_security_definer_views')
-            .catch(() => ({ data: null, error: { message: 'Function not available' } }));
+          const result = await (client as any).rpc('get_security_definer_views' as any);
+          const { data: securityDefinerViews, error: viewError } = result || { data: null, error: null };
 
           if (!viewError && securityDefinerViews) {
             (securityDefinerViews as any[]).forEach((view: any) => {
@@ -219,7 +218,7 @@ export function SupabaseSecurityAdvisor() {
             });
           }
         } catch (error) {
-          console.log('Security definer views check function not available');
+          console.log('Security definer views check function not available', error);
         }
       }
 
