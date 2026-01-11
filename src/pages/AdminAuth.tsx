@@ -167,17 +167,22 @@ const AdminAuth = () => {
     details?: string
   ) => {
     // Fire and forget - don't block login flow
-    supabase.from('admin_security_logs').insert({
-      event_type: eventType,
-      email_attempt: email,
-      success: success,
-      ip_address: 'client-side',
-      user_agent: navigator.userAgent,
-      details: details,
-      created_at: new Date().toISOString()
-    }).catch((error) => {
-      console.error('Failed to log security event:', error);
-    });
+    // Use db (any type) since admin_security_logs might not be in generated types
+    (async () => {
+      try {
+        await db.from('admin_security_logs').insert({
+          event_type: eventType,
+          email_attempt: email,
+          success: success,
+          ip_address: 'client-side',
+          user_agent: navigator.userAgent,
+          details: details,
+          created_at: new Date().toISOString()
+        });
+      } catch (error: any) {
+        console.error('Failed to log security event:', error);
+      }
+    })();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -287,10 +292,15 @@ const AdminAuth = () => {
               console.log('🔐 Staff member verified:', staffData.full_name, 'Role:', staffData.role);
               
               // Update last_login timestamp (fire and forget - don't block)
-              db.from('admin_staff')
-                .update({ last_login: new Date().toISOString() })
-                .eq('id', staffData.id)
-                .catch((err: any) => console.error('Failed to update last_login:', err));
+              (async () => {
+                try {
+                  await db.from('admin_staff')
+                    .update({ last_login: new Date().toISOString() })
+                    .eq('id', staffData.id);
+                } catch (err: any) {
+                  console.error('Failed to update last_login:', err);
+                }
+              })();
             } else {
               console.log('🔐 Staff account is not active:', staffData.status);
               toast({
@@ -379,10 +389,16 @@ const AdminAuth = () => {
           hasSupabaseSession = true;
           
           // Set admin role in user_roles table (fire and forget)
-          supabase.from('user_roles').upsert({
-            user_id: authData.user.id,
-            role: 'admin'
-          }, { onConflict: 'user_id' }).catch(() => {});
+          (async () => {
+            try {
+              await supabase.from('user_roles').upsert({
+                user_id: authData.user.id,
+                role: 'admin'
+              }, { onConflict: 'user_id' });
+            } catch (err) {
+              // Ignore errors
+            }
+          })();
         } else {
           console.log('ℹ️ No Supabase account, using localStorage auth');
         }
