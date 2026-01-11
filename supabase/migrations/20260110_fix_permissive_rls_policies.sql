@@ -3,6 +3,26 @@
 -- This migration replaces always-true RLS policies with proper security checks
 -- =============================================
 
+-- Ensure app_role type exists
+DO $$ 
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'app_role') THEN
+    CREATE TYPE public.app_role AS ENUM ('admin', 'moderator', 'user', 'builder', 'supplier', 'delivery_provider');
+  END IF;
+END $$;
+
+-- Ensure user_roles table exists
+CREATE TABLE IF NOT EXISTS public.user_roles (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  role app_role NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  UNIQUE (user_id, role)
+);
+
+-- Enable RLS on user_roles if not already enabled
+ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
+
 -- Helper function to check if user is admin (reuse existing if available)
 -- Uses user_roles table which is the current system standard
 CREATE OR REPLACE FUNCTION public.is_admin()
