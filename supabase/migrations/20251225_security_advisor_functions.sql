@@ -202,62 +202,58 @@ DECLARE
 BEGIN
   -- RLS Policies that are always true (permissive policies)
   -- Query pg_policy system catalog directly to get actual expression text
+  -- Use pg_policies view as fallback since it's more reliable for expression matching
   RETURN QUERY
+  WITH policy_expressions AS (
+    SELECT 
+      p.tablename,
+      p.policyname,
+      p.cmd,
+      p.roles,
+      p.qual,
+      p.with_check,
+      -- Normalize expressions: remove whitespace and parentheses for comparison
+      TRIM(BOTH '()' FROM TRIM(COALESCE(p.qual, ''))) as qual_normalized,
+      TRIM(BOTH '()' FROM TRIM(COALESCE(p.with_check, ''))) as with_check_normalized
+    FROM pg_policies p
+    WHERE p.schemaname = 'public'
+      AND p.cmd IN ('INSERT', 'UPDATE', 'DELETE', 'ALL')
+  )
   SELECT 
     'rls_policy_always_true'::TEXT as issue_type,
     CASE 
-      WHEN pol.polcmd IN ('w'::"char", 'd'::"char", '*'::"char") THEN 'high'::TEXT
-      WHEN pol.polcmd = 'a'::"char" AND (c.relname LIKE '%user%' OR c.relname LIKE '%profile%' OR c.relname LIKE '%payment%' OR c.relname LIKE '%security%') THEN 'high'::TEXT
+      WHEN pe.cmd IN ('UPDATE', 'DELETE', 'ALL') THEN 'high'::TEXT
+      WHEN pe.cmd = 'INSERT' AND (pe.tablename LIKE '%user%' OR pe.tablename LIKE '%profile%' OR pe.tablename LIKE '%payment%' OR pe.tablename LIKE '%security%') THEN 'high'::TEXT
       ELSE 'medium'::TEXT
     END as severity,
     'RLS Policy Always True'::TEXT as category,
-    (c.relname || '.' || pol.polname)::TEXT as resource_name,
+    (pe.tablename || '.' || pe.policyname)::TEXT as resource_name,
     'rls_policy'::TEXT as resource_type,
-    ('Table "' || c.relname || '" has an RLS policy "' || pol.polname || '" for "' || 
-     CASE pol.polcmd
-       WHEN 'r'::"char" THEN 'SELECT'
-       WHEN 'a'::"char" THEN 'INSERT'
-       WHEN 'w'::"char" THEN 'UPDATE'
-       WHEN 'd'::"char" THEN 'DELETE'
-       WHEN '*'::"char" THEN 'ALL'
-       ELSE 'UNKNOWN'
-     END || '" that allows unrestricted access' ||
+    ('Table "' || pe.tablename || '" has an RLS policy "' || pe.policyname || '" for "' || pe.cmd || '" that allows unrestricted access' ||
      CASE 
-       WHEN pol.polqual IS NOT NULL AND pg_get_expr(pol.polqual, pol.polrelid) = 'true'
-            AND pol.polwithcheck IS NOT NULL AND pg_get_expr(pol.polwithcheck, pol.polrelid) = 'true'
+       WHEN (pe.qual_normalized = 'true' OR LOWER(pe.qual_normalized) = 'true')
+            AND (pe.with_check_normalized = 'true' OR LOWER(pe.with_check_normalized) = 'true')
        THEN ' (both USING and WITH CHECK are always true)'
-       WHEN pol.polqual IS NOT NULL AND pg_get_expr(pol.polqual, pol.polrelid) = 'true'
+       WHEN pe.qual_normalized = 'true' OR LOWER(pe.qual_normalized) = 'true'
        THEN ' (USING clause is always true)'
-       WHEN pol.polwithcheck IS NOT NULL AND pg_get_expr(pol.polwithcheck, pol.polrelid) = 'true'
+       WHEN pe.with_check_normalized = 'true' OR LOWER(pe.with_check_normalized) = 'true'
        THEN ' (WITH CHECK clause is always true)'
        ELSE ''
      END ||
      '. This effectively bypasses row-level security' ||
      CASE 
-       WHEN array_length(pol.polroles, 1) > 0 THEN ' for ' || array_to_string(
-         ARRAY(SELECT r.rolname FROM pg_roles r WHERE r.oid = ANY(pol.polroles)), ', '
-       )
+       WHEN array_length(pe.roles, 1) > 0 AND pe.roles[1] != '-' THEN ' for ' || array_to_string(pe.roles, ', ')
+       WHEN array_length(pe.roles, 1) = 0 OR (array_length(pe.roles, 1) = 1 AND pe.roles[1] = '-') THEN ' for all roles'
        ELSE ' for all roles'
      END || '.')::TEXT as description,
-    ('Review and restrict RLS policy "' || pol.polname || '" on table "' || c.relname || 
-     '" to prevent unauthorized ' || 
-     CASE pol.polcmd
-       WHEN 'a'::"char" THEN 'INSERT'
-       WHEN 'w'::"char" THEN 'UPDATE'
-       WHEN 'd'::"char" THEN 'DELETE'
-       WHEN '*'::"char" THEN 'access'
-       ELSE 'access'
-     END || '. Avoid ''USING (true)'' or ''WITH CHECK (true)'' for write operations. ' ||
+    ('Review and restrict RLS policy "' || pe.policyname || '" on table "' || pe.tablename || 
+     '" to prevent unauthorized ' || pe.cmd || ' access. Avoid ''USING (true)'' or ''WITH CHECK (true)'' for write operations. ' ||
      'See: https://supabase.com/docs/guides/database/database-linter?lint=0024_permissive_rls_policy')::TEXT as recommendation
-  FROM pg_policy pol
-  JOIN pg_class c ON c.oid = pol.polrelid
-  JOIN pg_namespace n ON n.oid = c.relnamespace
-  WHERE n.nspname = 'public'
-    AND pol.polcmd IN ('a'::"char", 'w'::"char", 'd'::"char", '*'::"char")  -- INSERT, UPDATE, DELETE, ALL
-    AND (
-      (pol.polqual IS NOT NULL AND pg_get_expr(pol.polqual, pol.polrelid) = 'true')
-      OR (pol.polwithcheck IS NOT NULL AND pg_get_expr(pol.polwithcheck, pol.polrelid) = 'true')
-    );
+  FROM policy_expressions pe
+  WHERE (
+    (pe.qual IS NOT NULL AND (pe.qual_normalized = 'true' OR LOWER(pe.qual_normalized) = 'true'))
+    OR (pe.with_check IS NOT NULL AND (pe.with_check_normalized = 'true' OR LOWER(pe.with_check_normalized) = 'true'))
+  );
 
   -- Tables without RLS
   RETURN QUERY
