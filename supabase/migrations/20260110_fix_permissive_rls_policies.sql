@@ -521,9 +521,17 @@ CREATE POLICY "tracking_updates_insert"
     EXISTS (
       SELECT 1 FROM deliveries d
       WHERE d.id = tracking_updates.delivery_id
-      AND (d.buyer_id = auth.uid() OR d.delivery_provider_id IN (
-        SELECT id FROM delivery_providers WHERE user_id = auth.uid()
-      ))
+      AND (
+        d.builder_id = auth.uid()
+        OR d.provider_id IN (
+          SELECT id FROM delivery_providers WHERE user_id = auth.uid()
+        )
+        OR EXISTS (
+          SELECT 1 FROM purchase_orders po
+          WHERE po.id = d.order_id
+          AND po.buyer_id = auth.uid()
+        )
+      )
     )
     OR is_admin()
   );
@@ -535,9 +543,17 @@ CREATE POLICY "tracking_updates_select"
     EXISTS (
       SELECT 1 FROM deliveries d
       WHERE d.id = tracking_updates.delivery_id
-      AND (d.buyer_id = auth.uid() OR d.delivery_provider_id IN (
-        SELECT id FROM delivery_providers WHERE user_id = auth.uid()
-      ))
+      AND (
+        d.builder_id = auth.uid()
+        OR d.provider_id IN (
+          SELECT id FROM delivery_providers WHERE user_id = auth.uid()
+        )
+        OR EXISTS (
+          SELECT 1 FROM purchase_orders po
+          WHERE po.id = d.order_id
+          AND po.buyer_id = auth.uid()
+        )
+      )
     )
     OR is_admin()
   );
