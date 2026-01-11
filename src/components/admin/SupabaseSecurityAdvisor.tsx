@@ -70,8 +70,9 @@ export function SupabaseSecurityAdvisor() {
               description: issue.description,
               severity: issue.severity as 'critical' | 'high' | 'medium' | 'low',
               affectedResource: issue.resource_name,
-              recommendation: issue.recommendation
-            });
+              recommendation: issue.recommendation,
+              issue_type: issue.issue_type // Store for filtering
+            } as SecurityIssue & { issue_type?: string });
           });
         } else {
           console.log('No security issues returned or invalid format:', allSecurityIssues);
