@@ -224,23 +224,12 @@ DROP POLICY IF EXISTS "Enable delete for all users" ON job_applications;
 CREATE POLICY "Enable update for all users"
   ON job_applications FOR UPDATE
   TO authenticated
-  USING (
-    -- Users can update their own applications
-    user_id = auth.uid()
-    OR is_admin()
-  )
-  WITH CHECK (
-    user_id = auth.uid()
-    OR is_admin()
-  );
+  USING (is_admin()); -- Only admins can update (job_applications doesn't have user_id)
 
 CREATE POLICY "Enable delete for all users"
   ON job_applications FOR DELETE
   TO authenticated
-  USING (
-    user_id = auth.uid()
-    OR is_admin()
-  );
+  USING (is_admin()); -- Only admins can delete (job_applications doesn't have user_id)
 
 -- Fix material_qr_codes UPDATE/ALL policies
 DROP POLICY IF EXISTS "Suppliers can update own QR codes" ON material_qr_codes;
@@ -291,12 +280,12 @@ CREATE POLICY "Anyone can update monitoring requests"
   ON monitoring_service_requests FOR UPDATE
   TO authenticated
   USING (
-    -- Users can update their own requests
-    user_id = auth.uid()
+    -- Users can update their own requests (check both user_id and requester_id)
+    (user_id = auth.uid() OR requester_id = auth.uid())
     OR is_admin()
   )
   WITH CHECK (
-    user_id = auth.uid()
+    (user_id = auth.uid() OR requester_id = auth.uid())
     OR is_admin()
   );
 
@@ -340,11 +329,20 @@ CREATE POLICY "Anyone can update requests"
   ON product_requests FOR UPDATE
   TO authenticated
   USING (
-    user_id = auth.uid()
+    -- Product requests use supplier_id, not user_id
+    EXISTS (
+      SELECT 1 FROM suppliers s
+      WHERE s.id = product_requests.supplier_id
+      AND s.user_id = auth.uid()
+    )
     OR is_admin()
   )
   WITH CHECK (
-    user_id = auth.uid()
+    EXISTS (
+      SELECT 1 FROM suppliers s
+      WHERE s.id = product_requests.supplier_id
+      AND s.user_id = auth.uid()
+    )
     OR is_admin()
   );
 
@@ -591,11 +589,12 @@ CREATE POLICY "Authenticated can update chatbot messages"
   ON chatbot_messages FOR UPDATE
   TO authenticated
   USING (
-    user_id = auth.uid()
+    -- chatbot_messages has optional user_id, check if it exists and matches
+    (user_id IS NOT NULL AND user_id::uuid = auth.uid())
     OR is_admin()
   )
   WITH CHECK (
-    user_id = auth.uid()
+    (user_id IS NOT NULL AND user_id::uuid = auth.uid())
     OR is_admin()
   );
 
