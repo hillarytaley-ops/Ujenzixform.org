@@ -280,12 +280,12 @@ CREATE POLICY "Anyone can update monitoring requests"
   ON monitoring_service_requests FOR UPDATE
   TO authenticated
   USING (
-    -- Users can update their own requests (check both user_id and requester_id)
-    (user_id = auth.uid() OR requester_id = auth.uid())
+    -- Users can update their own requests (use requester_id, user_id may not exist)
+    requester_id = auth.uid()
     OR is_admin()
   )
   WITH CHECK (
-    (user_id = auth.uid() OR requester_id = auth.uid())
+    requester_id = auth.uid()
     OR is_admin()
   );
 
