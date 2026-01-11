@@ -110,10 +110,10 @@ CREATE POLICY "delivery_status_updates_insert"
   WITH CHECK (
     -- Owner or delivery provider can insert
     EXISTS (
-      SELECT 1 FROM delivery_orders do
-      JOIN purchase_orders po ON po.id = do.purchase_order_id
-      WHERE do.id = delivery_status_updates.delivery_order_id
-      AND (po.buyer_id = auth.uid() OR do.delivery_provider_id IN (
+      SELECT 1 FROM delivery_orders del_ord
+      JOIN purchase_orders po ON po.id = del_ord.purchase_order_id
+      WHERE del_ord.id = delivery_status_updates.delivery_order_id
+      AND (po.buyer_id = auth.uid() OR del_ord.delivery_provider_id IN (
         SELECT id FROM delivery_providers WHERE user_id = auth.uid()
       ))
     )
@@ -125,10 +125,10 @@ CREATE POLICY "delivery_status_updates_select"
   TO authenticated
   USING (
     EXISTS (
-      SELECT 1 FROM delivery_orders do
-      JOIN purchase_orders po ON po.id = do.purchase_order_id
-      WHERE do.id = delivery_status_updates.delivery_order_id
-      AND (po.buyer_id = auth.uid() OR do.delivery_provider_id IN (
+      SELECT 1 FROM delivery_orders del_ord
+      JOIN purchase_orders po ON po.id = del_ord.purchase_order_id
+      WHERE del_ord.id = delivery_status_updates.delivery_order_id
+      AND (po.buyer_id = auth.uid() OR del_ord.delivery_provider_id IN (
         SELECT id FROM delivery_providers WHERE user_id = auth.uid()
       ))
     )
