@@ -122,6 +122,46 @@ BEGIN
 END;
 $$;
 
+-- Function to get RLS policies that are always true (permissive)
+CREATE OR REPLACE FUNCTION public.get_permissive_rls_policies()
+RETURNS TABLE (
+  table_name TEXT,
+  policy_name TEXT,
+  command TEXT,
+  roles TEXT[],
+  permissive_using BOOLEAN,
+  permissive_with_check BOOLEAN
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    p.tablename::TEXT as table_name,
+    p.policyname::TEXT as policy_name,
+    p.cmd::TEXT as command,
+    p.roles::TEXT[] as roles,
+    CASE 
+      WHEN p.qual IS NOT NULL AND (p.qual::text = 'true' OR p.qual::text = '(true)') THEN true
+      ELSE false
+    END as permissive_using,
+    CASE 
+      WHEN p.with_check IS NOT NULL AND (p.with_check::text = 'true' OR p.with_check::text = '(true)') THEN true
+      ELSE false
+    END as permissive_with_check
+  FROM pg_policies p
+  WHERE p.schemaname = 'public'
+    AND p.cmd IN ('INSERT', 'UPDATE', 'DELETE', 'ALL')
+    AND (
+      (p.qual IS NOT NULL AND (p.qual::text = 'true' OR p.qual::text = '(true)'))
+      OR (p.with_check IS NOT NULL AND (p.with_check::text = 'true' OR p.with_check::text = '(true)'))
+    )
+  ORDER BY p.tablename, p.policyname;
+END;
+$$;
+
 -- Function to get all security issues (comprehensive check)
 CREATE OR REPLACE FUNCTION public.get_all_security_issues()
 RETURNS TABLE (
@@ -140,6 +180,45 @@ AS $$
 DECLARE
   issue_count INTEGER := 0;
 BEGIN
+  -- RLS Policies that are always true (permissive policies)
+  RETURN QUERY
+  SELECT 
+    'rls_policy_always_true'::TEXT as issue_type,
+    CASE 
+      WHEN p.cmd IN ('UPDATE', 'DELETE', 'ALL') THEN 'high'::TEXT
+      WHEN p.cmd = 'INSERT' AND (p.tablename LIKE '%user%' OR p.tablename LIKE '%profile%' OR p.tablename LIKE '%payment%' OR p.tablename LIKE '%security%') THEN 'high'::TEXT
+      ELSE 'medium'::TEXT
+    END as severity,
+    'RLS Policy Security'::TEXT as category,
+    (p.tablename || '.' || p.policyname)::TEXT as resource_name,
+    'policy'::TEXT as resource_type,
+    ('Table "' || p.tablename || '" has an RLS policy "' || p.policyname || '" for "' || p.cmd || '" that allows unrestricted access' ||
+     CASE 
+       WHEN (p.qual IS NOT NULL AND (p.qual::text = 'true' OR p.qual::text = '(true)')) 
+            AND (p.with_check IS NOT NULL AND (p.with_check::text = 'true' OR p.with_check::text = '(true)'))
+       THEN ' (both USING and WITH CHECK are always true)'
+       WHEN p.qual IS NOT NULL AND (p.qual::text = 'true' OR p.qual::text = '(true)')
+       THEN ' (USING clause is always true)'
+       WHEN p.with_check IS NOT NULL AND (p.with_check::text = 'true' OR p.with_check::text = '(true)')
+       THEN ' (WITH CHECK clause is always true)'
+       ELSE ''
+     END ||
+     '. This effectively bypasses row-level security' ||
+     CASE 
+       WHEN array_length(p.roles, 1) > 0 THEN ' for ' || array_to_string(p.roles, ', ')
+       ELSE ' for all roles'
+     END || '.')::TEXT as description,
+    ('Review and restrict the RLS policy "' || p.policyname || '" on table "' || p.tablename || 
+     '" to add proper access controls instead of using always-true conditions. ' ||
+     'See: https://supabase.com/docs/guides/database/database-linter?lint=0024_permissive_rls_policy')::TEXT as recommendation
+  FROM pg_policies p
+  WHERE p.schemaname = 'public'
+    AND p.cmd IN ('INSERT', 'UPDATE', 'DELETE', 'ALL')
+    AND (
+      (p.qual IS NOT NULL AND (p.qual::text = 'true' OR p.qual::text = '(true)'))
+      OR (p.with_check IS NOT NULL AND (p.with_check::text = 'true' OR p.with_check::text = '(true)'))
+    );
+
   -- Tables without RLS
   RETURN QUERY
   SELECT 
@@ -223,5 +302,6 @@ GRANT EXECUTE ON FUNCTION public.get_tables_without_rls() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_security_definer_functions() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_security_definer_views() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_tables_without_policies() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_permissive_rls_policies() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_all_security_issues() TO authenticated;
 
