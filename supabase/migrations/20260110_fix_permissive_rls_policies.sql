@@ -85,31 +85,23 @@ CREATE POLICY "delivery_orders_update"
   ON delivery_orders FOR UPDATE
   TO authenticated
   USING (
-    -- Owner can update their own orders
-    EXISTS (
-      SELECT 1 FROM purchase_orders po
-      WHERE po.id = delivery_orders.purchase_order_id
-      AND po.buyer_id = auth.uid()
-    )
+    -- Builder can update their own orders
+    builder_id = auth.uid()
     OR is_admin()
-    -- Delivery provider can update orders assigned to them
+    -- Supplier can update orders for their materials
     OR EXISTS (
-      SELECT 1 FROM delivery_providers dp
-      WHERE dp.user_id = auth.uid()
-      AND delivery_orders.delivery_provider_id = dp.id
+      SELECT 1 FROM suppliers s
+      WHERE s.id = delivery_orders.supplier_id
+      AND s.user_id = auth.uid()
     )
   )
   WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM purchase_orders po
-      WHERE po.id = delivery_orders.purchase_order_id
-      AND po.buyer_id = auth.uid()
-    )
+    builder_id = auth.uid()
     OR is_admin()
     OR EXISTS (
-      SELECT 1 FROM delivery_providers dp
-      WHERE dp.user_id = auth.uid()
-      AND delivery_orders.delivery_provider_id = dp.id
+      SELECT 1 FROM suppliers s
+      WHERE s.id = delivery_orders.supplier_id
+      AND s.user_id = auth.uid()
     )
   );
 
