@@ -201,59 +201,44 @@ DECLARE
   issue_count INTEGER := 0;
 BEGIN
   -- RLS Policies that are always true (permissive policies)
-  -- Query pg_policy system catalog directly to get actual expression text
-  -- Use pg_policies view as fallback since it's more reliable for expression matching
+  -- Based on actual pg_policies view data: qual and with_check are stored as literal string 'true'
   RETURN QUERY
-  WITH policy_expressions AS (
-    SELECT 
-      p.tablename,
-      p.policyname,
-      p.cmd,
-      p.roles,
-      p.qual,
-      p.with_check,
-      -- Normalize expressions: remove whitespace and parentheses for comparison
-      TRIM(BOTH '()' FROM TRIM(COALESCE(p.qual, ''))) as qual_normalized,
-      TRIM(BOTH '()' FROM TRIM(COALESCE(p.with_check, ''))) as with_check_normalized
-    FROM pg_policies p
-    WHERE p.schemaname = 'public'
-      AND p.cmd IN ('INSERT', 'UPDATE', 'DELETE', 'ALL')
-  )
   SELECT 
     'rls_policy_always_true'::TEXT as issue_type,
     CASE 
-      WHEN pe.cmd IN ('UPDATE', 'DELETE', 'ALL') THEN 'high'::TEXT
-      WHEN pe.cmd = 'INSERT' AND (pe.tablename LIKE '%user%' OR pe.tablename LIKE '%profile%' OR pe.tablename LIKE '%payment%' OR pe.tablename LIKE '%security%') THEN 'high'::TEXT
+      WHEN p.cmd IN ('UPDATE', 'DELETE', 'ALL') THEN 'high'::TEXT
+      WHEN p.cmd = 'INSERT' AND (p.tablename LIKE '%user%' OR p.tablename LIKE '%profile%' OR p.tablename LIKE '%payment%' OR p.tablename LIKE '%security%') THEN 'high'::TEXT
       ELSE 'medium'::TEXT
     END as severity,
     'RLS Policy Always True'::TEXT as category,
-    (pe.tablename || '.' || pe.policyname)::TEXT as resource_name,
+    (p.tablename || '.' || p.policyname)::TEXT as resource_name,
     'rls_policy'::TEXT as resource_type,
-    ('Table "' || pe.tablename || '" has an RLS policy "' || pe.policyname || '" for "' || pe.cmd || '" that allows unrestricted access' ||
+    ('Table "' || p.tablename || '" has an RLS policy "' || p.policyname || '" for "' || p.cmd || '" that allows unrestricted access' ||
      CASE 
-       WHEN (pe.qual_normalized = 'true' OR LOWER(pe.qual_normalized) = 'true')
-            AND (pe.with_check_normalized = 'true' OR LOWER(pe.with_check_normalized) = 'true')
+       WHEN p.qual = 'true' AND p.with_check = 'true'
        THEN ' (both USING and WITH CHECK are always true)'
-       WHEN pe.qual_normalized = 'true' OR LOWER(pe.qual_normalized) = 'true'
+       WHEN p.qual = 'true'
        THEN ' (USING clause is always true)'
-       WHEN pe.with_check_normalized = 'true' OR LOWER(pe.with_check_normalized) = 'true'
+       WHEN p.with_check = 'true'
        THEN ' (WITH CHECK clause is always true)'
        ELSE ''
      END ||
      '. This effectively bypasses row-level security' ||
      CASE 
-       WHEN array_length(pe.roles, 1) > 0 AND pe.roles[1] != '-' THEN ' for ' || array_to_string(pe.roles, ', ')
-       WHEN array_length(pe.roles, 1) = 0 OR (array_length(pe.roles, 1) = 1 AND pe.roles[1] = '-') THEN ' for all roles'
+       WHEN array_length(p.roles, 1) > 0 AND p.roles[1] != '-' THEN ' for ' || array_to_string(p.roles, ', ')
+       WHEN array_length(p.roles, 1) = 0 OR (array_length(p.roles, 1) = 1 AND p.roles[1] = '-') THEN ' for all roles'
        ELSE ' for all roles'
      END || '.')::TEXT as description,
-    ('Review and restrict RLS policy "' || pe.policyname || '" on table "' || pe.tablename || 
-     '" to prevent unauthorized ' || pe.cmd || ' access. Avoid ''USING (true)'' or ''WITH CHECK (true)'' for write operations. ' ||
+    ('Review and restrict RLS policy "' || p.policyname || '" on table "' || p.tablename || 
+     '" to prevent unauthorized ' || p.cmd || ' access. Avoid ''USING (true)'' or ''WITH CHECK (true)'' for write operations. ' ||
      'See: https://supabase.com/docs/guides/database/database-linter?lint=0024_permissive_rls_policy')::TEXT as recommendation
-  FROM policy_expressions pe
-  WHERE (
-    (pe.qual IS NOT NULL AND (pe.qual_normalized = 'true' OR LOWER(pe.qual_normalized) = 'true'))
-    OR (pe.with_check IS NOT NULL AND (pe.with_check_normalized = 'true' OR LOWER(pe.with_check_normalized) = 'true'))
-  );
+  FROM pg_policies p
+  WHERE p.schemaname = 'public'
+    AND p.cmd IN ('INSERT', 'UPDATE', 'DELETE', 'ALL')
+    AND (
+      p.qual = 'true'
+      OR p.with_check = 'true'
+    );
 
   -- Tables without RLS
   RETURN QUERY
