@@ -48,25 +48,57 @@ export function SupabaseSecurityAdvisor() {
 
       // 1. Get all security issues using comprehensive function
       try {
-        const result = await (client as any).rpc('get_all_security_issues' as any);
-        const { data: allSecurityIssues, error: allIssuesError } = result || { data: null, error: null };
+        const { data: allSecurityIssues, error: allIssuesError } = await (client as any).rpc('get_all_security_issues' as any);
 
-        if (!allIssuesError && allSecurityIssues && Array.isArray(allSecurityIssues)) {
+        if (allIssuesError) {
+          console.error('Error calling get_all_security_issues:', allIssuesError);
+        } else if (allSecurityIssues && Array.isArray(allSecurityIssues)) {
+          console.log(`Found ${allSecurityIssues.length} security issues from get_all_security_issues`);
           allSecurityIssues.forEach((issue: any) => {
+            const resourceTypeLabel = issue.resource_type === 'table' ? 'Table' 
+              : issue.resource_type === 'function' ? 'Function' 
+              : issue.resource_type === 'view' ? 'View'
+              : issue.resource_type === 'rls_policy' ? 'RLS Policy'
+              : 'Resource';
+            
             allIssues.push({
               id: `${issue.issue_type}-${issue.resource_name}`,
               type: issue.severity === 'critical' ? 'error' : issue.severity === 'high' ? 'error' : 'warning',
-              category: issue.category,
-              title: `${issue.resource_type === 'table' ? 'Table' : issue.resource_type === 'function' ? 'Function' : 'View'} "${issue.resource_name}" - ${issue.issue_type.replace(/_/g, ' ')}`,
+              category: issue.category || 'Security',
+              title: `${resourceTypeLabel} "${issue.resource_name}" - ${issue.issue_type.replace(/_/g, ' ')}`,
               description: issue.description,
               severity: issue.severity as 'critical' | 'high' | 'medium' | 'low',
               affectedResource: issue.resource_name,
               recommendation: issue.recommendation
             });
           });
+        } else {
+          console.log('No security issues returned or invalid format:', allSecurityIssues);
         }
       } catch (error) {
-        console.log('Comprehensive security check function not available, using individual checks', error);
+        console.error('Comprehensive security check function error:', error);
+        
+        // Fallback: Try calling get_permissive_rls_policies directly
+        try {
+          const { data: permissivePolicies, error: permError } = await (client as any).rpc('get_permissive_rls_policies' as any);
+          if (!permError && permissivePolicies && Array.isArray(permissivePolicies)) {
+            console.log(`Found ${permissivePolicies.length} permissive RLS policies`);
+            permissivePolicies.forEach((policy: any) => {
+              allIssues.push({
+                id: `permissive-rls-${policy.table_name}-${policy.policy_name}`,
+                type: 'warning',
+                category: 'RLS Policy Always True',
+                title: `RLS Policy "${policy.policy_name}" on table "${policy.table_name}"`,
+                description: `Table "${policy.table_name}" has an RLS policy "${policy.policy_name}" for ${policy.command} that allows unrestricted access (USING or WITH CHECK clause is always true). This effectively bypasses row-level security for ${policy.roles?.join(', ') || 'all roles'}.`,
+                severity: policy.command === 'UPDATE' || policy.command === 'DELETE' || policy.command === 'ALL' ? 'high' : 'medium',
+                affectedResource: `${policy.table_name}.${policy.policy_name}`,
+                recommendation: `Review and restrict RLS policy "${policy.policy_name}" on table "${policy.table_name}" to prevent unauthorized ${policy.command} access. Avoid 'USING (true)' or 'WITH CHECK (true)' for write operations.`
+              });
+            });
+          }
+        } catch (fallbackError) {
+          console.error('Fallback permissive policies check also failed:', fallbackError);
+        }
       }
 
       // 2. Check for tables without RLS enabled (fallback if comprehensive function doesn't work)
