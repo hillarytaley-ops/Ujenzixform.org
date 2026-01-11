@@ -171,10 +171,9 @@ const AdminAuth = () => {
   ) => {
     // Fire and forget - don't block login flow
     // Use db (any type) since admin_security_logs might not be in generated types
-    // Supabase insert needs .select() or proper promise handling
-    Promise.resolve().then(async () => {
+    (async () => {
       try {
-        const result = db.from('admin_security_logs').insert({
+        const { error } = await db.from('admin_security_logs').insert({
           event_type: eventType,
           email_attempt: email,
           success: success,
@@ -184,18 +183,13 @@ const AdminAuth = () => {
           created_at: new Date().toISOString()
         });
         
-        // Ensure we get a promise by calling select() or using the result properly
-        if (result && typeof result.then === 'function') {
-          await result;
-        } else if (result && typeof result.select === 'function') {
-          await result.select();
+        if (error) {
+          console.error('Failed to log security event:', error);
         }
       } catch (error: any) {
         console.error('Failed to log security event:', error);
       }
-    }).catch(() => {
-      // Silently fail - don't block login
-    });
+    })();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
