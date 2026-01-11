@@ -88,28 +88,31 @@ const AdminAuth = () => {
     }
     
     // Check Supabase auth in parallel (non-blocking)
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) {
-        // Check if user has admin role (non-blocking)
-        supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .eq('role', 'admin')
-          .maybeSingle()
-          .then(({ data: roleData }) => {
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          try {
+            // Check if user has admin role (non-blocking)
+            const { data: roleData } = await supabase
+              .from('user_roles')
+              .select('role')
+              .eq('user_id', user.id)
+              .eq('role', 'admin')
+              .maybeSingle();
+            
             if (roleData) {
               // Already authenticated as admin, redirect to admin dashboard
               navigate("/admin-dashboard");
             }
-          })
-          .catch(() => {
+          } catch {
             // Ignore errors - user can still login manually
-          });
+          }
+        }
+      } catch {
+        // Ignore errors - user can still login manually
       }
-    }).catch(() => {
-      // Ignore errors - user can still login manually
-    });
+    })();
   };
 
   const validateWorkEmail = (email: string): boolean => {
