@@ -140,6 +140,18 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Don't intercept module scripts - let them load directly from network
+  // This prevents MIME type issues (application/octet-stream vs application/javascript)
+  if (request.destination === 'script' || 
+      url.pathname.endsWith('.js') || 
+      url.pathname.endsWith('.mjs') || 
+      url.pathname.endsWith('.tsx') ||
+      url.pathname.includes('/src/') ||
+      url.pathname.includes('/assets/') && url.pathname.endsWith('.js')) {
+    // Let module scripts pass through without service worker interception
+    return;
+  }
+
   // Strategy selection based on request type
   if (isApiRequest(url)) {
     event.respondWith(networkFirstWithCache(request, API_CACHE));
