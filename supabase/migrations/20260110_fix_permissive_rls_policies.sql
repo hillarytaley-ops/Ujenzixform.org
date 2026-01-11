@@ -121,20 +121,15 @@ CREATE POLICY "delivery_status_updates_insert"
   ON delivery_status_updates FOR INSERT
   TO authenticated
   WITH CHECK (
-    -- Builder or delivery provider can insert
+    -- Builder or driver can insert
     EXISTS (
       SELECT 1 FROM delivery_requests dr
       WHERE dr.id = delivery_status_updates.delivery_request_id
       AND (
         dr.builder_id = auth.uid()
         OR dr.driver_id = auth.uid()
-        OR EXISTS (
-          SELECT 1 FROM purchase_orders po
-          WHERE po.id IN (
-            SELECT order_id FROM delivery_requests dr2
-            WHERE dr2.id = delivery_status_updates.delivery_request_id
-          )
-          AND po.buyer_id = auth.uid()
+        OR dr.provider_id IN (
+          SELECT id FROM delivery_providers WHERE user_id = auth.uid()
         )
       )
     )
@@ -151,13 +146,8 @@ CREATE POLICY "delivery_status_updates_select"
       AND (
         dr.builder_id = auth.uid()
         OR dr.driver_id = auth.uid()
-        OR EXISTS (
-          SELECT 1 FROM purchase_orders po
-          WHERE po.id IN (
-            SELECT order_id FROM delivery_requests dr2
-            WHERE dr2.id = delivery_status_updates.delivery_request_id
-          )
-          AND po.buyer_id = auth.uid()
+        OR dr.provider_id IN (
+          SELECT id FROM delivery_providers WHERE user_id = auth.uid()
         )
       )
     )
