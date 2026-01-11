@@ -175,7 +175,7 @@ const AdminAuth = () => {
       try {
         const { error } = await db.from('admin_security_logs').insert({
           event_type: eventType,
-          email_attempt: email,
+          email: email,
           success: success,
           ip_address: 'client-side',
           user_agent: navigator.userAgent,
