@@ -5,7 +5,7 @@
 //           periodic sync, share target, file handling
 // ============================================================
 
-const CACHE_VERSION = 'v6';
+const CACHE_VERSION = 'v7';
 const STATIC_CACHE = `mradipro-static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `mradipro-dynamic-${CACHE_VERSION}`;
 const API_CACHE = `mradipro-api-${CACHE_VERSION}`;
