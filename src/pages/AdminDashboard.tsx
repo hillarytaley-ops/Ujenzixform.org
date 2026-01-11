@@ -92,6 +92,7 @@ import { AdminVideoApproval } from "@/components/admin/AdminVideoApproval";
 import { UserRolesManager } from "@/components/admin/UserRolesManager";
 import { AdminMessaging } from "@/components/admin/AdminMessaging";
 import { LiveChatManager } from "@/components/admin/LiveChatManager";
+import { SupabaseSecurityAdvisor } from "@/components/admin/SupabaseSecurityAdvisor";
 import { Camera, UserCog, MessageCircle } from "lucide-react";
 import {
   Table,
@@ -3033,6 +3034,9 @@ const AdminDashboard = () => {
 
           {/* Security Tab */}
           <TabsContent value="security" className="space-y-6">
+            {/* Supabase Security Advisor - Full Width */}
+            <SupabaseSecurityAdvisor />
+            
             <div className="grid md:grid-cols-2 gap-6">
               <Card className="bg-slate-900/50 border-slate-800">
                 <CardHeader>
