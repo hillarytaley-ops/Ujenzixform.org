@@ -121,14 +121,18 @@ CREATE POLICY "delivery_status_updates_insert"
   ON delivery_status_updates FOR INSERT
   TO authenticated
   WITH CHECK (
-    -- Owner or delivery provider can insert
+    -- Builder or delivery provider can insert
     EXISTS (
       SELECT 1 FROM delivery_orders del_ord
-      JOIN purchase_orders po ON po.id = del_ord.purchase_order_id
       WHERE del_ord.id = delivery_status_updates.delivery_order_id
-      AND (po.buyer_id = auth.uid() OR del_ord.delivery_provider_id IN (
-        SELECT id FROM delivery_providers WHERE user_id = auth.uid()
-      ))
+      AND (
+        del_ord.builder_id = auth.uid()
+        OR EXISTS (
+          SELECT 1 FROM suppliers s
+          WHERE s.id = del_ord.supplier_id
+          AND s.user_id = auth.uid()
+        )
+      )
     )
     OR is_admin()
   );
@@ -139,11 +143,15 @@ CREATE POLICY "delivery_status_updates_select"
   USING (
     EXISTS (
       SELECT 1 FROM delivery_orders del_ord
-      JOIN purchase_orders po ON po.id = del_ord.purchase_order_id
       WHERE del_ord.id = delivery_status_updates.delivery_order_id
-      AND (po.buyer_id = auth.uid() OR del_ord.delivery_provider_id IN (
-        SELECT id FROM delivery_providers WHERE user_id = auth.uid()
-      ))
+      AND (
+        del_ord.builder_id = auth.uid()
+        OR EXISTS (
+          SELECT 1 FROM suppliers s
+          WHERE s.id = del_ord.supplier_id
+          AND s.user_id = auth.uid()
+        )
+      )
     )
     OR is_admin()
   );
@@ -158,9 +166,17 @@ CREATE POLICY "delivery_updates_insert"
     EXISTS (
       SELECT 1 FROM deliveries d
       WHERE d.id = delivery_updates.delivery_id
-      AND (d.buyer_id = auth.uid() OR d.delivery_provider_id IN (
-        SELECT id FROM delivery_providers WHERE user_id = auth.uid()
-      ))
+      AND (
+        d.builder_id = auth.uid()
+        OR d.provider_id IN (
+          SELECT id FROM delivery_providers WHERE user_id = auth.uid()
+        )
+        OR EXISTS (
+          SELECT 1 FROM purchase_orders po
+          WHERE po.id = d.order_id
+          AND po.buyer_id = auth.uid()
+        )
+      )
     )
     OR is_admin()
   );
@@ -172,9 +188,17 @@ CREATE POLICY "delivery_updates_select"
     EXISTS (
       SELECT 1 FROM deliveries d
       WHERE d.id = delivery_updates.delivery_id
-      AND (d.buyer_id = auth.uid() OR d.delivery_provider_id IN (
-        SELECT id FROM delivery_providers WHERE user_id = auth.uid()
-      ))
+      AND (
+        d.builder_id = auth.uid()
+        OR d.provider_id IN (
+          SELECT id FROM delivery_providers WHERE user_id = auth.uid()
+        )
+        OR EXISTS (
+          SELECT 1 FROM purchase_orders po
+          WHERE po.id = d.order_id
+          AND po.buyer_id = auth.uid()
+        )
+      )
     )
     OR is_admin()
   );
