@@ -53,7 +53,7 @@ export const ALL_ADMIN_TABS = [
   'staff',
   'activity-log',
   'scanning',
-  'chat',
+  'communications',
   'delivery-analytics',
   'settings'
 ] as const;
@@ -97,7 +97,8 @@ export const STAFF_ROLES: Record<string, StaffRole> = {
       'security',
       'activity-log',
       'settings',
-      'chat'
+      'communications',
+      'material-images'
     ],
     canManageStaff: false,
     canExportData: true,
@@ -184,7 +185,7 @@ export const STAFF_ROLES: Record<string, StaffRole> = {
     allowedTabs: [
       'overview',
       'feedback',
-      'chat',
+      'communications',
       'registrations',
       'delivery-requests'
     ],
@@ -324,7 +325,7 @@ export const TAB_METADATA: Record<AdminTab, { name: string; icon: string; descri
     description: 'QR code scan management',
     category: 'Operations'
   },
-  'chat': {
+  'communications': {
     name: 'Live Chat',
     icon: 'MessageCircle',
     description: 'Customer support chat',

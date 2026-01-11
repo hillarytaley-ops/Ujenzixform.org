@@ -121,6 +121,9 @@ import { StaffManagement } from "@/components/admin/StaffManagement";
 import { ActivityLogViewer } from "@/components/admin/ActivityLogViewer";
 import { ThemeToggle, ThemeProvider } from "@/components/admin/dashboard/ThemeToggle";
 import { MobileNav } from "@/components/admin/dashboard/MobileNav";
+import { useStaffPermissions } from "@/hooks/useStaffPermissions";
+import { PermissionGate } from "@/components/admin/PermissionGate";
+import { AdminTab } from "@/config/staffPermissions";
 
 // New Modular Admin Components
 import { 
@@ -387,6 +390,18 @@ const AdminDashboard = () => {
   });
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Staff permissions hook
+  const {
+    loading: permissionsLoading,
+    staffRole,
+    roleDetails,
+    isAdmin: isAdminStaff,
+    isSuperAdmin: isSuperAdminStaff,
+    accessibleTabs,
+    canAccessTab,
+    staffName
+  } = useStaffPermissions();
 
   // Use new modular hooks for data fetching
   const { 
@@ -1648,7 +1663,30 @@ const AdminDashboard = () => {
     }
   };
 
-  if (loading) {
+  // Helper function to check if a tab should be shown
+  const shouldShowTab = (tab: string): boolean => {
+    // Admin-only tabs (not in permissions config)
+    const adminOnlyTabs = ['pending-products', 'qr-codes', 'videos', 'user-roles', 'messaging'];
+    if (adminOnlyTabs.includes(tab)) {
+      return isAdminStaff || isSuperAdminStaff;
+    }
+    // Standard tabs - check permissions
+    if (isAdminStaff || isSuperAdminStaff) {
+      return true; // Admins see all tabs
+    }
+    return canAccessTab(tab as AdminTab);
+  };
+
+  // Auto-switch to first accessible tab if current tab is not accessible (for non-admin staff)
+  useEffect(() => {
+    if (!permissionsLoading && accessibleTabs.length > 0 && !isAdminStaff && !isSuperAdminStaff) {
+      if (!accessibleTabs.includes(activeTab as AdminTab) && !['pending-products', 'material-images', 'qr-codes', 'videos', 'user-roles', 'messaging'].includes(activeTab)) {
+        setActiveTab(accessibleTabs[0]);
+      }
+    }
+  }, [permissionsLoading, accessibleTabs, activeTab, isAdminStaff, isSuperAdminStaff]);
+
+  if (loading || permissionsLoading) {
     return (
       <ThemeProvider>
         <div className="min-h-screen bg-slate-950 dark:bg-slate-950 flex items-center justify-center">
@@ -1696,6 +1734,16 @@ const AdminDashboard = () => {
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                 <span className="text-sm text-gray-300 truncate max-w-[150px]">{adminEmail}</span>
               </div>
+              
+              {/* Staff Role Badge for Non-Admin Staff */}
+              {!isAdminStaff && !isSuperAdminStaff && roleDetails && (
+                <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg border" style={{ backgroundColor: roleDetails.color.replace('bg-', '') + '20', borderColor: roleDetails.color.replace('bg-', '') + '40' }}>
+                  <Shield className="h-4 w-4" style={{ color: roleDetails.color.replace('bg-', '#') }} />
+                  <span className="text-sm text-gray-300">
+                    {roleDetails.name} | {accessibleTabs.length} tab{accessibleTabs.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
+              )}
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -1807,106 +1855,156 @@ const AdminDashboard = () => {
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="bg-slate-900/50 border border-slate-800 p-1 flex-wrap h-auto gap-1 justify-start overflow-x-auto max-w-full">
-            <TabsTrigger value="overview" className="data-[state=active]:bg-blue-600">
-              <BarChart3 className="h-4 w-4 mr-2" />
-              Overview
-            </TabsTrigger>
-            <TabsTrigger value="monitoring" className="data-[state=active]:bg-red-600">
-              <Eye className="h-4 w-4 mr-2" />
-              Cameras
-            </TabsTrigger>
-            <TabsTrigger value="gps" className="data-[state=active]:bg-green-600">
-              <MapPin className="h-4 w-4 mr-2" />
-              GPS Tracking
-            </TabsTrigger>
-            <TabsTrigger value="pages" className="data-[state=active]:bg-blue-600">
-              <Globe className="h-4 w-4 mr-2" />
-              Pages
-            </TabsTrigger>
-            <TabsTrigger value="registrations" className="data-[state=active]:bg-blue-600">
-              <Users className="h-4 w-4 mr-2" />
-              Registrations
-            </TabsTrigger>
-            <TabsTrigger value="pending-products" className="data-[state=active]:bg-yellow-600">
-              <Package className="h-4 w-4 mr-2" />
-              Pending Products
-            </TabsTrigger>
-            <TabsTrigger value="material-images" className="data-[state=active]:bg-purple-600">
-              <FileImage className="h-4 w-4 mr-2" />
-              Material Images
-            </TabsTrigger>
-            <TabsTrigger value="delivery-apps" className="data-[state=active]:bg-green-600">
-              <Truck className="h-4 w-4 mr-2" />
-              Delivery Apps ({deliveryApplications.length})
-            </TabsTrigger>
-            <TabsTrigger value="delivery-requests" className="data-[state=active]:bg-orange-600">
-              <Package className="h-4 w-4 mr-2" />
-              Delivery Requests ({builderDeliveryRequests.length})
-            </TabsTrigger>
-            <TabsTrigger value="monitoring-requests" className="data-[state=active]:bg-red-600">
-              <Camera className="h-4 w-4 mr-2" />
-              Monitoring Requests
-            </TabsTrigger>
-            <TabsTrigger value="feedback" className="data-[state=active]:bg-blue-600">
-              <MessageSquare className="h-4 w-4 mr-2" />
-              Feedback
-            </TabsTrigger>
-            <TabsTrigger value="documents" className="data-[state=active]:bg-purple-600">
-              <Folder className="h-4 w-4 mr-2" />
-              Documents
-            </TabsTrigger>
-            <TabsTrigger value="financial" className="data-[state=active]:bg-emerald-600">
-              <DollarSign className="h-4 w-4 mr-2" />
-              Financial ({financialDocuments.length})
-            </TabsTrigger>
-            <TabsTrigger value="ml" className="data-[state=active]:bg-pink-600">
-              <Brain className="h-4 w-4 mr-2" />
-              ML & AI
-            </TabsTrigger>
-            <TabsTrigger value="security" className="data-[state=active]:bg-blue-600">
-              <Shield className="h-4 w-4 mr-2" />
-              Security
-            </TabsTrigger>
-            <TabsTrigger value="staff" className="data-[state=active]:bg-indigo-600">
-              <UserCheck className="h-4 w-4 mr-2" />
-              Staff
-            </TabsTrigger>
-            <TabsTrigger value="activity-log" className="data-[state=active]:bg-amber-600">
-              <History className="h-4 w-4 mr-2" />
-              Activity Log
-            </TabsTrigger>
-            <TabsTrigger value="scanning" className="data-[state=active]:bg-cyan-600">
-              <Scan className="h-4 w-4 mr-2" />
-              QR Scanning
-            </TabsTrigger>
-            <TabsTrigger value="qr-codes" className="data-[state=active]:bg-teal-600">
-              <QrCode className="h-4 w-4 mr-2" />
-              QR Codes
-            </TabsTrigger>
-            <TabsTrigger value="communications" className="data-[state=active]:bg-purple-600">
-              <MessageSquare className="h-4 w-4 mr-2" />
-              Communications
-            </TabsTrigger>
-            <TabsTrigger value="videos" className="data-[state=active]:bg-orange-600">
-              <FileImage className="h-4 w-4 mr-2" />
-              Video Approval
-            </TabsTrigger>
-            <TabsTrigger value="delivery-analytics" className="data-[state=active]:bg-teal-600">
-              <TrendingUp className="h-4 w-4 mr-2" />
-              Delivery Analytics
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="data-[state=active]:bg-blue-600">
-              <Settings className="h-4 w-4 mr-2" />
-              Settings
-            </TabsTrigger>
-            <TabsTrigger value="user-roles" className="data-[state=active]:bg-pink-600">
-              <UserCog className="h-4 w-4 mr-2" />
-              User Roles
-            </TabsTrigger>
-            <TabsTrigger value="messaging" className="data-[state=active]:bg-cyan-600">
-              <MessageCircle className="h-4 w-4 mr-2" />
-              Messaging
-            </TabsTrigger>
+            {shouldShowTab('overview') && (
+              <TabsTrigger value="overview" className="data-[state=active]:bg-blue-600">
+                <BarChart3 className="h-4 w-4 mr-2" />
+                Overview
+              </TabsTrigger>
+            )}
+            {shouldShowTab('monitoring') && (
+              <TabsTrigger value="monitoring" className="data-[state=active]:bg-red-600">
+                <Eye className="h-4 w-4 mr-2" />
+                Cameras
+              </TabsTrigger>
+            )}
+            {shouldShowTab('gps') && (
+              <TabsTrigger value="gps" className="data-[state=active]:bg-green-600">
+                <MapPin className="h-4 w-4 mr-2" />
+                GPS Tracking
+              </TabsTrigger>
+            )}
+            {shouldShowTab('pages') && (
+              <TabsTrigger value="pages" className="data-[state=active]:bg-blue-600">
+                <Globe className="h-4 w-4 mr-2" />
+                Pages
+              </TabsTrigger>
+            )}
+            {shouldShowTab('registrations') && (
+              <TabsTrigger value="registrations" className="data-[state=active]:bg-blue-600">
+                <Users className="h-4 w-4 mr-2" />
+                Registrations
+              </TabsTrigger>
+            )}
+            {shouldShowTab('pending-products') && (
+              <TabsTrigger value="pending-products" className="data-[state=active]:bg-yellow-600">
+                <Package className="h-4 w-4 mr-2" />
+                Pending Products
+              </TabsTrigger>
+            )}
+            {shouldShowTab('material-images') && (
+              <TabsTrigger value="material-images" className="data-[state=active]:bg-purple-600">
+                <FileImage className="h-4 w-4 mr-2" />
+                Material Images
+              </TabsTrigger>
+            )}
+            {shouldShowTab('delivery-apps') && (
+              <TabsTrigger value="delivery-apps" className="data-[state=active]:bg-green-600">
+                <Truck className="h-4 w-4 mr-2" />
+                Delivery Apps ({deliveryApplications.length})
+              </TabsTrigger>
+            )}
+            {shouldShowTab('delivery-requests') && (
+              <TabsTrigger value="delivery-requests" className="data-[state=active]:bg-orange-600">
+                <Package className="h-4 w-4 mr-2" />
+                Delivery Requests ({builderDeliveryRequests.length})
+              </TabsTrigger>
+            )}
+            {shouldShowTab('monitoring-requests') && (
+              <TabsTrigger value="monitoring-requests" className="data-[state=active]:bg-red-600">
+                <Camera className="h-4 w-4 mr-2" />
+                Monitoring Requests
+              </TabsTrigger>
+            )}
+            {shouldShowTab('feedback') && (
+              <TabsTrigger value="feedback" className="data-[state=active]:bg-blue-600">
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Feedback
+              </TabsTrigger>
+            )}
+            {shouldShowTab('documents') && (
+              <TabsTrigger value="documents" className="data-[state=active]:bg-purple-600">
+                <Folder className="h-4 w-4 mr-2" />
+                Documents
+              </TabsTrigger>
+            )}
+            {shouldShowTab('financial') && (
+              <TabsTrigger value="financial" className="data-[state=active]:bg-emerald-600">
+                <DollarSign className="h-4 w-4 mr-2" />
+                Financial ({financialDocuments.length})
+              </TabsTrigger>
+            )}
+            {shouldShowTab('ml') && (
+              <TabsTrigger value="ml" className="data-[state=active]:bg-pink-600">
+                <Brain className="h-4 w-4 mr-2" />
+                ML & AI
+              </TabsTrigger>
+            )}
+            {shouldShowTab('security') && (
+              <TabsTrigger value="security" className="data-[state=active]:bg-blue-600">
+                <Shield className="h-4 w-4 mr-2" />
+                Security
+              </TabsTrigger>
+            )}
+            {shouldShowTab('staff') && (
+              <TabsTrigger value="staff" className="data-[state=active]:bg-indigo-600">
+                <UserCheck className="h-4 w-4 mr-2" />
+                Staff
+              </TabsTrigger>
+            )}
+            {shouldShowTab('activity-log') && (
+              <TabsTrigger value="activity-log" className="data-[state=active]:bg-amber-600">
+                <History className="h-4 w-4 mr-2" />
+                Activity Log
+              </TabsTrigger>
+            )}
+            {shouldShowTab('scanning') && (
+              <TabsTrigger value="scanning" className="data-[state=active]:bg-cyan-600">
+                <Scan className="h-4 w-4 mr-2" />
+                QR Scanning
+              </TabsTrigger>
+            )}
+            {shouldShowTab('qr-codes') && (
+              <TabsTrigger value="qr-codes" className="data-[state=active]:bg-teal-600">
+                <QrCode className="h-4 w-4 mr-2" />
+                QR Codes
+              </TabsTrigger>
+            )}
+            {shouldShowTab('communications') && (
+              <TabsTrigger value="communications" className="data-[state=active]:bg-purple-600">
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Communications
+              </TabsTrigger>
+            )}
+            {shouldShowTab('videos') && (
+              <TabsTrigger value="videos" className="data-[state=active]:bg-orange-600">
+                <FileImage className="h-4 w-4 mr-2" />
+                Video Approval
+              </TabsTrigger>
+            )}
+            {shouldShowTab('delivery-analytics') && (
+              <TabsTrigger value="delivery-analytics" className="data-[state=active]:bg-teal-600">
+                <TrendingUp className="h-4 w-4 mr-2" />
+                Delivery Analytics
+              </TabsTrigger>
+            )}
+            {shouldShowTab('settings') && (
+              <TabsTrigger value="settings" className="data-[state=active]:bg-blue-600">
+                <Settings className="h-4 w-4 mr-2" />
+                Settings
+              </TabsTrigger>
+            )}
+            {shouldShowTab('user-roles') && (
+              <TabsTrigger value="user-roles" className="data-[state=active]:bg-pink-600">
+                <UserCog className="h-4 w-4 mr-2" />
+                User Roles
+              </TabsTrigger>
+            )}
+            {shouldShowTab('messaging') && (
+              <TabsTrigger value="messaging" className="data-[state=active]:bg-cyan-600">
+                <MessageCircle className="h-4 w-4 mr-2" />
+                Messaging
+              </TabsTrigger>
+            )}
           </TabsList>
 
           {/* Overview Tab - Using New Modular Component */}
