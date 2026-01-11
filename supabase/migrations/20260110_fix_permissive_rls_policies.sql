@@ -4,6 +4,7 @@
 -- =============================================
 
 -- Helper function to check if user is admin (reuse existing if available)
+-- Uses user_roles table which is the current system standard
 CREATE OR REPLACE FUNCTION public.is_admin()
 RETURNS boolean
 LANGUAGE sql
@@ -13,9 +14,9 @@ SET search_path = public
 AS $$
   SELECT EXISTS (
     SELECT 1
-    FROM public.profiles
+    FROM public.user_roles
     WHERE user_id = auth.uid()
-      AND role = 'admin'
+      AND role = 'admin'::app_role
   );
 $$;
 
