@@ -72,21 +72,44 @@ const AdminAuth = () => {
   }, []);
 
   const checkExistingAuth = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      // Check if user has admin role
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .eq('role', 'admin')
-        .maybeSingle();
+    // Check localStorage first (faster than database)
+    const isAdminAuthenticated = localStorage.getItem('admin_authenticated') === 'true';
+    const adminLoginTime = localStorage.getItem('admin_login_time');
+    
+    if (isAdminAuthenticated && adminLoginTime) {
+      const sessionAge = Date.now() - parseInt(adminLoginTime);
+      const maxSessionAge = 24 * 60 * 60 * 1000; // 24 hours
       
-      if (roleData) {
-        // Already authenticated as admin, redirect to admin dashboard
+      if (sessionAge < maxSessionAge) {
+        // Valid admin session, redirect immediately
         navigate("/admin-dashboard");
+        return;
       }
     }
+    
+    // Check Supabase auth in parallel (non-blocking)
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        // Check if user has admin role (non-blocking)
+        supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .eq('role', 'admin')
+          .maybeSingle()
+          .then(({ data: roleData }) => {
+            if (roleData) {
+              // Already authenticated as admin, redirect to admin dashboard
+              navigate("/admin-dashboard");
+            }
+          })
+          .catch(() => {
+            // Ignore errors - user can still login manually
+          });
+      }
+    }).catch(() => {
+      // Ignore errors - user can still login manually
+    });
   };
 
   const validateWorkEmail = (email: string): boolean => {
@@ -137,25 +160,24 @@ const AdminAuth = () => {
       .join('');
   };
 
-  const logSecurityEvent = async (
+  const logSecurityEvent = (
     eventType: string, 
     email: string, 
     success: boolean,
     details?: string
   ) => {
-    try {
-      await supabase.from('admin_security_logs').insert({
-        event_type: eventType,
-        email_attempt: email,
-        success: success,
-        ip_address: 'client-side',
-        user_agent: navigator.userAgent,
-        details: details,
-        created_at: new Date().toISOString()
-      });
-    } catch (error) {
+    // Fire and forget - don't block login flow
+    supabase.from('admin_security_logs').insert({
+      event_type: eventType,
+      email_attempt: email,
+      success: success,
+      ip_address: 'client-side',
+      user_agent: navigator.userAgent,
+      details: details,
+      created_at: new Date().toISOString()
+    }).catch((error) => {
       console.error('Failed to log security event:', error);
-    }
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -234,14 +256,25 @@ const AdminAuth = () => {
         console.log('🔐 Checking admin_staff table...');
         
         try {
-          const { data: staffData, error: staffError } = await db
+          // Add timeout to prevent hanging
+          const staffQueryPromise = db
             .from('admin_staff')
             .select('id, email, full_name, role, staff_code, status')
             .eq('email', normalizedEmail)
             .eq('staff_code', normalizedCode)
             .maybeSingle();
 
-          if (staffError) {
+          // Set 5 second timeout for database query
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Query timeout')), 5000)
+          );
+
+          const { data: staffData, error: staffError } = await Promise.race([
+            staffQueryPromise,
+            timeoutPromise
+          ]) as any;
+
+          if (staffError && staffError.message !== 'Query timeout') {
             console.error('🔐 Staff lookup error:', staffError);
           }
 
@@ -253,11 +286,11 @@ const AdminAuth = () => {
               staffName = staffData.full_name;
               console.log('🔐 Staff member verified:', staffData.full_name, 'Role:', staffData.role);
               
-              // Update last_login timestamp
-              await db
-                .from('admin_staff')
+              // Update last_login timestamp (fire and forget - don't block)
+              db.from('admin_staff')
                 .update({ last_login: new Date().toISOString() })
-                .eq('id', staffData.id);
+                .eq('id', staffData.id)
+                .catch((err: any) => console.error('Failed to update last_login:', err));
             } else {
               console.log('🔐 Staff account is not active:', staffData.status);
               toast({
@@ -271,7 +304,17 @@ const AdminAuth = () => {
           } else {
             console.log('🔐 No matching staff member found in database');
           }
-        } catch (err) {
+        } catch (err: any) {
+          if (err.message === 'Query timeout') {
+            console.error('🔐 Database query timed out');
+            toast({
+              variant: "destructive",
+              title: "Connection Timeout",
+              description: "Could not verify credentials. Please check your connection and try again."
+            });
+            setLoading(false);
+            return;
+          }
           console.error('🔐 Database check error:', err);
         }
       }
@@ -314,28 +357,41 @@ const AdminAuth = () => {
 
       // Try to sign in with Supabase using staff code as password
       // This creates a proper session for RLS policies
+      // Use Promise.race with timeout to prevent hanging
       let hasSupabaseSession = false;
       
       try {
-        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        const authPromise = supabase.auth.signInWithPassword({
           email: workEmail.toLowerCase(),
           password: staffCode.toUpperCase()
         });
+
+        // 3 second timeout for auth attempt
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Auth timeout')), 3000)
+        );
+
+        const result = await Promise.race([authPromise, timeoutPromise]) as any;
+        const { data: authData, error: authError } = result;
 
         if (!authError && authData?.user) {
           console.log('✅ Supabase session established');
           hasSupabaseSession = true;
           
-          // Set admin role in user_roles table
-          await supabase.from('user_roles').upsert({
+          // Set admin role in user_roles table (fire and forget)
+          supabase.from('user_roles').upsert({
             user_id: authData.user.id,
             role: 'admin'
           }, { onConflict: 'user_id' }).catch(() => {});
         } else {
           console.log('ℹ️ No Supabase account, using localStorage auth');
         }
-      } catch (err) {
-        console.log('ℹ️ Supabase auth skipped, using localStorage auth');
+      } catch (err: any) {
+        if (err.message !== 'Auth timeout') {
+          console.log('ℹ️ Supabase auth skipped, using localStorage auth');
+        } else {
+          console.log('ℹ️ Supabase auth timed out, using localStorage auth');
+        }
       }
 
       // Store staff status with login time (works regardless of Supabase session)
@@ -352,8 +408,8 @@ const AdminAuth = () => {
       setAttempts(0);
       setLockoutUntil(null);
 
-      // Log successful login
-      await logSecurityEvent('staff_login', workEmail, true, `Role: ${staffRole}`);
+      // Log successful login (non-blocking)
+      logSecurityEvent('staff_login', workEmail, true, `Role: ${staffRole}`);
 
       toast({
         title: staffName ? `Welcome, ${staffName}` : "Welcome, Administrator",
@@ -362,8 +418,8 @@ const AdminAuth = () => {
           : `You have been authenticated as ${staffRole} (limited mode).`
       });
 
-      // Redirect to Admin Dashboard
-      window.location.href = "/admin-dashboard";
+      // Redirect to Admin Dashboard immediately
+      navigate("/admin-dashboard");
 
     } catch (error: any) {
       console.error('Admin auth error:', error);
