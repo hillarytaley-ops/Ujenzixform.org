@@ -160,9 +160,6 @@ CREATE POLICY "delivery_updates_insert"
       WHERE d.id = delivery_updates.delivery_id
       AND (
         d.builder_id = auth.uid()
-        OR d.provider_id IN (
-          SELECT id FROM delivery_providers WHERE user_id = auth.uid()
-        )
         OR EXISTS (
           SELECT 1 FROM purchase_orders po
           WHERE po.id = d.order_id
@@ -182,9 +179,6 @@ CREATE POLICY "delivery_updates_select"
       WHERE d.id = delivery_updates.delivery_id
       AND (
         d.builder_id = auth.uid()
-        OR d.provider_id IN (
-          SELECT id FROM delivery_providers WHERE user_id = auth.uid()
-        )
         OR EXISTS (
           SELECT 1 FROM purchase_orders po
           WHERE po.id = d.order_id
@@ -515,9 +509,6 @@ CREATE POLICY "tracking_updates_insert"
       WHERE d.id = tracking_updates.delivery_id
       AND (
         d.builder_id = auth.uid()
-        OR d.provider_id IN (
-          SELECT id FROM delivery_providers WHERE user_id = auth.uid()
-        )
         OR EXISTS (
           SELECT 1 FROM purchase_orders po
           WHERE po.id = d.order_id
@@ -537,9 +528,6 @@ CREATE POLICY "tracking_updates_select"
       WHERE d.id = tracking_updates.delivery_id
       AND (
         d.builder_id = auth.uid()
-        OR d.provider_id IN (
-          SELECT id FROM delivery_providers WHERE user_id = auth.uid()
-        )
         OR EXISTS (
           SELECT 1 FROM purchase_orders po
           WHERE po.id = d.order_id
