@@ -128,8 +128,13 @@ CREATE POLICY "delivery_status_updates_insert"
       AND (
         dr.builder_id = auth.uid()
         OR dr.driver_id = auth.uid()
-        OR dr.provider_id IN (
-          SELECT id FROM delivery_providers WHERE user_id = auth.uid()
+        OR EXISTS (
+          SELECT 1 FROM delivery_providers dp
+          WHERE dp.user_id = auth.uid()
+          AND (
+            dp.id = dr.provider_id
+            OR dp.id = dr.assigned_provider_id
+          )
         )
       )
     )
@@ -146,8 +151,13 @@ CREATE POLICY "delivery_status_updates_select"
       AND (
         dr.builder_id = auth.uid()
         OR dr.driver_id = auth.uid()
-        OR dr.provider_id IN (
-          SELECT id FROM delivery_providers WHERE user_id = auth.uid()
+        OR EXISTS (
+          SELECT 1 FROM delivery_providers dp
+          WHERE dp.user_id = auth.uid()
+          AND (
+            dp.id = dr.provider_id
+            OR dp.id = dr.assigned_provider_id
+          )
         )
       )
     )
