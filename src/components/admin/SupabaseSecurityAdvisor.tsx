@@ -30,6 +30,7 @@ interface SecurityIssue {
   affectedResource?: string;
   recommendation?: string;
   createdAt?: string;
+  issue_type?: string; // Original issue type from database
 }
 
 export function SupabaseSecurityAdvisor() {
@@ -304,6 +305,19 @@ export function SupabaseSecurityAdvisor() {
   const errors = issues.filter(i => i.type === 'error');
   const warnings = issues.filter(i => i.type === 'warning');
   const infos = issues.filter(i => i.type === 'info');
+  
+  // Count RLS policy warnings specifically (should match Supabase Security Advisor's 106 warnings)
+  const rlsPolicyWarnings = issues.filter(i => 
+    i.category === 'RLS Policy Always True' || 
+    (i.issue_type && i.issue_type === 'rls_policy_always_true')
+  );
+  
+  // Breakdown by category
+  const issuesByCategory = issues.reduce((acc, issue) => {
+    const cat = issue.category || 'Other';
+    acc[cat] = (acc[cat] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
@@ -370,7 +384,7 @@ export function SupabaseSecurityAdvisor() {
         ) : (
           <div className="space-y-6">
             {/* Summary Stats */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-4 gap-4">
               <div className="p-4 bg-red-900/20 border border-red-800/50 rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
                   <XCircle className="h-5 w-5 text-red-500" />
@@ -384,6 +398,9 @@ export function SupabaseSecurityAdvisor() {
                   <span className="text-yellow-400 font-semibold">Warnings</span>
                 </div>
                 <p className="text-2xl font-bold text-white">{warnings.length}</p>
+                <p className="text-xs text-yellow-300/70 mt-1">
+                  RLS Policies: {rlsPolicyWarnings.length}
+                </p>
               </div>
               <div className="p-4 bg-blue-900/20 border border-blue-800/50 rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
@@ -392,7 +409,32 @@ export function SupabaseSecurityAdvisor() {
                 </div>
                 <p className="text-2xl font-bold text-white">{infos.length}</p>
               </div>
+              <div className="p-4 bg-purple-900/20 border border-purple-800/50 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <Shield className="h-5 w-5 text-purple-500" />
+                  <span className="text-purple-400 font-semibold">RLS Policy Warnings</span>
+                </div>
+                <p className="text-2xl font-bold text-white">{rlsPolicyWarnings.length}</p>
+                <p className="text-xs text-purple-300/70 mt-1">
+                  (Supabase: 106)
+                </p>
+              </div>
             </div>
+            
+            {/* Category Breakdown */}
+            {Object.keys(issuesByCategory).length > 0 && (
+              <div className="p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+                <h4 className="text-sm font-semibold text-gray-300 mb-3">Issues by Category:</h4>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                  {Object.entries(issuesByCategory).map(([category, count]) => (
+                    <div key={category} className="flex items-center justify-between text-sm">
+                      <span className="text-gray-400">{category}:</span>
+                      <Badge className="bg-slate-700 text-white">{count}</Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <Separator className="bg-slate-700" />
 
