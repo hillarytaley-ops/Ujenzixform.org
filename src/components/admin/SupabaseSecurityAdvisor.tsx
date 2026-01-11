@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { getAdminClient, isAdminClientAvailable } from '@/integrations/supabase/adminClient';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -41,80 +42,109 @@ export function SupabaseSecurityAdvisor() {
     const allIssues: SecurityIssue[] = [];
 
     try {
-      // 1. Check for tables without RLS enabled
-      try {
-        const { data: tablesWithoutRLS, error: rlsError } = await supabase
-          .rpc('check_tables_without_rls')
-          .catch(() => ({ data: null, error: { message: 'Function not available' } }));
+      // Use admin client if available for comprehensive checks
+      const client = isAdminClientAvailable() ? getAdminClient() : supabase;
+      const useAdminClient = isAdminClientAvailable() && client !== null;
 
-        if (!rlsError && tablesWithoutRLS) {
-          (tablesWithoutRLS as any[]).forEach((table: any) => {
+      // 1. Get all security issues using comprehensive function
+      try {
+        const result = await (client as any).rpc('get_all_security_issues' as any);
+        const { data: allSecurityIssues, error: allIssuesError } = result || { data: null, error: null };
+
+        if (!allIssuesError && allSecurityIssues && Array.isArray(allSecurityIssues)) {
+          allSecurityIssues.forEach((issue: any) => {
             allIssues.push({
-              id: `rls-${table.table_name}`,
-              type: 'error',
-              category: 'Row Level Security',
-              title: `Table "${table.table_name}" has RLS disabled`,
-              description: `The table "${table.table_name}" does not have Row Level Security enabled. This could expose sensitive data to unauthorized users.`,
-              severity: table.table_name.includes('user') || table.table_name.includes('profile') || table.table_name.includes('payment') ? 'critical' : 'high',
-              affectedResource: table.table_name,
-              recommendation: `Enable RLS on "${table.table_name}" table: ALTER TABLE ${table.table_name} ENABLE ROW LEVEL SECURITY;`
+              id: `${issue.issue_type}-${issue.resource_name}`,
+              type: issue.severity === 'critical' ? 'error' : issue.severity === 'high' ? 'error' : 'warning',
+              category: issue.category,
+              title: `${issue.resource_type === 'table' ? 'Table' : issue.resource_type === 'function' ? 'Function' : 'View'} "${issue.resource_name}" - ${issue.issue_type.replace(/_/g, ' ')}`,
+              description: issue.description,
+              severity: issue.severity as 'critical' | 'high' | 'medium' | 'low',
+              affectedResource: issue.resource_name,
+              recommendation: issue.recommendation
             });
           });
         }
       } catch (error) {
-        // Function might not exist, try direct query
-        console.log('RLS check function not available, using alternative method');
+        console.log('Comprehensive security check function not available, using individual checks', error);
       }
 
-      // 2. Check for SECURITY DEFINER functions (potential security risk)
-      try {
-        const { data: securityDefinerFuncs, error: funcError } = await supabase
-          .rpc('check_security_definer_functions')
-          .catch(() => ({ data: null, error: { message: 'Function not available' } }));
+      // 2. Check for tables without RLS enabled (fallback if comprehensive function doesn't work)
+      if (allIssues.length === 0) {
+        try {
+          const result = await (client as any).rpc('get_tables_without_rls' as any);
+          const { data: tablesWithoutRLS, error: rlsError } = result || { data: null, error: null };
 
-        if (!funcError && securityDefinerFuncs) {
-          (securityDefinerFuncs as any[]).forEach((func: any) => {
-            allIssues.push({
-              id: `secdef-${func.function_name}`,
-              type: 'warning',
-              category: 'Function Security',
-              title: `Function "${func.function_name}" uses SECURITY DEFINER`,
-              description: `The function "${func.function_name}" is defined with SECURITY DEFINER, which means it runs with the privileges of the function creator rather than the caller. This can be a security risk if not properly secured.`,
-              severity: 'medium',
-              affectedResource: func.function_name,
-              recommendation: `Review "${func.function_name}" function and consider using SECURITY INVOKER if possible, or ensure proper access controls are in place.`
+          if (!rlsError && tablesWithoutRLS) {
+            (tablesWithoutRLS as any[]).forEach((table: any) => {
+              allIssues.push({
+                id: `rls-${table.table_name}`,
+                type: 'error',
+                category: 'Row Level Security',
+                title: `Table "${table.table_name}" has RLS disabled`,
+                description: `The table "${table.table_name}" does not have Row Level Security enabled. This could expose sensitive data to unauthorized users.`,
+                severity: table.table_name.includes('user') || table.table_name.includes('profile') || table.table_name.includes('payment') ? 'critical' : 'high',
+                affectedResource: table.table_name,
+                recommendation: `Enable RLS on "${table.table_name}" table: ALTER TABLE ${table.table_name} ENABLE ROW LEVEL SECURITY;`
+              });
             });
-          });
+          }
+        } catch (error) {
+          console.log('RLS check function not available', error);
         }
-      } catch (error) {
-        console.log('Security definer check function not available');
       }
 
-      // 3. Check for tables with missing RLS policies
-      try {
-        const { data: tablesWithoutPolicies, error: policyError } = await supabase
-          .rpc('check_tables_without_policies')
-          .catch(() => ({ data: null, error: { message: 'Function not available' } }));
+      // 3. Check for SECURITY DEFINER functions (fallback)
+      if (allIssues.length === 0 || !allIssues.some(i => i.category === 'Function Security')) {
+        try {
+          const result = await (client as any).rpc('get_security_definer_functions' as any);
+          const { data: securityDefinerFuncs, error: funcError } = result || { data: null, error: null };
 
-        if (!policyError && tablesWithoutPolicies) {
-          (tablesWithoutPolicies as any[]).forEach((table: any) => {
-            allIssues.push({
-              id: `nopolicy-${table.table_name}`,
-              type: 'warning',
-              category: 'RLS Policies',
-              title: `Table "${table.table_name}" has RLS enabled but no policies`,
-              description: `The table "${table.table_name}" has Row Level Security enabled but no policies are defined. This means no one can access the data.`,
-              severity: 'high',
-              affectedResource: table.table_name,
-              recommendation: `Create appropriate RLS policies for "${table.table_name}" table to allow authorized access.`
+          if (!funcError && securityDefinerFuncs) {
+            (securityDefinerFuncs as any[]).forEach((func: any) => {
+              allIssues.push({
+                id: `secdef-${func.function_name}`,
+                type: 'warning',
+                category: 'Function Security',
+                title: `Function "${func.function_name}" uses SECURITY DEFINER`,
+                description: `The function "${func.function_name}" is defined with SECURITY DEFINER, which means it runs with the privileges of the function creator rather than the caller. This can be a security risk if not properly secured.`,
+                severity: 'medium',
+                affectedResource: func.function_name,
+                recommendation: `Review "${func.function_name}" function and consider using SECURITY INVOKER if possible, or ensure proper access controls are in place.`
+              });
             });
-          });
+          }
+        } catch (error) {
+          console.log('Security definer check function not available', error);
         }
-      } catch (error) {
-        console.log('Policy check function not available');
       }
 
-      // 4. Check for publicly accessible sensitive tables (using SecurityAudit)
+      // 4. Check for tables with missing RLS policies (fallback)
+      if (allIssues.length === 0 || !allIssues.some(i => i.category === 'RLS Policies')) {
+        try {
+          const result = await (client as any).rpc('get_tables_without_policies' as any);
+          const { data: tablesWithoutPolicies, error: policyError } = result || { data: null, error: null };
+
+          if (!policyError && tablesWithoutPolicies) {
+            (tablesWithoutPolicies as any[]).forEach((table: any) => {
+              allIssues.push({
+                id: `nopolicy-${table.table_name}`,
+                type: 'warning',
+                category: 'RLS Policies',
+                title: `Table "${table.table_name}" has RLS enabled but no policies`,
+                description: `The table "${table.table_name}" has Row Level Security enabled but no policies are defined. This means no one can access the data.`,
+                severity: 'high',
+                affectedResource: table.table_name,
+                recommendation: `Create appropriate RLS policies for "${table.table_name}" table to allow authorized access.`
+              });
+            });
+          }
+        } catch (error) {
+          console.log('Policy check function not available', error);
+        }
+      }
+
+      // 5. Check for publicly accessible sensitive tables (using SecurityAudit)
       try {
         const criticalTables = ['profiles', 'payments', 'deliveries', 'suppliers', 'delivery_providers'];
         for (const table of criticalTables) {
@@ -144,10 +174,10 @@ export function SupabaseSecurityAdvisor() {
         console.error('Public access check failed:', error);
       }
 
-      // 5. Check admin_security_logs table structure
+      // 6. Check admin_security_logs table structure
       try {
-        const { error: logError } = await supabase
-          .from('admin_security_logs')
+        const { error: logError } = await (client as any)
+          .from('admin_security_logs' as any)
           .select('id')
           .limit(1);
 
@@ -167,31 +197,33 @@ export function SupabaseSecurityAdvisor() {
         // Table exists, which is good
       }
 
-      // 6. Check for views with SECURITY DEFINER
-      try {
-        const { data: securityDefinerViews, error: viewError } = await supabase
-          .rpc('check_security_definer_views')
-          .catch(() => ({ data: null, error: { message: 'Function not available' } }));
+      // 7. Check for views with SECURITY DEFINER (fallback)
+      if (allIssues.length === 0 || !allIssues.some(i => i.category === 'View Security')) {
+        try {
+          const { data: securityDefinerViews, error: viewError } = await (client as any)
+            .rpc('get_security_definer_views')
+            .catch(() => ({ data: null, error: { message: 'Function not available' } }));
 
-        if (!viewError && securityDefinerViews) {
-          (securityDefinerViews as any[]).forEach((view: any) => {
-            allIssues.push({
-              id: `secdefview-${view.view_name}`,
-              type: 'error',
-              category: 'View Security',
-              title: `View "${view.view_name}" uses SECURITY DEFINER`,
-              description: `The view "${view.view_name}" is defined with SECURITY DEFINER, which bypasses Row Level Security. This is a critical security vulnerability.`,
-              severity: 'critical',
-              affectedResource: view.view_name,
-              recommendation: `Remove SECURITY DEFINER from "${view.view_name}" view or recreate it without SECURITY DEFINER.`
+          if (!viewError && securityDefinerViews) {
+            (securityDefinerViews as any[]).forEach((view: any) => {
+              allIssues.push({
+                id: `secdefview-${view.view_name}`,
+                type: 'error',
+                category: 'View Security',
+                title: `View "${view.view_name}" uses SECURITY DEFINER`,
+                description: `The view "${view.view_name}" is defined with SECURITY DEFINER, which bypasses Row Level Security. This is a critical security vulnerability.`,
+                severity: 'critical',
+                affectedResource: view.view_name,
+                recommendation: `Remove SECURITY DEFINER from "${view.view_name}" view or recreate it without SECURITY DEFINER.`
+              });
             });
-          });
+          }
+        } catch (error) {
+          console.log('Security definer views check function not available');
         }
-      } catch (error) {
-        console.log('Security definer views check function not available');
       }
 
-      // 7. Info: Check RLS status on critical tables
+      // 8. Info: Check RLS status on critical tables
       const criticalTables = ['profiles', 'payments', 'deliveries', 'suppliers', 'delivery_providers', 'admin_security_logs'];
       for (const table of criticalTables) {
         try {
