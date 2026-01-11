@@ -123,14 +123,18 @@ CREATE POLICY "delivery_status_updates_insert"
   WITH CHECK (
     -- Builder or delivery provider can insert
     EXISTS (
-      SELECT 1 FROM delivery_orders del_ord
-      WHERE del_ord.id = delivery_status_updates.delivery_order_id
+      SELECT 1 FROM delivery_requests dr
+      WHERE dr.id = delivery_status_updates.delivery_request_id
       AND (
-        del_ord.builder_id = auth.uid()
+        dr.builder_id = auth.uid()
+        OR dr.driver_id = auth.uid()
         OR EXISTS (
-          SELECT 1 FROM suppliers s
-          WHERE s.id = del_ord.supplier_id
-          AND s.user_id = auth.uid()
+          SELECT 1 FROM purchase_orders po
+          WHERE po.id IN (
+            SELECT order_id FROM delivery_requests dr2
+            WHERE dr2.id = delivery_status_updates.delivery_request_id
+          )
+          AND po.buyer_id = auth.uid()
         )
       )
     )
@@ -142,14 +146,18 @@ CREATE POLICY "delivery_status_updates_select"
   TO authenticated
   USING (
     EXISTS (
-      SELECT 1 FROM delivery_orders del_ord
-      WHERE del_ord.id = delivery_status_updates.delivery_order_id
+      SELECT 1 FROM delivery_requests dr
+      WHERE dr.id = delivery_status_updates.delivery_request_id
       AND (
-        del_ord.builder_id = auth.uid()
+        dr.builder_id = auth.uid()
+        OR dr.driver_id = auth.uid()
         OR EXISTS (
-          SELECT 1 FROM suppliers s
-          WHERE s.id = del_ord.supplier_id
-          AND s.user_id = auth.uid()
+          SELECT 1 FROM purchase_orders po
+          WHERE po.id IN (
+            SELECT order_id FROM delivery_requests dr2
+            WHERE dr2.id = delivery_status_updates.delivery_request_id
+          )
+          AND po.buyer_id = auth.uid()
         )
       )
     )
