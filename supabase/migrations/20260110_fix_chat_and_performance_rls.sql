@@ -179,13 +179,17 @@ BEGIN
     EXECUTE 'DROP POLICY IF EXISTS "admin_only_delete_performance_metrics" ON performance_metrics';
     
     -- Create proper policies for performance_metrics
-    -- Allow authenticated users to read their own metrics or admins to read all
+    -- Allow authenticated users to read their own metrics, system metrics (NULL user_id), or admins to read all
     EXECUTE '
       CREATE POLICY "Users can view own performance metrics"
       ON performance_metrics FOR SELECT
-      TO authenticated
+      TO anon, authenticated
       USING (
+        -- Users can view their own metrics
         user_id = auth.uid()
+        -- OR system metrics (NULL user_id) are visible to all authenticated users
+        OR (auth.uid() IS NOT NULL AND user_id IS NULL)
+        -- OR admins can view all
         OR EXISTS (
           SELECT 1 FROM user_roles 
           WHERE user_id = auth.uid() 
@@ -194,13 +198,20 @@ BEGIN
       );
     ';
     
-    -- Allow authenticated users to insert their own metrics
+    -- Allow authenticated users to insert their own metrics OR anonymous users to insert system metrics
+    -- user_id can be NULL for system-level performance tracking
     EXECUTE '
       CREATE POLICY "Users can insert own performance metrics"
       ON performance_metrics FOR INSERT
-      TO authenticated
+      TO anon, authenticated
       WITH CHECK (
-        user_id = auth.uid()
+        -- Authenticated users can insert with their own user_id
+        (auth.uid() IS NOT NULL AND user_id = auth.uid())
+        -- OR authenticated users can insert with NULL user_id (system metrics)
+        OR (auth.uid() IS NOT NULL AND user_id IS NULL)
+        -- OR anonymous users can insert with NULL user_id (client-side tracking)
+        OR (auth.uid() IS NULL AND user_id IS NULL)
+        -- OR admins can insert for any user
         OR EXISTS (
           SELECT 1 FROM user_roles 
           WHERE user_id = auth.uid() 
