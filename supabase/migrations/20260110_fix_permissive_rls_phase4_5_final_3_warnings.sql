@@ -75,10 +75,10 @@ BEGIN
         ON notifications FOR INSERT
         TO authenticated
         WITH CHECK (
-          -- Require user_id (system can set it for any user)
-          -- This prevents completely empty notifications
-          -- OR allow admins to insert (even if user_id is NULL for system notifications)
-          (user_id IS NOT NULL)
+          -- Users can create notifications for themselves
+          -- OR admins can create notifications for any user
+          -- This prevents unauthorized notification creation
+          (user_id = auth.uid())
           OR (is_admin())
         );
       ';
