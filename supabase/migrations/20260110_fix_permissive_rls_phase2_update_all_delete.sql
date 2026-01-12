@@ -462,16 +462,23 @@ CREATE POLICY "material_qr_codes_delete"
   );
 
 -- Fix scanned_receivables ALL policy
+-- Note: scanned_receivables doesn't have supplier_id, it has delivery_order_id
+-- Builders receive items, suppliers can view items they sent
 DROP POLICY IF EXISTS "scanned_receivables_all" ON scanned_receivables;
 
 CREATE POLICY "scanned_receivables_insert"
   ON scanned_receivables FOR INSERT
   TO authenticated
   WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM suppliers s
-      WHERE s.id = scanned_receivables.supplier_id
-      AND s.user_id = auth.uid()
+    -- Builder can insert their own received items
+    scanned_by::uuid = auth.uid()
+    OR (
+      scanned_receivables.delivery_order_id IS NOT NULL
+      AND EXISTS (
+        SELECT 1 FROM delivery_orders del_ord
+        WHERE del_ord.id = scanned_receivables.delivery_order_id
+        AND del_ord.builder_id = auth.uid()
+      )
     )
     OR is_admin()
   );
@@ -480,10 +487,22 @@ CREATE POLICY "scanned_receivables_select"
   ON scanned_receivables FOR SELECT
   TO authenticated
   USING (
-    EXISTS (
-      SELECT 1 FROM suppliers s
-      WHERE s.id = scanned_receivables.supplier_id
-      AND s.user_id = auth.uid()
+    -- Builder can see items they received
+    scanned_by::uuid = auth.uid()
+    OR (
+      scanned_receivables.delivery_order_id IS NOT NULL
+      AND EXISTS (
+        SELECT 1 FROM delivery_orders del_ord
+        WHERE del_ord.id = scanned_receivables.delivery_order_id
+        AND (
+          del_ord.builder_id = auth.uid()
+          OR EXISTS (
+            SELECT 1 FROM suppliers s
+            WHERE s.id = del_ord.supplier_id
+            AND s.user_id = auth.uid()
+          )
+        )
+      )
     )
     OR is_admin()
   );
@@ -492,18 +511,27 @@ CREATE POLICY "scanned_receivables_update"
   ON scanned_receivables FOR UPDATE
   TO authenticated
   USING (
-    EXISTS (
-      SELECT 1 FROM suppliers s
-      WHERE s.id = scanned_receivables.supplier_id
-      AND s.user_id = auth.uid()
+    -- Builder can update items they received
+    scanned_by::uuid = auth.uid()
+    OR (
+      scanned_receivables.delivery_order_id IS NOT NULL
+      AND EXISTS (
+        SELECT 1 FROM delivery_orders del_ord
+        WHERE del_ord.id = scanned_receivables.delivery_order_id
+        AND del_ord.builder_id = auth.uid()
+      )
     )
     OR is_admin()
   )
   WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM suppliers s
-      WHERE s.id = scanned_receivables.supplier_id
-      AND s.user_id = auth.uid()
+    scanned_by::uuid = auth.uid()
+    OR (
+      scanned_receivables.delivery_order_id IS NOT NULL
+      AND EXISTS (
+        SELECT 1 FROM delivery_orders del_ord
+        WHERE del_ord.id = scanned_receivables.delivery_order_id
+        AND del_ord.builder_id = auth.uid()
+      )
     )
     OR is_admin()
   );
@@ -511,14 +539,7 @@ CREATE POLICY "scanned_receivables_update"
 CREATE POLICY "scanned_receivables_delete"
   ON scanned_receivables FOR DELETE
   TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM suppliers s
-      WHERE s.id = scanned_receivables.supplier_id
-      AND s.user_id = auth.uid()
-    )
-    OR is_admin()
-  );
+  USING (is_admin());
 
 -- Fix scanned_supplies ALL policy
 DROP POLICY IF EXISTS "scanned_supplies_all" ON scanned_supplies;
