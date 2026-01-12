@@ -520,6 +520,40 @@ const AdminAuth = () => {
   const isLocked = lockoutUntil && Date.now() < lockoutUntil;
   const remainingAttempts = Math.max(0, 3 - attempts);
 
+  // Mobile Debug Console - Shows errors on screen (can be removed later)
+  const [debugErrors, setDebugErrors] = useState<string[]>([]);
+  
+  useEffect(() => {
+    // Capture console errors
+    const originalError = console.error;
+    const originalWarn = console.warn;
+    
+    console.error = (...args: any[]) => {
+      originalError(...args);
+      setDebugErrors(prev => [...prev.slice(-4), `ERROR: ${args.join(' ')}`]);
+    };
+    
+    console.warn = (...args: any[]) => {
+      originalWarn(...args);
+      setDebugErrors(prev => [...prev.slice(-4), `WARN: ${args.join(' ')}`]);
+    };
+    
+    // Capture unhandled errors
+    window.addEventListener('error', (event) => {
+      setDebugErrors(prev => [...prev.slice(-4), `ERROR: ${event.message} at ${event.filename}:${event.lineno}`]);
+    });
+    
+    // Capture promise rejections
+    window.addEventListener('unhandledrejection', (event) => {
+      setDebugErrors(prev => [...prev.slice(-4), `PROMISE ERROR: ${event.reason}`]);
+    });
+    
+    return () => {
+      console.error = originalError;
+      console.warn = originalWarn;
+    };
+  }, []);
+
   // Show loading spinner only during initial page load
   if (pageLoading) {
     return (
@@ -534,6 +568,26 @@ const AdminAuth = () => {
 
   return (
     <div className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden">
+      {/* Mobile Debug Console - Shows errors on screen */}
+      {debugErrors.length > 0 && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-red-950/95 border-b-2 border-red-500 p-2 max-h-40 overflow-y-auto">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-red-400 text-xs font-bold">🐛 DEBUG CONSOLE (Tap to dismiss)</p>
+            <button
+              onClick={() => setDebugErrors([])}
+              className="text-red-400 hover:text-red-300 text-xs px-2 py-1 bg-red-900/50 rounded"
+            >
+              ✕ Clear
+            </button>
+          </div>
+          {debugErrors.map((error, idx) => (
+            <div key={idx} className="text-red-300 text-xs font-mono mb-1 break-all">
+              {error}
+            </div>
+          ))}
+        </div>
+      )}
+      
       {/* Beautiful Kenyan Construction Workers with Yellow Hard Hats Background */}
       <div 
         className="absolute inset-0 z-0"
