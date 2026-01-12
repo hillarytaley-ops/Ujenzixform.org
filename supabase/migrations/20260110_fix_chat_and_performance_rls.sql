@@ -172,11 +172,17 @@ BEGIN
     -- Enable RLS if not already enabled
     EXECUTE 'ALTER TABLE public.performance_metrics ENABLE ROW LEVEL SECURITY';
     
-    -- Drop any admin-only policies
+    -- Drop any existing policies (admin-only and any previous versions)
     EXECUTE 'DROP POLICY IF EXISTS "admin_only_select_performance_metrics" ON performance_metrics';
     EXECUTE 'DROP POLICY IF EXISTS "admin_only_insert_performance_metrics" ON performance_metrics';
     EXECUTE 'DROP POLICY IF EXISTS "admin_only_update_performance_metrics" ON performance_metrics';
     EXECUTE 'DROP POLICY IF EXISTS "admin_only_delete_performance_metrics" ON performance_metrics';
+    EXECUTE 'DROP POLICY IF EXISTS "Users can view own performance metrics" ON performance_metrics';
+    EXECUTE 'DROP POLICY IF EXISTS "Users can insert own performance metrics" ON performance_metrics';
+    EXECUTE 'DROP POLICY IF EXISTS "Users can update own performance metrics" ON performance_metrics';
+    EXECUTE 'DROP POLICY IF EXISTS "performance_metrics_insert" ON performance_metrics';
+    EXECUTE 'DROP POLICY IF EXISTS "performance_metrics_anon_insert" ON performance_metrics';
+    EXECUTE 'DROP POLICY IF EXISTS "performance_metrics_insert_all" ON performance_metrics';
     
     -- Create proper policies for performance_metrics
     -- Allow authenticated users to read their own metrics, system metrics (NULL user_id), or admins to read all
