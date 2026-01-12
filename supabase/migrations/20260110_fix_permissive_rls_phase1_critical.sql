@@ -101,22 +101,15 @@ CREATE POLICY "purchase_orders_update_policy"
   );
 
 -- Fix quote_requests UPDATE policy (CRITICAL)
--- Note: quote_requests table doesn't have order_id column in actual database
--- Using supplier_id check only (still more secure than USING (true))
+-- Note: quote_requests table structure is unclear - no order_id or supplier_id columns
+-- Making admin-only for updates (still more secure than USING (true))
 DROP POLICY IF EXISTS "quote_requests_update_policy" ON quote_requests;
 
 CREATE POLICY "quote_requests_update_policy"
   ON quote_requests FOR UPDATE
   TO authenticated
-  USING (
-    -- Supplier can update their own quotes
-    supplier_id = auth.uid()
-    OR is_admin()
-  )
-  WITH CHECK (
-    supplier_id = auth.uid()
-    OR is_admin()
-  );
+  USING (is_admin())
+  WITH CHECK (is_admin());
 
 -- Fix delivery_orders UPDATE policy (CRITICAL)
 DROP POLICY IF EXISTS "delivery_orders_update" ON delivery_orders;
