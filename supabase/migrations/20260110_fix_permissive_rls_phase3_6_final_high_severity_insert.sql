@@ -48,22 +48,55 @@ $$;
 -- =============================================
 
 -- Fix service_requests INSERT policy (if it's a separate table from monitoring_service_requests)
--- Note: Check if this table exists first
+-- Note: Check if this table exists and what columns it has
 DO $$
+DECLARE
+  has_user_id BOOLEAN;
+  has_requester_id BOOLEAN;
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = 'service_requests') THEN
+    -- Check which columns exist
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.columns 
+      WHERE table_schema = 'public' 
+      AND table_name = 'service_requests' 
+      AND column_name = 'user_id'
+    ) INTO has_user_id;
+    
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.columns 
+      WHERE table_schema = 'public' 
+      AND table_name = 'service_requests' 
+      AND column_name = 'requester_id'
+    ) INTO has_requester_id;
+    
     DROP POLICY IF EXISTS "service_requests_insert" ON service_requests;
     DROP POLICY IF EXISTS "Anyone can insert service requests" ON service_requests;
     
-    CREATE POLICY "service_requests_insert"
-      ON service_requests FOR INSERT
-      TO authenticated
-      WITH CHECK (
-        -- Users can create their own service requests
-        user_id = auth.uid()
-        OR requester_id = auth.uid()
-        OR is_admin()
-      );
+    -- Create policy based on which columns exist
+    IF has_user_id THEN
+      EXECUTE 'CREATE POLICY "service_requests_insert"
+        ON service_requests FOR INSERT
+        TO authenticated
+        WITH CHECK (
+          user_id = auth.uid()
+          OR is_admin()
+        )';
+    ELSIF has_requester_id THEN
+      EXECUTE 'CREATE POLICY "service_requests_insert"
+        ON service_requests FOR INSERT
+        TO authenticated
+        WITH CHECK (
+          requester_id = auth.uid()
+          OR is_admin()
+        )';
+    ELSE
+      -- If neither column exists, make it admin-only for safety
+      EXECUTE 'CREATE POLICY "service_requests_insert"
+        ON service_requests FOR INSERT
+        TO authenticated
+        WITH CHECK (is_admin())';
+    END IF;
   END IF;
 END $$;
 
