@@ -313,6 +313,57 @@ export function SupabaseSecurityAdvisor() {
     (i.issue_type && i.issue_type === 'rls_policy_always_true')
   );
   
+  // Detailed breakdown of RLS policy warnings by operation type
+  const rlsBreakdownByOperation = rlsPolicyWarnings.reduce((acc, issue) => {
+    // Extract operation type from description or title
+    // Format: '...for "INSERT"...' or '...for "UPDATE"...' etc.
+    const desc = issue.description || issue.title || '';
+    let operation = 'UNKNOWN';
+    
+    // Check for explicit " for "INSERT"" pattern first (most specific)
+    if (desc.match(/ for "INSERT"/i)) {
+      operation = 'INSERT';
+    } else if (desc.match(/ for "UPDATE"/i)) {
+      operation = 'UPDATE';
+    } else if (desc.match(/ for "DELETE"/i)) {
+      operation = 'DELETE';
+    } else if (desc.match(/ for "ALL"/i)) {
+      operation = 'ALL';
+    } else {
+      // Fallback: check if description contains the operation type
+      if (desc.includes('INSERT') && !desc.includes('UPDATE') && !desc.includes('DELETE')) {
+        operation = 'INSERT';
+      } else if (desc.includes('UPDATE') && !desc.includes('DELETE')) {
+        operation = 'UPDATE';
+      } else if (desc.includes('DELETE')) {
+        operation = 'DELETE';
+      } else if (desc.includes('ALL')) {
+        operation = 'ALL';
+      }
+    }
+    
+    acc[operation] = (acc[operation] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  // Breakdown by severity for RLS warnings
+  const rlsBreakdownBySeverity = rlsPolicyWarnings.reduce((acc, issue) => {
+    const sev = issue.severity || 'unknown';
+    acc[sev] = (acc[sev] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  // Breakdown by table (top 10 tables with most warnings)
+  const rlsBreakdownByTable = rlsPolicyWarnings.reduce((acc, issue) => {
+    const tableName = issue.affectedResource?.split('.')[0] || issue.title.split('"')[1] || 'Unknown';
+    acc[tableName] = (acc[tableName] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  
+  const topTables = Object.entries(rlsBreakdownByTable)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 10);
+  
   // Breakdown by category
   const issuesByCategory = issues.reduce((acc, issue) => {
     const cat = issue.category || 'Other';
@@ -417,15 +468,92 @@ export function SupabaseSecurityAdvisor() {
                 </div>
                 <p className="text-2xl font-bold text-white">{rlsPolicyWarnings.length}</p>
                 <p className="text-xs text-purple-300/70 mt-1">
-                  (Supabase: 106)
+                  Permissive policies
                 </p>
               </div>
             </div>
             
+            {/* Detailed RLS Policy Warnings Breakdown */}
+            {rlsPolicyWarnings.length > 0 && (
+              <div className="space-y-4">
+                <div className="p-4 bg-purple-900/20 rounded-lg border border-purple-800/50">
+                  <h4 className="text-sm font-semibold text-purple-300 mb-4 flex items-center gap-2">
+                    <Lock className="h-4 w-4" />
+                    RLS Policy Warnings Breakdown ({rlsPolicyWarnings.length} total)
+                  </h4>
+                  
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {/* By Operation Type */}
+                    <div className="space-y-2">
+                      <h5 className="text-xs font-semibold text-purple-400 mb-2">By Operation Type:</h5>
+                      <div className="space-y-1.5">
+                        {Object.entries(rlsBreakdownByOperation)
+                          .sort(([, a], [, b]) => b - a)
+                          .map(([operation, count]) => (
+                            <div key={operation} className="flex items-center justify-between text-sm">
+                              <span className="text-gray-300">
+                                {operation === 'INSERT' && '🔵'} 
+                                {operation === 'UPDATE' && '🟠'} 
+                                {operation === 'DELETE' && '🔴'} 
+                                {operation === 'ALL' && '⚫'} 
+                                {operation === 'UNKNOWN' && '⚪'} 
+                                <span className="ml-1">{operation}:</span>
+                              </span>
+                              <Badge className={`${
+                                operation === 'UPDATE' || operation === 'DELETE' || operation === 'ALL' 
+                                  ? 'bg-orange-600' 
+                                  : 'bg-blue-600'
+                              } text-white`}>
+                                {count}
+                              </Badge>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+
+                    {/* By Severity */}
+                    <div className="space-y-2">
+                      <h5 className="text-xs font-semibold text-purple-400 mb-2">By Severity:</h5>
+                      <div className="space-y-1.5">
+                        {Object.entries(rlsBreakdownBySeverity)
+                          .sort(([a], [b]) => {
+                            const order = { critical: 0, high: 1, medium: 2, low: 3, unknown: 4 };
+                            return (order[a as keyof typeof order] || 99) - (order[b as keyof typeof order] || 99);
+                          })
+                          .map(([severity, count]) => (
+                            <div key={severity} className="flex items-center justify-between text-sm">
+                              <span className="text-gray-300 capitalize">{severity}:</span>
+                              <Badge className={getSeverityColor(severity)}>
+                                {count}
+                              </Badge>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Top Tables */}
+                  {topTables.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-purple-800/50">
+                      <h5 className="text-xs font-semibold text-purple-400 mb-2">Top Tables with Warnings:</h5>
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                        {topTables.map(([table, count]) => (
+                          <div key={table} className="flex items-center justify-between text-xs bg-slate-800/50 p-2 rounded">
+                            <span className="text-gray-300 truncate" title={table}>{table}:</span>
+                            <Badge className="bg-purple-700 text-white ml-1">{count}</Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            
             {/* Category Breakdown */}
             {Object.keys(issuesByCategory).length > 0 && (
               <div className="p-4 bg-slate-800/50 rounded-lg border border-slate-700">
-                <h4 className="text-sm font-semibold text-gray-300 mb-3">Issues by Category:</h4>
+                <h4 className="text-sm font-semibold text-gray-300 mb-3">All Issues by Category:</h4>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                   {Object.entries(issuesByCategory).map(([category, count]) => (
                     <div key={category} className="flex items-center justify-between text-sm">
