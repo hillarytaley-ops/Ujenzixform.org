@@ -74,9 +74,9 @@ BEGIN
         TO authenticated
         WITH CHECK (
           -- Require user_id (system can set it for any user)
+          -- This prevents completely empty notifications
           user_id IS NOT NULL
-          -- Allow authenticated users (system/admins)
-          OR auth.uid() IS NOT NULL
+          -- Admins can insert notifications
           OR is_admin()
         );
       ';
@@ -85,7 +85,7 @@ BEGIN
         CREATE POLICY "notifications_insert"
         ON notifications FOR INSERT
         TO authenticated
-        WITH CHECK (auth.uid() IS NOT NULL OR is_admin());
+        WITH CHECK (is_admin());
       ';
     END IF;
   END IF;
