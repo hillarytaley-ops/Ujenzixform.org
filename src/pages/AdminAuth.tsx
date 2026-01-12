@@ -51,48 +51,62 @@ const AdminAuth = () => {
   const [workEmail, setWorkEmail] = useState("");
   const [staffCode, setStaffCode] = useState("");
   const [loading, setLoading] = useState(false);
-  const [pageLoading, setPageLoading] = useState(true); // New state for initial page load
+  const [pageLoading, setPageLoading] = useState(false); // Start as false - show form immediately
   const [attempts, setAttempts] = useState(0);
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
-    // Clear any stale lockouts on component mount
-    Object.keys(localStorage).forEach(key => {
-      if (key.startsWith('admin_lockout_')) {
-        const lockoutTime = parseInt(localStorage.getItem(key) || '0');
-        if (Date.now() > lockoutTime) {
-          localStorage.removeItem(key);
+    // IMMEDIATELY show form on mobile - don't wait for checks
+    // Set a very short timeout to ensure form shows quickly
+    const immediateTimeout = setTimeout(() => {
+      setPageLoading(false);
+    }, 500); // Show form after 500ms max
+    
+    // Clear any stale lockouts on component mount (non-blocking)
+    try {
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('admin_lockout_')) {
+          const lockoutTime = parseInt(localStorage.getItem(key) || '0');
+          if (Date.now() > lockoutTime) {
+            localStorage.removeItem(key);
+          }
         }
-      }
+      });
+    } catch (error) {
+      // Ignore localStorage errors
+    }
+    
+    // Check if user is already authenticated (non-blocking, with very short timeout)
+    const checkPromise = checkExistingAuth().catch(() => {
+      // Ignore all errors - just show the form
     });
     
-    // Set a timeout to show the form even if auth check is slow (mobile-friendly)
-    const showFormTimeout = setTimeout(() => {
+    // Force show form after 1 second regardless
+    const forceShowTimeout = setTimeout(() => {
       setPageLoading(false);
-    }, 2000); // Show form after 2 seconds max, even if checks are still running
+    }, 1000);
     
-    // Check if user is already authenticated as admin (with timeout)
-    const authCheckTimeout = setTimeout(() => {
-      setPageLoading(false); // Stop loading if check takes too long
-    }, 3000); // Max 3 seconds for auth check
-    
-    checkExistingAuth().finally(() => {
-      clearTimeout(authCheckTimeout);
-      clearTimeout(showFormTimeout);
+    // Cleanup
+    Promise.race([
+      checkPromise,
+      new Promise(resolve => setTimeout(resolve, 1000))
+    ]).finally(() => {
+      clearTimeout(immediateTimeout);
+      clearTimeout(forceShowTimeout);
       setPageLoading(false);
     });
     
     return () => {
-      clearTimeout(showFormTimeout);
-      clearTimeout(authCheckTimeout);
+      clearTimeout(immediateTimeout);
+      clearTimeout(forceShowTimeout);
     };
   }, []);
 
   const checkExistingAuth = async () => {
     try {
-      // Check localStorage first (faster than database)
+      // Check localStorage first (fast, synchronous)
       const isAdminAuthenticated = localStorage.getItem('admin_authenticated') === 'true';
       const adminLoginTime = localStorage.getItem('admin_login_time');
       
@@ -102,26 +116,35 @@ const AdminAuth = () => {
         
         if (sessionAge < maxSessionAge) {
           // Valid admin session, redirect immediately
-          navigate("/admin-dashboard");
+          // Use setTimeout to avoid blocking render
+          setTimeout(() => {
+            navigate("/admin-dashboard", { replace: true });
+          }, 100);
           return;
         }
       }
       
-      // Check Supabase auth with timeout (mobile-friendly)
+      // Skip Supabase checks on mobile to avoid hanging
+      // User can still login manually if needed
+      // Only do quick check if network seems fast
+      if (navigator.connection && (navigator.connection as any).effectiveType === 'slow-2g') {
+        // Skip network checks on slow connections
+        return;
+      }
+      
+      // Quick Supabase check with very short timeout (500ms)
       try {
         const getUserPromise = supabase.auth.getUser();
         const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Auth check timeout')), 2000)
+          setTimeout(() => reject(new Error('Timeout')), 500)
         );
         
-        const { data: { user } } = await Promise.race([
-          getUserPromise,
-          timeoutPromise
-        ]) as any;
+        const result = await Promise.race([getUserPromise, timeoutPromise]) as any;
+        const { data: { user } } = result || { data: { user: null } };
         
         if (user) {
+          // Quick role check with timeout
           try {
-            // Check if user has admin role with timeout
             const roleQueryPromise = supabase
               .from('user_roles')
               .select('role')
@@ -130,30 +153,26 @@ const AdminAuth = () => {
               .maybeSingle();
             
             const roleTimeoutPromise = new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Role check timeout')), 2000)
+              setTimeout(() => reject(new Error('Timeout')), 500)
             );
             
-            const { data: roleData } = await Promise.race([
-              roleQueryPromise,
-              roleTimeoutPromise
-            ]) as any;
+            const roleResult = await Promise.race([roleQueryPromise, roleTimeoutPromise]) as any;
+            const { data: roleData } = roleResult || { data: null };
             
             if (roleData) {
-              // Already authenticated as admin, redirect to admin dashboard
-              navigate("/admin-dashboard");
+              setTimeout(() => {
+                navigate("/admin-dashboard", { replace: true });
+              }, 100);
             }
-          } catch (error: any) {
-            // Ignore errors - user can still login manually
-            console.log('Role check failed or timed out:', error.message);
+          } catch {
+            // Ignore - show form
           }
         }
-      } catch (error: any) {
-        // Ignore errors - user can still login manually
-        console.log('Auth check failed or timed out:', error.message);
+      } catch {
+        // Ignore all errors - show login form
       }
     } catch (error) {
       // Ignore all errors - show login form
-      console.log('Auth check error:', error);
     }
   };
 
