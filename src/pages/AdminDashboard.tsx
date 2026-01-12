@@ -623,23 +623,48 @@ const AdminDashboard = () => {
   const loadDashboardStats = async () => {
     try {
       const client = getAdminClient() || supabase;
+      const isAdminClient = !!getAdminClient();
       
-      // Parallel count queries - very fast
-      const [rolesRes, supplierPendingRes, deliveryPendingRes, feedbackRes] = await Promise.all([
+      // Parallel count queries - very fast, with error handling
+      const results = await Promise.allSettled([
         client.from('user_roles').select('role', { count: 'exact', head: true }),
         client.from('supplier_applications').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
         client.from('delivery_providers').select('*', { count: 'exact', head: true }).eq('is_verified', false),
         client.from('feedback').select('*', { count: 'exact', head: true })
       ]);
 
+      // Handle each result separately
+      const rolesRes = results[0].status === 'fulfilled' ? results[0].value : null;
+      const supplierPendingRes = results[1].status === 'fulfilled' ? results[1].value : null;
+      const deliveryPendingRes = results[2].status === 'fulfilled' ? results[2].value : null;
+      const feedbackRes = results[3].status === 'fulfilled' ? results[3].value : null;
+
+      // Log warnings for failed queries (likely RLS blocks)
+      results.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          const tableNames = ['user_roles', 'supplier_applications', 'delivery_providers', 'feedback'];
+          console.warn(`⚠️ Error loading ${tableNames[index]} (RLS may be blocking):`, result.reason?.message || result.reason);
+          if (!isAdminClient) {
+            console.warn(`⚠️ Admin service key not configured. Some data may not be accessible.`);
+          }
+        }
+      });
+
       setStats(prev => ({
         ...prev,
-        totalUsers: rolesRes.count || 0,
-        pendingRegistrations: (supplierPendingRes.count || 0) + (deliveryPendingRes.count || 0),
-        totalFeedback: feedbackRes.count || 0
+        totalUsers: rolesRes?.count || 0,
+        pendingRegistrations: (supplierPendingRes?.count || 0) + (deliveryPendingRes?.count || 0),
+        totalFeedback: feedbackRes?.count || 0
       }));
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading stats:', error);
+      // Set defaults to prevent showing stale data
+      setStats(prev => ({
+        ...prev,
+        totalUsers: 0,
+        pendingRegistrations: 0,
+        totalFeedback: 0
+      }));
     }
   };
 
@@ -698,13 +723,27 @@ const AdminDashboard = () => {
     try {
       // Use admin client if available (bypasses RLS), otherwise use regular client
       const client = getAdminClient() || supabase;
+      const isAdminClient = !!getAdminClient();
       
       // Get user counts by role - single query
       const { data: rolesData, error: rolesError } = await client
         .from('user_roles')
         .select('role');
 
-      if (!rolesError && rolesData) {
+      if (rolesError) {
+        console.warn('⚠️ Error loading user roles (RLS may be blocking):', rolesError.message);
+        // If RLS blocks access, set counts to 0 instead of failing
+        if (!isAdminClient && rolesError.code === 'PGRST301' || rolesError.code === '42501') {
+          console.warn('⚠️ RLS policy blocking access. Admin service key not configured or user lacks permissions.');
+          setStats(prev => ({
+            ...prev,
+            totalUsers: 0,
+            totalBuilders: 0,
+            totalSuppliers: 0,
+            totalDelivery: 0
+          }));
+        }
+      } else if (rolesData) {
         const builderCount = rolesData.filter(r => r.role === 'builder' || r.role === 'professional_builder' || r.role === 'private_client').length;
         const supplierCount = rolesData.filter(r => r.role === 'supplier').length;
         const deliveryCount = rolesData.filter(r => r.role === 'delivery_provider' || r.role === 'delivery').length;
@@ -718,21 +757,42 @@ const AdminDashboard = () => {
         }));
       }
 
-      // Get pending registrations count from correct tables - parallel
-      const [supplierRegs, deliveryRegs] = await Promise.all([
-        client.from('supplier_applications').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-        client.from('delivery_providers').select('id', { count: 'exact', head: true }).eq('is_verified', false)
-      ]);
+      // Get pending registrations count from correct tables - parallel with error handling
+      try {
+        const [supplierRegs, deliveryRegs] = await Promise.all([
+          client.from('supplier_applications').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+          client.from('delivery_providers').select('id', { count: 'exact', head: true }).eq('is_verified', false)
+        ]);
 
-      const pendingCount = (supplierRegs.count || 0) + (deliveryRegs.count || 0);
+        const pendingCount = (supplierRegs.count || 0) + (deliveryRegs.count || 0);
 
-      setStats(prev => ({
-        ...prev,
-        pendingRegistrations: pendingCount
-      }));
+        setStats(prev => ({
+          ...prev,
+          pendingRegistrations: pendingCount
+        }));
+      } catch (regError: any) {
+        console.warn('⚠️ Error loading pending registrations (RLS may be blocking):', regError.message);
+        // Set to 0 if access is blocked
+        setStats(prev => ({
+          ...prev,
+          pendingRegistrations: 0
+        }));
+      }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading dashboard data:', error);
+      // Set all stats to 0 to prevent showing stale data
+      setStats({
+        totalUsers: 0,
+        totalBuilders: 0,
+        totalSuppliers: 0,
+        totalDelivery: 0,
+        pendingRegistrations: 0,
+        activeToday: 0,
+        totalFeedback: 0,
+        positiveFeedback: 0,
+        negativeFeedback: 0
+      });
     }
   };
   
