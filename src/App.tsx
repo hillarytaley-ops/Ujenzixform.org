@@ -159,6 +159,7 @@ const App = () => {
                 {/* Floating Social Media Button - Global, hides on auth pages */}
                 {showChat && <FloatingSocialSidebar />}
                 
+                <ErrorBoundary fallback={<ErrorFallback error={new Error('Page failed to load')} resetErrorBoundary={() => window.location.reload()} />}>
                 <Routes>
                     {/* Public Routes - Accessible to everyone after single sign in */}
                     <Route path="/" element={<Auth />} />
@@ -283,6 +284,7 @@ const App = () => {
                     {/* 404 */}
                     <Route path="*" element={<NotFound />} />
                 </Routes>
+                </ErrorBoundary>
                 {/* Privacy features will be re-enabled once dependencies are resolved */}
               </BrowserRouter>
             </TooltipProvider>

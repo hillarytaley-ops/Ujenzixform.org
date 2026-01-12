@@ -54,6 +54,8 @@ const AdminAuth = () => {
   const [pageLoading, setPageLoading] = useState(false); // Start as false - show form immediately
   const [attempts, setAttempts] = useState(0);
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
+  const [hasError, setHasError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string>("");
   const navigate = useNavigate();
   const { toast } = useToast();
 
