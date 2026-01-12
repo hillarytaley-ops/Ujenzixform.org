@@ -50,8 +50,10 @@ $$;
 
 -- Fix notifications INSERT policy (MEDIUM PRIORITY - notifications)
 -- Note: This is different from user_notifications which was fixed in Phase 3.10
+-- Drop all possible notification INSERT policies
 DROP POLICY IF EXISTS "System can insert notifications" ON notifications;
 DROP POLICY IF EXISTS "notifications_insert" ON notifications;
+DROP POLICY IF EXISTS "notifications_insert_policy" ON notifications;
 
 -- Only authenticated users (system/admins) can insert notifications
 -- Require user_id validation
@@ -75,9 +77,9 @@ BEGIN
         WITH CHECK (
           -- Require user_id (system can set it for any user)
           -- This prevents completely empty notifications
-          user_id IS NOT NULL
-          -- Admins can insert notifications
-          OR is_admin()
+          -- OR allow admins to insert (even if user_id is NULL for system notifications)
+          (user_id IS NOT NULL)
+          OR (is_admin())
         );
       ';
     ELSE
