@@ -830,5 +830,28 @@ const AdminAuth = () => {
   );
 };
 
-export default AdminAuth;
+// Wrap in error boundary to ensure it always renders
+const AdminAuthWithErrorBoundary = () => {
+  try {
+    return <AdminAuth />;
+  } catch (error: any) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4">
+        <div className="text-center space-y-4 max-w-md">
+          <div className="text-red-500 text-2xl font-bold">⚠️ Error Loading Admin Login</div>
+          <p className="text-gray-400">Please refresh the page or contact support.</p>
+          <p className="text-gray-500 text-xs font-mono">{error?.message || 'Unknown error'}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+          >
+            Refresh Page
+          </button>
+        </div>
+      </div>
+    );
+  }
+};
+
+export default AdminAuthWithErrorBoundary;
 
