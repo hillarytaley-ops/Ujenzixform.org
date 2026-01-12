@@ -101,39 +101,20 @@ CREATE POLICY "purchase_orders_update_policy"
   );
 
 -- Fix quote_requests UPDATE policy (CRITICAL)
--- Note: quote_requests has order_id that references purchase_orders
--- We need to join through purchase_orders to check builder ownership
+-- Note: quote_requests table doesn't have order_id column in actual database
+-- Using supplier_id check only (still more secure than USING (true))
 DROP POLICY IF EXISTS "quote_requests_update_policy" ON quote_requests;
 
 CREATE POLICY "quote_requests_update_policy"
   ON quote_requests FOR UPDATE
   TO authenticated
   USING (
-    -- Builder can update if they own the related purchase_order
-    EXISTS (
-      SELECT 1 FROM purchase_orders po
-      WHERE po.id = quote_requests.order_id
-      AND po.builder_id = auth.uid()
-    )
     -- Supplier can update their own quotes
-    OR EXISTS (
-      SELECT 1 FROM suppliers s
-      WHERE s.id = quote_requests.supplier_id
-      AND s.user_id = auth.uid()
-    )
+    supplier_id = auth.uid()
     OR is_admin()
   )
   WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM purchase_orders po
-      WHERE po.id = quote_requests.order_id
-      AND po.builder_id = auth.uid()
-    )
-    OR EXISTS (
-      SELECT 1 FROM suppliers s
-      WHERE s.id = quote_requests.supplier_id
-      AND s.user_id = auth.uid()
-    )
+    supplier_id = auth.uid()
     OR is_admin()
   );
 
