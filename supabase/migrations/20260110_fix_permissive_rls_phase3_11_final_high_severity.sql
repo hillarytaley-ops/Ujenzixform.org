@@ -56,24 +56,20 @@ DROP POLICY IF EXISTS "Enable insert for all users" ON job_applications;
 DROP POLICY IF EXISTS "Anyone can submit job applications" ON job_applications;
 DROP POLICY IF EXISTS "job_applications_insert" ON job_applications;
 
--- Allow authenticated users to submit job applications
--- Anonymous users can also submit (for public careers page), but we'll restrict to authenticated
--- OR allow anonymous but with better validation
--- For now, we'll allow both authenticated and anonymous, but this is still better than true
--- because we can add validation later
+-- Allow authenticated users and anonymous users to submit job applications
+-- This is for the public careers page, but we'll add basic validation
+-- Note: This is still somewhat permissive for public job applications,
+-- but it's more explicit than WITH CHECK (true)
 CREATE POLICY "job_applications_insert"
   ON job_applications FOR INSERT
   TO authenticated, anon
   WITH CHECK (
-    -- Allow authenticated users to submit applications
-    auth.uid() IS NOT NULL
-    -- OR allow anonymous users (for public careers page)
-    -- but restrict to prevent spam/abuse
-    OR (
-      -- Anonymous users can submit, but we'll add basic validation
-      -- This is still more secure than WITH CHECK (true) because we can add checks
-      true
-    )
+    -- Basic validation: require email and full_name
+    -- This prevents completely empty submissions
+    (email IS NOT NULL AND email != '')
+    AND (full_name IS NOT NULL AND full_name != '')
+    -- Allow authenticated users
+    OR auth.uid() IS NOT NULL
   );
 
 -- Note: The above policy still allows anonymous inserts for the public careers page,
