@@ -308,6 +308,7 @@ CREATE POLICY "goods_received_notes_delete"
   USING (is_admin());
 
 -- Fix order_materials ALL policy
+-- Note: order_materials.order_id references delivery_orders, not purchase_orders
 DROP POLICY IF EXISTS "order_materials_all" ON order_materials;
 
 CREATE POLICY "order_materials_insert"
@@ -315,10 +316,15 @@ CREATE POLICY "order_materials_insert"
   TO authenticated
   WITH CHECK (
     EXISTS (
-      SELECT 1 FROM purchase_orders po
-      WHERE po.id = order_materials.purchase_order_id
+      SELECT 1 FROM delivery_orders del_ord
+      WHERE del_ord.id = order_materials.order_id
       AND (
-        po.builder_id = auth.uid()
+        del_ord.builder_id = auth.uid()
+        OR EXISTS (
+          SELECT 1 FROM suppliers s
+          WHERE s.id = del_ord.supplier_id
+          AND s.user_id = auth.uid()
+        )
         OR is_admin()
       )
     )
@@ -329,13 +335,13 @@ CREATE POLICY "order_materials_select"
   TO authenticated
   USING (
     EXISTS (
-      SELECT 1 FROM purchase_orders po
-      WHERE po.id = order_materials.purchase_order_id
+      SELECT 1 FROM delivery_orders del_ord
+      WHERE del_ord.id = order_materials.order_id
       AND (
-        po.builder_id = auth.uid()
+        del_ord.builder_id = auth.uid()
         OR EXISTS (
           SELECT 1 FROM suppliers s
-          WHERE s.id = po.supplier_id
+          WHERE s.id = del_ord.supplier_id
           AND s.user_id = auth.uid()
         )
         OR is_admin()
@@ -348,20 +354,30 @@ CREATE POLICY "order_materials_update"
   TO authenticated
   USING (
     EXISTS (
-      SELECT 1 FROM purchase_orders po
-      WHERE po.id = order_materials.purchase_order_id
+      SELECT 1 FROM delivery_orders del_ord
+      WHERE del_ord.id = order_materials.order_id
       AND (
-        po.builder_id = auth.uid()
+        del_ord.builder_id = auth.uid()
+        OR EXISTS (
+          SELECT 1 FROM suppliers s
+          WHERE s.id = del_ord.supplier_id
+          AND s.user_id = auth.uid()
+        )
         OR is_admin()
       )
     )
   )
   WITH CHECK (
     EXISTS (
-      SELECT 1 FROM purchase_orders po
-      WHERE po.id = order_materials.purchase_order_id
+      SELECT 1 FROM delivery_orders del_ord
+      WHERE del_ord.id = order_materials.order_id
       AND (
-        po.builder_id = auth.uid()
+        del_ord.builder_id = auth.uid()
+        OR EXISTS (
+          SELECT 1 FROM suppliers s
+          WHERE s.id = del_ord.supplier_id
+          AND s.user_id = auth.uid()
+        )
         OR is_admin()
       )
     )
@@ -372,10 +388,15 @@ CREATE POLICY "order_materials_delete"
   TO authenticated
   USING (
     EXISTS (
-      SELECT 1 FROM purchase_orders po
-      WHERE po.id = order_materials.purchase_order_id
+      SELECT 1 FROM delivery_orders del_ord
+      WHERE del_ord.id = order_materials.order_id
       AND (
-        po.builder_id = auth.uid()
+        del_ord.builder_id = auth.uid()
+        OR EXISTS (
+          SELECT 1 FROM suppliers s
+          WHERE s.id = del_ord.supplier_id
+          AND s.user_id = auth.uid()
+        )
         OR is_admin()
       )
     )
