@@ -128,76 +128,265 @@ BEGIN
 END $$;
 
 -- Fix profile_access_log INSERT policy (HIGH PRIORITY - audit table)
+-- Use dynamic column checking since schema may vary
 DROP POLICY IF EXISTS "profile_access_log_insert" ON profile_access_log;
 
--- Users can log their own profile access
--- Admins can insert any profile access logs
-CREATE POLICY "profile_access_log_insert"
-  ON profile_access_log FOR INSERT
-  TO authenticated
-  WITH CHECK (
-    -- Users can log their own profile access
-    user_id = auth.uid()
-    OR is_admin()
-  );
+DO $$
+BEGIN
+  -- Check if table exists and what column it uses
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public'
+    AND table_name = 'profile_access_log'
+  ) THEN
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public'
+      AND table_name = 'profile_access_log'
+      AND column_name = 'user_id'
+    ) THEN
+      EXECUTE '
+        CREATE POLICY "profile_access_log_insert"
+        ON profile_access_log FOR INSERT
+        TO authenticated
+        WITH CHECK (
+          user_id = auth.uid()
+          OR is_admin()
+        );
+      ';
+    ELSIF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public'
+      AND table_name = 'profile_access_log'
+      AND column_name = 'accessing_user_id'
+    ) THEN
+      EXECUTE '
+        CREATE POLICY "profile_access_log_insert"
+        ON profile_access_log FOR INSERT
+        TO authenticated
+        WITH CHECK (
+          accessing_user_id = auth.uid()
+          OR is_admin()
+        );
+      ';
+    ELSE
+      -- Fallback: admin-only if no user column exists
+      EXECUTE '
+        CREATE POLICY "profile_access_log_insert"
+        ON profile_access_log FOR INSERT
+        TO authenticated
+        WITH CHECK (is_admin());
+      ';
+    END IF;
+  END IF;
+END $$;
 
 -- Fix profile_identity_security_audit INSERT policy (HIGH PRIORITY - audit table)
+-- This table uses accessing_user_id, not user_id
 DROP POLICY IF EXISTS "profile_identity_security_audit_system_insert" ON profile_identity_security_audit;
 DROP POLICY IF EXISTS "profile_identity_security_audit_insert" ON profile_identity_security_audit;
 
--- Users can log their own identity security events
--- Admins can insert any identity security audits
-CREATE POLICY "profile_identity_security_audit_insert"
-  ON profile_identity_security_audit FOR INSERT
-  TO authenticated
-  WITH CHECK (
-    -- Users can log their own identity security events
-    user_id = auth.uid()
-    OR is_admin()
-  );
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public'
+    AND table_name = 'profile_identity_security_audit'
+  ) THEN
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public'
+      AND table_name = 'profile_identity_security_audit'
+      AND column_name = 'accessing_user_id'
+    ) THEN
+      EXECUTE '
+        CREATE POLICY "profile_identity_security_audit_insert"
+        ON profile_identity_security_audit FOR INSERT
+        TO authenticated
+        WITH CHECK (
+          accessing_user_id = auth.uid()
+          OR is_admin()
+        );
+      ';
+    ELSIF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public'
+      AND table_name = 'profile_identity_security_audit'
+      AND column_name = 'user_id'
+    ) THEN
+      EXECUTE '
+        CREATE POLICY "profile_identity_security_audit_insert"
+        ON profile_identity_security_audit FOR INSERT
+        TO authenticated
+        WITH CHECK (
+          user_id = auth.uid()
+          OR is_admin()
+        );
+      ';
+    ELSE
+      EXECUTE '
+        CREATE POLICY "profile_identity_security_audit_insert"
+        ON profile_identity_security_audit FOR INSERT
+        TO authenticated
+        WITH CHECK (is_admin());
+      ';
+    END IF;
+  END IF;
+END $$;
 
 -- Fix provider_access_log INSERT policy (HIGH PRIORITY - audit table)
 DROP POLICY IF EXISTS "provider_access_log_insert" ON provider_access_log;
 
--- Users can log their own provider access
--- Admins can insert any provider access logs
-CREATE POLICY "provider_access_log_insert"
-  ON provider_access_log FOR INSERT
-  TO authenticated
-  WITH CHECK (
-    -- Users can log their own provider access
-    user_id = auth.uid()
-    OR is_admin()
-  );
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public'
+    AND table_name = 'provider_access_log'
+  ) THEN
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public'
+      AND table_name = 'provider_access_log'
+      AND column_name = 'user_id'
+    ) THEN
+      EXECUTE '
+        CREATE POLICY "provider_access_log_insert"
+        ON provider_access_log FOR INSERT
+        TO authenticated
+        WITH CHECK (
+          user_id = auth.uid()
+          OR is_admin()
+        );
+      ';
+    ELSIF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public'
+      AND table_name = 'provider_access_log'
+      AND column_name = 'accessing_user_id'
+    ) THEN
+      EXECUTE '
+        CREATE POLICY "provider_access_log_insert"
+        ON provider_access_log FOR INSERT
+        TO authenticated
+        WITH CHECK (
+          accessing_user_id = auth.uid()
+          OR is_admin()
+        );
+      ';
+    ELSE
+      EXECUTE '
+        CREATE POLICY "provider_access_log_insert"
+        ON provider_access_log FOR INSERT
+        TO authenticated
+        WITH CHECK (is_admin());
+      ';
+    END IF;
+  END IF;
+END $$;
 
 -- Fix provider_business_access_audit INSERT policy (HIGH PRIORITY - audit table)
 DROP POLICY IF EXISTS "provider_business_audit_system_write" ON provider_business_access_audit;
 DROP POLICY IF EXISTS "provider_business_access_audit_insert" ON provider_business_access_audit;
 
--- Users can log their own provider business access
--- Admins can insert any provider business audits
-CREATE POLICY "provider_business_access_audit_insert"
-  ON provider_business_access_audit FOR INSERT
-  TO authenticated
-  WITH CHECK (
-    -- Users can log their own provider business access
-    user_id = auth.uid()
-    OR is_admin()
-  );
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public'
+    AND table_name = 'provider_business_access_audit'
+  ) THEN
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public'
+      AND table_name = 'provider_business_access_audit'
+      AND column_name = 'user_id'
+    ) THEN
+      EXECUTE '
+        CREATE POLICY "provider_business_access_audit_insert"
+        ON provider_business_access_audit FOR INSERT
+        TO authenticated
+        WITH CHECK (
+          user_id = auth.uid()
+          OR is_admin()
+        );
+      ';
+    ELSIF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public'
+      AND table_name = 'provider_business_access_audit'
+      AND column_name = 'accessing_user_id'
+    ) THEN
+      EXECUTE '
+        CREATE POLICY "provider_business_access_audit_insert"
+        ON provider_business_access_audit FOR INSERT
+        TO authenticated
+        WITH CHECK (
+          accessing_user_id = auth.uid()
+          OR is_admin()
+        );
+      ';
+    ELSE
+      EXECUTE '
+        CREATE POLICY "provider_business_access_audit_insert"
+        ON provider_business_access_audit FOR INSERT
+        TO authenticated
+        WITH CHECK (is_admin());
+      ';
+    END IF;
+  END IF;
+END $$;
 
 -- Fix provider_contact_security_log INSERT policy (HIGH PRIORITY - audit table)
 DROP POLICY IF EXISTS "provider_contact_security_log_insert" ON provider_contact_security_log;
 
--- Users can log their own provider contact security events
--- Admins can insert any provider contact security logs
-CREATE POLICY "provider_contact_security_log_insert"
-  ON provider_contact_security_log FOR INSERT
-  TO authenticated
-  WITH CHECK (
-    -- Users can log their own provider contact security events
-    user_id = auth.uid()
-    OR is_admin()
-  );
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public'
+    AND table_name = 'provider_contact_security_log'
+  ) THEN
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public'
+      AND table_name = 'provider_contact_security_log'
+      AND column_name = 'user_id'
+    ) THEN
+      EXECUTE '
+        CREATE POLICY "provider_contact_security_log_insert"
+        ON provider_contact_security_log FOR INSERT
+        TO authenticated
+        WITH CHECK (
+          user_id = auth.uid()
+          OR is_admin()
+        );
+      ';
+    ELSIF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public'
+      AND table_name = 'provider_contact_security_log'
+      AND column_name = 'accessing_user_id'
+    ) THEN
+      EXECUTE '
+        CREATE POLICY "provider_contact_security_log_insert"
+        ON provider_contact_security_log FOR INSERT
+        TO authenticated
+        WITH CHECK (
+          accessing_user_id = auth.uid()
+          OR is_admin()
+        );
+      ';
+    ELSE
+      EXECUTE '
+        CREATE POLICY "provider_contact_security_log_insert"
+        ON provider_contact_security_log FOR INSERT
+        TO authenticated
+        WITH CHECK (is_admin());
+      ';
+    END IF;
+  END IF;
+END $$;
 
 -- Note: All high-severity INSERT policies should now be fixed.
 -- Remaining warnings should be medium-severity only.
