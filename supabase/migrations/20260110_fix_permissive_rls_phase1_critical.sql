@@ -85,28 +85,37 @@ CREATE POLICY "user_roles_delete"
   USING (is_admin());
 
 -- Fix purchase_orders UPDATE policy (CRITICAL)
+-- Note: Error indicates buyer_id doesn't exist, so using builder_id based on migrations
 DROP POLICY IF EXISTS "purchase_orders_update_policy" ON purchase_orders;
 
 CREATE POLICY "purchase_orders_update_policy"
   ON purchase_orders FOR UPDATE
   TO authenticated
   USING (
-    buyer_id = auth.uid()
+    builder_id = auth.uid()
     OR is_admin()
   )
   WITH CHECK (
-    buyer_id = auth.uid()
+    builder_id = auth.uid()
     OR is_admin()
   );
 
 -- Fix quote_requests UPDATE policy (CRITICAL)
+-- Note: quote_requests has order_id that references purchase_orders
+-- We need to join through purchase_orders to check builder ownership
 DROP POLICY IF EXISTS "quote_requests_update_policy" ON quote_requests;
 
 CREATE POLICY "quote_requests_update_policy"
   ON quote_requests FOR UPDATE
   TO authenticated
   USING (
-    buyer_id = auth.uid()
+    -- Builder can update if they own the related purchase_order
+    EXISTS (
+      SELECT 1 FROM purchase_orders po
+      WHERE po.id = quote_requests.order_id
+      AND po.builder_id = auth.uid()
+    )
+    -- Supplier can update their own quotes
     OR EXISTS (
       SELECT 1 FROM suppliers s
       WHERE s.id = quote_requests.supplier_id
@@ -115,7 +124,11 @@ CREATE POLICY "quote_requests_update_policy"
     OR is_admin()
   )
   WITH CHECK (
-    buyer_id = auth.uid()
+    EXISTS (
+      SELECT 1 FROM purchase_orders po
+      WHERE po.id = quote_requests.order_id
+      AND po.builder_id = auth.uid()
+    )
     OR EXISTS (
       SELECT 1 FROM suppliers s
       WHERE s.id = quote_requests.supplier_id
