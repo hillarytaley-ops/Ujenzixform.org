@@ -501,6 +501,18 @@ const AdminAuth = () => {
   const isLocked = lockoutUntil && Date.now() < lockoutUntil;
   const remainingAttempts = Math.max(0, 3 - attempts);
 
+  // Show loading spinner only during initial page load
+  if (pageLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto"></div>
+          <p className="text-gray-400">Loading admin portal...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden">
       {/* Beautiful Kenyan Construction Workers with Yellow Hard Hats Background */}
