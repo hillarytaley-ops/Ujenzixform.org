@@ -30,10 +30,12 @@ CREATE TABLE IF NOT EXISTS public.user_roles (
 );
 
 -- Create is_admin() helper function if it doesn't exist
+-- Fix: Set search_path to prevent search_path injection attacks
 CREATE OR REPLACE FUNCTION public.is_admin()
 RETURNS BOOLEAN
 LANGUAGE sql
 SECURITY DEFINER
+SET search_path = public
 STABLE
 AS $$
   SELECT EXISTS (
@@ -52,6 +54,7 @@ $$;
 -- Note: This is different from user_notifications which was fixed in Phase 3.10
 -- Drop all possible notification INSERT policies
 DROP POLICY IF EXISTS "System can insert notifications" ON notifications;
+DROP POLICY IF EXISTS "System can create notifications" ON notifications;
 DROP POLICY IF EXISTS "notifications_insert" ON notifications;
 DROP POLICY IF EXISTS "notifications_insert_policy" ON notifications;
 
