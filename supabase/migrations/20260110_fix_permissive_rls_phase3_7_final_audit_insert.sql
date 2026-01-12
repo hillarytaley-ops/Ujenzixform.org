@@ -53,7 +53,7 @@ DROP POLICY IF EXISTS "privacy_consent_audit_insert" ON privacy_consent_audit;
 
 -- Users can log their own privacy consent events
 -- Admins can insert any privacy consent audits
-CREATE POLICY "privacy_consent_audit_insert"
+CREATE POLICY IF NOT EXISTS "privacy_consent_audit_insert"
   ON privacy_consent_audit FOR INSERT
   TO authenticated
   WITH CHECK (
@@ -67,7 +67,7 @@ DROP POLICY IF EXISTS "location_data_access_log_insert" ON location_data_access_
 
 -- Users can log their own location data access
 -- Admins can insert any location access logs
-CREATE POLICY "location_data_access_log_insert"
+CREATE POLICY IF NOT EXISTS "location_data_access_log_insert"
   ON location_data_access_log FOR INSERT
   TO authenticated
   WITH CHECK (
@@ -80,9 +80,10 @@ CREATE POLICY "location_data_access_log_insert"
 -- Note: builder_id references profiles.id, not auth.users.id
 DROP POLICY IF EXISTS "delivery_requests_insert_policy" ON delivery_requests;
 DROP POLICY IF EXISTS "allow_insert" ON delivery_requests;
+DROP POLICY IF EXISTS "delivery_requests_insert" ON delivery_requests;
 
 -- Builders can create delivery requests for themselves
-CREATE POLICY "delivery_requests_insert"
+CREATE POLICY IF NOT EXISTS "delivery_requests_insert"
   ON delivery_requests FOR INSERT
   TO authenticated
   WITH CHECK (
@@ -101,7 +102,7 @@ DROP POLICY IF EXISTS "driver_info_access_log_insert" ON driver_info_access_log;
 
 -- Users can log their own driver info access
 -- Admins can insert any driver info access logs
-CREATE POLICY "driver_info_access_log_insert"
+CREATE POLICY IF NOT EXISTS "driver_info_access_log_insert"
   ON driver_info_access_log FOR INSERT
   TO authenticated
   WITH CHECK (
@@ -112,28 +113,31 @@ CREATE POLICY "driver_info_access_log_insert"
 
 -- Fix emergency_lockdown_log INSERT policy (HIGH PRIORITY - audit table)
 DROP POLICY IF EXISTS "emergency_lockdown_system_write" ON emergency_lockdown_log;
+DROP POLICY IF EXISTS "emergency_lockdown_log_insert" ON emergency_lockdown_log;
 
 -- Only admins can insert emergency lockdown logs
-CREATE POLICY "emergency_lockdown_log_insert"
+CREATE POLICY IF NOT EXISTS "emergency_lockdown_log_insert"
   ON emergency_lockdown_log FOR INSERT
   TO authenticated
   WITH CHECK (is_admin());
 
 -- Fix emergency_security_log INSERT policy (HIGH PRIORITY - audit table)
 DROP POLICY IF EXISTS "emergency_security_system_write" ON emergency_security_log;
+DROP POLICY IF EXISTS "emergency_security_log_insert" ON emergency_security_log;
 
 -- Only admins can insert emergency security logs
-CREATE POLICY "emergency_security_log_insert"
+CREATE POLICY IF NOT EXISTS "emergency_security_log_insert"
   ON emergency_security_log FOR INSERT
   TO authenticated
   WITH CHECK (is_admin());
 
 -- Fix contact_messages INSERT policy (HIGH PRIORITY)
 DROP POLICY IF EXISTS "contact_messages_insert_policy" ON contact_messages;
+DROP POLICY IF EXISTS "contact_messages_insert" ON contact_messages;
 
 -- Anyone can submit contact messages (public contact form)
 -- But restrict to authenticated users for better security
-CREATE POLICY "contact_messages_insert"
+CREATE POLICY IF NOT EXISTS "contact_messages_insert"
   ON contact_messages FOR INSERT
   TO authenticated
   WITH CHECK (
@@ -147,7 +151,7 @@ DROP POLICY IF EXISTS "security_alerts_insert" ON security_alerts;
 
 -- Only admins can insert security alerts
 -- System can insert security alerts via admin role
-CREATE POLICY "security_alerts_insert"
+CREATE POLICY IF NOT EXISTS "security_alerts_insert"
   ON security_alerts FOR INSERT
   TO authenticated
   WITH CHECK (is_admin());
@@ -156,7 +160,7 @@ CREATE POLICY "security_alerts_insert"
 DROP POLICY IF EXISTS "master_rls_security_audit_insert" ON master_rls_security_audit;
 
 -- Only admins can insert master security audit logs
-CREATE POLICY "master_rls_security_audit_insert"
+CREATE POLICY IF NOT EXISTS "master_rls_security_audit_insert"
   ON master_rls_security_audit FOR INSERT
   TO authenticated
   WITH CHECK (is_admin());
@@ -166,7 +170,7 @@ DROP POLICY IF EXISTS "payment_encryption_audit_insert" ON payment_encryption_au
 
 -- Users can log their own payment encryption events
 -- Admins can insert any payment encryption audits
-CREATE POLICY "payment_encryption_audit_insert"
+CREATE POLICY IF NOT EXISTS "payment_encryption_audit_insert"
   ON payment_encryption_audit FOR INSERT
   TO authenticated
   WITH CHECK (
