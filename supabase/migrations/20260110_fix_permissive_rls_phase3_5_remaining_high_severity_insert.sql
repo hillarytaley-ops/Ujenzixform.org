@@ -129,19 +129,13 @@ CREATE POLICY "purchase_orders_insert"
 
 -- Fix monitoring_service_requests INSERT policy (HIGH PRIORITY)
 -- Note: The table is monitoring_service_requests, not service_requests
--- It uses user_id (based on actual schema)
+-- Note: This policy was already created in Phase 2, so we just need to drop old permissive policies
 DROP POLICY IF EXISTS "service_requests_insert" ON monitoring_service_requests;
 DROP POLICY IF EXISTS "Users can create monitoring requests" ON monitoring_service_requests;
+DROP POLICY IF EXISTS "Anyone can update monitoring requests" ON monitoring_service_requests;
 
--- Users can create monitoring service requests for themselves
-CREATE POLICY "monitoring_service_requests_insert"
-  ON monitoring_service_requests FOR INSERT
-  TO authenticated
-  WITH CHECK (
-    -- Users can create their own service requests
-    user_id = auth.uid()
-    OR is_admin()
-  );
+-- The INSERT policy was already created in Phase 2, so we don't need to recreate it
+-- If it doesn't exist for some reason, it will be created by Phase 2 migration
 
 -- Fix email_notifications INSERT policy
 DROP POLICY IF EXISTS "email_notifications_insert" ON email_notifications;
