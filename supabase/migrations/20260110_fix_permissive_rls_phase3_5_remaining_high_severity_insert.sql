@@ -129,7 +129,7 @@ CREATE POLICY "purchase_orders_insert"
 
 -- Fix monitoring_service_requests INSERT policy (HIGH PRIORITY)
 -- Note: The table is monitoring_service_requests, not service_requests
--- It uses user_id (older) or requester_id (newer migrations)
+-- It uses user_id (based on actual schema)
 DROP POLICY IF EXISTS "service_requests_insert" ON monitoring_service_requests;
 DROP POLICY IF EXISTS "Users can create monitoring requests" ON monitoring_service_requests;
 
@@ -139,9 +139,7 @@ CREATE POLICY "monitoring_service_requests_insert"
   TO authenticated
   WITH CHECK (
     -- Users can create their own service requests
-    -- Check both user_id and requester_id to handle different schema versions
-    (user_id IS NOT NULL AND user_id = auth.uid())
-    OR (requester_id IS NOT NULL AND requester_id = auth.uid())
+    user_id = auth.uid()
     OR is_admin()
   );
 
