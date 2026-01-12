@@ -214,6 +214,7 @@ CREATE POLICY "contact_security_audit_insert"
   );
 
 -- Fix cross_role_access_audit INSERT policy
+-- Note: This table uses accessing_user_id, not user_id
 DROP POLICY IF EXISTS "cross_role_access_audit_insert" ON cross_role_access_audit;
 
 CREATE POLICY "cross_role_access_audit_insert"
@@ -221,7 +222,7 @@ CREATE POLICY "cross_role_access_audit_insert"
   TO authenticated
   WITH CHECK (
     -- Users can log their own cross-role access attempts
-    user_id = auth.uid()
+    accessing_user_id = auth.uid()
     OR is_admin()
   );
 
