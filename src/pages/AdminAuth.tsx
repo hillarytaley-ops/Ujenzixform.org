@@ -51,6 +51,7 @@ const AdminAuth = () => {
   const [workEmail, setWorkEmail] = useState("");
   const [staffCode, setStaffCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const [pageLoading, setPageLoading] = useState(true); // New state for initial page load
   const [attempts, setAttempts] = useState(0);
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
   const navigate = useNavigate();
@@ -67,52 +68,93 @@ const AdminAuth = () => {
       }
     });
     
-    // Check if user is already authenticated as admin
-    checkExistingAuth();
+    // Set a timeout to show the form even if auth check is slow (mobile-friendly)
+    const showFormTimeout = setTimeout(() => {
+      setPageLoading(false);
+    }, 2000); // Show form after 2 seconds max, even if checks are still running
+    
+    // Check if user is already authenticated as admin (with timeout)
+    const authCheckTimeout = setTimeout(() => {
+      setPageLoading(false); // Stop loading if check takes too long
+    }, 3000); // Max 3 seconds for auth check
+    
+    checkExistingAuth().finally(() => {
+      clearTimeout(authCheckTimeout);
+      clearTimeout(showFormTimeout);
+      setPageLoading(false);
+    });
+    
+    return () => {
+      clearTimeout(showFormTimeout);
+      clearTimeout(authCheckTimeout);
+    };
   }, []);
 
   const checkExistingAuth = async () => {
-    // Check localStorage first (faster than database)
-    const isAdminAuthenticated = localStorage.getItem('admin_authenticated') === 'true';
-    const adminLoginTime = localStorage.getItem('admin_login_time');
-    
-    if (isAdminAuthenticated && adminLoginTime) {
-      const sessionAge = Date.now() - parseInt(adminLoginTime);
-      const maxSessionAge = 24 * 60 * 60 * 1000; // 24 hours
+    try {
+      // Check localStorage first (faster than database)
+      const isAdminAuthenticated = localStorage.getItem('admin_authenticated') === 'true';
+      const adminLoginTime = localStorage.getItem('admin_login_time');
       
-      if (sessionAge < maxSessionAge) {
-        // Valid admin session, redirect immediately
-        navigate("/admin-dashboard");
-        return;
+      if (isAdminAuthenticated && adminLoginTime) {
+        const sessionAge = Date.now() - parseInt(adminLoginTime);
+        const maxSessionAge = 24 * 60 * 60 * 1000; // 24 hours
+        
+        if (sessionAge < maxSessionAge) {
+          // Valid admin session, redirect immediately
+          navigate("/admin-dashboard");
+          return;
+        }
       }
-    }
-    
-    // Check Supabase auth in parallel (non-blocking)
-    (async () => {
+      
+      // Check Supabase auth with timeout (mobile-friendly)
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const getUserPromise = supabase.auth.getUser();
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Auth check timeout')), 2000)
+        );
+        
+        const { data: { user } } = await Promise.race([
+          getUserPromise,
+          timeoutPromise
+        ]) as any;
+        
         if (user) {
           try {
-            // Check if user has admin role (non-blocking)
-            const { data: roleData } = await supabase
+            // Check if user has admin role with timeout
+            const roleQueryPromise = supabase
               .from('user_roles')
               .select('role')
               .eq('user_id', user.id)
               .eq('role', 'admin')
               .maybeSingle();
             
+            const roleTimeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Role check timeout')), 2000)
+            );
+            
+            const { data: roleData } = await Promise.race([
+              roleQueryPromise,
+              roleTimeoutPromise
+            ]) as any;
+            
             if (roleData) {
               // Already authenticated as admin, redirect to admin dashboard
               navigate("/admin-dashboard");
             }
-          } catch {
+          } catch (error: any) {
             // Ignore errors - user can still login manually
+            console.log('Role check failed or timed out:', error.message);
           }
         }
-      } catch {
+      } catch (error: any) {
         // Ignore errors - user can still login manually
+        console.log('Auth check failed or timed out:', error.message);
       }
-    })();
+    } catch (error) {
+      // Ignore all errors - show login form
+      console.log('Auth check error:', error);
+    }
   };
 
   const validateWorkEmail = (email: string): boolean => {
