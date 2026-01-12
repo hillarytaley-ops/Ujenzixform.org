@@ -77,6 +77,7 @@ CREATE POLICY "location_data_access_log_insert"
   );
 
 -- Fix delivery_requests INSERT policy (HIGH PRIORITY)
+-- Note: builder_id references profiles.id, not auth.users.id
 DROP POLICY IF EXISTS "delivery_requests_insert_policy" ON delivery_requests;
 DROP POLICY IF EXISTS "allow_insert" ON delivery_requests;
 
@@ -86,8 +87,8 @@ CREATE POLICY "delivery_requests_insert"
   TO authenticated
   WITH CHECK (
     -- Builder can create their own delivery requests
-    builder_id = auth.uid()
-    OR EXISTS (
+    -- builder_id references profiles.id, so we need to join through profiles
+    EXISTS (
       SELECT 1 FROM profiles p
       WHERE p.id = delivery_requests.builder_id
       AND p.user_id = auth.uid()
