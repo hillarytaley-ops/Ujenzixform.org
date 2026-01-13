@@ -31,7 +31,7 @@
  * ╚══════════════════════════════════════════════════════════════════════════════════════╝
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Component, ErrorInfo, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -39,7 +39,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import AnimatedSection from "@/components/AnimatedSection";
 import { Shield, Lock, AlertTriangle, KeyRound, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -60,12 +59,7 @@ const AdminAuth = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // IMMEDIATELY show form on mobile - don't wait for checks
-    // Set a very short timeout to ensure form shows quickly
-    const immediateTimeout = setTimeout(() => {
-      setPageLoading(false);
-    }, 500); // Show form after 500ms max
-    
+    // IMMEDIATELY show form - pageLoading starts as false
     // Clear any stale lockouts on component mount (non-blocking)
     try {
       Object.keys(localStorage).forEach(key => {
@@ -80,30 +74,11 @@ const AdminAuth = () => {
       // Ignore localStorage errors
     }
     
-    // Check if user is already authenticated (non-blocking, with very short timeout)
-    const checkPromise = checkExistingAuth().catch(() => {
-      // Ignore all errors - just show the form
+    // Check if user is already authenticated (non-blocking)
+    // This runs in background and redirects if already logged in
+    checkExistingAuth().catch(() => {
+      // Ignore all errors - form is already showing
     });
-    
-    // Force show form after 1 second regardless
-    const forceShowTimeout = setTimeout(() => {
-      setPageLoading(false);
-    }, 1000);
-    
-    // Cleanup
-    Promise.race([
-      checkPromise,
-      new Promise(resolve => setTimeout(resolve, 1000))
-    ]).finally(() => {
-      clearTimeout(immediateTimeout);
-      clearTimeout(forceShowTimeout);
-      setPageLoading(false);
-    });
-    
-    return () => {
-      clearTimeout(immediateTimeout);
-      clearTimeout(forceShowTimeout);
-    };
   }, []);
 
   const checkExistingAuth = async () => {
@@ -591,6 +566,7 @@ const AdminAuth = () => {
       )}
       
       {/* Beautiful Kenyan Construction Workers with Yellow Hard Hats Background */}
+      {/* Note: Removed backgroundAttachment: 'fixed' as it causes issues on iOS Safari and some mobile browsers */}
       <div 
         className="absolute inset-0 z-0"
         style={{
@@ -598,8 +574,7 @@ const AdminAuth = () => {
           backgroundColor: '#1e3a5f',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          backgroundAttachment: 'fixed'
+          backgroundRepeat: 'no-repeat'
         }}
         role="img"
         aria-label="Kenyan construction workers in yellow hard hats reviewing blueprints at steel construction site"
@@ -608,7 +583,8 @@ const AdminAuth = () => {
       {/* Dark overlay for admin security feel */}
       <div className="absolute inset-0 bg-gradient-to-br from-slate-900/85 via-blue-900/70 to-slate-900/85 z-0"></div>
       
-      <AnimatedSection animation="scaleIn" className="relative z-10">
+      {/* Removed AnimatedSection to prevent mobile visibility issues */}
+      <div className="relative z-10 animate-in fade-in zoom-in-95 duration-500">
         <Card className="w-full max-w-md border-2 border-blue-600/70 shadow-2xl bg-slate-900/65 backdrop-blur-2xl">
           <CardHeader className="text-center bg-gradient-to-r from-blue-950 to-slate-950 border-b-2 border-blue-900/50">
             <div className="flex justify-center mb-4">
@@ -825,32 +801,67 @@ const AdminAuth = () => {
             </AlertDescription>
           </Alert>
         </div>
-      </AnimatedSection>
+      </div>
     </div>
   );
 };
 
-// Wrap in error boundary to ensure it always renders
-const AdminAuthWithErrorBoundary = () => {
-  try {
-    return <AdminAuth />;
-  } catch (error: any) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4">
-        <div className="text-center space-y-4 max-w-md">
-          <div className="text-red-500 text-2xl font-bold">⚠️ Error Loading Admin Login</div>
-          <p className="text-gray-400">Please refresh the page or contact support.</p>
-          <p className="text-gray-500 text-xs font-mono">{error?.message || 'Unknown error'}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
-          >
-            Refresh Page
-          </button>
-        </div>
-      </div>
-    );
+// Proper React Error Boundary class component
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+interface ErrorBoundaryProps {
+  children: ReactNode;
+}
+
+class AdminAuthErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
   }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('AdminAuth Error Boundary caught an error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4">
+          <div className="text-center space-y-4 max-w-md bg-slate-900/80 p-8 rounded-lg border border-red-800">
+            <div className="text-red-500 text-2xl font-bold">⚠️ Error Loading Admin Login</div>
+            <p className="text-gray-400">Please refresh the page or contact support.</p>
+            <p className="text-gray-500 text-xs font-mono break-all">
+              {this.state.error?.message || 'Unknown error'}
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 font-medium"
+            >
+              Refresh Page
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+// Wrap AdminAuth with proper Error Boundary
+const AdminAuthWithErrorBoundary = () => {
+  return (
+    <AdminAuthErrorBoundary>
+      <AdminAuth />
+    </AdminAuthErrorBoundary>
+  );
 };
 
 export default AdminAuthWithErrorBoundary;
