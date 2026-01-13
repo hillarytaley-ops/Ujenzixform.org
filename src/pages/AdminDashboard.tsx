@@ -558,7 +558,7 @@ const AdminDashboard = () => {
     return () => {
       console.log('🔌 Cleaning up real-time subscriptions...');
       deliveryRequestsSub.unsubscribe();
-      builderRegsSub.unsubscribe();
+      profilesSub.unsubscribe();
       supplierRegsSub.unsubscribe();
       deliveryProviderRegsSub.unsubscribe();
       monitoringRequestsSub.unsubscribe();
