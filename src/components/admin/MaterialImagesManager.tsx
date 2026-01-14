@@ -93,6 +93,7 @@ interface MaterialImage {
   name: string;
   category: string;
   image_url: string;
+  additional_images?: string[]; // Array of additional angle images (front, back, sides, etc.)
   source: 'admin' | 'supplier';
   supplier_id?: string;
   supplier_name?: string;
@@ -101,6 +102,18 @@ interface MaterialImage {
   created_at: string;
   material_id?: string;
 }
+
+// Image angle labels for multi-angle gallery
+const IMAGE_ANGLES = [
+  { id: 'main', label: 'Main/Front', icon: '📷' },
+  { id: 'back', label: 'Back', icon: '🔙' },
+  { id: 'left', label: 'Left Side', icon: '◀️' },
+  { id: 'right', label: 'Right Side', icon: '▶️' },
+  { id: 'top', label: 'Top', icon: '⬆️' },
+  { id: 'bottom', label: 'Bottom', icon: '⬇️' },
+  { id: 'detail', label: 'Detail/Close-up', icon: '🔍' },
+  { id: 'packaging', label: 'Packaging', icon: '📦' },
+];
 
 interface SupplierMaterial {
   id: string;
@@ -229,9 +242,19 @@ export const MaterialImagesManager: React.FC = () => {
     error: string | null;
   }>>([]);
   const [bulkUploading, setBulkUploading] = useState(false);
+
+  // Multi-angle gallery state
+  const [showGalleryDialog, setShowGalleryDialog] = useState(false);
+  const [galleryImage, setGalleryImage] = useState<MaterialImage | null>(null);
+  const [galleryActiveIndex, setGalleryActiveIndex] = useState(0);
+  const [showAddAnglesDialog, setShowAddAnglesDialog] = useState(false);
+  const [addAnglesImage, setAddAnglesImage] = useState<MaterialImage | null>(null);
+  const [newAngleImages, setNewAngleImages] = useState<Array<{ file: File; previewUrl: string; angle: string }>>([]);
+  const [uploadingAngles, setUploadingAngles] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bulkFileInputRef = useRef<HTMLInputElement>(null);
+  const angleFileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   // Fetch admin-uploaded images from Supabase storage
@@ -560,6 +583,169 @@ export const MaterialImagesManager: React.FC = () => {
     setShowBulkUploadDialog(false);
   };
 
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // MULTI-ANGLE GALLERY FUNCTIONALITY
+  // ═══════════════════════════════════════════════════════════════════════════════
+
+  // Open gallery view for an image
+  const openGallery = (image: MaterialImage) => {
+    setGalleryImage(image);
+    setGalleryActiveIndex(0);
+    setShowGalleryDialog(true);
+  };
+
+  // Get all images for gallery (main + additional angles)
+  const getGalleryImages = (image: MaterialImage | null): string[] => {
+    if (!image) return [];
+    const images = [image.image_url];
+    if (image.additional_images && Array.isArray(image.additional_images)) {
+      images.push(...image.additional_images);
+    }
+    return images;
+  };
+
+  // Open add angles dialog
+  const openAddAnglesDialog = (image: MaterialImage) => {
+    setAddAnglesImage(image);
+    setNewAngleImages([]);
+    setShowAddAnglesDialog(true);
+  };
+
+  // Handle angle file selection
+  const handleAngleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    const newImages: typeof newAngleImages = [];
+    
+    Array.from(files).forEach((file, index) => {
+      const isValidImage = file.type.startsWith('image/') || SUPPORTED_IMAGE_TYPES.includes(file.type.toLowerCase());
+      if (!isValidImage || file.size > 10 * 1024 * 1024) return;
+
+      newImages.push({
+        file,
+        previewUrl: URL.createObjectURL(file),
+        angle: IMAGE_ANGLES[Math.min(index + 1, IMAGE_ANGLES.length - 1)].id // Skip 'main' as it's already set
+      });
+    });
+
+    setNewAngleImages(prev => [...prev, ...newImages]);
+    
+    if (angleFileInputRef.current) {
+      angleFileInputRef.current.value = '';
+    }
+  };
+
+  // Update angle label for an image
+  const updateAngleLabel = (index: number, angle: string) => {
+    setNewAngleImages(prev => prev.map((img, i) => 
+      i === index ? { ...img, angle } : img
+    ));
+  };
+
+  // Remove angle image
+  const removeAngleImage = (index: number) => {
+    setNewAngleImages(prev => {
+      const item = prev[index];
+      if (item?.previewUrl) {
+        URL.revokeObjectURL(item.previewUrl);
+      }
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
+  // Upload additional angle images
+  const handleUploadAngles = async () => {
+    if (!addAnglesImage || newAngleImages.length === 0) return;
+
+    setUploadingAngles(true);
+    
+    try {
+      const newImageUrls: string[] = [];
+
+      // Convert each image to base64
+      for (const angleImg of newAngleImages) {
+        const reader = new FileReader();
+        const imageDataUrl = await new Promise<string>((resolve, reject) => {
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(angleImg.file);
+        });
+        newImageUrls.push(imageDataUrl);
+      }
+
+      // Get existing additional images
+      const existingImages = addAnglesImage.additional_images || [];
+      const allAdditionalImages = [...existingImages, ...newImageUrls];
+
+      // Update the database record
+      const { error } = await (supabase as any)
+        .from('admin_material_images')
+        .update({ additional_images: allAdditionalImages })
+        .eq('id', addAnglesImage.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Angle images added',
+        description: `${newAngleImages.length} additional view${newAngleImages.length > 1 ? 's' : ''} added to ${addAnglesImage.name}`,
+      });
+
+      // Cleanup and close
+      newAngleImages.forEach(img => URL.revokeObjectURL(img.previewUrl));
+      setNewAngleImages([]);
+      setShowAddAnglesDialog(false);
+      fetchAdminImages();
+
+    } catch (err: any) {
+      console.error('Error uploading angle images:', err);
+      toast({
+        title: 'Upload failed',
+        description: err.message || 'Failed to add angle images',
+        variant: 'destructive',
+      });
+    } finally {
+      setUploadingAngles(false);
+    }
+  };
+
+  // Delete a specific angle image
+  const deleteAngleImage = async (image: MaterialImage, angleIndex: number) => {
+    if (!image.additional_images) return;
+    
+    const updatedImages = image.additional_images.filter((_, i) => i !== angleIndex);
+    
+    try {
+      const { error } = await (supabase as any)
+        .from('admin_material_images')
+        .update({ additional_images: updatedImages.length > 0 ? updatedImages : null })
+        .eq('id', image.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Angle image removed',
+        description: 'The additional view has been deleted',
+      });
+
+      fetchAdminImages();
+      
+      // Update gallery if open
+      if (galleryImage?.id === image.id) {
+        setGalleryImage({ ...image, additional_images: updatedImages });
+        if (galleryActiveIndex >= updatedImages.length + 1) {
+          setGalleryActiveIndex(0);
+        }
+      }
+    } catch (err: any) {
+      toast({
+        title: 'Error',
+        description: err.message || 'Failed to delete angle image',
+        variant: 'destructive',
+      });
+    }
+  };
+
   // Toggle featured status
   const toggleFeatured = async (image: MaterialImage) => {
     try {
@@ -877,13 +1063,41 @@ export const MaterialImagesManager: React.FC = () => {
                     <img
                       src={image.image_url}
                       alt={image.name}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover cursor-pointer"
+                      onClick={() => openGallery(image)}
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iIzFmMjkzNyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjNjQ3NDhiIiBmb250LXNpemU9IjE0Ij5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=';
                       }}
                     />
+                    {/* Multi-angle indicator */}
+                    {image.additional_images && image.additional_images.length > 0 && (
+                      <Badge 
+                        className="absolute top-2 left-2 bg-blue-600 cursor-pointer hover:bg-blue-700"
+                        onClick={() => openGallery(image)}
+                      >
+                        📷 {image.additional_images.length + 1} views
+                      </Badge>
+                    )}
                     {/* Overlay with actions */}
-                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1 flex-wrap p-2">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => openGallery(image)}
+                        className="text-white hover:bg-white/20"
+                        title="View all angles"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => openAddAnglesDialog(image)}
+                        className="text-white hover:bg-white/20"
+                        title="Add more angles"
+                      >
+                        <ImageIcon className="h-4 w-4" />
+                      </Button>
                       <Button
                         size="sm"
                         variant="ghost"
@@ -902,21 +1116,9 @@ export const MaterialImagesManager: React.FC = () => {
                         variant="ghost"
                         onClick={() => openEditDialog(image)}
                         className="text-white hover:bg-white/20"
-                        title="Edit"
+                        title="Edit details"
                       >
                         <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setSelectedImage(image);
-                          setShowPreviewDialog(true);
-                        }}
-                        className="text-white hover:bg-white/20"
-                        title="Preview"
-                      >
-                        <Eye className="h-4 w-4" />
                       </Button>
                       <Button
                         size="sm"
@@ -938,9 +1140,16 @@ export const MaterialImagesManager: React.FC = () => {
                   </div>
                   <CardContent className="p-3">
                     <p className="font-medium text-white text-sm truncate">{image.name}</p>
-                    <Badge variant="outline" className="mt-1 text-xs">
-                      {image.category}
-                    </Badge>
+                    <div className="flex items-center justify-between mt-1">
+                      <Badge variant="outline" className="text-xs">
+                        {image.category}
+                      </Badge>
+                      {image.additional_images && image.additional_images.length > 0 && (
+                        <span className="text-xs text-slate-400">
+                          +{image.additional_images.length} angles
+                        </span>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               ))}
@@ -1648,6 +1857,277 @@ export const MaterialImagesManager: React.FC = () => {
                 <>
                   <Save className="h-4 w-4 mr-1" />
                   Save Changes
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══════════════════════════════════════════════════════════════════════════════ */}
+      {/* MULTI-ANGLE GALLERY DIALOG */}
+      {/* ═══════════════════════════════════════════════════════════════════════════════ */}
+      <Dialog open={showGalleryDialog} onOpenChange={setShowGalleryDialog}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-4xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              📷 {galleryImage?.name || 'Image Gallery'}
+              <Badge variant="outline" className="ml-2">{galleryImage?.category}</Badge>
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              View all angles of this material. Click thumbnails to switch views.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {galleryImage && (
+            <div className="space-y-4">
+              {/* Main Image Display */}
+              <div className="relative bg-slate-800 rounded-lg overflow-hidden" style={{ height: '400px' }}>
+                <img
+                  src={getGalleryImages(galleryImage)[galleryActiveIndex]}
+                  alt={`${galleryImage.name} - View ${galleryActiveIndex + 1}`}
+                  className="w-full h-full object-contain"
+                />
+                
+                {/* Navigation Arrows */}
+                {getGalleryImages(galleryImage).length > 1 && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white"
+                      onClick={() => setGalleryActiveIndex(prev => 
+                        prev === 0 ? getGalleryImages(galleryImage).length - 1 : prev - 1
+                      )}
+                    >
+                      ◀
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white"
+                      onClick={() => setGalleryActiveIndex(prev => 
+                        prev === getGalleryImages(galleryImage).length - 1 ? 0 : prev + 1
+                      )}
+                    >
+                      ▶
+                    </Button>
+                  </>
+                )}
+
+                {/* Image Counter */}
+                <div className="absolute bottom-2 right-2 bg-black/70 px-3 py-1 rounded-full text-sm">
+                  {galleryActiveIndex + 1} / {getGalleryImages(galleryImage).length}
+                </div>
+
+                {/* Angle Label */}
+                <div className="absolute top-2 left-2 bg-black/70 px-3 py-1 rounded-full text-sm">
+                  {galleryActiveIndex === 0 ? '📷 Main/Front' : `🔄 View ${galleryActiveIndex + 1}`}
+                </div>
+              </div>
+
+              {/* Thumbnail Strip */}
+              <div className="flex gap-2 overflow-x-auto pb-2">
+                {getGalleryImages(galleryImage).map((imgUrl, index) => (
+                  <div
+                    key={index}
+                    className={`relative flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden cursor-pointer border-2 transition-all ${
+                      index === galleryActiveIndex 
+                        ? 'border-orange-500 ring-2 ring-orange-500/50' 
+                        : 'border-slate-600 hover:border-slate-500'
+                    }`}
+                    onClick={() => setGalleryActiveIndex(index)}
+                  >
+                    <img
+                      src={imgUrl}
+                      alt={`View ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                    {index === 0 && (
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-center text-xs py-0.5">
+                        Main
+                      </div>
+                    )}
+                    {/* Delete button for additional images */}
+                    {index > 0 && (
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-1 right-1 h-5 w-5 opacity-0 group-hover:opacity-100 hover:opacity-100"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm('Delete this angle image?')) {
+                            deleteAngleImage(galleryImage, index - 1);
+                          }
+                        }}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                
+                {/* Add More Button */}
+                <div
+                  className="flex-shrink-0 w-20 h-20 rounded-lg border-2 border-dashed border-slate-600 hover:border-orange-500 cursor-pointer flex items-center justify-center transition-colors"
+                  onClick={() => {
+                    setShowGalleryDialog(false);
+                    openAddAnglesDialog(galleryImage);
+                  }}
+                >
+                  <div className="text-center">
+                    <Upload className="h-5 w-5 text-slate-400 mx-auto" />
+                    <span className="text-xs text-slate-400">Add</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (galleryImage) openAddAnglesDialog(galleryImage);
+                setShowGalleryDialog(false);
+              }}
+              className="border-slate-600"
+            >
+              <ImageIcon className="h-4 w-4 mr-2" />
+              Add More Angles
+            </Button>
+            <Button onClick={() => setShowGalleryDialog(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══════════════════════════════════════════════════════════════════════════════ */}
+      {/* ADD ANGLE IMAGES DIALOG */}
+      {/* ═══════════════════════════════════════════════════════════════════════════════ */}
+      <Dialog open={showAddAnglesDialog} onOpenChange={(open) => {
+        if (!open) {
+          newAngleImages.forEach(img => URL.revokeObjectURL(img.previewUrl));
+          setNewAngleImages([]);
+        }
+        setShowAddAnglesDialog(open);
+      }}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ImageIcon className="h-5 w-5 text-orange-400" />
+              Add Angle Images
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Add additional views for <strong className="text-white">{addAnglesImage?.name}</strong> (back, sides, detail, etc.)
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Current main image preview */}
+            {addAnglesImage && (
+              <div className="flex items-center gap-3 p-3 bg-slate-800 rounded-lg">
+                <img 
+                  src={addAnglesImage.image_url} 
+                  alt={addAnglesImage.name}
+                  className="w-16 h-16 object-cover rounded"
+                />
+                <div>
+                  <p className="font-medium">{addAnglesImage.name}</p>
+                  <p className="text-sm text-slate-400">
+                    Current views: {1 + (addAnglesImage.additional_images?.length || 0)}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* File Selection */}
+            <div 
+              className="border-2 border-dashed border-slate-600 rounded-lg p-6 text-center cursor-pointer hover:border-orange-500 transition-colors"
+              onClick={() => angleFileInputRef.current?.click()}
+            >
+              <Upload className="h-8 w-8 text-orange-400 mx-auto mb-2" />
+              <p className="text-slate-300 font-medium">Click to add angle images</p>
+              <p className="text-xs text-slate-500 mt-1">Back, sides, top, bottom, detail shots, etc.</p>
+            </div>
+            <input
+              ref={angleFileInputRef}
+              type="file"
+              accept="image/*,.jpg,.jpeg,.png,.gif,.webp"
+              multiple
+              onChange={handleAngleFileSelect}
+              className="hidden"
+            />
+
+            {/* Selected Images List */}
+            {newAngleImages.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-sm text-slate-300">Selected Images ({newAngleImages.length})</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  {newAngleImages.map((img, index) => (
+                    <div key={index} className="relative bg-slate-800 rounded-lg p-2 flex gap-2">
+                      <img 
+                        src={img.previewUrl} 
+                        alt={`Angle ${index + 1}`}
+                        className="w-16 h-16 object-cover rounded flex-shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <Select value={img.angle} onValueChange={(v) => updateAngleLabel(index, v)}>
+                          <SelectTrigger className="bg-slate-700 border-slate-600 h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {IMAGE_ANGLES.filter(a => a.id !== 'main').map(angle => (
+                              <SelectItem key={angle.id} value={angle.id} className="text-sm">
+                                {angle.icon} {angle.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-red-400 hover:bg-red-500/20 flex-shrink-0"
+                        onClick={() => removeAngleImage(index)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="pt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                newAngleImages.forEach(img => URL.revokeObjectURL(img.previewUrl));
+                setNewAngleImages([]);
+                setShowAddAnglesDialog(false);
+              }}
+              className="border-slate-600"
+              disabled={uploadingAngles}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUploadAngles}
+              disabled={uploadingAngles || newAngleImages.length === 0}
+              className="bg-orange-500 hover:bg-orange-600"
+            >
+              {uploadingAngles ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Add {newAngleImages.length} Angle{newAngleImages.length > 1 ? 's' : ''}
                 </>
               )}
             </Button>
