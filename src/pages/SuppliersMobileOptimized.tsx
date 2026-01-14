@@ -471,7 +471,7 @@ const SuppliersMobileOptimized = () => {
 
           {/* Materials Grid - iPhone Safe Version */}
           <Card>
-            <CardHeader>
+            <CardHeader className="text-center">
               <CardTitle className="text-xl">Browse Materials</CardTitle>
               <CardDescription>
                 High-quality construction materials from verified suppliers

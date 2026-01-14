@@ -966,16 +966,16 @@ export const MaterialsGrid = () => {
       {/* Banner for Non-Registered Users */}
       {!isAuthenticated && (
         <Alert className="bg-gradient-to-r from-orange-50 to-amber-50 border-orange-300 border-2">
-          <ShoppingCart className="h-5 w-5 text-orange-600" />
-          <AlertDescription className="ml-2">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <div>
-                <strong className="text-orange-800">🏗️ Want to Buy or Request Quotes?</strong>
-                <p className="text-sm text-orange-700 mt-1">
-                  <strong>Private Clients</strong> can buy directly | <strong>Professional Builders</strong> can request quotes
-                </p>
+          <AlertDescription className="w-full">
+            <div className="flex flex-col items-center justify-center text-center gap-4 py-2">
+              <div className="flex items-center gap-2">
+                <ShoppingCart className="h-5 w-5 text-orange-600" />
+                <strong className="text-orange-800 text-lg">🏗️ Want to Buy or Request Quotes?</strong>
               </div>
-              <div className="flex gap-2 flex-shrink-0">
+              <p className="text-sm text-orange-700">
+                <strong>Private Clients</strong> can buy directly | <strong>Professional Builders</strong> can request quotes
+              </p>
+              <div className="flex gap-3">
                 <a href="/home">
                   <Button size="sm" className="bg-orange-600 hover:bg-orange-700 text-white">
                     Register Now
