@@ -164,6 +164,7 @@ const AuthSimple = () => {
                       type="password"
                       placeholder="••••••••"
                       className="pl-10"
+                      autoComplete="current-password"
                       required
                       disabled={loading}
                     />
@@ -222,6 +223,7 @@ const AuthSimple = () => {
                       type="password"
                       placeholder="••••••••"
                       className="pl-10"
+                      autoComplete="new-password"
                       required
                       minLength={6}
                       disabled={loading}

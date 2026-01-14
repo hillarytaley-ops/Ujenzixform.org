@@ -351,6 +351,7 @@ const Auth = () => {
                       name="password"
                       type="password"
                       placeholder="Enter your password"
+                      autoComplete="current-password"
                       required
                     />
                   </div>
@@ -511,7 +512,8 @@ const Auth = () => {
       <div 
         className="absolute inset-0 z-0"
         style={{
-          backgroundImage: `url('/kenyan-workers.jpg'), url('https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-gW4eb5K3am2BERQxC6jCNuhvaVOrTl.png')`,
+          backgroundImage: `url('/kenyan-workers.jpg')`,
+          backgroundColor: '#1e3a5f',
           backgroundSize: 'cover',
           backgroundPosition: 'center center',
           backgroundRepeat: 'no-repeat'
