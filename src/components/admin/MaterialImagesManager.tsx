@@ -1541,20 +1541,22 @@ export const MaterialImagesManager: React.FC = () => {
                         {/* Row 1: Name and Price */}
                         <div className="flex gap-2">
                           <div className="flex-1">
+                            <Label className="text-xs text-slate-400 mb-1 block">Material Name *</Label>
                             <Input
                               value={item.name}
                               onChange={(e) => updateBulkItem(item.id, { name: e.target.value })}
-                              placeholder="Material name (e.g., Bamburi Cement 50kg) *"
+                              placeholder="e.g., Bamburi Cement 50kg"
                               className="bg-slate-700 border-slate-600 h-8 text-sm"
                               disabled={item.uploaded || item.uploading}
                             />
                           </div>
                           <div className="w-28">
+                            <Label className="text-xs text-slate-400 mb-1 block">Price (KES)</Label>
                             <Input
                               type="number"
                               value={item.suggestedPrice || ''}
                               onChange={(e) => updateBulkItem(item.id, { suggestedPrice: parseFloat(e.target.value) || 0 })}
-                              placeholder="Price (KES)"
+                              placeholder="0"
                               className="bg-slate-700 border-slate-600 h-8 text-sm"
                               disabled={item.uploaded || item.uploading}
                             />
@@ -1563,10 +1565,11 @@ export const MaterialImagesManager: React.FC = () => {
                         
                         {/* Row 2: Description */}
                         <div>
+                          <Label className="text-xs text-slate-400 mb-1 block">Description (optional)</Label>
                           <Input
                             value={item.description}
                             onChange={(e) => updateBulkItem(item.id, { description: e.target.value })}
-                            placeholder="Description (optional) - e.g., High-quality Portland cement for all construction needs"
+                            placeholder="Brief product description..."
                             className="bg-slate-700 border-slate-600 h-8 text-sm"
                             disabled={item.uploaded || item.uploading}
                           />
