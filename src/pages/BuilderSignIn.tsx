@@ -586,6 +586,7 @@ const BuilderSignIn = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="pl-10"
+                  autoComplete="email"
                   required
                 />
               </div>
@@ -602,6 +603,7 @@ const BuilderSignIn = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-10 pr-10"
+                  autoComplete={isSignUp ? "new-password" : "current-password"}
                   required
                 />
                 <button

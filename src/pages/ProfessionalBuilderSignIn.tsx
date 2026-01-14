@@ -109,6 +109,7 @@ const ProfessionalBuilderSignIn = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                autoComplete="email"
                 className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
               />
             </div>
@@ -122,6 +123,7 @@ const ProfessionalBuilderSignIn = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  autoComplete="current-password"
                   className="border-gray-300 focus:border-blue-500 focus:ring-blue-500 pr-10"
                 />
                 <button
