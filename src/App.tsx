@@ -211,6 +211,12 @@ const App = () => {
                         <PrivateBuilderRegistration />
                       </AuthRequired>
                     } />
+                    {/* Alias for private-client-registration (some links use this path) */}
+                    <Route path="/private-builder-registration" element={
+                      <AuthRequired>
+                        <PrivateBuilderRegistration />
+                      </AuthRequired>
+                    } />
                     <Route path="/analytics" element={
                       <AuthRequired>
                         <Analytics />
