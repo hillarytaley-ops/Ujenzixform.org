@@ -1514,86 +1514,102 @@ export const MaterialImagesManager: React.FC = () => {
               className="hidden"
             />
 
-            {/* Items List */}
+            {/* Items List - Card Layout for better editing */}
             {bulkUploadItems.length > 0 && (
-              <div className="flex-1 overflow-y-auto border border-slate-700 rounded-lg">
-                <Table>
-                  <TableHeader className="sticky top-0 bg-slate-800">
-                    <TableRow className="border-slate-700">
-                      <TableHead className="w-16 text-slate-300">Image</TableHead>
-                      <TableHead className="text-slate-300">Name *</TableHead>
-                      <TableHead className="w-24 text-slate-300">Price (KES)</TableHead>
-                      <TableHead className="w-20 text-slate-300">Status</TableHead>
-                      <TableHead className="w-12"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {bulkUploadItems.map((item) => (
-                      <TableRow key={item.id} className="border-slate-700">
-                        <TableCell>
-                          <img 
-                            src={item.previewUrl} 
-                            alt={item.name}
-                            className="w-12 h-12 object-cover rounded"
-                          />
-                        </TableCell>
-                        <TableCell>
+              <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+                {bulkUploadItems.map((item) => (
+                  <div 
+                    key={item.id} 
+                    className={`bg-slate-800 rounded-lg p-3 border ${
+                      item.uploaded ? 'border-green-500/50 bg-green-900/20' : 
+                      item.error ? 'border-red-500/50 bg-red-900/20' : 
+                      'border-slate-700'
+                    }`}
+                  >
+                    <div className="flex gap-3">
+                      {/* Image Preview */}
+                      <div className="flex-shrink-0">
+                        <img 
+                          src={item.previewUrl} 
+                          alt={item.name}
+                          className="w-20 h-20 object-cover rounded-lg"
+                        />
+                      </div>
+                      
+                      {/* Form Fields */}
+                      <div className="flex-1 space-y-2 min-w-0">
+                        {/* Row 1: Name and Price */}
+                        <div className="flex gap-2">
+                          <div className="flex-1">
+                            <Input
+                              value={item.name}
+                              onChange={(e) => updateBulkItem(item.id, { name: e.target.value })}
+                              placeholder="Material name (e.g., Bamburi Cement 50kg) *"
+                              className="bg-slate-700 border-slate-600 h-8 text-sm"
+                              disabled={item.uploaded || item.uploading}
+                            />
+                          </div>
+                          <div className="w-28">
+                            <Input
+                              type="number"
+                              value={item.suggestedPrice || ''}
+                              onChange={(e) => updateBulkItem(item.id, { suggestedPrice: parseFloat(e.target.value) || 0 })}
+                              placeholder="Price (KES)"
+                              className="bg-slate-700 border-slate-600 h-8 text-sm"
+                              disabled={item.uploaded || item.uploading}
+                            />
+                          </div>
+                        </div>
+                        
+                        {/* Row 2: Description */}
+                        <div>
                           <Input
-                            value={item.name}
-                            onChange={(e) => updateBulkItem(item.id, { name: e.target.value })}
-                            placeholder="Material name..."
-                            className="bg-slate-800 border-slate-600 h-8 text-sm"
+                            value={item.description}
+                            onChange={(e) => updateBulkItem(item.id, { description: e.target.value })}
+                            placeholder="Description (optional) - e.g., High-quality Portland cement for all construction needs"
+                            className="bg-slate-700 border-slate-600 h-8 text-sm"
                             disabled={item.uploaded || item.uploading}
                           />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            value={item.suggestedPrice || ''}
-                            onChange={(e) => updateBulkItem(item.id, { suggestedPrice: parseFloat(e.target.value) || 0 })}
-                            placeholder="0"
-                            className="bg-slate-800 border-slate-600 h-8 text-sm w-20"
-                            disabled={item.uploaded || item.uploading}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          {item.uploading ? (
-                            <Badge className="bg-blue-500/20 text-blue-400">
-                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                              Uploading
-                            </Badge>
-                          ) : item.uploaded ? (
-                            <Badge className="bg-green-500/20 text-green-400">
-                              <CheckCircle className="h-3 w-3 mr-1" />
-                              Done
-                            </Badge>
-                          ) : item.error ? (
-                            <Badge className="bg-red-500/20 text-red-400" title={item.error}>
-                              <XCircle className="h-3 w-3 mr-1" />
-                              Error
-                            </Badge>
-                          ) : (
-                            <Badge className="bg-slate-500/20 text-slate-400">
-                              Pending
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {!item.uploaded && !item.uploading && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-red-400 hover:text-red-300 hover:bg-red-500/20"
-                              onClick={() => removeBulkItem(item.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                        </div>
+                      </div>
+                      
+                      {/* Status & Actions */}
+                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                        {item.uploading ? (
+                          <Badge className="bg-blue-500/20 text-blue-400">
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            Uploading
+                          </Badge>
+                        ) : item.uploaded ? (
+                          <Badge className="bg-green-500/20 text-green-400">
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Done
+                          </Badge>
+                        ) : item.error ? (
+                          <Badge className="bg-red-500/20 text-red-400" title={item.error}>
+                            <XCircle className="h-3 w-3 mr-1" />
+                            Error
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-slate-500/20 text-slate-400">
+                            Pending
+                          </Badge>
+                        )}
+                        
+                        {!item.uploaded && !item.uploading && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-red-400 hover:text-red-300 hover:bg-red-500/20"
+                            onClick={() => removeBulkItem(item.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
 
