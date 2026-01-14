@@ -212,8 +212,26 @@ export const MaterialImagesManager: React.FC = () => {
     unit: 'unit',
     suggestedPrice: 0
   });
+
+  // Bulk upload state
+  const [showBulkUploadDialog, setShowBulkUploadDialog] = useState(false);
+  const [bulkUploadCategory, setBulkUploadCategory] = useState('Cement');
+  const [bulkUploadUnit, setBulkUploadUnit] = useState('bag');
+  const [bulkUploadItems, setBulkUploadItems] = useState<Array<{
+    id: string;
+    file: File;
+    previewUrl: string;
+    name: string;
+    description: string;
+    suggestedPrice: number;
+    uploading: boolean;
+    uploaded: boolean;
+    error: string | null;
+  }>>([]);
+  const [bulkUploading, setBulkUploading] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const bulkFileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   // Fetch admin-uploaded images from Supabase storage
@@ -374,6 +392,172 @@ export const MaterialImagesManager: React.FC = () => {
       console.error('Error saving admin image record:', error);
       throw error; // Throw so the caller knows it failed
     }
+  };
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // BULK UPLOAD FUNCTIONALITY
+  // ═══════════════════════════════════════════════════════════════════════════════
+
+  // Handle bulk file selection
+  const handleBulkFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    const newItems: typeof bulkUploadItems = [];
+    
+    Array.from(files).forEach((file, index) => {
+      // Validate file type
+      const isValidImage = file.type.startsWith('image/') || SUPPORTED_IMAGE_TYPES.includes(file.type.toLowerCase());
+      if (!isValidImage) {
+        toast({
+          title: 'Invalid file skipped',
+          description: `${file.name} is not a valid image file`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Validate file size (10MB max)
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: 'File too large',
+          description: `${file.name} exceeds 10MB limit`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Extract name from filename (remove extension)
+      const baseName = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+      // Capitalize first letter of each word
+      const formattedName = baseName.replace(/\b\w/g, c => c.toUpperCase());
+
+      newItems.push({
+        id: `bulk-${Date.now()}-${index}`,
+        file,
+        previewUrl: URL.createObjectURL(file),
+        name: formattedName,
+        description: '',
+        suggestedPrice: 0,
+        uploading: false,
+        uploaded: false,
+        error: null
+      });
+    });
+
+    setBulkUploadItems(prev => [...prev, ...newItems]);
+    
+    // Reset file input
+    if (bulkFileInputRef.current) {
+      bulkFileInputRef.current.value = '';
+    }
+  };
+
+  // Update bulk item details
+  const updateBulkItem = (id: string, updates: Partial<typeof bulkUploadItems[0]>) => {
+    setBulkUploadItems(prev => prev.map(item => 
+      item.id === id ? { ...item, ...updates } : item
+    ));
+  };
+
+  // Remove bulk item
+  const removeBulkItem = (id: string) => {
+    setBulkUploadItems(prev => {
+      const item = prev.find(i => i.id === id);
+      if (item?.previewUrl) {
+        URL.revokeObjectURL(item.previewUrl);
+      }
+      return prev.filter(i => i.id !== id);
+    });
+  };
+
+  // Upload all bulk items
+  const handleBulkUpload = async () => {
+    const itemsToUpload = bulkUploadItems.filter(item => !item.uploaded && item.name.trim());
+    
+    if (itemsToUpload.length === 0) {
+      toast({
+        title: 'No items to upload',
+        description: 'Please add images and fill in the names',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setBulkUploading(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const item of itemsToUpload) {
+      updateBulkItem(item.id, { uploading: true, error: null });
+      
+      try {
+        // Convert image to base64
+        const reader = new FileReader();
+        const imageDataUrl = await new Promise<string>((resolve, reject) => {
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(item.file);
+        });
+
+        // Save to database
+        const { error } = await (supabase as any)
+          .from('admin_material_images')
+          .insert({
+            name: item.name.trim(),
+            category: bulkUploadCategory,
+            description: item.description || '',
+            unit: bulkUploadUnit,
+            suggested_price: item.suggestedPrice || 0,
+            image_url: imageDataUrl,
+            is_featured: false,
+            is_approved: true
+          });
+
+        if (error) throw error;
+
+        updateBulkItem(item.id, { uploading: false, uploaded: true });
+        successCount++;
+      } catch (err: any) {
+        console.error('Bulk upload error for', item.name, err);
+        updateBulkItem(item.id, { uploading: false, error: err.message || 'Upload failed' });
+        errorCount++;
+      }
+    }
+
+    setBulkUploading(false);
+
+    if (successCount > 0) {
+      toast({
+        title: `${successCount} image${successCount > 1 ? 's' : ''} uploaded successfully`,
+        description: errorCount > 0 ? `${errorCount} failed` : 'All images added to marketplace',
+      });
+      fetchAdminImages();
+    }
+
+    if (errorCount > 0 && successCount === 0) {
+      toast({
+        title: 'Upload failed',
+        description: 'Could not upload any images',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Clear all bulk items
+  const clearBulkItems = () => {
+    bulkUploadItems.forEach(item => {
+      if (item.previewUrl) {
+        URL.revokeObjectURL(item.previewUrl);
+      }
+    });
+    setBulkUploadItems([]);
+  };
+
+  // Close bulk upload dialog
+  const closeBulkUploadDialog = () => {
+    clearBulkItems();
+    setShowBulkUploadDialog(false);
   };
 
   // Toggle featured status
@@ -557,13 +741,23 @@ export const MaterialImagesManager: React.FC = () => {
             Upload and manage material images for the suppliers marketplace
           </p>
         </div>
-        <Button
-          onClick={() => setShowUploadDialog(true)}
-          className="bg-orange-500 hover:bg-orange-600"
-        >
-          <Upload className="h-4 w-4 mr-2" />
-          Upload New Image
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={() => setShowBulkUploadDialog(true)}
+            variant="outline"
+            className="border-orange-500 text-orange-400 hover:bg-orange-500/20"
+          >
+            <Package className="h-4 w-4 mr-2" />
+            Bulk Upload
+          </Button>
+          <Button
+            onClick={() => setShowUploadDialog(true)}
+            className="bg-orange-500 hover:bg-orange-600"
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            Upload Single
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -1030,6 +1224,228 @@ export const MaterialImagesManager: React.FC = () => {
                 </>
               )}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══════════════════════════════════════════════════════════════════════════════ */}
+      {/* BULK UPLOAD DIALOG */}
+      {/* ═══════════════════════════════════════════════════════════════════════════════ */}
+      <Dialog open={showBulkUploadDialog} onOpenChange={(open) => !open && closeBulkUploadDialog()}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader className="pb-2 flex-shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5 text-orange-400" />
+              Bulk Upload Materials
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Upload multiple images at once for a category. Select files, edit names, then upload all.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
+            {/* Category and Unit Selection - Apply to all */}
+            <div className="grid grid-cols-2 gap-4 flex-shrink-0">
+              <div>
+                <Label className="text-xs text-slate-300">Category (applies to all) *</Label>
+                <Select value={bulkUploadCategory} onValueChange={setBulkUploadCategory}>
+                  <SelectTrigger className="bg-slate-800 border-slate-600 h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {PRODUCT_CATEGORIES.filter(c => c !== 'All Categories').map(cat => (
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs text-slate-300">Unit (applies to all)</Label>
+                <Select value={bulkUploadUnit} onValueChange={setBulkUploadUnit}>
+                  <SelectTrigger className="bg-slate-800 border-slate-600 h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    <SelectItem value="bag">Per Bag</SelectItem>
+                    <SelectItem value="kg">Per Kg</SelectItem>
+                    <SelectItem value="piece">Per Piece</SelectItem>
+                    <SelectItem value="unit">Per Unit</SelectItem>
+                    <SelectItem value="sheet">Per Sheet</SelectItem>
+                    <SelectItem value="meter">Per Meter</SelectItem>
+                    <SelectItem value="ton">Per Ton</SelectItem>
+                    <SelectItem value="liter">Per Liter</SelectItem>
+                    <SelectItem value="roll">Per Roll</SelectItem>
+                    <SelectItem value="box">Per Box</SelectItem>
+                    <SelectItem value="pallet">Per Pallet</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* File Selection Area */}
+            <div 
+              className="border-2 border-dashed border-slate-600 rounded-lg p-4 text-center cursor-pointer hover:border-orange-500 transition-colors flex-shrink-0"
+              onClick={() => bulkFileInputRef.current?.click()}
+            >
+              <Upload className="h-8 w-8 text-orange-400 mx-auto mb-2" />
+              <p className="text-slate-300 font-medium">Click to select multiple images</p>
+              <p className="text-xs text-slate-500 mt-1">JPG, PNG, WEBP, GIF (max 10MB each)</p>
+              {bulkUploadItems.length > 0 && (
+                <Badge className="mt-2 bg-orange-500/20 text-orange-400 border-orange-500/50">
+                  {bulkUploadItems.length} image{bulkUploadItems.length > 1 ? 's' : ''} selected
+                </Badge>
+              )}
+            </div>
+            <input
+              ref={bulkFileInputRef}
+              type="file"
+              accept="image/*,.jpg,.jpeg,.png,.gif,.webp,.avif"
+              multiple
+              onChange={handleBulkFileSelect}
+              className="hidden"
+            />
+
+            {/* Items List */}
+            {bulkUploadItems.length > 0 && (
+              <div className="flex-1 overflow-y-auto border border-slate-700 rounded-lg">
+                <Table>
+                  <TableHeader className="sticky top-0 bg-slate-800">
+                    <TableRow className="border-slate-700">
+                      <TableHead className="w-16 text-slate-300">Image</TableHead>
+                      <TableHead className="text-slate-300">Name *</TableHead>
+                      <TableHead className="w-24 text-slate-300">Price (KES)</TableHead>
+                      <TableHead className="w-20 text-slate-300">Status</TableHead>
+                      <TableHead className="w-12"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {bulkUploadItems.map((item) => (
+                      <TableRow key={item.id} className="border-slate-700">
+                        <TableCell>
+                          <img 
+                            src={item.previewUrl} 
+                            alt={item.name}
+                            className="w-12 h-12 object-cover rounded"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            value={item.name}
+                            onChange={(e) => updateBulkItem(item.id, { name: e.target.value })}
+                            placeholder="Material name..."
+                            className="bg-slate-800 border-slate-600 h-8 text-sm"
+                            disabled={item.uploaded || item.uploading}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={item.suggestedPrice || ''}
+                            onChange={(e) => updateBulkItem(item.id, { suggestedPrice: parseFloat(e.target.value) || 0 })}
+                            placeholder="0"
+                            className="bg-slate-800 border-slate-600 h-8 text-sm w-20"
+                            disabled={item.uploaded || item.uploading}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          {item.uploading ? (
+                            <Badge className="bg-blue-500/20 text-blue-400">
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                              Uploading
+                            </Badge>
+                          ) : item.uploaded ? (
+                            <Badge className="bg-green-500/20 text-green-400">
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              Done
+                            </Badge>
+                          ) : item.error ? (
+                            <Badge className="bg-red-500/20 text-red-400" title={item.error}>
+                              <XCircle className="h-3 w-3 mr-1" />
+                              Error
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-slate-500/20 text-slate-400">
+                              Pending
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {!item.uploaded && !item.uploading && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-red-400 hover:text-red-300 hover:bg-red-500/20"
+                              onClick={() => removeBulkItem(item.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+
+            {/* Empty State */}
+            {bulkUploadItems.length === 0 && (
+              <div className="flex-1 flex items-center justify-center text-slate-500">
+                <div className="text-center">
+                  <ImageIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>No images selected yet</p>
+                  <p className="text-xs mt-1">Click above to add images</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="pt-4 flex-shrink-0 border-t border-slate-700 mt-4">
+            <div className="flex items-center justify-between w-full">
+              <div className="text-sm text-slate-400">
+                {bulkUploadItems.filter(i => i.uploaded).length} of {bulkUploadItems.length} uploaded
+              </div>
+              <div className="flex gap-2">
+                {bulkUploadItems.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={clearBulkItems}
+                    className="border-slate-600 text-slate-300"
+                    disabled={bulkUploading}
+                  >
+                    Clear All
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={closeBulkUploadDialog}
+                  className="border-slate-600"
+                  disabled={bulkUploading}
+                >
+                  Close
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleBulkUpload}
+                  disabled={bulkUploading || bulkUploadItems.filter(i => !i.uploaded && i.name.trim()).length === 0}
+                  className="bg-orange-500 hover:bg-orange-600"
+                >
+                  {bulkUploading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4 mr-1" />
+                      Upload All ({bulkUploadItems.filter(i => !i.uploaded && i.name.trim()).length})
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
