@@ -616,13 +616,70 @@ export const MaterialsGrid = () => {
       }
       
       // ═══════════════════════════════════════════════════════════════════════════════
-      // ONLY SHOW ADMIN-UPLOADED IMAGES
-      // Supplier materials from 'materials' table are NOT shown on the public grid
-      // Only images uploaded via Admin Dashboard (admin_material_images) are displayed
+      // SHOW ADMIN + SUPPLIER UPLOADED IMAGES (NO URL-BASED IMAGES)
+      // - Admin images from admin_material_images table
+      // - Supplier images from materials table (ONLY base64/uploaded images, NO URLs)
       // ═══════════════════════════════════════════════════════════════════════════════
       
-      // Use ONLY admin materials - no supplier materials from materials table
-      const allMaterials = adminMaterials;
+      // STEP 3: Fetch supplier materials from materials table  
+      let data: any[] | null = null;
+      
+      try {
+        const response = await fetch(
+          `${SUPABASE_URL}/rest/v1/materials?select=*&order=created_at.desc&limit=100`,
+          {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        
+        if (response.ok) {
+          data = await response.json();
+        }
+      } catch (fetchError: any) {
+        // Silent fail - continue with admin materials
+      }
+
+      // Filter supplier materials:
+      // - Only approved products
+      // - ONLY images that are base64 data URLs (uploaded images), NOT http/https URLs
+      const supplierMaterials = data ? data
+        .filter(item => {
+          // Must be approved (or no approval status for backward compatibility)
+          const isApproved = !item.approval_status || item.approval_status === 'approved';
+          
+          // Must have an image that is a base64 data URL (starts with 'data:image/')
+          // REJECT any http:// or https:// URLs (like Unsplash links)
+          const hasUploadedImage = item.image_url && 
+            item.image_url.startsWith('data:image/') &&
+            !item.image_url.startsWith('http://') &&
+            !item.image_url.startsWith('https://');
+          
+          return isApproved && hasUploadedImage;
+        })
+        .map(item => ({
+          ...item,
+          supplier: {
+            company_name: 'Supplier',
+            location: 'Kenya',
+            rating: 4.5
+          }
+        })) : [];
+
+      // Combine: Admin materials FIRST, then supplier-uploaded materials
+      const combinedMaterials = [...adminMaterials, ...supplierMaterials];
+      
+      // Remove duplicates by name (keep first occurrence - admin images take priority)
+      const seenNames = new Set<string>();
+      const allMaterials = combinedMaterials.filter(m => {
+        const normalizedName = m.name.toLowerCase().trim();
+        if (seenNames.has(normalizedName)) return false;
+        seenNames.add(normalizedName);
+        return true;
+      });
 
       // Show empty state if no materials
       if (allMaterials.length === 0) {
