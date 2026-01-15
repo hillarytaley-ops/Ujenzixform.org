@@ -55,6 +55,7 @@ interface Material {
   unit: string;
   unit_price: number;
   image_url?: string;
+  additional_images?: string[]; // Multi-angle images (front, back, sides, etc.)
   in_stock: boolean;
   created_at: string;
   supplier?: {
@@ -569,12 +570,12 @@ export const MaterialsGrid = () => {
         console.log('Supplier prices table not available');
       }
       
-      // STEP 2: Fetch admin-uploaded images
+      // STEP 2: Fetch ALL admin-uploaded images (no approval filter - admin uploads are always shown)
       let adminMaterials: Material[] = [];
       
       try {
         const response = await fetch(
-          `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,image_url&is_approved=eq.true&order=created_at.desc&limit=50`,
+          `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,image_url,additional_images&order=created_at.desc&limit=500`,
           {
             headers: {
               'apikey': SUPABASE_ANON_KEY,
@@ -586,6 +587,7 @@ export const MaterialsGrid = () => {
         
         if (response.ok) {
           const adminData = await response.json();
+          console.log(`📦 Fetched ${adminData?.length || 0} admin materials from database`);
           if (adminData && adminData.length > 0) {
             adminMaterials = adminData.map((item: any) => {
               // Check if any supplier has set a price for this product
@@ -600,6 +602,7 @@ export const MaterialsGrid = () => {
                 // Use supplier price if available, otherwise use admin's suggested price
                 unit_price: supplierPrice?.price || item.suggested_price || 0,
                 image_url: item.image_url,
+                additional_images: item.additional_images || [], // Multi-angle images
                 // Use supplier's stock status if available
                 in_stock: supplierPrice?.in_stock ?? true,
                 supplier: {
@@ -610,6 +613,8 @@ export const MaterialsGrid = () => {
               };
             });
           }
+        } else {
+          console.error('❌ Failed to fetch admin materials:', response.status, response.statusText);
         }
       } catch (adminErr: any) {
         // Silent fail - continue with other data sources
