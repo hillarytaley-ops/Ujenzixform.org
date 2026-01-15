@@ -48,7 +48,7 @@ const isIOSSafari = () => {
 
 interface Material {
   id: string;
-  supplier_id: string;
+  supplier_id?: string; // Optional - admin materials don't have supplier_id
   name: string;
   description: string;
   category: string;
@@ -57,7 +57,7 @@ interface Material {
   image_url?: string;
   additional_images?: string[]; // Multi-angle images (front, back, sides, etc.)
   in_stock: boolean;
-  created_at: string;
+  created_at?: string;
   supplier?: {
     company_name: string;
     location: string;
@@ -642,15 +642,18 @@ export const MaterialsGrid = () => {
         if (response.ok) {
           const adminData = await response.json();
           console.log(`📦 Fetched ${adminData?.length || 0} admin materials from database`);
-          if (adminData && adminData.length > 0) {
+          console.log('📦 Admin materials data:', adminData);
+          
+          if (adminData && Array.isArray(adminData) && adminData.length > 0) {
             adminMaterials = adminData.map((item: any) => {
               // Check if any supplier has set a price for this product
               const supplierPrice = supplierPrices[item.id];
               
-              return {
+              const material: Material = {
                 id: item.id,
-                name: item.name,
-                category: item.category,
+                supplier_id: 'admin-catalog', // Admin materials have a special supplier_id
+                name: item.name || 'Unnamed Material',
+                category: item.category || 'Uncategorized',
                 description: item.description || '',
                 unit: item.unit || 'unit',
                 // Use supplier price if available, otherwise use admin's suggested price
@@ -665,13 +668,20 @@ export const MaterialsGrid = () => {
                   rating: supplierPrice ? 4.5 : 5.0
                 }
               };
+              
+              return material;
             });
+            
+            console.log(`✅ Processed ${adminMaterials.length} admin materials`);
+          } else {
+            console.warn('⚠️ Admin materials response was empty or not an array');
           }
         } else {
-          console.error('❌ Failed to fetch admin materials:', response.status, response.statusText);
+          const errorText = await response.text();
+          console.error('❌ Failed to fetch admin materials:', response.status, response.statusText, errorText);
         }
       } catch (adminErr: any) {
-        // Silent fail - continue with other data sources
+        console.error('❌ Error fetching admin materials:', adminErr);
       }
       
       // ═══════════════════════════════════════════════════════════════════════════════
@@ -731,6 +741,8 @@ export const MaterialsGrid = () => {
       // Combine: Admin materials FIRST, then supplier-uploaded materials
       const combinedMaterials = [...adminMaterials, ...supplierMaterials];
       
+      console.log(`🔗 Combined materials: ${adminMaterials.length} admin + ${supplierMaterials.length} supplier = ${combinedMaterials.length} total`);
+      
       // Remove duplicates by name (keep first occurrence - admin images take priority)
       const seenNames = new Set<string>();
       const allMaterials = combinedMaterials.filter(m => {
@@ -739,9 +751,12 @@ export const MaterialsGrid = () => {
         seenNames.add(normalizedName);
         return true;
       });
+      
+      console.log(`✅ Final materials after deduplication: ${allMaterials.length}`);
 
       // Show empty state if no materials
       if (allMaterials.length === 0) {
+        console.warn('⚠️ No materials to display!');
         setMaterials([]);
         setFilteredMaterials([]);
         setLoading(false);
@@ -750,6 +765,7 @@ export const MaterialsGrid = () => {
 
       setMaterials(allMaterials);
       setFilteredMaterials(allMaterials);
+      console.log(`🎉 Successfully loaded ${allMaterials.length} materials to display`);
     } catch (error) {
       console.error('Error loading materials:', error);
       // Show empty state on error
