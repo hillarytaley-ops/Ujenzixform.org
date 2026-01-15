@@ -1,11 +1,11 @@
 // ============================================================
 // MradiPro Service Worker - Enhanced PWA Support
-// Version: 5.0
+// Version: 6.0
 // Features: Offline caching, background sync, push notifications,
 //           periodic sync, share target, file handling
 // ============================================================
 
-const CACHE_VERSION = 'v7';
+const CACHE_VERSION = 'v8';
 const STATIC_CACHE = `mradipro-static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `mradipro-dynamic-${CACHE_VERSION}`;
 const API_CACHE = `mradipro-api-${CACHE_VERSION}`;
