@@ -25,7 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Search, ShoppingCart, Store, Package, Filter, PartyPopper, Plus, Minus, Check, Scale } from 'lucide-react';
+import { Search, ShoppingCart, Store, Package, Filter, PartyPopper, Plus, Minus, Check, Scale, Camera, ChevronLeft, ChevronRight, X, Eye } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -314,6 +314,12 @@ export const MaterialsGrid = () => {
   const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
   const [quoteCartItems, setQuoteCartItems] = useState<QuoteCartItem[]>([]);
   const [isQuoteCartOpen, setIsQuoteCartOpen] = useState(false);
+  
+  // Multi-angle image gallery state
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [galleryMaterial, setGalleryMaterial] = useState<Material | null>(null);
+  const [galleryIndex, setGalleryIndex] = useState(0);
+  
   const { toast } = useToast();
   const { addToCart, isInCart, getItemQuantity, setIsCartOpen } = useCart();
 
@@ -365,6 +371,54 @@ export const MaterialsGrid = () => {
   };
 
   const isInQuoteCart = (id: string) => quoteCartItems.some(item => item.id === id);
+  
+  // Get all images for a material (main + additional angles)
+  const getAllMaterialImages = (material: Material) => {
+    const images: { url: string; label: string }[] = [];
+    
+    // Main image first
+    if (material.image_url) {
+      images.push({ url: material.image_url, label: 'Main View' });
+    }
+    
+    // Additional angle images
+    if (material.additional_images && Array.isArray(material.additional_images)) {
+      material.additional_images.forEach((img: any, index: number) => {
+        if (typeof img === 'string') {
+          images.push({ url: img, label: `View ${index + 2}` });
+        } else if (img && img.url) {
+          images.push({ url: img.url, label: img.angle || img.label || `View ${index + 2}` });
+        }
+      });
+    }
+    
+    return images;
+  };
+  
+  // Check if material has multiple images
+  const hasMultipleImages = (material: Material) => {
+    return getAllMaterialImages(material).length > 1;
+  };
+  
+  // Open image gallery for a material
+  const openGallery = (material: Material, startIndex: number = 0) => {
+    setGalleryMaterial(material);
+    setGalleryIndex(startIndex);
+    setGalleryOpen(true);
+  };
+  
+  // Navigate gallery
+  const nextGalleryImage = () => {
+    if (!galleryMaterial) return;
+    const images = getAllMaterialImages(galleryMaterial);
+    setGalleryIndex((prev) => (prev + 1) % images.length);
+  };
+  
+  const prevGalleryImage = () => {
+    if (!galleryMaterial) return;
+    const images = getAllMaterialImages(galleryMaterial);
+    setGalleryIndex((prev) => (prev - 1 + images.length) % images.length);
+  };
   
   // Toggle item for comparison
   const toggleCompare = (materialId: string) => {
@@ -1245,14 +1299,15 @@ export const MaterialsGrid = () => {
                 return (
                   <Card key={material.id} className={`overflow-hidden hover:shadow-xl transition-shadow duration-300 group flex flex-col ${itemInCart ? 'ring-2 ring-green-500' : ''} ${isSelectedForCompare ? 'ring-2 ring-purple-500' : ''}`}>
                     {/* Image Section - Fixed height */}
-                    <div className="relative bg-white overflow-hidden h-44 flex-shrink-0">
+                    <div className="relative bg-white overflow-hidden h-44 flex-shrink-0 group/image">
                       {imageUrl ? (
                         <img
                           src={imageUrl}
                           alt={material.name}
-                          className="w-full h-full object-contain p-3 bg-white"
+                          className="w-full h-full object-contain p-3 bg-white cursor-pointer transition-transform duration-200 group-hover/image:scale-105"
                           loading="lazy"
                           style={{ imageRendering: 'auto' }}
+                          onClick={() => openGallery(material)}
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center bg-white">
@@ -1270,6 +1325,38 @@ export const MaterialsGrid = () => {
                           {material.in_stock ? 'In Stock' : 'Out of Stock'}
                         </Badge>
                       </div>
+                      
+                      {/* Multi-Angle Gallery Badge & Button */}
+                      {hasMultipleImages(material) && (
+                        <div className="absolute bottom-2 left-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openGallery(material);
+                            }}
+                            className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded-md transition-colors shadow-lg"
+                            style={{ fontSize: '10px' }}
+                          >
+                            <Camera className="h-3 w-3" />
+                            {getAllMaterialImages(material).length} views
+                          </button>
+                        </div>
+                      )}
+                      
+                      {/* View Image Button (shows on hover) */}
+                      <div className="absolute inset-0 bg-black/0 group-hover/image:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover/image:opacity-100">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openGallery(material);
+                          }}
+                          className="bg-white/90 hover:bg-white text-gray-800 px-3 py-2 rounded-lg shadow-lg flex items-center gap-2 transition-all transform scale-90 group-hover/image:scale-100"
+                        >
+                          <Eye className="h-4 w-4" />
+                          <span className="text-sm font-medium">View {hasMultipleImages(material) ? 'All Angles' : 'Image'}</span>
+                        </button>
+                      </div>
+                      
                       {/* In Cart Badge */}
                       {itemInCart && (
                         <div className="absolute bottom-2 right-2">
@@ -1510,6 +1597,127 @@ export const MaterialsGrid = () => {
           />
         </>
       )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════════════
+          MULTI-ANGLE IMAGE GALLERY DIALOG
+          Allows customers to view products from all angles (front, back, sides, etc.)
+          ═══════════════════════════════════════════════════════════════════════════════ */}
+      <Dialog open={galleryOpen} onOpenChange={setGalleryOpen}>
+        <DialogContent className="sm:max-w-[900px] max-h-[90vh] p-0 bg-slate-900 border-slate-700">
+          {galleryMaterial && (() => {
+            const images = getAllMaterialImages(galleryMaterial);
+            const currentImage = images[galleryIndex];
+            
+            return (
+              <>
+                {/* Header */}
+                <div className="flex items-center justify-between p-4 border-b border-slate-700">
+                  <div>
+                    <DialogTitle className="text-white text-lg">{galleryMaterial.name}</DialogTitle>
+                    <DialogDescription className="text-slate-400">
+                      {currentImage?.label || 'Product Image'} • {galleryIndex + 1} of {images.length}
+                    </DialogDescription>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-slate-400 hover:text-white hover:bg-slate-800"
+                    onClick={() => setGalleryOpen(false)}
+                  >
+                    <X className="h-5 w-5" />
+                  </Button>
+                </div>
+                
+                {/* Main Image Area */}
+                <div className="relative flex items-center justify-center bg-white min-h-[400px] max-h-[60vh]">
+                  {currentImage && (
+                    <img
+                      src={currentImage.url}
+                      alt={`${galleryMaterial.name} - ${currentImage.label}`}
+                      className="max-w-full max-h-[60vh] object-contain p-4"
+                    />
+                  )}
+                  
+                  {/* Navigation Arrows */}
+                  {images.length > 1 && (
+                    <>
+                      <button
+                        onClick={prevGalleryImage}
+                        className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 text-white p-3 rounded-full transition-colors"
+                      >
+                        <ChevronLeft className="h-6 w-6" />
+                      </button>
+                      <button
+                        onClick={nextGalleryImage}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 text-white p-3 rounded-full transition-colors"
+                      >
+                        <ChevronRight className="h-6 w-6" />
+                      </button>
+                    </>
+                  )}
+                </div>
+                
+                {/* Thumbnail Strip */}
+                {images.length > 1 && (
+                  <div className="p-4 bg-slate-800 border-t border-slate-700">
+                    <div className="flex gap-2 overflow-x-auto pb-2">
+                      {images.map((img, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setGalleryIndex(idx)}
+                          className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${
+                            idx === galleryIndex 
+                              ? 'border-blue-500 ring-2 ring-blue-500/50' 
+                              : 'border-slate-600 hover:border-slate-500'
+                          }`}
+                        >
+                          <img
+                            src={img.url}
+                            alt={img.label}
+                            className="w-full h-full object-cover bg-white"
+                          />
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex justify-center gap-2 mt-3">
+                      {images.map((img, idx) => (
+                        <span
+                          key={idx}
+                          className={`text-xs px-2 py-1 rounded ${
+                            idx === galleryIndex 
+                              ? 'bg-blue-600 text-white' 
+                              : 'bg-slate-700 text-slate-400'
+                          }`}
+                        >
+                          {img.label}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Product Info Footer */}
+                <div className="p-4 bg-slate-800 border-t border-slate-700">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-slate-400 text-sm">{galleryMaterial.category}</p>
+                      <p className="text-white font-semibold">
+                        {userRole === 'professional_builder' 
+                          ? 'Request quote for pricing' 
+                          : `KES ${galleryMaterial.unit_price?.toLocaleString() || '0'} / ${galleryMaterial.unit}`
+                        }
+                      </p>
+                    </div>
+                    <Badge className={galleryMaterial.in_stock ? 'bg-green-600' : 'bg-red-600'}>
+                      {galleryMaterial.in_stock ? 'In Stock' : 'Out of Stock'}
+                    </Badge>
+                  </div>
+                </div>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
