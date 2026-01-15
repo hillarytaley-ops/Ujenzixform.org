@@ -313,7 +313,7 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
       } catch (err) {
         // Silent fail for polling
       }
-    }, 2000);
+    }, 1000); // Reduced from 2000ms to 1000ms for faster updates
 
     return () => {
       isSubscribed = false;

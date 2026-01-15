@@ -193,11 +193,11 @@ export const SimpleChatButton = () => {
         <div className="h-96 p-4 overflow-y-auto bg-gray-50">
           {messages.length === 0 ? (
             <>
-              <div className="bg-white rounded-lg p-3 mb-4">
+              <div className="bg-white rounded-lg p-3 mb-4 shadow-sm border border-gray-200">
                 <div className="flex items-start gap-2">
-                  <Bot className="h-4 w-4 mt-1 text-blue-600" />
-                  <div className="text-sm">
-                    <strong className="text-blue-600">MradiPro:</strong> Karibu! I can help you with construction materials, prices, suppliers, and deliveries. Need to talk to a real person? Just ask! What would you like to know?
+                  <Bot className="h-4 w-4 mt-1 text-blue-600 flex-shrink-0" />
+                  <div className="text-sm text-gray-700">
+                    <strong className="text-blue-600">MradiPro:</strong> <span className="text-gray-800">Karibu! I can help you with construction materials, prices, suppliers, and deliveries. Need to talk to a real person? Just ask! What would you like to know?</span>
                   </div>
                 </div>
               </div>
@@ -248,14 +248,14 @@ export const SimpleChatButton = () => {
                 <div key={idx}>
                   <div className={`flex items-start gap-2 ${msg.role === 'user' ? 'justify-end' : ''}`}>
                     {msg.role === 'bot' && <Bot className="h-4 w-4 mt-1 text-blue-600 flex-shrink-0" />}
-                    <div className={`rounded-lg p-3 max-w-[80%] ${
+                    <div className={`rounded-lg p-3 max-w-[80%] shadow-sm ${
                       msg.role === 'user' 
                         ? 'bg-blue-600 text-white ml-auto' 
-                        : 'bg-white'
+                        : 'bg-white border border-gray-200'
                     }`}>
-                      <div className="text-sm whitespace-pre-line">
+                      <div className={`text-sm whitespace-pre-line ${msg.role === 'bot' ? 'text-gray-800' : ''}`}>
                         {msg.role === 'bot' && <strong className="text-blue-600">MradiPro: </strong>}
-                        {msg.content}
+                        <span className={msg.role === 'bot' ? 'text-gray-700' : ''}>{msg.content}</span>
                       </div>
                     </div>
                     {msg.role === 'user' && <User className="h-4 w-4 mt-1 flex-shrink-0" />}

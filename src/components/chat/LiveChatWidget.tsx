@@ -293,13 +293,12 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
         console.log('📡 Chat subscription status:', status);
       });
 
-    // POLLING FALLBACK: Check for new messages every 2 seconds
-    // Slightly slower than before to reduce load but still responsive
+    // POLLING FALLBACK: Check for new messages every 1.5 seconds for faster response
     pollingIntervalRef.current = setInterval(() => {
       if (isMountedRef.current) {
         loadMessages(true);
       }
-    }, 2000);
+    }, 1500);
 
     return () => {
       isSubscribed = false;
@@ -659,13 +658,13 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
         <div ref={scrollRef} className="h-96 p-4 overflow-y-auto bg-gray-50">
           {messages.length === 0 ? (
             <>
-              <div className="bg-white rounded-lg p-3 mb-4 shadow-sm">
+              <div className="bg-white rounded-lg p-3 mb-4 shadow-sm border border-gray-200">
                 <div className="flex items-start gap-2">
                   <Bot className="h-5 w-5 mt-1 text-blue-600 flex-shrink-0" />
-                  <div className="text-sm">
-                    <strong className="text-blue-600">MradiPro:</strong> Karibu! 🇰🇪 I can help you with construction materials, prices, suppliers, and deliveries. 
+                  <div className="text-sm text-gray-700">
+                    <strong className="text-blue-600">MradiPro:</strong> <span className="text-gray-800">Karibu! 🇰🇪 I can help you with construction materials, prices, suppliers, and deliveries.</span>
                     <br /><br />
-                    <strong>Need human support?</strong> Just type "talk to staff" anytime!
+                    <strong className="text-gray-800">Need human support?</strong> <span className="text-gray-700">Just type "talk to staff" anytime!</span>
                   </div>
                 </div>
               </div>
@@ -721,12 +720,12 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
                         ? 'bg-blue-600 text-white ml-auto' 
                         : msg.role === 'staff'
                         ? 'bg-purple-100 border border-purple-200'
-                        : 'bg-white'
+                        : 'bg-white border border-gray-200'
                     }`}>
-                      <div className="text-sm whitespace-pre-line">
+                      <div className={`text-sm whitespace-pre-line ${msg.role !== 'user' ? 'text-gray-800' : ''}`}>
                         {msg.role === 'bot' && <strong className="text-blue-600">MradiPro: </strong>}
                         {msg.role === 'staff' && <strong className="text-purple-600">Staff: </strong>}
-                        {msg.content}
+                        <span className={msg.role === 'bot' ? 'text-gray-700' : msg.role === 'staff' ? 'text-purple-800' : ''}>{msg.content}</span>
                       </div>
                       <div className={`text-xs mt-1 ${msg.role === 'user' ? 'text-blue-200' : 'text-gray-400'}`}>
                         {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
