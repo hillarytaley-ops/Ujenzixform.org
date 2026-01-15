@@ -37,15 +37,10 @@ export function AdminVideoApproval() {
     setLoading(true);
     try {
       // Note: builder_videos table may not exist yet - handle gracefully
+      // Fetch videos without join (profiles table doesn't have proper FK relationship)
       let query = supabase
         .from('builder_videos' as any)
-        .select(`
-          *,
-          profiles:builder_id (
-            full_name,
-            email
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (filter !== 'all') {
@@ -64,10 +59,29 @@ export function AdminVideoApproval() {
         throw error;
       }
 
+      // Fetch builder names separately if we have videos
+      let profilesMap: Record<string, string> = {};
+      if (data && data.length > 0) {
+        const builderIds = [...new Set(data.map((v: any) => v.builder_id).filter(Boolean))];
+        if (builderIds.length > 0) {
+          const { data: profilesData } = await supabase
+            .from('profiles')
+            .select('id, user_id, full_name')
+            .in('id', builderIds);
+          
+          if (profilesData) {
+            profilesData.forEach((p: any) => {
+              profilesMap[p.id] = p.full_name || 'Unknown';
+              if (p.user_id) profilesMap[p.user_id] = p.full_name || 'Unknown';
+            });
+          }
+        }
+      }
+
       const formattedVideos = (data || []).map((video: any) => ({
         ...video,
-        builder_name: video.profiles?.full_name || 'Unknown Builder',
-        builder_email: video.profiles?.email || 'No email'
+        builder_name: profilesMap[video.builder_id] || 'Unknown Builder',
+        builder_email: '' // Email not available in profiles table
       }));
 
       setVideos(formattedVideos);
