@@ -228,14 +228,16 @@ export const MaterialImagesManager: React.FC = () => {
 
   // Bulk upload state
   const [showBulkUploadDialog, setShowBulkUploadDialog] = useState(false);
-  const [bulkUploadCategory, setBulkUploadCategory] = useState('Cement');
-  const [bulkUploadUnit, setBulkUploadUnit] = useState('bag');
+  const [bulkUploadCategory, setBulkUploadCategory] = useState('Cement'); // Default category for new items
+  const [bulkUploadUnit, setBulkUploadUnit] = useState('bag'); // Default unit for new items
   const [bulkUploadItems, setBulkUploadItems] = useState<Array<{
     id: string;
     file: File;
     previewUrl: string;
     name: string;
+    category: string; // Individual category per item
     description: string;
+    unit: string; // Individual unit per item
     suggestedPrice: number;
     uploading: boolean;
     uploaded: boolean;
@@ -460,7 +462,9 @@ export const MaterialImagesManager: React.FC = () => {
         file,
         previewUrl: URL.createObjectURL(file),
         name: formattedName,
+        category: bulkUploadCategory, // Use default category (can be changed per item)
         description: '',
+        unit: bulkUploadUnit, // Use default unit (can be changed per item)
         suggestedPrice: 0,
         uploading: false,
         uploaded: false,
@@ -523,14 +527,14 @@ export const MaterialImagesManager: React.FC = () => {
           reader.readAsDataURL(item.file);
         });
 
-        // Save to database
+        // Save to database - use individual item's category and unit
         const { error } = await (supabase as any)
           .from('admin_material_images')
           .insert({
             name: item.name.trim(),
-            category: bulkUploadCategory,
+            category: item.category, // Use item's individual category
             description: item.description || '',
-            unit: bulkUploadUnit,
+            unit: item.unit, // Use item's individual unit
             suggested_price: item.suggestedPrice || 0,
             image_url: imageDataUrl,
             is_featured: false,
@@ -1453,41 +1457,44 @@ export const MaterialImagesManager: React.FC = () => {
           </DialogHeader>
           
           <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
-            {/* Category and Unit Selection - Apply to all */}
-            <div className="grid grid-cols-2 gap-4 flex-shrink-0">
-              <div>
-                <Label className="text-xs text-slate-300">Category (applies to all) *</Label>
-                <Select value={bulkUploadCategory} onValueChange={setBulkUploadCategory}>
-                  <SelectTrigger className="bg-slate-800 border-slate-600 h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    {PRODUCT_CATEGORIES.filter(c => c !== 'All Categories').map(cat => (
-                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-xs text-slate-300">Unit (applies to all)</Label>
-                <Select value={bulkUploadUnit} onValueChange={setBulkUploadUnit}>
-                  <SelectTrigger className="bg-slate-800 border-slate-600 h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    <SelectItem value="bag">Per Bag</SelectItem>
-                    <SelectItem value="kg">Per Kg</SelectItem>
-                    <SelectItem value="piece">Per Piece</SelectItem>
-                    <SelectItem value="unit">Per Unit</SelectItem>
-                    <SelectItem value="sheet">Per Sheet</SelectItem>
-                    <SelectItem value="meter">Per Meter</SelectItem>
-                    <SelectItem value="ton">Per Ton</SelectItem>
-                    <SelectItem value="liter">Per Liter</SelectItem>
-                    <SelectItem value="roll">Per Roll</SelectItem>
-                    <SelectItem value="box">Per Box</SelectItem>
-                    <SelectItem value="pallet">Per Pallet</SelectItem>
-                  </SelectContent>
-                </Select>
+            {/* Default Category and Unit Selection - For newly added items */}
+            <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700 flex-shrink-0">
+              <p className="text-xs text-slate-400 mb-2">📋 Default values for new images (can be changed per item below)</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs text-slate-300">Default Category</Label>
+                  <Select value={bulkUploadCategory} onValueChange={setBulkUploadCategory}>
+                    <SelectTrigger className="bg-slate-800 border-slate-600 h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      {PRODUCT_CATEGORIES.filter(c => c !== 'All Categories').map(cat => (
+                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-slate-300">Default Unit</Label>
+                  <Select value={bulkUploadUnit} onValueChange={setBulkUploadUnit}>
+                    <SelectTrigger className="bg-slate-800 border-slate-600 h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      <SelectItem value="bag">Per Bag</SelectItem>
+                      <SelectItem value="kg">Per Kg</SelectItem>
+                      <SelectItem value="piece">Per Piece</SelectItem>
+                      <SelectItem value="unit">Per Unit</SelectItem>
+                      <SelectItem value="sheet">Per Sheet</SelectItem>
+                      <SelectItem value="meter">Per Meter</SelectItem>
+                      <SelectItem value="ton">Per Ton</SelectItem>
+                      <SelectItem value="liter">Per Liter</SelectItem>
+                      <SelectItem value="roll">Per Roll</SelectItem>
+                      <SelectItem value="box">Per Box</SelectItem>
+                      <SelectItem value="pallet">Per Pallet</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
 
@@ -1532,25 +1539,122 @@ export const MaterialImagesManager: React.FC = () => {
                         <img 
                           src={item.previewUrl} 
                           alt={item.name}
-                          className="w-20 h-20 object-cover rounded-lg"
+                          className="w-24 h-24 object-cover rounded-lg"
                         />
                       </div>
                       
-                      {/* Form Fields */}
+                      {/* Form Fields - All fields like single upload */}
                       <div className="flex-1 space-y-2 min-w-0">
-                        {/* Row 1: Name and Price */}
-                        <div className="flex gap-2">
-                          <div className="flex-1">
-                            <Label className="text-xs text-slate-400 mb-1 block">Material Name *</Label>
+                        {/* Row 1: Name */}
+                        <div>
+                          <Label className="text-xs text-slate-400 mb-1 block">Material Name *</Label>
+                          <Input
+                            value={item.name}
+                            onChange={(e) => updateBulkItem(item.id, { name: e.target.value })}
+                            placeholder="e.g., Bamburi Cement 50kg"
+                            className="bg-slate-700 border-slate-600 h-8 text-sm"
+                            disabled={item.uploaded || item.uploading}
+                          />
+                        </div>
+                        
+                        {/* Row 2: Category and Unit */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <Label className="text-xs text-slate-400 mb-1 block">Category *</Label>
+                            <Select 
+                              value={item.category} 
+                              onValueChange={(value) => updateBulkItem(item.id, { category: value })}
+                              disabled={item.uploaded || item.uploading}
+                            >
+                              <SelectTrigger className="bg-slate-700 border-slate-600 h-8 text-sm">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent className="max-h-60">
+                                {PRODUCT_CATEGORIES.filter(c => c !== 'All Categories').map(cat => (
+                                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label className="text-xs text-slate-400 mb-1 block">Unit</Label>
+                            <Select 
+                              value={item.unit} 
+                              onValueChange={(value) => updateBulkItem(item.id, { unit: value })}
+                              disabled={item.uploaded || item.uploading}
+                            >
+                              <SelectTrigger className="bg-slate-700 border-slate-600 h-8 text-sm">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent className="max-h-60">
+                                {/* Weight & Mass */}
+                                <SelectItem value="kg">Per Kg</SelectItem>
+                                <SelectItem value="gram">Per Gram</SelectItem>
+                                <SelectItem value="tonne">Per Tonne</SelectItem>
+                                <SelectItem value="ton">Per Ton</SelectItem>
+                                {/* Volume */}
+                                <SelectItem value="liter">Per Liter</SelectItem>
+                                <SelectItem value="ml">Per ML</SelectItem>
+                                <SelectItem value="cubic meter">Per M³</SelectItem>
+                                <SelectItem value="cubic foot">Per Cubic Foot</SelectItem>
+                                {/* Length */}
+                                <SelectItem value="meter">Per Meter</SelectItem>
+                                <SelectItem value="mm">Per MM</SelectItem>
+                                <SelectItem value="cm">Per CM</SelectItem>
+                                <SelectItem value="foot">Per Foot</SelectItem>
+                                <SelectItem value="inch">Per Inch</SelectItem>
+                                {/* Area */}
+                                <SelectItem value="sqm">Per Sqm</SelectItem>
+                                <SelectItem value="sqft">Per Sqft</SelectItem>
+                                {/* Count/Quantity */}
+                                <SelectItem value="piece">Per Piece</SelectItem>
+                                <SelectItem value="unit">Per Unit</SelectItem>
+                                <SelectItem value="pair">Per Pair</SelectItem>
+                                <SelectItem value="dozen">Per Dozen</SelectItem>
+                                <SelectItem value="set">Per Set</SelectItem>
+                                <SelectItem value="bundle">Per Bundle</SelectItem>
+                                {/* Packaging */}
+                                <SelectItem value="bag">Per Bag</SelectItem>
+                                <SelectItem value="packet">Per Packet</SelectItem>
+                                <SelectItem value="carton">Per Carton</SelectItem>
+                                <SelectItem value="box">Per Box</SelectItem>
+                                <SelectItem value="pallet">Per Pallet</SelectItem>
+                                {/* Sheets & Rolls */}
+                                <SelectItem value="sheet">Per Sheet</SelectItem>
+                                <SelectItem value="roll">Per Roll</SelectItem>
+                                <SelectItem value="coil">Per Coil</SelectItem>
+                                {/* Building Specific */}
+                                <SelectItem value="trip">Per Trip</SelectItem>
+                                <SelectItem value="lorry">Per Lorry</SelectItem>
+                                <SelectItem value="wheelbarrow">Per Wheelbarrow</SelectItem>
+                                {/* Length Bundles */}
+                                <SelectItem value="length">Per Length</SelectItem>
+                                <SelectItem value="bar">Per Bar</SelectItem>
+                                <SelectItem value="rod">Per Rod</SelectItem>
+                                <SelectItem value="pole">Per Pole</SelectItem>
+                                {/* Liquid Containers */}
+                                <SelectItem value="drum">Per Drum</SelectItem>
+                                <SelectItem value="jerrycan">Per Jerrycan</SelectItem>
+                                <SelectItem value="bucket">Per Bucket</SelectItem>
+                                <SelectItem value="tin">Per Tin</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        
+                        {/* Row 3: Description and Price */}
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="col-span-2">
+                            <Label className="text-xs text-slate-400 mb-1 block">Description (optional)</Label>
                             <Input
-                              value={item.name}
-                              onChange={(e) => updateBulkItem(item.id, { name: e.target.value })}
-                              placeholder="e.g., Bamburi Cement 50kg"
+                              value={item.description}
+                              onChange={(e) => updateBulkItem(item.id, { description: e.target.value })}
+                              placeholder="Brief product description..."
                               className="bg-slate-700 border-slate-600 h-8 text-sm"
                               disabled={item.uploaded || item.uploading}
                             />
                           </div>
-                          <div className="w-28">
+                          <div>
                             <Label className="text-xs text-slate-400 mb-1 block">Price (KES)</Label>
                             <Input
                               type="number"
@@ -1561,18 +1665,6 @@ export const MaterialImagesManager: React.FC = () => {
                               disabled={item.uploaded || item.uploading}
                             />
                           </div>
-                        </div>
-                        
-                        {/* Row 2: Description */}
-                        <div>
-                          <Label className="text-xs text-slate-400 mb-1 block">Description (optional)</Label>
-                          <Input
-                            value={item.description}
-                            onChange={(e) => updateBulkItem(item.id, { description: e.target.value })}
-                            placeholder="Brief product description..."
-                            className="bg-slate-700 border-slate-600 h-8 text-sm"
-                            disabled={item.uploaded || item.uploading}
-                          />
                         </div>
                       </div>
                       
