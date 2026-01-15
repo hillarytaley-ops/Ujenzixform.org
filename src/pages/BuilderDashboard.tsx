@@ -432,7 +432,7 @@ const BuilderDashboard = () => {
                     Welcome, {profile?.full_name || 'Builder'}!
                   </h1>
                   <Badge className={`${isProfessional ? 'bg-blue-500' : 'bg-emerald-500'}`}>
-                    {isProfessional ? '🏢 Professional' : '🏠 Private Client'}
+                    {isProfessional ? '🏢 Professional' : '🏠 Private Builder'}
                   </Badge>
                 </div>
                 <p className="text-white/80">
@@ -717,7 +717,7 @@ const BuilderDashboard = () => {
               </Card>
             )}
 
-            {/* Private Client: My Home Project */}
+            {/* Private Builder: My Home Project */}
             {!isProfessional && (
               <Card className={`${isDarkMode 
                 ? 'bg-gradient-to-br from-emerald-900/50 to-teal-900/50 border-emerald-800' 

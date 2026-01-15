@@ -101,7 +101,7 @@ const PrivateClientDashboard = () => {
       if (roleData?.role !== 'private_client') {
         toast({
           title: "Access Denied",
-          description: "This dashboard is for Private Clients only.",
+          description: "This dashboard is for Private Builders only.",
           variant: "destructive",
         });
         navigate('/');
@@ -238,7 +238,7 @@ const PrivateClientDashboard = () => {
                 <h1 className="text-2xl md:text-3xl font-bold">
                   Welcome, {profile?.full_name || user?.email?.split('@')[0]}!
                 </h1>
-                <p className="text-green-100">Private Client Dashboard</p>
+                <p className="text-green-100">Private Builder Dashboard</p>
               </div>
             </div>
             <div className="flex gap-2">

@@ -40,7 +40,7 @@ const PrivateClientSignIn = () => {
       if (roleData?.role !== 'private_client') {
         toast({
           title: "Access Denied",
-          description: "This sign-in is for Private Clients only. Please use the correct portal.",
+          description: "This sign-in is for Private Builders only. Please use the correct portal.",
           variant: "destructive",
         });
         await supabase.auth.signOut();
@@ -92,7 +92,7 @@ const PrivateClientSignIn = () => {
             <ShoppingBag className="h-8 w-8 text-white" />
           </div>
           <div>
-            <CardTitle className="text-2xl font-bold text-gray-900">Private Client Sign In</CardTitle>
+            <CardTitle className="text-2xl font-bold text-gray-900">Private Builder Sign In</CardTitle>
             <CardDescription className="text-gray-600">
               Access your personal purchasing dashboard
             </CardDescription>
@@ -165,7 +165,7 @@ const PrivateClientSignIn = () => {
 
           {/* Benefits */}
           <div className="mt-6 p-4 bg-green-50 rounded-lg border border-green-200">
-            <h4 className="font-semibold text-green-900 mb-2">Private Client Benefits:</h4>
+            <h4 className="font-semibold text-green-900 mb-2">Private Builder Benefits:</h4>
             <ul className="space-y-1 text-sm text-green-800">
               <li className="flex items-center gap-2">
                 <span className="text-green-600">✓</span>

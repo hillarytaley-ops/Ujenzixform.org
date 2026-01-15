@@ -1718,7 +1718,7 @@ const AdminDashboard = () => {
       case 'professional_builder':
         return <Badge className="bg-blue-600"><Building2 className="h-3 w-3 mr-1" /> Professional Builder</Badge>;
       case 'private_client':
-        return <Badge className="bg-green-600"><ShoppingBag className="h-3 w-3 mr-1" /> Private Client</Badge>;
+        return <Badge className="bg-green-600"><ShoppingBag className="h-3 w-3 mr-1" /> Private Builder</Badge>;
       case 'supplier':
         return <Badge className="bg-orange-600"><Store className="h-3 w-3 mr-1" /> Supplier</Badge>;
       case 'delivery':
@@ -3315,7 +3315,7 @@ const AdminDashboard = () => {
                               'bg-gray-600'
                             }>
                               {doc.userRole === 'professional_builder' ? 'Professional Builder' :
-                               doc.userRole === 'private_client' ? 'Private Client' :
+                               doc.userRole === 'private_client' ? 'Private Builder' :
                                doc.userRole === 'delivery_provider' ? 'Delivery Provider' :
                                doc.userRole}
                             </Badge>

@@ -223,7 +223,7 @@ const PrivateBuilderRegistration = () => {
           <div className="max-w-4xl mx-auto text-center">
             <div className="flex items-center justify-center mb-4">
               <User className="h-12 w-12 mr-3" />
-              <h1 className="text-4xl font-bold drop-shadow-lg">Private Client Registration</h1>
+              <h1 className="text-4xl font-bold drop-shadow-lg">Private Builder Registration</h1>
             </div>
             <p className="text-xl mb-8 opacity-95 drop-shadow-md">
               Connect with professional builders and suppliers for your construction project
@@ -242,7 +242,7 @@ const PrivateBuilderRegistration = () => {
       </section>
 
       <main className="container mx-auto px-4 py-12">
-        {/* Private Client Benefits */}
+        {/* Private Builder Benefits */}
         <div className="max-w-4xl mx-auto mb-8">
           <Card className="border-green-200 bg-green-50">
             <CardHeader>
@@ -283,7 +283,7 @@ const PrivateBuilderRegistration = () => {
         <div className="max-w-4xl mx-auto">
           <Card>
             <CardHeader>
-              <CardTitle className="text-2xl">Private Client Registration</CardTitle>
+              <CardTitle className="text-2xl">Private Builder Registration</CardTitle>
               <p className="text-muted-foreground">
                 Tell us about your construction project and connect with the right professionals
               </p>
@@ -529,7 +529,7 @@ const PrivateBuilderRegistration = () => {
                           </FormControl>
                           <div className="space-y-1 leading-none">
                             <FormLabel className="text-sm font-normal">
-                              I accept the Terms and Conditions for Private Clients *
+                              I accept the Terms and Conditions for Private Builders *
                             </FormLabel>
                             <p className="text-xs text-muted-foreground">
                               By checking this box, you agree to our client terms of service
@@ -594,7 +594,7 @@ const PrivateBuilderRegistration = () => {
                           {progress < 30 ? "Checking..." : progress < 80 ? "Saving..." : "Finishing..."}
                         </span>
                       ) : (
-                        "Register as Private Client"
+                        "Register as Private Builder"
                       )}
                     </Button>
                   </div>

@@ -472,7 +472,7 @@ const Builders = () => {
         </section>
       </AnimatedSection>
 
-      {/* Sign-In Section for Professional Builders & Private Clients */}
+      {/* Sign-In Section for Professional Builders & Private Builders */}
       <section className="py-12 bg-gradient-to-r from-slate-50 to-blue-50">
         <div className="container mx-auto px-4">
           <div className="text-center mb-8">
@@ -482,13 +482,13 @@ const Builders = () => {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
-            {/* Private Client Sign In */}
+            {/* Private Builder Sign In */}
             <Card className="hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border-2 border-emerald-200 bg-gradient-to-br from-emerald-50 to-white">
               <CardContent className="p-8 text-center">
                 <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                   <ShoppingCart className="h-8 w-8 text-emerald-600" />
                 </div>
-                <h3 className="text-xl font-bold text-emerald-800 mb-2">Private Client</h3>
+                <h3 className="text-xl font-bold text-emerald-800 mb-2">Private Builder</h3>
                 <p className="text-sm text-muted-foreground mb-6">Home projects & personal purchases</p>
                 <div className="space-y-3">
                   <Link to="/private-client-signin" className="block">

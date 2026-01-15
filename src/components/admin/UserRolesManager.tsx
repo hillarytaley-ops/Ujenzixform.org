@@ -59,7 +59,7 @@ const AVAILABLE_ROLES = [
   { value: 'admin', label: 'Admin', icon: Shield, color: 'bg-red-500' },
   { value: 'supplier', label: 'Supplier', icon: Store, color: 'bg-amber-500' },
   { value: 'delivery_provider', label: 'Delivery Provider', icon: Truck, color: 'bg-purple-500' },
-  { value: 'private_client', label: 'Private Client', icon: ShoppingBag, color: 'bg-green-500' },
+  { value: 'private_client', label: 'Private Builder', icon: ShoppingBag, color: 'bg-green-500' },
   { value: 'professional_builder', label: 'Professional Builder', icon: HardHat, color: 'bg-blue-500' },
 ];
 

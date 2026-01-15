@@ -359,14 +359,14 @@ const Index = () => {
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
-            {/* Private Client */}
+            {/* Private Builder */}
             <Link to="/private-builder-registration">
               <Card className="h-full hover:scale-[1.03] transition-all duration-300 cursor-pointer bg-gradient-to-br from-emerald-600 to-emerald-700 border-2 border-emerald-500/30 hover:border-emerald-400 shadow-xl hover:shadow-2xl">
                 <CardContent className="p-8 text-center">
                   <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
                     <ShoppingCart className="h-8 w-8 text-white" />
                   </div>
-                  <h3 className="text-white font-bold text-xl mb-2">Private Client</h3>
+                  <h3 className="text-white font-bold text-xl mb-2">Private Builder</h3>
                   <p className="text-emerald-100/80 text-sm mb-4">Home projects & personal purchases</p>
                   <Badge className="bg-white text-emerald-700 px-4 py-1">Register →</Badge>
                 </CardContent>

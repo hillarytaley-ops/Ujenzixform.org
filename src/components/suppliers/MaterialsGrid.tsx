@@ -834,7 +834,7 @@ export const MaterialsGrid = () => {
       if (userRole !== 'professional_builder' && userRole !== 'admin') {
         toast({
           title: '📋 Professional Builder Required',
-          description: 'Only Professional Builders can request quotes. Private Clients can buy directly.',
+          description: 'Only Professional Builders can request quotes. Private Builders can buy directly.',
           variant: 'destructive',
         });
         return;
@@ -914,11 +914,11 @@ export const MaterialsGrid = () => {
         return;
       }
       
-      // Only Private Clients can buy directly
+      // Only Private Builders can buy directly
       if (userRole !== 'private_client' && userRole !== 'admin') {
         toast({
-          title: '🛒 Private Client Required',
-          description: 'Only Private Clients can purchase directly. Professional Builders should request quotes.',
+          title: '🛒 Private Builder Required',
+          description: 'Only Private Builders can purchase directly. Professional Builders should request quotes.',
           variant: 'destructive',
         });
         return;
@@ -1071,7 +1071,7 @@ export const MaterialsGrid = () => {
                 <strong className="text-orange-800 text-lg">🏗️ Want to Buy or Request Quotes?</strong>
               </div>
               <p className="text-sm text-orange-700">
-                <strong>Private Clients</strong> can buy directly | <strong>Professional Builders</strong> can request quotes
+                <strong>Private Builders</strong> can buy directly | <strong>Professional Builders</strong> can request quotes
               </p>
               <div className="flex gap-3">
                 <a href="/home">
@@ -1107,9 +1107,9 @@ export const MaterialsGrid = () => {
         <Alert className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-300 border-2">
           <ShoppingCart className="h-5 w-5 text-green-600" />
           <AlertDescription className="ml-2">
-            <strong className="text-green-800">🛒 Private Client Mode</strong>
+            <strong className="text-green-800">🛒 Private Builder Mode</strong>
             <p className="text-sm text-green-700 mt-1">
-              As a Private Client, you can <strong>buy materials directly</strong> from suppliers. Add items to your cart and checkout!
+              As a Private Builder, you can <strong>buy materials directly</strong> from suppliers. Add items to your cart and checkout!
             </p>
           </AlertDescription>
         </Alert>
@@ -1120,7 +1120,7 @@ export const MaterialsGrid = () => {
           <AlertDescription className="ml-2">
             <strong className="text-red-800">⚠️ Purchasing Not Available</strong>
             <p className="text-sm text-red-700 mt-1">
-              Your account type ({userRole}) cannot purchase materials. Please register as a <strong>Private Client</strong> or <strong>Professional Builder</strong>.
+              Your account type ({userRole}) cannot purchase materials. Please register as a <strong>Private Builder</strong> or <strong>Professional Builder</strong>.
             </p>
           </AlertDescription>
         </Alert>
@@ -1284,7 +1284,7 @@ export const MaterialsGrid = () => {
                     }, 1500);
                     return;
                   }
-                  // Only Private Clients can buy directly
+                  // Only Private Builders can buy directly
                   if (userRole !== 'private_client' && userRole !== 'admin') {
                     if (userRole === 'professional_builder') {
                       toast({
@@ -1294,8 +1294,8 @@ export const MaterialsGrid = () => {
                       });
                     } else {
                       toast({
-                        title: '⚠️ Private Client Account Required',
-                        description: 'Only Private Clients can purchase materials directly. Please register as a Private Client.',
+                        title: '⚠️ Private Builder Account Required',
+                        description: 'Only Private Builders can purchase materials directly. Please register as a Private Builder.',
                         variant: 'destructive',
                       });
                     }
@@ -1494,7 +1494,7 @@ export const MaterialsGrid = () => {
                       </div>
                       
                       {/* Role-Based Action Buttons */}
-                      {/* Private Clients: Show Buy/Cart buttons */}
+                      {/* Private Builders: Show Buy/Cart buttons */}
                       {(userRole === 'private_client' || userRole === 'admin') && (
                         <>
                           <Button 
@@ -1557,7 +1557,7 @@ export const MaterialsGrid = () => {
                             Sign In to Purchase
                           </Button>
                           <p className="text-xs text-center text-muted-foreground">
-                            Private Clients buy directly • Pro Builders request quotes
+                            Private Builders buy directly • Pro Builders request quotes
                           </p>
                         </div>
                       )}
@@ -1569,7 +1569,7 @@ export const MaterialsGrid = () => {
                             ⚠️ Your account type cannot purchase materials
                           </p>
                           <a href="/home" className="text-xs text-blue-600 underline">
-                            Register as Private Client or Pro Builder
+                            Register as Private Builder or Pro Builder
                           </a>
                         </div>
                       )}
