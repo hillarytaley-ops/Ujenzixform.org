@@ -79,7 +79,8 @@ import {
   PieChart,
   LineChart,
   QrCode,
-  Scan
+  Scan,
+  ShoppingBag
 } from "lucide-react";
 import { AdminScanDashboard } from "@/components/qr/AdminScanDashboard";
 import { EnhancedQRCodeManager } from "@/components/qr/EnhancedQRCodeManager";
@@ -893,7 +894,7 @@ const AdminDashboard = () => {
               type: 'profile_photo',
               uploadedBy: reg.full_name || 'Unknown',
               userEmail: reg.email,
-              userRole: 'builder',
+              userRole: 'professional_builder',
               size: 'N/A',
               status: 'verified',
               uploadedAt: reg.created_at
@@ -1714,11 +1715,15 @@ const AdminDashboard = () => {
   const getTypeBadge = (type: string) => {
     switch (type) {
       case 'builder':
-        return <Badge className="bg-blue-600"><Building2 className="h-3 w-3 mr-1" /> Builder</Badge>;
+      case 'professional_builder':
+        return <Badge className="bg-blue-600"><Building2 className="h-3 w-3 mr-1" /> Professional Builder</Badge>;
+      case 'private_client':
+        return <Badge className="bg-green-600"><ShoppingBag className="h-3 w-3 mr-1" /> Private Client</Badge>;
       case 'supplier':
         return <Badge className="bg-orange-600"><Store className="h-3 w-3 mr-1" /> Supplier</Badge>;
       case 'delivery':
-        return <Badge className="bg-teal-600"><Truck className="h-3 w-3 mr-1" /> Delivery</Badge>;
+      case 'delivery_provider':
+        return <Badge className="bg-teal-600"><Truck className="h-3 w-3 mr-1" /> Delivery Provider</Badge>;
       default:
         return <Badge variant="outline">{type}</Badge>;
     }
@@ -3303,11 +3308,16 @@ const AdminDashboard = () => {
                           </TableCell>
                           <TableCell>
                             <Badge className={
-                              doc.userRole === 'builder' ? 'bg-blue-600' :
+                              doc.userRole === 'professional_builder' || doc.userRole === 'builder' ? 'bg-blue-600' :
+                              doc.userRole === 'private_client' ? 'bg-green-600' :
                               doc.userRole === 'supplier' ? 'bg-orange-600' :
-                              'bg-green-600'
+                              doc.userRole === 'delivery_provider' || doc.userRole === 'delivery' ? 'bg-teal-600' :
+                              'bg-gray-600'
                             }>
-                              {doc.userRole}
+                              {doc.userRole === 'professional_builder' ? 'Professional Builder' :
+                               doc.userRole === 'private_client' ? 'Private Client' :
+                               doc.userRole === 'delivery_provider' ? 'Delivery Provider' :
+                               doc.userRole}
                             </Badge>
                           </TableCell>
                           <TableCell>

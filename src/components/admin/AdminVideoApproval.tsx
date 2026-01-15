@@ -80,7 +80,7 @@ export function AdminVideoApproval() {
 
       const formattedVideos = (data || []).map((video: any) => ({
         ...video,
-        builder_name: profilesMap[video.builder_id] || 'Unknown Builder',
+        builder_name: profilesMap[video.builder_id] || 'Unknown Professional Builder',
         builder_email: '' // Email not available in profiles table
       }));
 

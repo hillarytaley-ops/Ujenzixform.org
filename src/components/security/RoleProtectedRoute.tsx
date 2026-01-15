@@ -218,12 +218,12 @@ export const RoleProtectedRoute = ({
       return <Navigate to="/supplier-dashboard" replace />;
     }
     
-    if (userRole === 'builder') {
-      console.log('🔄 Redirecting builder to builder-dashboard');
+    if (userRole === 'professional_builder' || userRole === 'private_client') {
+      console.log('🔄 Redirecting professional builder/private client to builder-dashboard');
       return <Navigate to="/builder-dashboard" replace />;
     }
     
-    if (userRole === 'delivery') {
+    if (userRole === 'delivery_provider' || userRole === 'delivery') {
       console.log('🔄 Redirecting delivery provider to delivery-dashboard');
       return <Navigate to="/delivery-dashboard" replace />;
     }
