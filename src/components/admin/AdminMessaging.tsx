@@ -109,13 +109,13 @@ export function AdminMessaging() {
 
       if (chatsError) throw chatsError;
 
-      // Get user profiles for each chat
+      // Get user profiles for each chat (profiles table doesn't have email column)
       const userIds = [...new Set((chatsData || []).map(c => c.user_id))];
       
       if (userIds.length > 0) {
         const { data: profilesData } = await supabase
           .from('profiles')
-          .select('id, full_name, email')
+          .select('id, user_id, full_name')
           .in('id', userIds);
 
         // Get roles
@@ -126,12 +126,12 @@ export function AdminMessaging() {
 
         // Merge data
         const enrichedChats = (chatsData || []).map(chat => {
-          const profile = (profilesData || []).find(p => p.id === chat.user_id);
+          const profile = (profilesData || []).find(p => p.id === chat.user_id || p.user_id === chat.user_id);
           const roleData = (rolesData || []).find(r => r.user_id === chat.user_id);
           return {
             ...chat,
             user_name: profile?.full_name || 'Unknown User',
-            user_email: profile?.email || '',
+            user_email: '', // Email not available in profiles table
             user_role: roleData?.role || chat.user_role || 'unknown'
           };
         });

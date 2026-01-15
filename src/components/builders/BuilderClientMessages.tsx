@@ -68,10 +68,10 @@ export function BuilderClientMessages({ builderId }: BuilderClientMessagesProps)
       // Get unique client IDs
       const clientIds = [...new Set((messagesData || []).map(m => m.client_id))];
 
-      // Fetch client profiles
+      // Fetch client profiles (profiles table doesn't have email column)
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('id, full_name, email')
+        .select('id, user_id, full_name')
         .in('id', clientIds);
 
       // Fetch video titles if any
@@ -92,7 +92,7 @@ export function BuilderClientMessages({ builderId }: BuilderClientMessagesProps)
           conversationsMap.set(msg.client_id, {
             client_id: msg.client_id,
             client_name: profile?.full_name || 'Unknown Client',
-            client_email: profile?.email || '',
+            client_email: '', // Email not available in profiles table
             last_message: msg.message,
             last_message_at: msg.created_at,
             unread_count: msg.sender_type === 'client' && !msg.read ? 1 : 0,

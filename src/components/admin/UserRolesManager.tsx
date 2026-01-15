@@ -84,19 +84,21 @@ export const UserRolesManager = () => {
 
       if (rolesError) throw rolesError;
 
-      // Get profiles for names
+      // Get profiles for names (profiles table doesn't have email column)
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, full_name, email');
+        .select('id, user_id, full_name');
 
-      if (profilesError) throw profilesError;
+      if (profilesError) {
+        console.warn('Could not fetch profiles:', profilesError);
+      }
 
       // Combine the data
       const combinedUsers: UserWithRole[] = (rolesData || []).map((role: any) => {
-        const profile = profilesData?.find((p: any) => p.id === role.user_id);
+        const profile = profilesData?.find((p: any) => p.id === role.user_id || p.user_id === role.user_id);
         return {
           id: role.user_id,
-          email: profile?.email || 'Unknown',
+          email: profile?.full_name || `User ${role.user_id.slice(0, 8)}...`, // Use full_name or truncated ID as display
           role: role.role,
           created_at: role.created_at,
           full_name: profile?.full_name || undefined,
