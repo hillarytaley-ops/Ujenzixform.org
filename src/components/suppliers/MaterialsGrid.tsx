@@ -745,14 +745,21 @@ export const MaterialsGrid = () => {
       
       // Remove duplicates by name (keep first occurrence - admin images take priority)
       const seenNames = new Set<string>();
+      const duplicates: string[] = [];
       const allMaterials = combinedMaterials.filter(m => {
         const normalizedName = m.name.toLowerCase().trim();
-        if (seenNames.has(normalizedName)) return false;
+        if (seenNames.has(normalizedName)) {
+          duplicates.push(m.name);
+          return false;
+        }
         seenNames.add(normalizedName);
         return true;
       });
       
       console.log(`✅ Final materials after deduplication: ${allMaterials.length}`);
+      if (duplicates.length > 0) {
+        console.log(`🔄 Removed ${duplicates.length} duplicate(s):`, duplicates);
+      }
 
       // Show empty state if no materials
       if (allMaterials.length === 0) {
