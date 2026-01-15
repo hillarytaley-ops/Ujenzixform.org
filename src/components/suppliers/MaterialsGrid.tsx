@@ -615,55 +615,14 @@ export const MaterialsGrid = () => {
         // Silent fail - continue with other data sources
       }
       
-      // STEP 3: Fetch supplier materials from materials table  
-      let data: any[] | null = null;
+      // ═══════════════════════════════════════════════════════════════════════════════
+      // ONLY SHOW ADMIN-UPLOADED IMAGES
+      // Supplier materials from 'materials' table are NOT shown on the public grid
+      // Only images uploaded via Admin Dashboard (admin_material_images) are displayed
+      // ═══════════════════════════════════════════════════════════════════════════════
       
-      try {
-        // Fetch materials - filter by approval_status on client side for backward compatibility
-        // (in case the approval_status column hasn't been added to the database yet)
-        const response = await fetch(
-          `${SUPABASE_URL}/rest/v1/materials?select=*&order=created_at.desc&limit=50`,
-          {
-            headers: {
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-        
-        if (response.ok) {
-          data = await response.json();
-        }
-      } catch (fetchError: any) {
-        // Silent fail - continue with admin materials
-      }
-
-      // Transform supplier data with default supplier info
-      // Filter to only show approved products (or products without approval_status for backward compatibility)
-      const supplierMaterials = data ? data
-        .filter(item => !item.approval_status || item.approval_status === 'approved')
-        .map(item => ({
-          ...item,
-          supplier: {
-            company_name: 'Supplier',
-            location: 'Kenya',
-            rating: 4.5
-          }
-        })) : [];
-
-      // Combine: Admin materials FIRST, then supplier materials
-      const combinedMaterials = [...adminMaterials, ...supplierMaterials];
-      
-      // Remove duplicates by name (keep first occurrence with a base64 image if available)
-      const seenNames = new Set<string>();
-      const allMaterials = combinedMaterials.filter(m => {
-        // Skip if we've already seen this product name
-        const normalizedName = m.name.toLowerCase().trim();
-        if (seenNames.has(normalizedName)) return false;
-        seenNames.add(normalizedName);
-        return true;
-      });
+      // Use ONLY admin materials - no supplier materials from materials table
+      const allMaterials = adminMaterials;
 
       // Show empty state if no materials
       if (allMaterials.length === 0) {
