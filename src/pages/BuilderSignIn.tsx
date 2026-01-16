@@ -97,23 +97,27 @@ const BuilderSignIn = () => {
         return;
       }
       
-      // If user is a builder OR has no role yet, allow access
-      if (dbRole === 'builder' || !dbRole) {
-        // If no role exists, CREATE it in the database first
+      // If user is a builder (professional_builder, private_client, or legacy 'builder') OR has no role yet, allow access
+      const isBuilderRole = ['builder', 'professional_builder', 'private_client'].includes(dbRole || '');
+      
+      if (isBuilderRole || !dbRole) {
+        // If no role exists, CREATE it in the database first (default to private_client)
         if (!dbRole) {
-          console.log('🔐 No role found, creating builder role in database');
+          console.log('🔐 No role found, creating private_client role in database');
           const { error: insertError } = await supabase
             .from('user_roles')
-            .insert({ user_id: user.id, role: 'builder' as any });
+            .insert({ user_id: user.id, role: 'private_client' as any });
           
           if (insertError) {
-            console.warn('🔐 Could not create builder role:', insertError);
+            console.warn('🔐 Could not create private_client role:', insertError);
           } else {
-            console.log('🔐 Successfully created builder role in database');
+            console.log('🔐 Successfully created private_client role in database');
           }
         }
         
-        localStorage.setItem('user_role', 'builder');
+        // Store the actual role (or default to private_client)
+        const roleToStore = dbRole || 'private_client';
+        localStorage.setItem('user_role', roleToStore);
         localStorage.setItem('user_role_id', user.id);
         toast({
           title: "✅ Welcome Back!",
@@ -210,18 +214,22 @@ const BuilderSignIn = () => {
         const metadataRole = authData.user.user_metadata?.role;
         console.log('🔐 Metadata role:', metadataRole);
         
-        if (metadataRole === 'builder') {
+        // Accept builder, professional_builder, or private_client from metadata
+        const builderMetadataRoles = ['builder', 'professional_builder', 'private_client'];
+        if (builderMetadataRoles.includes(metadataRole)) {
           // User registered as builder but role wasn't saved to DB - fix it now
-          console.log('🔐 Found builder role in metadata, creating in database...');
+          // Default to private_client for new users
+          const roleToCreate = metadataRole === 'builder' ? 'private_client' : metadataRole;
+          console.log('🔐 Found builder role in metadata, creating in database as:', roleToCreate);
           const { error: insertError } = await supabase
             .from('user_roles')
-            .insert({ user_id: userId, role: 'builder' as any });
+            .insert({ user_id: userId, role: roleToCreate as any });
           
           if (insertError) {
             console.warn('🔐 Could not create builder role from metadata:', insertError);
           } else {
             console.log('🔐 Successfully created builder role from metadata');
-            dbRole = 'builder';
+            dbRole = roleToCreate;
           }
         }
       }
@@ -253,34 +261,39 @@ const BuilderSignIn = () => {
         return;
       }
 
+      // Check if user is a builder type (professional_builder, private_client, or legacy 'builder')
+      const isBuilderRole = ['builder', 'professional_builder', 'private_client'].includes(dbRole || '');
+      
       // User is builder OR has no role yet - GRANT ACCESS
-      console.log('✅ Granting builder access');
+      console.log('✅ Granting builder access, role:', dbRole || 'none (will create)');
       
       // Only create/update role if user STILL doesn't have one
       if (!dbRole) {
-        console.log('🔐 User has no role, creating builder role in database...');
+        console.log('🔐 User has no role, creating private_client role in database...');
         
         // CRITICAL: Insert into user_roles table BEFORE redirecting
         const { error: insertError } = await supabase
           .from('user_roles')
-          .insert({ user_id: userId, role: 'builder' as any });
+          .insert({ user_id: userId, role: 'private_client' as any });
         
         if (insertError) {
-          console.warn('🔐 Could not create builder role:', insertError);
+          console.warn('🔐 Could not create private_client role:', insertError);
         } else {
-          console.log('🔐 Successfully created builder role in database');
+          console.log('🔐 Successfully created private_client role in database');
+          dbRole = 'private_client';
         }
         
         // Update user metadata (background, don't wait)
         supabase.auth.updateUser({
-          data: { role: 'builder', user_type: 'builder' }
+          data: { role: 'private_client', user_type: 'private_client' }
         }).catch(() => {});
       }
       
-      // Set localStorage with builder role
-      localStorage.setItem('user_role', 'builder');
+      // Set localStorage with the actual role (or default to private_client)
+      const roleToStore = dbRole || 'private_client';
+      localStorage.setItem('user_role', roleToStore);
       localStorage.setItem('user_role_id', userId);
-      saveUserSession(userId, userEmail, 'builder');
+      saveUserSession(userId, userEmail, roleToStore);
 
       toast({
         title: "✅ Welcome!",
@@ -334,8 +347,8 @@ const BuilderSignIn = () => {
         password: password,
         options: {
           data: {
-            role: 'builder',
-            user_type: 'builder'
+            role: 'private_client',
+            user_type: 'private_client'
           },
           emailRedirectTo: undefined
         }
@@ -412,7 +425,9 @@ const BuilderSignIn = () => {
             .eq('user_id', signInData.user.id)
             .maybeSingle();
           
-          if (existingRole?.role && existingRole.role !== 'builder' && existingRole.role !== 'admin') {
+          // Allow builder types (professional_builder, private_client, legacy 'builder') and admin
+          const allowedRoles = ['builder', 'professional_builder', 'private_client', 'admin'];
+          if (existingRole?.role && !allowedRoles.includes(existingRole.role)) {
             // User has a DIFFERENT role - BLOCK them
             console.log('🔐 User already has role:', existingRole.role, '- blocking builder access');
             toast({
@@ -426,23 +441,24 @@ const BuilderSignIn = () => {
             return;
           }
           
-          // Create builder role only if no role exists
+          // Create private_client role only if no role exists
           if (!existingRole?.role) {
-            console.log('🔐 Creating builder role in database for new user');
+            console.log('🔐 Creating private_client role in database for new user');
             const { error: insertError } = await supabase
               .from('user_roles')
-              .insert({ user_id: signInData.user.id, role: 'builder' as any });
+              .insert({ user_id: signInData.user.id, role: 'private_client' as any });
             
             if (insertError) {
-              console.warn('🔐 Could not create builder role:', insertError);
+              console.warn('🔐 Could not create private_client role:', insertError);
             } else {
-              console.log('🔐 Successfully created builder role in database');
+              console.log('🔐 Successfully created private_client role in database');
             }
           }
 
-          localStorage.setItem('user_role', 'builder');
+          const roleToStore = existingRole?.role || 'private_client';
+          localStorage.setItem('user_role', roleToStore);
           localStorage.setItem('user_role_id', signInData.user.id);
-          saveUserSession(signInData.user.id, userEmail, 'builder');
+          saveUserSession(signInData.user.id, userEmail, roleToStore);
 
           toast({
             title: "✅ Account Created & Signed In!",
@@ -464,7 +480,9 @@ const BuilderSignIn = () => {
         .eq('user_id', userId)
         .maybeSingle();
       
-      if (existingRole?.role && existingRole.role !== 'builder' && existingRole.role !== 'admin') {
+      // Allow builder types (professional_builder, private_client, legacy 'builder') and admin
+      const allowedRoles = ['builder', 'professional_builder', 'private_client', 'admin'];
+      if (existingRole?.role && !allowedRoles.includes(existingRole.role)) {
         // User has a DIFFERENT role - BLOCK them
         console.log('🔐 User already has role:', existingRole.role, '- blocking builder access');
         toast({
@@ -478,26 +496,27 @@ const BuilderSignIn = () => {
         return;
       }
       
-      // Create builder role only if no role exists
+      // Create private_client role only if no role exists
       if (!existingRole?.role) {
-        console.log('🔐 Creating builder role in database for new user (session exists)');
+        console.log('🔐 Creating private_client role in database for new user (session exists)');
         const { error: insertError } = await supabase
           .from('user_roles')
-          .insert({ user_id: userId, role: 'builder' as any });
+          .insert({ user_id: userId, role: 'private_client' as any });
         
         if (insertError) {
-          console.warn('🔐 Could not create builder role:', insertError);
+          console.warn('🔐 Could not create private_client role:', insertError);
         } else {
-          console.log('🔐 Successfully created builder role in database');
+          console.log('🔐 Successfully created private_client role in database');
         }
       }
 
-      localStorage.setItem('user_role', 'builder');
+      const roleToStore = existingRole?.role || 'private_client';
+      localStorage.setItem('user_role', roleToStore);
       localStorage.setItem('user_role_id', userId);
-      saveUserSession(userId, userEmail, 'builder');
+      saveUserSession(userId, userEmail, roleToStore);
 
       supabase.auth.updateUser({
-        data: { role: 'builder', user_type: 'builder' }
+        data: { role: roleToStore, user_type: roleToStore }
       }).catch(() => {});
 
       toast({
