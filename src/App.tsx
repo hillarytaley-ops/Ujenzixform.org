@@ -116,23 +116,48 @@ const App = () => {
     const conn: any = typeof navigator !== 'undefined' ? (navigator as any).connection : null;
     const isLowData = !!conn && (conn.saveData || conn.effectiveType === 'slow-2g' || conn.effectiveType === '2g' || conn.effectiveType === '3g');
 
-    // Get current user for chatbot (deferred, longer delay on low-data)
-    const timer = setTimeout(() => {
-      import('@/integrations/supabase/client').then(({ supabase }) => {
-        supabase.auth.getUser().then(({ data }) => {
-          setUser(data.user);
-        });
-      });
-    }, isLowData ? 3000 : 1000);
+    let authSubscription: any = null;
 
-    // Load chat widget after page is interactive (always show, just delay on slow connections)
+    // Get current user and set up auth listener
+    const initAuth = async () => {
+      const { supabase } = await import('@/integrations/supabase/client');
+      
+      // Get current user immediately
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (currentUser) {
+        console.log('🔐 Chat: User detected:', currentUser.email);
+        setUser(currentUser);
+      }
+      
+      // Listen for auth changes (sign in, sign out)
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        console.log('🔐 Chat: Auth state changed:', event, session?.user?.email);
+        if (session?.user) {
+          setUser(session.user);
+        } else {
+          setUser(null);
+        }
+      });
+      
+      authSubscription = subscription;
+    };
+
+    // Initialize auth (with slight delay on slow connections)
+    const timer = setTimeout(() => {
+      initAuth();
+    }, isLowData ? 2000 : 500);
+
+    // Load chat widget after page is interactive (always show)
     const chatTimer = setTimeout(() => {
       setShowChat(true);
-    }, isLowData ? 4000 : 2000);
+    }, isLowData ? 3000 : 1500);
 
     return () => {
       clearTimeout(timer);
       clearTimeout(chatTimer);
+      if (authSubscription) {
+        authSubscription.unsubscribe();
+      }
     };
   }, []);
 
