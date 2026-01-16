@@ -400,11 +400,42 @@ export const MaterialsGrid = () => {
     return getAllMaterialImages(material).length > 1;
   };
   
-  // Open image gallery for a material
-  const openGallery = (material: Material, startIndex: number = 0) => {
+  // Open image gallery for a material - fetches additional images on-demand
+  const openGallery = async (material: Material, startIndex: number = 0) => {
     setGalleryMaterial(material);
     setGalleryIndex(startIndex);
     setGalleryOpen(true);
+    
+    // Fetch additional images on-demand if not already loaded
+    if (!material.additional_images || material.additional_images.length === 0) {
+      try {
+        const response = await fetch(
+          `${SUPABASE_URL}/rest/v1/admin_material_images?select=additional_images&id=eq.${material.id}`,
+          {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data[0]?.additional_images) {
+            // Update the material with additional images
+            const updatedMaterial = { ...material, additional_images: data[0].additional_images };
+            setGalleryMaterial(updatedMaterial);
+            // Also update in the materials array for future access
+            setMaterials(prev => prev.map(m => 
+              m.id === material.id ? updatedMaterial : m
+            ));
+          }
+        }
+      } catch (err) {
+        console.log('Could not fetch additional images:', err);
+      }
+    }
   };
   
   // Navigate gallery
@@ -624,61 +655,93 @@ export const MaterialsGrid = () => {
         console.log('Supplier prices table not available');
       }
       
-      // STEP 2: Fetch ALL admin-uploaded images (no approval filter - admin uploads are always shown)
+      // STEP 2: Fetch admin-uploaded images in batches to avoid timeout
+      // The image_url field contains base64 data which makes queries slow
       let adminMaterials: Material[] = [];
       
       try {
-        const response = await fetch(
-          `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,image_url,additional_images&order=created_at.desc&limit=500`,
-          {
-            headers: {
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
+        // Fetch in smaller batches to avoid timeout
+        const BATCH_SIZE = 20;
+        const MAX_BATCHES = 5; // Maximum 100 materials
+        let allAdminData: any[] = [];
         
-        if (response.ok) {
-          const adminData = await response.json();
-          console.log(`📦 Fetched ${adminData?.length || 0} admin materials from database`);
-          console.log('📦 Admin materials data:', adminData);
+        for (let batch = 0; batch < MAX_BATCHES; batch++) {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout per batch
           
-          if (adminData && Array.isArray(adminData) && adminData.length > 0) {
-            adminMaterials = adminData.map((item: any) => {
-              // Check if any supplier has set a price for this product
-              const supplierPrice = supplierPrices[item.id];
-              
-              const material: Material = {
-                id: item.id,
-                supplier_id: 'admin-catalog', // Admin materials have a special supplier_id
-                name: item.name || 'Unnamed Material',
-                category: item.category || 'Uncategorized',
-                description: item.description || '',
-                unit: item.unit || 'unit',
-                // Use supplier price if available, otherwise use admin's suggested price
-                unit_price: supplierPrice?.price || item.suggested_price || 0,
-                image_url: item.image_url,
-                additional_images: item.additional_images || [], // Multi-angle images
-                // Use supplier's stock status if available
-                in_stock: supplierPrice?.in_stock ?? true,
-                supplier: {
-                  company_name: supplierPrice ? 'Supplier' : 'Admin Catalog',
-                  location: 'Kenya',
-                  rating: supplierPrice ? 4.5 : 5.0
-                }
-              };
-              
-              return material;
-            });
+          try {
+            const response = await fetch(
+              `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,image_url&order=created_at.desc&limit=${BATCH_SIZE}&offset=${batch * BATCH_SIZE}`,
+              {
+                headers: {
+                  'apikey': SUPABASE_ANON_KEY,
+                  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                  'Content-Type': 'application/json',
+                  'Prefer': 'count=none'
+                },
+                signal: controller.signal
+              }
+            );
             
-            console.log(`✅ Processed ${adminMaterials.length} admin materials`);
-          } else {
-            console.warn('⚠️ Admin materials response was empty or not an array');
+            clearTimeout(timeoutId);
+            
+            if (response.ok) {
+              const batchData = await response.json();
+              if (batchData && batchData.length > 0) {
+                allAdminData = [...allAdminData, ...batchData];
+                console.log(`📦 Batch ${batch + 1}: Fetched ${batchData.length} materials (total: ${allAdminData.length})`);
+                
+                // If we got less than batch size, we've reached the end
+                if (batchData.length < BATCH_SIZE) {
+                  break;
+                }
+              } else {
+                break; // No more data
+              }
+            } else {
+              console.warn(`⚠️ Batch ${batch + 1} failed, stopping pagination`);
+              break;
+            }
+          } catch (batchErr: any) {
+            console.warn(`⚠️ Batch ${batch + 1} timed out or failed:`, batchErr.message);
+            // Continue with what we have so far
+            break;
           }
+        }
+        
+        console.log(`📦 Total fetched: ${allAdminData.length} admin materials`);
+        
+        if (allAdminData.length > 0) {
+          adminMaterials = allAdminData.map((item: any) => {
+            // Check if any supplier has set a price for this product
+            const supplierPrice = supplierPrices[item.id];
+            
+            const material: Material = {
+              id: item.id,
+              supplier_id: 'admin-catalog', // Admin materials have a special supplier_id
+              name: item.name || 'Unnamed Material',
+              category: item.category || 'Uncategorized',
+              description: item.description || '',
+              unit: item.unit || 'unit',
+              // Use supplier price if available, otherwise use admin's suggested price
+              unit_price: supplierPrice?.price || item.suggested_price || 0,
+              image_url: item.image_url,
+              additional_images: [], // Load on-demand when gallery is opened
+              // Use supplier's stock status if available
+              in_stock: supplierPrice?.in_stock ?? true,
+              supplier: {
+                company_name: supplierPrice ? 'Supplier' : 'Admin Catalog',
+                location: 'Kenya',
+                rating: supplierPrice ? 4.5 : 5.0
+              }
+            };
+            
+            return material;
+          });
+          
+          console.log(`✅ Processed ${adminMaterials.length} admin materials`);
         } else {
-          const errorText = await response.text();
-          console.error('❌ Failed to fetch admin materials:', response.status, response.statusText, errorText);
+          console.warn('⚠️ No admin materials fetched');
         }
       } catch (adminErr: any) {
         console.error('❌ Error fetching admin materials:', adminErr);
@@ -714,20 +777,22 @@ export const MaterialsGrid = () => {
 
       // Filter supplier materials:
       // - Only approved products
-      // - ONLY images that are base64 data URLs (uploaded images), NOT http/https URLs
+      // - Accept base64 data URLs OR Supabase storage URLs (reject external URLs like Unsplash)
       const supplierMaterials = data ? data
         .filter(item => {
           // Must be approved (or no approval status for backward compatibility)
           const isApproved = !item.approval_status || item.approval_status === 'approved';
           
-          // Must have an image that is a base64 data URL (starts with 'data:image/')
-          // REJECT any http:// or https:// URLs (like Unsplash links)
-          const hasUploadedImage = item.image_url && 
-            item.image_url.startsWith('data:image/') &&
-            !item.image_url.startsWith('http://') &&
-            !item.image_url.startsWith('https://');
+          // Accept images that are:
+          // 1. Base64 data URLs (starts with 'data:image/')
+          // 2. Supabase storage URLs (contains 'supabase.co/storage')
+          // REJECT external URLs like Unsplash, Unsplash, etc.
+          const imageUrl = item.image_url || '';
+          const isBase64 = imageUrl.startsWith('data:image/');
+          const isSupabaseStorage = imageUrl.includes('supabase.co/storage');
+          const hasValidImage = imageUrl && (isBase64 || isSupabaseStorage);
           
-          return isApproved && hasUploadedImage;
+          return isApproved && hasValidImage;
         })
         .map(item => ({
           ...item,
