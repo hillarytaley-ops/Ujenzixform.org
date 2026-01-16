@@ -1529,9 +1529,10 @@ const AdminDashboard = () => {
       const allRegistrations: RegistrationRecord[] = [];
 
       // Load supplier applications (correct table name)
+      // Schema uses: address (not county), materials_offered (not material_categories)
       const { data: suppliers, error: suppliersError } = await client
         .from('supplier_applications')
-        .select('id, company_name, email, phone, county, material_categories, status, created_at')
+        .select('id, company_name, contact_person, email, phone, address, materials_offered, status, created_at')
         .order('created_at', { ascending: false })
         .limit(50);
 
@@ -1544,12 +1545,12 @@ const AdminDashboard = () => {
           allRegistrations.push({
             id: s.id,
             type: 'supplier',
-            name: s.company_name || 'N/A',
+            name: s.company_name || s.contact_person || 'N/A',
             email: s.email || 'N/A',
             phone: s.phone,
             company_name: s.company_name,
-            county: s.county,
-            material_categories: s.material_categories,
+            county: s.address, // Schema uses address, not county
+            material_categories: s.materials_offered, // Schema uses materials_offered
             status: s.status || 'pending',
             created_at: s.created_at
           });
@@ -1557,9 +1558,10 @@ const AdminDashboard = () => {
       }
 
       // Load delivery providers (correct table name)
+      // Schema uses: provider_name (not full_name), service_counties (not county/service_areas), is_verified (not status)
       const { data: delivery, error: deliveryError } = await client
         .from('delivery_providers')
-        .select('id, full_name, email, phone, county, vehicle_type, vehicle_registration, service_areas, company_name, status, created_at')
+        .select('id, provider_name, email, phone, address, vehicle_type, vehicle_registration, service_counties, is_verified, created_at')
         .order('created_at', { ascending: false })
         .limit(50);
 
@@ -1572,14 +1574,14 @@ const AdminDashboard = () => {
           allRegistrations.push({
             id: d.id,
             type: 'delivery',
-            name: d.full_name || d.company_name || 'N/A',
+            name: d.provider_name || 'N/A',
             email: d.email || 'N/A',
             phone: d.phone,
-            company_name: d.company_name,
-            county: d.county,
+            company_name: d.provider_name,
+            county: d.address || (d.service_counties?.[0]), // Use address or first service county
             vehicle_type: d.vehicle_type,
-            service_areas: d.service_areas,
-            status: d.status || 'pending',
+            service_areas: d.service_counties, // Schema uses service_counties
+            status: d.is_verified ? 'approved' : 'pending', // Schema uses is_verified boolean
             created_at: d.created_at
           });
         });

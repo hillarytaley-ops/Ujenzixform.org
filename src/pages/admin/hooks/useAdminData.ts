@@ -176,19 +176,19 @@ export const useRegistrations = () => {
         });
       }
 
-      // Format delivery providers
+      // Format delivery providers - use correct column names from schema
       if (deliveryRes.data) {
         deliveryRes.data.forEach((d: Record<string, unknown>) => {
           allRegistrations.push({
             id: d.id as string,
             type: 'delivery',
-            name: (d.full_name as string) || (d.company_name as string) || 'N/A',
+            name: (d.provider_name as string) || 'N/A', // Schema uses provider_name, not full_name
             email: (d.email as string) || 'N/A',
             phone: d.phone as string | undefined,
-            company_name: d.company_name as string | undefined,
-            county: d.service_area as string | undefined,
+            company_name: d.provider_name as string | undefined, // Schema uses provider_name
+            county: Array.isArray(d.service_counties) ? (d.service_counties as string[])[0] : undefined, // Schema uses service_counties array
             vehicle_type: d.vehicle_type as string | undefined,
-            service_areas: d.service_areas as string[] | undefined,
+            service_areas: d.service_counties as string[] | undefined, // Schema uses service_counties
             status: (d.is_verified as boolean) ? 'approved' : 'pending',
             created_at: d.created_at as string,
           });
