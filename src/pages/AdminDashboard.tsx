@@ -1557,31 +1557,48 @@ const AdminDashboard = () => {
         });
       }
 
-      // Load delivery providers (correct table name)
-      // Schema uses: provider_name (not full_name), service_counties (not county/service_areas), is_verified (not status)
-      const { data: delivery, error: deliveryError } = await client
-        .from('delivery_providers')
-        .select('id, provider_name, email, phone, address, vehicle_type, vehicle_registration, service_counties, is_verified, created_at')
+      // Load delivery provider registrations
+      // Try delivery_provider_registrations first (has less strict RLS), fallback to delivery_providers
+      let deliveryData: any[] = [];
+      
+      // First try the registrations table (more accessible)
+      const { data: deliveryRegs, error: deliveryRegsError } = await client
+        .from('delivery_provider_registrations')
+        .select('id, full_name, email, phone, county, vehicle_type, vehicle_registration, service_areas, status, created_at')
         .order('created_at', { ascending: false })
         .limit(50);
-
-      if (deliveryError) {
-        console.error('Error loading delivery registrations:', deliveryError);
+      
+      if (!deliveryRegsError && deliveryRegs) {
+        deliveryData = deliveryRegs;
+      } else {
+        // Fallback to delivery_providers table (may fail due to strict RLS)
+        const { data: delivery, error: deliveryError } = await client
+          .from('delivery_providers')
+          .select('*') // Use * to avoid column name issues with RLS
+          .order('created_at', { ascending: false })
+          .limit(50);
+        
+        if (deliveryError) {
+          console.error('Error loading delivery registrations:', deliveryError);
+        }
+        if (delivery) {
+          deliveryData = delivery;
+        }
       }
 
-      if (delivery) {
-        delivery.forEach((d: any) => {
+      if (deliveryData.length > 0) {
+        deliveryData.forEach((d: any) => {
           allRegistrations.push({
             id: d.id,
             type: 'delivery',
-            name: d.provider_name || 'N/A',
+            name: d.full_name || d.provider_name || 'N/A',
             email: d.email || 'N/A',
             phone: d.phone,
-            company_name: d.provider_name,
-            county: d.address || (d.service_counties?.[0]), // Use address or first service county
+            company_name: d.company_name || d.provider_name,
+            county: d.county || d.address || (d.service_counties?.[0]),
             vehicle_type: d.vehicle_type,
-            service_areas: d.service_counties, // Schema uses service_counties
-            status: d.is_verified ? 'approved' : 'pending', // Schema uses is_verified boolean
+            service_areas: d.service_areas || d.service_counties,
+            status: d.status || (d.is_verified ? 'approved' : 'pending'),
             created_at: d.created_at
           });
         });

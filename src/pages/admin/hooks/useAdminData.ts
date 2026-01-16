@@ -150,9 +150,11 @@ export const useRegistrations = () => {
       setLoading(true);
       const client = getAdminClient() || supabase;
 
-      // Fetch all registration/application types in parallel using correct table names
-      const [suppliersRes, deliveryRes] = await Promise.all([
+      // Fetch all registration/application types in parallel
+      // Try delivery_provider_registrations first (less strict RLS), fallback to delivery_providers
+      const [suppliersRes, deliveryRegsRes, deliveryProvidersRes] = await Promise.all([
         client.from('supplier_applications').select('*').order('created_at', { ascending: false }),
+        client.from('delivery_provider_registrations').select('*').order('created_at', { ascending: false }),
         client.from('delivery_providers').select('*').order('created_at', { ascending: false }),
       ]);
 
@@ -176,20 +178,21 @@ export const useRegistrations = () => {
         });
       }
 
-      // Format delivery providers - use correct column names from schema
-      if (deliveryRes.data) {
-        deliveryRes.data.forEach((d: Record<string, unknown>) => {
+      // Format delivery - prefer registrations table, fallback to providers table
+      const deliveryData = deliveryRegsRes.data || deliveryProvidersRes.data || [];
+      if (deliveryData.length > 0) {
+        deliveryData.forEach((d: Record<string, unknown>) => {
           allRegistrations.push({
             id: d.id as string,
             type: 'delivery',
-            name: (d.provider_name as string) || 'N/A', // Schema uses provider_name, not full_name
+            name: (d.full_name as string) || (d.provider_name as string) || 'N/A',
             email: (d.email as string) || 'N/A',
             phone: d.phone as string | undefined,
-            company_name: d.provider_name as string | undefined, // Schema uses provider_name
-            county: Array.isArray(d.service_counties) ? (d.service_counties as string[])[0] : undefined, // Schema uses service_counties array
+            company_name: (d.company_name as string) || (d.provider_name as string) || undefined,
+            county: (d.county as string) || (d.address as string) || (Array.isArray(d.service_counties) ? (d.service_counties as string[])[0] : undefined),
             vehicle_type: d.vehicle_type as string | undefined,
-            service_areas: d.service_counties as string[] | undefined, // Schema uses service_counties
-            status: (d.is_verified as boolean) ? 'approved' : 'pending',
+            service_areas: (d.service_areas as string[]) || (d.service_counties as string[]) || undefined,
+            status: (d.status as string) || ((d.is_verified as boolean) ? 'approved' : 'pending'),
             created_at: d.created_at as string,
           });
         });
