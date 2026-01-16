@@ -296,6 +296,9 @@ export const MaterialsGrid = () => {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [filteredMaterials, setFilteredMaterials] = useState<Material[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMoreMaterials, setHasMoreMaterials] = useState(false);
+  const [totalMaterialsCount, setTotalMaterialsCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All Categories');
   const [priceRange, setPriceRange] = useState('all');
@@ -660,14 +663,21 @@ export const MaterialsGrid = () => {
       let adminMaterials: Material[] = [];
       
       try {
-        // Fetch in smaller batches to avoid timeout
-        const BATCH_SIZE = 25;
-        const MAX_BATCHES = 10; // Maximum 250 materials (increased from 100)
+        // Detect mobile devices for optimized loading
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) 
+          || window.innerWidth < 768;
+        
+        // Use smaller batches on mobile to prevent timeout on slower connections
+        const BATCH_SIZE = isMobile ? 15 : 25;
+        const MAX_BATCHES = isMobile ? 6 : 10; // Mobile: 90 max, Desktop: 250 max
+        const TIMEOUT_MS = isMobile ? 8000 : 10000; // Shorter timeout on mobile
         let allAdminData: any[] = [];
+        
+        console.log(`📱 Device: ${isMobile ? 'Mobile' : 'Desktop'}, Batch size: ${BATCH_SIZE}, Max batches: ${MAX_BATCHES}`);
         
         for (let batch = 0; batch < MAX_BATCHES; batch++) {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout per batch
+          const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
           
           try {
             const response = await fetch(
@@ -710,6 +720,33 @@ export const MaterialsGrid = () => {
         }
         
         console.log(`📦 Total fetched: ${allAdminData.length} admin materials`);
+        
+        // Check if there might be more materials (if we hit the max batches limit)
+        const maxFetched = BATCH_SIZE * MAX_BATCHES;
+        if (allAdminData.length >= maxFetched - BATCH_SIZE) {
+          // We might have more materials, fetch count
+          try {
+            const countResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/admin_material_images?select=id`,
+              {
+                headers: {
+                  'apikey': SUPABASE_ANON_KEY,
+                  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                  'Prefer': 'count=exact'
+                }
+              }
+            );
+            const countHeader = countResponse.headers.get('content-range');
+            if (countHeader) {
+              const total = parseInt(countHeader.split('/')[1] || '0');
+              setTotalMaterialsCount(total);
+              setHasMoreMaterials(total > allAdminData.length);
+              console.log(`📊 Total materials in DB: ${total}, Loaded: ${allAdminData.length}, More available: ${total > allAdminData.length}`);
+            }
+          } catch (countErr) {
+            console.warn('Could not fetch total count');
+          }
+        }
         
         if (allAdminData.length > 0) {
           adminMaterials = allAdminData.map((item: any) => {
@@ -1644,6 +1681,102 @@ export const MaterialsGrid = () => {
               })}
         </div>
       )}
+      
+      {/* Load More Button - shown when there are more materials available */}
+      {hasMoreMaterials && !loading && filteredMaterials.length > 0 && (
+        <div className="flex flex-col items-center justify-center mt-8 mb-4">
+          <p className="text-sm text-muted-foreground mb-3">
+            Showing {filteredMaterials.length} of {totalMaterialsCount} materials
+          </p>
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={async () => {
+              setLoadingMore(true);
+              try {
+                // Fetch remaining materials
+                const currentCount = materials.length;
+                const BATCH_SIZE = 25;
+                let moreMaterials: any[] = [];
+                
+                for (let offset = currentCount; offset < totalMaterialsCount; offset += BATCH_SIZE) {
+                  const response = await fetch(
+                    `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,image_url&order=created_at.desc&limit=${BATCH_SIZE}&offset=${offset}`,
+                    {
+                      headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Content-Type': 'application/json'
+                      }
+                    }
+                  );
+                  if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.length > 0) {
+                      moreMaterials = [...moreMaterials, ...data];
+                    }
+                    if (data.length < BATCH_SIZE) break;
+                  } else {
+                    break;
+                  }
+                }
+                
+                if (moreMaterials.length > 0) {
+                  const newMaterials: Material[] = moreMaterials.map((item: any) => ({
+                    id: item.id,
+                    supplier_id: 'admin-catalog',
+                    name: item.name || 'Unnamed Material',
+                    category: item.category || 'Uncategorized',
+                    description: item.description || '',
+                    unit: item.unit || 'unit',
+                    unit_price: item.suggested_price || 0,
+                    image_url: item.image_url,
+                    additional_images: [],
+                    in_stock: true,
+                    supplier: {
+                      company_name: 'Admin Catalog',
+                      location: 'Kenya',
+                      rating: 5.0
+                    }
+                  }));
+                  
+                  setMaterials(prev => [...prev, ...newMaterials]);
+                  setFilteredMaterials(prev => [...prev, ...newMaterials]);
+                  setHasMoreMaterials(false);
+                  toast({
+                    title: '✅ Loaded all materials',
+                    description: `Now showing all ${materials.length + newMaterials.length} materials`,
+                  });
+                }
+              } catch (error) {
+                console.error('Error loading more materials:', error);
+                toast({
+                  variant: 'destructive',
+                  title: 'Error loading more',
+                  description: 'Could not load additional materials. Please try again.',
+                });
+              } finally {
+                setLoadingMore(false);
+              }
+            }}
+            disabled={loadingMore}
+            className="px-8"
+          >
+            {loadingMore ? (
+              <>
+                <span className="animate-spin mr-2">⏳</span>
+                Loading more...
+              </>
+            ) : (
+              <>
+                <Package className="mr-2 h-4 w-4" />
+                Load All {totalMaterialsCount - filteredMaterials.length} Remaining Materials
+              </>
+            )}
+          </Button>
+        </div>
+      )}
+      
       <Dialog open={isMultiQuoteOpen} onOpenChange={setIsMultiQuoteOpen}>
         <DialogContent className="sm:max-w-[800px]">
           <DialogHeader>
