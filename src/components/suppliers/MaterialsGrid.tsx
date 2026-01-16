@@ -661,8 +661,8 @@ export const MaterialsGrid = () => {
       
       try {
         // Fetch in smaller batches to avoid timeout
-        const BATCH_SIZE = 20;
-        const MAX_BATCHES = 5; // Maximum 100 materials
+        const BATCH_SIZE = 25;
+        const MAX_BATCHES = 10; // Maximum 250 materials (increased from 100)
         let allAdminData: any[] = [];
         
         for (let batch = 0; batch < MAX_BATCHES; batch++) {
