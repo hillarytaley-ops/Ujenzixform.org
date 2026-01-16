@@ -10,7 +10,7 @@
  * @version 1.0.0
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   STAFF_ROLES, 
@@ -21,6 +21,11 @@ import {
   AdminTab,
   StaffRole
 } from '@/config/staffPermissions';
+
+// Module-level flags to only log once across all hook instances
+let hasLoggedInit = false;
+let hasLoggedStoredRole = false;
+let hasLoggedDbRole = false;
 
 interface StaffPermissionsState {
   loading: boolean;
@@ -147,7 +152,10 @@ export function useStaffPermissions(): StaffPermissionsReturn {
           const storedRole = localStorage.getItem('admin_staff_role') || 'admin';
           const storedName = localStorage.getItem('admin_staff_name') || 'Staff Member';
           
-          console.log('🔐 Using stored staff role:', storedRole, 'Name:', storedName);
+          if (!hasLoggedStoredRole) {
+            console.log('🔐 Using stored staff role:', storedRole, 'Name:', storedName);
+            hasLoggedStoredRole = true;
+          }
           
           // Get role details from config
           const roleDetails = getStaffRole(storedRole) || STAFF_ROLES.admin;
@@ -169,7 +177,10 @@ export function useStaffPermissions(): StaffPermissionsReturn {
               const dbRole = getStaffRole(staffData.role) || STAFF_ROLES.admin;
               const dbIsAdmin = ['admin', 'super_admin', 'administrator'].includes(staffData.role);
               
-              console.log('🔐 Found staff in DB:', staffData.full_name, 'Role:', staffData.role);
+              if (!hasLoggedDbRole) {
+                console.log('🔐 Found staff in DB:', staffData.full_name, 'Role:', staffData.role);
+                hasLoggedDbRole = true;
+              }
               
               setState({
                 loading: false,
@@ -307,14 +318,18 @@ export function useStaffPermissions(): StaffPermissionsReturn {
   }, []);
 
   useEffect(() => {
-    // Log only once on mount
-    console.log('🔐 Staff permissions init:', { 
-      effectiveRole, 
-      storedStaffRole, 
-      isFullAdmin,
-      allowedTabs: roleDetails.allowedTabs.length 
-    });
+    // Log only once across ALL hook instances (module-level flag)
+    if (!hasLoggedInit) {
+      console.log('🔐 Staff permissions init:', { 
+        effectiveRole, 
+        storedStaffRole, 
+        isFullAdmin,
+        allowedTabs: roleDetails.allowedTabs.length 
+      });
+      hasLoggedInit = true;
+    }
     fetchStaffPermissions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty deps - only run once on mount
 
   // Permission check functions
