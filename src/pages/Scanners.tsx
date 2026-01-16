@@ -162,7 +162,7 @@ const ScannersAccessGuard = ({ children }: { children: React.ReactNode }) => {
   
   if (restrictedRoles.includes(dbRole)) {
     const roleDisplayName = dbRole === 'builder' ? 'Builder' 
-      : dbRole === 'private_client' ? 'Private Client' 
+      : dbRole === 'private_client' ? 'Private Builder' 
       : 'Professional Builder';
     
     const dashboardLink = dbRole === 'builder' ? '/builder-dashboard'

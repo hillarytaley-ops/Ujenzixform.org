@@ -111,7 +111,7 @@ const SuppliersIPhone = () => {
                     onClick={() => navigate('/private-builder-registration')}
                   >
                     <UserPlus className="h-4 w-4 mr-2" />
-                    Private Client
+                    Private Builder
                   </Button>
                 </div>
               </div>

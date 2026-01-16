@@ -145,7 +145,7 @@ export const BuildersRegister: React.FC<BuildersRegisterProps> = ({
       case 'professional':
         return <Badge className="bg-blue-600">Professional</Badge>;
       case 'private':
-        return <Badge className="bg-purple-600">Private Client</Badge>;
+        return <Badge className="bg-purple-600">Private Builder</Badge>;
       default:
         return <Badge variant="outline">{category}</Badge>;
     }

@@ -472,7 +472,7 @@ export function AdminMessaging() {
                 className="w-full p-2 border rounded-lg bg-background"
               >
                 <option value="all">All Users</option>
-                <option value="private_client">Private Clients</option>
+                <option value="private_client">Private Builders</option>
                 <option value="professional_builder">Professional Builders</option>
                 <option value="supplier">Suppliers</option>
                 <option value="delivery">Delivery Providers</option>

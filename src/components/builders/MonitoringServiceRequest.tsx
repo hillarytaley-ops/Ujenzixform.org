@@ -92,7 +92,7 @@ interface ServiceRequest {
   additionalNotes: string;
 }
 
-// Pricing discount for private clients (40% lower due to smaller project sizes)
+// Pricing discount for Private Builders (40% lower due to smaller project sizes)
 const PRIVATE_CLIENT_DISCOUNT = 0.4; // 40% discount
 
 // Base prices for professional builders (companies)
@@ -103,7 +103,7 @@ const PROFESSIONAL_BASE_PRICES = {
   'analytics-reporting': 20000
 };
 
-// Private client prices (40% lower due to smaller project sizes)
+// Private Builder prices (40% lower due to smaller project sizes)
 const PRIVATE_BASE_PRICES = {
   'ai-cameras': 9000,      // 15000 * 0.6 = 9000
   'drone-surveillance': 15000, // 25000 * 0.6 = 15000
@@ -551,7 +551,7 @@ export const MonitoringServiceRequest: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Private Client Option */}
+                {/* Private Builder Option */}
                 <div 
                   className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
                     formData.builderType === 'private' 
@@ -566,7 +566,7 @@ export const MonitoringServiceRequest: React.FC = () => {
                     </div>
                     <div className="flex-1">
                       <h4 className="font-semibold flex items-center gap-2">
-                        Private Client
+                        Private Builder
                         <Badge className="bg-green-100 text-green-800 text-xs">40% Lower Prices</Badge>
                       </h4>
                       <p className="text-sm text-muted-foreground mt-1">
@@ -624,7 +624,7 @@ export const MonitoringServiceRequest: React.FC = () => {
                 <Alert className={`mt-4 ${formData.builderType === 'private' ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'}`}>
                   <DollarSign className={`h-4 w-4 ${formData.builderType === 'private' ? 'text-green-600' : 'text-blue-600'}`} />
                   <AlertTitle className={formData.builderType === 'private' ? 'text-green-800' : 'text-blue-800'}>
-                    {formData.builderType === 'private' ? 'Private Client Pricing Active' : 'Professional Pricing Active'}
+                    {formData.builderType === 'private' ? 'Private Builder Pricing Active' : 'Professional Pricing Active'}
                   </AlertTitle>
                   <AlertDescription className={formData.builderType === 'private' ? 'text-green-700' : 'text-blue-700'}>
                     {formData.builderType === 'private' 

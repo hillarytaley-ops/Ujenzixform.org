@@ -279,8 +279,8 @@ export const MaterialsGridSafe = () => {
       // TODO: Implement actual buy now functionality
     } else {
       toast({
-        title: 'Private Clients Only',
-        description: 'Buy Now is available for private clients. Please use Request Quote instead.',
+        title: 'Private Builders Only',
+        description: 'Buy Now is available for Private Builders. Please use Request Quote instead.',
         variant: 'destructive'
       });
     }

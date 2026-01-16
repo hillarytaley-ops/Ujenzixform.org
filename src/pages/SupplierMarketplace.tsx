@@ -345,7 +345,7 @@ const SupplierMarketplace = () => {
                     onClick={() => navigate('/private-builder-registration')}
                   >
                     <UserPlus className="h-4 w-4 mr-2" />
-                    Private Client
+                    Private Builder
                   </Button>
                 </div>
               </div>
@@ -391,7 +391,7 @@ const SupplierMarketplace = () => {
             ) : user && isBuilder ? (
               <div className="inline-flex items-center gap-2 bg-green-500/30 backdrop-blur px-6 py-3 rounded-lg border border-green-400/50">
                 <CheckCircle className="h-5 w-5 text-green-300" />
-                <span>Welcome back, {userRole === 'private_client' ? 'Private Client' : 'Professional Builder'}! You're ready to shop.</span>
+                <span>Welcome back, {userRole === 'private_client' ? 'Private Builder' : 'Professional Builder'}! You're ready to shop.</span>
               </div>
             ) : (
               <div className="space-y-4">
@@ -426,7 +426,7 @@ const SupplierMarketplace = () => {
                     onClick={() => navigate('/private-builder-registration?redirect=/supplier-marketplace')}
                   >
                     <UserPlus className="h-5 w-5 mr-2" />
-                    Register as Private Client
+                    Register as Private Builder
                   </Button>
                 </div>
               </div>
@@ -510,7 +510,7 @@ const SupplierMarketplace = () => {
                   <h3 className="font-bold text-amber-800">Builders Only Marketplace</h3>
                 </div>
                 <p className="text-amber-700 text-sm">
-                  This marketplace is exclusively for registered builders (Professional Builders and Private Clients) to purchase construction materials. 
+                  This marketplace is exclusively for registered builders (Professional Builders and Private Builders) to purchase construction materials. 
                   Register as a builder to unlock full access.
                 </p>
               </div>
@@ -524,7 +524,7 @@ const SupplierMarketplace = () => {
                     </div>
                     <h3 className="font-semibold mb-2">Register as Builder</h3>
                     <p className="text-sm text-gray-500">
-                      Create a free account as a Professional Builder or Private Client
+                      Create a free account as a Professional Builder or Private Builder
                     </p>
                   </CardContent>
                 </Card>
@@ -618,7 +618,7 @@ const SupplierMarketplace = () => {
                     onClick={() => navigate('/private-builder-registration?redirect=/supplier-marketplace')}
                   >
                     <UserPlus className="h-5 w-5 mr-2" />
-                    Register as Private Client
+                    Register as Private Builder
                   </Button>
                 </div>
               </CardContent>
@@ -634,7 +634,7 @@ const SupplierMarketplace = () => {
                     <h3 className="text-xl font-bold text-emerald-900 mb-2">You're All Set!</h3>
                     <p className="text-emerald-700 mb-4">
                       {userRole === 'private_client' 
-                        ? "As a Private Client, you can buy materials directly from suppliers."
+                        ? "As a Private Builder, you can buy materials directly from suppliers."
                         : "As a Professional Builder, you can request quotes and purchase in bulk."
                       }
                     </p>

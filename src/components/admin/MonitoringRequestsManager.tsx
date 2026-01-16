@@ -247,7 +247,7 @@ export const MonitoringRequestsManager: React.FC = () => {
 
   const getBuilderTypeLabel = (builderType?: string) => {
     switch (builderType) {
-      case 'private': return '🏠 Private Client';
+      case 'private': return '🏠 Private Builder';
       case 'professional': return '🏢 Professional';
       default: return 'Not Specified';
     }
@@ -546,7 +546,7 @@ export const MonitoringRequestsManager: React.FC = () => {
                               <div className="mt-3 pt-3 border-t text-xs text-muted-foreground">
                                 {selectedRequest.builder_type === 'private' ? (
                                   <span className="text-green-700">
-                                    💡 Private client pricing applied (40% lower than professional rates)
+                                    💡 Private Builder pricing applied (40% lower than professional rates)
                                   </span>
                                 ) : (
                                   <span className="text-blue-700">

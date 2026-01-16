@@ -125,7 +125,7 @@ const SuppliersMobileOptimized = () => {
                 <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform">
                   <ShoppingCart className="h-7 w-7 text-white" />
                 </div>
-                <h3 className="text-white font-bold text-xl mb-2">Private Client</h3>
+                <h3 className="text-white font-bold text-xl mb-2">Private Builder</h3>
                 <p className="text-emerald-100/70 text-sm mb-5">Home projects & personal purchases</p>
                 <div className="flex gap-2">
                   <Link to="/private-client-signin" className="flex-1">
@@ -238,7 +238,7 @@ const SuppliersMobileOptimized = () => {
                       {userRole === 'private_client' && (
                         <div className="space-y-2">
                           <p className="text-gray-700">
-                            <strong className="text-green-600">Private Client Account:</strong> Purchase materials directly.
+                            <strong className="text-green-600">Private Builder Account:</strong> Purchase materials directly.
                           </p>
                           <div className="flex gap-2 flex-wrap">
                             <Badge className="bg-green-600">
@@ -320,7 +320,7 @@ const SuppliersMobileOptimized = () => {
                       <div className="mx-auto w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mb-2">
                         <ShoppingCart className="h-6 w-6 text-white" />
                       </div>
-                      <CardTitle className="text-xl">Private Client</CardTitle>
+                      <CardTitle className="text-xl">Private Builder</CardTitle>
                       <CardDescription className="text-green-100">
                         Personal purchases for home projects
                       </CardDescription>
