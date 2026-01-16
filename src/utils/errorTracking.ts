@@ -209,12 +209,18 @@ export const clearUserContext = (): void => {
 
 /**
  * Track a performance metric
+ * Note: This is optional functionality - fails silently if table doesn't exist or RLS blocks
  */
 export const trackPerformance = async (
   metricName: string,
   value: number,
   unit: string = 'ms'
 ): Promise<void> => {
+  // Skip performance tracking to avoid 403 errors from RLS
+  // This is non-critical functionality
+  return;
+  
+  /* Disabled due to RLS restrictions on performance_metrics table
   try {
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -229,8 +235,9 @@ export const trackPerformance = async (
       connection_type: (navigator as Navigator & { connection?: { effectiveType?: string } }).connection?.effectiveType || 'unknown',
     });
   } catch (error) {
-    logger.warn('[ErrorTracking] Failed to track performance metric', error);
+    // Silently fail - performance tracking is optional
   }
+  */
 };
 
 /**
