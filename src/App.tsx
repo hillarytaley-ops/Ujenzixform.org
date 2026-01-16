@@ -118,18 +118,17 @@ const App = () => {
 
     // Get current user for chatbot (deferred, longer delay on low-data)
     const timer = setTimeout(() => {
-      if (isLowData) return;
       import('@/integrations/supabase/client').then(({ supabase }) => {
         supabase.auth.getUser().then(({ data }) => {
           setUser(data.user);
         });
       });
-    }, isLowData ? 4000 : 1000);
+    }, isLowData ? 3000 : 1000);
 
-    // Load chat widget after page is interactive (skip on low-data)
+    // Load chat widget after page is interactive (always show, just delay on slow connections)
     const chatTimer = setTimeout(() => {
-      if (!isLowData) setShowChat(true);
-    }, isLowData ? 6000 : 2000);
+      setShowChat(true);
+    }, isLowData ? 4000 : 2000);
 
     return () => {
       clearTimeout(timer);
