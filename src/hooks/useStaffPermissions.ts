@@ -104,13 +104,6 @@ export function useStaffPermissions(): StaffPermissionsReturn {
   const roleDetails = getStaffRole(effectiveRole) || STAFF_ROLES.admin;
   const isFullAdmin = ['admin', 'super_admin', 'administrator'].includes(effectiveRole);
   
-  console.log('🔐 Staff permissions init:', { 
-    effectiveRole, 
-    storedStaffRole, 
-    isFullAdmin,
-    allowedTabs: roleDetails.allowedTabs.length 
-  });
-  
   const initialState: StaffPermissionsState = hasValidAdminSession ? {
     loading: false, // Don't show loading for admin
     staffId: null,
@@ -314,8 +307,15 @@ export function useStaffPermissions(): StaffPermissionsReturn {
   }, []);
 
   useEffect(() => {
+    // Log only once on mount
+    console.log('🔐 Staff permissions init:', { 
+      effectiveRole, 
+      storedStaffRole, 
+      isFullAdmin,
+      allowedTabs: roleDetails.allowedTabs.length 
+    });
     fetchStaffPermissions();
-  }, [fetchStaffPermissions]);
+  }, []); // Empty deps - only run once on mount
 
   // Permission check functions
   const checkTabAccess = useCallback((tab: AdminTab): boolean => {

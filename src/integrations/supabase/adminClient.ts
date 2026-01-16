@@ -19,6 +19,7 @@ const SUPABASE_URL = "https://wuuyjjpgzgeimiptuuws.supabase.co";
 const SUPABASE_SERVICE_ROLE_KEY = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || '';
 
 let adminClient: SupabaseClient<Database> | null = null;
+let hasWarnedAboutMissingKey = false;
 
 /**
  * Get the admin Supabase client (bypasses RLS)
@@ -26,7 +27,11 @@ let adminClient: SupabaseClient<Database> | null = null;
  */
 export const getAdminClient = (): SupabaseClient<Database> | null => {
   if (!SUPABASE_SERVICE_ROLE_KEY) {
-    console.warn('⚠️ Admin service role key not configured. Admin operations may fail.');
+    // Only warn once to avoid console spam
+    if (!hasWarnedAboutMissingKey) {
+      console.warn('⚠️ Admin service role key not configured. Admin operations may fail.');
+      hasWarnedAboutMissingKey = true;
+    }
     return null;
   }
   
