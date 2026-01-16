@@ -260,22 +260,47 @@ export const MaterialImagesManager: React.FC = () => {
   const { toast } = useToast();
 
   // Fetch admin-uploaded images from Supabase storage
+  // Uses batch loading to avoid timeout due to large base64 image data
   const fetchAdminImages = async () => {
     try {
-      // Fetch from admin_material_images table if it exists
-      // Using 'as any' to bypass TypeScript since table is created dynamically
-      const { data, error } = await (supabase as any)
-        .from('admin_material_images')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const allImages: MaterialImage[] = [];
+      const batchSize = 20; // Fetch in small batches to avoid timeout
+      const maxBatches = 10; // Max 200 images
       
-      if (error) {
-        // Table might not exist yet, that's okay
-        console.log('Admin images table not found, will create on first upload');
-        setAdminImages([]);
-      } else {
-        setAdminImages((data || []) as MaterialImage[]);
+      for (let batch = 0; batch < maxBatches; batch++) {
+        const offset = batch * batchSize;
+        
+        // Fetch batch - exclude additional_images from initial load (too large)
+        const { data, error } = await (supabase as any)
+          .from('admin_material_images')
+          .select('id, name, category, image_url, is_featured, is_approved, created_at, description, unit, suggested_price')
+          .order('created_at', { ascending: false })
+          .range(offset, offset + batchSize - 1);
+        
+        if (error) {
+          if (batch === 0) {
+            // Table might not exist yet, that's okay
+            console.log('Admin images table not found, will create on first upload');
+          }
+          break;
+        }
+        
+        if (!data || data.length === 0) break;
+        
+        // Map to MaterialImage format
+        const batchImages = data.map((item: any) => ({
+          ...item,
+          source: 'admin' as const,
+          additional_images: [] // Load on-demand when viewing gallery
+        }));
+        
+        allImages.push(...batchImages);
+        
+        // If we got less than batch size, we've reached the end
+        if (data.length < batchSize) break;
       }
+      
+      setAdminImages(allImages);
     } catch (err) {
       console.error('Error fetching admin images:', err);
       setAdminImages([]);
@@ -591,11 +616,33 @@ export const MaterialImagesManager: React.FC = () => {
   // MULTI-ANGLE GALLERY FUNCTIONALITY
   // ═══════════════════════════════════════════════════════════════════════════════
 
-  // Open gallery view for an image
-  const openGallery = (image: MaterialImage) => {
+  // Open gallery view for an image - fetches additional_images on demand
+  const openGallery = async (image: MaterialImage) => {
     setGalleryImage(image);
     setGalleryActiveIndex(0);
     setShowGalleryDialog(true);
+    
+    // Fetch additional_images on-demand if not already loaded
+    if (!image.additional_images || image.additional_images.length === 0) {
+      try {
+        const { data, error } = await (supabase as any)
+          .from('admin_material_images')
+          .select('additional_images')
+          .eq('id', image.id)
+          .single();
+        
+        if (!error && data?.additional_images && data.additional_images.length > 0) {
+          // Update the gallery image with additional images
+          setGalleryImage(prev => prev ? { ...prev, additional_images: data.additional_images } : null);
+          // Also update in the main list
+          setAdminImages(prev => prev.map(img => 
+            img.id === image.id ? { ...img, additional_images: data.additional_images } : img
+          ));
+        }
+      } catch (err) {
+        console.error('Error fetching additional images:', err);
+      }
+    }
   };
 
   // Get all images for gallery (main + additional angles)
