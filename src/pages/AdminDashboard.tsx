@@ -879,18 +879,19 @@ const AdminDashboard = () => {
       // Collect documents from all registration tables
       const allDocuments: DocumentRecord[] = [];
       
-      // Get builder documents from profiles table
-      const { data: builderDocs } = await client
+      // Get builder documents from profiles table (use * to avoid column errors)
+      const { data: builderDocs, error: builderDocsError } = await client
         .from('profiles')
-        .select('id, email, full_name, avatar_url, created_at, role')
-        .in('role', ['professional_builder', 'private_client']);
+        .select('*');
       
-      if (builderDocs) {
+      if (!builderDocsError && builderDocs) {
         builderDocs.forEach((reg: any) => {
-          if (reg.avatar_url) {
+          // Only include builders with avatar
+          const isBuilder = ['professional_builder', 'private_client'].includes(reg.role);
+          if (isBuilder && reg.avatar_url) {
             allDocuments.push({
               id: `builder-avatar-${reg.id}`,
-              name: `Profile Photo - ${reg.full_name}`,
+              name: `Profile Photo - ${reg.full_name || 'Unknown'}`,
               type: 'profile_photo',
               uploadedBy: reg.full_name || 'Unknown',
               userEmail: reg.email,
@@ -903,101 +904,75 @@ const AdminDashboard = () => {
         });
       }
       
-      // Get supplier documents from supplier_applications table
-      const { data: supplierDocs } = await client
+      // Get supplier documents from supplier_applications table (use * to avoid column errors)
+      const { data: supplierDocs, error: supplierDocsError } = await client
         .from('supplier_applications')
-        .select('id, email, company_name, business_registration_url, kra_pin_url, profile_photo_url, created_at, status');
+        .select('*');
       
-      if (supplierDocs) {
+      if (!supplierDocsError && supplierDocs) {
         supplierDocs.forEach((reg: any) => {
-          if (reg.business_registration_url) {
-            allDocuments.push({
-              id: `supplier-cert-${reg.id}`,
-              name: `Business Registration - ${reg.company_name || 'Unknown'}`,
-              type: 'business_certificate',
-              uploadedBy: reg.company_name || 'Unknown',
-              userEmail: reg.email,
-              userRole: 'supplier',
-              size: 'N/A',
-              status: reg.status === 'approved' ? 'verified' : 'pending',
-              uploadedAt: reg.created_at
-            });
-          }
-          if (reg.kra_pin_url) {
-            allDocuments.push({
-              id: `supplier-kra-${reg.id}`,
-              name: `KRA PIN - ${reg.company_name || 'Unknown'}`,
-              type: 'id_document',
-              uploadedBy: reg.contact_person || 'Unknown',
-              userEmail: reg.email,
-              userRole: 'supplier',
-              size: 'N/A',
-              status: reg.status === 'approved' ? 'verified' : 'pending',
-              uploadedAt: reg.created_at
-            });
-          }
+          // Check for any document URL fields that might exist
+          const docUrls = [
+            { field: 'business_registration_url', type: 'business_certificate', label: 'Business Registration' },
+            { field: 'kra_pin_url', type: 'id_document', label: 'KRA PIN' },
+            { field: 'profile_photo_url', type: 'profile_photo', label: 'Profile Photo' },
+          ];
+          
+          docUrls.forEach(({ field, type, label }) => {
+            if (reg[field]) {
+              allDocuments.push({
+                id: `supplier-${field}-${reg.id}`,
+                name: `${label} - ${reg.company_name || 'Unknown'}`,
+                type: type,
+                uploadedBy: reg.company_name || reg.contact_person || 'Unknown',
+                userEmail: reg.email,
+                userRole: 'supplier',
+                size: 'N/A',
+                status: reg.status === 'approved' ? 'verified' : 'pending',
+                uploadedAt: reg.created_at
+              });
+            }
+          });
         });
       }
       
-      // Get delivery documents from delivery_providers table
-      const { data: deliveryDocs } = await client
-        .from('delivery_providers')
-        .select('id, email, full_name, id_document_url, driving_license_url, vehicle_logbook_url, insurance_certificate_url, created_at, status');
+      // Get delivery documents - try registrations table first (less strict RLS)
+      const { data: deliveryRegDocs } = await client
+        .from('delivery_provider_registrations')
+        .select('*');
       
-      if (deliveryDocs) {
+      const { data: deliveryProvDocs } = await client
+        .from('delivery_providers')
+        .select('*');
+      
+      const deliveryDocs = deliveryRegDocs || deliveryProvDocs || [];
+      
+      if (deliveryDocs.length > 0) {
         deliveryDocs.forEach((reg: any) => {
-          if (reg.id_document_url) {
-            allDocuments.push({
-              id: `delivery-id-${reg.id}`,
-              name: `ID Document - ${reg.full_name}`,
-              type: 'id_document',
-              uploadedBy: reg.full_name || 'Unknown',
-              userEmail: reg.email,
-              userRole: 'delivery',
-              size: 'N/A',
-              status: reg.status === 'approved' ? 'verified' : 'pending',
-              uploadedAt: reg.created_at
-            });
-          }
-          if (reg.driving_license_url) {
-            allDocuments.push({
-              id: `delivery-license-${reg.id}`,
-              name: `Driving License - ${reg.full_name}`,
-              type: 'license',
-              uploadedBy: reg.full_name || 'Unknown',
-              userEmail: reg.email,
-              userRole: 'delivery',
-              size: 'N/A',
-              status: reg.status === 'approved' ? 'verified' : 'pending',
-              uploadedAt: reg.created_at
-            });
-          }
-          if (reg.vehicle_logbook_url) {
-            allDocuments.push({
-              id: `delivery-vehicle-${reg.id}`,
-              name: `Vehicle Logbook - ${reg.full_name}`,
-              type: 'other',
-              uploadedBy: reg.full_name || 'Unknown',
-              userEmail: reg.email,
-              userRole: 'delivery',
-              size: 'N/A',
-              status: reg.status === 'approved' ? 'verified' : 'pending',
-              uploadedAt: reg.created_at
-            });
-          }
-          if (reg.insurance_certificate_url) {
-            allDocuments.push({
-              id: `delivery-insurance-${reg.id}`,
-              name: `Insurance Certificate - ${reg.full_name}`,
-              type: 'insurance',
-              uploadedBy: reg.full_name || 'Unknown',
-              userEmail: reg.email,
-              userRole: 'delivery',
-              size: 'N/A',
-              status: reg.status === 'approved' ? 'verified' : 'pending',
-              uploadedAt: reg.created_at
-            });
-          }
+          const name = reg.full_name || reg.provider_name || 'Unknown';
+          const docUrls = [
+            { field: 'id_document_url', type: 'id_document', label: 'ID Document' },
+            { field: 'driving_license_url', type: 'license', label: 'Driving License' },
+            { field: 'vehicle_logbook_url', type: 'other', label: 'Vehicle Logbook' },
+            { field: 'insurance_certificate_url', type: 'insurance', label: 'Insurance Certificate' },
+            { field: 'vehicle_photo_url', type: 'other', label: 'Vehicle Photo' },
+          ];
+          
+          docUrls.forEach(({ field, type, label }) => {
+            if (reg[field]) {
+              allDocuments.push({
+                id: `delivery-${field}-${reg.id}`,
+                name: `${label} - ${name}`,
+                type: type,
+                uploadedBy: name,
+                userEmail: reg.email,
+                userRole: 'delivery',
+                size: 'N/A',
+                status: reg.status === 'approved' || reg.is_verified ? 'verified' : 'pending',
+                uploadedAt: reg.created_at
+              });
+            }
+          });
         });
       }
       
