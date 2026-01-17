@@ -57,8 +57,18 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
     
     initializingRef.current = true;
     
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    console.log('📱 Device type:', isMobile ? 'Mobile' : 'Desktop');
+    
     const initConversation = async () => {
-      const storedConversationId = localStorage.getItem('mradipro_chat_conversation');
+      let storedConversationId: string | null = null;
+      
+      // Try to get from localStorage (may fail in private browsing)
+      try {
+        storedConversationId = localStorage.getItem('mradipro_chat_conversation');
+      } catch (e) {
+        console.warn('⚠️ localStorage not available');
+      }
       
       if (storedConversationId) {
         console.log('🔑 Using existing conversation ID:', storedConversationId);
@@ -81,11 +91,17 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
       
       // Create a new conversation
       const newConversationId = crypto.randomUUID();
-      console.log('🔑 Creating new conversation:', newConversationId);
+      console.log('🔑 Creating new conversation:', newConversationId, isMobile ? '(Mobile)' : '(Desktop)');
       
       // Set immediately to prevent race conditions
       conversationIdRef.current = newConversationId;
-      localStorage.setItem('mradipro_chat_conversation', newConversationId);
+      
+      // Try to save to localStorage
+      try {
+        localStorage.setItem('mradipro_chat_conversation', newConversationId);
+      } catch (e) {
+        console.warn('⚠️ Could not save to localStorage');
+      }
       
       // For guest users, use NULL for client_id (foreign key allows NULL)
       const { error } = await supabase
@@ -93,17 +109,21 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
         .insert({
           id: newConversationId,
           client_id: userId || null,
-          client_name: userName || 'Guest',
+          client_name: userName || (isMobile ? 'Mobile Guest' : 'Guest'),
           client_email: userEmail || 'guest@mradipro.co.ke',
           client_role: userId ? 'builder' : 'guest',
           status: 'open',
           priority: 'normal',
-          subject: 'Chat Support',
+          subject: isMobile ? 'Mobile Chat Support' : 'Chat Support',
           unread_count: 0
         });
       
       if (error) {
-        console.error('❌ Failed to create conversation:', error.message);
+        console.error('❌ Failed to create conversation:', error.message, error.code);
+        // If it's a duplicate key error, the conversation already exists
+        if (error.code === '23505') {
+          console.log('ℹ️ Conversation already exists, continuing...');
+        }
       } else {
         console.log('✅ Conversation created successfully');
       }
@@ -347,28 +367,69 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
     const dbSenderType = senderType === 'user' ? 'client' : senderType === 'bot' ? 'system' : 'staff';
     
     // Use ref for immediate access, fallback to state, then localStorage
-    const currentConversationId = conversationIdRef.current || conversationId || localStorage.getItem('mradipro_chat_conversation');
+    let currentConversationId = conversationIdRef.current || conversationId || localStorage.getItem('mradipro_chat_conversation');
     
-    console.log('💬 Saving chat message:', { conversationId: currentConversationId, senderType: dbSenderType, content: content.substring(0, 50) });
-    
+    // MOBILE FIX: If no conversation ID exists, create one now
     if (!currentConversationId) {
-      console.error('❌ No conversation ID available');
-      return null;
+      console.log('📱 No conversation ID - creating new one (mobile fix)');
+      currentConversationId = crypto.randomUUID();
+      conversationIdRef.current = currentConversationId;
+      setConversationId(currentConversationId);
+      
+      try {
+        localStorage.setItem('mradipro_chat_conversation', currentConversationId);
+      } catch (e) {
+        console.warn('⚠️ localStorage not available (private browsing?)');
+      }
+      
+      // Create the conversation in DB
+      const { error: convError } = await supabase
+        .from('conversations')
+        .insert({
+          id: currentConversationId,
+          client_id: userId || null,
+          client_name: userName || 'Mobile Guest',
+          client_email: userEmail || 'guest@mradipro.co.ke',
+          client_role: userId ? 'builder' : 'guest',
+          status: 'open',
+          priority: 'normal',
+          subject: 'Mobile Chat Support',
+          unread_count: 0
+        });
+      
+      if (convError) {
+        console.error('❌ Failed to create conversation:', convError.message);
+      } else {
+        console.log('✅ Mobile conversation created:', currentConversationId);
+      }
     }
+    
+    console.log('💬 Saving chat message:', { 
+      conversationId: currentConversationId, 
+      senderType: dbSenderType, 
+      content: content.substring(0, 50),
+      isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    });
 
     // sender_id is TEXT in the database, so we can use any string
     // Use a consistent guest ID from localStorage for tracking
-    const guestSenderId = localStorage.getItem('mradipro_guest_id') || (() => {
-      const id = `guest_${crypto.randomUUID()}`;
-      localStorage.setItem('mradipro_guest_id', id);
-      return id;
-    })();
+    let guestSenderId: string;
+    try {
+      guestSenderId = localStorage.getItem('mradipro_guest_id') || (() => {
+        const id = `guest_${crypto.randomUUID()}`;
+        localStorage.setItem('mradipro_guest_id', id);
+        return id;
+      })();
+    } catch (e) {
+      // localStorage not available (private browsing)
+      guestSenderId = `guest_${crypto.randomUUID()}`;
+    }
     
     const messageData = {
       conversation_id: currentConversationId,
       sender_id: userId || guestSenderId, // TEXT field, not UUID FK
       sender_type: dbSenderType,
-      sender_name: senderType === 'bot' ? 'UjenziXform AI' : userName,
+      sender_name: senderType === 'bot' ? 'UjenziXform AI' : (userName || 'Mobile User'),
       content: content,
       message_type: 'text',
       read: false
