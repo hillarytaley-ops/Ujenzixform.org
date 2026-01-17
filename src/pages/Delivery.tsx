@@ -283,74 +283,41 @@ const Delivery = () => {
     };
 
     try {
-      console.log('📦 Submitting delivery request...');
+      console.log('📦 Submitting delivery request...', trackingNumber);
       
-      // Get current user session
-      const { data: sessionData } = await supabase.auth.getSession();
-      
-      // Get user's profile ID
-      let builderId = sessionData?.session?.user?.id || null;
-      
-      console.log('📦 Builder ID:', builderId);
-
-      // Save to deliveries table using direct fetch with timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-      
-      let response;
-      try {
-        response = await fetch(`${SUPABASE_URL}/rest/v1/deliveries`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${sessionData?.session?.access_token || SUPABASE_ANON_KEY}`,
-            'Prefer': 'return=minimal'
-          },
-          body: JSON.stringify({
-            tracking_number: trackingNumber,
-            builder_id: builderId,
-            pickup_address: deliveryForm.pickupAddress,
-            delivery_address: deliveryForm.deliveryAddress,
-            material_type: deliveryForm.materialType,
-            quantity: `${deliveryForm.quantity} ${deliveryForm.unit}`,
-            contact_name: deliveryForm.contactName,
-            contact_phone: deliveryForm.contactPhone,
-            preferred_date: deliveryForm.preferredDate || null,
-            preferred_time: deliveryForm.preferredTime || null,
-            special_instructions: deliveryForm.specialInstructions || null,
-            urgency: deliveryForm.urgency,
-            status: 'pending'
-          }),
-          signal: controller.signal
+      // Use Supabase client directly (more reliable than fetch)
+      const { data, error: insertError } = await supabase
+        .from('deliveries')
+        .insert({
+          tracking_number: trackingNumber,
+          pickup_address: deliveryForm.pickupAddress,
+          delivery_address: deliveryForm.deliveryAddress,
+          material_type: deliveryForm.materialType,
+          quantity: `${deliveryForm.quantity} ${deliveryForm.unit}`,
+          contact_name: deliveryForm.contactName,
+          contact_phone: deliveryForm.contactPhone,
+          preferred_date: deliveryForm.preferredDate || null,
+          preferred_time: deliveryForm.preferredTime || null,
+          special_instructions: deliveryForm.specialInstructions || null,
+          urgency: deliveryForm.urgency,
+          status: 'pending'
         });
-      } catch (fetchError: any) {
-        clearTimeout(timeoutId);
-        if (fetchError.name === 'AbortError') {
-          console.error('❌ Request timed out');
-          throw new Error('Request timed out. Please check your internet connection and try again.');
-        }
-        throw fetchError;
-      }
-      
-      clearTimeout(timeoutId);
 
-      console.log('📦 Response status:', response.status);
+      console.log('📦 Insert result:', { data, error: insertError });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Delivery submission error:', errorText);
+      if (insertError) {
+        console.error('❌ Delivery submission error:', insertError);
         
-        // Check for common errors
-        if (response.status === 404) {
-          throw new Error('Delivery service is not available. Please contact support.');
-        } else if (response.status === 401 || response.status === 403) {
-          throw new Error('You need to be logged in to submit a delivery request.');
-        } else if (response.status === 400) {
-          throw new Error('Invalid request. Please check your form data.');
+        // Check for specific error types
+        if (insertError.code === '42P01') {
+          throw new Error('Delivery table does not exist. Please contact support.');
+        } else if (insertError.code === '42501' || insertError.message?.includes('policy')) {
+          throw new Error('Permission denied. Please sign in and try again.');
+        } else if (insertError.code === '23505') {
+          throw new Error('This delivery request already exists.');
         }
         
-        throw new Error(errorText || 'Failed to submit delivery request');
+        throw new Error(insertError.message || 'Failed to submit delivery request');
       }
 
       console.log('✅ Delivery request submitted successfully');
