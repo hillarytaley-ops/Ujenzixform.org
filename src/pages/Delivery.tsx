@@ -285,16 +285,17 @@ const Delivery = () => {
     try {
       console.log('📦 Submitting delivery request...', trackingNumber);
       
+      // Match the actual table columns - only use columns that exist
+      // Based on error: 'contact_name' doesn't exist, so use different column names
       const insertData = {
         tracking_number: trackingNumber,
-        pickup_address: deliveryForm.pickupAddress,
-        delivery_address: deliveryForm.deliveryAddress,
+        pickup_location: deliveryForm.pickupAddress,
+        delivery_location: deliveryForm.deliveryAddress,
         material_type: deliveryForm.materialType,
-        quantity: `${deliveryForm.quantity} ${deliveryForm.unit}`,
-        contact_name: deliveryForm.contactName,
-        contact_phone: deliveryForm.contactPhone,
-        special_instructions: deliveryForm.specialInstructions || null,
-        urgency: deliveryForm.urgency,
+        quantity: deliveryForm.quantity,
+        unit: deliveryForm.unit,
+        notes: `Contact: ${deliveryForm.contactName}, Phone: ${deliveryForm.contactPhone}${deliveryForm.specialInstructions ? ', Instructions: ' + deliveryForm.specialInstructions : ''}`,
+        priority: deliveryForm.urgency,
         status: 'pending'
       };
       
