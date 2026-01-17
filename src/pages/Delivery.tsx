@@ -284,7 +284,8 @@ const Delivery = () => {
 
     try {
       console.log('📦 Submitting delivery request...', trackingNumber);
-      console.log('📦 Form data:', {
+      
+      const insertData = {
         tracking_number: trackingNumber,
         pickup_address: deliveryForm.pickupAddress,
         delivery_address: deliveryForm.deliveryAddress,
@@ -292,74 +293,55 @@ const Delivery = () => {
         quantity: `${deliveryForm.quantity} ${deliveryForm.unit}`,
         contact_name: deliveryForm.contactName,
         contact_phone: deliveryForm.contactPhone,
-      });
-      
-      // Create a promise that rejects after timeout
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Request timed out after 10 seconds')), 10000);
-      });
-      
-      // First, let's check what columns exist in the table
-      const { data: testData, error: testError } = await supabase
-        .from('deliveries')
-        .select('*')
-        .limit(1);
-      
-      console.log('📦 Table test:', { testData, testError });
-      
-      if (testError) {
-        console.error('📦 Table access error:', testError);
-        throw new Error(`Cannot access deliveries table: ${testError.message}`);
-      }
-
-      // Use Supabase client directly with timeout - minimal fields only
-      const insertData: Record<string, any> = {
-        tracking_number: trackingNumber,
+        special_instructions: deliveryForm.specialInstructions || null,
+        urgency: deliveryForm.urgency,
         status: 'pending'
       };
       
-      // Add optional fields only if they might exist
-      // These are common column names
-      if (deliveryForm.pickupAddress) insertData.pickup_address = deliveryForm.pickupAddress;
-      if (deliveryForm.deliveryAddress) insertData.delivery_address = deliveryForm.deliveryAddress;
-      if (deliveryForm.materialType) insertData.material_type = deliveryForm.materialType;
-      if (deliveryForm.quantity) insertData.quantity = `${deliveryForm.quantity} ${deliveryForm.unit}`;
-      if (deliveryForm.contactName) insertData.contact_name = deliveryForm.contactName;
-      if (deliveryForm.contactPhone) insertData.contact_phone = deliveryForm.contactPhone;
-      if (deliveryForm.specialInstructions) insertData.special_instructions = deliveryForm.specialInstructions;
-      if (deliveryForm.urgency) insertData.urgency = deliveryForm.urgency;
-      
       console.log('📦 Insert data:', insertData);
-      
-      const insertPromise = supabase
-        .from('deliveries')
-        .insert(insertData);
 
-      console.log('📦 Waiting for insert...');
-      
-      // Race between insert and timeout
-      const result = await Promise.race([insertPromise, timeoutPromise]) as any;
-      
-      const { data, error: insertError } = result;
+      // Use direct fetch with AbortController for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        console.log('📦 Aborting request due to timeout');
+        controller.abort();
+      }, 15000);
 
-      console.log('📦 Insert result:', { data, error: insertError });
-
-      if (insertError) {
-        console.error('❌ Delivery submission error:', insertError);
+      try {
+        console.log('📦 Sending fetch request to:', `${SUPABASE_URL}/rest/v1/deliveries`);
         
-        // Check for specific error types
-        if (insertError.code === '42P01') {
-          throw new Error('Delivery table does not exist. Please contact support.');
-        } else if (insertError.code === '42501' || insertError.message?.includes('policy')) {
-          throw new Error('Permission denied. Please sign in and try again.');
-        } else if (insertError.code === '23505') {
-          throw new Error('This delivery request already exists.');
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/deliveries`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify(insertData),
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+        
+        console.log('📦 Response received:', response.status, response.statusText);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('❌ Server error:', response.status, errorText);
+          throw new Error(`Server error (${response.status}): ${errorText || response.statusText}`);
         }
-        
-        throw new Error(insertError.message || 'Failed to submit delivery request');
-      }
 
-      console.log('✅ Delivery request submitted successfully');
+        console.log('✅ Delivery request submitted successfully');
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        
+        if (fetchError.name === 'AbortError') {
+          console.error('❌ Request was aborted (timeout)');
+          throw new Error('Request timed out. Please check your internet connection.');
+        }
+        throw fetchError;
+      }
 
       // Update local state
       setDeliveries(prev => [newDelivery, ...prev]);
