@@ -3,7 +3,10 @@
  * ║                                                                                      ║
  * ║   🛡️ PROTECTED FILE - MATERIALGRID.TSX - DO NOT MODIFY WITHOUT APPROVAL             ║
  * ║                                                                                      ║
- * ║   LAST UPDATED: December 27, 2025                                                    ║
+ * ║   LAST UPDATED: January 17, 2026 - v2.0 PERFORMANCE UPDATE                           ║
+ * ║   - Removed Loading... button state completely                                       ║
+ * ║   - Added localStorage caching for instant load                                      ║
+ * ║   - Auth state initialized from cache                                                ║
  * ║   PROTECTED FEATURES:                                                                ║
  * ║   1. Price Comparison Feature - "Compare Price" button on each card                 ║
  * ║   2. Quantity counter starting from 0                                               ║
