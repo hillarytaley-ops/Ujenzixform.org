@@ -195,8 +195,15 @@ const Delivery = () => {
   };
 
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = React.useRef(false); // Prevent double submissions
 
   const handleSubmitRequest = async () => {
+    // Prevent double submission
+    if (submitting || submittingRef.current) {
+      console.log('⚠️ Already submitting, ignoring click');
+      return;
+    }
+    
     // Form validation
     if (!deliveryForm.materialType) {
       toast({
@@ -255,6 +262,8 @@ const Delivery = () => {
       return;
     }
 
+    // Set both ref and state to prevent double submission
+    submittingRef.current = true;
     setSubmitting(true);
     
     // Generate tracking number
@@ -355,6 +364,8 @@ const Delivery = () => {
         variant: "destructive"
       });
     } finally {
+      // Reset both ref and state
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
