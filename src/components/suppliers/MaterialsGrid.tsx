@@ -343,9 +343,26 @@ const PRODUCT_CATEGORIES = [
 
 export const MaterialsGrid = () => {
   const [searchParams] = useSearchParams();
-  const [materials, setMaterials] = useState<Material[]>([]);
-  const [filteredMaterials, setFilteredMaterials] = useState<Material[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Try to load from cache immediately for instant display
+  const getCachedMaterials = (): Material[] => {
+    try {
+      const cached = localStorage.getItem('materials_cache');
+      const timestamp = localStorage.getItem('materials_cache_timestamp');
+      if (cached && timestamp) {
+        const age = Date.now() - parseInt(timestamp);
+        if (age < 5 * 60 * 1000) { // 5 minutes
+          return JSON.parse(cached);
+        }
+      }
+    } catch (e) {}
+    return [];
+  };
+  
+  const initialMaterials = getCachedMaterials();
+  const [materials, setMaterials] = useState<Material[]>(initialMaterials);
+  const [filteredMaterials, setFilteredMaterials] = useState<Material[]>(initialMaterials);
+  // If we have cached materials, don't show loading state
+  const [loading, setLoading] = useState(initialMaterials.length === 0);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMoreMaterials, setHasMoreMaterials] = useState(false);
   const [totalMaterialsCount, setTotalMaterialsCount] = useState(0);
