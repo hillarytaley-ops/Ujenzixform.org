@@ -305,6 +305,7 @@ export const MaterialsGrid = () => {
   const [stockFilter, setStockFilter] = useState('all');
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false); // Track if auth check is complete
   const [showWelcome, setShowWelcome] = useState(false);
   const [isMultiQuoteOpen, setIsMultiQuoteOpen] = useState(false);
   const [builderId, setBuilderId] = useState<string>('');
@@ -549,8 +550,10 @@ export const MaterialsGrid = () => {
           setUserRole(null);
           console.log('MaterialsGrid - No user authenticated');
         }
+        setAuthChecked(true); // Mark auth check as complete
       } catch (error) {
         console.error('Error checking user role:', error);
+        setAuthChecked(true); // Still mark as checked even on error
       }
     };
     
@@ -1193,8 +1196,8 @@ export const MaterialsGrid = () => {
 
   return (
     <div className="space-y-6">
-      {/* Banner for Non-Registered Users */}
-      {!isAuthenticated && (
+      {/* Banner for Non-Registered Users (only show after auth check confirms not logged in) */}
+      {authChecked && !isAuthenticated && (
         <Alert className="bg-gradient-to-r from-orange-50 to-amber-50 border-orange-300 border-2">
           <AlertDescription className="w-full">
             <div className="flex flex-col items-center justify-center text-center gap-4 py-2">
@@ -1679,8 +1682,8 @@ export const MaterialsGrid = () => {
                         </div>
                       )}
 
-                      {/* Not authenticated: Show sign-in prompt */}
-                      {!isAuthenticated && (
+                      {/* Not authenticated: Show sign-in prompt (only after auth check completes) */}
+                      {authChecked && !isAuthenticated && (
                         <div className="space-y-2">
                           <Button 
                             className="w-full h-10 text-sm font-semibold bg-orange-500 hover:bg-orange-600 text-white"
@@ -1691,6 +1694,18 @@ export const MaterialsGrid = () => {
                           <p className="text-xs text-center text-muted-foreground">
                             Private Builders buy directly • Pro Builders request quotes
                           </p>
+                        </div>
+                      )}
+                      
+                      {/* Auth check in progress - show loading state */}
+                      {!authChecked && (
+                        <div className="space-y-2">
+                          <Button 
+                            className="w-full h-10 text-sm font-semibold bg-gray-400 text-white"
+                            disabled
+                          >
+                            Loading...
+                          </Button>
                         </div>
                       )}
 
