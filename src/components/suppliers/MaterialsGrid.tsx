@@ -46,6 +46,72 @@ const isIOSSafari = () => {
   return /iPad|iPhone|iPod/.test(ua) || (ua.includes('Mac') && 'ontouchend' in document);
 };
 
+// Product Image component with loading state - prevents brown box flash
+const ProductImage = ({ src, alt, category, onClick }: { 
+  src: string; 
+  alt: string; 
+  category: string;
+  onClick: () => void;
+}) => {
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  const [currentSrc, setCurrentSrc] = useState(src);
+  
+  // Reset state when src changes
+  useEffect(() => {
+    setIsLoaded(false);
+    setHasError(false);
+    setCurrentSrc(src);
+  }, [src]);
+  
+  const handleLoad = () => {
+    setIsLoaded(true);
+  };
+  
+  const handleError = () => {
+    if (!hasError) {
+      setHasError(true);
+      // Try category default image
+      const defaultImg = getDefaultCategoryImage(category);
+      if (defaultImg && currentSrc !== defaultImg) {
+        setCurrentSrc(defaultImg);
+        setHasError(false); // Reset to try the fallback
+      }
+    }
+  };
+  
+  return (
+    <>
+      {/* Loading skeleton - shows while image loads */}
+      {!isLoaded && (
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-200 animate-pulse flex items-center justify-center">
+          <div className="w-16 h-16 rounded-full bg-gray-300 animate-pulse" />
+        </div>
+      )}
+      
+      {/* Actual image */}
+      {currentSrc ? (
+        <img
+          src={currentSrc}
+          alt={alt}
+          className={`w-full h-full object-contain p-3 bg-white cursor-pointer transition-all duration-300 group-hover/image:scale-105 ${
+            isLoaded ? 'opacity-100' : 'opacity-0'
+          }`}
+          loading="eager" // Load immediately, don't lazy load
+          decoding="async"
+          onLoad={handleLoad}
+          onError={handleError}
+          onClick={onClick}
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center bg-gray-100">
+          <Package className="h-16 w-16 text-muted-foreground" />
+        </div>
+      )}
+    </>
+  );
+};
+
 interface Material {
   id: string;
   supplier_id?: string; // Optional - admin materials don't have supplier_id
@@ -1588,29 +1654,12 @@ export const MaterialsGrid = () => {
                   >
                     {/* Image Section - Fixed height */}
                     <div className="relative bg-white overflow-hidden h-44 flex-shrink-0 group/image">
-                      {imageUrl ? (
-                        <img
-                          src={imageUrl}
-                          alt={material.name}
-                          className="w-full h-full object-contain p-3 bg-white cursor-pointer transition-transform duration-200 group-hover/image:scale-105"
-                          loading="lazy"
-                          decoding="async"
-                          style={{ imageRendering: 'auto' }}
-                          onClick={() => openGallery(material)}
-                          onError={(e) => {
-                            // On error, try category default image
-                            const target = e.currentTarget;
-                            const defaultImg = getDefaultCategoryImage(material.category);
-                            if (defaultImg && target.src !== defaultImg) {
-                              target.src = defaultImg;
-                            }
-                          }}
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                          <Package className="h-16 w-16 text-muted-foreground" />
-                        </div>
-                      )}
+                      <ProductImage 
+                        src={imageUrl} 
+                        alt={material.name} 
+                        category={material.category}
+                        onClick={() => openGallery(material)}
+                      />
                       {/* Category Badge */}
                       <div className="absolute top-2 left-2">
                         <Badge variant="secondary" className="bg-black/60 text-white border-none" style={{ fontSize: '10px' }}>
