@@ -326,24 +326,23 @@ const Delivery = () => {
         }
       }
       
-      // Build insert data based on discovered columns
-      // We know material_type is required, let's include all likely fields
+      // Log the sample data columns for debugging
+      if (sampleData && sampleData.length > 0) {
+        console.log('📦 ACTUAL TABLE COLUMNS:', Object.keys(sampleData[0]));
+      }
+      
+      // Build insert data - remove fields that don't exist
+      // Known to exist: material_type, quantity, status
+      // Known to NOT exist: contact_name, delivery_location, pickup_location
       const insertData: Record<string, any> = {
         material_type: deliveryForm.materialType,
         quantity: deliveryForm.quantity,
         status: 'pending'
       };
       
-      // Add other fields that might exist
-      // We'll try these and see which ones work
-      insertData.tracking_number = trackingNumber;
-      insertData.pickup_address = deliveryForm.pickupAddress;
-      insertData.delivery_address = deliveryForm.deliveryAddress;
-      insertData.unit = deliveryForm.unit;
-      insertData.contact_name = deliveryForm.contactName;
-      insertData.contact_phone = deliveryForm.contactPhone;
-      insertData.notes = deliveryForm.specialInstructions || null;
-      insertData.urgency = deliveryForm.urgency;
+      // Store contact info in notes/description field
+      const contactInfo = `Contact: ${deliveryForm.contactName}, Phone: ${deliveryForm.contactPhone}. From: ${deliveryForm.pickupAddress} To: ${deliveryForm.deliveryAddress}. ${deliveryForm.specialInstructions || ''}`;
+      insertData.notes = contactInfo;
       
       console.log('📦 Insert data:', insertData);
 
