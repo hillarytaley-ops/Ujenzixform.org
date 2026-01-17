@@ -146,33 +146,27 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
   // Watch form values for security validation
   const formValues = watch();
 
-  // Security validation
+  // Security validation - relaxed for better UX
   const validateFormSecurity = (formData: FeedbackForm) => {
     let score = 100;
     const issues: string[] = [];
 
-    // Check submission timing (too fast = bot)
+    // Check submission timing (too fast = bot) - only penalize if under 2 seconds
     const submissionTime = Date.now() - submissionStartTime;
-    if (submissionTime < 5000) {
-      score -= 30;
+    if (submissionTime < 2000) {
+      score -= 20;
       issues.push('Form submitted too quickly');
     }
 
-    // Check form interactions
-    if (formInteractions < 3) {
-      score -= 25;
-      issues.push('Insufficient form interactions');
-    }
-
-    // Check for suspicious patterns
+    // Check for suspicious patterns only (removed interaction requirement)
     const suspiciousPatterns = [
-      /script/i, /javascript/i, /vbscript/i, /onload/i, /onerror/i,
-      /<.*>/, /eval\(/i, /document\./i, /window\./i
+      /<script/i, /javascript:/i, /vbscript:/i, /onload=/i, /onerror=/i,
+      /eval\(/i, /document\.cookie/i, /window\.location/i
     ];
 
     [formData.subject, formData.message].forEach(field => {
       if (field && suspiciousPatterns.some(pattern => pattern.test(field))) {
-        score -= 40;
+        score -= 50;
         issues.push('Suspicious content detected');
       }
     });
@@ -192,6 +186,7 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
           description: `Please wait until ${rateLimitStatus.resetTime} before submitting again.`,
           variant: "destructive",
         });
+        setIsSubmitting(false);
         return;
       }
 
@@ -202,6 +197,7 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
           description: "Bot activity detected.",
           variant: "destructive",
         });
+        setIsSubmitting(false);
         return;
       }
 
@@ -212,6 +208,7 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
           description: "Please agree to the privacy policy to continue.",
           variant: "destructive",
         });
+        setIsSubmitting(false);
         return;
       }
 
@@ -223,6 +220,7 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
           description: "Please review your input and try again.",
           variant: "destructive",
         });
+        setIsSubmitting(false);
         return;
       }
 
@@ -511,7 +509,7 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
         <div className="pt-4">
           <Button 
             type="submit" 
-            disabled={isSubmitting || !rateLimitStatus.canSubmit || securityScore < 50} 
+            disabled={isSubmitting || !rateLimitStatus.canSubmit} 
             className="w-full h-14 text-lg font-semibold"
             size="lg"
           >
