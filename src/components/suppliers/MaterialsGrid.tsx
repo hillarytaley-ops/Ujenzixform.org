@@ -46,69 +46,53 @@ const isIOSSafari = () => {
   return /iPad|iPhone|iPod/.test(ua) || (ua.includes('Mac') && 'ontouchend' in document);
 };
 
-// Product Image component with loading state - prevents brown box flash
+// Product Image component - simple and reliable
 const ProductImage = ({ src, alt, category, onClick }: { 
   src: string; 
   alt: string; 
   category: string;
   onClick: () => void;
 }) => {
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [hasError, setHasError] = useState(false);
-  const [currentSrc, setCurrentSrc] = useState(src);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const [imgSrc, setImgSrc] = useState(src);
+  const [errorCount, setErrorCount] = useState(0);
   
-  // Reset state when src changes
+  // Update src when prop changes
   useEffect(() => {
-    setIsLoaded(false);
-    setHasError(false);
-    setCurrentSrc(src);
+    setImgSrc(src);
+    setErrorCount(0);
   }, [src]);
   
-  const handleLoad = () => {
-    setIsLoaded(true);
-  };
-  
   const handleError = () => {
-    if (!hasError) {
-      setHasError(true);
-      // Try category default image
+    // Only try fallback once
+    if (errorCount === 0) {
+      setErrorCount(1);
       const defaultImg = getDefaultCategoryImage(category);
-      if (defaultImg && currentSrc !== defaultImg) {
-        setCurrentSrc(defaultImg);
-        setHasError(false); // Reset to try the fallback
+      if (defaultImg) {
+        setImgSrc(defaultImg);
       }
     }
   };
   
+  if (!imgSrc) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-100">
+        <Package className="h-16 w-16 text-muted-foreground" />
+      </div>
+    );
+  }
+  
   return (
-    <>
-      {/* Loading skeleton - shows while image loads */}
-      {!isLoaded && (
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-200 animate-pulse flex items-center justify-center">
-          <div className="w-16 h-16 rounded-full bg-gray-300 animate-pulse" />
-        </div>
-      )}
-      
-      {/* Actual image */}
-      {currentSrc ? (
-        <img
-          src={currentSrc}
-          alt={alt}
-          className={`w-full h-full object-contain p-3 bg-white cursor-pointer transition-all duration-300 group-hover/image:scale-105 ${
-            isLoaded ? 'opacity-100' : 'opacity-0'
-          }`}
-          loading="eager" // Load immediately, don't lazy load
-          decoding="async"
-          onLoad={handleLoad}
-          onError={handleError}
-          onClick={onClick}
-        />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center bg-gray-100">
-          <Package className="h-16 w-16 text-muted-foreground" />
-        </div>
-      )}
-    </>
+    <img
+      ref={imgRef}
+      src={imgSrc}
+      alt={alt}
+      className="w-full h-full object-contain p-3 bg-white cursor-pointer transition-transform duration-200 group-hover/image:scale-105"
+      loading="eager"
+      decoding="sync"
+      onError={handleError}
+      onClick={onClick}
+    />
   );
 };
 
