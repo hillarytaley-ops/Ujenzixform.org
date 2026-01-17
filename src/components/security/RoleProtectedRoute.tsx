@@ -204,9 +204,13 @@ export const RoleProtectedRoute = ({
       return <Navigate to="/supplier-dashboard" replace />;
     }
     
-    // Handle all builder types (legacy 'builder', professional_builder, private_client)
-    if (userRole === 'builder' || userRole === 'professional_builder' || userRole === 'private_client') {
+    // Handle builder types - redirect to their specific dashboard
+    if (userRole === 'professional_builder' || userRole === 'builder') {
       return <Navigate to="/professional-builder-dashboard" replace />;
+    }
+    
+    if (userRole === 'private_client') {
+      return <Navigate to="/private-client-dashboard" replace />;
     }
     
     if (userRole === 'delivery_provider' || userRole === 'delivery') {
