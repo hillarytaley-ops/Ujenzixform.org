@@ -531,13 +531,23 @@ export const MaterialsGrid = () => {
         if (user) {
           setIsAuthenticated(true);
           setBuilderId(user.id); // Set builderId when user is logged in
-          const { data: roleData } = await supabase
+          const { data: roleData, error: roleError } = await supabase
             .from('user_roles')
             .select('role')
             .eq('user_id', user.id)
             .maybeSingle();
-          setUserRole(roleData?.role || null);
-          console.log('User role:', roleData?.role, 'BuilderId:', user.id);
+          
+          if (roleError) {
+            console.error('Error fetching user role:', roleError);
+          }
+          
+          const role = roleData?.role || null;
+          setUserRole(role);
+          console.log('MaterialsGrid - User authenticated:', user.email, 'Role:', role, 'BuilderId:', user.id);
+        } else {
+          setIsAuthenticated(false);
+          setUserRole(null);
+          console.log('MaterialsGrid - No user authenticated');
         }
       } catch (error) {
         console.error('Error checking user role:', error);
@@ -545,6 +555,26 @@ export const MaterialsGrid = () => {
     };
     
     checkUserRole();
+    
+    // Also listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        setIsAuthenticated(true);
+        setBuilderId(session.user.id);
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+        setUserRole(roleData?.role || null);
+        console.log('MaterialsGrid - Auth state changed:', event, 'Role:', roleData?.role);
+      } else {
+        setIsAuthenticated(false);
+        setUserRole(null);
+      }
+    });
+    
+    return () => subscription.unsubscribe();
     
     // Wrap in try-catch to prevent crashes
     try {
