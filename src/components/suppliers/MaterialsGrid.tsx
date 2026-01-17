@@ -2002,8 +2002,8 @@ export const MaterialsGrid = () => {
                         </div>
                       )}
 
-                      {/* Not authenticated: Show sign-in prompt (only after auth check completes) */}
-                      {authChecked && !isAuthenticated && (
+                      {/* Not authenticated OR no role yet: Show sign-in prompt */}
+                      {(!isAuthenticated || (isAuthenticated && !userRole)) && (
                         <div className="space-y-2">
                           <Button 
                             className="w-full h-10 text-sm font-semibold bg-orange-500 hover:bg-orange-600 text-white"
