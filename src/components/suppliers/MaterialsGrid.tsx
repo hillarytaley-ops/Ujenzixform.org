@@ -556,6 +556,16 @@ export const MaterialsGrid = () => {
     
     checkUserRole();
     
+    // Load materials data
+    try {
+      loadMaterials();
+    } catch (error) {
+      console.error('Error in loadMaterials effect:', error);
+      setMaterials([]);
+      setFilteredMaterials([]);
+      setLoading(false);
+    }
+    
     // Also listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
@@ -575,16 +585,6 @@ export const MaterialsGrid = () => {
     });
     
     return () => subscription.unsubscribe();
-    
-    // Wrap in try-catch to prevent crashes
-    try {
-      loadMaterials();
-    } catch (error) {
-      console.error('Error in loadMaterials effect:', error);
-      setMaterials([]);
-      setFilteredMaterials([]);
-      setLoading(false);
-    }
   }, []);
 
   useEffect(() => {
