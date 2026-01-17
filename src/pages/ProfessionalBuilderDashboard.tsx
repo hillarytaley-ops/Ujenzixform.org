@@ -90,18 +90,40 @@ const ProfessionalBuilderDashboardPage = () => {
 
       setUser(user);
 
-      // Get profile - handle gracefully if profiles table doesn't exist or RLS blocks
-      const { data: profileData, error: profileError } = await supabase
+      // Get profile - try both 'id' and 'user_id' columns (different schemas use different names)
+      let profileData = null;
+      let profileError = null;
+      
+      // First try with user_id (newer schema)
+      const { data: profileByUserId, error: errorByUserId } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', user.id)
+        .eq('user_id', user.id)
         .maybeSingle();
+      
+      if (!errorByUserId && profileByUserId) {
+        profileData = profileByUserId;
+      } else {
+        // Fallback to id column (older schema)
+        const { data: profileById, error: errorById } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .maybeSingle();
+        
+        if (!errorById && profileById) {
+          profileData = profileById;
+        } else {
+          profileError = errorByUserId || errorById;
+        }
+      }
 
-      if (profileError) {
-        console.warn('Profile fetch warning:', profileError.message);
+      if (profileError || !profileData) {
+        console.warn('Profile fetch warning:', profileError?.message || 'No profile found');
         // Create a basic profile from auth data if profiles table fails
         setProfile({
           id: user.id,
+          user_id: user.id,
           email: user.email,
           full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Builder',
           phone: user.user_metadata?.phone || '',
