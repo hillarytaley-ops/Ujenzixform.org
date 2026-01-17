@@ -90,14 +90,27 @@ const ProfessionalBuilderDashboardPage = () => {
 
       setUser(user);
 
-      // Get profile
-      const { data: profileData } = await supabase
+      // Get profile - handle gracefully if profiles table doesn't exist or RLS blocks
+      const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .maybeSingle();
 
-      setProfile(profileData);
+      if (profileError) {
+        console.warn('Profile fetch warning:', profileError.message);
+        // Create a basic profile from auth data if profiles table fails
+        setProfile({
+          id: user.id,
+          email: user.email,
+          full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Builder',
+          phone: user.user_metadata?.phone || '',
+          company_name: user.user_metadata?.company_name || '',
+          county: user.user_metadata?.county || '',
+        });
+      } else {
+        setProfile(profileData);
+      }
 
       // Verify role
       const { data: roleData } = await supabase
