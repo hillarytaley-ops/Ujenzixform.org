@@ -1407,10 +1407,21 @@ export const MaterialsGrid = () => {
       ) : (
         <div ref={gridRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredMaterials.map((material, index) => {
-                const imageUrl = material.image_url || getDefaultCategoryImage(material.category);
-                // Debug first 3 cards
-                if (index < 3) {
-                  console.log(`🖼️ Card ${index + 1} (${material.name}): imageUrl = ${imageUrl ? (imageUrl.startsWith('data:') ? 'base64(' + imageUrl.length + ' chars)' : imageUrl.substring(0, 50)) : 'NONE'}`);
+                // Get image URL - prefer material's own image, fallback to category default
+                const materialImageUrl = material.image_url;
+                const categoryDefault = getDefaultCategoryImage(material.category);
+                const imageUrl = materialImageUrl || categoryDefault || '/cement.png'; // Ultimate fallback
+                
+                // Debug first 5 cards
+                if (index < 5) {
+                  console.log(`🖼️ Card ${index + 1}:`, {
+                    name: material.name,
+                    category: material.category,
+                    hasOwnImage: !!materialImageUrl,
+                    ownImageType: materialImageUrl ? (materialImageUrl.startsWith('data:') ? 'base64' : materialImageUrl.startsWith('http') ? 'URL' : 'local') : 'none',
+                    categoryDefault: categoryDefault,
+                    finalImageUrl: imageUrl?.substring(0, 60)
+                  });
                 }
                 const currentQty = getQuantity(material.id);
                 const itemInCart = isInCart(material.id);
