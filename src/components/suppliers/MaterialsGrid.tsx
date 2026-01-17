@@ -1625,86 +1625,44 @@ export const MaterialsGrid = () => {
                         )}
                       </div>
                       
-                      {/* Role-Based Action Buttons */}
-                      {/* Private Builders: Show Buy/Cart buttons */}
-                      {(userRole === 'private_client' || userRole === 'admin') && (
-                        <>
-                          <Button 
-                            className={`w-full h-10 text-sm font-semibold flex items-center justify-center gap-2 ${
-                              itemInCart 
-                                ? 'bg-green-600 hover:bg-green-700' 
-                                : currentQty > 0
-                                  ? 'bg-orange-500 hover:bg-orange-600'
-                                  : 'bg-gray-400 cursor-not-allowed'
-                            }`}
-                            onClick={handleAddToCart}
-                            disabled={!material.in_stock || currentQty === 0}
-                          >
-                            <ShoppingCart className="h-4 w-4" />
-                            {itemInCart ? `Add More (${cartQty} in cart)` : currentQty === 0 ? 'Select Quantity' : 'Add to Cart'}
-                          </Button>
-                          <Button 
-                            className="w-full h-8 text-xs font-medium bg-green-600 hover:bg-green-700 text-white"
-                            onClick={() => {
+                      {/* ACTION BUTTONS - Always visible */}
+                      <div className="space-y-2">
+                        {/* Buy Now Button */}
+                        <Button 
+                          className="w-full h-10 text-sm font-semibold bg-green-600 hover:bg-green-700 text-white"
+                          onClick={() => {
+                            if (!isAuthenticated) {
+                              window.location.href = '/home';
+                              return;
+                            }
+                            if (userRole === 'professional_builder') {
+                              addToQuoteCart(material);
+                            } else {
                               handleAddToCart();
                               setIsCartOpen(true);
-                            }}
-                            disabled={!material.in_stock || currentQty === 0}
-                          >
-                            🛒 Buy Now
-                          </Button>
-                        </>
-                      )}
-
-                      {/* Professional Builders: Show Add to Quote Cart button */}
-                      {userRole === 'professional_builder' && (
-                        <div className="space-y-2">
-                          <Button 
-                            className={`w-full h-10 text-sm font-semibold flex items-center justify-center gap-2 ${
-                              isInQuoteCart(material.id)
-                                ? 'bg-green-600 hover:bg-green-700 text-white'
-                                : 'bg-blue-600 hover:bg-blue-700 text-white'
-                            }`}
-                            onClick={() => addToQuoteCart(material)}
-                            disabled={!material.in_stock}
-                          >
-                            <FileText className="h-4 w-4" />
-                            {isInQuoteCart(material.id) ? '✓ In Quote Cart' : 'Add to Quote'}
-                          </Button>
-                          {currentQty === 0 && (
-                            <p className="text-xs text-center text-muted-foreground">
-                              Set quantity above, then add to quote
-                            </p>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Not authenticated: Show sign-in prompt */}
-                      {!isAuthenticated && (
-                        <div className="space-y-2">
-                          <Button 
-                            className="w-full h-10 text-sm font-semibold bg-orange-500 hover:bg-orange-600 text-white"
-                            onClick={() => window.location.href = '/home'}
-                          >
-                            Sign In to Purchase
-                          </Button>
-                          <p className="text-xs text-center text-muted-foreground">
-                            Private Builders buy directly • Pro Builders request quotes
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Other roles: Show restriction message */}
-                      {isAuthenticated && userRole && !['private_client', 'professional_builder', 'admin'].includes(userRole) && (
-                        <div className="text-center py-2">
-                          <p className="text-xs text-red-600 font-medium">
-                            ⚠️ Your account type cannot purchase materials
-                          </p>
-                          <a href="/home" className="text-xs text-blue-600 underline">
-                            Register as Private Builder or Pro Builder
-                          </a>
-                        </div>
-                      )}
+                            }
+                          }}
+                          disabled={!material.in_stock}
+                        >
+                          🛒 Buy Now
+                        </Button>
+                        
+                        {/* Request Quote Button */}
+                        <Button 
+                          className="w-full h-10 text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white"
+                          onClick={() => {
+                            if (!isAuthenticated) {
+                              window.location.href = '/home';
+                              return;
+                            }
+                            addToQuoteCart(material);
+                          }}
+                          disabled={!material.in_stock}
+                        >
+                          <FileText className="h-4 w-4 mr-2" />
+                          Request Quote
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
                 );
