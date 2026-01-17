@@ -1,5 +1,5 @@
 /**
- * MradiPro Type Definitions
+ * UjenziXform Type Definitions
  * Central export point for all application types
  * 
  * Usage:

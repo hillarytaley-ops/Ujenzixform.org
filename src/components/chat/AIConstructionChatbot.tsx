@@ -414,7 +414,7 @@ I can help with:
 • **Suppliers** - Find verified suppliers near you
 • **Deliveries** - Request and track material deliveries
 • **Best Practices** - Construction tips and standards
-• **Platform Help** - How to use MradiPro features
+• **Platform Help** - How to use UjenziXform features
 
 **Ask me anything about construction in Kenya!**
 
@@ -471,7 +471,7 @@ Examples:
     { icon: Package, label: 'Material Prices', query: 'Show me current material prices' },
     { icon: DollarSign, label: 'Cost Calculator', query: 'Calculate costs for 3-bedroom house' },
     { icon: Truck, label: 'Delivery Help', query: 'How do I request delivery?' },
-    { icon: HelpCircle, label: 'Platform Guide', query: 'How to use MradiPro?' }
+    { icon: HelpCircle, label: 'Platform Guide', query: 'How to use UjenziXform?' }
   ];
 
   if (!isOpen) {

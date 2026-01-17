@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { User, Session } from '@supabase/supabase-js';
 import { UserGuideMenu } from "@/components/ui/user-guide-menu";
-import { MradiProLogo, UserAvatar } from "@/components/common/ProfilePicture";
+import { UjenziXformLogo, UserAvatar } from "@/components/common/ProfilePicture";
 
 const Navigation = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -147,7 +147,7 @@ const Navigation = () => {
           <div className="relative flex-shrink-0" style={{ width: '48px', height: '48px' }}>
             <img 
               src="/mradipro-logo.png" 
-              alt="MradiPro" 
+              alt="UjenziXform" 
               width="48"
               height="48"
               style={{

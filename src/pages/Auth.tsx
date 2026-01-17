@@ -498,7 +498,7 @@ const Auth = () => {
       <div className="min-h-screen flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
-            <CardTitle>Welcome to MradiPro</CardTitle>
+            <CardTitle>Welcome to UjenziXform</CardTitle>
             <CardDescription>Sign in to continue</CardDescription>
           </CardHeader>
           <CardContent>{authTabs}</CardContent>
@@ -525,8 +525,8 @@ const Auth = () => {
       <AnimatedSection animation="scaleIn" className="relative z-10">
         <Card className="w-full max-w-md bg-white/98 backdrop-blur-sm shadow-2xl border-white/70">
           <CardHeader className="text-center">
-            <CardTitle>Welcome to MradiPro</CardTitle>
-            <CardDescription>Jenga na MradiPro - Build with Kenya's Premier Construction Platform</CardDescription>
+            <CardTitle>Welcome to UjenziXform</CardTitle>
+            <CardDescription>Jenga na UjenziXform - Build with Kenya's Premier Construction Platform</CardDescription>
           </CardHeader>
           <CardContent>{authTabs}</CardContent>
         </Card>
@@ -539,7 +539,7 @@ const Auth = () => {
               </div>
               <div>
                 <h4 className="text-sm font-semibold text-white">Admin Access</h4>
-                <p className="text-xs text-slate-400 mt-0.5">MradiPro Staff Only</p>
+                <p className="text-xs text-slate-400 mt-0.5">UjenziXform Staff Only</p>
               </div>
               <Link to="/admin-login" className="w-full mt-1">
                 <Button 

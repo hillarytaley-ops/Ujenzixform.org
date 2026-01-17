@@ -255,7 +255,7 @@ export function UserMessaging({ userId, userRole, userName, themeColor = 'blue' 
           </div>
           <div>
             <h3 className="font-semibold">Admin Support</h3>
-            <p className="text-sm text-muted-foreground">Direct communication with MradiPro team</p>
+            <p className="text-sm text-muted-foreground">Direct communication with UjenziXform team</p>
           </div>
         </div>
         {unreadCount > 0 && (
@@ -378,7 +378,7 @@ export function UserMessaging({ userId, userRole, userName, themeColor = 'blue' 
                         }`}>
                           {msg.sender_type === 'admin' && (
                             <p className="text-xs font-semibold mb-1 text-primary">
-                              🛡️ MradiPro Admin
+                              🛡️ UjenziXform Admin
                             </p>
                           )}
                           <p className="text-sm whitespace-pre-wrap">{msg.message}</p>

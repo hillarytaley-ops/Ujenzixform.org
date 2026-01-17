@@ -1,6 +1,6 @@
 /**
  * Admin Types
- * Comprehensive type definitions for admin functionality in MradiPro
+ * Comprehensive type definitions for admin functionality in UjenziXform
  */
 
 // Matches the app_role enum in Supabase: admin, builder, supplier, delivery_provider

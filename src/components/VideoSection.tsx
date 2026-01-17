@@ -22,7 +22,7 @@ const VideoSection: React.FC<VideoSectionProps> = ({
   synthesiaUrl,
   steveAiUrl,
   thumbnail = '/mradipro-demo-thumbnail.svg',
-  title = 'MradiPro Platform Demo',
+  title = 'UjenziXform Platform Demo',
   description = 'See how easy it is to connect, quote, and build across Kenya',
   useYouTube = true,
   useSynthesia = false,

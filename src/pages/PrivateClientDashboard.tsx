@@ -632,7 +632,7 @@ const PrivateClientDashboard = () => {
                   <Headphones className="h-5 w-5 text-purple-600" />
                   Live Support
                 </CardTitle>
-                <CardDescription>Chat directly with MradiPro support team</CardDescription>
+                <CardDescription>Chat directly with UjenziXform support team</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Live Chat Guide */}
@@ -687,7 +687,7 @@ const PrivateClientDashboard = () => {
                       </h4>
                       <p className="text-sm text-muted-foreground">
                         Call: +254 700 000 000<br />
-                        Email: support@mradipro.co.ke
+                        Email: support@UjenziXform.co.ke
                       </p>
                     </CardContent>
                   </Card>

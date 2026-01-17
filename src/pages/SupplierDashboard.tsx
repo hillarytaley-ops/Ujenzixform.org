@@ -948,7 +948,7 @@ const SupplierDashboard = () => {
                   Live Support
                 </CardTitle>
                 <CardDescription className={mutedText}>
-                  Chat directly with MradiPro support team
+                  Chat directly with UjenziXform support team
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -1004,7 +1004,7 @@ const SupplierDashboard = () => {
                       </h4>
                       <p className={`text-sm ${mutedText}`}>
                         Call: +254 700 000 000<br />
-                        Email: suppliers@mradipro.co.ke
+                        Email: suppliers@UjenziXform.co.ke
                       </p>
                     </CardContent>
                   </Card>

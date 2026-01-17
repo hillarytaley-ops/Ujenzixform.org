@@ -78,7 +78,7 @@ const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message:
   },
   order_delivered: {
     title: '🎉 Order Delivered',
-    message: 'Your order #{orderNumber} has been delivered. Thank you for shopping with MradiPro!'
+    message: 'Your order #{orderNumber} has been delivered. Thank you for shopping with UjenziXform!'
   },
   quote_received: {
     title: '💰 Quote Received',
@@ -185,7 +185,7 @@ export class NotificationService {
       await supabase.functions.invoke('send-email', {
         body: {
           to: profile.email,
-          subject: `MradiPro: ${subject}`,
+          subject: `UjenziXform: ${subject}`,
           html: this.generateEmailHTML(subject, body, data),
           text: body
         }
@@ -223,7 +223,7 @@ export class NotificationService {
       await supabase.functions.invoke('send-sms', {
         body: {
           to: phone,
-          message: `MradiPro: ${message}`
+          message: `UjenziXform: ${message}`
         }
       });
 
@@ -259,8 +259,8 @@ export class NotificationService {
           payload: {
             title,
             body,
-            icon: '/mradipro-logo.png',
-            badge: '/mradipro-favicon.svg',
+            icon: '/UjenziXform-logo.png',
+            badge: '/UjenziXform-favicon.svg',
             data: {
               url: data.url || '/',
               ...data
@@ -575,7 +575,7 @@ export class NotificationService {
                     <table role="presentation" style="width: 100%;">
                       <tr>
                         <td>
-                          <img src="https://mradipro.com/mradipro-logo.png" alt="MradiPro" style="height: 40px; width: auto;">
+                          <img src="https://UjenziXform.com/UjenziXform-logo.png" alt="UjenziXform" style="height: 40px; width: auto;">
                         </td>
                         <td align="right">
                           <span style="color: #ffffff; font-size: 14px;">Kenya's Construction Platform</span>
@@ -606,10 +606,10 @@ export class NotificationService {
                 <tr>
                   <td style="padding: 24px 32px; background-color: #f4f4f5; border-radius: 0 0 12px 12px;">
                     <p style="margin: 0; font-size: 12px; color: #71717a; text-align: center;">
-                      © ${new Date().getFullYear()} MradiPro. Connecting Kenya's Construction Industry.
+                      © ${new Date().getFullYear()} UjenziXform. Connecting Kenya's Construction Industry.
                       <br>
-                      <a href="https://mradipro.com/unsubscribe" style="color: #2563eb;">Unsubscribe</a> | 
-                      <a href="https://mradipro.com/preferences" style="color: #2563eb;">Notification Preferences</a>
+                      <a href="https://UjenziXform.com/unsubscribe" style="color: #2563eb;">Unsubscribe</a> | 
+                      <a href="https://UjenziXform.com/preferences" style="color: #2563eb;">Notification Preferences</a>
                     </p>
                   </td>
                 </tr>

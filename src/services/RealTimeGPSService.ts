@@ -450,7 +450,7 @@ class RealTimeGPSService {
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
         {
           headers: {
-            'User-Agent': 'MradiPro-DeliveryTracking/1.0'
+            'User-Agent': 'UjenziXform-DeliveryTracking/1.0'
           }
         }
       );

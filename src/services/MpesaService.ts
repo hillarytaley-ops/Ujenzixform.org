@@ -1,6 +1,6 @@
 /**
  * ============================================================
- * MradiPro M-Pesa Integration Service
+ * UjenziXform M-Pesa Integration Service
  * ============================================================
  * 
  * This service handles M-Pesa payments via Safaricom's Daraja API.

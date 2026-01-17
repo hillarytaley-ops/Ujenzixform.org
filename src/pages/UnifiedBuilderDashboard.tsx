@@ -519,7 +519,7 @@ export default function UnifiedBuilderDashboard() {
                     <div className="flex items-center gap-4 p-3 bg-gray-700/50 rounded-lg">
                       <Bell className="w-5 h-5 text-blue-400" />
                       <div>
-                        <p className="text-white text-sm">Welcome to MradiPro!</p>
+                        <p className="text-white text-sm">Welcome to UjenziXform!</p>
                         <p className="text-gray-400 text-xs">Start by exploring our materials catalog</p>
                       </div>
                     </div>
@@ -654,7 +654,7 @@ export default function UnifiedBuilderDashboard() {
                   Live Support
                 </CardTitle>
                 <CardDescription className="text-gray-400">
-                  Chat directly with MradiPro support team
+                  Chat directly with UjenziXform support team
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -710,7 +710,7 @@ export default function UnifiedBuilderDashboard() {
                       </h4>
                       <p className="text-sm text-gray-400">
                         Call: +254 700 000 000<br />
-                        Email: builders@mradipro.co.ke
+                        Email: builders@UjenziXform.co.ke
                       </p>
                     </CardContent>
                   </Card>

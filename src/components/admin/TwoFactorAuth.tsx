@@ -11,7 +11,7 @@
  * - Backup codes generation
  * - 2FA enable/disable management
  * 
- * @author MradiPro Team
+ * @author UjenziXform Team
  * @version 1.0.0
  * @created December 28, 2025
  */
@@ -103,7 +103,7 @@ export const TwoFactorAuth: React.FC<TwoFactorAuthProps> = ({
 
   // Generate QR code URL for authenticator apps
   const generateQRCodeUrl = (secret: string): string => {
-    const issuer = 'MradiPro';
+    const issuer = 'UjenziXform';
     const otpauthUrl = `otpauth://totp/${issuer}:${userEmail}?secret=${secret}&issuer=${issuer}&algorithm=SHA1&digits=6&period=30`;
     return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(otpauthUrl)}`;
   };

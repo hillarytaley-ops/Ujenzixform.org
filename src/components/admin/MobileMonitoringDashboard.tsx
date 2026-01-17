@@ -97,7 +97,7 @@ export const MobileMonitoringDashboard: React.FC = () => {
       <div className="sticky top-0 z-50 bg-slate-900/95 backdrop-blur-lg border-b border-slate-700 px-4 py-3">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-white">MradiPro</h1>
+            <h1 className="text-xl font-bold text-white">UjenziXform</h1>
             <p className="text-xs text-slate-400">Monitoring Dashboard</p>
           </div>
           <div className="flex items-center gap-2">

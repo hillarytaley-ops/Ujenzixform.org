@@ -64,7 +64,7 @@ interface CompanyApplication {
   certifications: string[];
   
   // Additional Information
-  whyJoinMradiPro: string;
+  whyJoinUjenziXform: string;
   additionalServices: string;
 }
 
@@ -167,7 +167,7 @@ const DeliveryProviderApplication = () => {
     previousClients: "",
     insuranceCoverage: "",
     certifications: [],
-    whyJoinMradiPro: "",
+    whyJoinUjenziXform: "",
     additionalServices: ""
   });
 
@@ -249,7 +249,7 @@ const DeliveryProviderApplication = () => {
           vehicle_capacity_description: companyForm.deliveryCapacity,
           driving_license_number: 'Company Fleet',
           insurance_provider: companyForm.insuranceCoverage,
-          pricing_notes: `Operating Hours: ${companyForm.operatingHours}. Service Types: ${companyForm.serviceTypes.join(', ')}. Specializations: ${companyForm.specializations.join(', ')}. Why join: ${companyForm.whyJoinMradiPro}`,
+          pricing_notes: `Operating Hours: ${companyForm.operatingHours}. Service Types: ${companyForm.serviceTypes.join(', ')}. Specializations: ${companyForm.specializations.join(', ')}. Why join: ${companyForm.whyJoinUjenziXform}`,
           available_hours_start: '06:00',
           available_hours_end: '20:00',
           terms_accepted: true,
@@ -286,7 +286,7 @@ const DeliveryProviderApplication = () => {
         previousClients: "",
         insuranceCoverage: "",
         certifications: [],
-        whyJoinMradiPro: "",
+        whyJoinUjenziXform: "",
         additionalServices: ""
       });
     } catch (error: any) {
@@ -422,7 +422,7 @@ const DeliveryProviderApplication = () => {
             Become a Delivery Provider
           </h1>
           <p className="text-lg text-muted-foreground mb-6">
-            Join MradiPro's network of trusted delivery partners and grow your business
+            Join UjenziXform's network of trusted delivery partners and grow your business
           </p>
           
           {/* Benefits Overview */}
@@ -447,7 +447,7 @@ const DeliveryProviderApplication = () => {
           <Alert className="max-w-2xl mx-auto mb-6 border-green-200 bg-green-50">
             <CheckCircle className="h-4 w-4" />
             <AlertDescription>
-              <strong>Join Kenya's Leading Construction Platform:</strong> Partner with MradiPro to access 
+              <strong>Join Kenya's Leading Construction Platform:</strong> Partner with UjenziXform to access 
               thousands of builders and suppliers who need reliable delivery services across all 47 counties.
             </AlertDescription>
           </Alert>
@@ -478,7 +478,7 @@ const DeliveryProviderApplication = () => {
                       <div>
                         <h3 className="text-xl font-bold text-green-800">🎉 Congratulations! Your Application is Approved</h3>
                         <p className="text-green-700">
-                          Welcome to MradiPro's delivery network, {existingApplication.company_name || existingApplication.full_name}!
+                          Welcome to UjenziXform's delivery network, {existingApplication.company_name || existingApplication.full_name}!
                         </p>
                         <p className="text-sm text-green-600 mt-1">
                           Approved on: {new Date(existingApplication.updated_at).toLocaleDateString('en-KE', { 
@@ -533,7 +533,7 @@ const DeliveryProviderApplication = () => {
                           </p>
                         )}
                         <p className="text-sm text-red-600 mt-2">
-                          You may contact support at <a href="mailto:delivery@mradipro.com" className="underline">delivery@mradipro.com</a> for more information.
+                          You may contact support at <a href="mailto:delivery@UjenziXform.com" className="underline">delivery@UjenziXform.com</a> for more information.
                         </p>
                       </div>
                     </div>
@@ -635,7 +635,7 @@ const DeliveryProviderApplication = () => {
                   Delivery Company Application
                 </CardTitle>
                 <CardDescription>
-                  Apply as a registered delivery company to join MradiPro's network of trusted partners
+                  Apply as a registered delivery company to join UjenziXform's network of trusted partners
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -842,12 +842,12 @@ const DeliveryProviderApplication = () => {
                   <h3 className="text-lg font-semibold">Additional Information</h3>
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="whyJoinMradiPro">Why do you want to join MradiPro? *</Label>
+                      <Label htmlFor="whyJoinUjenziXform">Why do you want to join UjenziXform? *</Label>
                       <Textarea
-                        id="whyJoinMradiPro"
+                        id="whyJoinUjenziXform"
                         placeholder="Tell us about your motivation and how you can contribute to our platform"
-                        value={companyForm.whyJoinMradiPro}
-                        onChange={(e) => handleCompanyFormChange('whyJoinMradiPro', e.target.value)}
+                        value={companyForm.whyJoinUjenziXform}
+                        onChange={(e) => handleCompanyFormChange('whyJoinUjenziXform', e.target.value)}
                       />
                     </div>
                     <div className="space-y-2">
@@ -1109,7 +1109,7 @@ const DeliveryProviderApplication = () => {
 
                 {/* Motivation */}
                 <div className="space-y-2">
-                  <Label htmlFor="motivation">Why do you want to join MradiPro? *</Label>
+                  <Label htmlFor="motivation">Why do you want to join UjenziXform? *</Label>
                   <Textarea
                     id="motivation"
                     placeholder="Tell us about your motivation and goals as a delivery provider"

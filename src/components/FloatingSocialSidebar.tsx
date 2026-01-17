@@ -13,7 +13,7 @@
  * ║   - Single floating button that expands to show all social media links              ║
  * ║   - Works consistently across all screen sizes                                       ║
  * ║   - HIDDEN on authentication pages (auth, signin pages)                             ║
- * ║   - Links to official MradiPro social media accounts                                ║
+ * ║   - Links to official UjenziXform social media accounts                                ║
  * ║                                                                                      ║
  * ║   CRITICAL BEHAVIOR:                                                                 ║
  * ║   - Must NOT appear on /auth, /admin-auth, /builder-signin, etc.                    ║

@@ -1,6 +1,6 @@
 /**
  * ============================================================
- * MradiPro M-Pesa Service Tests
+ * UjenziXform M-Pesa Service Tests
  * ============================================================
  * 
  * Unit tests for M-Pesa payment integration

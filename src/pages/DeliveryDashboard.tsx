@@ -859,7 +859,7 @@ const DeliveryDashboard = () => {
                   Live Support
                 </CardTitle>
                 <CardDescription className={isDarkMode ? 'text-gray-400' : ''}>
-                  Chat directly with MradiPro support team
+                  Chat directly with UjenziXform support team
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -915,7 +915,7 @@ const DeliveryDashboard = () => {
                       </h4>
                       <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                         Call: +254 700 000 000<br />
-                        Email: drivers@mradipro.co.ke
+                        Email: drivers@UjenziXform.co.ke
                       </p>
                     </CardContent>
                   </Card>

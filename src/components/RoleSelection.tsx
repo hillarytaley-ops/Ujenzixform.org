@@ -83,7 +83,7 @@ const RoleSelection = () => {
     if (!selectedRole) {
       toast({
         title: "Please select a role",
-        description: "Choose how you want to use MradiPro",
+        description: "Choose how you want to use UjenziXform",
         variant: "destructive"
       });
       return;
@@ -151,7 +151,7 @@ const RoleSelection = () => {
 
         console.log('🎯 RoleSelection: Role inserted successfully');
         toast({
-          title: "Welcome to MradiPro! 🎉",
+          title: "Welcome to UjenziXform! 🎉",
           description: `You're now registered as a ${selectedRole === 'builder' ? 'Builder' : selectedRole === 'supplier' ? 'Supplier' : 'Delivery Provider'}`,
         });
       }
@@ -185,7 +185,7 @@ const RoleSelection = () => {
       <div className="w-full max-w-4xl">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Welcome to MradiPro! 👋
+            Welcome to UjenziXform! 👋
           </h1>
           <p className="text-lg text-gray-600">
             How would you like to use the platform?

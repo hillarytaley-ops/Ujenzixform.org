@@ -106,7 +106,7 @@ export const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({
               <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg">
                 <img 
                   src="/mradipro-logo-circular.svg" 
-                  alt="MradiPro" 
+                  alt="UjenziXform" 
                   className="w-10 h-10"
                 />
               </div>
@@ -115,7 +115,7 @@ export const PWAInstallPrompt: React.FC<PWAInstallPromptProps> = ({
             {/* Content */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <h3 className="font-bold text-lg">Install MradiPro</h3>
+                <h3 className="font-bold text-lg">Install UjenziXform</h3>
                 <Badge variant="secondary" className="text-xs">
                   Free
                 </Badge>
@@ -218,7 +218,7 @@ export const IOSInstallInstructions: React.FC = () => {
             <Smartphone className="h-8 w-8 mx-auto mb-2 text-primary" />
             <h3 className="font-bold mb-2">Add to Home Screen</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Install MradiPro on your iPhone for the best experience
+              Install UjenziXform on your iPhone for the best experience
             </p>
 
             <div className="space-y-3 text-left bg-muted/50 rounded-lg p-3">

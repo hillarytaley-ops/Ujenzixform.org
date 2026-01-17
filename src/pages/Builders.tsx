@@ -252,7 +252,7 @@ const Builders = () => {
               <div className="w-full h-full bg-gradient-to-b from-blue-600 to-blue-800 rounded-2xl overflow-hidden relative">
                 {/* App Header */}
                 <div className="bg-blue-700 p-3 text-center">
-                  <p className="text-white text-xs font-bold">MradiPro Builder App</p>
+                  <p className="text-white text-xs font-bold">UjenziXform Builder App</p>
                 </div>
                 {/* App Content */}
                 <div className="p-3 space-y-2">

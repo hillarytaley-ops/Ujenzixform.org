@@ -1,8 +1,8 @@
-# 🏗️ MradiPro - Kenya's Premier Construction Platform
+# 🏗️ UjenziXform - Kenya's Premier Construction Platform
 
 ## 📋 Project Overview
 
-**MradiPro** is Kenya's leading digital platform connecting builders with verified construction material suppliers across all 47 counties. From Mombasa to Eldoret, from Kisumu to Garissa - we facilitate quality materials, competitive prices, and lasting business partnerships.
+**UjenziXform** is Kenya's leading digital platform connecting builders with verified construction material suppliers across all 47 counties. From Mombasa to Eldoret, from Kisumu to Garissa - we facilitate quality materials, competitive prices, and lasting business partnerships.
 
 ### 🎯 **Mission**
 *Kujenga Pamoja* - Building Together Across Kenya
@@ -85,7 +85,7 @@ To revolutionize Kenya's construction industry through digital innovation, trans
 git clone <YOUR_REPOSITORY_URL>
 
 # Navigate to project directory
-cd MradiPro
+cd UjenziXform
 
 # Install dependencies
 npm install
@@ -125,7 +125,7 @@ npm run security:full     # Complete security test suite
 ## 🏗️ **Project Structure**
 
 ```
-MradiPro/
+UjenziXform/
 ├── src/
 │   ├── components/          # React components
 │   │   ├── builders/        # Builder-specific components
@@ -207,7 +207,7 @@ MradiPro/
 
 ## 📄 **License**
 
-This project is proprietary software owned by MradiPro Ltd. All rights reserved.
+This project is proprietary software owned by UjenziXform Ltd. All rights reserved.
 
 ## 🎉 **Acknowledgments**
 
@@ -219,7 +219,7 @@ Special thanks to:
 
 ---
 
-**🏆 MradiPro - Building Kenya's Future, One Connection at a Time**
+**🏆 UjenziXform - Building Kenya's Future, One Connection at a Time**
 
 *Proudly Kenyan 🇰🇪 | Enterprise Security 🛡️ | World-Class Platform 🌍*
 

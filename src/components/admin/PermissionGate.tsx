@@ -6,7 +6,7 @@
  * Wraps content that requires specific staff permissions.
  * Shows a blocked message if the staff member doesn't have access.
  * 
- * @author MradiPro Team
+ * @author UjenziXform Team
  * @version 1.0.0
  */
 

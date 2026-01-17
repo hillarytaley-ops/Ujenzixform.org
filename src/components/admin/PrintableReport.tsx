@@ -212,7 +212,7 @@ export const PrintableReport: React.FC = () => {
         <!DOCTYPE html>
         <html>
         <head>
-          <title>MradiPro Report - ${format(new Date(), 'yyyy-MM-dd')}</title>
+          <title>UjenziXform Report - ${format(new Date(), 'yyyy-MM-dd')}</title>
           <style>
             * { margin: 0; padding: 0; box-sizing: border-box; }
             body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; color: #1f2937; line-height: 1.6; }
@@ -633,7 +633,7 @@ export const PrintableReport: React.FC = () => {
               style={{ minHeight: '500px' }}
             >
               <div className="header">
-                <div className="logo">📊 MradiPro</div>
+                <div className="logo">📊 UjenziXform</div>
                 <div className="subtitle">{TEMPLATES.find(t => t.value === template)?.label}</div>
                 <div className="meta">
                   Period: {reportData.dateRange} | Generated: {reportData.generatedAt}
@@ -645,7 +645,7 @@ export const PrintableReport: React.FC = () => {
               </div>
 
               <div className="footer">
-                <p>MradiPro Construction Monitoring System</p>
+                <p>UjenziXform Construction Monitoring System</p>
                 <p>Confidential - For internal use only</p>
               </div>
             </div>

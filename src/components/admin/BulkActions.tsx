@@ -13,7 +13,7 @@
  * - Progress indicator
  * - Confirmation dialogs
  * 
- * @author MradiPro Team
+ * @author UjenziXform Team
  * @version 1.0.0
  * @created December 28, 2025
  */

@@ -658,7 +658,7 @@ const SupplierRegistration = () => {
               <CardDescription>
                 {existingUser 
                   ? "You're already signed in. Complete your supplier profile to start selling."
-                  : "Complete all steps to start selling construction materials on MradiPro"
+                  : "Complete all steps to start selling construction materials on UjenziXform"
                 }
               </CardDescription>
             </CardHeader>

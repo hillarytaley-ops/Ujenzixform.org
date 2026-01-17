@@ -6,7 +6,7 @@
  * Hook to check staff member permissions for the admin dashboard.
  * Fetches the staff member's role and provides permission checking functions.
  * 
- * @author MradiPro Team
+ * @author UjenziXform Team
  * @version 1.0.0
  */
 

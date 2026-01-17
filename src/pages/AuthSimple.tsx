@@ -125,7 +125,7 @@ const AuthSimple = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-orange-50 p-4">
       <Card className="w-full max-w-md shadow-2xl">
         <CardHeader className="text-center">
-          <CardTitle className="text-3xl font-bold">Welcome to MradiPro</CardTitle>
+          <CardTitle className="text-3xl font-bold">Welcome to UjenziXform</CardTitle>
           <CardDescription>Sign in or create an account to get started</CardDescription>
         </CardHeader>
         <CardContent>

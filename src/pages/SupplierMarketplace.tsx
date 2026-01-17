@@ -560,7 +560,7 @@ const SupplierMarketplace = () => {
 
           {/* Why Choose Us */}
           <div className="bg-white rounded-2xl p-8 mb-12">
-            <h2 className="text-2xl font-bold text-center mb-8">Why Buy from MradiPro Marketplace?</h2>
+            <h2 className="text-2xl font-bold text-center mb-8">Why Buy from UjenziXform Marketplace?</h2>
             <div className="grid md:grid-cols-4 gap-6">
               <div className="text-center">
                 <Shield className="h-10 w-10 text-emerald-600 mx-auto mb-3" />

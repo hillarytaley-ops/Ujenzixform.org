@@ -165,7 +165,7 @@ const PublicBuilderProfile = () => {
       try {
         await navigator.share({
           title: `${profile?.company_name || profile?.full_name} - Professional Builder`,
-          text: `Check out ${profile?.company_name || profile?.full_name} on MradiPro`,
+          text: `Check out ${profile?.company_name || profile?.full_name} on UjenziXform`,
           url: shareUrl,
         });
       } catch (error) {
@@ -647,7 +647,7 @@ const PublicBuilderProfile = () => {
                       </div>
                       <div>
                         <p className="font-bold text-green-800">Verified Builder</p>
-                        <p className="text-sm text-green-600">Identity & credentials verified by MradiPro</p>
+                        <p className="text-sm text-green-600">Identity & credentials verified by UjenziXform</p>
                       </div>
                     </div>
                   </CardContent>

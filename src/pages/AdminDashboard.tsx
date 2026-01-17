@@ -451,7 +451,7 @@ const AdminDashboard = () => {
     { name: 'Scanners', path: '/scanners', icon: Zap, status: 'active', visits: 0, description: 'QR/Barcode scanners (Admin Access ✓)', category: 'protected' },
     { name: 'Analytics', path: '/analytics', icon: BarChart3, status: 'active', visits: 0, description: 'Business analytics', category: 'protected' },
     { name: 'Feedback', path: '/feedback', icon: MessageSquare, status: 'active', visits: 0, description: 'User feedback collection', category: 'protected' },
-    { name: 'About', path: '/about', icon: Info, status: 'active', visits: 0, description: 'About MradiPro', category: 'protected' },
+    { name: 'About', path: '/about', icon: Info, status: 'active', visits: 0, description: 'About UjenziXform', category: 'protected' },
     { name: 'Contact', path: '/contact', icon: Phone, status: 'active', visits: 0, description: 'Contact information', category: 'protected' },
     { name: 'Terms of Service', path: '/terms', icon: FileText, status: 'active', visits: 0, description: 'Legal terms', category: 'public' },
     { name: 'Privacy Policy', path: '/privacy', icon: Shield, status: 'active', visits: 0, description: 'Privacy information', category: 'public' },
@@ -1777,7 +1777,7 @@ const AdminDashboard = () => {
                   <Shield className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-lg sm:text-xl font-bold text-white">MradiPro Admin</h1>
+                  <h1 className="text-lg sm:text-xl font-bold text-white">UjenziXform Admin</h1>
                   <p className="text-xs text-gray-400 hidden sm:block">Staff Dashboard</p>
                 </div>
               </div>
@@ -2314,7 +2314,7 @@ const AdminDashboard = () => {
                       All Application Pages
                     </CardTitle>
                     <CardDescription className="text-gray-400 mt-1">
-                      Monitor and manage all pages in the MradiPro application
+                      Monitor and manage all pages in the UjenziXform application
                     </CardDescription>
                   </div>
                   <Badge className="bg-green-600">
@@ -4293,7 +4293,7 @@ const AdminDashboard = () => {
       <footer className="border-t border-slate-800 py-6 mt-12">
         <div className="container mx-auto px-4">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-gray-500">
-            <p>© 2024 MradiPro Admin Portal. All rights reserved.</p>
+            <p>© 2024 UjenziXform Admin Portal. All rights reserved.</p>
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-green-500 rounded-full"></div>
               <span>System Status: Operational</span>

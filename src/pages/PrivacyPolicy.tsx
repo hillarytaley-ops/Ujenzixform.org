@@ -20,7 +20,7 @@ const PrivacyPolicy = () => {
           </Badge>
           <h1 className="text-4xl font-bold mb-4">Privacy Policy</h1>
           <p className="text-gray-300 max-w-2xl mx-auto">
-            Learn how MradiPro collects, uses, and protects your personal information in compliance 
+            Learn how UjenziXform collects, uses, and protects your personal information in compliance 
             with the Kenya Data Protection Act 2019.
           </p>
           <p className="text-sm text-gray-400 mt-4">Last Updated: {lastUpdated}</p>
@@ -34,7 +34,7 @@ const PrivacyPolicy = () => {
           <div>
             <h3 className="font-semibold text-green-800">Kenya DPA 2019 Compliant</h3>
             <p className="text-sm text-green-700">
-              MradiPro is fully compliant with the Kenya Data Protection Act 2019 and follows 
+              UjenziXform is fully compliant with the Kenya Data Protection Act 2019 and follows 
               international best practices for data protection.
             </p>
           </div>
@@ -166,8 +166,8 @@ const PrivacyPolicy = () => {
 
             <p className="mt-4">
               To exercise these rights, contact our Data Protection Officer at{" "}
-              <a href="mailto:privacy@mradipro.co.ke" className="text-primary hover:underline">
-                privacy@mradipro.co.ke
+              <a href="mailto:privacy@UjenziXform.co.ke" className="text-primary hover:underline">
+                privacy@UjenziXform.co.ke
               </a>
             </p>
           </CardContent>
@@ -216,7 +216,7 @@ const PrivacyPolicy = () => {
           </CardHeader>
           <CardContent className="prose prose-gray max-w-none">
             <p>
-              MradiPro is not intended for users under 18 years of age. We do not knowingly collect 
+              UjenziXform is not intended for users under 18 years of age. We do not knowingly collect 
               personal information from children. If we discover that a child has provided us with 
               personal information, we will delete it immediately.
             </p>
@@ -249,9 +249,9 @@ const PrivacyPolicy = () => {
           <CardContent className="prose prose-gray max-w-none">
             <p>For privacy-related inquiries or to exercise your data rights:</p>
             <ul className="list-none pl-0 space-y-2 mt-4">
-              <li><strong>Data Protection Officer:</strong> privacy@mradipro.co.ke</li>
-              <li><strong>General Inquiries:</strong> support@mradipro.co.ke</li>
-              <li><strong>Phone:</strong> +254-700-MRADIPRO</li>
+              <li><strong>Data Protection Officer:</strong> privacy@UjenziXform.co.ke</li>
+              <li><strong>General Inquiries:</strong> support@UjenziXform.co.ke</li>
+              <li><strong>Phone:</strong> +254-700-UjenziXform</li>
               <li><strong>Address:</strong> Nairobi, Kenya</li>
             </ul>
 

@@ -408,7 +408,7 @@ const SuppliersMobileOptimized = () => {
                       </div>
                       <CardTitle className="text-xl">Supplier</CardTitle>
                       <CardDescription className="text-amber-100">
-                        Sell your materials on MradiPro
+                        Sell your materials on UjenziXform
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="pt-4 space-y-4">

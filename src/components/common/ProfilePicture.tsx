@@ -47,8 +47,8 @@ export const ProfilePicture: React.FC<ProfilePictureProps> = ({
   );
 };
 
-// MradiPro Logo Component (for company branding)
-export const MradiProLogo: React.FC<{
+// UjenziXform Logo Component (for company branding)
+export const UjenziXformLogo: React.FC<{
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
   className?: string;
   showText?: boolean;
@@ -63,7 +63,7 @@ export const MradiProLogo: React.FC<{
       <div className={`relative ${sizeClasses[size]}`}>
         <img
           src={logoSrc}
-          alt="MradiPro Logo"
+          alt="UjenziXform Logo"
           className="w-full h-full rounded-full object-cover border-2 border-gray-200 shadow-sm"
           onError={() => setImgError(true)}
         />
@@ -71,7 +71,7 @@ export const MradiProLogo: React.FC<{
       {showText && (
         <div className="flex flex-col">
           <span className="font-bold text-[#0F2C59] text-lg">MRADIPRO</span>
-          <span className="text-xs text-[#4A9FD8]">Jenga na MradiPro</span>
+          <span className="text-xs text-[#4A9FD8]">Jenga na UjenziXform</span>
         </div>
       )}
     </div>

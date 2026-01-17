@@ -107,7 +107,7 @@ const Index = () => {
       name: "John Kamau",
       role: "General Contractor",
       location: "Nairobi",
-      content: "MradiPro has revolutionized how I source materials. The GPS tracking and QR verification give me peace of mind.",
+      content: "UjenziXform has revolutionized how I source materials. The GPS tracking and QR verification give me peace of mind.",
       rating: 5,
       image: "JK"
     },
@@ -195,7 +195,7 @@ const Index = () => {
 
             <AnimatedSection animation="fadeInUp" delay={100}>
               <h3 className="text-2xl md:text-3xl font-semibold mb-4 text-orange-400">
-                Welcome to MradiPro
+                Welcome to UjenziXform
               </h3>
               <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
                 <span className="text-white">Building Kenya's</span>
@@ -300,7 +300,7 @@ const Index = () => {
       <section className="pt-12 pb-6 bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 text-white">
         <div className="container mx-auto px-4">
           <div className="text-center mb-8">
-            <Badge className="mb-4 bg-white/10 text-white border-white/20">New to MradiPro?</Badge>
+            <Badge className="mb-4 bg-white/10 text-white border-white/20">New to UjenziXform?</Badge>
             <h2 className="text-3xl font-bold mb-2">Join Our Platform</h2>
             <p className="text-white/70 max-w-xl mx-auto">Register based on your role to access tailored features</p>
           </div>
@@ -431,7 +431,7 @@ const Index = () => {
               </h2>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
                 From finding materials to monitoring your construction site, 
-                MradiPro has all the tools you need in one powerful platform.
+                UjenziXform has all the tools you need in one powerful platform.
               </p>
             </div>
           </AnimatedSection>
@@ -470,7 +470,7 @@ const Index = () => {
                 🎬 Platform Demo
               </Badge>
               <h2 className="text-3xl md:text-4xl font-bold mb-4">
-                See MradiPro in Action
+                See UjenziXform in Action
               </h2>
               <p className="text-lg text-gray-300 max-w-2xl mx-auto">
                 Watch how our platform transforms construction management across Kenya
@@ -483,7 +483,7 @@ const Index = () => {
               videoId="pedwSxiDpCs"
               useYouTube={true}
               thumbnail="https://img.youtube.com/vi/pedwSxiDpCs/maxresdefault.jpg"
-              title="MradiPro Complete Platform Demo"
+              title="UjenziXform Complete Platform Demo"
               description="See all features in action"
             />
           </div>
@@ -661,7 +661,7 @@ const Index = () => {
               Ready to Transform Your Construction Business?
             </h2>
             <p className="text-xl text-white/80 mb-8 max-w-2xl mx-auto">
-              Join 5,200+ construction professionals already using MradiPro to grow their business
+              Join 5,200+ construction professionals already using UjenziXform to grow their business
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <Link to="/builder-registration">

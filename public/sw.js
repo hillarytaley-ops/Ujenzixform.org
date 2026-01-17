@@ -1,16 +1,16 @@
 // ============================================================
-// MradiPro Service Worker - Enhanced PWA Support
+// UjenziXform Service Worker - Enhanced PWA Support
 // Version: 6.0
 // Features: Offline caching, background sync, push notifications,
 //           periodic sync, share target, file handling
 // ============================================================
 
 const CACHE_VERSION = 'v8';
-const STATIC_CACHE = `mradipro-static-${CACHE_VERSION}`;
-const DYNAMIC_CACHE = `mradipro-dynamic-${CACHE_VERSION}`;
-const API_CACHE = `mradipro-api-${CACHE_VERSION}`;
-const IMAGE_CACHE = `mradipro-images-${CACHE_VERSION}`;
-const OFFLINE_CACHE = `mradipro-offline-${CACHE_VERSION}`;
+const STATIC_CACHE = `UjenziXform-static-${CACHE_VERSION}`;
+const DYNAMIC_CACHE = `UjenziXform-dynamic-${CACHE_VERSION}`;
+const API_CACHE = `UjenziXform-api-${CACHE_VERSION}`;
+const IMAGE_CACHE = `UjenziXform-images-${CACHE_VERSION}`;
+const OFFLINE_CACHE = `UjenziXform-offline-${CACHE_VERSION}`;
 
 // Critical assets to cache immediately on install
 const STATIC_ASSETS = [
@@ -18,9 +18,9 @@ const STATIC_ASSETS = [
   '/index.html',
   '/offline.html',
   '/manifest.json',
-  '/mradipro-logo.png',
-  '/mradipro-favicon.svg',
-  '/mradipro-logo-circular.svg',
+  '/UjenziXform-logo.png',
+  '/UjenziXform-favicon.svg',
+  '/UjenziXform-logo-circular.svg',
 ];
 
 // Pages to cache for offline access
@@ -49,14 +49,14 @@ const MAX_IMAGE_CACHE_ITEMS = 200;
 const MAX_API_CACHE_AGE = 5 * 60 * 1000; // 5 minutes
 
 // IndexedDB for offline data
-const DB_NAME = 'mradipro-offline';
+const DB_NAME = 'UjenziXform-offline';
 const DB_VERSION = 1;
 
 // ============================================================
 // INSTALL EVENT - Cache static assets
 // ============================================================
 self.addEventListener('install', (event) => {
-  console.log('[SW] Installing MradiPro service worker v5...');
+  console.log('[SW] Installing UjenziXform service worker v5...');
   
   event.waitUntil(
     Promise.all([
@@ -250,7 +250,7 @@ async function cacheFirstWithNetwork(request, cacheName) {
     
     // Return placeholder for images
     if (isImageRequest(request)) {
-      return caches.match('/mradipro-logo.png');
+      return caches.match('/UjenziXform-logo.png');
     }
     
     return caches.match('/offline.html');
@@ -424,7 +424,7 @@ async function syncPendingOrders() {
           // Notify user
           self.registration.showNotification('Order Synced', {
             body: `Order ${order.id} has been submitted successfully.`,
-            icon: '/mradipro-logo.png'
+            icon: '/UjenziXform-logo.png'
           });
         }
       } catch (e) {
@@ -509,10 +509,10 @@ self.addEventListener('push', (event) => {
   console.log('[SW] Push notification received');
   
   let data = { 
-    title: 'MradiPro', 
+    title: 'UjenziXform', 
     body: 'You have a new notification',
-    icon: '/mradipro-logo.png',
-    badge: '/mradipro-favicon.svg'
+    icon: '/UjenziXform-logo.png',
+    badge: '/UjenziXform-favicon.svg'
   };
   
   if (event.data) {
@@ -525,10 +525,10 @@ self.addEventListener('push', (event) => {
   
   const options = {
     body: data.body,
-    icon: data.icon || '/mradipro-logo.png',
-    badge: data.badge || '/mradipro-favicon.svg',
+    icon: data.icon || '/UjenziXform-logo.png',
+    badge: data.badge || '/UjenziXform-favicon.svg',
     vibrate: [100, 50, 100, 50, 100],
-    tag: data.tag || `mradipro-${Date.now()}`,
+    tag: data.tag || `UjenziXform-${Date.now()}`,
     renotify: true,
     requireInteraction: data.requireInteraction || false,
     data: {
@@ -696,4 +696,4 @@ self.addEventListener('unhandledrejection', (event) => {
   console.error('[SW] Unhandled rejection:', event.reason);
 });
 
-console.log('[SW] MradiPro Service Worker loaded - Version:', CACHE_VERSION);
+console.log('[SW] UjenziXform Service Worker loaded - Version:', CACHE_VERSION);

@@ -1233,7 +1233,7 @@ export const MaterialsGrid = () => {
         <Alert className="bg-gradient-to-r from-green-50 to-blue-50 border-green-300">
           <PartyPopper className="h-5 w-5 text-green-600" />
           <AlertDescription className="ml-2">
-            <strong className="text-green-800">🎉 Welcome to MradiPro!</strong>
+            <strong className="text-green-800">🎉 Welcome to UjenziXform!</strong>
             <p className="mt-1">
               {searchParams.get('welcome') === 'private_client' ? (
                 <>You can now <strong>purchase materials directly</strong> using the <span className="text-green-600 font-bold">"Buy Now"</span> buttons below. Start shopping!</>
@@ -1410,7 +1410,7 @@ export const MaterialsGrid = () => {
                     unit: material.unit,
                     unit_price: material.unit_price,
                     image_url: imageUrl,
-                    supplier_name: material.supplier?.company_name || 'MradiPro Catalog',
+                    supplier_name: material.supplier?.company_name || 'UjenziXform Catalog',
                     supplier_id: material.supplier_id
                   }, currentQty);
                   toast({
@@ -1507,7 +1507,7 @@ export const MaterialsGrid = () => {
                       {/* Supplier Info */}
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Store className="h-3 w-3 flex-shrink-0" />
-                        <span className="font-medium truncate">{material.supplier?.company_name || 'MradiPro Catalog'}</span>
+                        <span className="font-medium truncate">{material.supplier?.company_name || 'UjenziXform Catalog'}</span>
                         {material.supplier?.rating > 0 && (
                           <span className="text-yellow-500 ml-auto flex-shrink-0">⭐ {material.supplier.rating.toFixed(1)}</span>
                         )}

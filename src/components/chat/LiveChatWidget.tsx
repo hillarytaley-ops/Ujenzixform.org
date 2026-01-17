@@ -218,7 +218,7 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
             if (lastStaffMsg) {
               setUnreadCount(prev => prev + 1);
               toast({
-                title: "💬 New message from MradiPro Staff",
+                title: "💬 New message from UjenziXform Staff",
                 description: lastStaffMsg.content.substring(0, 50) + '...',
               });
               
@@ -277,7 +277,7 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
             if (!isOpenRef.current) {
               setUnreadCount(prev => prev + 1);
               toast({
-                title: "💬 New message from MradiPro Staff",
+                title: "💬 New message from UjenziXform Staff",
                 description: newMsg.content.substring(0, 50) + '...',
               });
               
@@ -368,7 +368,7 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
       conversation_id: currentConversationId,
       sender_id: userId || guestSenderId, // TEXT field, not UUID FK
       sender_type: dbSenderType,
-      sender_name: senderType === 'bot' ? 'MradiPro AI' : userName,
+      sender_name: senderType === 'bot' ? 'UjenziXform AI' : userName,
       content: content,
       message_type: 'text',
       read: false
@@ -421,7 +421,7 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
     // Check for human support request
     if (query.includes('human') || query.includes('staff') || query.includes('person') || query.includes('agent') || query.includes('talk to someone') || query.includes('real person')) {
       return {
-        response: `👤 **Connecting you to MradiPro Staff...**\n\nI'm switching you to our human support team. A staff member will respond shortly.\n\n**While you wait:**\n• Our team typically responds within 5-10 minutes\n• Office hours: Mon-Fri 8AM-6PM, Sat 9AM-4PM\n• For urgent matters, call: +254-700-MRADIPRO\n\n**What would you like help with?**`,
+        response: `👤 **Connecting you to UjenziXform Staff...**\n\nI'm switching you to our human support team. A staff member will respond shortly.\n\n**While you wait:**\n• Our team typically responds within 5-10 minutes\n• Office hours: Mon-Fri 8AM-6PM, Sat 9AM-4PM\n• For urgent matters, call: +254-700-MRADIPRO\n\n**What would you like help with?**`,
         suggestions: ['I have a billing question', 'Technical issue', 'Order problem', 'General inquiry']
       };
     }
@@ -460,7 +460,7 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
 
     // Default response
     return {
-      response: `Hi! I'm MradiPro AI 🤖🇰🇪\n\nI can help with:\n• **Prices** - Material costs\n• **Calculate** - Quantities needed\n• **Find** - Suppliers near you\n• **Delivery** - Costs & tracking\n• **Human Support** - Talk to our staff\n\nWhat would you like to know?`,
+      response: `Hi! I'm UjenziXform AI 🤖🇰🇪\n\nI can help with:\n• **Prices** - Material costs\n• **Calculate** - Quantities needed\n• **Find** - Suppliers near you\n• **Delivery** - Costs & tracking\n• **Human Support** - Talk to our staff\n\nWhat would you like to know?`,
       suggestions: ['Cement prices', 'Find suppliers', 'Delivery costs', 'Talk to human staff']
     };
   };
@@ -617,7 +617,7 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
               )}
               <div>
                 <div className="font-semibold flex items-center gap-2">
-                  MradiPro
+                  UjenziXform
                   <Badge variant="secondary" className="text-xs bg-white/20">
                     {mode === 'human' ? 'Live Support' : 'AI Assistant'}
                   </Badge>
@@ -662,7 +662,7 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
                 <div className="flex items-start gap-2">
                   <Bot className="h-5 w-5 mt-1 text-blue-600 flex-shrink-0" />
                   <div className="text-sm text-gray-700">
-                    <strong className="text-blue-600">MradiPro:</strong> <span className="text-gray-800">Karibu! 🇰🇪 I can help you with construction materials, prices, suppliers, and deliveries.</span>
+                    <strong className="text-blue-600">UjenziXform:</strong> <span className="text-gray-800">Karibu! 🇰🇪 I can help you with construction materials, prices, suppliers, and deliveries.</span>
                     <br /><br />
                     <strong className="text-gray-800">Need human support?</strong> <span className="text-gray-700">Just type "talk to staff" anytime!</span>
                   </div>
@@ -723,7 +723,7 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
                         : 'bg-white border border-gray-200'
                     }`}>
                       <div className={`text-sm whitespace-pre-line ${msg.role !== 'user' ? 'text-gray-800' : ''}`}>
-                        {msg.role === 'bot' && <strong className="text-blue-600">MradiPro: </strong>}
+                        {msg.role === 'bot' && <strong className="text-blue-600">UjenziXform: </strong>}
                         {msg.role === 'staff' && <strong className="text-purple-600">Staff: </strong>}
                         <span className={msg.role === 'bot' ? 'text-gray-700' : msg.role === 'staff' ? 'text-purple-800' : ''}>{msg.content}</span>
                       </div>
@@ -780,7 +780,7 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
         <div className="border-t p-4 bg-white">
           <div className="flex gap-2">
             <Input
-              placeholder={mode === 'human' ? "Message staff..." : "Ask MradiPro..."}
+              placeholder={mode === 'human' ? "Message staff..." : "Ask UjenziXform..."}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyPress={(e) => {
@@ -801,7 +801,7 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
           <div className="text-xs text-gray-500 mt-2 flex items-center justify-between">
             <div className="flex items-center gap-1">
               <Sparkles className="h-3 w-3" />
-              MradiPro 🇰🇪 • {mode === 'human' ? 'Live Support' : 'AI + Human Support'}
+              UjenziXform 🇰🇪 • {mode === 'human' ? 'Live Support' : 'AI + Human Support'}
             </div>
             {mode === 'ai' && (
               <button 

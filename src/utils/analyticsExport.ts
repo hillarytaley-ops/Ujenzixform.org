@@ -111,7 +111,7 @@ const generatePDFHTML = (data: ExportData): string => {
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>MradiPro Analytics Report</title>
+  <title>UjenziXform Analytics Report</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -223,7 +223,7 @@ const generatePDFHTML = (data: ExportData): string => {
 </head>
 <body>
   <div class="header">
-    <div class="logo">📊 MradiPro</div>
+    <div class="logo">📊 UjenziXform</div>
     <div class="subtitle">Monitoring Analytics Report</div>
     <div class="meta">
       Date Range: ${data.summary.dateRange}<br>
@@ -346,7 +346,7 @@ const generatePDFHTML = (data: ExportData): string => {
   </div>
 
   <div class="footer">
-    <p>MradiPro Construction Monitoring System</p>
+    <p>UjenziXform Construction Monitoring System</p>
     <p>This report was automatically generated. For questions, contact support@mradipro.com</p>
   </div>
 </body>

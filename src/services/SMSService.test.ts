@@ -1,6 +1,6 @@
 /**
  * ============================================================
- * MradiPro SMS Service Tests
+ * UjenziXform SMS Service Tests
  * ============================================================
  * 
  * Unit tests for SMS notification service
@@ -126,7 +126,7 @@ describe('SMS Templates', () => {
       const message = SMS_TEMPLATES.ORDER_PLACED('ORD-12345', 50000);
       expect(message).toContain('ORD-12345');
       expect(message).toContain('50,000');
-      expect(message).toContain('MradiPro');
+      expect(message).toContain('UjenziXform');
     });
   });
 
@@ -161,7 +161,7 @@ describe('SMS Templates', () => {
     it('should generate welcome message', () => {
       const message = SMS_TEMPLATES.WELCOME('John');
       expect(message).toContain('John');
-      expect(message).toContain('MradiPro');
+      expect(message).toContain('UjenziXform');
       expect(message).toContain('Kenya');
     });
   });

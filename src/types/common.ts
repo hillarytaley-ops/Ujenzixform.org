@@ -1,6 +1,6 @@
 /**
  * Common Types
- * Shared type definitions used across MradiPro
+ * Shared type definitions used across UjenziXform
  */
 
 // =====================================================

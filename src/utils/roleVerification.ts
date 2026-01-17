@@ -8,7 +8,7 @@
  * This utility provides centralized role verification functions that ALWAYS
  * check the database. NEVER trust localStorage alone.
  * 
- * @author MradiPro Security Team
+ * @author UjenziXform Security Team
  * @version 1.0.0
  * @lastModified December 2025
  */

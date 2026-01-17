@@ -1,7 +1,7 @@
 /**
  * ╔══════════════════════════════════════════════════════════════════════════════════════╗
  * ║                                                                                      ║
- * ║   💼 CAREERS PAGE - Professional Career Opportunities at MradiPro                  ║
+ * ║   💼 CAREERS PAGE - Professional Career Opportunities at UjenziXform                  ║
  * ║                                                                                      ║
  * ║   Created: December 27, 2025                                                         ║
  * ║   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ║
@@ -322,7 +322,7 @@ const Careers = () => {
               </h1>
               
               <p className="text-xl text-white/80 mb-8 leading-relaxed max-w-2xl mx-auto">
-                Join MradiPro and help transform how builders, suppliers, and delivery providers 
+                Join UjenziXform and help transform how builders, suppliers, and delivery providers 
                 connect across all 47 counties. We're looking for passionate people who want to 
                 make a real impact on Africa's largest industry.
               </p>
@@ -375,7 +375,7 @@ const Careers = () => {
               <Badge className="mb-4">Our Culture</Badge>
               <h2 className="text-4xl font-bold mb-4">What We Stand For</h2>
               <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
-                These principles guide everything we do at MradiPro
+                These principles guide everything we do at UjenziXform
               </p>
             </div>
             
@@ -674,7 +674,7 @@ const Careers = () => {
                   We don't have any open positions right now, but we're always looking for talented people.
                 </p>
                 <Button asChild>
-                  <a href="mailto:careers@mradipro.com">
+                  <a href="mailto:careers@UjenziXform.com">
                     Send Your Resume
                   </a>
                 </Button>
@@ -696,14 +696,14 @@ const Careers = () => {
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <Button size="lg" variant="secondary" className="text-lg px-8" asChild>
-                <a href="mailto:careers@mradipro.com">
+                <a href="mailto:careers@UjenziXform.com">
                   Send Your Resume
                   <ArrowRight className="h-5 w-5 ml-2" />
                 </a>
               </Button>
               <Button size="lg" variant="outline" className="text-white border-white/30 hover:bg-white/10 text-lg px-8" asChild>
                 <a href="/about">
-                  Learn About MradiPro
+                  Learn About UjenziXform
                 </a>
               </Button>
             </div>

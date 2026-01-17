@@ -213,7 +213,7 @@ serve(async (req: Request) => {
               'Authorization': `Bearer ${RESEND_API_KEY}`
             },
             body: JSON.stringify({
-              from: 'MradiPro Reports <reports@mradipro.com>',
+              from: 'UjenziXform Reports <reports@mradipro.com>',
               to: recipient,
               subject: `${isTest ? '[TEST] ' : ''}${report.name} - ${new Date().toLocaleDateString()}`,
               html: emailHtml
@@ -407,7 +407,7 @@ function generateReportEmail(
     </div>
     
     <div class="footer">
-      <p>MradiPro Construction Monitoring System</p>
+      <p>UjenziXform Construction Monitoring System</p>
       <p>This is an automated report. To manage your subscriptions, visit the admin dashboard.</p>
     </div>
   </div>

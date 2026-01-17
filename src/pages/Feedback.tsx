@@ -342,7 +342,7 @@ export default function Feedback() {
                   ))}
                 </div>
                 <p className="text-muted-foreground mb-4 italic">
-                  "MradiPro has transformed how I source materials. The tracking feature 
+                  "UjenziXform has transformed how I source materials. The tracking feature 
                   is a game-changer for my construction projects in Nairobi."
                 </p>
                 <div className="flex items-center gap-3">

@@ -17,7 +17,7 @@
  * - moderator: Content moderation, feedback review
  * - viewer: Read-only access to overview
  * 
- * @author MradiPro Team
+ * @author UjenziXform Team
  * @version 1.0.0
  * @lastModified December 2025
  */

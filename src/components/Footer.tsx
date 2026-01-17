@@ -22,8 +22,8 @@ const Footer = () => {
             <div className="flex items-center space-x-2 mb-4">
               <Building2 className="h-6 w-6" />
               <h3 className="text-lg font-semibold">
-                <span className="text-white">Mradi</span>
-                <span className="text-green-400">Pro</span>
+                <span className="text-white">Ujenzi</span>
+                <span className="text-green-400">Xform</span>
               </h3>
             </div>
             <p className="text-gray-400 mb-4">
@@ -33,7 +33,7 @@ const Footer = () => {
             {/* Social Media Icons */}
             <div className="flex flex-wrap gap-2 mt-4">
               <a
-                href="https://facebook.com/mradipro"
+                href="https://facebook.com/ujenzixform"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="p-2 bg-gray-800 rounded-lg hover:bg-[#1877F2] transition-all duration-300 hover:scale-110"
@@ -42,7 +42,7 @@ const Footer = () => {
                 <FacebookIcon size={18} className="text-white" />
               </a>
               <a
-                href="https://twitter.com/mradipro"
+                href="https://twitter.com/ujenzixform"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="p-2 bg-gray-800 rounded-lg hover:bg-black transition-all duration-300 hover:scale-110"
@@ -51,7 +51,7 @@ const Footer = () => {
                 <TwitterIcon size={18} className="text-white" />
               </a>
               <a
-                href="https://instagram.com/mradipro"
+                href="https://instagram.com/ujenzixform"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="p-2 bg-gray-800 rounded-lg hover:bg-gradient-to-r hover:from-purple-600 hover:to-pink-600 transition-all duration-300 hover:scale-110"
@@ -60,7 +60,7 @@ const Footer = () => {
                 <InstagramIcon size={18} className="text-white" />
               </a>
               <a
-                href="https://tiktok.com/@mradipro"
+                href="https://tiktok.com/@ujenzixform"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="p-2 bg-gray-800 rounded-lg hover:bg-black transition-all duration-300 hover:scale-110"
@@ -69,7 +69,7 @@ const Footer = () => {
                 <TikTokIcon size={18} className="text-white" />
               </a>
               <a
-                href="https://linkedin.com/company/mradipro"
+                href="https://linkedin.com/company/ujenzixform"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="p-2 bg-gray-800 rounded-lg hover:bg-[#0A66C2] transition-all duration-300 hover:scale-110"
@@ -78,7 +78,7 @@ const Footer = () => {
                 <LinkedInIcon size={18} className="text-white" />
               </a>
               <a
-                href="https://youtube.com/@mradipro"
+                href="https://youtube.com/@ujenzixform"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="p-2 bg-gray-800 rounded-lg hover:bg-[#FF0000] transition-all duration-300 hover:scale-110"
@@ -155,7 +155,7 @@ const Footer = () => {
         <div className="border-t border-gray-800 mt-8 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-gray-400 text-center md:text-left">
-              &copy; {new Date().getFullYear()} MradiPro. All rights reserved. Made with ❤️ in Kenya 🇰🇪
+              &copy; {new Date().getFullYear()} UjenziXform. All rights reserved. Made with ❤️ in Kenya 🇰🇪
             </p>
             
             {/* Bottom Social Icons - Mobile Only */}

@@ -519,7 +519,7 @@ const DeliveryRegistration = () => {
               <CardDescription>
                 {existingUser 
                   ? "You're already signed in. Complete your delivery provider profile to start earning."
-                  : "Complete all steps to start delivering construction materials on MradiPro"
+                  : "Complete all steps to start delivering construction materials on UjenziXform"
                 }
               </CardDescription>
             </CardHeader>

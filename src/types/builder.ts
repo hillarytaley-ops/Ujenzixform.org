@@ -1,6 +1,6 @@
 /**
  * Builder Types
- * Comprehensive type definitions for builders in MradiPro
+ * Comprehensive type definitions for builders in UjenziXform
  */
 
 export type BuilderCategory = 'professional' | 'private';

@@ -85,7 +85,7 @@ export const PriceComparisonModal: React.FC<PriceComparisonModalProps> = ({
       unit: material.unit,
       unit_price: material.unit_price,
       image_url: material.image_url,
-      supplier_name: material.supplier?.company_name || 'MradiPro Catalog',
+      supplier_name: material.supplier?.company_name || 'UjenziXform Catalog',
       supplier_id: material.supplier_id
     }, 1);
     
@@ -202,7 +202,7 @@ export const PriceComparisonModal: React.FC<PriceComparisonModalProps> = ({
                     {/* Supplier */}
                     <td className="py-3">
                       <div className="text-sm">
-                        <p className="text-gray-700">{material.supplier?.company_name || 'MradiPro'}</p>
+                        <p className="text-gray-700">{material.supplier?.company_name || 'UjenziXform'}</p>
                         {material.supplier?.rating && (
                           <div className="flex items-center gap-0.5 text-yellow-500">
                             <Star className="h-3 w-3 fill-current" />

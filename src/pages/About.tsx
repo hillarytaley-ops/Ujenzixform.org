@@ -106,7 +106,7 @@ const About: React.FC = () => {
   ];
 
   const milestones = [
-    { year: "2023", title: "Founded", description: "MradiPro was born in Nairobi" },
+    { year: "2023", title: "Founded", description: "UjenziXform was born in Nairobi" },
     { year: "2023", title: "100+ Users", description: "First hundred builders joined" },
     { year: "2024", title: "47 Counties", description: "Nationwide coverage achieved" },
     { year: "2024", title: "1000+ Projects", description: "Milestone projects completed" },
@@ -170,7 +170,7 @@ const About: React.FC = () => {
               <AnimatedSection animation="fadeInUp" delay={100}>
                 <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight">
                   <span className="bg-gradient-to-r from-white via-blue-200 to-white bg-clip-text text-transparent">
-                    About MradiPro
+                    About UjenziXform
                   </span>
                 </h1>
               </AnimatedSection>
@@ -257,7 +257,7 @@ const About: React.FC = () => {
                     </h2>
                     <div className="space-y-4 text-lg text-muted-foreground">
                       <p>
-                        MradiPro was born from a simple observation: Kenya's construction industry needed
+                        UjenziXform was born from a simple observation: Kenya's construction industry needed
                         not just better connections, but complete project visibility.
                       </p>
                       <p>

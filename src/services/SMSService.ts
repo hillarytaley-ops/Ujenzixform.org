@@ -1,6 +1,6 @@
 /**
  * ============================================================
- * MradiPro SMS Notification Service
+ * UjenziXform SMS Notification Service
  * ============================================================
  * 
  * This service handles SMS notifications via Africa's Talking API.
@@ -93,51 +93,51 @@ export interface SMSRecord {
 export const SMS_TEMPLATES = {
   // Order notifications
   ORDER_PLACED: (orderId: string, total: number) => 
-    `MradiPro: Your order #${orderId} for KES ${total.toLocaleString()} has been placed. Track at mradipro.co.ke/tracking`,
+    `UjenziXform: Your order #${orderId} for KES ${total.toLocaleString()} has been placed. Track at UjenziXform.co.ke/tracking`,
   
   ORDER_CONFIRMED: (orderId: string) =>
-    `MradiPro: Order #${orderId} confirmed! Supplier is preparing your materials. We'll notify you when ready.`,
+    `UjenziXform: Order #${orderId} confirmed! Supplier is preparing your materials. We'll notify you when ready.`,
   
   ORDER_SHIPPED: (orderId: string, trackingNo: string) =>
-    `MradiPro: Order #${orderId} is on the way! Track: ${trackingNo}. Driver will call on arrival.`,
+    `UjenziXform: Order #${orderId} is on the way! Track: ${trackingNo}. Driver will call on arrival.`,
   
   ORDER_DELIVERED: (orderId: string) =>
-    `MradiPro: Order #${orderId} delivered! Please confirm receipt in the app. Thank you for using MradiPro!`,
+    `UjenziXform: Order #${orderId} delivered! Please confirm receipt in the app. Thank you for using UjenziXform!`,
 
   // Delivery notifications
   DELIVERY_ASSIGNED: (driverName: string, phone: string) =>
-    `MradiPro: ${driverName} will deliver your order. Driver: ${phone}. Track live in app.`,
+    `UjenziXform: ${driverName} will deliver your order. Driver: ${phone}. Track live in app.`,
   
   DELIVERY_NEARBY: (minutes: number) =>
-    `MradiPro: Your delivery arrives in ~${minutes} mins! Please be ready to receive.`,
+    `UjenziXform: Your delivery arrives in ~${minutes} mins! Please be ready to receive.`,
   
   DELIVERY_ARRIVED: (code: string) =>
-    `MradiPro: Driver has arrived! Confirmation code: ${code}. Show this to the driver.`,
+    `UjenziXform: Driver has arrived! Confirmation code: ${code}. Show this to the driver.`,
 
   // Payment notifications
   PAYMENT_RECEIVED: (amount: number, receipt: string) =>
-    `MradiPro: Payment of KES ${amount.toLocaleString()} received. Receipt: ${receipt}. Thank you!`,
+    `UjenziXform: Payment of KES ${amount.toLocaleString()} received. Receipt: ${receipt}. Thank you!`,
   
   PAYMENT_FAILED: (orderId: string) =>
-    `MradiPro: Payment for order #${orderId} failed. Please retry or contact support.`,
+    `UjenziXform: Payment for order #${orderId} failed. Please retry or contact support.`,
 
   // OTP & Verification
   OTP_CODE: (code: string) =>
-    `MradiPro: Your verification code is ${code}. Valid for 10 minutes. Do not share this code.`,
+    `UjenziXform: Your verification code is ${code}. Valid for 10 minutes. Do not share this code.`,
   
   WELCOME: (name: string) =>
-    `Welcome to MradiPro, ${name}! Kenya's #1 construction materials platform. Start ordering at mradipro.co.ke`,
+    `Welcome to UjenziXform, ${name}! Kenya's #1 construction materials platform. Start ordering at UjenziXform.co.ke`,
 
   // Monitoring alerts
   MONITORING_ALERT: (project: string, alert: string) =>
-    `MradiPro Alert: ${project} - ${alert}. View cameras at mradipro.co.ke/monitoring`,
+    `UjenziXform Alert: ${project} - ${alert}. View cameras at UjenziXform.co.ke/monitoring`,
 
   // Quote notifications
   QUOTE_RECEIVED: (supplier: string, amount: number) =>
-    `MradiPro: New quote from ${supplier} for KES ${amount.toLocaleString()}. View in app to accept.`,
+    `UjenziXform: New quote from ${supplier} for KES ${amount.toLocaleString()}. View in app to accept.`,
   
   QUOTE_EXPIRING: (supplier: string, hours: number) =>
-    `MradiPro: Quote from ${supplier} expires in ${hours} hours. Accept now to lock in price!`,
+    `UjenziXform: Quote from ${supplier} expires in ${hours} hours. Accept now to lock in price!`,
 };
 
 // ============================================================
@@ -153,7 +153,7 @@ class SMSService {
       provider: (import.meta.env.VITE_SMS_PROVIDER as 'africastalking' | 'twilio') || 'africastalking',
       apiKey: import.meta.env.VITE_AFRICASTALKING_API_KEY || '',
       username: import.meta.env.VITE_AFRICASTALKING_USERNAME || 'sandbox',
-      senderId: import.meta.env.VITE_AFRICASTALKING_SENDER_ID || 'MradiPro',
+      senderId: import.meta.env.VITE_AFRICASTALKING_SENDER_ID || 'UjenziXform',
       environment: (import.meta.env.VITE_SMS_ENV as 'sandbox' | 'production') || 'sandbox',
     };
 

@@ -196,7 +196,7 @@ export const WebhookIntegrations: React.FC = () => {
       const testPayload = buildPayload(webhook.platform, {
         type: 'test',
         title: '🧪 Test Notification',
-        message: 'This is a test message from MradiPro to verify your webhook integration.',
+        message: 'This is a test message from UjenziXform to verify your webhook integration.',
         severity: 'info',
         timestamp: new Date().toISOString()
       });
@@ -288,7 +288,7 @@ export const WebhookIntegrations: React.FC = () => {
               { name: 'Severity', value: data.severity, inline: true },
               { name: 'Time', value: format(new Date(data.timestamp), 'MMM dd, HH:mm'), inline: true }
             ],
-            footer: { text: 'MradiPro Monitoring' }
+            footer: { text: 'UjenziXform Monitoring' }
           }]
         };
 
