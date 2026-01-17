@@ -326,30 +326,26 @@ const Delivery = () => {
         }
       }
       
-      // Use minimal columns that are most likely to exist
+      // Build insert data based on discovered columns
+      // We know material_type is required, let's include all likely fields
       const insertData: Record<string, any> = {
-        id: crypto.randomUUID(),
-        status: 'pending',
-        created_at: new Date().toISOString()
-      };
-      
-      // Try common column name variations
-      // Store all form data in a 'metadata' or 'data' JSON field if it exists
-      const formData = {
-        tracking_number: trackingNumber,
-        pickup_address: deliveryForm.pickupAddress,
-        delivery_address: deliveryForm.deliveryAddress,
         material_type: deliveryForm.materialType,
         quantity: deliveryForm.quantity,
-        unit: deliveryForm.unit,
-        contact_name: deliveryForm.contactName,
-        contact_phone: deliveryForm.contactPhone,
-        special_instructions: deliveryForm.specialInstructions,
-        urgency: deliveryForm.urgency
+        status: 'pending'
       };
       
-      console.log('📦 Form data to insert:', formData);
-      console.log('📦 Trying minimal insert with just id, status, created_at...');
+      // Add other fields that might exist
+      // We'll try these and see which ones work
+      insertData.tracking_number = trackingNumber;
+      insertData.pickup_address = deliveryForm.pickupAddress;
+      insertData.delivery_address = deliveryForm.deliveryAddress;
+      insertData.unit = deliveryForm.unit;
+      insertData.contact_name = deliveryForm.contactName;
+      insertData.contact_phone = deliveryForm.contactPhone;
+      insertData.notes = deliveryForm.specialInstructions || null;
+      insertData.urgency = deliveryForm.urgency;
+      
+      console.log('📦 Insert data:', insertData);
 
       // Use direct fetch with AbortController for timeout
       const controller = new AbortController();
