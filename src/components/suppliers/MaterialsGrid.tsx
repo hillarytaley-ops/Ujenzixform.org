@@ -1586,23 +1586,31 @@ export const MaterialsGrid = () => {
                     className={`overflow-hidden hover:shadow-xl transition-shadow duration-300 group flex flex-col ${itemInCart ? 'ring-2 ring-green-500' : ''} ${isSelectedForCompare ? 'ring-2 ring-purple-500' : ''}`}
                     onMouseEnter={() => prefetchAdditionalImages(material)}
                   >
-                    {/* Image Section - Fixed height with skeleton loading */}
+                    {/* Image Section - Fixed height */}
                     <div className="relative bg-white overflow-hidden h-44 flex-shrink-0 group/image">
-                      {/* Use LazyImage for optimized loading with category-based fallback */}
-                      <LazyImage
-                        src={imageUrl || ''}
-                        alt={material.name}
-                        className="w-full h-full object-contain p-3 bg-white cursor-pointer transition-transform duration-200 group-hover/image:scale-105"
-                        loading="lazy"
-                        category={material.category}
-                        showIconFallback={false}
-                      />
-                      {/* Click overlay for gallery */}
-                      <div 
-                        className="absolute inset-0 cursor-pointer" 
-                        onClick={() => openGallery(material)}
-                        aria-label={`View ${material.name} gallery`}
-                      />
+                      {imageUrl ? (
+                        <img
+                          src={imageUrl}
+                          alt={material.name}
+                          className="w-full h-full object-contain p-3 bg-white cursor-pointer transition-transform duration-200 group-hover/image:scale-105"
+                          loading="lazy"
+                          decoding="async"
+                          style={{ imageRendering: 'auto' }}
+                          onClick={() => openGallery(material)}
+                          onError={(e) => {
+                            // On error, try category default image
+                            const target = e.currentTarget;
+                            const defaultImg = getDefaultCategoryImage(material.category);
+                            if (defaultImg && target.src !== defaultImg) {
+                              target.src = defaultImg;
+                            }
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                          <Package className="h-16 w-16 text-muted-foreground" />
+                        </div>
+                      )}
                       {/* Category Badge */}
                       <div className="absolute top-2 left-2">
                         <Badge variant="secondary" className="bg-black/60 text-white border-none" style={{ fontSize: '10px' }}>
