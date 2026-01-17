@@ -576,7 +576,7 @@ export const MaterialsGrid = () => {
 
   useEffect(() => {
     // FAST: Use cached session first, then verify in background
-    const initializeAuth = () => {
+    const initializeAuth = async () => {
       // Try to get cached role from localStorage for instant display
       const cachedRole = localStorage.getItem('user_role');
       const cachedUserId = localStorage.getItem('user_id');
@@ -589,11 +589,37 @@ export const MaterialsGrid = () => {
         setAuthChecked(true);
         console.log('MaterialsGrid - INSTANT from cache:', cachedRole);
         
-        // Verify in background (non-blocking)
+        // Verify in background (non-blocking) - don't await
         verifyAuthInBackground();
       } else {
-        // No cache - need to check Supabase
-        checkSupabaseAuth();
+        // No cache - check Supabase but set authChecked quickly
+        // First, set authChecked to true with unauthenticated state
+        // This prevents "Loading..." from showing
+        setAuthChecked(true);
+        setIsAuthenticated(false);
+        
+        // Then check Supabase in background
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user) {
+            setIsAuthenticated(true);
+            setBuilderId(session.user.id);
+            localStorage.setItem('user_id', session.user.id);
+            
+            const { data: roleData } = await supabase
+              .from('user_roles')
+              .select('role')
+              .eq('user_id', session.user.id)
+              .maybeSingle();
+            
+            const role = roleData?.role || null;
+            setUserRole(role);
+            if (role) localStorage.setItem('user_role', role);
+            console.log('MaterialsGrid - Fresh auth:', session.user.email, 'Role:', role);
+          }
+        } catch (error) {
+          console.error('Error checking auth:', error);
+        }
       }
     };
     
@@ -617,48 +643,18 @@ export const MaterialsGrid = () => {
           }
           console.log('MaterialsGrid - Background verified:', role);
         } else {
-          // Session expired - clear cache
+          // Session expired - clear cache and update state
           setIsAuthenticated(false);
           setUserRole(null);
           localStorage.removeItem('user_role');
           localStorage.removeItem('user_id');
-          setAuthChecked(true);
         }
       } catch (error) {
         console.error('Background auth verify error:', error);
       }
     };
     
-    const checkSupabaseAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-          setIsAuthenticated(true);
-          setBuilderId(session.user.id);
-          localStorage.setItem('user_id', session.user.id);
-          
-          const { data: roleData } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', session.user.id)
-            .maybeSingle();
-          
-          const role = roleData?.role || null;
-          setUserRole(role);
-          if (role) localStorage.setItem('user_role', role);
-          console.log('MaterialsGrid - Fresh auth:', session.user.email, 'Role:', role);
-        } else {
-          setIsAuthenticated(false);
-          setUserRole(null);
-        }
-      } catch (error) {
-        console.error('Error checking auth:', error);
-      } finally {
-        setAuthChecked(true);
-      }
-    };
-    
-    // Initialize immediately (synchronous for cached values)
+    // Initialize immediately
     initializeAuth();
     
     // Load materials
