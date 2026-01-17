@@ -905,14 +905,6 @@ export const MaterialsGrid = () => {
       setMaterials(allMaterials);
       setFilteredMaterials(allMaterials);
       console.log(`🎉 Successfully loaded ${allMaterials.length} materials to display`);
-      
-      // Debug: Log first 3 materials with their image URLs
-      allMaterials.slice(0, 3).forEach((m, i) => {
-        console.log(`📸 Material ${i + 1}: ${m.name}`);
-        console.log(`   - image_url exists: ${!!m.image_url}`);
-        console.log(`   - image_url type: ${m.image_url?.startsWith('data:') ? 'base64' : m.image_url?.startsWith('http') ? 'URL' : m.image_url?.startsWith('/') ? 'local' : 'unknown'}`);
-        console.log(`   - image_url length: ${m.image_url?.length || 0}`);
-      });
     } catch (error) {
       console.error('Error loading materials:', error);
       // Show empty state on error
@@ -1406,23 +1398,9 @@ export const MaterialsGrid = () => {
         </Card>
       ) : (
         <div ref={gridRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredMaterials.map((material, index) => {
+          {filteredMaterials.map((material) => {
                 // Get image URL - prefer material's own image, fallback to category default
-                const materialImageUrl = material.image_url;
-                const categoryDefault = getDefaultCategoryImage(material.category);
-                const imageUrl = materialImageUrl || categoryDefault || '/cement.png'; // Ultimate fallback
-                
-                // Debug first 5 cards
-                if (index < 5) {
-                  console.log(`🖼️ Card ${index + 1}:`, {
-                    name: material.name,
-                    category: material.category,
-                    hasOwnImage: !!materialImageUrl,
-                    ownImageType: materialImageUrl ? (materialImageUrl.startsWith('data:') ? 'base64' : materialImageUrl.startsWith('http') ? 'URL' : 'local') : 'none',
-                    categoryDefault: categoryDefault,
-                    finalImageUrl: imageUrl?.substring(0, 60)
-                  });
-                }
+                const imageUrl = material.image_url || getDefaultCategoryImage(material.category) || '/cement.png';
                 const currentQty = getQuantity(material.id);
                 const itemInCart = isInCart(material.id);
                 const cartQty = getItemQuantity(material.id);
@@ -1477,30 +1455,25 @@ export const MaterialsGrid = () => {
                 return (
                   <Card key={material.id} className={`overflow-hidden hover:shadow-xl transition-shadow duration-300 group flex flex-col ${itemInCart ? 'ring-2 ring-green-500' : ''} ${isSelectedForCompare ? 'ring-2 ring-purple-500' : ''}`}>
                     {/* Image Section - Fixed height */}
-                    <div className="relative bg-white overflow-hidden h-44 flex-shrink-0 group/image">
+                    <div className="relative bg-gray-100 overflow-hidden h-44 flex-shrink-0 group/image">
                       {imageUrl ? (
                         <img
                           src={imageUrl}
                           alt={material.name}
-                          className="w-full h-full object-contain p-3 bg-white cursor-pointer transition-transform duration-200 group-hover/image:scale-105"
-                          loading="eager"
-                          decoding="sync"
-                          style={{ imageRendering: 'auto' }}
+                          className="w-full h-full object-contain p-2 bg-white cursor-pointer"
+                          loading="lazy"
+                          decoding="async"
                           onClick={() => openGallery(material)}
                           onError={(e) => {
-                            console.error('Image failed to load:', material.name, imageUrl?.substring(0, 100));
                             // Fallback to category default image
                             const fallback = getDefaultCategoryImage(material.category);
                             if (fallback && e.currentTarget.src !== fallback) {
                               e.currentTarget.src = fallback;
-                            } else {
-                              // Hide the broken image
-                              e.currentTarget.style.display = 'none';
                             }
                           }}
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-white">
+                        <div className="w-full h-full flex items-center justify-center bg-gray-100">
                           <Package className="h-16 w-16 text-muted-foreground" />
                         </div>
                       )}
