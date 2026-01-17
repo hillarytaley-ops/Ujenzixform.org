@@ -3,10 +3,7 @@
  * ║                                                                                      ║
  * ║   🛡️ PROTECTED FILE - MATERIALGRID.TSX - DO NOT MODIFY WITHOUT APPROVAL             ║
  * ║                                                                                      ║
- * ║   LAST UPDATED: January 17, 2026 - v2.0 PERFORMANCE UPDATE                           ║
- * ║   - Removed Loading... button state completely                                       ║
- * ║   - Added localStorage caching for instant load                                      ║
- * ║   - Auth state initialized from cache                                                ║
+ * ║   LAST UPDATED: December 27, 2025                                                    ║
  * ║   PROTECTED FEATURES:                                                                ║
  * ║   1. Price Comparison Feature - "Compare Price" button on each card                 ║
  * ║   2. Quantity counter starting from 0                                               ║
@@ -47,56 +44,6 @@ const isIOSSafari = () => {
   if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
   const ua = navigator.userAgent;
   return /iPad|iPhone|iPod/.test(ua) || (ua.includes('Mac') && 'ontouchend' in document);
-};
-
-// Product Image component - simple and reliable
-const ProductImage = ({ src, alt, category, onClick }: { 
-  src: string; 
-  alt: string; 
-  category: string;
-  onClick: () => void;
-}) => {
-  const imgRef = useRef<HTMLImageElement>(null);
-  const [imgSrc, setImgSrc] = useState(src);
-  const [errorCount, setErrorCount] = useState(0);
-  
-  // Update src when prop changes
-  useEffect(() => {
-    setImgSrc(src);
-    setErrorCount(0);
-  }, [src]);
-  
-  const handleError = () => {
-    // Only try fallback once
-    if (errorCount === 0) {
-      setErrorCount(1);
-      const defaultImg = getDefaultCategoryImage(category);
-      if (defaultImg) {
-        setImgSrc(defaultImg);
-      }
-    }
-  };
-  
-  if (!imgSrc) {
-    return (
-      <div className="w-full h-full flex items-center justify-center bg-gray-100">
-        <Package className="h-16 w-16 text-muted-foreground" />
-      </div>
-    );
-  }
-  
-  return (
-    <img
-      ref={imgRef}
-      src={imgSrc}
-      alt={alt}
-      className="w-full h-full object-contain p-3 bg-white cursor-pointer transition-transform duration-200 group-hover/image:scale-105"
-      loading="eager"
-      decoding="sync"
-      onError={handleError}
-      onClick={onClick}
-    />
-  );
 };
 
 interface Material {
@@ -346,26 +293,9 @@ const PRODUCT_CATEGORIES = [
 
 export const MaterialsGrid = () => {
   const [searchParams] = useSearchParams();
-  // Try to load from cache immediately for instant display
-  const getCachedMaterials = (): Material[] => {
-    try {
-      const cached = localStorage.getItem('materials_cache');
-      const timestamp = localStorage.getItem('materials_cache_timestamp');
-      if (cached && timestamp) {
-        const age = Date.now() - parseInt(timestamp);
-        if (age < 5 * 60 * 1000) { // 5 minutes
-          return JSON.parse(cached);
-        }
-      }
-    } catch (e) {}
-    return [];
-  };
-  
-  const initialMaterials = getCachedMaterials();
-  const [materials, setMaterials] = useState<Material[]>(initialMaterials);
-  const [filteredMaterials, setFilteredMaterials] = useState<Material[]>(initialMaterials);
-  // If we have cached materials, don't show loading state
-  const [loading, setLoading] = useState(initialMaterials.length === 0);
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [filteredMaterials, setFilteredMaterials] = useState<Material[]>([]);
+  const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMoreMaterials, setHasMoreMaterials] = useState(false);
   const [totalMaterialsCount, setTotalMaterialsCount] = useState(0);
@@ -373,21 +303,8 @@ export const MaterialsGrid = () => {
   const [selectedCategory, setSelectedCategory] = useState('All Categories');
   const [priceRange, setPriceRange] = useState('all');
   const [stockFilter, setStockFilter] = useState('all');
-  // Initialize auth state from cache for instant button display
-  const getCachedAuth = () => {
-    const cachedRole = localStorage.getItem('user_role');
-    const cachedUserId = localStorage.getItem('user_id');
-    return {
-      isAuth: !!(cachedRole && cachedUserId),
-      role: cachedRole
-    };
-  };
-  const cachedAuth = getCachedAuth();
-  
-  const [userRole, setUserRole] = useState<string | null>(cachedAuth.role);
-  const [isAuthenticated, setIsAuthenticated] = useState(cachedAuth.isAuth);
-  // Always true - we show buttons immediately based on cached auth or "Sign In" if no cache
-  const [authChecked, setAuthChecked] = useState(true);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
   const [isMultiQuoteOpen, setIsMultiQuoteOpen] = useState(false);
   const [builderId, setBuilderId] = useState<string>('');
@@ -607,123 +524,67 @@ export const MaterialsGrid = () => {
   }, [searchParams]);
 
   useEffect(() => {
-    // FAST: Use cached session first, then verify in background
-    const initializeAuth = async () => {
-      // Try to get cached role from localStorage for instant display
-      const cachedRole = localStorage.getItem('user_role');
-      const cachedUserId = localStorage.getItem('user_id');
-      
-      if (cachedRole && cachedUserId) {
-        // Instant: Use cached values - set all states synchronously
-        setIsAuthenticated(true);
-        setUserRole(cachedRole);
-        setBuilderId(cachedUserId);
-        setAuthChecked(true);
-        console.log('MaterialsGrid - INSTANT from cache:', cachedRole);
-        
-        // Verify in background (non-blocking) - don't await
-        verifyAuthInBackground();
-      } else {
-        // No cache - check Supabase but set authChecked quickly
-        // First, set authChecked to true with unauthenticated state
-        // This prevents "Loading..." from showing
-        setAuthChecked(true);
-        setIsAuthenticated(false);
-        
-        // Then check Supabase in background
-        try {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session?.user) {
-            setIsAuthenticated(true);
-            setBuilderId(session.user.id);
-            localStorage.setItem('user_id', session.user.id);
-            
-            const { data: roleData } = await supabase
-              .from('user_roles')
-              .select('role')
-              .eq('user_id', session.user.id)
-              .maybeSingle();
-            
-            const role = roleData?.role || null;
-            setUserRole(role);
-            if (role) localStorage.setItem('user_role', role);
-            console.log('MaterialsGrid - Fresh auth:', session.user.email, 'Role:', role);
-          }
-        } catch (error) {
-          console.error('Error checking auth:', error);
-        }
-      }
-    };
-    
-    const verifyAuthInBackground = async () => {
+    // Check user role for purchase flow
+    const checkUserRole = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-          setBuilderId(session.user.id);
-          localStorage.setItem('user_id', session.user.id);
-          
-          const { data: roleData } = await supabase
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          setIsAuthenticated(true);
+          setBuilderId(user.id); // Set builderId when user is logged in
+          const { data: roleData, error: roleError } = await supabase
             .from('user_roles')
             .select('role')
-            .eq('user_id', session.user.id)
+            .eq('user_id', user.id)
             .maybeSingle();
           
-          const role = roleData?.role || null;
-          if (role) {
-            setUserRole(role);
-            localStorage.setItem('user_role', role);
+          if (roleError) {
+            console.error('Error fetching user role:', roleError);
           }
-          console.log('MaterialsGrid - Background verified:', role);
+          
+          const role = roleData?.role || null;
+          setUserRole(role);
+          console.log('MaterialsGrid - User authenticated:', user.email, 'Role:', role, 'BuilderId:', user.id);
         } else {
-          // Session expired - clear cache and update state
           setIsAuthenticated(false);
           setUserRole(null);
-          localStorage.removeItem('user_role');
-          localStorage.removeItem('user_id');
+          console.log('MaterialsGrid - No user authenticated');
         }
       } catch (error) {
-        console.error('Background auth verify error:', error);
+        console.error('Error checking user role:', error);
       }
     };
     
-    // Initialize immediately
-    initializeAuth();
+    checkUserRole();
     
-    // Load materials
-    loadMaterials().catch(error => {
-      console.error('Error loading materials:', error);
-      setMaterials([]);
-      setFilteredMaterials([]);
-      setLoading(false);
-    });
-    
-    // Listen for auth state changes
+    // Also listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         setIsAuthenticated(true);
         setBuilderId(session.user.id);
-        localStorage.setItem('user_id', session.user.id);
-        
         const { data: roleData } = await supabase
           .from('user_roles')
           .select('role')
           .eq('user_id', session.user.id)
           .maybeSingle();
-        
-        const role = roleData?.role || null;
-        setUserRole(role);
-        if (role) localStorage.setItem('user_role', role);
-        setAuthChecked(true);
-      } else if (event === 'SIGNED_OUT') {
+        setUserRole(roleData?.role || null);
+        console.log('MaterialsGrid - Auth state changed:', event, 'Role:', roleData?.role);
+      } else {
         setIsAuthenticated(false);
         setUserRole(null);
-        localStorage.removeItem('user_role');
-        localStorage.removeItem('user_id');
-        setAuthChecked(true);
       }
     });
     
     return () => subscription.unsubscribe();
+    
+    // Wrap in try-catch to prevent crashes
+    try {
+      loadMaterials();
+    } catch (error) {
+      console.error('Error in loadMaterials effect:', error);
+      setMaterials([]);
+      setFilteredMaterials([]);
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -785,35 +646,6 @@ export const MaterialsGrid = () => {
     try {
       setLoading(true);
       
-      // INSTANT LOAD: Try to load from cache first for instant display
-      const CACHE_KEY = 'materials_cache';
-      const CACHE_TIMESTAMP_KEY = 'materials_cache_timestamp';
-      const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-      
-      try {
-        const cachedData = localStorage.getItem(CACHE_KEY);
-        const cachedTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
-        
-        if (cachedData && cachedTimestamp) {
-          const cacheAge = Date.now() - parseInt(cachedTimestamp);
-          if (cacheAge < CACHE_DURATION) {
-            const cached = JSON.parse(cachedData);
-            if (cached && cached.length > 0) {
-              console.log(`⚡ INSTANT: Loaded ${cached.length} materials from cache`);
-              setMaterials(cached);
-              setFilteredMaterials(cached);
-              setLoading(false);
-              
-              // Refresh in background (non-blocking)
-              setTimeout(() => refreshMaterialsInBackground(), 100);
-              return;
-            }
-          }
-        }
-      } catch (cacheErr) {
-        console.log('Cache read failed, fetching fresh data');
-      }
-      
       // iOS/Safari specific: Add delay to prevent race conditions
       if (isIOSSafari()) {
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -873,7 +705,6 @@ export const MaterialsGrid = () => {
         
         console.log(`📱 Device: ${isMobile ? 'Mobile' : 'Desktop'}, Batch size: ${BATCH_SIZE}, Max batches: ${MAX_BATCHES}`);
         
-        // Fetch materials WITH images - use smaller batches for faster first paint
         for (let batch = 0; batch < MAX_BATCHES; batch++) {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -918,8 +749,6 @@ export const MaterialsGrid = () => {
           }
         }
         
-        console.log(`📦 Total fetched: ${allAdminData.length} admin materials with images`);
-        
         console.log(`📦 Total fetched: ${allAdminData.length} admin materials`);
         
         // Check if there might be more materials (if we hit the max batches limit)
@@ -963,7 +792,7 @@ export const MaterialsGrid = () => {
               unit: item.unit || 'unit',
               // Use supplier price if available, otherwise use admin's suggested price
               unit_price: supplierPrice?.price || item.suggested_price || 0,
-              image_url: item.image_url || null, // May be null if fetched without images
+              image_url: item.image_url,
               additional_images: [], // Load on-demand when gallery is opened
               // Use supplier's stock status if available
               in_stock: supplierPrice?.in_stock ?? true,
@@ -977,7 +806,7 @@ export const MaterialsGrid = () => {
             return material;
           });
           
-          console.log(`✅ Processed ${adminMaterials.length} admin materials with images`);
+          console.log(`✅ Processed ${adminMaterials.length} admin materials`);
         } else {
           console.warn('⚠️ No admin materials fetched');
         }
@@ -1076,21 +905,6 @@ export const MaterialsGrid = () => {
       setMaterials(allMaterials);
       setFilteredMaterials(allMaterials);
       console.log(`🎉 Successfully loaded ${allMaterials.length} materials to display`);
-      
-      // CACHE: Save to localStorage for instant load next time
-      try {
-        const CACHE_KEY = 'materials_cache';
-        const CACHE_TIMESTAMP_KEY = 'materials_cache_timestamp';
-        localStorage.setItem(CACHE_KEY, JSON.stringify(allMaterials));
-        localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
-        console.log(`💾 Cached ${allMaterials.length} materials for instant load`);
-      } catch (cacheErr) {
-        console.log('Cache write failed (storage full?)');
-      }
-      
-      // PREFETCH IMAGES: Start loading images in background for instant display
-      prefetchMaterialImages(allMaterials);
-      
     } catch (error) {
       console.error('Error loading materials:', error);
       // Show empty state on error
@@ -1101,149 +915,6 @@ export const MaterialsGrid = () => {
       setLoading(false);
     }
   };
-  
-  // Background refresh - updates cache without blocking UI
-  const refreshMaterialsInBackground = async () => {
-    console.log('🔄 Background refresh starting...');
-    try {
-      // Fetch fresh data silently
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) 
-        || window.innerWidth < 768;
-      const BATCH_SIZE = isMobile ? 15 : 25;
-      const MAX_BATCHES = isMobile ? 4 : 6; // Smaller for background
-      
-      let allAdminData: any[] = [];
-      
-      for (let batch = 0; batch < MAX_BATCHES; batch++) {
-        try {
-          const response = await fetch(
-            `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,image_url&order=created_at.desc&limit=${BATCH_SIZE}&offset=${batch * BATCH_SIZE}`,
-            {
-              headers: {
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-                'Content-Type': 'application/json',
-                'Prefer': 'count=none'
-              }
-            }
-          );
-          
-          if (response.ok) {
-            const batchData = await response.json();
-            if (batchData && batchData.length > 0) {
-              allAdminData = [...allAdminData, ...batchData];
-              if (batchData.length < BATCH_SIZE) break;
-            } else {
-              break;
-            }
-          } else {
-            break;
-          }
-        } catch {
-          break;
-        }
-      }
-      
-      if (allAdminData.length > 0) {
-        const freshMaterials = allAdminData.map((item: any) => ({
-          id: item.id,
-          supplier_id: 'admin-catalog',
-          name: item.name || 'Unnamed Material',
-          category: item.category || 'Uncategorized',
-          description: item.description || '',
-          unit: item.unit || 'unit',
-          unit_price: item.suggested_price || 0,
-          image_url: item.image_url,
-          additional_images: [],
-          in_stock: true,
-          supplier: {
-            company_name: 'Admin Catalog',
-            location: 'Kenya',
-            rating: 5.0
-          }
-        }));
-        
-        // Update cache
-        const CACHE_KEY = 'materials_cache';
-        const CACHE_TIMESTAMP_KEY = 'materials_cache_timestamp';
-        localStorage.setItem(CACHE_KEY, JSON.stringify(freshMaterials));
-        localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
-        
-        // Update state if data changed significantly
-        setMaterials(prev => {
-          if (prev.length !== freshMaterials.length) {
-            console.log(`🔄 Background refresh: Updated ${freshMaterials.length} materials`);
-            setFilteredMaterials(freshMaterials);
-            return freshMaterials;
-          }
-          return prev;
-        });
-      }
-    } catch (error) {
-      console.log('Background refresh failed silently');
-    }
-  };
-  
-  // Track which materials have been prefetched to avoid duplicates
-  const prefetchedMaterialIds = useRef<Set<string>>(new Set());
-  const prefetchedAdditionalIds = useRef<Set<string>>(new Set());
-  
-  // Prefetch images in background for instant display when user clicks
-  const prefetchMaterialImages = (materials: Material[]) => {
-    // Don't prefetch on slow connections
-    const connection = (navigator as any).connection;
-    if (connection && (connection.saveData || connection.effectiveType === 'slow-2g' || connection.effectiveType === '2g')) {
-      console.log('🚫 Skipping image prefetch on slow connection');
-      return;
-    }
-    
-    // Prefetch first 20 images (visible ones) immediately
-    const priorityImages = materials.slice(0, 20);
-    // Prefetch remaining images with delay
-    const remainingImages = materials.slice(20, 50);
-    
-    console.log(`🖼️ Prefetching ${priorityImages.length} priority images...`);
-    
-    // Priority images - load immediately
-    priorityImages.forEach((material) => {
-      if (material.image_url && !material.image_url.startsWith('data:') && !prefetchedMaterialIds.current.has(material.id)) {
-        prefetchedMaterialIds.current.add(material.id);
-        const img = new Image();
-        img.src = material.image_url;
-      }
-    });
-    
-    // Remaining images - load after 2 seconds delay
-    if (remainingImages.length > 0) {
-      setTimeout(() => {
-        console.log(`🖼️ Prefetching ${remainingImages.length} additional images...`);
-        remainingImages.forEach((material) => {
-          if (material.image_url && !material.image_url.startsWith('data:') && !prefetchedMaterialIds.current.has(material.id)) {
-            prefetchedMaterialIds.current.add(material.id);
-            const img = new Image();
-            img.src = material.image_url;
-          }
-        });
-      }, 2000);
-    }
-  };
-  
-  // Prefetch additional images when user hovers over a product card
-  const prefetchAdditionalImages = (material: Material) => {
-    // Skip if already prefetched
-    if (prefetchedAdditionalIds.current.has(material.id)) return;
-    prefetchedAdditionalIds.current.add(material.id);
-    
-    // Prefetch all gallery images for this material
-    const allImages = getAllMaterialImages(material);
-    allImages.forEach((imgData) => {
-      if (imgData.url && !imgData.url.startsWith('data:')) {
-        const img = new Image();
-        img.src = imgData.url;
-      }
-    });
-  };
-  
 
   const filterMaterials = () => {
     let filtered = [...materials];
@@ -1522,8 +1193,8 @@ export const MaterialsGrid = () => {
 
   return (
     <div className="space-y-6">
-      {/* Banner for Non-Registered Users (only show after auth check confirms not logged in) */}
-      {authChecked && !isAuthenticated && (
+      {/* Banner for Non-Registered Users */}
+      {!isAuthenticated && (
         <Alert className="bg-gradient-to-r from-orange-50 to-amber-50 border-orange-300 border-2">
           <AlertDescription className="w-full">
             <div className="flex flex-col items-center justify-center text-center gap-4 py-2">
@@ -1781,19 +1452,23 @@ export const MaterialsGrid = () => {
                 const isSelectedForCompare = compareItems.has(material.id);
                 
                 return (
-                  <Card 
-                    key={material.id} 
-                    className={`overflow-hidden hover:shadow-xl transition-shadow duration-300 group flex flex-col ${itemInCart ? 'ring-2 ring-green-500' : ''} ${isSelectedForCompare ? 'ring-2 ring-purple-500' : ''}`}
-                    onMouseEnter={() => prefetchAdditionalImages(material)}
-                  >
+                  <Card key={material.id} className={`overflow-hidden hover:shadow-xl transition-shadow duration-300 group flex flex-col ${itemInCart ? 'ring-2 ring-green-500' : ''} ${isSelectedForCompare ? 'ring-2 ring-purple-500' : ''}`}>
                     {/* Image Section - Fixed height */}
                     <div className="relative bg-white overflow-hidden h-44 flex-shrink-0 group/image">
-                      <ProductImage 
-                        src={imageUrl} 
-                        alt={material.name} 
-                        category={material.category}
-                        onClick={() => openGallery(material)}
-                      />
+                      {imageUrl ? (
+                        <img
+                          src={imageUrl}
+                          alt={material.name}
+                          className="w-full h-full object-contain p-3 bg-white cursor-pointer transition-transform duration-200 group-hover/image:scale-105"
+                          loading="lazy"
+                          style={{ imageRendering: 'auto' }}
+                          onClick={() => openGallery(material)}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-white">
+                          <Package className="h-16 w-16 text-muted-foreground" />
+                        </div>
+                      )}
                       {/* Category Badge */}
                       <div className="absolute top-2 left-2">
                         <Badge variant="secondary" className="bg-black/60 text-white border-none" style={{ fontSize: '10px' }}>
@@ -1950,10 +1625,9 @@ export const MaterialsGrid = () => {
                         )}
                       </div>
                       
-                      {/* Role-Based Action Buttons - ALWAYS show something */}
-                      
+                      {/* Role-Based Action Buttons */}
                       {/* Private Builders: Show Buy/Cart buttons */}
-                      {userRole === 'private_client' || userRole === 'admin' ? (
+                      {(userRole === 'private_client' || userRole === 'admin') && (
                         <>
                           <Button 
                             className={`w-full h-10 text-sm font-semibold flex items-center justify-center gap-2 ${
@@ -1980,8 +1654,10 @@ export const MaterialsGrid = () => {
                             🛒 Buy Now
                           </Button>
                         </>
-                      ) : userRole === 'professional_builder' ? (
-                        /* Professional Builders: Show Add to Quote Cart button */
+                      )}
+
+                      {/* Professional Builders: Show Add to Quote Cart button */}
+                      {userRole === 'professional_builder' && (
                         <div className="space-y-2">
                           <Button 
                             className={`w-full h-10 text-sm font-semibold flex items-center justify-center gap-2 ${
@@ -2001,18 +1677,10 @@ export const MaterialsGrid = () => {
                             </p>
                           )}
                         </div>
-                      ) : userRole && !['private_client', 'professional_builder', 'admin'].includes(userRole) ? (
-                        /* Other roles (supplier, delivery): Show restriction message */
-                        <div className="text-center py-2">
-                          <p className="text-xs text-red-600 font-medium">
-                            ⚠️ Your account type cannot purchase materials
-                          </p>
-                          <a href="/home" className="text-xs text-blue-600 underline">
-                            Register as Private Builder or Pro Builder
-                          </a>
-                        </div>
-                      ) : (
-                        /* Default: Not authenticated - Show sign-in prompt */
+                      )}
+
+                      {/* Not authenticated: Show sign-in prompt */}
+                      {!isAuthenticated && (
                         <div className="space-y-2">
                           <Button 
                             className="w-full h-10 text-sm font-semibold bg-orange-500 hover:bg-orange-600 text-white"
@@ -2023,6 +1691,18 @@ export const MaterialsGrid = () => {
                           <p className="text-xs text-center text-muted-foreground">
                             Private Builders buy directly • Pro Builders request quotes
                           </p>
+                        </div>
+                      )}
+
+                      {/* Other roles: Show restriction message */}
+                      {isAuthenticated && userRole && !['private_client', 'professional_builder', 'admin'].includes(userRole) && (
+                        <div className="text-center py-2">
+                          <p className="text-xs text-red-600 font-medium">
+                            ⚠️ Your account type cannot purchase materials
+                          </p>
+                          <a href="/home" className="text-xs text-blue-600 underline">
+                            Register as Private Builder or Pro Builder
+                          </a>
                         </div>
                       )}
                     </CardContent>
