@@ -611,8 +611,7 @@ export const MaterialsGrid = () => {
     // Initialize immediately (synchronous for cached values)
     initializeAuth();
     
-    // Run auth check and load materials IN PARALLEL for speed
-    initializeAuth();
+    // Load materials
     loadMaterials().catch(error => {
       console.error('Error loading materials:', error);
       setMaterials([]);
@@ -967,6 +966,10 @@ export const MaterialsGrid = () => {
       setMaterials(allMaterials);
       setFilteredMaterials(allMaterials);
       console.log(`🎉 Successfully loaded ${allMaterials.length} materials to display`);
+      
+      // PREFETCH IMAGES: Start loading images in background for instant display
+      prefetchMaterialImages(allMaterials);
+      
     } catch (error) {
       console.error('Error loading materials:', error);
       // Show empty state on error
@@ -976,6 +979,66 @@ export const MaterialsGrid = () => {
     } finally {
       setLoading(false);
     }
+  };
+  
+  // Track which materials have been prefetched to avoid duplicates
+  const prefetchedMaterialIds = useRef<Set<string>>(new Set());
+  const prefetchedAdditionalIds = useRef<Set<string>>(new Set());
+  
+  // Prefetch images in background for instant display when user clicks
+  const prefetchMaterialImages = (materials: Material[]) => {
+    // Don't prefetch on slow connections
+    const connection = (navigator as any).connection;
+    if (connection && (connection.saveData || connection.effectiveType === 'slow-2g' || connection.effectiveType === '2g')) {
+      console.log('🚫 Skipping image prefetch on slow connection');
+      return;
+    }
+    
+    // Prefetch first 20 images (visible ones) immediately
+    const priorityImages = materials.slice(0, 20);
+    // Prefetch remaining images with delay
+    const remainingImages = materials.slice(20, 50);
+    
+    console.log(`🖼️ Prefetching ${priorityImages.length} priority images...`);
+    
+    // Priority images - load immediately
+    priorityImages.forEach((material) => {
+      if (material.image_url && !material.image_url.startsWith('data:') && !prefetchedMaterialIds.current.has(material.id)) {
+        prefetchedMaterialIds.current.add(material.id);
+        const img = new Image();
+        img.src = material.image_url;
+      }
+    });
+    
+    // Remaining images - load after 2 seconds delay
+    if (remainingImages.length > 0) {
+      setTimeout(() => {
+        console.log(`🖼️ Prefetching ${remainingImages.length} additional images...`);
+        remainingImages.forEach((material) => {
+          if (material.image_url && !material.image_url.startsWith('data:') && !prefetchedMaterialIds.current.has(material.id)) {
+            prefetchedMaterialIds.current.add(material.id);
+            const img = new Image();
+            img.src = material.image_url;
+          }
+        });
+      }, 2000);
+    }
+  };
+  
+  // Prefetch additional images when user hovers over a product card
+  const prefetchAdditionalImages = (material: Material) => {
+    // Skip if already prefetched
+    if (prefetchedAdditionalIds.current.has(material.id)) return;
+    prefetchedAdditionalIds.current.add(material.id);
+    
+    // Prefetch all gallery images for this material
+    const allImages = getAllMaterialImages(material);
+    allImages.forEach((imgData) => {
+      if (imgData.url && !imgData.url.startsWith('data:')) {
+        const img = new Image();
+        img.src = imgData.url;
+      }
+    });
   };
 
   const filterMaterials = () => {
@@ -1514,7 +1577,11 @@ export const MaterialsGrid = () => {
                 const isSelectedForCompare = compareItems.has(material.id);
                 
                 return (
-                  <Card key={material.id} className={`overflow-hidden hover:shadow-xl transition-shadow duration-300 group flex flex-col ${itemInCart ? 'ring-2 ring-green-500' : ''} ${isSelectedForCompare ? 'ring-2 ring-purple-500' : ''}`}>
+                  <Card 
+                    key={material.id} 
+                    className={`overflow-hidden hover:shadow-xl transition-shadow duration-300 group flex flex-col ${itemInCart ? 'ring-2 ring-green-500' : ''} ${isSelectedForCompare ? 'ring-2 ring-purple-500' : ''}`}
+                    onMouseEnter={() => prefetchAdditionalImages(material)}
+                  >
                     {/* Image Section - Fixed height */}
                     <div className="relative bg-white overflow-hidden h-44 flex-shrink-0 group/image">
                       {imageUrl ? (
