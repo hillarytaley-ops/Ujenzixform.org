@@ -285,64 +285,19 @@ const Delivery = () => {
     try {
       console.log('📦 Submitting delivery request...', trackingNumber);
       
-      // First, discover what columns exist in the table
-      console.log('📦 Discovering table structure...');
-      const discoverResponse = await fetch(`${SUPABASE_URL}/rest/v1/deliveries?limit=0`, {
-        method: 'GET',
-        headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        }
-      });
-      
-      // Get columns from response headers
-      const contentRange = discoverResponse.headers.get('content-range');
-      console.log('📦 Content-Range:', contentRange);
-      
-      // Try to get a sample row to see columns
-      const sampleResponse = await fetch(`${SUPABASE_URL}/rest/v1/deliveries?select=*&limit=1`, {
-        method: 'GET',
-        headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        }
-      });
-      const sampleData = await sampleResponse.json();
-      console.log('📦 Sample data (shows available columns):', sampleData);
-      
-      // If no rows, try to get column info from OpenAPI spec
-      if (!sampleData || sampleData.length === 0) {
-        const schemaResponse = await fetch(`${SUPABASE_URL}/rest/v1/`, {
-          method: 'GET',
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          }
-        });
-        const schemaData = await schemaResponse.json();
-        console.log('📦 Available tables:', Object.keys(schemaData?.definitions || {}));
-        if (schemaData?.definitions?.deliveries) {
-          console.log('📦 Deliveries columns:', Object.keys(schemaData.definitions.deliveries.properties || {}));
-        }
-      }
-      
-      // Log the sample data columns for debugging
-      if (sampleData && sampleData.length > 0) {
-        console.log('📦 ACTUAL TABLE COLUMNS:', Object.keys(sampleData[0]));
-      }
-      
-      // Build insert data - remove fields that don't exist
-      // Known to exist: material_type, quantity, status
-      // Known to NOT exist: contact_name, delivery_location, pickup_location
-      const insertData: Record<string, any> = {
+      // Build insert data matching the actual deliveries table schema
+      // Columns: material_type, quantity (number), pickup_address, delivery_address, 
+      //          tracking_number, status, notes, delivery_date
+      const insertData = {
         material_type: deliveryForm.materialType,
-        quantity: deliveryForm.quantity,
-        status: 'pending'
+        quantity: parseInt(deliveryForm.quantity) || 1,  // Must be a number
+        pickup_address: deliveryForm.pickupAddress,
+        delivery_address: deliveryForm.deliveryAddress,
+        tracking_number: trackingNumber,
+        status: 'pending',
+        notes: `Contact: ${deliveryForm.contactName}, Phone: ${deliveryForm.contactPhone}. Unit: ${deliveryForm.unit}. Urgency: ${deliveryForm.urgency}. ${deliveryForm.specialInstructions || ''}`.trim(),
+        delivery_date: deliveryForm.preferredDate || null
       };
-      
-      // Store contact info in notes/description field
-      const contactInfo = `Contact: ${deliveryForm.contactName}, Phone: ${deliveryForm.contactPhone}. From: ${deliveryForm.pickupAddress} To: ${deliveryForm.deliveryAddress}. ${deliveryForm.specialInstructions || ''}`;
-      insertData.notes = contactInfo;
       
       console.log('📦 Insert data:', insertData);
 

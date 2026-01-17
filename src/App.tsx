@@ -19,8 +19,8 @@ import Builders from "./pages/Builders";
 import BuilderRegistration from "./pages/BuilderRegistration";
 import ProfessionalBuilderRegistration from "./pages/ProfessionalBuilderRegistration";
 import PrivateBuilderRegistration from "./pages/PrivateBuilderRegistration";
-import SuppliersIPhone from "./pages/SuppliersIPhone";
-import SuppliersMobileOptimized from "./pages/SuppliersMobileOptimized";
+// Unified responsive Suppliers page (replaces SuppliersIPhone, SuppliersMobileOptimized, SupplierMarketplace)
+import Suppliers from "./pages/Suppliers";
 import BuilderPortal from "./pages/BuilderPortal";
 import About from "./pages/About";
 import Contact from "./pages/Contact";
@@ -45,7 +45,7 @@ import DeliveryDashboard from "./pages/DeliveryDashboard";
 
 // Additional pages
 import SupplierRegistration from "./pages/SupplierRegistration";
-import SupplierMarketplace from "./pages/SupplierMarketplace";
+// SupplierMarketplace replaced by unified Suppliers page
 import SupplierSignIn from "./pages/SupplierSignIn";
 import BuilderSignIn from "./pages/BuilderSignIn";
 import DeliverySignIn from "./pages/DeliverySignIn";
@@ -193,8 +193,9 @@ const App = () => {
                     
                     {/* All pages accessible after sign in - no repeated auth required */}
                     <Route path="/home" element={<Index />} />
-                    <Route path="/suppliers" element={<SuppliersMobileOptimized />} />
-                    <Route path="/suppliers-mobile" element={<SuppliersMobileOptimized />} />
+                    <Route path="/suppliers" element={<Suppliers />} />
+                    <Route path="/suppliers-mobile" element={<Suppliers />} />
+                    <Route path="/supplier-marketplace" element={<Suppliers />} />
                     <Route path="/builders" element={<Builders />} />
                     <Route path="/builder/:builderId" element={<PublicBuilderProfile />} />
                     <Route path="/about" element={<About />} />
