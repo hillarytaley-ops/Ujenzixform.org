@@ -1950,10 +1950,10 @@ export const MaterialsGrid = () => {
                         )}
                       </div>
                       
-                      {/* Role-Based Action Buttons */}
+                      {/* Role-Based Action Buttons - ALWAYS show something */}
                       
                       {/* Private Builders: Show Buy/Cart buttons */}
-                      {(userRole === 'private_client' || userRole === 'admin') && (
+                      {userRole === 'private_client' || userRole === 'admin' ? (
                         <>
                           <Button 
                             className={`w-full h-10 text-sm font-semibold flex items-center justify-center gap-2 ${
@@ -1980,10 +1980,8 @@ export const MaterialsGrid = () => {
                             🛒 Buy Now
                           </Button>
                         </>
-                      )}
-
-                      {/* Professional Builders: Show Add to Quote Cart button */}
-                      {userRole === 'professional_builder' && (
+                      ) : userRole === 'professional_builder' ? (
+                        /* Professional Builders: Show Add to Quote Cart button */
                         <div className="space-y-2">
                           <Button 
                             className={`w-full h-10 text-sm font-semibold flex items-center justify-center gap-2 ${
@@ -2003,10 +2001,18 @@ export const MaterialsGrid = () => {
                             </p>
                           )}
                         </div>
-                      )}
-
-                      {/* Not authenticated OR no role yet: Show sign-in prompt */}
-                      {(!isAuthenticated || (isAuthenticated && !userRole)) && (
+                      ) : userRole && !['private_client', 'professional_builder', 'admin'].includes(userRole) ? (
+                        /* Other roles (supplier, delivery): Show restriction message */
+                        <div className="text-center py-2">
+                          <p className="text-xs text-red-600 font-medium">
+                            ⚠️ Your account type cannot purchase materials
+                          </p>
+                          <a href="/home" className="text-xs text-blue-600 underline">
+                            Register as Private Builder or Pro Builder
+                          </a>
+                        </div>
+                      ) : (
+                        /* Default: Not authenticated - Show sign-in prompt */
                         <div className="space-y-2">
                           <Button 
                             className="w-full h-10 text-sm font-semibold bg-orange-500 hover:bg-orange-600 text-white"
@@ -2017,19 +2023,6 @@ export const MaterialsGrid = () => {
                           <p className="text-xs text-center text-muted-foreground">
                             Private Builders buy directly • Pro Builders request quotes
                           </p>
-                        </div>
-                      )}
-                      
-
-                      {/* Other roles: Show restriction message */}
-                      {isAuthenticated && userRole && !['private_client', 'professional_builder', 'admin'].includes(userRole) && (
-                        <div className="text-center py-2">
-                          <p className="text-xs text-red-600 font-medium">
-                            ⚠️ Your account type cannot purchase materials
-                          </p>
-                          <a href="/home" className="text-xs text-blue-600 underline">
-                            Register as Private Builder or Pro Builder
-                          </a>
                         </div>
                       )}
                     </CardContent>
