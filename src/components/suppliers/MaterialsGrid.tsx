@@ -905,6 +905,14 @@ export const MaterialsGrid = () => {
       setMaterials(allMaterials);
       setFilteredMaterials(allMaterials);
       console.log(`🎉 Successfully loaded ${allMaterials.length} materials to display`);
+      
+      // Debug: Log first 3 materials with their image URLs
+      allMaterials.slice(0, 3).forEach((m, i) => {
+        console.log(`📸 Material ${i + 1}: ${m.name}`);
+        console.log(`   - image_url exists: ${!!m.image_url}`);
+        console.log(`   - image_url type: ${m.image_url?.startsWith('data:') ? 'base64' : m.image_url?.startsWith('http') ? 'URL' : m.image_url?.startsWith('/') ? 'local' : 'unknown'}`);
+        console.log(`   - image_url length: ${m.image_url?.length || 0}`);
+      });
     } catch (error) {
       console.error('Error loading materials:', error);
       // Show empty state on error
@@ -1398,8 +1406,12 @@ export const MaterialsGrid = () => {
         </Card>
       ) : (
         <div ref={gridRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredMaterials.map((material) => {
+          {filteredMaterials.map((material, index) => {
                 const imageUrl = material.image_url || getDefaultCategoryImage(material.category);
+                // Debug first 3 cards
+                if (index < 3) {
+                  console.log(`🖼️ Card ${index + 1} (${material.name}): imageUrl = ${imageUrl ? (imageUrl.startsWith('data:') ? 'base64(' + imageUrl.length + ' chars)' : imageUrl.substring(0, 50)) : 'NONE'}`);
+                }
                 const currentQty = getQuantity(material.id);
                 const itemInCart = isInCart(material.id);
                 const cartQty = getItemQuantity(material.id);
@@ -1460,9 +1472,21 @@ export const MaterialsGrid = () => {
                           src={imageUrl}
                           alt={material.name}
                           className="w-full h-full object-contain p-3 bg-white cursor-pointer transition-transform duration-200 group-hover/image:scale-105"
-                          loading="lazy"
+                          loading="eager"
+                          decoding="sync"
                           style={{ imageRendering: 'auto' }}
                           onClick={() => openGallery(material)}
+                          onError={(e) => {
+                            console.error('Image failed to load:', material.name, imageUrl?.substring(0, 100));
+                            // Fallback to category default image
+                            const fallback = getDefaultCategoryImage(material.category);
+                            if (fallback && e.currentTarget.src !== fallback) {
+                              e.currentTarget.src = fallback;
+                            } else {
+                              // Hide the broken image
+                              e.currentTarget.style.display = 'none';
+                            }
+                          }}
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center bg-white">
