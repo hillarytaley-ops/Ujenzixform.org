@@ -437,7 +437,7 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
           <Textarea
             id="message"
             {...register("message")}
-            placeholder="Tell us about your experience with UjenziPro. What did you like? What could we improve? Any suggestions for better serving Kenya's construction industry?"
+            placeholder="Tell us about your experience with UjenziXform. What did you like? What could we improve? Any suggestions for better serving Kenya's construction industry?"
             rows={6}
             className="text-lg resize-none"
             onFocus={() => trackInteraction('focus')}
@@ -460,13 +460,21 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
           <div className="flex items-start space-x-3">
             <Checkbox 
               id="gdprConsent"
-              {...register("gdprConsent")}
-              onCheckedChange={() => trackInteraction('checkbox')}
+              checked={watch("gdprConsent")}
+              onCheckedChange={(checked) => {
+                setValue("gdprConsent", checked === true);
+                trackInteraction('checkbox');
+              }}
             />
             <div className="grid gap-1.5 leading-none">
               <Label 
                 htmlFor="gdprConsent"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                onClick={() => {
+                  const currentValue = watch("gdprConsent");
+                  setValue("gdprConsent", !currentValue);
+                  trackInteraction('checkbox');
+                }}
               >
                 I agree to the privacy policy and terms of service *
               </Label>
