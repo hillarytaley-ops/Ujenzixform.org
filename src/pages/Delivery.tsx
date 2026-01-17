@@ -284,9 +284,23 @@ const Delivery = () => {
 
     try {
       console.log('📦 Submitting delivery request...', trackingNumber);
+      console.log('📦 Form data:', {
+        tracking_number: trackingNumber,
+        pickup_address: deliveryForm.pickupAddress,
+        delivery_address: deliveryForm.deliveryAddress,
+        material_type: deliveryForm.materialType,
+        quantity: `${deliveryForm.quantity} ${deliveryForm.unit}`,
+        contact_name: deliveryForm.contactName,
+        contact_phone: deliveryForm.contactPhone,
+      });
       
-      // Use Supabase client directly (more reliable than fetch)
-      const { data, error: insertError } = await supabase
+      // Create a promise that rejects after timeout
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Request timed out after 10 seconds')), 10000);
+      });
+      
+      // Use Supabase client directly with timeout
+      const insertPromise = supabase
         .from('deliveries')
         .insert({
           tracking_number: trackingNumber,
@@ -302,6 +316,13 @@ const Delivery = () => {
           urgency: deliveryForm.urgency,
           status: 'pending'
         });
+
+      console.log('📦 Waiting for insert...');
+      
+      // Race between insert and timeout
+      const result = await Promise.race([insertPromise, timeoutPromise]) as any;
+      
+      const { data, error: insertError } = result;
 
       console.log('📦 Insert result:', { data, error: insertError });
 
