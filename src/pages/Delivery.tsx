@@ -194,7 +194,69 @@ const Delivery = () => {
     setDeliveryForm(prev => ({ ...prev, [field]: value }));
   };
 
+  const [submitting, setSubmitting] = useState(false);
+
   const handleSubmitRequest = async () => {
+    // Form validation
+    if (!deliveryForm.materialType) {
+      toast({
+        title: "Missing Information",
+        description: "Please select a material type.",
+        variant: "destructive"
+      });
+      return;
+    }
+    if (!deliveryForm.quantity) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter a quantity.",
+        variant: "destructive"
+      });
+      return;
+    }
+    if (!deliveryForm.unit) {
+      toast({
+        title: "Missing Information",
+        description: "Please select a unit.",
+        variant: "destructive"
+      });
+      return;
+    }
+    if (!deliveryForm.pickupAddress) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter a pickup address.",
+        variant: "destructive"
+      });
+      return;
+    }
+    if (!deliveryForm.deliveryAddress) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter a delivery address.",
+        variant: "destructive"
+      });
+      return;
+    }
+    if (!deliveryForm.contactName) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter a contact name.",
+        variant: "destructive"
+      });
+      return;
+    }
+    if (!deliveryForm.contactPhone) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter a contact phone number.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSubmitting(true);
+    
     // Generate tracking number
     const trackingNumber = `DEL-${Date.now()}`;
     
@@ -212,31 +274,17 @@ const Delivery = () => {
     };
 
     try {
+      console.log('📦 Submitting delivery request...');
+      
       // Get current user session
       const { data: sessionData } = await supabase.auth.getSession();
       
       // Get user's profile ID
-      let builderId = sessionData?.session?.user?.id;
+      let builderId = sessionData?.session?.user?.id || null;
       
-      if (!builderId && sessionData?.session?.user?.id) {
-        // SUPABASE_URL and SUPABASE_ANON_KEY imported from centralized client
-        const profileResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/profiles?id=eq.${sessionData.session.user.id}&select=id`,
-          {
-            headers: {
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${sessionData.session.access_token}`
-            }
-          }
-        );
-        const profileData = await profileResponse.json();
-        if (profileData && profileData[0]) {
-          builderId = profileData[0].id;
-        }
-      }
+      console.log('📦 Builder ID:', builderId);
 
       // Save to deliveries table using direct fetch
-      // SUPABASE_URL and SUPABASE_ANON_KEY imported from centralized client
       const response = await fetch(`${SUPABASE_URL}/rest/v1/deliveries`, {
         method: 'POST',
         headers: {
@@ -262,45 +310,52 @@ const Delivery = () => {
         })
       });
 
+      console.log('📦 Response status:', response.status);
+
       if (!response.ok) {
-        console.error('Delivery submission error:', await response.text());
-        throw new Error('Failed to submit delivery request');
+        const errorText = await response.text();
+        console.error('❌ Delivery submission error:', errorText);
+        throw new Error(errorText || 'Failed to submit delivery request');
       }
+
+      console.log('✅ Delivery request submitted successfully');
 
       // Update local state
       setDeliveries(prev => [newDelivery, ...prev]);
       
       toast({
-        title: "Delivery Request Submitted!",
-        description: `Tracking number: ${trackingNumber}`,
+        title: "✅ Delivery Request Submitted!",
+        description: `Tracking number: ${trackingNumber}. We'll contact you within 24 hours.`,
       });
       
-    } catch (error) {
-      console.error('Error submitting delivery:', error);
+      // Reset form
+      setDeliveryForm({
+        materialType: "",
+        quantity: "",
+        unit: "",
+        pickupAddress: "",
+        deliveryAddress: "",
+        contactName: "",
+        contactPhone: "",
+        preferredDate: "",
+        preferredTime: "",
+        specialInstructions: "",
+        urgency: "normal"
+      });
+
+      if (isAdmin) {
+        setActiveTab("tracking");
+      }
+      
+    } catch (error: any) {
+      console.error('❌ Error submitting delivery:', error);
       toast({
         title: "Error",
-        description: "Failed to submit delivery request. Please try again.",
+        description: error.message || "Failed to submit delivery request. Please try again.",
         variant: "destructive"
       });
-      return;
-    }
-    
-    setDeliveryForm({
-      materialType: "",
-      quantity: "",
-      unit: "",
-      pickupAddress: "",
-      deliveryAddress: "",
-      contactName: "",
-      contactPhone: "",
-      preferredDate: "",
-      preferredTime: "",
-      specialInstructions: "",
-      urgency: "normal"
-    });
-
-    if (isAdmin) {
-      setActiveTab("tracking");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -664,9 +719,22 @@ const Delivery = () => {
 
                   {/* Submit Button */}
                   <div className="flex justify-end">
-                    <Button onClick={handleSubmitRequest} className="flex items-center gap-2">
-                      <Send className="h-4 w-4" />
-                      Submit Delivery Request
+                    <Button 
+                      onClick={handleSubmitRequest} 
+                      disabled={submitting}
+                      className="flex items-center gap-2"
+                    >
+                      {submitting ? (
+                        <>
+                          <span className="animate-spin">⏳</span>
+                          Submitting...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="h-4 w-4" />
+                          Submit Delivery Request
+                        </>
+                      )}
                     </Button>
                   </div>
                 </CardContent>
@@ -953,18 +1021,31 @@ const Delivery = () => {
 
                 {/* Submit Button */}
                 <div className="flex justify-end">
-                  <Button onClick={handleSubmitRequest} className="flex items-center gap-2">
-                    <Send className="h-4 w-4" />
-                    Submit Delivery Request
+                  <Button 
+                    onClick={handleSubmitRequest} 
+                    disabled={submitting}
+                    className="flex items-center gap-2"
+                  >
+                    {submitting ? (
+                      <>
+                        <span className="animate-spin">⏳</span>
+                        Submitting...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="h-4 w-4" />
+                        Submit Delivery Request
+                      </>
+                    )}
                   </Button>
                 </div>
 
-                {/* Success Message for Public Users */}
-                <Alert className="border-green-200 bg-green-50">
-                  <CheckCircle className="h-4 w-4" />
+                {/* Info Message for Public Users */}
+                <Alert className="border-blue-200 bg-blue-50">
+                  <Truck className="h-4 w-4" />
                   <AlertDescription>
-                    <strong>Request Submitted:</strong> Your delivery request will be processed by our team. 
-                    You will be contacted within 24 hours with confirmation and tracking details.
+                    <strong>How it works:</strong> Fill out the form above and click submit. 
+                    Our team will contact you within 24 hours with confirmation and tracking details.
                   </AlertDescription>
                 </Alert>
               </CardContent>
