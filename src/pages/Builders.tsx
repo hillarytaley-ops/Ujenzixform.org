@@ -358,7 +358,7 @@ const Builders = () => {
               {!loading && (
                 // Only show Dashboard button to builders - not to suppliers or delivery providers
                 userProfile && userRoleState === 'builder' ? (
-                  <Link to="/builder-dashboard">
+                  <Link to="/professional-builder-dashboard">
                     <Button 
                       size="lg"
                       className="bg-green-600 hover:bg-green-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
@@ -391,7 +391,7 @@ const Builders = () => {
                   </Link>
                 ) : !userProfile ? (
                   // Not logged in - show sign in for builder dashboard
-                  <Link to="/builder-signin?redirect=/builder-dashboard">
+                  <Link to="/builder-signin?redirect=/professional-builder-dashboard">
                     <Button 
                       size="lg"
                       className="bg-green-600 hover:bg-green-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
@@ -818,7 +818,7 @@ const Builders = () => {
               <div className="bg-white/95 backdrop-blur-sm rounded-2xl border-2 border-white/50 shadow-2xl p-6">
                 <LoginPortal 
                   type="builder"
-                  redirectTo="/builder-dashboard"
+                  redirectTo="/professional-builder-dashboard"
                   title="Builder Dashboard Access"
                   description="Sign in to access your builder dashboard, manage projects, and track deliveries"
                 />

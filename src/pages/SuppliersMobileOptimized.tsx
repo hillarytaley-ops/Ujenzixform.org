@@ -256,7 +256,7 @@ const SuppliersMobileOptimized = () => {
                     {/* Dashboard Button */}
                     <div className="flex gap-2">
                       {(userRole === 'builder' || userRole === 'professional_builder' || userRole === 'private_client') && (
-                        <Link to="/builder-dashboard">
+                        <Link to="/professional-builder-dashboard">
                           <Button className="bg-blue-600 hover:bg-blue-700">
                             <Building className="h-4 w-4 mr-2" />
                             My Dashboard

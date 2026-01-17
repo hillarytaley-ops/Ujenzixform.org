@@ -123,7 +123,7 @@ const DeliveryRegistration = () => {
             description: "You are registered as a Builder. Please use the Builder portal.",
             duration: 5000,
           });
-          setTimeout(() => navigate('/builder-dashboard'), 1000);
+          setTimeout(() => navigate('/delivery-dashboard'), 1000);
         } else if (roleData?.role === 'supplier') {
           toast({
             variant: "destructive",

@@ -177,7 +177,7 @@ const SupplierRegistration = () => {
               description: "You're already registered as a builder. You cannot also register as a supplier.",
               duration: 5000,
             });
-            setTimeout(() => navigate('/builder-dashboard'), 2000);
+            setTimeout(() => navigate('/supplier-dashboard'), 2000);
           }
         } catch (roleCheckError) {
           console.warn('📝 SupplierRegistration: Role check error (non-blocking):', roleCheckError);

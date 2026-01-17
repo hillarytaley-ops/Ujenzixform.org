@@ -439,7 +439,7 @@ const AdminDashboard = () => {
     { name: 'Builder Sign In', path: '/builder-signin', icon: Building2, status: 'active', visits: 0, description: 'Builder portal login', category: 'public' },
     { name: 'Supplier Sign In', path: '/supplier-signin', icon: Store, status: 'active', visits: 0, description: 'Supplier portal login', category: 'public' },
     { name: 'Delivery Sign In', path: '/delivery-signin', icon: Truck, status: 'active', visits: 0, description: 'Delivery portal login', category: 'public' },
-    { name: 'Builder Dashboard', path: '/builder-dashboard', icon: LayoutDashboard, status: 'active', visits: 0, description: 'Builder management panel', category: 'protected' },
+    { name: 'Builder Dashboard', path: '/professional-builder-dashboard', icon: LayoutDashboard, status: 'active', visits: 0, description: 'Builder management panel', category: 'protected' },
     { name: 'Supplier Dashboard', path: '/supplier-dashboard', icon: LayoutDashboard, status: 'active', visits: 0, description: 'Supplier management panel', category: 'protected' },
     { name: 'Delivery Dashboard', path: '/delivery-dashboard', icon: LayoutDashboard, status: 'active', visits: 0, description: 'Delivery management panel', category: 'protected' },
     { name: 'Supplier Marketplace', path: '/supplier-marketplace', icon: ShoppingCart, status: 'active', visits: 0, description: 'Material marketplace for builders', category: 'protected' },
@@ -4154,7 +4154,7 @@ const AdminDashboard = () => {
                 <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-3">
                   <Button 
                     className="justify-start bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-600/30"
-                    onClick={() => navigate('/builder-dashboard')}
+                    onClick={() => navigate('/professional-builder-dashboard')}
                   >
                     <Building2 className="h-4 w-4 mr-2" />
                     Builder Dashboard

@@ -40,7 +40,6 @@ import NotFound from "./pages/NotFound";
 
 // Dashboard imports
 import AdminDashboard from "./pages/AdminDashboard";
-import BuilderDashboard from "./pages/BuilderDashboard";
 import SupplierDashboard from "./pages/SupplierDashboard";
 import DeliveryDashboard from "./pages/DeliveryDashboard";
 
@@ -277,10 +276,9 @@ const App = () => {
                         <AdminDashboard />
                       </RoleProtectedRoute>
                     } />
+                    {/* Redirect /builder-dashboard to appropriate dashboard based on role */}
                     <Route path="/builder-dashboard" element={
-                      <RoleProtectedRoute allowedRoles={['builder', 'professional_builder', 'private_client', 'admin']}>
-                        <BuilderDashboard />
-                      </RoleProtectedRoute>
+                      <Navigate to="/professional-builder-dashboard" replace />
                     } />
                     <Route path="/supplier-dashboard" element={
                       <RoleProtectedRoute allowedRoles={['supplier', 'admin']}>
