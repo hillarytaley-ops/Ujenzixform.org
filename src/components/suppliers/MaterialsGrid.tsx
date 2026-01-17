@@ -370,10 +370,20 @@ export const MaterialsGrid = () => {
   const [selectedCategory, setSelectedCategory] = useState('All Categories');
   const [priceRange, setPriceRange] = useState('all');
   const [stockFilter, setStockFilter] = useState('all');
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  // Initialize authChecked to true immediately - we'll show Sign In button by default
-  // This prevents the "Loading..." state from ever showing
+  // Initialize auth state from cache for instant button display
+  const getCachedAuth = () => {
+    const cachedRole = localStorage.getItem('user_role');
+    const cachedUserId = localStorage.getItem('user_id');
+    return {
+      isAuth: !!(cachedRole && cachedUserId),
+      role: cachedRole
+    };
+  };
+  const cachedAuth = getCachedAuth();
+  
+  const [userRole, setUserRole] = useState<string | null>(cachedAuth.role);
+  const [isAuthenticated, setIsAuthenticated] = useState(cachedAuth.isAuth);
+  // Always true - we show buttons immediately based on cached auth or "Sign In" if no cache
   const [authChecked, setAuthChecked] = useState(true);
   const [showWelcome, setShowWelcome] = useState(false);
   const [isMultiQuoteOpen, setIsMultiQuoteOpen] = useState(false);
