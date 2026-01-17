@@ -133,13 +133,30 @@ export function BuilderProfileEdit({ userId, builderCategory, onSave, onCancel }
 
   const fetchProfile = async () => {
     try {
-      const { data, error } = await supabase
+      // Try user_id first (RLS policy), then fallback to id
+      let data = null;
+      
+      const { data: dataByUserId, error: errorByUserId } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (error) throw error;
+        .eq('user_id', userId)
+        .maybeSingle();
+      
+      if (dataByUserId) {
+        data = dataByUserId;
+      } else {
+        const { data: dataById, error: errorById } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle();
+        
+        if (dataById) {
+          data = dataById;
+        } else if (errorByUserId && errorById) {
+          throw errorByUserId;
+        }
+      }
 
       if (data) {
         setProfile({

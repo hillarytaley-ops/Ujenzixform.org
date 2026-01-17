@@ -82,14 +82,38 @@ const PrivateClientDashboard = () => {
 
       setUser(user);
 
-      // Get profile
-      const { data: profileData } = await supabase
+      // Get profile - try user_id first (RLS policy uses user_id), fallback to id
+      const { data: profileByUserId } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', user.id)
+        .eq('user_id', user.id)
         .maybeSingle();
-
-      setProfile(profileData);
+      
+      if (profileByUserId) {
+        setProfile(profileByUserId);
+      } else {
+        // Fallback to id column or use auth metadata
+        const { data: profileById } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .maybeSingle();
+        
+        if (profileById) {
+          setProfile(profileById);
+        } else {
+          // Use auth user metadata as fallback
+          setProfile({
+            id: user.id,
+            user_id: user.id,
+            email: user.email,
+            full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Client',
+            phone: user.user_metadata?.phone || '',
+            company_name: user.user_metadata?.company_name || '',
+            county: user.user_metadata?.county || '',
+          });
+        }
+      }
 
       // Verify role
       const { data: roleData } = await supabase
