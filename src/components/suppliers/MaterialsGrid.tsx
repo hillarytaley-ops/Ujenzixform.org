@@ -773,6 +773,35 @@ export const MaterialsGrid = () => {
     try {
       setLoading(true);
       
+      // INSTANT LOAD: Try to load from cache first for instant display
+      const CACHE_KEY = 'materials_cache';
+      const CACHE_TIMESTAMP_KEY = 'materials_cache_timestamp';
+      const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+      
+      try {
+        const cachedData = localStorage.getItem(CACHE_KEY);
+        const cachedTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
+        
+        if (cachedData && cachedTimestamp) {
+          const cacheAge = Date.now() - parseInt(cachedTimestamp);
+          if (cacheAge < CACHE_DURATION) {
+            const cached = JSON.parse(cachedData);
+            if (cached && cached.length > 0) {
+              console.log(`⚡ INSTANT: Loaded ${cached.length} materials from cache`);
+              setMaterials(cached);
+              setFilteredMaterials(cached);
+              setLoading(false);
+              
+              // Refresh in background (non-blocking)
+              setTimeout(() => refreshMaterialsInBackground(), 100);
+              return;
+            }
+          }
+        }
+      } catch (cacheErr) {
+        console.log('Cache read failed, fetching fresh data');
+      }
+      
       // iOS/Safari specific: Add delay to prevent race conditions
       if (isIOSSafari()) {
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -1036,6 +1065,17 @@ export const MaterialsGrid = () => {
       setFilteredMaterials(allMaterials);
       console.log(`🎉 Successfully loaded ${allMaterials.length} materials to display`);
       
+      // CACHE: Save to localStorage for instant load next time
+      try {
+        const CACHE_KEY = 'materials_cache';
+        const CACHE_TIMESTAMP_KEY = 'materials_cache_timestamp';
+        localStorage.setItem(CACHE_KEY, JSON.stringify(allMaterials));
+        localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+        console.log(`💾 Cached ${allMaterials.length} materials for instant load`);
+      } catch (cacheErr) {
+        console.log('Cache write failed (storage full?)');
+      }
+      
       // PREFETCH IMAGES: Start loading images in background for instant display
       prefetchMaterialImages(allMaterials);
       
@@ -1047,6 +1087,88 @@ export const MaterialsGrid = () => {
       setFilteredMaterials([]);
     } finally {
       setLoading(false);
+    }
+  };
+  
+  // Background refresh - updates cache without blocking UI
+  const refreshMaterialsInBackground = async () => {
+    console.log('🔄 Background refresh starting...');
+    try {
+      // Fetch fresh data silently
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) 
+        || window.innerWidth < 768;
+      const BATCH_SIZE = isMobile ? 15 : 25;
+      const MAX_BATCHES = isMobile ? 4 : 6; // Smaller for background
+      
+      let allAdminData: any[] = [];
+      
+      for (let batch = 0; batch < MAX_BATCHES; batch++) {
+        try {
+          const response = await fetch(
+            `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,image_url&order=created_at.desc&limit=${BATCH_SIZE}&offset=${batch * BATCH_SIZE}`,
+            {
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'count=none'
+              }
+            }
+          );
+          
+          if (response.ok) {
+            const batchData = await response.json();
+            if (batchData && batchData.length > 0) {
+              allAdminData = [...allAdminData, ...batchData];
+              if (batchData.length < BATCH_SIZE) break;
+            } else {
+              break;
+            }
+          } else {
+            break;
+          }
+        } catch {
+          break;
+        }
+      }
+      
+      if (allAdminData.length > 0) {
+        const freshMaterials = allAdminData.map((item: any) => ({
+          id: item.id,
+          supplier_id: 'admin-catalog',
+          name: item.name || 'Unnamed Material',
+          category: item.category || 'Uncategorized',
+          description: item.description || '',
+          unit: item.unit || 'unit',
+          unit_price: item.suggested_price || 0,
+          image_url: item.image_url,
+          additional_images: [],
+          in_stock: true,
+          supplier: {
+            company_name: 'Admin Catalog',
+            location: 'Kenya',
+            rating: 5.0
+          }
+        }));
+        
+        // Update cache
+        const CACHE_KEY = 'materials_cache';
+        const CACHE_TIMESTAMP_KEY = 'materials_cache_timestamp';
+        localStorage.setItem(CACHE_KEY, JSON.stringify(freshMaterials));
+        localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+        
+        // Update state if data changed significantly
+        setMaterials(prev => {
+          if (prev.length !== freshMaterials.length) {
+            console.log(`🔄 Background refresh: Updated ${freshMaterials.length} materials`);
+            setFilteredMaterials(freshMaterials);
+            return freshMaterials;
+          }
+          return prev;
+        });
+      }
+    } catch (error) {
+      console.log('Background refresh failed silently');
     }
   };
   
