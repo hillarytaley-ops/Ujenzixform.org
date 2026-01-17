@@ -58,6 +58,7 @@ import PrivateClientSignIn from "./pages/PrivateClientSignIn";
 import ProfessionalBuilderSignIn from "./pages/ProfessionalBuilderSignIn";
 import PrivateClientDashboard from "./pages/PrivateClientDashboard";
 import ProfessionalBuilderDashboardPage from "./pages/ProfessionalBuilderDashboard";
+import PublicBuilderProfile from "./pages/PublicBuilderProfile";
 
 // Auth Guard
 import { AuthRequired } from "@/components/security/AuthRequired";
@@ -196,6 +197,7 @@ const App = () => {
                     <Route path="/suppliers" element={<SuppliersMobileOptimized />} />
                     <Route path="/suppliers-mobile" element={<SuppliersMobileOptimized />} />
                     <Route path="/builders" element={<Builders />} />
+                    <Route path="/builder/:builderId" element={<PublicBuilderProfile />} />
                     <Route path="/about" element={<About />} />
                     <Route path="/contact" element={<Contact />} />
                     <Route path="/monitoring" element={<Monitoring />} />

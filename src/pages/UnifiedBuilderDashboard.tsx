@@ -35,8 +35,12 @@ import {
   Headphones,
   Plane,
   MapPin,
-  Send
+  Send,
+  User,
+  Upload
 } from 'lucide-react';
+import { BuilderProfileEdit } from '@/components/builders/BuilderProfileEdit';
+import { BuilderVideoPortfolio } from '@/components/builders/BuilderVideoPortfolio';
 
 // Monitoring Request Form Component
 function MonitoringRequestForm({ userId, onSuccess }: { userId: string; onSuccess: () => void }) {
@@ -431,7 +435,7 @@ export default function UnifiedBuilderDashboard() {
 
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="bg-gray-800/50 border border-gray-700 p-1">
+          <TabsList className="bg-gray-800/50 border border-gray-700 p-1 flex-wrap h-auto">
             <TabsTrigger value="overview" className="data-[state=active]:bg-purple-600">
               <Home className="w-4 h-4 mr-2" />
               Overview
@@ -454,13 +458,13 @@ export default function UnifiedBuilderDashboard() {
                 Portfolio
               </TabsTrigger>
             )}
+            <TabsTrigger value="profile" className="data-[state=active]:bg-purple-600">
+              <User className="w-4 h-4 mr-2" />
+              Profile
+            </TabsTrigger>
             <TabsTrigger value="support" className="data-[state=active]:bg-purple-600">
               <Headphones className="w-4 h-4 mr-2" />
               Support
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="data-[state=active]:bg-purple-600">
-              <Settings className="w-4 h-4 mr-2" />
-              Settings
             </TabsTrigger>
           </TabsList>
 
@@ -594,23 +598,53 @@ export default function UnifiedBuilderDashboard() {
             <TabsContent value="portfolio">
               <Card className="bg-gray-800/50 border-gray-700">
                 <CardHeader>
-                  <CardTitle className="text-white">Video Portfolio</CardTitle>
+                  <CardTitle className="text-white flex items-center gap-2">
+                    <Video className="w-5 h-5 text-purple-400" />
+                    Video Portfolio
+                  </CardTitle>
                   <CardDescription className="text-gray-400">
-                    Showcase your work with video content
+                    Showcase your projects with video content. Upload videos to attract more clients!
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-center py-12">
-                    <Video className="w-12 h-12 mx-auto text-gray-500 mb-4" />
-                    <p className="text-gray-400">No videos uploaded yet</p>
-                    <Button className="mt-4 bg-purple-600 hover:bg-purple-700">
-                      Upload Video
-                    </Button>
-                  </div>
+                  <BuilderVideoPortfolio 
+                    builderId={profile.id} 
+                    isOwner={true}
+                  />
                 </CardContent>
               </Card>
             </TabsContent>
           )}
+
+          <TabsContent value="profile">
+            <Card className="bg-gray-800/50 border-gray-700">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <User className="w-5 h-5 text-blue-400" />
+                  Edit Your Profile
+                </CardTitle>
+                <CardDescription className="text-gray-400">
+                  Update your profile information to help suppliers and clients find you
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="bg-white rounded-lg p-6">
+                  <BuilderProfileEdit
+                    userId={profile.id}
+                    builderCategory={profile.builder_category === 'professional' ? 'professional' : 'private'}
+                    onSave={() => {
+                      toast({
+                        title: "Profile Updated",
+                        description: "Your profile has been saved successfully.",
+                      });
+                      // Refresh profile data
+                      window.location.reload();
+                    }}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           <TabsContent value="support">
             <Card className="bg-gray-800/50 border-gray-700">
@@ -685,40 +719,6 @@ export default function UnifiedBuilderDashboard() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="settings">
-            <Card className="bg-gray-800/50 border-gray-700">
-              <CardHeader>
-                <CardTitle className="text-white">Account Settings</CardTitle>
-                <CardDescription className="text-gray-400">
-                  Manage your profile and preferences
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-gray-400 text-sm">Name</p>
-                    <p className="text-white">{profile.full_name || 'Not set'}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-400 text-sm">Email</p>
-                    <p className="text-white">{profile.email}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-400 text-sm">Phone</p>
-                    <p className="text-white">{profile.phone || 'Not set'}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-400 text-sm">Location</p>
-                    <p className="text-white">{profile.location || 'Not set'}</p>
-                  </div>
-                </div>
-                <Button variant="outline" className="mt-4">
-                  <Settings className="w-4 h-4 mr-2" />
-                  Edit Profile
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
         </Tabs>
       </main>
 

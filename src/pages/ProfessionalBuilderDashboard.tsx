@@ -31,8 +31,12 @@ import {
   Camera,
   Send,
   MapPin,
-  Calendar
+  Calendar,
+  Upload,
+  Play
 } from "lucide-react";
+import { BuilderProfileEdit } from "@/components/builders/BuilderProfileEdit";
+import { BuilderVideoPortfolio } from "@/components/builders/BuilderVideoPortfolio";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -344,10 +348,18 @@ const ProfessionalBuilderDashboardPage = () => {
               Team
             </TabsTrigger>
             <TabsTrigger value="monitoring" className="data-[state=active]:bg-cyan-500 data-[state=active]:text-white">
-              <Video className="h-4 w-4 mr-2" />
+              <Camera className="h-4 w-4 mr-2" />
               Monitoring
             </TabsTrigger>
-            <TabsTrigger value="support" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white">
+            <TabsTrigger value="portfolio" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white">
+              <Video className="h-4 w-4 mr-2" />
+              Portfolio
+            </TabsTrigger>
+            <TabsTrigger value="profile" className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white">
+              <User className="h-4 w-4 mr-2" />
+              Profile
+            </TabsTrigger>
+            <TabsTrigger value="support" className="data-[state=active]:bg-gray-500 data-[state=active]:text-white">
               <Headphones className="h-4 w-4 mr-2" />
               Support
             </TabsTrigger>
@@ -660,6 +672,77 @@ const ProfessionalBuilderDashboardPage = () => {
                     <p className="text-sm mb-4">Request camera monitoring for your construction sites</p>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Portfolio Tab - Video Marketing */}
+          <TabsContent value="portfolio">
+            <Card>
+              <CardHeader>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Video className="h-5 w-5 text-purple-600" />
+                      Video Portfolio
+                    </CardTitle>
+                    <CardDescription>
+                      Upload project videos to showcase your work and attract more clients
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {/* Info Banner */}
+                <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg p-4 mb-6">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-purple-500 rounded-lg text-white">
+                      <Play className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-purple-800 mb-1">Showcase Your Projects</h4>
+                      <p className="text-sm text-purple-700">
+                        Upload videos of your completed projects to build trust with potential clients.
+                        Videos with good engagement (likes, comments) are featured on the Builders page!
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Video Portfolio Component */}
+                <BuilderVideoPortfolio 
+                  builderId={user?.id || ''} 
+                  isOwner={true}
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Profile Tab */}
+          <TabsContent value="profile">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="h-5 w-5 text-indigo-600" />
+                  Edit Your Profile
+                </CardTitle>
+                <CardDescription>
+                  Update your company information, specialties, and credentials to attract more clients
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <BuilderProfileEdit
+                  userId={user?.id || ''}
+                  builderCategory="professional"
+                  onSave={() => {
+                    toast({
+                      title: "Profile Updated!",
+                      description: "Your profile has been saved successfully.",
+                    });
+                    // Refresh to show updated data
+                    checkAuth();
+                  }}
+                />
               </CardContent>
             </Card>
           </TabsContent>
