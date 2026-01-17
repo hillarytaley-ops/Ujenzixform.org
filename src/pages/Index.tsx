@@ -296,63 +296,10 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Sign In Portals Section */}
-      <section className="py-12 bg-muted/30">
+      {/* Registration Section - All User Types */}
+      <section className="pt-12 pb-6 bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 text-white">
         <div className="container mx-auto px-4">
           <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold mb-2">Access Your Dashboard</h2>
-            <p className="text-muted-foreground">Sign in to your account to manage your business</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-            {/* Builder Portal */}
-            <Link to="/builder-signin">
-              <Card className="hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-white">
-                <CardContent className="p-6 text-center">
-                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Building2 className="h-8 w-8 text-blue-600" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-blue-800 mb-2">Builder Portal</h3>
-                  <p className="text-sm text-muted-foreground mb-4">Manage your projects & orders</p>
-                  <Badge className="bg-blue-100 text-blue-700">Sign In →</Badge>
-                </CardContent>
-              </Card>
-            </Link>
-
-            {/* Supplier Portal */}
-            <Link to="/supplier-signin">
-              <Card className="hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer border-2 border-orange-200 bg-gradient-to-br from-orange-50 to-white">
-                <CardContent className="p-6 text-center">
-                  <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Store className="h-8 w-8 text-orange-600" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-orange-800 mb-2">Supplier Portal</h3>
-                  <p className="text-sm text-muted-foreground mb-4">Manage inventory & sales</p>
-                  <Badge className="bg-orange-100 text-orange-700">Sign In →</Badge>
-                </CardContent>
-              </Card>
-            </Link>
-
-            {/* Delivery Provider Portal */}
-            <Link to="/delivery-signin">
-              <Card className="hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer border-2 border-teal-200 bg-gradient-to-br from-teal-50 to-white">
-                <CardContent className="p-6 text-center">
-                  <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Truck className="h-8 w-8 text-teal-600" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-teal-800 mb-2">Delivery Provider</h3>
-                  <p className="text-sm text-muted-foreground mb-4">Manage deliveries & routes</p>
-                  <Badge className="bg-teal-100 text-teal-700">Sign In →</Badge>
-                </CardContent>
-              </Card>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Registration Section - All User Types */}
-      <section className="py-12 bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 text-white">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-10">
             <Badge className="mb-4 bg-white/10 text-white border-white/20">New to MradiPro?</Badge>
             <h2 className="text-3xl font-bold mb-2">Join Our Platform</h2>
             <p className="text-white/70 max-w-xl mx-auto">Register based on your role to access tailored features</p>
@@ -411,6 +358,59 @@ const Index = () => {
                   <h3 className="text-white font-bold text-xl mb-2">Delivery</h3>
                   <p className="text-teal-100/80 text-sm mb-4">Transport & logistics services</p>
                   <Badge className="bg-white text-teal-700 px-4 py-1">Apply →</Badge>
+                </CardContent>
+              </Card>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Sign In Portals Section */}
+      <section className="pt-6 pb-12 bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-6">
+            <h2 className="text-2xl font-bold mb-2 text-white">Already Registered?</h2>
+            <p className="text-white/70">Sign in to your account to manage your business</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
+            {/* Builder Portal */}
+            <Link to="/builder-signin">
+              <Card className="hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer border-2 border-blue-400/30 bg-white/10 backdrop-blur-sm hover:bg-white/20">
+                <CardContent className="p-5 text-center">
+                  <div className="w-12 h-12 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Building2 className="h-6 w-6 text-blue-300" />
+                  </div>
+                  <h3 className="text-base font-semibold text-white mb-1">Builder Portal</h3>
+                  <p className="text-xs text-white/60 mb-3">Manage projects & orders</p>
+                  <Badge className="bg-blue-500/20 text-blue-200 border-blue-400/30">Sign In →</Badge>
+                </CardContent>
+              </Card>
+            </Link>
+
+            {/* Supplier Portal */}
+            <Link to="/supplier-signin">
+              <Card className="hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer border-2 border-orange-400/30 bg-white/10 backdrop-blur-sm hover:bg-white/20">
+                <CardContent className="p-5 text-center">
+                  <div className="w-12 h-12 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Store className="h-6 w-6 text-orange-300" />
+                  </div>
+                  <h3 className="text-base font-semibold text-white mb-1">Supplier Portal</h3>
+                  <p className="text-xs text-white/60 mb-3">Manage inventory & sales</p>
+                  <Badge className="bg-orange-500/20 text-orange-200 border-orange-400/30">Sign In →</Badge>
+                </CardContent>
+              </Card>
+            </Link>
+
+            {/* Delivery Provider Portal */}
+            <Link to="/delivery-signin">
+              <Card className="hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer border-2 border-teal-400/30 bg-white/10 backdrop-blur-sm hover:bg-white/20">
+                <CardContent className="p-5 text-center">
+                  <div className="w-12 h-12 bg-teal-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Truck className="h-6 w-6 text-teal-300" />
+                  </div>
+                  <h3 className="text-base font-semibold text-white mb-1">Delivery Provider</h3>
+                  <p className="text-xs text-white/60 mb-3">Manage deliveries & routes</p>
+                  <Badge className="bg-teal-500/20 text-teal-200 border-teal-400/30">Sign In →</Badge>
                 </CardContent>
               </Card>
             </Link>
