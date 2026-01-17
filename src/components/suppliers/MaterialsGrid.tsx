@@ -525,69 +525,90 @@ export const MaterialsGrid = () => {
   }, [searchParams]);
 
   useEffect(() => {
-    // Check user role for purchase flow
-    const checkUserRole = async () => {
+    // FAST: Use cached session first, then verify in background
+    const initializeAuth = async () => {
+      // Try to get cached role from localStorage for instant display
+      const cachedRole = localStorage.getItem('user_role');
+      const cachedUserId = localStorage.getItem('user_id');
+      
+      if (cachedRole && cachedUserId) {
+        // Instant: Use cached values
+        setIsAuthenticated(true);
+        setUserRole(cachedRole);
+        setBuilderId(cachedUserId);
+        setAuthChecked(true);
+        console.log('MaterialsGrid - Using cached auth:', cachedRole);
+      }
+      
+      // Then verify with Supabase (non-blocking)
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
           setIsAuthenticated(true);
-          setBuilderId(user.id); // Set builderId when user is logged in
-          const { data: roleData, error: roleError } = await supabase
+          setBuilderId(session.user.id);
+          localStorage.setItem('user_id', session.user.id);
+          
+          // Fetch role
+          const { data: roleData } = await supabase
             .from('user_roles')
             .select('role')
-            .eq('user_id', user.id)
+            .eq('user_id', session.user.id)
             .maybeSingle();
-          
-          if (roleError) {
-            console.error('Error fetching user role:', roleError);
-          }
           
           const role = roleData?.role || null;
           setUserRole(role);
-          console.log('MaterialsGrid - User authenticated:', user.email, 'Role:', role, 'BuilderId:', user.id);
-        } else {
+          if (role) localStorage.setItem('user_role', role);
+          console.log('MaterialsGrid - Verified auth:', session.user.email, 'Role:', role);
+        } else if (!cachedRole) {
+          // Only set to false if we didn't have cached values
           setIsAuthenticated(false);
           setUserRole(null);
-          console.log('MaterialsGrid - No user authenticated');
+          localStorage.removeItem('user_role');
+          localStorage.removeItem('user_id');
         }
-        setAuthChecked(true); // Mark auth check as complete
+        setAuthChecked(true);
       } catch (error) {
-        console.error('Error checking user role:', error);
-        setAuthChecked(true); // Still mark as checked even on error
+        console.error('Error checking auth:', error);
+        setAuthChecked(true);
       }
     };
     
-    checkUserRole();
+    // Run auth check and load materials IN PARALLEL for speed
+    initializeAuth();
+    loadMaterials().catch(error => {
+      console.error('Error loading materials:', error);
+      setMaterials([]);
+      setFilteredMaterials([]);
+      setLoading(false);
+    });
     
-    // Also listen for auth state changes
+    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         setIsAuthenticated(true);
         setBuilderId(session.user.id);
+        localStorage.setItem('user_id', session.user.id);
+        
         const { data: roleData } = await supabase
           .from('user_roles')
           .select('role')
           .eq('user_id', session.user.id)
           .maybeSingle();
-        setUserRole(roleData?.role || null);
-        console.log('MaterialsGrid - Auth state changed:', event, 'Role:', roleData?.role);
-      } else {
+        
+        const role = roleData?.role || null;
+        setUserRole(role);
+        if (role) localStorage.setItem('user_role', role);
+        setAuthChecked(true);
+      } else if (event === 'SIGNED_OUT') {
         setIsAuthenticated(false);
         setUserRole(null);
+        localStorage.removeItem('user_role');
+        localStorage.removeItem('user_id');
+        setAuthChecked(true);
       }
     });
     
     return () => subscription.unsubscribe();
-    
-    // Wrap in try-catch to prevent crashes
-    try {
-      loadMaterials();
-    } catch (error) {
-      console.error('Error in loadMaterials effect:', error);
-      setMaterials([]);
-      setFilteredMaterials([]);
-      setLoading(false);
-    }
   }, []);
 
   useEffect(() => {
@@ -1629,10 +1650,6 @@ export const MaterialsGrid = () => {
                       </div>
                       
                       {/* Role-Based Action Buttons */}
-                      {/* DEBUG: Show current auth state - REMOVE AFTER TESTING */}
-                      <p className="text-xs text-red-500 mb-1 bg-yellow-100 p-1 rounded">
-                        DEBUG: authChecked={String(authChecked)} | isAuth={String(isAuthenticated)} | role={userRole || 'null'}
-                      </p>
                       
                       {/* Private Builders: Show Buy/Cart buttons */}
                       {(userRole === 'private_client' || userRole === 'admin') && (
