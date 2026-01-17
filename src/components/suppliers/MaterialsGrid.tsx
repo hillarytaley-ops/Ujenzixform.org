@@ -355,7 +355,9 @@ export const MaterialsGrid = () => {
   const [stockFilter, setStockFilter] = useState('all');
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [authChecked, setAuthChecked] = useState(false); // Track if auth check is complete
+  // Initialize authChecked to true immediately - we'll show Sign In button by default
+  // This prevents the "Loading..." state from ever showing
+  const [authChecked, setAuthChecked] = useState(true);
   const [showWelcome, setShowWelcome] = useState(false);
   const [isMultiQuoteOpen, setIsMultiQuoteOpen] = useState(false);
   const [builderId, setBuilderId] = useState<string>('');
@@ -1988,17 +1990,6 @@ export const MaterialsGrid = () => {
                         </div>
                       )}
                       
-                      {/* Auth check in progress - show loading state */}
-                      {!authChecked && (
-                        <div className="space-y-2">
-                          <Button 
-                            className="w-full h-10 text-sm font-semibold bg-gray-400 text-white"
-                            disabled
-                          >
-                            Loading...
-                          </Button>
-                        </div>
-                      )}
 
                       {/* Other roles: Show restriction message */}
                       {isAuthenticated && userRole && !['private_client', 'professional_builder', 'admin'].includes(userRole) && (
