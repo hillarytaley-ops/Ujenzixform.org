@@ -67,7 +67,11 @@ import {
   Filter,
   RefreshCw,
   X,
-  Loader2
+  Loader2,
+  Upload,
+  Camera,
+  DollarSign,
+  AlertCircle
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -106,15 +110,17 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
   const { t } = useLanguage();
   const { user } = useAuth();
   
-  // Request form state
+  // Request form state with multiple images
   const [requestForm, setRequestForm] = useState({
     productName: '',
     category: '',
     description: '',
-    suggestedPrice: 0,
-    imageFile: null as File | null,
-    imagePreview: ''
+    suggestedPrice: '',
+    unit: 'piece',
+    images: [] as { file: File; preview: string }[],
   });
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadAdminProducts();
@@ -225,16 +231,27 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
       return;
     }
 
+    if (!requestForm.suggestedPrice) {
+      toast({
+        title: 'Price Required',
+        description: 'Please enter your selling price',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       
-      let imageBase64 = '';
-      if (requestForm.imageFile) {
+      // Convert images to base64
+      const imageDataArray: string[] = [];
+      for (const img of requestForm.images) {
         const reader = new FileReader();
-        imageBase64 = await new Promise((resolve) => {
+        const base64 = await new Promise<string>((resolve) => {
           reader.onload = () => resolve(reader.result as string);
-          reader.readAsDataURL(requestForm.imageFile!);
+          reader.readAsDataURL(img.file);
         });
+        imageDataArray.push(base64);
       }
       
       const { error } = await (supabase
@@ -244,8 +261,10 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
           product_name: requestForm.productName,
           category: requestForm.category,
           description: requestForm.description,
-          suggested_price: requestForm.suggestedPrice,
-          image_data: imageBase64,
+          suggested_price: parseFloat(requestForm.suggestedPrice) || 0,
+          unit: requestForm.unit,
+          image_data: imageDataArray[0] || '', // Main image
+          additional_images: imageDataArray.slice(1), // Additional angles
           status: 'pending',
           created_at: new Date().toISOString()
         }));
@@ -255,18 +274,11 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
       }
       
       setShowRequestDialog(false);
-      setRequestForm({
-        productName: '',
-        category: '',
-        description: '',
-        suggestedPrice: 0,
-        imageFile: null,
-        imagePreview: ''
-      });
+      resetRequestForm();
       
       toast({
-        title: 'Request Submitted',
-        description: 'Your product request has been sent to the admin.',
+        title: 'Request Submitted!',
+        description: 'Your product request has been sent to admin for review.',
       });
     } catch (error) {
       console.error('Error submitting request:', error);
@@ -280,27 +292,84 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
     }
   };
 
-  // Handle request image selection
+  // Reset request form
+  const resetRequestForm = () => {
+    // Clean up preview URLs
+    requestForm.images.forEach(img => URL.revokeObjectURL(img.preview));
+    setRequestForm({
+      productName: '',
+      category: '',
+      description: '',
+      suggestedPrice: '',
+      unit: 'piece',
+      images: [],
+    });
+  };
+
+  // Handle request image selection - supports multiple
   const handleRequestImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
     
-    if (file.size > 10 * 1024 * 1024) {
-      toast({
-        title: 'File too large',
-        description: 'Please select an image under 10MB',
-        variant: 'destructive'
-      });
-      return;
+    const newImages: { file: File; preview: string }[] = [];
+    
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: 'Invalid file',
+          description: 'Please select image files only',
+          variant: 'destructive'
+        });
+        continue;
+      }
+      
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: 'File too large',
+          description: `${file.name} is over 5MB limit`,
+          variant: 'destructive'
+        });
+        continue;
+      }
+      
+      // Limit to 5 images total
+      if (requestForm.images.length + newImages.length >= 5) {
+        toast({
+          title: 'Maximum images reached',
+          description: 'You can upload up to 5 images',
+        });
+        break;
+      }
+      
+      const preview = URL.createObjectURL(file);
+      newImages.push({ file, preview });
     }
     
-    const preview = URL.createObjectURL(file);
-    setRequestForm(prev => ({
-      ...prev,
-      imageFile: file,
-      imagePreview: preview
-    }));
+    if (newImages.length > 0) {
+      setRequestForm(prev => ({
+        ...prev,
+        images: [...prev.images, ...newImages]
+      }));
+    }
+    
+    // Reset input
+    if (event.target) event.target.value = '';
   };
+
+  // Remove an image from request form
+  const removeRequestImage = (index: number) => {
+    setRequestForm(prev => {
+      const newImages = [...prev.images];
+      URL.revokeObjectURL(newImages[index].preview);
+      newImages.splice(index, 1);
+      return { ...prev, images: newImages };
+    });
+  };
+
+  // Units for products
+  const UNITS = ['piece', 'kg', 'bag', 'ton', 'meter', 'sqm', 'liter', 'sheet', 'bundle', 'trip'];
 
   const cardBg = isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white';
   const textColor = isDarkMode ? 'text-white' : 'text-gray-900';
@@ -337,87 +406,204 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
-          <Dialog open={showRequestDialog} onOpenChange={setShowRequestDialog}>
+          <Dialog open={showRequestDialog} onOpenChange={(open) => {
+            setShowRequestDialog(open);
+            if (!open) resetRequestForm();
+          }}>
             <DialogTrigger asChild>
               <Button className="bg-orange-500 hover:bg-orange-600">
                 <Plus className="h-4 w-4 mr-2" />
                 Request New Product
               </Button>
             </DialogTrigger>
-            <DialogContent compact className="max-w-xs">
-              <DialogHeader className="pb-1">
-                <DialogTitle className="text-sm">Request New Product</DialogTitle>
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5 text-orange-500" />
+                  Request New Product
+                </DialogTitle>
+                <DialogDescription>
+                  Fill in the product details and upload photos from all angles. Admin will review and add it to the catalog.
+                </DialogDescription>
               </DialogHeader>
-              <div className="grid gap-2">
-                {/* Row 1: Name + Category */}
-                <div className="flex gap-2">
+              
+              <div className="space-y-5 py-4">
+                {/* Product Photos Section */}
+                <div className="space-y-3">
+                  <Label className="flex items-center gap-2 text-base font-semibold">
+                    <Camera className="h-4 w-4 text-orange-500" />
+                    Product Photos (Upload from all angles)
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Upload up to 5 photos showing the product from different angles
+                  </p>
+                  
+                  {/* Image Grid */}
+                  <div className="grid grid-cols-5 gap-2">
+                    {/* Uploaded images */}
+                    {requestForm.images.map((img, index) => (
+                      <div key={index} className="relative aspect-square rounded-lg border-2 border-green-400 overflow-hidden group">
+                        <img src={img.preview} alt={`Photo ${index + 1}`} className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => removeRequestImage(index)}
+                          className="absolute top-1 right-1 p-1 bg-red-500 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                        {index === 0 && (
+                          <Badge className="absolute bottom-1 left-1 bg-orange-500 text-[9px] px-1 py-0">Main</Badge>
+                        )}
+                      </div>
+                    ))}
+                    
+                    {/* Upload button - show if less than 5 images */}
+                    {requestForm.images.length < 5 && (
+                      <div 
+                        className="aspect-square rounded-lg border-2 border-dashed border-gray-300 hover:border-orange-400 cursor-pointer flex flex-col items-center justify-center bg-gray-50 hover:bg-orange-50 transition-colors"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <Upload className="h-5 w-5 text-gray-400 mb-1" />
+                        <span className="text-[10px] text-gray-500">Add Photo</span>
+                      </div>
+                    )}
+                    
+                    {/* Empty slots */}
+                    {Array.from({ length: Math.max(0, 4 - requestForm.images.length) }).map((_, i) => (
+                      <div key={`empty-${i}`} className="aspect-square rounded-lg border-2 border-dashed border-gray-200 bg-gray-50 flex items-center justify-center">
+                        <span className="text-[10px] text-gray-300">Angle {requestForm.images.length + i + 2}</span>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleRequestImageSelect}
+                    className="hidden"
+                  />
+                </div>
+
+                {/* Product Name */}
+                <div className="space-y-2">
+                  <Label htmlFor="product-name">Product Name *</Label>
                   <Input
+                    id="product-name"
                     value={requestForm.productName}
                     onChange={(e) => setRequestForm(prev => ({ ...prev, productName: e.target.value }))}
-                    placeholder="Product name *"
-                    className="h-7 text-xs flex-1"
+                    placeholder="e.g., Bamburi Cement 42.5N (50kg)"
                   />
-                  <Select
-                    value={requestForm.category}
-                    onValueChange={(value) => setRequestForm(prev => ({ ...prev, category: value }))}
-                  >
-                    <SelectTrigger className="h-7 text-xs w-24">
-                      <SelectValue placeholder="Category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CATEGORIES.map(cat => (
-                        <SelectItem key={cat} value={cat} className="text-xs">{cat}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                 </div>
-                {/* Row 2: Price + Image */}
-                <div className="flex gap-2 items-center">
-                  <Input
-                    type="number"
-                    value={requestForm.suggestedPrice}
-                    onChange={(e) => setRequestForm(prev => ({ ...prev, suggestedPrice: parseFloat(e.target.value) || 0 }))}
-                    placeholder="Price (KES)"
-                    className="h-7 text-xs w-20"
-                  />
-                  {requestForm.imagePreview ? (
-                    <div className="relative h-7 w-7 flex-shrink-0">
-                      <img src={requestForm.imagePreview} alt="Preview" className="w-7 h-7 object-cover rounded border" />
-                      <button
-                        type="button"
-                        className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-3 h-3 flex items-center justify-center text-[8px]"
-                        onClick={() => setRequestForm(prev => ({ ...prev, imageFile: null, imagePreview: '' }))}
-                      >×</button>
-                    </div>
-                  ) : (
-                    <label className="h-7 px-2 text-xs border rounded flex items-center gap-1 cursor-pointer hover:bg-gray-50 flex-shrink-0">
-                      <Plus className="h-3 w-3" />
-                      <span>Image</span>
-                      <input type="file" accept="image/*" onChange={handleRequestImageSelect} className="hidden" />
-                    </label>
-                  )}
-                  <Input
+
+                {/* Category and Unit */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Category *</Label>
+                    <Select
+                      value={requestForm.category}
+                      onValueChange={(value) => setRequestForm(prev => ({ ...prev, category: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CATEGORIES.map(cat => (
+                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>Unit *</Label>
+                    <Select
+                      value={requestForm.unit}
+                      onValueChange={(value) => setRequestForm(prev => ({ ...prev, unit: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select unit" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {UNITS.map(unit => (
+                          <SelectItem key={unit} value={unit}>{unit}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Price Input - Prominent */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <DollarSign className="h-4 w-4 text-green-600" />
+                    Your Selling Price (KES) *
+                  </Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">KES</span>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={requestForm.suggestedPrice}
+                      onChange={(e) => setRequestForm(prev => ({ ...prev, suggestedPrice: e.target.value }))}
+                      placeholder="0.00"
+                      className="pl-12 text-lg font-semibold h-12"
+                    />
+                    {requestForm.unit && (
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                        per {requestForm.unit}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Description */}
+                <div className="space-y-2">
+                  <Label>Description (optional)</Label>
+                  <Textarea
                     value={requestForm.description}
                     onChange={(e) => setRequestForm(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="Description (optional)"
-                    className="h-7 text-xs flex-1"
+                    placeholder="Describe the product, brand, specifications, etc."
+                    rows={3}
                   />
                 </div>
-                {/* Row 3: Buttons */}
-                <div className="flex justify-end gap-2 pt-1">
-                  <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={() => setShowRequestDialog(false)}>
-                    Cancel
-                  </Button>
-                  <Button 
-                    size="sm"
-                    className="h-6 text-xs px-3 bg-orange-500 hover:bg-orange-600"
-                    onClick={handleRequestNewProduct}
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? '...' : 'Submit'}
-                  </Button>
+
+                {/* Info Banner */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5" />
+                    <div className="text-sm text-blue-700">
+                      <p className="font-medium">What happens next?</p>
+                      <p>Admin will review your request and add the product to the catalog. You'll be notified once approved.</p>
+                    </div>
+                  </div>
                 </div>
               </div>
+
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => setShowRequestDialog(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleRequestNewProduct}
+                  disabled={isSubmitting || !requestForm.productName || !requestForm.category || !requestForm.suggestedPrice}
+                  className="bg-orange-500 hover:bg-orange-600"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Submit Request
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
