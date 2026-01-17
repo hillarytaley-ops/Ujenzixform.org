@@ -4,59 +4,18 @@
 -- Description: Automatically creates a profile row when a new user signs up
 -- =====================================================
 
--- Function to handle new user creation
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS trigger AS $$
+-- First, ensure the email column exists (add if missing)
+DO $$
 BEGIN
-  INSERT INTO public.profiles (
-    user_id,
-    email,
-    full_name,
-    phone,
-    company_name,
-    county,
-    created_at,
-    updated_at
-  )
-  VALUES (
-    new.id,
-    new.email,
-    COALESCE(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
-    COALESCE(new.raw_user_meta_data->>'phone', ''),
-    COALESCE(new.raw_user_meta_data->>'company_name', ''),
-    COALESCE(new.raw_user_meta_data->>'county', ''),
-    NOW(),
-    NOW()
-  )
-  ON CONFLICT (user_id) DO NOTHING; -- Don't fail if profile already exists
-  
-  RETURN new;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Drop existing trigger if it exists
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-
--- Create trigger to auto-create profile on signup
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
-
--- =====================================================
--- Backfill: Create profiles for existing users who don't have one
--- =====================================================
-INSERT INTO public.profiles (user_id, email, full_name, created_at, updated_at)
-SELECT 
-  u.id,
-  u.email,
-  COALESCE(u.raw_user_meta_data->>'full_name', u.raw_user_meta_data->>'name', split_part(u.email, '@', 1)),
-  COALESCE(u.created_at, NOW()),
-  NOW()
-FROM auth.users u
-WHERE NOT EXISTS (
-  SELECT 1 FROM public.profiles p WHERE p.user_id = u.id
-)
-ON CONFLICT (user_id) DO NOTHING;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'profiles' 
+    AND column_name = 'email'
+  ) THEN
+    ALTER TABLE public.profiles ADD COLUMN email TEXT;
+  END IF;
+END $$;
 
 -- =====================================================
 -- Ensure user_id column has unique constraint for ON CONFLICT to work
@@ -77,6 +36,51 @@ EXCEPTION
   WHEN others THEN
     RAISE NOTICE 'Could not add unique constraint: %', SQLERRM;
 END $$;
+
+-- Function to handle new user creation
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.profiles (
+    user_id,
+    full_name,
+    created_at,
+    updated_at
+  )
+  VALUES (
+    new.id,
+    COALESCE(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
+    NOW(),
+    NOW()
+  )
+  ON CONFLICT (user_id) DO NOTHING; -- Don't fail if profile already exists
+  
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Drop existing trigger if it exists
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+
+-- Create trigger to auto-create profile on signup
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- =====================================================
+-- Backfill: Create profiles for existing users who don't have one
+-- =====================================================
+INSERT INTO public.profiles (user_id, full_name, created_at, updated_at)
+SELECT 
+  u.id,
+  COALESCE(u.raw_user_meta_data->>'full_name', u.raw_user_meta_data->>'name', split_part(u.email, '@', 1)),
+  COALESCE(u.created_at, NOW()),
+  NOW()
+FROM auth.users u
+WHERE NOT EXISTS (
+  SELECT 1 FROM public.profiles p WHERE p.user_id = u.id
+)
+ON CONFLICT (user_id) DO NOTHING;
 
 -- =====================================================
 -- Grant necessary permissions
