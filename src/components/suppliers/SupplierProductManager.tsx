@@ -15,7 +15,7 @@
  * ╚══════════════════════════════════════════════════════════════════════════════════════╝
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,7 +25,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Edit, Trash2, Package, Image as ImageIcon, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { Plus, Edit, Trash2, Package, Image as ImageIcon, Clock, CheckCircle, XCircle, AlertCircle, Upload, X, Camera, Loader2, DollarSign } from 'lucide-react';
 import { CategoryImageSelector } from './CategoryImageSelector';
 import { getDefaultCategoryImage } from '@/config/defaultCategoryImages';
 import {
@@ -35,6 +35,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog";
 
 interface Product {
@@ -46,6 +47,7 @@ interface Product {
   unit: string;
   unit_price: number;
   image_url?: string;
+  additional_images?: string[]; // Multiple images from different angles
   in_stock: boolean;
   created_at: string;
   updated_at: string;
@@ -139,9 +141,12 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
   const [loading, setLoading] = useState(true);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
+  const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const { toast } = useToast();
 
-  // Form state
+  // Form state with multiple images support
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -149,6 +154,7 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
     unit: '',
     unit_price: '',
     image_url: '',
+    additional_images: [] as string[], // Up to 4 additional angle images
     in_stock: true
   });
 
@@ -209,6 +215,7 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
         unit: formData.unit,
         unit_price: parseFloat(formData.unit_price),
         image_url: formData.image_url,
+        additional_images: formData.additional_images.filter(img => img), // Filter empty strings
         in_stock: formData.in_stock,
         updated_at: new Date().toISOString()
       };
@@ -257,6 +264,7 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
         unit: '',
         unit_price: '',
         image_url: '',
+        additional_images: [],
         in_stock: true
       });
       setShowAddDialog(false);
@@ -281,9 +289,91 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
       unit: product.unit,
       unit_price: product.unit_price.toString(),
       image_url: product.image_url || '',
+      additional_images: product.additional_images || [],
       in_stock: product.in_stock
     });
     setShowAddDialog(true);
+  };
+
+  // Handle image upload for main or additional images
+  const handleImageUpload = async (file: File, index: number) => {
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: 'Invalid file type',
+        description: 'Please select an image file (JPG, PNG, WebP)',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: 'File too large',
+        description: 'Please select an image under 5MB',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setUploading(true);
+    setUploadingIndex(index);
+
+    try {
+      const fileName = `${supplierId}/${Date.now()}-${index}.${file.name.split('.').pop()}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(fileName);
+
+      if (index === 0) {
+        // Main image
+        setFormData(prev => ({ ...prev, image_url: publicUrl }));
+      } else {
+        // Additional images (index 1-4)
+        setFormData(prev => {
+          const newAdditionalImages = [...prev.additional_images];
+          newAdditionalImages[index - 1] = publicUrl;
+          return { ...prev, additional_images: newAdditionalImages };
+        });
+      }
+
+      toast({
+        title: 'Image uploaded',
+        description: index === 0 ? 'Main product image uploaded' : `Angle ${index} image uploaded`
+      });
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast({
+        title: 'Upload failed',
+        description: 'Failed to upload image. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setUploading(false);
+      setUploadingIndex(null);
+    }
+  };
+
+  const removeImage = (index: number) => {
+    if (index === 0) {
+      setFormData(prev => ({ ...prev, image_url: '' }));
+    } else {
+      setFormData(prev => {
+        const newAdditionalImages = [...prev.additional_images];
+        newAdditionalImages[index - 1] = '';
+        return { ...prev, additional_images: newAdditionalImages };
+      });
+    }
   };
 
   const handleDelete = async (productId: string) => {
@@ -321,10 +411,25 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
       unit: '',
       unit_price: '',
       image_url: '',
+      additional_images: [],
       in_stock: true
     });
     setEditingProduct(null);
     setShowAddDialog(false);
+  };
+
+  // Image slot labels
+  const imageSlots = [
+    { index: 0, label: 'Main Photo', description: 'Front view' },
+    { index: 1, label: 'Angle 2', description: 'Side view' },
+    { index: 2, label: 'Angle 3', description: 'Back view' },
+    { index: 3, label: 'Angle 4', description: 'Detail shot' },
+    { index: 4, label: 'Angle 5', description: 'In use/context' },
+  ];
+
+  const getImageUrl = (index: number) => {
+    if (index === 0) return formData.image_url;
+    return formData.additional_images[index - 1] || '';
   };
 
   return (
@@ -340,37 +445,248 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
           if (!open) resetForm();
         }}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="bg-orange-600 hover:bg-orange-700">
               <Plus className="h-4 w-4 mr-2" />
-              Add Product
+              Add New Product
             </Button>
           </DialogTrigger>
-          <DialogContent compact>
-            <form onSubmit={handleSubmit} className="flex flex-col gap-1.5">
-              {/* Row 1: Image + Category + Unit + Price */}
-              <div className="flex gap-1.5 items-center">
-                <div className="w-9 h-9 rounded border bg-muted flex-shrink-0 overflow-hidden cursor-pointer" onClick={() => document.getElementById(`up-${supplierId}`)?.click()}>
-                  {formData.image_url ? <img src={formData.image_url} className="w-full h-full object-cover" /> : <ImageIcon className="w-full h-full p-1.5 text-muted-foreground" />}
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5 text-orange-600" />
+                {editingProduct ? 'Edit Product' : 'Add New Product'}
+              </DialogTitle>
+              <DialogDescription>
+                Upload product photos from all angles and set your price. Products require admin approval before appearing in the marketplace.
+              </DialogDescription>
+            </DialogHeader>
+
+            <form onSubmit={handleSubmit} className="space-y-6 py-4">
+              {/* Product Images Section */}
+              <div className="space-y-3">
+                <Label className="text-base font-semibold flex items-center gap-2">
+                  <Camera className="h-4 w-4" />
+                  Product Photos (Upload from all angles)
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Upload up to 5 photos showing your product from different angles. The first photo will be the main display image.
+                </p>
+                
+                <div className="grid grid-cols-5 gap-3">
+                  {imageSlots.map((slot) => {
+                    const imageUrl = getImageUrl(slot.index);
+                    const isUploading = uploading && uploadingIndex === slot.index;
+                    
+                    return (
+                      <div key={slot.index} className="space-y-1">
+                        <div 
+                          className={`relative aspect-square rounded-lg border-2 border-dashed overflow-hidden cursor-pointer transition-all hover:border-orange-400 ${
+                            slot.index === 0 ? 'border-orange-300 bg-orange-50' : 'border-gray-300 bg-gray-50'
+                          } ${imageUrl ? 'border-solid border-green-400' : ''}`}
+                          onClick={() => !isUploading && fileInputRefs.current[slot.index]?.click()}
+                        >
+                          {isUploading ? (
+                            <div className="absolute inset-0 flex items-center justify-center bg-white/80">
+                              <Loader2 className="h-6 w-6 animate-spin text-orange-600" />
+                            </div>
+                          ) : imageUrl ? (
+                            <>
+                              <img src={imageUrl} alt={slot.label} className="w-full h-full object-cover" />
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); removeImage(slot.index); }}
+                                className="absolute top-1 right-1 p-1 bg-red-500 rounded-full text-white hover:bg-red-600"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                              {slot.index === 0 && (
+                                <Badge className="absolute bottom-1 left-1 bg-orange-600 text-[10px] px-1 py-0">Main</Badge>
+                              )}
+                            </>
+                          ) : (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center p-2">
+                              <Upload className={`h-5 w-5 mb-1 ${slot.index === 0 ? 'text-orange-400' : 'text-gray-400'}`} />
+                              <span className={`text-[10px] text-center ${slot.index === 0 ? 'text-orange-600 font-medium' : 'text-gray-500'}`}>
+                                {slot.label}
+                              </span>
+                            </div>
+                          )}
+                          <input
+                            ref={el => fileInputRefs.current[slot.index] = el}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleImageUpload(file, slot.index);
+                              e.target.value = '';
+                            }}
+                          />
+                        </div>
+                        <p className="text-[10px] text-center text-muted-foreground">{slot.description}</p>
+                      </div>
+                    );
+                  })}
                 </div>
-                <input id={`up-${supplierId}`} type="file" accept="image/*" className="hidden" onChange={async(e)=>{const f=e.target.files?.[0];if(!f)return;try{const n=`${supplierId}/${Date.now()}.${f.name.split('.').pop()}`;await supabase.storage.from('product-images').upload(n,f);const{data:{publicUrl}}=supabase.storage.from('product-images').getPublicUrl(n);setFormData({...formData,image_url:publicUrl});}catch(err){console.error(err);}}} />
-                <Select value={formData.category} onValueChange={(v) => setFormData({ ...formData, category: v })}>
-                  <SelectTrigger className="h-6 text-[10px] flex-1"><SelectValue placeholder="Category" /></SelectTrigger>
-                  <SelectContent>{PRODUCT_CATEGORIES.map((c) => <SelectItem key={c} value={c} className="text-[10px]">{c}</SelectItem>)}</SelectContent>
-                </Select>
-                <Select value={formData.unit} onValueChange={(v) => setFormData({ ...formData, unit: v })}>
-                  <SelectTrigger className="h-6 text-[10px] w-12"><SelectValue placeholder="Unit" /></SelectTrigger>
-                  <SelectContent>{UNITS.map((u) => <SelectItem key={u} value={u} className="text-[10px]">{u}</SelectItem>)}</SelectContent>
-                </Select>
-                <Input type="number" placeholder="KES" value={formData.unit_price} onChange={(e) => setFormData({ ...formData, unit_price: e.target.value })} className="h-6 text-[10px] w-14" required />
+
+                {/* Use default category image button */}
+                {formData.category && !formData.image_url && (
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => { 
+                      const d = getDefaultCategoryImage(formData.category); 
+                      if(d) setFormData({...formData, image_url: d}); 
+                    }}
+                  >
+                    <ImageIcon className="h-4 w-4 mr-2" />
+                    Use Default Category Image
+                  </Button>
+                )}
               </div>
-              {/* Row 2: Name */}
-              <Input placeholder="Product name *" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="h-6 text-[10px]" required />
-              {/* Row 3: Buttons */}
-              <div className="flex justify-end gap-1">
-                {formData.category && !formData.image_url && <Button type="button" variant="link" className="h-5 text-[9px] p-0 mr-auto" onClick={() => { const d = getDefaultCategoryImage(formData.category); if(d) setFormData({...formData, image_url: d}); }}>Default img</Button>}
-                <Button type="button" variant="ghost" className="h-5 text-[9px] px-1.5" onClick={resetForm}>Cancel</Button>
-                <Button type="submit" className="h-5 text-[9px] px-2">{editingProduct ? 'Save' : 'Submit'}</Button>
+
+              {/* Product Details Section */}
+              <div className="space-y-4">
+                <Label className="text-base font-semibold">Product Details</Label>
+                
+                {/* Product Name */}
+                <div className="space-y-2">
+                  <Label htmlFor="product-name">Product Name *</Label>
+                  <Input
+                    id="product-name"
+                    placeholder="e.g., Portland Cement 50kg Bag"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    required
+                  />
+                </div>
+
+                {/* Category and Unit Row */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Category *</Label>
+                    <Select value={formData.category} onValueChange={(v) => setFormData({ ...formData, category: v })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-60">
+                        {PRODUCT_CATEGORIES.map((c) => (
+                          <SelectItem key={c} value={c}>{c}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>Unit of Measurement *</Label>
+                    <Select value={formData.unit} onValueChange={(v) => setFormData({ ...formData, unit: v })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select unit" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-60">
+                        {UNITS.map((u) => (
+                          <SelectItem key={u} value={u}>{u}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Price Input - Prominent */}
+                <div className="space-y-2">
+                  <Label htmlFor="product-price" className="flex items-center gap-2">
+                    <DollarSign className="h-4 w-4 text-green-600" />
+                    Price (KES) *
+                  </Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">KES</span>
+                    <Input
+                      id="product-price"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={formData.unit_price}
+                      onChange={(e) => setFormData({ ...formData, unit_price: e.target.value })}
+                      className="pl-12 text-lg font-semibold h-12"
+                      required
+                    />
+                    {formData.unit && (
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                        per {formData.unit}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Description */}
+                <div className="space-y-2">
+                  <Label htmlFor="product-description">Description (optional)</Label>
+                  <Textarea
+                    id="product-description"
+                    placeholder="Describe your product, specifications, quality, brand, etc."
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    rows={3}
+                  />
+                </div>
+
+                {/* Stock Status */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="in-stock"
+                    checked={formData.in_stock}
+                    onChange={(e) => setFormData({ ...formData, in_stock: e.target.checked })}
+                    className="h-4 w-4 rounded border-gray-300"
+                  />
+                  <Label htmlFor="in-stock" className="cursor-pointer">Product is currently in stock</Label>
+                </div>
               </div>
+
+              {/* Info Banner */}
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-amber-800">Admin Approval Required</p>
+                    <p className="text-sm text-amber-700">
+                      Your product will be reviewed by our team before appearing in the marketplace. 
+                      This usually takes 24-48 hours.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Form Actions */}
+              <DialogFooter className="gap-2">
+                <Button type="button" variant="outline" onClick={resetForm}>
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  className="bg-orange-600 hover:bg-orange-700"
+                  disabled={uploading || !formData.name || !formData.category || !formData.unit || !formData.unit_price}
+                >
+                  {uploading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Uploading...
+                    </>
+                  ) : editingProduct ? (
+                    <>
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Save Changes
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Submit Product
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
@@ -400,6 +716,8 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
           {products.map((product) => {
             // Use custom image, fallback to default category image
             const imageUrl = product.image_url || getDefaultCategoryImage(product.category);
+            const additionalImages = product.additional_images || [];
+            const totalImages = 1 + additionalImages.filter(img => img).length;
             
             return (
             <Card key={product.id} className="overflow-hidden hover:shadow-lg transition-shadow">
@@ -421,6 +739,15 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
                     {product.in_stock ? 'In Stock' : 'Out of Stock'}
                   </Badge>
                 </div>
+                {/* Show image count if multiple */}
+                {totalImages > 1 && (
+                  <div className="absolute bottom-2 left-2">
+                    <Badge variant="secondary" className="bg-black/60 text-white">
+                      <Camera className="h-3 w-3 mr-1" />
+                      {totalImages} photos
+                    </Badge>
+                  </div>
+                )}
               </div>
 
               {/* Product Info */}
