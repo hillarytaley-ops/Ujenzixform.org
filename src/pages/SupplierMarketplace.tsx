@@ -144,19 +144,21 @@ const SupplierMarketplace = () => {
     }
   }, []);
 
-  // Background check - doesn't block UI
+  // Background check - doesn't block UI (uses faster getSession)
   const checkAuthBackground = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setUser(user);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setUser(session.user);
+        localStorage.setItem('user_id', session.user.id);
         const { data: roleData } = await supabase
           .from('user_roles')
           .select('role')
-          .eq('user_id', user.id)
+          .eq('user_id', session.user.id)
           .maybeSingle();
         if (roleData?.role) {
           setUserRole(roleData.role);
+          localStorage.setItem('user_role', roleData.role);
         }
       }
     } catch (error) {
@@ -167,8 +169,9 @@ const SupplierMarketplace = () => {
   const checkAuth = async () => {
     console.log('🔐 SupplierMarketplace - Checking auth...');
     try {
-      // First check Supabase Auth
-      const { data: { user } } = await supabase.auth.getUser();
+      // First check Supabase Auth (use getSession for speed)
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
       
       if (user) {
         setUser(user);

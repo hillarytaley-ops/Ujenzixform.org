@@ -25,24 +25,45 @@ const SuppliersMobileOptimized = () => {
   const { toast } = useToast();
 
   useEffect(() => {
+    // FAST: Use cached values first for instant display
+    const cachedRole = localStorage.getItem('user_role');
+    const cachedUserId = localStorage.getItem('user_id');
+    
+    if (cachedRole && cachedUserId) {
+      setUser({ id: cachedUserId });
+      setUserRole(cachedRole);
+      setLoading(false);
+    }
+    
+    // Then verify with Supabase in background
     checkAuth();
+    
     // Prefetch likely next pages for instant navigation
     prefetchRoutes(['/delivery', '/tracking', '/feedback'], 3000, 1000);
   }, []);
 
   const checkAuth = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setUser(user);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setUser(session.user);
+        localStorage.setItem('user_id', session.user.id);
         
         const { data: roleData } = await supabase
           .from('user_roles')
           .select('role')
-          .eq('user_id', user.id)
+          .eq('user_id', session.user.id)
           .maybeSingle();
         
-        setUserRole(roleData?.role || null);
+        const role = roleData?.role || null;
+        setUserRole(role);
+        if (role) localStorage.setItem('user_role', role);
+      } else {
+        // Clear cache if not authenticated
+        localStorage.removeItem('user_role');
+        localStorage.removeItem('user_id');
+        setUser(null);
+        setUserRole(null);
       }
     } catch (error) {
       console.error('Error checking auth:', error);

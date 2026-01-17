@@ -21,25 +21,45 @@ const SuppliersIPhone = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // FAST: Use cached values first for instant display
+    const cachedRole = localStorage.getItem('user_role');
+    const cachedUserId = localStorage.getItem('user_id');
+    
+    if (cachedRole && cachedUserId) {
+      setUser({ id: cachedUserId });
+      setUserRole(cachedRole);
+      setIsAdmin(cachedRole === 'admin');
+      setLoading(false);
+    }
+    
+    // Then verify with Supabase in background
     checkAuth();
   }, []);
 
   const checkAuth = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setUser(user);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setUser(session.user);
+        localStorage.setItem('user_id', session.user.id);
         
         const { data: roleData } = await supabase
           .from('user_roles')
           .select('role')
-          .eq('user_id', user.id)
+          .eq('user_id', session.user.id)
           .limit(1)
           .maybeSingle();
         
         const role = roleData?.role || 'builder';
         setUserRole(role);
         setIsAdmin(role === 'admin');
+        if (role) localStorage.setItem('user_role', role);
+      } else {
+        localStorage.removeItem('user_role');
+        localStorage.removeItem('user_id');
+        setUser(null);
+        setUserRole(null);
+        setIsAdmin(false);
       }
     } catch (error) {
       console.error('Auth check error:', error);
