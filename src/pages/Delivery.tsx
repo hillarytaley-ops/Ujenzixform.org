@@ -299,23 +299,41 @@ const Delivery = () => {
         setTimeout(() => reject(new Error('Request timed out after 10 seconds')), 10000);
       });
       
-      // Use Supabase client directly with timeout
+      // First, let's check what columns exist in the table
+      const { data: testData, error: testError } = await supabase
+        .from('deliveries')
+        .select('*')
+        .limit(1);
+      
+      console.log('📦 Table test:', { testData, testError });
+      
+      if (testError) {
+        console.error('📦 Table access error:', testError);
+        throw new Error(`Cannot access deliveries table: ${testError.message}`);
+      }
+
+      // Use Supabase client directly with timeout - minimal fields only
+      const insertData: Record<string, any> = {
+        tracking_number: trackingNumber,
+        status: 'pending'
+      };
+      
+      // Add optional fields only if they might exist
+      // These are common column names
+      if (deliveryForm.pickupAddress) insertData.pickup_address = deliveryForm.pickupAddress;
+      if (deliveryForm.deliveryAddress) insertData.delivery_address = deliveryForm.deliveryAddress;
+      if (deliveryForm.materialType) insertData.material_type = deliveryForm.materialType;
+      if (deliveryForm.quantity) insertData.quantity = `${deliveryForm.quantity} ${deliveryForm.unit}`;
+      if (deliveryForm.contactName) insertData.contact_name = deliveryForm.contactName;
+      if (deliveryForm.contactPhone) insertData.contact_phone = deliveryForm.contactPhone;
+      if (deliveryForm.specialInstructions) insertData.special_instructions = deliveryForm.specialInstructions;
+      if (deliveryForm.urgency) insertData.urgency = deliveryForm.urgency;
+      
+      console.log('📦 Insert data:', insertData);
+      
       const insertPromise = supabase
         .from('deliveries')
-        .insert({
-          tracking_number: trackingNumber,
-          pickup_address: deliveryForm.pickupAddress,
-          delivery_address: deliveryForm.deliveryAddress,
-          material_type: deliveryForm.materialType,
-          quantity: `${deliveryForm.quantity} ${deliveryForm.unit}`,
-          contact_name: deliveryForm.contactName,
-          contact_phone: deliveryForm.contactPhone,
-          preferred_date: deliveryForm.preferredDate || null,
-          preferred_time: deliveryForm.preferredTime || null,
-          special_instructions: deliveryForm.specialInstructions || null,
-          urgency: deliveryForm.urgency,
-          status: 'pending'
-        });
+        .insert(insertData);
 
       console.log('📦 Waiting for insert...');
       
