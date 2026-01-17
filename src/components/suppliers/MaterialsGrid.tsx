@@ -1629,6 +1629,11 @@ export const MaterialsGrid = () => {
                       </div>
                       
                       {/* Role-Based Action Buttons */}
+                      {/* DEBUG: Show current auth state - REMOVE AFTER TESTING */}
+                      <p className="text-xs text-red-500 mb-1 bg-yellow-100 p-1 rounded">
+                        DEBUG: authChecked={String(authChecked)} | isAuth={String(isAuthenticated)} | role={userRole || 'null'}
+                      </p>
+                      
                       {/* Private Builders: Show Buy/Cart buttons */}
                       {(userRole === 'private_client' || userRole === 'admin') && (
                         <>
