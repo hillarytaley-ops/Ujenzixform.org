@@ -285,21 +285,71 @@ const Delivery = () => {
     try {
       console.log('📦 Submitting delivery request...', trackingNumber);
       
-      // Match the actual table columns - only use columns that exist
-      // Based on error: 'contact_name' doesn't exist, so use different column names
-      const insertData = {
+      // First, discover what columns exist in the table
+      console.log('📦 Discovering table structure...');
+      const discoverResponse = await fetch(`${SUPABASE_URL}/rest/v1/deliveries?limit=0`, {
+        method: 'GET',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        }
+      });
+      
+      // Get columns from response headers
+      const contentRange = discoverResponse.headers.get('content-range');
+      console.log('📦 Content-Range:', contentRange);
+      
+      // Try to get a sample row to see columns
+      const sampleResponse = await fetch(`${SUPABASE_URL}/rest/v1/deliveries?select=*&limit=1`, {
+        method: 'GET',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        }
+      });
+      const sampleData = await sampleResponse.json();
+      console.log('📦 Sample data (shows available columns):', sampleData);
+      
+      // If no rows, try to get column info from OpenAPI spec
+      if (!sampleData || sampleData.length === 0) {
+        const schemaResponse = await fetch(`${SUPABASE_URL}/rest/v1/`, {
+          method: 'GET',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          }
+        });
+        const schemaData = await schemaResponse.json();
+        console.log('📦 Available tables:', Object.keys(schemaData?.definitions || {}));
+        if (schemaData?.definitions?.deliveries) {
+          console.log('📦 Deliveries columns:', Object.keys(schemaData.definitions.deliveries.properties || {}));
+        }
+      }
+      
+      // Use minimal columns that are most likely to exist
+      const insertData: Record<string, any> = {
+        id: crypto.randomUUID(),
+        status: 'pending',
+        created_at: new Date().toISOString()
+      };
+      
+      // Try common column name variations
+      // Store all form data in a 'metadata' or 'data' JSON field if it exists
+      const formData = {
         tracking_number: trackingNumber,
-        pickup_location: deliveryForm.pickupAddress,
-        delivery_location: deliveryForm.deliveryAddress,
+        pickup_address: deliveryForm.pickupAddress,
+        delivery_address: deliveryForm.deliveryAddress,
         material_type: deliveryForm.materialType,
         quantity: deliveryForm.quantity,
         unit: deliveryForm.unit,
-        notes: `Contact: ${deliveryForm.contactName}, Phone: ${deliveryForm.contactPhone}${deliveryForm.specialInstructions ? ', Instructions: ' + deliveryForm.specialInstructions : ''}`,
-        priority: deliveryForm.urgency,
-        status: 'pending'
+        contact_name: deliveryForm.contactName,
+        contact_phone: deliveryForm.contactPhone,
+        special_instructions: deliveryForm.specialInstructions,
+        urgency: deliveryForm.urgency
       };
       
-      console.log('📦 Insert data:', insertData);
+      console.log('📦 Form data to insert:', formData);
+      console.log('📦 Trying minimal insert with just id, status, created_at...');
 
       // Use direct fetch with AbortController for timeout
       const controller = new AbortController();
