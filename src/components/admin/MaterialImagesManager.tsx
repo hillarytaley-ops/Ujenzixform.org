@@ -1570,16 +1570,18 @@ export const MaterialImagesManager: React.FC = () => {
 
             {/* Spacer and divider between upload area and items list */}
             {bulkUploadItems.length > 0 && (
-              <div className="flex items-center gap-3 py-2 flex-shrink-0">
-                <div className="flex-1 h-px bg-slate-700"></div>
-                <span className="text-xs text-slate-500 font-medium">📦 Selected Images ({bulkUploadItems.length})</span>
-                <div className="flex-1 h-px bg-slate-700"></div>
+              <div className="flex items-center gap-3 py-4 mt-4 flex-shrink-0 border-t border-slate-700">
+                <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-500/50 to-transparent"></div>
+                <span className="text-sm text-orange-400 font-semibold px-3 py-1 bg-slate-800 rounded-full border border-slate-600">
+                  📦 {bulkUploadItems.length} Image{bulkUploadItems.length > 1 ? 's' : ''} Selected - Edit Below ↓
+                </span>
+                <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-500/50 to-transparent"></div>
               </div>
             )}
 
             {/* Items List - Card Layout for better editing - SCROLLABLE */}
             {bulkUploadItems.length > 0 && (
-              <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-2 pt-2 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
+              <div className="flex-1 overflow-y-auto space-y-4 pr-2 pb-4" style={{ minHeight: '200px', maxHeight: '400px' }}>
                 {bulkUploadItems.map((item) => (
                   <div 
                     key={item.id} 
