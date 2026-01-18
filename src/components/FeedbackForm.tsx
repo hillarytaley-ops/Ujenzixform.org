@@ -235,6 +235,21 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
 
       const { data: sessionData } = await supabase.auth.getSession();
       
+      // Check if user has a profile (feedback table has foreign key to profiles)
+      let userId = null;
+      if (sessionData?.session?.user?.id) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', sessionData.session.user.id)
+          .single();
+        
+        // Only set user_id if profile exists (avoids foreign key constraint error)
+        if (profileData) {
+          userId = sessionData.session.user.id;
+        }
+      }
+      
       // Use direct fetch to Supabase REST API (more reliable than client)
       // SUPABASE_URL and SUPABASE_ANON_KEY imported from centralized client
       const response = await fetch(`${SUPABASE_URL}/rest/v1/feedback`, {
@@ -246,7 +261,7 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
           'Prefer': 'return=minimal'
         },
         body: JSON.stringify({
-          user_id: sessionData?.session?.user?.id || null,
+          user_id: userId,
           category: sanitizedData.subject,
           comment: `[${sanitizedData.email}] ${sanitizedData.name || 'Anonymous'}: ${sanitizedData.message}`,
           rating: sanitizedData.rating
