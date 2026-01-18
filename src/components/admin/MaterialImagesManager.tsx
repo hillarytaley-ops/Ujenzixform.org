@@ -1492,21 +1492,21 @@ export const MaterialImagesManager: React.FC = () => {
       {/* BULK UPLOAD DIALOG */}
       {/* ═══════════════════════════════════════════════════════════════════════════════ */}
       <Dialog open={showBulkUploadDialog} onOpenChange={(open) => !open && closeBulkUploadDialog()}>
-        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="pb-2">
-            <DialogTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5 text-orange-400" />
+        <DialogContent className="bg-slate-900 border-slate-700 text-white w-[95vw] max-w-6xl h-[95vh] overflow-y-auto p-6">
+          <DialogHeader className="pb-4">
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <Package className="h-6 w-6 text-orange-400" />
               Bulk Upload Materials
             </DialogTitle>
-            <DialogDescription className="text-slate-400">
-              Upload multiple images at once for a category. Select files, edit names, then upload all.
+            <DialogDescription className="text-slate-400 text-base">
+              Upload multiple images at once. Select files, then edit each item's name, category, and price below.
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-4">
-            {/* Default Category and Unit Selection - For newly added items */}
-            <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700 flex-shrink-0">
-              <p className="text-xs text-slate-400 mb-2">📋 Default values for new images (can be changed per item below)</p>
+          <div className="space-y-6">
+            {/* Default Category and Unit Selection - Compact */}
+            <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+              <p className="text-sm text-slate-400 mb-3">📋 Default values for new images:</p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-xs text-slate-300">Default Category</Label>
@@ -1545,19 +1545,23 @@ export const MaterialImagesManager: React.FC = () => {
               </div>
             </div>
 
-            {/* File Selection Area */}
+            {/* File Selection Area - Compact */}
             <div 
-              className="border-2 border-dashed border-slate-600 rounded-lg p-4 text-center cursor-pointer hover:border-orange-500 transition-colors flex-shrink-0"
+              className="border-2 border-dashed border-slate-600 rounded-lg p-3 text-center cursor-pointer hover:border-orange-500 transition-colors"
               onClick={() => bulkFileInputRef.current?.click()}
             >
-              <Upload className="h-8 w-8 text-orange-400 mx-auto mb-2" />
-              <p className="text-slate-300 font-medium">Click to select multiple images</p>
-              <p className="text-xs text-slate-500 mt-1">JPG, PNG, WEBP, GIF (max 10MB each)</p>
-              {bulkUploadItems.length > 0 && (
-                <Badge className="mt-2 bg-orange-500/20 text-orange-400 border-orange-500/50">
-                  {bulkUploadItems.length} image{bulkUploadItems.length > 1 ? 's' : ''} selected
-                </Badge>
-              )}
+              <div className="flex items-center justify-center gap-4">
+                <Upload className="h-6 w-6 text-orange-400" />
+                <div>
+                  <p className="text-slate-300 font-medium">Click to select images</p>
+                  <p className="text-xs text-slate-500">JPG, PNG, WEBP, GIF (max 10MB each)</p>
+                </div>
+                {bulkUploadItems.length > 0 && (
+                  <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/50 text-sm px-3 py-1">
+                    {bulkUploadItems.length} selected
+                  </Badge>
+                )}
+              </div>
             </div>
             <input
               ref={bulkFileInputRef}
@@ -1568,63 +1572,100 @@ export const MaterialImagesManager: React.FC = () => {
               className="hidden"
             />
 
-            {/* Spacer and divider between upload area and items list */}
+            {/* ════════════════════════════════════════════════════════════════════════════ */}
+            {/* UPLOADED IMAGES EDITING AREA - THIS IS THE MAIN AREA */}
+            {/* ════════════════════════════════════════════════════════════════════════════ */}
             {bulkUploadItems.length > 0 && (
-              <div className="flex items-center gap-3 py-6 mt-6 border-t-2 border-b-2 border-orange-500/30 bg-slate-800/50 rounded-lg mx-0">
-                <div className="flex-1 h-1 bg-gradient-to-r from-transparent via-orange-500 to-transparent"></div>
-                <span className="text-base text-orange-400 font-bold px-4 py-2 bg-orange-500/20 rounded-full border-2 border-orange-500/50">
-                  📦 {bulkUploadItems.length} Image{bulkUploadItems.length > 1 ? 's' : ''} Selected - SCROLL DOWN TO EDIT ⬇️
-                </span>
-                <div className="flex-1 h-1 bg-gradient-to-r from-transparent via-orange-500 to-transparent"></div>
-              </div>
-            )}
+              <>
+                {/* Section Header */}
+                <div className="bg-orange-500/10 border-2 border-orange-500/50 rounded-lg p-4 mt-4">
+                  <h3 className="text-lg font-bold text-orange-400 flex items-center gap-2">
+                    📦 Edit Your {bulkUploadItems.length} Uploaded Image{bulkUploadItems.length > 1 ? 's' : ''} Below
+                  </h3>
+                  <p className="text-sm text-slate-400 mt-1">Fill in the name, category, and price for each image</p>
+                </div>
 
-            {/* Items List - Card Layout for better editing */}
-            {bulkUploadItems.length > 0 && (
-              <div className="space-y-4 pb-4">
-                {bulkUploadItems.map((item) => (
-                  <div 
-                    key={item.id} 
-                    className={`bg-slate-800 rounded-lg p-3 border ${
-                      item.uploaded ? 'border-green-500/50 bg-green-900/20' : 
-                      item.error ? 'border-red-500/50 bg-red-900/20' : 
-                      'border-slate-700'
-                    }`}
-                  >
-                    <div className="flex gap-3">
-                      {/* Image Preview */}
-                      <div className="flex-shrink-0">
-                        <img 
-                          src={item.previewUrl} 
-                          alt={item.name}
-                          className="w-24 h-24 object-cover rounded-lg"
-                        />
+                {/* Items List - LARGE CARDS for easy editing */}
+                <div className="space-y-6 mt-6">
+                  {bulkUploadItems.map((item, index) => (
+                    <div 
+                      key={item.id} 
+                      className={`bg-slate-800 rounded-xl p-5 border-2 ${
+                        item.uploaded ? 'border-green-500 bg-green-900/20' : 
+                        item.error ? 'border-red-500 bg-red-900/20' : 
+                        'border-slate-600'
+                      }`}
+                    >
+                      {/* Item Number Header */}
+                      <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-700">
+                        <span className="text-lg font-bold text-white">Image #{index + 1}</span>
+                        {item.uploading ? (
+                          <Badge className="bg-blue-500/20 text-blue-400 text-sm px-3 py-1">
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Uploading...
+                          </Badge>
+                        ) : item.uploaded ? (
+                          <Badge className="bg-green-500/20 text-green-400 text-sm px-3 py-1">
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            Uploaded
+                          </Badge>
+                        ) : item.error ? (
+                          <Badge className="bg-red-500/20 text-red-400 text-sm px-3 py-1">
+                            <XCircle className="h-4 w-4 mr-2" />
+                            Error
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-slate-500/20 text-slate-400 text-sm px-3 py-1">
+                            Pending
+                          </Badge>
+                        )}
                       </div>
                       
-                      {/* Form Fields - All fields like single upload */}
-                      <div className="flex-1 space-y-2 min-w-0">
-                        {/* Row 1: Name */}
+                      <div className="flex gap-6">
+                        {/* Image Preview - BIGGER */}
+                        <div className="flex-shrink-0">
+                          <img 
+                            src={item.previewUrl} 
+                            alt={item.name}
+                            className="w-32 h-32 object-cover rounded-lg border-2 border-slate-600"
+                          />
+                          {!item.uploaded && !item.uploading && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="w-full mt-2 text-red-400 hover:text-red-300 hover:bg-red-500/20"
+                              onClick={() => removeBulkItem(item.id)}
+                            >
+                              <Trash2 className="h-4 w-4 mr-1" />
+                              Remove
+                            </Button>
+                          )}
+                        </div>
+                      
+                      {/* Form Fields - BIGGER and CLEARER */}
+                      <div className="flex-1 space-y-4 min-w-0">
+                        {/* Row 1: Name - FULL WIDTH, BIGGER */}
                         <div>
-                          <Label className="text-xs text-slate-400 mb-1 block">Material Name *</Label>
+                          <Label className="text-sm text-white font-semibold mb-2 block">Material Name *</Label>
                           <Input
                             value={item.name}
                             onChange={(e) => updateBulkItem(item.id, { name: e.target.value })}
                             placeholder="e.g., Bamburi Cement 50kg"
-                            className="bg-slate-700 border-slate-600 h-8 text-sm"
+                            className="bg-slate-700 border-slate-500 h-12 text-base"
                             disabled={item.uploaded || item.uploading}
                           />
                         </div>
                         
-                        {/* Row 2: Category and Unit */}
-                        <div className="grid grid-cols-2 gap-2">
+                        {/* Row 2: Category and Unit - BIGGER */}
+                        <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <Label className="text-xs text-slate-400 mb-1 block">Category *</Label>
+                            <Label className="text-sm text-white font-semibold mb-2 block">Category *</Label>
                             <Select 
                               value={item.category} 
                               onValueChange={(value) => updateBulkItem(item.id, { category: value })}
                               disabled={item.uploaded || item.uploading}
                             >
-                              <SelectTrigger className="bg-slate-700 border-slate-600 h-8 text-sm">
+                              <SelectTrigger className="bg-slate-700 border-slate-500 h-12 text-base">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent className="max-h-60">
@@ -1635,13 +1676,13 @@ export const MaterialImagesManager: React.FC = () => {
                             </Select>
                           </div>
                           <div>
-                            <Label className="text-xs text-slate-400 mb-1 block">Unit</Label>
+                            <Label className="text-sm text-white font-semibold mb-2 block">Unit</Label>
                             <Select 
                               value={item.unit} 
                               onValueChange={(value) => updateBulkItem(item.id, { unit: value })}
                               disabled={item.uploaded || item.uploading}
                             >
-                              <SelectTrigger className="bg-slate-700 border-slate-600 h-8 text-sm">
+                              <SelectTrigger className="bg-slate-700 border-slate-500 h-12 text-base">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent className="max-h-60">
@@ -1700,70 +1741,36 @@ export const MaterialImagesManager: React.FC = () => {
                           </div>
                         </div>
                         
-                        {/* Row 3: Description and Price */}
-                        <div className="grid grid-cols-3 gap-2">
+                        {/* Row 3: Description and Price - BIGGER */}
+                        <div className="grid grid-cols-3 gap-4">
                           <div className="col-span-2">
-                            <Label className="text-xs text-slate-400 mb-1 block">Description (optional)</Label>
+                            <Label className="text-sm text-white font-semibold mb-2 block">Description (optional)</Label>
                             <Input
                               value={item.description}
                               onChange={(e) => updateBulkItem(item.id, { description: e.target.value })}
                               placeholder="Brief product description..."
-                              className="bg-slate-700 border-slate-600 h-8 text-sm"
+                              className="bg-slate-700 border-slate-500 h-12 text-base"
                               disabled={item.uploaded || item.uploading}
                             />
                           </div>
                           <div>
-                            <Label className="text-xs text-slate-400 mb-1 block">Price (KES)</Label>
+                            <Label className="text-sm text-white font-semibold mb-2 block">Price (KES)</Label>
                             <Input
                               type="number"
                               value={item.suggestedPrice || ''}
                               onChange={(e) => updateBulkItem(item.id, { suggestedPrice: parseFloat(e.target.value) || 0 })}
                               placeholder="0"
-                              className="bg-slate-700 border-slate-600 h-8 text-sm"
+                              className="bg-slate-700 border-slate-500 h-12 text-base"
                               disabled={item.uploaded || item.uploading}
                             />
                           </div>
                         </div>
                       </div>
-                      
-                      {/* Status & Actions */}
-                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                        {item.uploading ? (
-                          <Badge className="bg-blue-500/20 text-blue-400">
-                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                            Uploading
-                          </Badge>
-                        ) : item.uploaded ? (
-                          <Badge className="bg-green-500/20 text-green-400">
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            Done
-                          </Badge>
-                        ) : item.error ? (
-                          <Badge className="bg-red-500/20 text-red-400" title={item.error}>
-                            <XCircle className="h-3 w-3 mr-1" />
-                            Error
-                          </Badge>
-                        ) : (
-                          <Badge className="bg-slate-500/20 text-slate-400">
-                            Pending
-                          </Badge>
-                        )}
-                        
-                        {!item.uploaded && !item.uploading && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-red-400 hover:text-red-300 hover:bg-red-500/20"
-                            onClick={() => removeBulkItem(item.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
                     </div>
                   </div>
                 ))}
-              </div>
+                </div>
+              </>
             )}
 
             {/* Empty State */}
