@@ -230,7 +230,7 @@ const Suppliers = () => {
                 description="Request quotes for bulk orders"
                 gradient="from-blue-600 to-blue-700"
                 borderColor="blue"
-                primaryAction={{ label: "Sign In", path: "/professional-builder-sign-in" }}
+                primaryAction={{ label: "Sign In", path: "/professional-builder-signin" }}
                 secondaryAction={{ label: "Register", path: "/professional-builder-registration" }}
               />
 
