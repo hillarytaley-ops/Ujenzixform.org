@@ -222,27 +222,12 @@ const App = () => {
                         <BuilderRegistration />
                       </AuthRequired>
                     } />
-                    <Route path="/builders/register" element={
-                      <AuthRequired>
-                        <BuilderRegistration />
-                      </AuthRequired>
-                    } />
-                    <Route path="/professional-builder-registration" element={
-                      <AuthRequired>
-                        <ProfessionalBuilderRegistration />
-                      </AuthRequired>
-                    } />
-                    <Route path="/private-client-registration" element={
-                      <AuthRequired>
-                        <PrivateBuilderRegistration />
-                      </AuthRequired>
-                    } />
+                    {/* Registration pages - NO auth required (new users registering) */}
+                    <Route path="/builders/register" element={<BuilderRegistration />} />
+                    <Route path="/professional-builder-registration" element={<ProfessionalBuilderRegistration />} />
+                    <Route path="/private-client-registration" element={<PrivateBuilderRegistration />} />
                     {/* Alias for private-client-registration (some links use this path) */}
-                    <Route path="/private-builder-registration" element={
-                      <AuthRequired>
-                        <PrivateBuilderRegistration />
-                      </AuthRequired>
-                    } />
+                    <Route path="/private-builder-registration" element={<PrivateBuilderRegistration />} />
                     <Route path="/analytics" element={
                       <AuthRequired>
                         <Analytics />
