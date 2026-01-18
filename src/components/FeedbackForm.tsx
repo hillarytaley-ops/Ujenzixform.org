@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Star, MessageSquare, Shield, AlertTriangle, CheckCircle } from "lucide-react";
-import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 const feedbackSchema = z.object({
@@ -233,48 +233,25 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
         rating: data.rating
       };
 
-      const { data: sessionData } = await supabase.auth.getSession();
+      // Submit feedback without user_id to avoid foreign key constraint issues
+      // The email is captured in the comment field for follow-up
+      console.log('Submitting feedback...');
       
-      // Check if user has a profile (feedback table has foreign key to profiles)
-      // Use try-catch to handle any RLS or query errors gracefully
-      let userId = null;
-      if (sessionData?.session?.user?.id) {
-        try {
-          const { data: profileData, error: profileError } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('id', sessionData.session.user.id)
-            .maybeSingle(); // Use maybeSingle() instead of single() to avoid error when no row found
-          
-          // Only set user_id if profile exists and no error (avoids foreign key constraint error)
-          if (profileData && !profileError) {
-            userId = sessionData.session.user.id;
-          } else {
-            console.log('No profile found for user, submitting as anonymous');
-          }
-        } catch (profileCheckError) {
-          console.log('Profile check failed, submitting as anonymous:', profileCheckError);
-          // Continue without user_id - submit as anonymous
-        }
-      }
-      
-      // Use direct fetch to Supabase REST API (more reliable than client)
-      // SUPABASE_URL and SUPABASE_ANON_KEY imported from centralized client
       const response = await fetch(`${SUPABASE_URL}/rest/v1/feedback`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${sessionData?.session?.access_token || SUPABASE_ANON_KEY}`,
           'Prefer': 'return=minimal'
         },
         body: JSON.stringify({
-          user_id: userId,
           category: sanitizedData.subject,
           comment: `[${sanitizedData.email}] ${sanitizedData.name || 'Anonymous'}: ${sanitizedData.message}`,
           rating: sanitizedData.rating
         })
       });
+      
+      console.log('Feedback response status:', response.status);
 
       if (!response.ok) {
         const errorText = await response.text();
