@@ -92,8 +92,8 @@ interface ServiceRequest {
   additionalNotes: string;
 }
 
-// Pricing discount for Private Builders (40% lower due to smaller project sizes)
-const PRIVATE_CLIENT_DISCOUNT = 0.4; // 40% discount
+// Pricing discount for Private Builders (50% lower due to smaller project sizes)
+const PRIVATE_CLIENT_DISCOUNT = 0.5; // 50% discount
 
 // Base prices for professional builders (companies)
 const PROFESSIONAL_BASE_PRICES = {
@@ -103,12 +103,12 @@ const PROFESSIONAL_BASE_PRICES = {
   'analytics-reporting': 20000
 };
 
-// Private Builder prices (40% lower due to smaller project sizes)
+// Private Builder prices (50% lower due to smaller project sizes - homeowner friendly pricing)
 const PRIVATE_BASE_PRICES = {
-  'ai-cameras': 9000,      // 15000 * 0.6 = 9000
-  'drone-surveillance': 15000, // 25000 * 0.6 = 15000
-  'security-monitoring': 30000, // 50000 * 0.6 = 30000
-  'analytics-reporting': 12000  // 20000 * 0.6 = 12000
+  'ai-cameras': 7500,       // 15000 * 0.5 = 7,500
+  'drone-surveillance': 12500, // 25000 * 0.5 = 12,500
+  'security-monitoring': 25000, // 50000 * 0.5 = 25,000
+  'analytics-reporting': 10000  // 20000 * 0.5 = 10,000
 };
 
 const getMonitoringServices = (builderType: 'private' | 'professional' | ''): MonitoringService[] => {

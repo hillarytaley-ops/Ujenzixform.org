@@ -32,6 +32,7 @@ WHERE builder_type IS NULL OR builder_type = '';
 
 -- =====================================================
 -- PRICING REFERENCE (for documentation)
+-- Updated: 2026-01-18 - Increased private client discount to 50%
 -- =====================================================
 -- 
 -- PROFESSIONAL BUILDERS (Companies/Contractors):
@@ -40,11 +41,11 @@ WHERE builder_type IS NULL OR builder_type = '';
 --   - Security Monitoring: KES 50,000 per site/month
 --   - Analytics & Reporting: KES 20,000 per project/month
 --
--- PRIVATE CLIENTS (Individual Homeowners) - 40% Lower:
---   - AI Cameras: KES 9,000 per camera/month
---   - Drone Surveillance: KES 15,000 per flight hour
---   - Security Monitoring: KES 30,000 per site/month
---   - Analytics & Reporting: KES 12,000 per project/month
+-- PRIVATE CLIENTS (Individual Homeowners) - 50% Lower (Homeowner Friendly):
+--   - AI Cameras: KES 7,500 per camera/month
+--   - Drone Surveillance: KES 12,500 per flight hour
+--   - Security Monitoring: KES 25,000 per site/month
+--   - Analytics & Reporting: KES 10,000 per project/month
 --
 -- =====================================================
 

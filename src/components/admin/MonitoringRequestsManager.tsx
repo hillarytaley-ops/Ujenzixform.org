@@ -75,7 +75,7 @@ interface MonitoringRequest {
   updated_at: string;
 }
 
-// Pricing reference for admin
+// Pricing reference for admin (Private clients get 50% discount)
 const PRICING_REFERENCE = {
   professional: {
     'ai-cameras': 15000,
@@ -84,10 +84,10 @@ const PRICING_REFERENCE = {
     'analytics-reporting': 20000
   },
   private: {
-    'ai-cameras': 9000,
-    'drone-surveillance': 15000,
-    'security-monitoring': 30000,
-    'analytics-reporting': 12000
+    'ai-cameras': 7500,        // 50% off professional rate
+    'drone-surveillance': 12500, // 50% off professional rate
+    'security-monitoring': 25000, // 50% off professional rate
+    'analytics-reporting': 10000  // 50% off professional rate
   }
 };
 
