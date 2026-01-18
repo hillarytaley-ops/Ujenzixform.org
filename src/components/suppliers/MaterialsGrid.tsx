@@ -46,6 +46,14 @@ const isIOSSafari = () => {
   return /iPad|iPhone|iPod/.test(ua) || (ua.includes('Mac') && 'ontouchend' in document);
 };
 
+// Variant type for products with multiple sizes/prices
+interface PriceVariant {
+  id: string;
+  sizeLabel: string;
+  price: number;
+  stock: number;
+}
+
 interface Material {
   id: string;
   supplier_id?: string; // Optional - admin materials don't have supplier_id
@@ -63,6 +71,9 @@ interface Material {
     location: string;
     rating: number;
   };
+  // New: Pricing type and variants
+  pricing_type?: 'single' | 'variants';
+  variants?: PriceVariant[];
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1557,7 +1568,26 @@ export const MaterialsGrid = () => {
                           <FileText className="h-3 w-3 text-blue-600" />
                           <span className="text-xs font-medium text-blue-700">Request quote for pricing</span>
                         </div>
+                      ) : material.pricing_type === 'variants' && material.variants && material.variants.length > 0 ? (
+                        /* Multiple Variants Pricing */
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs font-medium text-purple-600 bg-purple-50 px-2 py-0.5 rounded">Multiple Sizes</span>
+                          </div>
+                          <div className="text-xs space-y-0.5">
+                            {material.variants.slice(0, 2).map((variant, idx) => (
+                              <div key={idx} className="flex justify-between items-center">
+                                <span className="text-muted-foreground truncate max-w-[80px]">{variant.sizeLabel}</span>
+                                <span className="font-semibold text-blue-600">KES {variant.price.toLocaleString()}</span>
+                              </div>
+                            ))}
+                            {material.variants.length > 2 && (
+                              <span className="text-purple-500 text-xs">+{material.variants.length - 2} more sizes</span>
+                            )}
+                          </div>
+                        </div>
                       ) : (
+                        /* Single Price */
                         <div className="flex items-baseline gap-1">
                           <span className="text-lg font-bold text-blue-600">KES {material.unit_price.toLocaleString()}</span>
                           <span className="text-xs text-muted-foreground">/{material.unit}</span>

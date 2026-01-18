@@ -206,6 +206,14 @@ export const MaterialImagesManager: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<MaterialImage | SupplierMaterial | null>(null);
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
   
+  // Variant type for multiple sizes/prices
+  interface PriceVariant {
+    id: string;
+    sizeLabel: string;
+    price: number;
+    stock: number;
+  }
+
   // Upload form state
   const [uploadForm, setUploadForm] = useState({
     name: '',
@@ -214,7 +222,9 @@ export const MaterialImagesManager: React.FC = () => {
     unit: 'unit',
     suggestedPrice: 0,
     imageFile: null as File | null,
-    previewUrl: ''
+    previewUrl: '',
+    pricingType: 'single' as 'single' | 'variants',
+    variants: [] as PriceVariant[]
   });
 
   // Edit form state
@@ -1282,9 +1292,9 @@ export const MaterialImagesManager: React.FC = () => {
         </TabsContent>
       </Tabs>
 
-      {/* Upload Dialog - Compact Version */}
+      {/* Upload Dialog - Enhanced with Pricing Options */}
       <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
-        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader className="pb-2">
             <DialogTitle>Upload Material Image</DialogTitle>
           </DialogHeader>
@@ -1375,83 +1385,213 @@ export const MaterialImagesManager: React.FC = () => {
               />
             </div>
 
-            {/* Unit and Price Row - Compact */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs">Unit</Label>
-                <Select
-                  value={uploadForm.unit}
-                  onValueChange={(value) => setUploadForm(prev => ({ ...prev, unit: value }))}
+            {/* Unit Selection */}
+            <div>
+              <Label className="text-xs">Unit</Label>
+              <Select
+                value={uploadForm.unit}
+                onValueChange={(value) => setUploadForm(prev => ({ ...prev, unit: value }))}
+              >
+                <SelectTrigger className="bg-slate-800 border-slate-600 h-8 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  {/* Weight & Mass */}
+                  <SelectItem value="kg">Per Kg</SelectItem>
+                  <SelectItem value="gram">Per Gram</SelectItem>
+                  <SelectItem value="tonne">Per Tonne</SelectItem>
+                  <SelectItem value="ton">Per Ton</SelectItem>
+                  {/* Volume */}
+                  <SelectItem value="liter">Per Liter</SelectItem>
+                  <SelectItem value="ml">Per ML</SelectItem>
+                  <SelectItem value="cubic meter">Per M³</SelectItem>
+                  <SelectItem value="cubic foot">Per Cubic Foot</SelectItem>
+                  {/* Length */}
+                  <SelectItem value="meter">Per Meter</SelectItem>
+                  <SelectItem value="mm">Per MM</SelectItem>
+                  <SelectItem value="cm">Per CM</SelectItem>
+                  <SelectItem value="foot">Per Foot</SelectItem>
+                  <SelectItem value="ft">Per Ft</SelectItem>
+                  <SelectItem value="inch">Per Inch</SelectItem>
+                  {/* Area */}
+                  <SelectItem value="sqm">Per Sqm</SelectItem>
+                  <SelectItem value="sqft">Per Sqft</SelectItem>
+                  {/* Count/Quantity */}
+                  <SelectItem value="piece">Per Piece</SelectItem>
+                  <SelectItem value="unit">Per Unit</SelectItem>
+                  <SelectItem value="pair">Per Pair</SelectItem>
+                  <SelectItem value="dozen">Per Dozen</SelectItem>
+                  <SelectItem value="set">Per Set</SelectItem>
+                  <SelectItem value="bundle">Per Bundle</SelectItem>
+                  {/* Packaging */}
+                  <SelectItem value="bag">Per Bag</SelectItem>
+                  <SelectItem value="packet">Per Packet</SelectItem>
+                  <SelectItem value="carton">Per Carton</SelectItem>
+                  <SelectItem value="box">Per Box</SelectItem>
+                  <SelectItem value="pallet">Per Pallet</SelectItem>
+                  {/* Sheets & Rolls */}
+                  <SelectItem value="sheet">Per Sheet</SelectItem>
+                  <SelectItem value="roll">Per Roll</SelectItem>
+                  <SelectItem value="coil">Per Coil</SelectItem>
+                  {/* Building Specific */}
+                  <SelectItem value="trip">Per Trip</SelectItem>
+                  <SelectItem value="lorry">Per Lorry</SelectItem>
+                  <SelectItem value="wheelbarrow">Per Wheelbarrow</SelectItem>
+                  {/* Length Bundles */}
+                  <SelectItem value="length">Per Length</SelectItem>
+                  <SelectItem value="bar">Per Bar</SelectItem>
+                  <SelectItem value="rod">Per Rod</SelectItem>
+                  <SelectItem value="pole">Per Pole</SelectItem>
+                  {/* Liquid Containers */}
+                  <SelectItem value="drum">Per Drum</SelectItem>
+                  <SelectItem value="jerrycan">Per Jerrycan</SelectItem>
+                  <SelectItem value="bucket">Per Bucket</SelectItem>
+                  <SelectItem value="tin">Per Tin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Pricing Type Toggle */}
+            <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
+              <Label className="text-xs text-slate-300 mb-2 block">Pricing Type</Label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={uploadForm.pricingType === 'single' ? 'default' : 'outline'}
+                  size="sm"
+                  className={`flex-1 ${uploadForm.pricingType === 'single' ? 'bg-orange-500 hover:bg-orange-600' : 'border-slate-600 text-slate-300'}`}
+                  onClick={() => setUploadForm(prev => ({ ...prev, pricingType: 'single', variants: [] }))}
                 >
-                  <SelectTrigger className="bg-slate-800 border-slate-600 h-8 text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    {/* Weight & Mass */}
-                    <SelectItem value="kg">Per Kg</SelectItem>
-                    <SelectItem value="gram">Per Gram</SelectItem>
-                    <SelectItem value="tonne">Per Tonne</SelectItem>
-                    <SelectItem value="ton">Per Ton</SelectItem>
-                    {/* Volume */}
-                    <SelectItem value="liter">Per Liter</SelectItem>
-                    <SelectItem value="ml">Per ML</SelectItem>
-                    <SelectItem value="cubic meter">Per M³</SelectItem>
-                    <SelectItem value="cubic foot">Per Cubic Foot</SelectItem>
-                    {/* Length */}
-                    <SelectItem value="meter">Per Meter</SelectItem>
-                    <SelectItem value="mm">Per MM</SelectItem>
-                    <SelectItem value="cm">Per CM</SelectItem>
-                    <SelectItem value="foot">Per Foot</SelectItem>
-                    <SelectItem value="inch">Per Inch</SelectItem>
-                    {/* Area */}
-                    <SelectItem value="sqm">Per Sqm</SelectItem>
-                    <SelectItem value="sqft">Per Sqft</SelectItem>
-                    {/* Count/Quantity */}
-                    <SelectItem value="piece">Per Piece</SelectItem>
-                    <SelectItem value="unit">Per Unit</SelectItem>
-                    <SelectItem value="pair">Per Pair</SelectItem>
-                    <SelectItem value="dozen">Per Dozen</SelectItem>
-                    <SelectItem value="set">Per Set</SelectItem>
-                    <SelectItem value="bundle">Per Bundle</SelectItem>
-                    {/* Packaging */}
-                    <SelectItem value="bag">Per Bag</SelectItem>
-                    <SelectItem value="packet">Per Packet</SelectItem>
-                    <SelectItem value="carton">Per Carton</SelectItem>
-                    <SelectItem value="box">Per Box</SelectItem>
-                    <SelectItem value="pallet">Per Pallet</SelectItem>
-                    {/* Sheets & Rolls */}
-                    <SelectItem value="sheet">Per Sheet</SelectItem>
-                    <SelectItem value="roll">Per Roll</SelectItem>
-                    <SelectItem value="coil">Per Coil</SelectItem>
-                    {/* Building Specific */}
-                    <SelectItem value="trip">Per Trip</SelectItem>
-                    <SelectItem value="lorry">Per Lorry</SelectItem>
-                    <SelectItem value="wheelbarrow">Per Wheelbarrow</SelectItem>
-                    {/* Length Bundles */}
-                    <SelectItem value="length">Per Length</SelectItem>
-                    <SelectItem value="bar">Per Bar</SelectItem>
-                    <SelectItem value="rod">Per Rod</SelectItem>
-                    <SelectItem value="pole">Per Pole</SelectItem>
-                    {/* Liquid Containers */}
-                    <SelectItem value="drum">Per Drum</SelectItem>
-                    <SelectItem value="jerrycan">Per Jerrycan</SelectItem>
-                    <SelectItem value="bucket">Per Bucket</SelectItem>
-                    <SelectItem value="tin">Per Tin</SelectItem>
-                  </SelectContent>
-                </Select>
+                  💰 Single Price
+                </Button>
+                <Button
+                  type="button"
+                  variant={uploadForm.pricingType === 'variants' ? 'default' : 'outline'}
+                  size="sm"
+                  className={`flex-1 ${uploadForm.pricingType === 'variants' ? 'bg-purple-500 hover:bg-purple-600' : 'border-slate-600 text-slate-300'}`}
+                  onClick={() => setUploadForm(prev => ({ 
+                    ...prev, 
+                    pricingType: 'variants',
+                    variants: prev.variants.length === 0 ? [{ id: crypto.randomUUID(), sizeLabel: '', price: 0, stock: 0 }] : prev.variants
+                  }))}
+                >
+                  📊 Multiple Sizes / Variants
+                </Button>
               </div>
+            </div>
+
+            {/* Single Price Input */}
+            {uploadForm.pricingType === 'single' && (
               <div>
-                <Label htmlFor="suggestedPrice" className="text-xs">Suggested Price (KES)</Label>
+                <Label htmlFor="suggestedPrice" className="text-xs">Suggested Price (KES) per {uploadForm.unit}</Label>
                 <Input
                   id="suggestedPrice"
                   type="number"
                   placeholder="0"
                   value={uploadForm.suggestedPrice || ''}
                   onChange={(e) => setUploadForm(prev => ({ ...prev, suggestedPrice: parseFloat(e.target.value) || 0 }))}
-                  className="bg-slate-800 border-slate-600 h-8 text-sm"
+                  className="bg-slate-800 border-slate-600 h-10 text-base"
                 />
               </div>
-            </div>
+            )}
+
+            {/* Multiple Variants Table */}
+            {uploadForm.pricingType === 'variants' && (
+              <div className="bg-slate-800/30 rounded-lg p-3 border border-purple-500/30">
+                <div className="flex items-center justify-between mb-3">
+                  <Label className="text-sm text-purple-300 font-semibold">Size / Variant Pricing (per {uploadForm.unit})</Label>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="border-purple-500 text-purple-400 hover:bg-purple-500/20 h-7 text-xs"
+                    onClick={() => setUploadForm(prev => ({
+                      ...prev,
+                      variants: [...prev.variants, { id: crypto.randomUUID(), sizeLabel: '', price: 0, stock: 0 }]
+                    }))}
+                  >
+                    + Add Variant
+                  </Button>
+                </div>
+                
+                {/* Variants Table */}
+                <div className="space-y-2">
+                  {/* Header */}
+                  <div className="grid grid-cols-12 gap-2 text-xs text-slate-400 font-medium px-1">
+                    <div className="col-span-5">Size / Label</div>
+                    <div className="col-span-3">Price (KES)</div>
+                    <div className="col-span-3">Stock</div>
+                    <div className="col-span-1"></div>
+                  </div>
+                  
+                  {/* Variant Rows */}
+                  {uploadForm.variants.map((variant, index) => (
+                    <div key={variant.id} className="grid grid-cols-12 gap-2 items-center">
+                      <div className="col-span-5">
+                        <Input
+                          placeholder="e.g., 50kg, Large, 2x4"
+                          value={variant.sizeLabel}
+                          onChange={(e) => {
+                            const newVariants = [...uploadForm.variants];
+                            newVariants[index].sizeLabel = e.target.value;
+                            setUploadForm(prev => ({ ...prev, variants: newVariants }));
+                          }}
+                          className="bg-slate-700 border-slate-600 h-8 text-sm"
+                        />
+                      </div>
+                      <div className="col-span-3">
+                        <Input
+                          type="number"
+                          placeholder="0"
+                          value={variant.price || ''}
+                          onChange={(e) => {
+                            const newVariants = [...uploadForm.variants];
+                            newVariants[index].price = parseFloat(e.target.value) || 0;
+                            setUploadForm(prev => ({ ...prev, variants: newVariants }));
+                          }}
+                          className="bg-slate-700 border-slate-600 h-8 text-sm"
+                        />
+                      </div>
+                      <div className="col-span-3">
+                        <Input
+                          type="number"
+                          placeholder="0"
+                          value={variant.stock || ''}
+                          onChange={(e) => {
+                            const newVariants = [...uploadForm.variants];
+                            newVariants[index].stock = parseInt(e.target.value) || 0;
+                            setUploadForm(prev => ({ ...prev, variants: newVariants }));
+                          }}
+                          className="bg-slate-700 border-slate-600 h-8 text-sm"
+                        />
+                      </div>
+                      <div className="col-span-1 flex justify-center">
+                        {uploadForm.variants.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-red-400 hover:text-red-300 hover:bg-red-500/20"
+                            onClick={() => {
+                              setUploadForm(prev => ({
+                                ...prev,
+                                variants: prev.variants.filter(v => v.id !== variant.id)
+                              }));
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                {uploadForm.variants.length === 0 && (
+                  <p className="text-xs text-slate-500 text-center py-2">No variants added. Click "Add Variant" to start.</p>
+                )}
+              </div>
+            )}
           </div>
 
           <DialogFooter className="pt-2">
@@ -1460,7 +1600,7 @@ export const MaterialImagesManager: React.FC = () => {
               size="sm"
               onClick={() => {
                 setShowUploadDialog(false);
-                setUploadForm({ name: '', category: 'Cement', description: '', unit: 'unit', suggestedPrice: 0, imageFile: null, previewUrl: '' });
+                setUploadForm({ name: '', category: 'Cement', description: '', unit: 'unit', suggestedPrice: 0, imageFile: null, previewUrl: '', pricingType: 'single', variants: [] });
               }}
               className="border-slate-600"
             >
@@ -1701,6 +1841,7 @@ export const MaterialImagesManager: React.FC = () => {
                                 <SelectItem value="mm">Per MM</SelectItem>
                                 <SelectItem value="cm">Per CM</SelectItem>
                                 <SelectItem value="foot">Per Foot</SelectItem>
+                                <SelectItem value="ft">Per Ft</SelectItem>
                                 <SelectItem value="inch">Per Inch</SelectItem>
                                 {/* Area */}
                                 <SelectItem value="sqm">Per Sqm</SelectItem>
@@ -1953,6 +2094,7 @@ export const MaterialImagesManager: React.FC = () => {
                       <SelectItem value="mm">Per MM</SelectItem>
                       <SelectItem value="cm">Per CM</SelectItem>
                       <SelectItem value="foot">Per Foot</SelectItem>
+                      <SelectItem value="ft">Per Ft</SelectItem>
                       <SelectItem value="inch">Per Inch</SelectItem>
                       {/* Area */}
                       <SelectItem value="sqm">Per Sqm</SelectItem>
