@@ -274,50 +274,66 @@ export const MaterialImagesManager: React.FC = () => {
   const { toast } = useToast();
 
   // Fetch admin-uploaded images from Supabase storage
-  // Uses batch loading to avoid timeout due to large base64 image data
+  // ✅ PERFORMANCE OPTIMIZED: Only fetch metadata first, load images lazily
   const fetchAdminImages = async () => {
     try {
-      const allImages: MaterialImage[] = [];
-      const batchSize = 20; // Fetch in small batches to avoid timeout
-      const maxBatches = 10; // Max 200 images
+      // ✅ FAST: Only fetch metadata (no image_url which contains huge base64 data)
+      const { data, error, count } = await (supabase as any)
+        .from('admin_material_images')
+        .select('id, name, category, is_featured, is_approved, created_at, description, unit, suggested_price', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .limit(100); // Limit to 100 items for fast initial load
       
-      for (let batch = 0; batch < maxBatches; batch++) {
-        const offset = batch * batchSize;
-        
-        // Fetch batch - exclude additional_images from initial load (too large)
-        const { data, error } = await (supabase as any)
-          .from('admin_material_images')
-          .select('id, name, category, image_url, is_featured, is_approved, created_at, description, unit, suggested_price')
-          .order('created_at', { ascending: false })
-          .range(offset, offset + batchSize - 1);
-        
-        if (error) {
-          if (batch === 0) {
-            // Table might not exist yet, that's okay
-            console.log('Admin images table not found, will create on first upload');
-          }
-          break;
-        }
-        
-        if (!data || data.length === 0) break;
-        
-        // Map to MaterialImage format
-        const batchImages = data.map((item: any) => ({
-          ...item,
-          source: 'admin' as const,
-          additional_images: [] // Load on-demand when viewing gallery
-        }));
-        
-        allImages.push(...batchImages);
-        
-        // If we got less than batch size, we've reached the end
-        if (data.length < batchSize) break;
+      if (error) {
+        console.log('Admin images table not found or error:', error.message);
+        setAdminImages([]);
+        return;
       }
       
-      setAdminImages(allImages);
+      if (!data || data.length === 0) {
+        setAdminImages([]);
+        return;
+      }
+      
+      console.log(`📊 Loaded ${data.length} material metadata records (total: ${count})`);
+      
+      // Map to MaterialImage format - image_url will be loaded on-demand
+      const images = data.map((item: any) => ({
+        ...item,
+        image_url: '', // Will be loaded lazily when displayed
+        source: 'admin' as const,
+        additional_images: []
+      }));
+      
+      setAdminImages(images);
+      
+      // ✅ LAZY LOAD: Fetch image URLs in background for visible items
+      loadImageUrls(data.slice(0, 20).map((d: any) => d.id));
     } catch (err) {
       console.error('Error fetching admin images:', err);
       setAdminImages([]);
+    }
+  };
+  
+  // ✅ LAZY LOAD: Fetch image URLs for specific IDs
+  const loadImageUrls = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    
+    try {
+      const { data, error } = await (supabase as any)
+        .from('admin_material_images')
+        .select('id, image_url')
+        .in('id', ids);
+      
+      if (error || !data) return;
+      
+      // Update images with their URLs
+      setAdminImages(prev => prev.map(img => {
+        const found = data.find((d: any) => d.id === img.id);
+        return found ? { ...img, image_url: found.image_url } : img;
+      }));
+    } catch (err) {
+      console.error('Error loading image URLs:', err);
     }
   };
 
@@ -1016,6 +1032,23 @@ export const MaterialImagesManager: React.FC = () => {
           </p>
         </div>
         <div className="flex gap-2">
+          {/* ✅ PERFORMANCE: Load all images button */}
+          <Button
+            onClick={() => {
+              const unloadedIds = adminImages.filter(img => !img.image_url).map(img => img.id);
+              if (unloadedIds.length > 0) {
+                toast({ title: `Loading ${unloadedIds.length} images...` });
+                loadImageUrls(unloadedIds);
+              } else {
+                toast({ title: 'All images already loaded' });
+              }
+            }}
+            variant="outline"
+            className="border-blue-500 text-blue-400 hover:bg-blue-500/20"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Load All Images ({adminImages.filter(img => !img.image_url).length})
+          </Button>
           <Button
             onClick={() => setShowBulkUploadDialog(true)}
             variant="outline"
@@ -1145,18 +1178,35 @@ export const MaterialImagesManager: React.FC = () => {
             </Card>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {filteredAdminImages.map(image => (
+              {filteredAdminImages.map((image, index) => (
                 <Card key={image.id} className="bg-slate-800/50 border-slate-700 overflow-hidden group">
                   <div className="relative aspect-square">
+                    {/* ✅ LAZY LOAD: Show placeholder while image loads */}
+                    {!image.image_url ? (
+                      <div 
+                        className="w-full h-full bg-slate-700 flex items-center justify-center cursor-pointer"
+                        onClick={() => {
+                          // Load this image's URL when clicked
+                          loadImageUrls([image.id]);
+                        }}
+                      >
+                        <div className="text-center text-slate-400">
+                          <ImageIcon className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                          <span className="text-xs">Click to load</span>
+                        </div>
+                      </div>
+                    ) : (
                     <img
                       src={image.image_url}
                       alt={image.name}
                       className="w-full h-full object-cover cursor-pointer"
+                      loading="lazy"
                       onClick={() => openGallery(image)}
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iIzFmMjkzNyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjNjQ3NDhiIiBmb250LXNpemU9IjE0Ij5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=';
                       }}
                     />
+                    )}
                     {/* Multi-angle indicator */}
                     {image.additional_images && image.additional_images.length > 0 && (
                       <Badge 
