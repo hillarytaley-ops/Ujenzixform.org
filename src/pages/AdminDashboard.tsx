@@ -1235,20 +1235,22 @@ const AdminDashboard = () => {
         .limit(50);
 
       if (!error && feedbackData) {
+        console.log('📬 Loaded feedback data:', feedbackData.length, 'items');
         const formattedFeedback: FeedbackRecord[] = feedbackData.map((f: any) => ({
           id: f.id,
           user_email: f.email || f.user_email || 'Anonymous',
-          message: f.message || f.comment || f.feedback || f.content || '',
+          message: f.comment || f.message || f.feedback || f.content || '',
           rating: f.rating || 0,
-          category: f.feedback_category || f.category || f.type || 'General',
+          category: f.category || f.feedback_category || f.type || 'General',
           created_at: f.created_at,
           status: f.status || 'pending',
           // Additional fields from enhanced table
           name: f.name || null,
-          subject: f.subject || null,
+          subject: f.subject || f.category || null,
           user_type: f.user_type || null
         }));
         
+        console.log('📬 Formatted feedback:', formattedFeedback);
         setFeedbackList(formattedFeedback);
         
         // Calculate feedback stats

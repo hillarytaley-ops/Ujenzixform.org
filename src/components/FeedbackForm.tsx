@@ -234,7 +234,6 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
       };
 
       // Submit feedback without user_id to avoid foreign key constraint issues
-      // The email is captured in the comment field for follow-up
       console.log('Submitting feedback...');
       
       const response = await fetch(`${SUPABASE_URL}/rest/v1/feedback`, {
@@ -245,9 +244,13 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
           'Prefer': 'return=minimal'
         },
         body: JSON.stringify({
+          // Send all fields separately for proper admin dashboard display
+          email: sanitizedData.email,
+          name: sanitizedData.name || 'Anonymous',
           category: sanitizedData.subject,
-          comment: `[${sanitizedData.email}] ${sanitizedData.name || 'Anonymous'}: ${sanitizedData.message}`,
-          rating: sanitizedData.rating
+          comment: sanitizedData.message,
+          rating: sanitizedData.rating,
+          status: 'pending'
         })
       });
       
