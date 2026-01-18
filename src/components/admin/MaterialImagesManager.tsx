@@ -1479,146 +1479,145 @@ export const MaterialImagesManager: React.FC = () => {
             </div>
 
             {/* Pricing Type Toggle */}
-            <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
-              <Label className="text-xs text-slate-300 mb-2 block">Pricing Type</Label>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant={uploadForm.pricingType === 'single' ? 'default' : 'outline'}
-                  size="sm"
-                  className={`flex-1 ${uploadForm.pricingType === 'single' ? 'bg-orange-500 hover:bg-orange-600' : 'border-slate-600 text-slate-300'}`}
-                  onClick={() => setUploadForm(prev => ({ ...prev, pricingType: 'single', variants: [] }))}
-                >
-                  💰 Single Price
-                </Button>
-                <Button
-                  type="button"
-                  variant={uploadForm.pricingType === 'variants' ? 'default' : 'outline'}
-                  size="sm"
-                  className={`flex-1 ${uploadForm.pricingType === 'variants' ? 'bg-purple-500 hover:bg-purple-600' : 'border-slate-600 text-slate-300'}`}
-                  onClick={() => setUploadForm(prev => ({ 
-                    ...prev, 
-                    pricingType: 'variants',
-                    variants: prev.variants.length === 0 ? [{ id: crypto.randomUUID(), sizeLabel: '', price: 0, stock: 0 }] : prev.variants
-                  }))}
-                >
-                  📊 Multiple Sizes / Variants
-                </Button>
-              </div>
-            </div>
-
-            {/* Single Price Input */}
-            {uploadForm.pricingType === 'single' && (
+            <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700 space-y-4">
               <div>
-                <Label htmlFor="suggestedPrice" className="text-xs">Suggested Price (KES) per {uploadForm.unit}</Label>
+                <Label className="text-sm text-white font-semibold mb-2 block">Pricing Type *</Label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant={uploadForm.pricingType === 'single' ? 'default' : 'outline'}
+                    size="sm"
+                    className={`flex-1 ${uploadForm.pricingType === 'single' ? 'bg-orange-500 hover:bg-orange-600' : 'border-slate-600 text-slate-300'}`}
+                    onClick={() => setUploadForm(prev => ({ ...prev, pricingType: 'single' }))}
+                  >
+                    💰 Single Price
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={uploadForm.pricingType === 'variants' ? 'default' : 'outline'}
+                    size="sm"
+                    className={`flex-1 ${uploadForm.pricingType === 'variants' ? 'bg-purple-500 hover:bg-purple-600' : 'border-slate-600 text-slate-300'}`}
+                    onClick={() => setUploadForm(prev => ({ 
+                      ...prev, 
+                      pricingType: 'variants',
+                      variants: prev.variants.length === 0 ? [{ id: crypto.randomUUID(), sizeLabel: '', price: 0, stock: 0 }] : prev.variants
+                    }))}
+                  >
+                    📊 Multiple Sizes / Variants
+                  </Button>
+                </div>
+              </div>
+
+              {/* Suggested Price - Always visible */}
+              <div>
+                <Label htmlFor="suggestedPrice" className="text-sm text-white font-semibold mb-2 block">Suggested Price (KES) *</Label>
                 <Input
                   id="suggestedPrice"
                   type="number"
-                  placeholder="0"
+                  placeholder="850.00"
                   value={uploadForm.suggestedPrice || ''}
                   onChange={(e) => setUploadForm(prev => ({ ...prev, suggestedPrice: parseFloat(e.target.value) || 0 }))}
-                  className="bg-slate-800 border-slate-600 h-10 text-base"
+                  className="bg-slate-700 border-slate-600 h-12 text-lg font-semibold"
                 />
               </div>
-            )}
 
-            {/* Multiple Variants Table */}
-            {uploadForm.pricingType === 'variants' && (
-              <div className="bg-slate-800/30 rounded-lg p-3 border border-purple-500/30">
+              {/* Product Sizes / Variants - Always visible */}
+              <div className="bg-slate-900/50 rounded-lg p-3 border border-purple-500/30">
                 <div className="flex items-center justify-between mb-3">
-                  <Label className="text-sm text-purple-300 font-semibold">Size / Variant Pricing (per {uploadForm.unit})</Label>
+                  <Label className="text-sm text-purple-300 font-semibold">Product Sizes / Variants</Label>
                   <Button
                     type="button"
                     size="sm"
                     variant="outline"
-                    className="border-purple-500 text-purple-400 hover:bg-purple-500/20 h-7 text-xs"
+                    className="border-purple-500 text-purple-400 hover:bg-purple-500/20 h-8 text-xs px-3"
                     onClick={() => setUploadForm(prev => ({
                       ...prev,
+                      pricingType: 'variants',
                       variants: [...prev.variants, { id: crypto.randomUUID(), sizeLabel: '', price: 0, stock: 0 }]
                     }))}
                   >
-                    + Add Variant
+                    + Add Size
                   </Button>
                 </div>
                 
                 {/* Variants Table */}
-                <div className="space-y-2">
-                  {/* Header */}
-                  <div className="grid grid-cols-12 gap-2 text-xs text-slate-400 font-medium px-1">
-                    <div className="col-span-5">Size / Label</div>
-                    <div className="col-span-3">Price (KES)</div>
-                    <div className="col-span-3">Stock</div>
-                    <div className="col-span-1"></div>
-                  </div>
-                  
-                  {/* Variant Rows */}
-                  {uploadForm.variants.map((variant, index) => (
-                    <div key={variant.id} className="grid grid-cols-12 gap-2 items-center">
-                      <div className="col-span-5">
-                        <Input
-                          placeholder="e.g., 50kg, Large, 2x4"
-                          value={variant.sizeLabel}
-                          onChange={(e) => {
-                            const newVariants = [...uploadForm.variants];
-                            newVariants[index].sizeLabel = e.target.value;
-                            setUploadForm(prev => ({ ...prev, variants: newVariants }));
-                          }}
-                          className="bg-slate-700 border-slate-600 h-8 text-sm"
-                        />
-                      </div>
-                      <div className="col-span-3">
-                        <Input
-                          type="number"
-                          placeholder="0"
-                          value={variant.price || ''}
-                          onChange={(e) => {
-                            const newVariants = [...uploadForm.variants];
-                            newVariants[index].price = parseFloat(e.target.value) || 0;
-                            setUploadForm(prev => ({ ...prev, variants: newVariants }));
-                          }}
-                          className="bg-slate-700 border-slate-600 h-8 text-sm"
-                        />
-                      </div>
-                      <div className="col-span-3">
-                        <Input
-                          type="number"
-                          placeholder="0"
-                          value={variant.stock || ''}
-                          onChange={(e) => {
-                            const newVariants = [...uploadForm.variants];
-                            newVariants[index].stock = parseInt(e.target.value) || 0;
-                            setUploadForm(prev => ({ ...prev, variants: newVariants }));
-                          }}
-                          className="bg-slate-700 border-slate-600 h-8 text-sm"
-                        />
-                      </div>
-                      <div className="col-span-1 flex justify-center">
-                        {uploadForm.variants.length > 1 && (
+                {uploadForm.variants.length > 0 ? (
+                  <div className="space-y-2">
+                    {/* Header */}
+                    <div className="grid grid-cols-12 gap-2 text-xs text-slate-400 font-medium px-1 border-b border-slate-700 pb-2">
+                      <div className="col-span-5">Size / Label</div>
+                      <div className="col-span-3">Price (KES)</div>
+                      <div className="col-span-3">Stock</div>
+                      <div className="col-span-1"></div>
+                    </div>
+                    
+                    {/* Variant Rows */}
+                    {uploadForm.variants.map((variant, index) => (
+                      <div key={variant.id} className="grid grid-cols-12 gap-2 items-center">
+                        <div className="col-span-5">
+                          <Input
+                            placeholder="e.g., 1 inch, 2 inch"
+                            value={variant.sizeLabel}
+                            onChange={(e) => {
+                              const newVariants = [...uploadForm.variants];
+                              newVariants[index].sizeLabel = e.target.value;
+                              setUploadForm(prev => ({ ...prev, variants: newVariants }));
+                            }}
+                            className="bg-slate-700 border-slate-600 h-9 text-sm"
+                          />
+                        </div>
+                        <div className="col-span-3">
+                          <Input
+                            type="number"
+                            placeholder="120"
+                            value={variant.price || ''}
+                            onChange={(e) => {
+                              const newVariants = [...uploadForm.variants];
+                              newVariants[index].price = parseFloat(e.target.value) || 0;
+                              setUploadForm(prev => ({ ...prev, variants: newVariants }));
+                            }}
+                            className="bg-slate-700 border-slate-600 h-9 text-sm"
+                          />
+                        </div>
+                        <div className="col-span-3">
+                          <Input
+                            type="number"
+                            placeholder="50"
+                            value={variant.stock || ''}
+                            onChange={(e) => {
+                              const newVariants = [...uploadForm.variants];
+                              newVariants[index].stock = parseInt(e.target.value) || 0;
+                              setUploadForm(prev => ({ ...prev, variants: newVariants }));
+                            }}
+                            className="bg-slate-700 border-slate-600 h-9 text-sm"
+                          />
+                        </div>
+                        <div className="col-span-1 flex justify-center">
                           <Button
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 text-red-400 hover:text-red-300 hover:bg-red-500/20"
+                            className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-500/20"
                             onClick={() => {
+                              const newVariants = uploadForm.variants.filter(v => v.id !== variant.id);
                               setUploadForm(prev => ({
                                 ...prev,
-                                variants: prev.variants.filter(v => v.id !== variant.id)
+                                variants: newVariants,
+                                pricingType: newVariants.length === 0 ? 'single' : 'variants'
                               }));
                             }}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
-                        )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-                
-                {uploadForm.variants.length === 0 && (
-                  <p className="text-xs text-slate-500 text-center py-2">No variants added. Click "Add Variant" to start.</p>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500 text-center py-3 italic">No sizes added yet. Click "+ Add Size" to add product variants.</p>
                 )}
               </div>
-            )}
+            </div>
           </div>
 
           <DialogFooter className="pt-2">
@@ -1921,146 +1920,150 @@ export const MaterialImagesManager: React.FC = () => {
                           />
                         </div>
 
-                        {/* Row 4: Pricing Type Toggle */}
-                        <div className="bg-slate-700/50 rounded-lg p-3 border border-slate-600">
-                          <Label className="text-sm text-white font-semibold mb-2 block">Pricing Type</Label>
-                          <div className="flex gap-2">
-                            <Button
-                              type="button"
-                              variant={item.pricingType === 'single' ? 'default' : 'outline'}
-                              size="sm"
-                              className={`flex-1 ${item.pricingType === 'single' ? 'bg-orange-500 hover:bg-orange-600' : 'border-slate-500 text-slate-300'}`}
-                              onClick={() => updateBulkItem(item.id, { pricingType: 'single', variants: [] })}
-                              disabled={item.uploaded || item.uploading}
-                            >
-                              💰 Single Price
-                            </Button>
-                            <Button
-                              type="button"
-                              variant={item.pricingType === 'variants' ? 'default' : 'outline'}
-                              size="sm"
-                              className={`flex-1 ${item.pricingType === 'variants' ? 'bg-purple-500 hover:bg-purple-600' : 'border-slate-500 text-slate-300'}`}
-                              onClick={() => updateBulkItem(item.id, { 
-                                pricingType: 'variants',
-                                variants: item.variants.length === 0 ? [{ id: crypto.randomUUID(), sizeLabel: '', price: 0, stock: 0 }] : item.variants
-                              })}
-                              disabled={item.uploaded || item.uploading}
-                            >
-                              📊 Multiple Sizes
-                            </Button>
-                          </div>
-                        </div>
-
-                        {/* Single Price Input */}
-                        {item.pricingType === 'single' && (
+                        {/* Row 4: Pricing Section */}
+                        <div className="bg-slate-700/50 rounded-lg p-4 border border-slate-600 space-y-4">
+                          {/* Pricing Type Toggle */}
                           <div>
-                            <Label className="text-sm text-white font-semibold mb-2 block">Price (KES) per {item.unit}</Label>
+                            <Label className="text-sm text-white font-semibold mb-2 block">Pricing Type *</Label>
+                            <div className="flex gap-2">
+                              <Button
+                                type="button"
+                                variant={item.pricingType === 'single' ? 'default' : 'outline'}
+                                size="sm"
+                                className={`flex-1 ${item.pricingType === 'single' ? 'bg-orange-500 hover:bg-orange-600' : 'border-slate-500 text-slate-300'}`}
+                                onClick={() => updateBulkItem(item.id, { pricingType: 'single' })}
+                                disabled={item.uploaded || item.uploading}
+                              >
+                                💰 Single Price
+                              </Button>
+                              <Button
+                                type="button"
+                                variant={item.pricingType === 'variants' ? 'default' : 'outline'}
+                                size="sm"
+                                className={`flex-1 ${item.pricingType === 'variants' ? 'bg-purple-500 hover:bg-purple-600' : 'border-slate-500 text-slate-300'}`}
+                                onClick={() => updateBulkItem(item.id, { 
+                                  pricingType: 'variants',
+                                  variants: item.variants.length === 0 ? [{ id: crypto.randomUUID(), sizeLabel: '', price: 0, stock: 0 }] : item.variants
+                                })}
+                                disabled={item.uploaded || item.uploading}
+                              >
+                                📊 Multiple Sizes / Variants
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* Suggested Price - Always visible */}
+                          <div>
+                            <Label className="text-sm text-white font-semibold mb-2 block">Suggested Price (KES) *</Label>
                             <Input
                               type="number"
                               value={item.suggestedPrice || ''}
                               onChange={(e) => updateBulkItem(item.id, { suggestedPrice: parseFloat(e.target.value) || 0 })}
-                              placeholder="0"
-                              className="bg-slate-700 border-slate-500 h-12 text-base"
+                              placeholder="850.00"
+                              className="bg-slate-600 border-slate-500 h-12 text-lg font-semibold"
                               disabled={item.uploaded || item.uploading}
                             />
                           </div>
-                        )}
 
-                        {/* Multiple Variants Table */}
-                        {item.pricingType === 'variants' && (
-                          <div className="bg-purple-900/20 rounded-lg p-3 border border-purple-500/30">
+                          {/* Product Sizes / Variants - Always visible */}
+                          <div className="bg-slate-800/50 rounded-lg p-3 border border-purple-500/30">
                             <div className="flex items-center justify-between mb-3">
-                              <Label className="text-sm text-purple-300 font-semibold">Variants (per {item.unit})</Label>
+                              <Label className="text-sm text-purple-300 font-semibold">Product Sizes / Variants</Label>
                               <Button
                                 type="button"
                                 size="sm"
                                 variant="outline"
-                                className="border-purple-500 text-purple-400 hover:bg-purple-500/20 h-7 text-xs"
+                                className="border-purple-500 text-purple-400 hover:bg-purple-500/20 h-8 text-xs px-3"
                                 onClick={() => {
                                   const newVariants = [...item.variants, { id: crypto.randomUUID(), sizeLabel: '', price: 0, stock: 0 }];
-                                  updateBulkItem(item.id, { variants: newVariants });
+                                  updateBulkItem(item.id, { pricingType: 'variants', variants: newVariants });
                                 }}
                                 disabled={item.uploaded || item.uploading}
                               >
-                                + Add
+                                + Add Size
                               </Button>
                             </div>
                             
-                            <div className="space-y-2">
-                              {/* Header */}
-                              <div className="grid grid-cols-12 gap-2 text-xs text-slate-400 font-medium">
-                                <div className="col-span-5">Size/Label</div>
-                                <div className="col-span-3">Price</div>
-                                <div className="col-span-3">Stock</div>
-                                <div className="col-span-1"></div>
-                              </div>
-                              
-                              {/* Variant Rows */}
-                              {item.variants.map((variant, vIdx) => (
-                                <div key={variant.id} className="grid grid-cols-12 gap-2 items-center">
-                                  <div className="col-span-5">
-                                    <Input
-                                      placeholder="e.g., 50kg"
-                                      value={variant.sizeLabel}
-                                      onChange={(e) => {
-                                        const newVariants = [...item.variants];
-                                        newVariants[vIdx].sizeLabel = e.target.value;
-                                        updateBulkItem(item.id, { variants: newVariants });
-                                      }}
-                                      className="bg-slate-600 border-slate-500 h-8 text-sm"
-                                      disabled={item.uploaded || item.uploading}
-                                    />
-                                  </div>
-                                  <div className="col-span-3">
-                                    <Input
-                                      type="number"
-                                      placeholder="0"
-                                      value={variant.price || ''}
-                                      onChange={(e) => {
-                                        const newVariants = [...item.variants];
-                                        newVariants[vIdx].price = parseFloat(e.target.value) || 0;
-                                        updateBulkItem(item.id, { variants: newVariants });
-                                      }}
-                                      className="bg-slate-600 border-slate-500 h-8 text-sm"
-                                      disabled={item.uploaded || item.uploading}
-                                    />
-                                  </div>
-                                  <div className="col-span-3">
-                                    <Input
-                                      type="number"
-                                      placeholder="0"
-                                      value={variant.stock || ''}
-                                      onChange={(e) => {
-                                        const newVariants = [...item.variants];
-                                        newVariants[vIdx].stock = parseInt(e.target.value) || 0;
-                                        updateBulkItem(item.id, { variants: newVariants });
-                                      }}
-                                      className="bg-slate-600 border-slate-500 h-8 text-sm"
-                                      disabled={item.uploaded || item.uploading}
-                                    />
-                                  </div>
-                                  <div className="col-span-1 flex justify-center">
-                                    {item.variants.length > 1 && (
+                            {item.variants.length > 0 ? (
+                              <div className="space-y-2">
+                                {/* Header */}
+                                <div className="grid grid-cols-12 gap-2 text-xs text-slate-400 font-medium border-b border-slate-600 pb-2">
+                                  <div className="col-span-5">Size / Label</div>
+                                  <div className="col-span-3">Price (KES)</div>
+                                  <div className="col-span-3">Stock</div>
+                                  <div className="col-span-1"></div>
+                                </div>
+                                
+                                {/* Variant Rows */}
+                                {item.variants.map((variant, vIdx) => (
+                                  <div key={variant.id} className="grid grid-cols-12 gap-2 items-center">
+                                    <div className="col-span-5">
+                                      <Input
+                                        placeholder="e.g., 1 inch"
+                                        value={variant.sizeLabel}
+                                        onChange={(e) => {
+                                          const newVariants = [...item.variants];
+                                          newVariants[vIdx].sizeLabel = e.target.value;
+                                          updateBulkItem(item.id, { variants: newVariants });
+                                        }}
+                                        className="bg-slate-600 border-slate-500 h-9 text-sm"
+                                        disabled={item.uploaded || item.uploading}
+                                      />
+                                    </div>
+                                    <div className="col-span-3">
+                                      <Input
+                                        type="number"
+                                        placeholder="120"
+                                        value={variant.price || ''}
+                                        onChange={(e) => {
+                                          const newVariants = [...item.variants];
+                                          newVariants[vIdx].price = parseFloat(e.target.value) || 0;
+                                          updateBulkItem(item.id, { variants: newVariants });
+                                        }}
+                                        className="bg-slate-600 border-slate-500 h-9 text-sm"
+                                        disabled={item.uploaded || item.uploading}
+                                      />
+                                    </div>
+                                    <div className="col-span-3">
+                                      <Input
+                                        type="number"
+                                        placeholder="50"
+                                        value={variant.stock || ''}
+                                        onChange={(e) => {
+                                          const newVariants = [...item.variants];
+                                          newVariants[vIdx].stock = parseInt(e.target.value) || 0;
+                                          updateBulkItem(item.id, { variants: newVariants });
+                                        }}
+                                        className="bg-slate-600 border-slate-500 h-9 text-sm"
+                                        disabled={item.uploaded || item.uploading}
+                                      />
+                                    </div>
+                                    <div className="col-span-1 flex justify-center">
                                       <Button
                                         type="button"
                                         variant="ghost"
                                         size="icon"
-                                        className="h-6 w-6 text-red-400 hover:text-red-300 hover:bg-red-500/20"
+                                        className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-500/20"
                                         onClick={() => {
                                           const newVariants = item.variants.filter(v => v.id !== variant.id);
-                                          updateBulkItem(item.id, { variants: newVariants });
+                                          updateBulkItem(item.id, { 
+                                            variants: newVariants,
+                                            pricingType: newVariants.length === 0 ? 'single' : 'variants'
+                                          });
                                         }}
                                         disabled={item.uploaded || item.uploading}
                                       >
-                                        <X className="h-3 w-3" />
+                                        <X className="h-4 w-4" />
                                       </Button>
-                                    )}
+                                    </div>
                                   </div>
-                                </div>
-                              ))}
-                            </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-slate-500 text-center py-3 italic">No sizes added yet. Click "+ Add Size" to add variants.</p>
+                            )}
                           </div>
-                        )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -2288,147 +2291,147 @@ export const MaterialImagesManager: React.FC = () => {
                 </Select>
               </div>
 
-              {/* Pricing Type Toggle */}
-              <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
-                <Label className="text-xs text-slate-300 mb-2 block">Pricing Type</Label>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant={editForm.pricingType === 'single' ? 'default' : 'outline'}
-                    size="sm"
-                    className={`flex-1 ${editForm.pricingType === 'single' ? 'bg-orange-500 hover:bg-orange-600' : 'border-slate-600 text-slate-300'}`}
-                    onClick={() => setEditForm(prev => ({ ...prev, pricingType: 'single', variants: [] }))}
-                  >
-                    💰 Single Price
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={editForm.pricingType === 'variants' ? 'default' : 'outline'}
-                    size="sm"
-                    className={`flex-1 ${editForm.pricingType === 'variants' ? 'bg-purple-500 hover:bg-purple-600' : 'border-slate-600 text-slate-300'}`}
-                    onClick={() => setEditForm(prev => ({ 
-                      ...prev, 
-                      pricingType: 'variants',
-                      variants: prev.variants.length === 0 ? [{ id: crypto.randomUUID(), sizeLabel: '', price: 0, stock: 0 }] : prev.variants
-                    }))}
-                  >
-                    📊 Multiple Sizes / Variants
-                  </Button>
-                </div>
-              </div>
-
-              {/* Single Price Input */}
-              {editForm.pricingType === 'single' && (
+              {/* Pricing Section */}
+              <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700 space-y-4">
+                {/* Pricing Type Toggle */}
                 <div>
-                  <Label htmlFor="edit-suggestedPrice" className="text-xs">Suggested Price (KES) per {editForm.unit}</Label>
+                  <Label className="text-sm text-white font-semibold mb-2 block">Pricing Type *</Label>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant={editForm.pricingType === 'single' ? 'default' : 'outline'}
+                      size="sm"
+                      className={`flex-1 ${editForm.pricingType === 'single' ? 'bg-orange-500 hover:bg-orange-600' : 'border-slate-600 text-slate-300'}`}
+                      onClick={() => setEditForm(prev => ({ ...prev, pricingType: 'single' }))}
+                    >
+                      💰 Single Price
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={editForm.pricingType === 'variants' ? 'default' : 'outline'}
+                      size="sm"
+                      className={`flex-1 ${editForm.pricingType === 'variants' ? 'bg-purple-500 hover:bg-purple-600' : 'border-slate-600 text-slate-300'}`}
+                      onClick={() => setEditForm(prev => ({ 
+                        ...prev, 
+                        pricingType: 'variants',
+                        variants: prev.variants.length === 0 ? [{ id: crypto.randomUUID(), sizeLabel: '', price: 0, stock: 0 }] : prev.variants
+                      }))}
+                    >
+                      📊 Multiple Sizes / Variants
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Suggested Price - Always visible */}
+                <div>
+                  <Label htmlFor="edit-suggestedPrice" className="text-sm text-white font-semibold mb-2 block">Suggested Price (KES) *</Label>
                   <Input
                     id="edit-suggestedPrice"
                     type="number"
-                    placeholder="0"
+                    placeholder="850.00"
                     value={editForm.suggestedPrice || ''}
                     onChange={(e) => setEditForm(prev => ({ ...prev, suggestedPrice: parseFloat(e.target.value) || 0 }))}
-                    className="bg-slate-800 border-slate-600 h-10 text-base"
+                    className="bg-slate-700 border-slate-600 h-12 text-lg font-semibold"
                   />
                 </div>
-              )}
 
-              {/* Multiple Variants Table */}
-              {editForm.pricingType === 'variants' && (
-                <div className="bg-slate-800/30 rounded-lg p-3 border border-purple-500/30">
+                {/* Product Sizes / Variants - Always visible */}
+                <div className="bg-slate-900/50 rounded-lg p-3 border border-purple-500/30">
                   <div className="flex items-center justify-between mb-3">
-                    <Label className="text-sm text-purple-300 font-semibold">Size / Variant Pricing (per {editForm.unit})</Label>
+                    <Label className="text-sm text-purple-300 font-semibold">Product Sizes / Variants</Label>
                     <Button
                       type="button"
                       size="sm"
                       variant="outline"
-                      className="border-purple-500 text-purple-400 hover:bg-purple-500/20 h-7 text-xs"
+                      className="border-purple-500 text-purple-400 hover:bg-purple-500/20 h-8 text-xs px-3"
                       onClick={() => setEditForm(prev => ({
                         ...prev,
+                        pricingType: 'variants',
                         variants: [...prev.variants, { id: crypto.randomUUID(), sizeLabel: '', price: 0, stock: 0 }]
                       }))}
                     >
-                      + Add Variant
+                      + Add Size
                     </Button>
                   </div>
                   
                   {/* Variants Table */}
-                  <div className="space-y-2">
-                    {/* Header */}
-                    <div className="grid grid-cols-12 gap-2 text-xs text-slate-400 font-medium px-1">
-                      <div className="col-span-5">Size / Label</div>
-                      <div className="col-span-3">Price (KES)</div>
-                      <div className="col-span-3">Stock</div>
-                      <div className="col-span-1"></div>
-                    </div>
-                    
-                    {/* Variant Rows */}
-                    {editForm.variants.map((variant, index) => (
-                      <div key={variant.id} className="grid grid-cols-12 gap-2 items-center">
-                        <div className="col-span-5">
-                          <Input
-                            placeholder="e.g., 50kg, Large, 2x4"
-                            value={variant.sizeLabel}
-                            onChange={(e) => {
-                              const newVariants = [...editForm.variants];
-                              newVariants[index].sizeLabel = e.target.value;
-                              setEditForm(prev => ({ ...prev, variants: newVariants }));
-                            }}
-                            className="bg-slate-700 border-slate-600 h-8 text-sm"
-                          />
-                        </div>
-                        <div className="col-span-3">
-                          <Input
-                            type="number"
-                            placeholder="0"
-                            value={variant.price || ''}
-                            onChange={(e) => {
-                              const newVariants = [...editForm.variants];
-                              newVariants[index].price = parseFloat(e.target.value) || 0;
-                              setEditForm(prev => ({ ...prev, variants: newVariants }));
-                            }}
-                            className="bg-slate-700 border-slate-600 h-8 text-sm"
-                          />
-                        </div>
-                        <div className="col-span-3">
-                          <Input
-                            type="number"
-                            placeholder="0"
-                            value={variant.stock || ''}
-                            onChange={(e) => {
-                              const newVariants = [...editForm.variants];
-                              newVariants[index].stock = parseInt(e.target.value) || 0;
-                              setEditForm(prev => ({ ...prev, variants: newVariants }));
-                            }}
-                            className="bg-slate-700 border-slate-600 h-8 text-sm"
-                          />
-                        </div>
-                        <div className="col-span-1 flex justify-center">
-                          {editForm.variants.length > 1 && (
+                  {editForm.variants.length > 0 ? (
+                    <div className="space-y-2">
+                      {/* Header */}
+                      <div className="grid grid-cols-12 gap-2 text-xs text-slate-400 font-medium px-1 border-b border-slate-700 pb-2">
+                        <div className="col-span-5">Size / Label</div>
+                        <div className="col-span-3">Price (KES)</div>
+                        <div className="col-span-3">Stock</div>
+                        <div className="col-span-1"></div>
+                      </div>
+                      
+                      {/* Variant Rows */}
+                      {editForm.variants.map((variant, index) => (
+                        <div key={variant.id} className="grid grid-cols-12 gap-2 items-center">
+                          <div className="col-span-5">
+                            <Input
+                              placeholder="e.g., 1 inch, 2 inch"
+                              value={variant.sizeLabel}
+                              onChange={(e) => {
+                                const newVariants = [...editForm.variants];
+                                newVariants[index].sizeLabel = e.target.value;
+                                setEditForm(prev => ({ ...prev, variants: newVariants }));
+                              }}
+                              className="bg-slate-700 border-slate-600 h-9 text-sm"
+                            />
+                          </div>
+                          <div className="col-span-3">
+                            <Input
+                              type="number"
+                              placeholder="120"
+                              value={variant.price || ''}
+                              onChange={(e) => {
+                                const newVariants = [...editForm.variants];
+                                newVariants[index].price = parseFloat(e.target.value) || 0;
+                                setEditForm(prev => ({ ...prev, variants: newVariants }));
+                              }}
+                              className="bg-slate-700 border-slate-600 h-9 text-sm"
+                            />
+                          </div>
+                          <div className="col-span-3">
+                            <Input
+                              type="number"
+                              placeholder="50"
+                              value={variant.stock || ''}
+                              onChange={(e) => {
+                                const newVariants = [...editForm.variants];
+                                newVariants[index].stock = parseInt(e.target.value) || 0;
+                                setEditForm(prev => ({ ...prev, variants: newVariants }));
+                              }}
+                              className="bg-slate-700 border-slate-600 h-9 text-sm"
+                            />
+                          </div>
+                          <div className="col-span-1 flex justify-center">
                             <Button
                               type="button"
                               variant="ghost"
                               size="icon"
-                              className="h-7 w-7 text-red-400 hover:text-red-300 hover:bg-red-500/20"
+                              className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-500/20"
                               onClick={() => {
+                                const newVariants = editForm.variants.filter(v => v.id !== variant.id);
                                 setEditForm(prev => ({
                                   ...prev,
-                                  variants: prev.variants.filter(v => v.id !== variant.id)
+                                  variants: newVariants,
+                                  pricingType: newVariants.length === 0 ? 'single' : 'variants'
                                 }));
                               }}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
-                          )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  {editForm.variants.length === 0 && (
-                    <p className="text-xs text-slate-500 text-center py-2">No variants added. Click "Add Variant" to start.</p>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-500 text-center py-3 italic">No sizes added yet. Click "+ Add Size" to add product variants.</p>
                   )}
                 </div>
-              )}
+              </div>
             </div>
           )}
 
