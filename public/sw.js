@@ -175,20 +175,26 @@ async function networkFirstWithCache(request, cacheName) {
   try {
     const networkResponse = await fetch(request);
     
-    if (networkResponse.ok) {
-      const cache = await caches.open(cacheName);
-      // Clone and add timestamp
-      const responseToCache = networkResponse.clone();
-      const headers = new Headers(responseToCache.headers);
-      headers.set('sw-cached-at', Date.now().toString());
-      
-      const cachedResponse = new Response(await responseToCache.blob(), {
-        status: responseToCache.status,
-        statusText: responseToCache.statusText,
-        headers: headers
-      });
-      
-      cache.put(request, cachedResponse);
+    // ✅ FIX: Only cache complete responses (status 200), not partial (206) or other
+    if (networkResponse.ok && networkResponse.status === 200) {
+      try {
+        const cache = await caches.open(cacheName);
+        // Clone and add timestamp
+        const responseToCache = networkResponse.clone();
+        const headers = new Headers(responseToCache.headers);
+        headers.set('sw-cached-at', Date.now().toString());
+        
+        const cachedResponse = new Response(await responseToCache.blob(), {
+          status: responseToCache.status,
+          statusText: responseToCache.statusText,
+          headers: headers
+        });
+        
+        cache.put(request, cachedResponse);
+      } catch (cacheError) {
+        // Silently ignore cache errors (e.g., quota exceeded)
+        console.log('[SW] Cache put failed:', cacheError.message);
+      }
     }
     
     return networkResponse;
@@ -226,9 +232,12 @@ async function cacheFirstWithNetwork(request, cacheName) {
   if (cachedResponse) {
     // Update cache in background
     fetch(request).then(async (networkResponse) => {
-      if (networkResponse.ok) {
-        const cache = await caches.open(cacheName);
-        cache.put(request, networkResponse);
+      // ✅ FIX: Only cache complete responses (status 200)
+      if (networkResponse.ok && networkResponse.status === 200) {
+        try {
+          const cache = await caches.open(cacheName);
+          cache.put(request, networkResponse);
+        } catch (e) { /* ignore cache errors */ }
       }
     }).catch(() => {});
     
@@ -238,10 +247,13 @@ async function cacheFirstWithNetwork(request, cacheName) {
   try {
     const networkResponse = await fetch(request);
     
-    if (networkResponse.ok) {
-      const cache = await caches.open(cacheName);
-      cache.put(request, networkResponse.clone());
-      limitCacheSize(cacheName, cacheName === IMAGE_CACHE ? MAX_IMAGE_CACHE_ITEMS : MAX_DYNAMIC_CACHE_ITEMS);
+    // ✅ FIX: Only cache complete responses (status 200)
+    if (networkResponse.ok && networkResponse.status === 200) {
+      try {
+        const cache = await caches.open(cacheName);
+        cache.put(request, networkResponse.clone());
+        limitCacheSize(cacheName, cacheName === IMAGE_CACHE ? MAX_IMAGE_CACHE_ITEMS : MAX_DYNAMIC_CACHE_ITEMS);
+      } catch (e) { /* ignore cache errors */ }
     }
     
     return networkResponse;
@@ -262,10 +274,13 @@ async function networkFirstWithOffline(request) {
   try {
     const networkResponse = await fetch(request);
     
-    if (networkResponse.ok) {
-      // Cache the page for offline use
-      const cache = await caches.open(OFFLINE_CACHE);
-      cache.put(request, networkResponse.clone());
+    // ✅ FIX: Only cache complete responses (status 200)
+    if (networkResponse.ok && networkResponse.status === 200) {
+      try {
+        // Cache the page for offline use
+        const cache = await caches.open(OFFLINE_CACHE);
+        cache.put(request, networkResponse.clone());
+      } catch (e) { /* ignore cache errors */ }
     }
     
     return networkResponse;
@@ -296,9 +311,12 @@ async function staleWhileRevalidate(request, cacheName) {
   
   const fetchPromise = fetch(request)
     .then((networkResponse) => {
-      if (networkResponse.ok) {
-        cache.put(request, networkResponse.clone());
-        limitCacheSize(cacheName, MAX_DYNAMIC_CACHE_ITEMS);
+      // ✅ FIX: Only cache complete responses (status 200)
+      if (networkResponse.ok && networkResponse.status === 200) {
+        try {
+          cache.put(request, networkResponse.clone());
+          limitCacheSize(cacheName, MAX_DYNAMIC_CACHE_ITEMS);
+        } catch (e) { /* ignore cache errors */ }
       }
       return networkResponse;
     })
@@ -693,6 +711,12 @@ self.addEventListener('error', (event) => {
 });
 
 self.addEventListener('unhandledrejection', (event) => {
+  // ✅ FIX: Suppress cache-related errors to reduce console spam
+  const reason = event.reason?.message || String(event.reason);
+  if (reason.includes('Cache') || reason.includes('cache') || reason.includes('206')) {
+    event.preventDefault(); // Suppress the error
+    return;
+  }
   console.error('[SW] Unhandled rejection:', event.reason);
 });
 
