@@ -323,6 +323,7 @@ export const MaterialsGrid = () => {
   const [allSuppliers, setAllSuppliers] = useState<{ id: string; user_id?: string; company_name: string; location?: string; rating?: number }[]>([]);
   const [selectedSuppliersMap, setSelectedSuppliersMap] = useState<Record<string, string[]>>({});
   const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({}); // materialId -> variantId
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [compareItems, setCompareItems] = useState<Set<string>>(new Set());
   const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
@@ -342,6 +343,19 @@ export const MaterialsGrid = () => {
     const qty = getQuantity(material.id) || 1;
     const imageUrl = material.image_url || getDefaultCategoryImage(material.category);
     
+    // Get variant info if applicable
+    let itemName = material.name;
+    let unitPrice = material.unit_price;
+    
+    if (material.pricing_type === 'variants' && material.variants && material.variants.length > 0) {
+      const selectedVariantId = selectedVariants[material.id] || material.variants[0]?.id;
+      const selectedVariant = material.variants.find(v => v.id === selectedVariantId) || material.variants[0];
+      if (selectedVariant) {
+        itemName = `${material.name} (${selectedVariant.sizeLabel})`;
+        unitPrice = selectedVariant.price;
+      }
+    }
+    
     setQuoteCartItems(prev => {
       const existing = prev.find(item => item.id === material.id);
       if (existing) {
@@ -353,10 +367,10 @@ export const MaterialsGrid = () => {
       }
       return [...prev, {
         id: material.id,
-        name: material.name,
+        name: itemName,
         category: material.category,
         unit: material.unit,
-        unit_price: material.unit_price,
+        unit_price: unitPrice,
         quantity: qty,
         image_url: imageUrl,
         supplier_id: material.supplier_id,
@@ -366,7 +380,7 @@ export const MaterialsGrid = () => {
     
     toast({
       title: '📋 Added to Quote Cart!',
-      description: `${qty}x ${material.name} added. Click the Quote Cart to review and submit.`,
+      description: `${qty}x ${itemName} added. Click the Quote Cart to review and submit.`,
     });
   };
 
@@ -1445,19 +1459,32 @@ export const MaterialsGrid = () => {
                     }
                     return;
                   }
+                  // Get the correct price based on variant selection
+                  let unitPrice = material.unit_price;
+                  let itemName = material.name;
+                  
+                  if (material.pricing_type === 'variants' && material.variants && material.variants.length > 0) {
+                    const selectedVariantId = selectedVariants[material.id] || material.variants[0]?.id;
+                    const selectedVariant = material.variants.find(v => v.id === selectedVariantId) || material.variants[0];
+                    if (selectedVariant) {
+                      unitPrice = selectedVariant.price;
+                      itemName = `${material.name} (${selectedVariant.sizeLabel})`;
+                    }
+                  }
+                  
                   addToCart({
                     id: material.id,
-                    name: material.name,
+                    name: itemName,
                     category: material.category,
                     unit: material.unit,
-                    unit_price: material.unit_price,
+                    unit_price: unitPrice,
                     image_url: imageUrl,
                     supplier_name: material.supplier?.company_name || 'UjenziXform Catalog',
                     supplier_id: material.supplier_id
                   }, currentQty);
                   toast({
                     title: '🛒 Added to Cart!',
-                    description: `${currentQty} x ${material.name} added to your cart.`,
+                    description: `${currentQty} x ${itemName} added to your cart.`,
                   });
                 };
 
@@ -1569,22 +1596,38 @@ export const MaterialsGrid = () => {
                           <span className="text-xs font-medium text-blue-700">Request quote for pricing</span>
                         </div>
                       ) : material.pricing_type === 'variants' && material.variants && material.variants.length > 0 ? (
-                        /* Multiple Variants Pricing */
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-1">
-                            <span className="text-xs font-medium text-purple-600 bg-purple-50 px-2 py-0.5 rounded">Multiple Sizes</span>
+                        /* Multiple Variants - Size Selector */
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-medium text-purple-600 bg-purple-50 px-2 py-0.5 rounded">Select Size</span>
                           </div>
-                          <div className="text-xs space-y-0.5">
-                            {material.variants.slice(0, 2).map((variant, idx) => (
-                              <div key={idx} className="flex justify-between items-center">
-                                <span className="text-muted-foreground truncate max-w-[80px]">{variant.sizeLabel}</span>
-                                <span className="font-semibold text-blue-600">KES {variant.price.toLocaleString()}</span>
-                              </div>
+                          {/* Variant Selector Dropdown */}
+                          <select
+                            value={selectedVariants[material.id] || material.variants[0]?.id || ''}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              setSelectedVariants(prev => ({ ...prev, [material.id]: e.target.value }));
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full h-9 px-2 text-sm rounded-md border border-purple-300 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                          >
+                            {material.variants.map((variant) => (
+                              <option key={variant.id} value={variant.id}>
+                                {variant.sizeLabel} - KES {variant.price.toLocaleString()} {variant.stock > 0 ? `(${variant.stock} in stock)` : '(Out of stock)'}
+                              </option>
                             ))}
-                            {material.variants.length > 2 && (
-                              <span className="text-purple-500 text-xs">+{material.variants.length - 2} more sizes</span>
-                            )}
-                          </div>
+                          </select>
+                          {/* Selected Variant Price Display */}
+                          {(() => {
+                            const selectedVariantId = selectedVariants[material.id] || material.variants[0]?.id;
+                            const selectedVariant = material.variants.find(v => v.id === selectedVariantId) || material.variants[0];
+                            return selectedVariant ? (
+                              <div className="flex items-baseline justify-between">
+                                <span className="text-lg font-bold text-blue-600">KES {selectedVariant.price.toLocaleString()}</span>
+                                <span className="text-xs text-muted-foreground">/{material.unit}</span>
+                              </div>
+                            ) : null;
+                          })()}
                         </div>
                       ) : (
                         /* Single Price */
@@ -1658,7 +1701,15 @@ export const MaterialsGrid = () => {
                           </span>
                         ) : (
                           <span className="text-xs font-semibold text-gray-700 min-w-[50px] text-right">
-                            KES {(material.unit_price * currentQty).toLocaleString()}
+                            {(() => {
+                              // Calculate price based on variant if available
+                              if (material.pricing_type === 'variants' && material.variants && material.variants.length > 0) {
+                                const selectedVariantId = selectedVariants[material.id] || material.variants[0]?.id;
+                                const selectedVariant = material.variants.find(v => v.id === selectedVariantId) || material.variants[0];
+                                return `KES ${((selectedVariant?.price || 0) * currentQty).toLocaleString()}`;
+                              }
+                              return `KES ${(material.unit_price * currentQty).toLocaleString()}`;
+                            })()}
                           </span>
                         )}
                       </div>
