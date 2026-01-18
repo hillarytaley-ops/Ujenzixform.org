@@ -10,7 +10,9 @@ interface RoleProtectedRouteProps {
 }
 
 /**
- * RoleProtectedRoute - Enforces STRICT role-based access by checking the DATABASE
+ * RoleProtectedRoute - SPEED OPTIMIZED role-based access control
+ * 
+ * OPTIMIZATION: Trust localStorage for 5 minutes after sign-in to avoid DB roundtrips
  * Users can ONLY access dashboards that match their registered role
  * EXCEPTION: Admins can access ALL pages without restrictions
  */
@@ -28,27 +30,30 @@ export const RoleProtectedRoute = ({
   const lastCheckedPath = useRef<string | null>(null);
 
   useEffect(() => {
-    const checkDatabaseRole = async () => {
+    const checkRole = async () => {
       // Only log once per path change to avoid spam
       if (lastCheckedPath.current !== location.pathname) {
         console.log('🔐 RoleProtectedRoute: Checking access for', location.pathname);
         lastCheckedPath.current = location.pathname;
       }
       
-      // ✅ ADMIN BYPASS: Check if user is logged in as admin (localStorage check)
-      const isAdminAuthenticated = localStorage.getItem('admin_authenticated') === 'true';
-      const adminEmail = localStorage.getItem('admin_email');
-      const adminLoginTime = localStorage.getItem('admin_login_time');
       const localRole = localStorage.getItem('user_role');
+      const localRoleId = localStorage.getItem('user_role_id');
+      const roleVerifiedTime = localStorage.getItem('user_role_verified');
+      const isAdminAuthenticated = localStorage.getItem('admin_authenticated') === 'true';
+      const adminLoginTime = localStorage.getItem('admin_login_time');
       
-      // Validate admin session (within 24 hours)
-      const sessionAge = adminLoginTime ? Date.now() - parseInt(adminLoginTime) : Infinity;
-      const maxSessionAge = 24 * 60 * 60 * 1000; // 24 hours
+      // ✅ SPEED OPTIMIZATION: Trust localStorage if recently verified (within 5 minutes)
+      const TRUST_DURATION = 5 * 60 * 1000; // 5 minutes
+      const roleAge = roleVerifiedTime ? Date.now() - parseInt(roleVerifiedTime) : Infinity;
+      const isRecentlyVerified = roleAge < TRUST_DURATION;
       
-      if (isAdminAuthenticated && adminEmail && localRole === 'admin' && sessionAge < maxSessionAge) {
-        if (lastCheckedPath.current === location.pathname) {
-          console.log('👑 ADMIN BYPASS: Granting access to', location.pathname);
-        }
+      // ✅ ADMIN BYPASS: Check admin session (within 24 hours)
+      const adminSessionAge = adminLoginTime ? Date.now() - parseInt(adminLoginTime) : Infinity;
+      const maxAdminSessionAge = 24 * 60 * 60 * 1000; // 24 hours
+      
+      if (isAdminAuthenticated && localRole === 'admin' && adminSessionAge < maxAdminSessionAge) {
+        console.log('👑 ADMIN BYPASS: Granting access to', location.pathname);
         setUserRole('admin');
         setAccessGranted(true);
         setChecking(false);
@@ -56,39 +61,37 @@ export const RoleProtectedRoute = ({
       }
       
       if (!user) {
-        // Even without Supabase user, admin can still access if admin session is valid
-        if (isAdminAuthenticated && localRole === 'admin' && sessionAge < maxSessionAge) {
-          setUserRole('admin');
-          setAccessGranted(true);
-          setChecking(false);
-          return;
-        }
-        
         setChecking(false);
         setAccessGranted(false);
         return;
       }
 
+      // ✅ FAST PATH: Use localStorage if recently verified AND user ID matches
+      if (isRecentlyVerified && localRole && localRoleId === user.id) {
+        console.log('⚡ FAST PATH: Using cached role:', localRole);
+        setUserRole(localRole);
+        if (allowedRoles.includes(localRole) || localRole === 'admin') {
+          setAccessGranted(true);
+        } else {
+          setAccessGranted(false);
+        }
+        setChecking(false);
+        return;
+      }
+
+      // SLOW PATH: Check database (only if localStorage is stale or missing)
       try {
-        // ALWAYS check the database for the user's role - this is the source of truth
         const { data: roleData, error } = await supabase
           .from('user_roles')
           .select('role')
           .eq('user_id', user.id)
           .maybeSingle();
 
-        // If RLS blocks us, fall back to localStorage
         if (error) {
-          const localRoleId = localStorage.getItem('user_role_id');
-          
-          // Verify localStorage role belongs to current user
+          // If RLS blocks us, fall back to localStorage
           if (localRole && localRoleId === user.id) {
             setUserRole(localRole);
-            if (allowedRoles.includes(localRole) || localRole === 'admin') {
-              setAccessGranted(true);
-            } else {
-              setAccessGranted(false);
-            }
+            setAccessGranted(allowedRoles.includes(localRole) || localRole === 'admin');
           } else {
             setAccessGranted(false);
           }
@@ -97,9 +100,7 @@ export const RoleProtectedRoute = ({
         }
 
         if (!roleData?.role) {
-          // Check localStorage as fallback
-          const localRoleId = localStorage.getItem('user_role_id');
-          
+          // No role in DB - check localStorage
           if (localRole && localRoleId === user.id && (allowedRoles.includes(localRole) || localRole === 'admin')) {
             setUserRole(localRole);
             setAccessGranted(true);
@@ -114,24 +115,21 @@ export const RoleProtectedRoute = ({
         const dbRole = roleData.role as string;
         setUserRole(dbRole);
 
-        // Update localStorage to match database (for consistency)
+        // Update localStorage with fresh data
         localStorage.setItem('user_role', dbRole);
         localStorage.setItem('user_role_id', user.id);
+        localStorage.setItem('user_role_verified', Date.now().toString());
 
         // ✅ ADMIN can access ANY page
         if (dbRole === 'admin') {
           setAccessGranted(true);
-        }
-        // Check if the database role is in the allowed roles
-        else if (allowedRoles.includes(dbRole)) {
+        } else if (allowedRoles.includes(dbRole)) {
           setAccessGranted(true);
         } else {
           setAccessGranted(false);
         }
       } catch (err) {
         // Last resort: check localStorage
-        const localRoleId = localStorage.getItem('user_role_id');
-        
         if (localRole && localRoleId === user.id && (allowedRoles.includes(localRole) || localRole === 'admin')) {
           setUserRole(localRole);
           setAccessGranted(true);
@@ -144,7 +142,7 @@ export const RoleProtectedRoute = ({
     };
 
     if (!authLoading && user) {
-      checkDatabaseRole();
+      checkRole();
     } else if (!authLoading && !user) {
       // Check for admin session even without Supabase user
       const isAdminAuthenticated = localStorage.getItem('admin_authenticated') === 'true';

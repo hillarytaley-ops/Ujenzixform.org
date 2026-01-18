@@ -47,12 +47,18 @@ const PrivateClientSignIn = () => {
         return;
       }
 
+      // ✅ SPEED OPTIMIZATION: Store role in localStorage to skip DB check in RoleProtectedRoute
+      localStorage.setItem('user_role', 'private_client');
+      localStorage.setItem('user_role_id', data.user.id);
+      localStorage.setItem('user_role_verified', Date.now().toString());
+
       toast({
         title: "Welcome back!",
         description: "Redirecting to your dashboard...",
       });
 
-      navigate('/private-client-dashboard');
+      // Navigate immediately - RoleProtectedRoute will use localStorage
+      navigate('/private-client-dashboard', { replace: true });
     } catch (error: any) {
       toast({
         title: "Sign In Failed",

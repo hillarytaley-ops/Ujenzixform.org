@@ -47,12 +47,18 @@ const ProfessionalBuilderSignIn = () => {
         return;
       }
 
+      // ✅ SPEED OPTIMIZATION: Store role in localStorage to skip DB check in RoleProtectedRoute
+      localStorage.setItem('user_role', 'professional_builder');
+      localStorage.setItem('user_role_id', data.user.id);
+      localStorage.setItem('user_role_verified', Date.now().toString());
+
       toast({
         title: "Welcome back!",
         description: "Redirecting to your dashboard...",
       });
 
-      navigate('/professional-builder-dashboard');
+      // Navigate immediately - RoleProtectedRoute will use localStorage
+      navigate('/professional-builder-dashboard', { replace: true });
     } catch (error: any) {
       toast({
         title: "Sign In Failed",

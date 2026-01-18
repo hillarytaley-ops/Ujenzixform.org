@@ -147,6 +147,7 @@ const DeliverySignIn = () => {
       if (dbRole === 'delivery' || dbRole === 'delivery_provider' || dbRole === 'admin') {
         localStorage.setItem('user_role', dbRole);
         localStorage.setItem('user_role_id', user.id);
+        localStorage.setItem('user_role_verified', Date.now().toString());
         console.log('🔐 Delivery/admin role confirmed, redirecting to dashboard');
         window.location.href = redirectTo;
         return;
@@ -332,6 +333,7 @@ const DeliverySignIn = () => {
       const effectiveRole = dbRole || 'delivery';
       localStorage.setItem('user_role', effectiveRole);
       localStorage.setItem('user_role_id', userId);
+      localStorage.setItem('user_role_verified', Date.now().toString());
       localStorage.setItem('user_email', userEmail);
       
       toast({
@@ -491,6 +493,7 @@ const DeliverySignIn = () => {
 
           localStorage.setItem('user_role', 'delivery');
           localStorage.setItem('user_role_id', signInData.user.id);
+          localStorage.setItem('user_role_verified', Date.now().toString());
           saveUserSession(signInData.user.id, userEmail, 'delivery');
 
           toast({
@@ -544,6 +547,7 @@ const DeliverySignIn = () => {
 
       localStorage.setItem('user_role', 'delivery');
       localStorage.setItem('user_role_id', userId);
+      localStorage.setItem('user_role_verified', Date.now().toString());
       saveUserSession(userId, userEmail, 'delivery');
 
       supabase.auth.updateUser({

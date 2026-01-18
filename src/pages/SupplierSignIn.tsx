@@ -192,6 +192,7 @@ const SupplierSignIn = () => {
 
           localStorage.setItem('user_role', 'supplier');
           localStorage.setItem('user_role_id', signInData.user.id);
+          localStorage.setItem('user_role_verified', Date.now().toString());
           saveUserSession(signInData.user.id, userEmail, 'supplier');
 
           toast({
@@ -244,6 +245,7 @@ const SupplierSignIn = () => {
 
       localStorage.setItem('user_role', 'supplier');
       localStorage.setItem('user_role_id', userId);
+      localStorage.setItem('user_role_verified', Date.now().toString());
       saveUserSession(userId, userEmail, 'supplier');
 
       // Update metadata
@@ -368,6 +370,7 @@ const SupplierSignIn = () => {
       if (dbRole === 'supplier' || dbRole === 'admin' || !dbRole) {
         localStorage.setItem('user_role', dbRole || 'supplier');
         localStorage.setItem('user_role_id', user.id);
+        localStorage.setItem('user_role_verified', Date.now().toString());
         toast({
           title: "✅ Welcome Back!",
           description: "Redirecting to your Supplier Dashboard...",
@@ -513,6 +516,7 @@ const SupplierSignIn = () => {
       const effectiveRole = dbRole === 'admin' ? 'admin' : 'supplier';
       localStorage.setItem('user_role', effectiveRole);
       localStorage.setItem('user_role_id', userId);
+      localStorage.setItem('user_role_verified', Date.now().toString());
       saveUserSession(userId, userEmail, effectiveRole);
 
       toast({
