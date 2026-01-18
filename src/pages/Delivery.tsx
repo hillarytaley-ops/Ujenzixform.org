@@ -25,7 +25,8 @@ import {
   BarChart3,
   Users,
   Zap,
-  Shield
+  Shield,
+  ShoppingCart
 } from "lucide-react";
 // Lazy load these components to prevent errors from breaking the page
 // Load only when needed for better performance
