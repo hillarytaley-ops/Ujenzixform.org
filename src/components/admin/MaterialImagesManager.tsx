@@ -1492,7 +1492,7 @@ export const MaterialImagesManager: React.FC = () => {
       {/* BULK UPLOAD DIALOG */}
       {/* ═══════════════════════════════════════════════════════════════════════════════ */}
       <Dialog open={showBulkUploadDialog} onOpenChange={(open) => !open && closeBulkUploadDialog()}>
-        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-4xl h-[90vh] flex flex-col">
           <DialogHeader className="pb-2 flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Package className="h-5 w-5 text-orange-400" />
@@ -1503,7 +1503,7 @@ export const MaterialImagesManager: React.FC = () => {
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
+          <div className="space-y-4 flex-1 min-h-0 flex flex-col overflow-hidden">
             {/* Default Category and Unit Selection - For newly added items */}
             <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700 flex-shrink-0">
               <p className="text-xs text-slate-400 mb-2">📋 Default values for new images (can be changed per item below)</p>
@@ -1568,9 +1568,9 @@ export const MaterialImagesManager: React.FC = () => {
               className="hidden"
             />
 
-            {/* Items List - Card Layout for better editing */}
+            {/* Items List - Card Layout for better editing - SCROLLABLE */}
             {bulkUploadItems.length > 0 && (
-              <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+              <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
                 {bulkUploadItems.map((item) => (
                   <div 
                     key={item.id} 
