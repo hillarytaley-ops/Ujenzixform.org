@@ -667,6 +667,60 @@ export const MaterialsGrid = () => {
     };
   }, [filteredMaterials, columns]);
 
+  // ✅ LAZY LOAD: Load images for visible items when scroll position changes
+  useEffect(() => {
+    const visibleItems = filteredMaterials.slice(visibleStart, visibleEnd);
+    const itemsWithoutImages = visibleItems.filter(m => !m.image_url && m.supplier_id === 'admin-catalog');
+    
+    if (itemsWithoutImages.length > 0) {
+      const idsToLoad = itemsWithoutImages.map(m => m.id);
+      // Debounce to avoid too many requests
+      const timer = setTimeout(() => {
+        loadMaterialImages(idsToLoad, materials);
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [visibleStart, visibleEnd, filteredMaterials]);
+
+  // ✅ LAZY LOAD: Fetch image URLs for specific material IDs
+  const loadMaterialImages = async (ids: string[], currentMaterials: Material[]) => {
+    if (ids.length === 0) return;
+    
+    try {
+      const idsParam = ids.map(id => `"${id}"`).join(',');
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,image_url&id=in.(${idsParam})`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      if (response.ok) {
+        const imageData = await response.json();
+        
+        // Update materials with their image URLs
+        setMaterials(prev => prev.map(mat => {
+          const found = imageData.find((d: any) => d.id === mat.id);
+          return found ? { ...mat, image_url: found.image_url } : mat;
+        }));
+        
+        // Also update filtered materials
+        setFilteredMaterials(prev => prev.map(mat => {
+          const found = imageData.find((d: any) => d.id === mat.id);
+          return found ? { ...mat, image_url: found.image_url } : mat;
+        }));
+        
+        console.log(`🖼️ Loaded ${imageData.length} images`);
+      }
+    } catch (err) {
+      console.error('Error loading material images:', err);
+    }
+  };
+
   const loadMaterials = async () => {
     try {
       setLoading(true);
@@ -713,8 +767,8 @@ export const MaterialsGrid = () => {
         console.log('Supplier prices table not available');
       }
       
-      // STEP 2: Fetch admin-uploaded images in batches to avoid timeout
-      // The image_url field contains base64 data which makes queries slow
+      // STEP 2: Fetch admin-uploaded materials - OPTIMIZED for performance
+      // ✅ PERFORMANCE: First fetch metadata only (no image_url), then lazy load images
       let adminMaterials: Material[] = [];
       
       try {
@@ -722,153 +776,78 @@ export const MaterialsGrid = () => {
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) 
           || window.innerWidth < 768;
         
-        // Use smaller batches on mobile to prevent timeout on slower connections
-        const BATCH_SIZE = isMobile ? 15 : 25;
-        const MAX_BATCHES = isMobile ? 6 : 10; // Mobile: 90 max, Desktop: 250 max
-        const TIMEOUT_MS = isMobile ? 8000 : 10000; // Shorter timeout on mobile
-        let allAdminData: any[] = [];
+        console.log(`📱 Device: ${isMobile ? 'Mobile' : 'Desktop'}`);
         
-        console.log(`📱 Device: ${isMobile ? 'Mobile' : 'Desktop'}, Batch size: ${BATCH_SIZE}, Max batches: ${MAX_BATCHES}`);
-        
-        for (let batch = 0; batch < MAX_BATCHES; batch++) {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
-          
-          try {
-            const response = await fetch(
-              `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,image_url,pricing_type,variants&order=created_at.desc&limit=${BATCH_SIZE}&offset=${batch * BATCH_SIZE}`,
-              {
-                headers: {
-                  'apikey': SUPABASE_ANON_KEY,
-                  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-                  'Content-Type': 'application/json',
-                  'Prefer': 'count=none'
-                },
-                signal: controller.signal
-              }
-            );
-            
-            clearTimeout(timeoutId);
-            
-            if (response.ok) {
-              const batchData = await response.json();
-              if (batchData && batchData.length > 0) {
-                allAdminData = [...allAdminData, ...batchData];
-                console.log(`📦 Batch ${batch + 1}: Fetched ${batchData.length} materials (total: ${allAdminData.length})`);
-                
-                // If we got less than batch size, we've reached the end
-                if (batchData.length < BATCH_SIZE) {
-                  break;
-                }
-              } else {
-                break; // No more data
-              }
-            } else {
-              console.warn(`⚠️ Batch ${batch + 1} failed, stopping pagination`);
-              break;
+        // ✅ FAST: Fetch metadata only (NO image_url which contains huge base64 data)
+        const LIMIT = isMobile ? 50 : 100;
+        const response = await fetch(
+          `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants&order=created_at.desc&limit=${LIMIT}`,
+          {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'count=exact'
             }
-          } catch (batchErr: any) {
-            console.warn(`⚠️ Batch ${batch + 1} timed out or failed:`, batchErr.message);
-            // Continue with what we have so far
-            break;
           }
-        }
+        );
         
-        console.log(`📦 Total fetched: ${allAdminData.length} admin materials`);
-        
-        // Check if there might be more materials (if we hit the max batches limit)
-        const maxFetched = BATCH_SIZE * MAX_BATCHES;
-        if (allAdminData.length >= maxFetched - BATCH_SIZE) {
-          // We might have more materials, fetch count
-          try {
-            const countResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/admin_material_images?select=id`,
-              {
-                headers: {
-                  'apikey': SUPABASE_ANON_KEY,
-                  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-                  'Prefer': 'count=exact'
-                }
-              }
-            );
-            const countHeader = countResponse.headers.get('content-range');
-            if (countHeader) {
-              const total = parseInt(countHeader.split('/')[1] || '0');
-              setTotalMaterialsCount(total);
-              setHasMoreMaterials(total > allAdminData.length);
-              console.log(`📊 Total materials in DB: ${total}, Loaded: ${allAdminData.length}, More available: ${total > allAdminData.length}`);
-            }
-          } catch (countErr) {
-            console.warn('Could not fetch total count');
-          }
-        }
-        
-        if (allAdminData.length > 0) {
-          // Debug: Log first item to check if pricing_type and variants are present
-          console.log('🔍 DEBUG - First item raw data:', allAdminData[0]);
-          console.log('🔍 DEBUG - pricing_type:', allAdminData[0]?.pricing_type);
-          console.log('🔍 DEBUG - variants:', allAdminData[0]?.variants);
+        if (response.ok) {
+          const allAdminData = await response.json();
+          const countHeader = response.headers.get('content-range');
           
-          adminMaterials = allAdminData.map((item: any) => {
-            // Check if any supplier has set a price for this product
+          if (countHeader) {
+            const total = parseInt(countHeader.split('/')[1] || '0');
+            setTotalMaterialsCount(total);
+            setHasMoreMaterials(total > allAdminData.length);
+            console.log(`📊 Loaded ${allAdminData.length} materials (total: ${total})`);
+          }
+          
+          console.log(`⚡ Fast load: ${allAdminData.length} materials (metadata only)`);
+          
+          // Map materials WITHOUT image_url initially
+          const materialsWithoutImages = allAdminData.map((item: any) => {
             const supplierPrice = supplierPrices[item.id];
             
-            // Parse variants from JSON if needed
             let variants: PriceVariant[] = [];
             try {
               if (item.variants && Array.isArray(item.variants) && item.variants.length > 0) {
                 variants = item.variants;
-                console.log(`📦 Product "${item.name}" has ${variants.length} variants:`, variants);
               } else if (item.variants && typeof item.variants === 'string') {
                 variants = JSON.parse(item.variants);
-                console.log(`📦 Product "${item.name}" has ${variants.length} variants (parsed from string):`, variants);
               }
             } catch (e) {
-              console.warn(`⚠️ Failed to parse variants for "${item.name}":`, e);
               variants = [];
             }
             
-            const material: Material = {
+            return {
               id: item.id,
-              supplier_id: 'admin-catalog', // Admin materials have a special supplier_id
+              supplier_id: 'admin-catalog',
               name: item.name || 'Unnamed Material',
               category: item.category || 'Uncategorized',
               description: item.description || '',
               unit: item.unit || 'unit',
-              // Use supplier price if available, otherwise use admin's suggested price
               unit_price: supplierPrice?.price || item.suggested_price || 0,
-              image_url: item.image_url,
-              additional_images: [], // Load on-demand when gallery is opened
-              // Use supplier's stock status if available
+              image_url: '', // Will be loaded lazily
+              additional_images: [],
               in_stock: supplierPrice?.in_stock ?? true,
               supplier: {
                 company_name: supplierPrice ? 'Supplier' : 'Admin Catalog',
                 location: 'Kenya',
                 rating: supplierPrice ? 4.5 : 5.0
               },
-              // Pricing type and variants
               pricing_type: item.pricing_type || 'single',
               variants: variants
-            };
-            
-            // Debug log for products with variants
-            if (material.pricing_type === 'variants' || (material.variants && material.variants.length > 0)) {
-              console.log(`🎯 Material with variants: "${material.name}"`, {
-                pricing_type: material.pricing_type,
-                variants: material.variants
-              });
-            }
-            
-            return material;
+            } as Material;
           });
           
-          console.log(`✅ Processed ${adminMaterials.length} admin materials`);
+          adminMaterials = materialsWithoutImages;
           
-          // Count products with variants
-          const productsWithVariants = adminMaterials.filter(m => m.variants && m.variants.length > 0);
-          console.log(`📊 Products with variants: ${productsWithVariants.length}`);
+          // ✅ LAZY LOAD: Fetch images for first 20 items in background
+          const firstBatchIds = allAdminData.slice(0, 20).map((item: any) => item.id);
+          loadMaterialImages(firstBatchIds, materialsWithoutImages);
         } else {
-          console.warn('⚠️ No admin materials fetched');
+          console.warn('Failed to fetch admin materials');
         }
       } catch (adminErr: any) {
         console.error('❌ Error fetching admin materials:', adminErr);
@@ -1546,8 +1525,17 @@ export const MaterialsGrid = () => {
                           }}
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                          <Package className="h-16 w-16 text-muted-foreground" />
+                        <div 
+                          className="w-full h-full flex items-center justify-center bg-gray-100 cursor-pointer hover:bg-gray-200 transition-colors"
+                          onClick={() => {
+                            // ✅ LAZY LOAD: Load this material's image when clicked
+                            loadMaterialImages([material.id], materials);
+                          }}
+                        >
+                          <div className="text-center text-gray-400">
+                            <Package className="h-12 w-12 mx-auto mb-1" />
+                            <span className="text-xs">Click to load image</span>
+                          </div>
                         </div>
                       )}
                       {/* Category Badge */}
