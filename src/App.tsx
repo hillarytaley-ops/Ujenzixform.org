@@ -246,6 +246,13 @@ const App = () => {
                     <Route path="/private-client-signin" element={<PrivateClientSignIn />} />
                     <Route path="/professional-builder-signin" element={<ProfessionalBuilderSignIn />} />
                     
+                    {/* Redirect common URL typos (sign-in vs signin) to correct paths */}
+                    <Route path="/supplier-sign-in" element={<Navigate to="/supplier-signin" replace />} />
+                    <Route path="/builder-sign-in" element={<Navigate to="/builder-signin" replace />} />
+                    <Route path="/delivery-sign-in" element={<Navigate to="/delivery-signin" replace />} />
+                    <Route path="/private-client-sign-in" element={<Navigate to="/private-client-signin" replace />} />
+                    <Route path="/professional-builder-sign-in" element={<Navigate to="/professional-builder-signin" replace />} />
+                    
                     {/* Registration Routes */}
                     <Route path="/supplier-registration" element={<SupplierRegistration />} />
                     <Route path="/supplier-marketplace" element={<Suppliers />} />
