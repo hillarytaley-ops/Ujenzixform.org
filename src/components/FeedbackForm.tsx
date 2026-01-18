@@ -236,17 +236,25 @@ export function FeedbackForm({ onSuccess }: FeedbackFormProps) {
       const { data: sessionData } = await supabase.auth.getSession();
       
       // Check if user has a profile (feedback table has foreign key to profiles)
+      // Use try-catch to handle any RLS or query errors gracefully
       let userId = null;
       if (sessionData?.session?.user?.id) {
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('id', sessionData.session.user.id)
-          .single();
-        
-        // Only set user_id if profile exists (avoids foreign key constraint error)
-        if (profileData) {
-          userId = sessionData.session.user.id;
+        try {
+          const { data: profileData, error: profileError } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('id', sessionData.session.user.id)
+            .maybeSingle(); // Use maybeSingle() instead of single() to avoid error when no row found
+          
+          // Only set user_id if profile exists and no error (avoids foreign key constraint error)
+          if (profileData && !profileError) {
+            userId = sessionData.session.user.id;
+          } else {
+            console.log('No profile found for user, submitting as anonymous');
+          }
+        } catch (profileCheckError) {
+          console.log('Profile check failed, submitting as anonymous:', profileCheckError);
+          // Continue without user_id - submit as anonymous
         }
       }
       
