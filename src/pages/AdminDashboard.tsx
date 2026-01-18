@@ -696,6 +696,13 @@ const AdminDashboard = () => {
           await loadDocuments();
           break;
         case 'delivery':
+        case 'delivery-apps':
+          await loadDeliveryApplications();
+          break;
+        case 'delivery-requests':
+          await loadBuilderDeliveryRequests();
+          break;
+        case 'delivery-analytics':
           await loadDeliveryApplications();
           await loadBuilderDeliveryRequests();
           break;
