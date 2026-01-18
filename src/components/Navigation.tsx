@@ -141,8 +141,9 @@ const Navigation = () => {
   }
 
   return (
-    <header className="shadow-sm border-b sticky top-0 z-50 bg-gradient-primary relative overflow-visible" style={{ overflow: 'visible' }}>
-      <div className="container mx-auto px-4 py-3 flex items-center justify-between relative z-10 gap-4 overflow-visible">
+    <header className="shadow-sm border-b sticky top-0 z-50 bg-gradient-primary relative">
+      <div className="w-full px-4 py-3 flex items-center justify-between gap-2">
+        {/* Logo - Fixed width */}
         <Link to="/home" className="flex items-center group flex-shrink-0">
           <div className="relative flex-shrink-0" style={{ width: '48px', height: '48px' }}>
             <img 
@@ -168,13 +169,13 @@ const Navigation = () => {
           </div>
         </Link>
 
-        {/* Desktop Navigation */}
-        <nav className="hidden lg:flex items-center space-x-6 flex-1 justify-center">
+        {/* Desktop Navigation - Scrollable if needed */}
+        <nav className="hidden lg:flex items-center gap-3 xl:gap-5 flex-1 justify-center overflow-x-auto">
           {navItems.map((item) => (
             <Link
               key={item.path}
               to={item.path}
-              className={`text-sm font-semibold transition-colors hover:text-construction-orange whitespace-nowrap py-2 px-1 ${
+              className={`text-xs xl:text-sm font-semibold transition-colors hover:text-construction-orange whitespace-nowrap py-2 px-1 ${
                 isActive(item.path) ? "text-construction-orange font-bold border-b-2 border-construction-orange" : "text-text-on-dark"
               }`}
             >
@@ -183,18 +184,18 @@ const Navigation = () => {
           ))}
         </nav>
 
-        <div className="hidden lg:flex items-center space-x-3 flex-shrink-0 overflow-visible">
+        {/* Right Section - User/Auth - Fixed width, never shrinks */}
+        <div className="hidden lg:flex items-center gap-2 flex-shrink-0" style={{ minWidth: 'fit-content' }}>
           <UserGuideMenu 
             trigger={
-              <Button variant="outline" size="sm" className="text-text-on-dark border-border hover:bg-background hover:text-foreground">
-                <BookOpen className="h-4 w-4 mr-2" />
-                Help
+              <Button variant="outline" size="sm" className="text-text-on-dark border-border hover:bg-background hover:text-foreground px-2">
+                <BookOpen className="h-4 w-4" />
               </Button>
             }
           />
           {user ? (
-            <div className="flex items-center gap-3 overflow-visible">
-              <span className="text-white text-sm font-medium truncate max-w-[120px]">
+            <div className="flex items-center gap-2">
+              <span className="text-white text-xs font-medium hidden xl:inline">
                 {user.email?.split('@')[0] || 'User'}
               </span>
               <Button 
@@ -202,30 +203,30 @@ const Navigation = () => {
                 onClick={handleSignOut}
                 variant="destructive"
                 size="sm"
-                className="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2 rounded-md shadow-lg border-2 border-red-400 whitespace-nowrap"
+                className="bg-red-600 hover:bg-red-700 text-white font-bold px-3 py-1.5 rounded-md shadow-lg whitespace-nowrap text-xs"
               >
                 LOG OUT
               </Button>
             </div>
           ) : (
-            <>
+            <div className="flex items-center gap-2">
               <Link to="/auth">
-                <Button variant="outline" size="sm" className="text-foreground bg-background/90 border-border hover:bg-background hover:text-foreground font-semibold shadow-lg">
+                <Button variant="outline" size="sm" className="text-foreground bg-background/90 border-border hover:bg-background hover:text-foreground font-semibold shadow-lg text-xs px-3">
                   Sign In
                 </Button>
               </Link>
               <Link to="/auth">
-                <Button size="sm" className="bg-construction-orange text-foreground hover:bg-construction-orange/90 font-semibold shadow-lg">
+                <Button size="sm" className="bg-construction-orange text-foreground hover:bg-construction-orange/90 font-semibold shadow-lg text-xs px-3">
                   Get Started
                 </Button>
               </Link>
-            </>
+            </div>
           )}
         </div>
 
         {/* Mobile Menu Button */}
         <button
-          className="lg:hidden text-text-on-dark bg-background/20 p-2 rounded-lg border border-white/30 backdrop-blur-sm hover:bg-background/30 transition-all duration-200 z-50"
+          className="lg:hidden text-text-on-dark bg-background/20 p-2 rounded-lg border border-white/30 backdrop-blur-sm hover:bg-background/30 transition-all duration-200 z-50 flex-shrink-0"
           onClick={() => setIsMenuOpen(!isMenuOpen)}
         >
           {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
