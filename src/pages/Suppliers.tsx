@@ -338,7 +338,7 @@ const PortalCard: React.FC<PortalCardProps> = ({
         <Button
           size="sm"
           variant="secondary"
-          className="flex-1 bg-white/20 hover:bg-white/30 text-white border-0 text-xs md:text-sm"
+          className="flex-1 bg-white hover:bg-gray-100 text-gray-900 border-0 text-xs md:text-sm font-bold shadow-md"
           onClick={() => navigate(primaryAction.path)}
         >
           {primaryAction.label}
@@ -346,7 +346,7 @@ const PortalCard: React.FC<PortalCardProps> = ({
         <Button
           size="sm"
           variant="outline"
-          className="flex-1 border-white/30 text-white hover:bg-white/10 text-xs md:text-sm"
+          className="flex-1 bg-gray-900/80 hover:bg-gray-900 text-white border-2 border-white text-xs md:text-sm font-bold shadow-md"
           onClick={() => navigate(secondaryAction.path)}
         >
           {secondaryAction.label}
