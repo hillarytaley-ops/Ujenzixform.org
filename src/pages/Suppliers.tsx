@@ -219,7 +219,7 @@ const Suppliers = () => {
                 description="Home projects & personal purchases"
                 gradient="from-emerald-600 to-emerald-700"
                 borderColor="emerald"
-                primaryAction={{ label: "Sign In", path: "/private-client-sign-in" }}
+                primaryAction={{ label: "Sign In", path: "/private-client-signin" }}
                 secondaryAction={{ label: "Register", path: "/private-builder-registration" }}
               />
 
