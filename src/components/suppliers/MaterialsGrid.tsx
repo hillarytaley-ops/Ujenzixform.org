@@ -736,7 +736,7 @@ export const MaterialsGrid = () => {
           
           try {
             const response = await fetch(
-              `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,image_url&order=created_at.desc&limit=${BATCH_SIZE}&offset=${batch * BATCH_SIZE}`,
+              `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,image_url,pricing_type,variants&order=created_at.desc&limit=${BATCH_SIZE}&offset=${batch * BATCH_SIZE}`,
               {
                 headers: {
                   'apikey': SUPABASE_ANON_KEY,
@@ -808,6 +808,16 @@ export const MaterialsGrid = () => {
             // Check if any supplier has set a price for this product
             const supplierPrice = supplierPrices[item.id];
             
+            // Parse variants from JSON if needed
+            let variants: PriceVariant[] = [];
+            try {
+              if (item.variants) {
+                variants = typeof item.variants === 'string' ? JSON.parse(item.variants) : item.variants;
+              }
+            } catch (e) {
+              variants = [];
+            }
+            
             const material: Material = {
               id: item.id,
               supplier_id: 'admin-catalog', // Admin materials have a special supplier_id
@@ -825,7 +835,10 @@ export const MaterialsGrid = () => {
                 company_name: supplierPrice ? 'Supplier' : 'Admin Catalog',
                 location: 'Kenya',
                 rating: supplierPrice ? 4.5 : 5.0
-              }
+              },
+              // Pricing type and variants
+              pricing_type: item.pricing_type || 'single',
+              variants: variants
             };
             
             return material;
