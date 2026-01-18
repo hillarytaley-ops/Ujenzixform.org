@@ -129,9 +129,20 @@ const App = () => {
         setUser(currentUser);
       }
       
+      // Track last event to prevent duplicate logs
+      let lastEvent = '';
+      let lastEmail = '';
+      
       // Listen for auth changes (sign in, sign out)
       const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-        console.log('🔐 Chat: Auth state changed:', event, session?.user?.email);
+        // Dedupe: only log if event or email actually changed
+        const email = session?.user?.email || '';
+        if (event !== lastEvent || email !== lastEmail) {
+          console.log('🔐 Chat: Auth state changed:', event, email);
+          lastEvent = event;
+          lastEmail = email;
+        }
+        
         if (session?.user) {
           setUser(session.user);
         } else {

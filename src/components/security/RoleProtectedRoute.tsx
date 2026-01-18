@@ -28,13 +28,20 @@ export const RoleProtectedRoute = ({
   const [userRole, setUserRole] = useState<string | null>(null);
   const hasLoggedAccess = useRef(false);
   const lastCheckedPath = useRef<string | null>(null);
+  const hasCompletedCheck = useRef(false); // Prevent redundant checks
 
   useEffect(() => {
     const checkRole = async () => {
+      // ✅ PERFORMANCE: Skip if we already completed a successful check for this path
+      if (hasCompletedCheck.current && accessGranted && lastCheckedPath.current === location.pathname) {
+        return;
+      }
+      
       // Only log once per path change to avoid spam
       if (lastCheckedPath.current !== location.pathname) {
         console.log('🔐 RoleProtectedRoute: Checking access for', location.pathname);
         lastCheckedPath.current = location.pathname;
+        hasCompletedCheck.current = false; // Reset for new path
       }
       
       const localRole = localStorage.getItem('user_role');
@@ -53,10 +60,13 @@ export const RoleProtectedRoute = ({
       const maxAdminSessionAge = 24 * 60 * 60 * 1000; // 24 hours
       
       if (isAdminAuthenticated && localRole === 'admin' && adminSessionAge < maxAdminSessionAge) {
-        console.log('👑 ADMIN BYPASS: Granting access to', location.pathname);
+        if (!hasCompletedCheck.current) {
+          console.log('👑 ADMIN BYPASS: Granting access to', location.pathname);
+        }
         setUserRole('admin');
         setAccessGranted(true);
         setChecking(false);
+        hasCompletedCheck.current = true;
         return;
       }
       
@@ -68,7 +78,9 @@ export const RoleProtectedRoute = ({
 
       // ✅ FAST PATH: Use localStorage if recently verified AND user ID matches
       if (isRecentlyVerified && localRole && localRoleId === user.id) {
-        console.log('⚡ FAST PATH: Using cached role:', localRole);
+        if (!hasCompletedCheck.current) {
+          console.log('⚡ FAST PATH: Using cached role:', localRole);
+        }
         setUserRole(localRole);
         if (allowedRoles.includes(localRole) || localRole === 'admin') {
           setAccessGranted(true);
@@ -76,6 +88,7 @@ export const RoleProtectedRoute = ({
           setAccessGranted(false);
         }
         setChecking(false);
+        hasCompletedCheck.current = true;
         return;
       }
 

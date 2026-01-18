@@ -20,13 +20,18 @@ const Navigation = () => {
 
 
   useEffect(() => {
-    // DON'T use cached role - always fetch fresh from database
-    // This prevents stale role data from causing issues
+    // ✅ PERFORMANCE: Use cached data immediately for instant display
     const cachedEmail = localStorage.getItem('user_email');
+    const cachedRole = localStorage.getItem('user_role');
     if (cachedEmail) {
-      // Only use cached email for display, NOT the role
       setUser({ email: cachedEmail } as any);
     }
+    if (cachedRole) {
+      setUserRole(cachedRole);
+    }
+
+    // Track last fetched user ID to prevent duplicate DB calls
+    let lastFetchedUserId: string | null = null;
 
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -39,8 +44,18 @@ const Navigation = () => {
           localStorage.setItem('user_email', session.user.email);
         }
         
-        // Get user role when session changes
-        if (session?.user) {
+        // ✅ PERFORMANCE: Only fetch role if user ID changed (skip duplicate events)
+        if (session?.user && session.user.id !== lastFetchedUserId) {
+          lastFetchedUserId = session.user.id;
+          
+          // Use cached role if available
+          const cachedRoleId = localStorage.getItem('user_role_id');
+          const cachedRole = localStorage.getItem('user_role');
+          if (cachedRole && cachedRoleId === session.user.id) {
+            setUserRole(cachedRole);
+            return; // Skip DB call
+          }
+          
           const { data: roleData } = await supabase
             .from('user_roles')
             .select('role')
@@ -51,9 +66,11 @@ const Navigation = () => {
           setUserRole(role);
           if (role) {
             localStorage.setItem('user_role', role);
+            localStorage.setItem('user_role_id', session.user.id);
           }
-        } else {
+        } else if (!session?.user) {
           setUserRole(null);
+          lastFetchedUserId = null;
         }
       }
     );
@@ -68,8 +85,16 @@ const Navigation = () => {
         localStorage.setItem('user_email', session.user.email);
       }
       
-      // Get user role on initial load
+      // ✅ PERFORMANCE: Use cached role if available and matches user
       if (session?.user) {
+        const cachedRoleId = localStorage.getItem('user_role_id');
+        const cachedRole = localStorage.getItem('user_role');
+        if (cachedRole && cachedRoleId === session.user.id) {
+          setUserRole(cachedRole);
+          lastFetchedUserId = session.user.id;
+          return; // Skip DB call
+        }
+        
         const { data: roleData } = await supabase
           .from('user_roles')
           .select('role')
@@ -78,8 +103,10 @@ const Navigation = () => {
           .maybeSingle();
         const role = roleData?.role || null;
         setUserRole(role);
+        lastFetchedUserId = session.user.id;
         if (role) {
           localStorage.setItem('user_role', role);
+          localStorage.setItem('user_role_id', session.user.id);
         }
       }
     });
