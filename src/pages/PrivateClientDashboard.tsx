@@ -28,7 +28,8 @@ import {
   Camera,
   Send,
   MapPin,
-  Calendar
+  Calendar,
+  Plus
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -42,6 +43,7 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
+import DeliveryRequest from "@/components/DeliveryRequest";
 
 const PrivateClientDashboard = () => {
   const [user, setUser] = useState<any>(null);
@@ -346,6 +348,10 @@ const PrivateClientDashboard = () => {
               <Truck className="h-4 w-4 mr-2" />
               Deliveries
             </TabsTrigger>
+            <TabsTrigger value="request-delivery" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
+              <Plus className="h-4 w-4 mr-2" />
+              Request Delivery
+            </TabsTrigger>
             <TabsTrigger value="payments" className="data-[state=active]:bg-green-500 data-[state=active]:text-white">
               <CreditCard className="h-4 w-4 mr-2" />
               Payments
@@ -404,6 +410,42 @@ const PrivateClientDashboard = () => {
                   <p className="text-lg font-medium">No active deliveries</p>
                   <p className="text-sm">Your deliveries will appear here</p>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Manual Delivery Request Tab */}
+          <TabsContent value="request-delivery">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Send className="h-5 w-5 text-teal-600" />
+                  Request Manual Delivery
+                </CardTitle>
+                <CardDescription>
+                  Request delivery for materials sourced outside MradiPro
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {/* Info Banner */}
+                <div className="bg-gradient-to-r from-teal-50 to-green-50 border border-teal-200 rounded-lg p-4 mb-6">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-teal-500 rounded-lg text-white">
+                      <Truck className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-teal-800 mb-1">When to Use Manual Delivery Request</h4>
+                      <ul className="text-sm text-teal-700 space-y-1">
+                        <li>• Materials purchased from local hardware stores</li>
+                        <li>• Items bought from suppliers outside MradiPro</li>
+                        <li>• Moving materials between storage and construction site</li>
+                        <li>• Returning defective items to suppliers</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+                
+                <DeliveryRequest />
               </CardContent>
             </Card>
           </TabsContent>

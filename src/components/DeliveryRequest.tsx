@@ -113,7 +113,7 @@ const DeliveryRequest = () => {
         .limit(1)
         .maybeSingle();
       
-      if (!roleData || !['builder', 'admin'].includes(roleData.role)) {
+      if (!roleData || !['builder', 'professional_builder', 'private_client', 'admin'].includes(roleData.role)) {
         throw new Error('Insufficient permissions to create delivery requests');
       }
 

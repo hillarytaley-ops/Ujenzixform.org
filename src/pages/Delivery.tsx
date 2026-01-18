@@ -2,16 +2,12 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
-import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import AnimatedSection from "@/components/AnimatedSection";
@@ -23,19 +19,13 @@ import {
   Clock, 
   Phone, 
   User, 
-  Calendar,
   CheckCircle,
-  AlertCircle,
   Navigation as NavigationIcon,
-  Calculator,
   FileText,
-  Send,
   BarChart3,
   Users,
   Zap,
-  Shield,
-  ShoppingCart,
-  MessageSquare
+  Shield
 } from "lucide-react";
 // Lazy load these components to prevent errors from breaking the page
 // Load only when needed for better performance
@@ -55,6 +45,13 @@ const DeliverySecurityDashboard = React.lazy(() =>
   import("@/components/delivery/DeliverySecurityDashboard")
     .then(module => ({ default: module.DeliverySecurityDashboard }))
     .catch(() => ({ default: () => <div>Security dashboard temporarily unavailable</div> }))
+);
+
+// Lazy load the manual DeliveryRequest component for builders
+const DeliveryRequestForm = React.lazy(() => 
+  import("@/components/DeliveryRequest")
+    .then(module => ({ default: module.default }))
+    .catch(() => ({ default: () => <div>Delivery request form temporarily unavailable</div> }))
 );
 
 const Delivery = () => {
@@ -119,20 +116,6 @@ const Delivery = () => {
     }
   ]);
   
-  const [deliveryForm, setDeliveryForm] = useState({
-    materialType: "",
-    quantity: "",
-    unit: "",
-    pickupAddress: "",
-    deliveryAddress: "",
-    contactName: "",
-    contactPhone: "",
-    preferredDate: "",
-    preferredTime: "",
-    specialInstructions: "",
-    urgency: "normal"
-  });
-
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
@@ -189,201 +172,7 @@ const Delivery = () => {
   };
 
   const isAdmin = userRole === 'admin';
-
-  const handleFormChange = (field: string, value: string) => {
-    setDeliveryForm(prev => ({ ...prev, [field]: value }));
-  };
-
-  const [submitting, setSubmitting] = useState(false);
-  const submittingRef = React.useRef(false); // Prevent double submissions
-
-  const handleSubmitRequest = async () => {
-    // Prevent double submission
-    if (submitting || submittingRef.current) {
-      console.log('⚠️ Already submitting, ignoring click');
-      return;
-    }
-    
-    // Form validation
-    if (!deliveryForm.materialType) {
-      toast({
-        title: "Missing Information",
-        description: "Please select a material type.",
-        variant: "destructive"
-      });
-      return;
-    }
-    if (!deliveryForm.quantity) {
-      toast({
-        title: "Missing Information",
-        description: "Please enter a quantity.",
-        variant: "destructive"
-      });
-      return;
-    }
-    if (!deliveryForm.unit) {
-      toast({
-        title: "Missing Information",
-        description: "Please select a unit.",
-        variant: "destructive"
-      });
-      return;
-    }
-    if (!deliveryForm.pickupAddress) {
-      toast({
-        title: "Missing Information",
-        description: "Please enter a pickup address.",
-        variant: "destructive"
-      });
-      return;
-    }
-    if (!deliveryForm.deliveryAddress) {
-      toast({
-        title: "Missing Information",
-        description: "Please enter a delivery address.",
-        variant: "destructive"
-      });
-      return;
-    }
-    if (!deliveryForm.contactName) {
-      toast({
-        title: "Missing Information",
-        description: "Please enter a contact name.",
-        variant: "destructive"
-      });
-      return;
-    }
-    if (!deliveryForm.contactPhone) {
-      toast({
-        title: "Missing Information",
-        description: "Please enter a contact phone number.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Set both ref and state to prevent double submission
-    submittingRef.current = true;
-    setSubmitting(true);
-    
-    // Generate tracking number
-    const trackingNumber = `DEL-${Date.now()}`;
-    
-    const newDelivery = {
-      id: trackingNumber,
-      materialType: deliveryForm.materialType,
-      quantity: `${deliveryForm.quantity} ${deliveryForm.unit}`,
-      status: "pending" as const,
-      pickupLocation: deliveryForm.pickupAddress,
-      deliveryLocation: deliveryForm.deliveryAddress,
-      driver: "Not assigned",
-      driverPhone: "-",
-      estimatedArrival: "Pending",
-      progress: 0
-    };
-
-    try {
-      console.log('📦 Submitting delivery request...', trackingNumber);
-      
-      // Build insert data matching the actual deliveries table schema
-      // Columns: material_type, quantity (number), pickup_address, delivery_address, 
-      //          tracking_number, status, notes, delivery_date
-      const insertData = {
-        material_type: deliveryForm.materialType,
-        quantity: parseInt(deliveryForm.quantity) || 1,  // Must be a number
-        pickup_address: deliveryForm.pickupAddress,
-        delivery_address: deliveryForm.deliveryAddress,
-        tracking_number: trackingNumber,
-        status: 'pending',
-        notes: `Contact: ${deliveryForm.contactName}, Phone: ${deliveryForm.contactPhone}. Unit: ${deliveryForm.unit}. Urgency: ${deliveryForm.urgency}. ${deliveryForm.specialInstructions || ''}`.trim(),
-        delivery_date: deliveryForm.preferredDate || null
-      };
-      
-      console.log('📦 Insert data:', insertData);
-
-      // Use direct fetch with AbortController for timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => {
-        console.log('📦 Aborting request due to timeout');
-        controller.abort();
-      }, 15000);
-
-      try {
-        console.log('📦 Sending fetch request to:', `${SUPABASE_URL}/rest/v1/deliveries`);
-        
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/deliveries`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-            'Prefer': 'return=minimal'
-          },
-          body: JSON.stringify(insertData),
-          signal: controller.signal
-        });
-
-        clearTimeout(timeoutId);
-        
-        console.log('📦 Response received:', response.status, response.statusText);
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('❌ Server error:', response.status, errorText);
-          throw new Error(`Server error (${response.status}): ${errorText || response.statusText}`);
-        }
-
-        console.log('✅ Delivery request submitted successfully');
-      } catch (fetchError: any) {
-        clearTimeout(timeoutId);
-        
-        if (fetchError.name === 'AbortError') {
-          console.error('❌ Request was aborted (timeout)');
-          throw new Error('Request timed out. Please check your internet connection.');
-        }
-        throw fetchError;
-      }
-
-      // Update local state
-      setDeliveries(prev => [newDelivery, ...prev]);
-      
-      toast({
-        title: "✅ Delivery Request Submitted!",
-        description: `Tracking number: ${trackingNumber}. We'll contact you within 24 hours.`,
-      });
-      
-      // Reset form
-      setDeliveryForm({
-        materialType: "",
-        quantity: "",
-        unit: "",
-        pickupAddress: "",
-        deliveryAddress: "",
-        contactName: "",
-        contactPhone: "",
-        preferredDate: "",
-        preferredTime: "",
-        specialInstructions: "",
-        urgency: "normal"
-      });
-
-      if (isAdmin) {
-        setActiveTab("tracking");
-      }
-      
-    } catch (error: any) {
-      console.error('❌ Error submitting delivery:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to submit delivery request. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      // Reset both ref and state
-      submittingRef.current = false;
-      setSubmitting(false);
-    }
-  };
+  const isBuilder = ['builder', 'professional_builder', 'private_client'].includes(userRole || '');
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -630,141 +419,20 @@ const Delivery = () => {
               </TabsTrigger>
             </TabsList>
 
-            {/* Delivery Request Tab */}
+            {/* Delivery Request Tab - Using unified DeliveryRequest component */}
             <TabsContent value="request" className="space-y-6">
-              <Card className="max-w-4xl mx-auto">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Package className="h-5 w-5" />
-                    New Delivery Request
-                  </CardTitle>
-                  <CardDescription>
-                    Fill out the form below to request a delivery for your construction materials
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Material Information */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">Material Information</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="materialType">Material Type</Label>
-                        <Select value={deliveryForm.materialType} onValueChange={(value) => handleFormChange('materialType', value)}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select material" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="cement">Cement</SelectItem>
-                            <SelectItem value="sand">Sand</SelectItem>
-                            <SelectItem value="gravel">Gravel</SelectItem>
-                            <SelectItem value="steel-bars">Steel Bars</SelectItem>
-                            <SelectItem value="bricks">Bricks</SelectItem>
-                            <SelectItem value="tiles">Tiles</SelectItem>
-                            <SelectItem value="timber">Timber</SelectItem>
-                            <SelectItem value="other">Other</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="quantity">Quantity</Label>
-                        <Input
-                          id="quantity"
-                          type="number"
-                          placeholder="Enter quantity"
-                          value={deliveryForm.quantity}
-                          onChange={(e) => handleFormChange('quantity', e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="unit">Unit</Label>
-                        <Select value={deliveryForm.unit} onValueChange={(value) => handleFormChange('unit', value)}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select unit" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="bags">Bags</SelectItem>
-                            <SelectItem value="tons">Tons</SelectItem>
-                            <SelectItem value="cubic-meters">Cubic Meters</SelectItem>
-                            <SelectItem value="pieces">Pieces</SelectItem>
-                            <SelectItem value="square-meters">Square Meters</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Location Information */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">Location Information</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="pickupAddress">Pickup Address</Label>
-                        <Textarea
-                          id="pickupAddress"
-                          placeholder="Enter pickup location"
-                          value={deliveryForm.pickupAddress}
-                          onChange={(e) => handleFormChange('pickupAddress', e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="deliveryAddress">Delivery Address</Label>
-                        <Textarea
-                          id="deliveryAddress"
-                          placeholder="Enter delivery location"
-                          value={deliveryForm.deliveryAddress}
-                          onChange={(e) => handleFormChange('deliveryAddress', e.target.value)}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Contact Information */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">Contact Information</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="contactName">Contact Name</Label>
-                        <Input
-                          id="contactName"
-                          placeholder="Enter contact person name"
-                          value={deliveryForm.contactName}
-                          onChange={(e) => handleFormChange('contactName', e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="contactPhone">Contact Phone</Label>
-                        <Input
-                          id="contactPhone"
-                          placeholder="Enter phone number"
-                          value={deliveryForm.contactPhone}
-                          onChange={(e) => handleFormChange('contactPhone', e.target.value)}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Submit Button */}
-                  <div className="flex justify-end">
-                    <Button 
-                      onClick={handleSubmitRequest} 
-                      disabled={submitting}
-                      className="flex items-center gap-2"
-                    >
-                      {submitting ? (
-                        <>
-                          <span className="animate-spin">⏳</span>
-                          Submitting...
-                        </>
-                      ) : (
-                        <>
-                          <Send className="h-4 w-4" />
-                          Submit Delivery Request
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="max-w-4xl mx-auto">
+                <React.Suspense fallback={
+                  <Card>
+                    <CardContent className="p-8 text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-4 border-primary border-t-transparent mx-auto mb-4"></div>
+                      <p className="text-muted-foreground">Loading delivery request form...</p>
+                    </CardContent>
+                  </Card>
+                }>
+                  <DeliveryRequestForm />
+                </React.Suspense>
+              </div>
             </TabsContent>
 
             {/* Tracking Tab */}
@@ -931,147 +599,244 @@ const Delivery = () => {
               </Card>
             </TabsContent>
           </Tabs>
+        ) : isBuilder ? (
+          /* Builder Access - Tabs with Request & Tracking */
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-3 max-w-3xl mx-auto mb-8">
+              <TabsTrigger value="request" className="flex items-center gap-2">
+                <Package className="h-4 w-4" />
+                Request Delivery
+              </TabsTrigger>
+              <TabsTrigger value="tracking" className="flex items-center gap-2">
+                <NavigationIcon className="h-4 w-4" />
+                Track Deliveries
+              </TabsTrigger>
+              <TabsTrigger value="history" className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                History
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Manual Delivery Request Tab for Builders */}
+            <TabsContent value="request" className="space-y-6">
+              <div className="max-w-4xl mx-auto">
+                {/* Info Banner */}
+                <Card className="mb-6 border-teal-200 bg-gradient-to-r from-teal-50 to-blue-50">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-teal-500 rounded-lg text-white">
+                        <Truck className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-teal-800 mb-1">Manual Delivery Request</h4>
+                        <p className="text-sm text-teal-700">
+                          Use this form to request delivery for materials sourced outside MradiPro, 
+                          site-to-site transfers, or when you need to move existing inventory.
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <React.Suspense fallback={
+                  <Card>
+                    <CardContent className="p-8 text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-4 border-teal-500 border-t-transparent mx-auto mb-4"></div>
+                      <p className="text-muted-foreground">Loading delivery request form...</p>
+                    </CardContent>
+                  </Card>
+                }>
+                  <DeliveryRequestForm />
+                </React.Suspense>
+              </div>
+            </TabsContent>
+
+            {/* Tracking Tab for Builders */}
+            <TabsContent value="tracking" className="space-y-6">
+              <div className="max-w-6xl mx-auto">
+                <h2 className="text-2xl font-bold mb-6">Your Active Deliveries</h2>
+                <div className="grid gap-6">
+                  {deliveries.filter(d => d.status !== 'delivered').map((delivery) => (
+                    <Card key={delivery.id}>
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="bg-primary/10 p-2 rounded-lg">
+                              {getStatusIcon(delivery.status)}
+                            </div>
+                            <div>
+                              <CardTitle className="text-lg">Delivery #{delivery.id}</CardTitle>
+                              <CardDescription>{delivery.materialType} - {delivery.quantity}</CardDescription>
+                            </div>
+                          </div>
+                          <Badge className={getStatusColor(delivery.status)}>
+                            {delivery.status.replace('_', ' ').toUpperCase()}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                          <div className="space-y-3">
+                            <h4 className="font-semibold flex items-center gap-2">
+                              <MapPin className="h-4 w-4" />
+                              Route
+                            </h4>
+                            <div className="text-sm space-y-1">
+                              <p><span className="text-muted-foreground">From:</span> {delivery.pickupLocation}</p>
+                              <p><span className="text-muted-foreground">To:</span> {delivery.deliveryLocation}</p>
+                            </div>
+                          </div>
+                          <div className="space-y-3">
+                            <h4 className="font-semibold flex items-center gap-2">
+                              <User className="h-4 w-4" />
+                              Driver
+                            </h4>
+                            <div className="text-sm space-y-1">
+                              <p>{delivery.driver}</p>
+                              <p className="flex items-center gap-1">
+                                <Phone className="h-3 w-3" />
+                                {delivery.driverPhone}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="space-y-3">
+                            <h4 className="font-semibold flex items-center gap-2">
+                              <Clock className="h-4 w-4" />
+                              ETA
+                            </h4>
+                            <p className="text-lg font-medium">{delivery.estimatedArrival}</p>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div 
+                                className="bg-primary h-2 rounded-full transition-all" 
+                                style={{ width: `${delivery.progress}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                  
+                  {deliveries.filter(d => d.status !== 'delivered').length === 0 && (
+                    <Card>
+                      <CardContent className="text-center py-12">
+                        <Truck className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+                        <p className="text-lg font-medium text-gray-500">No active deliveries</p>
+                        <p className="text-sm text-muted-foreground">Your deliveries will appear here once requested</p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* History Tab for Builders */}
+            <TabsContent value="history" className="space-y-6">
+              <Card className="max-w-4xl mx-auto">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    Delivery History
+                  </CardTitle>
+                  <CardDescription>
+                    View all your past delivery requests and their status
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {deliveries.filter(d => d.status === 'delivered').map((delivery) => (
+                      <div key={delivery.id} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <CheckCircle className="h-5 w-5 text-green-500" />
+                          <div>
+                            <p className="font-medium">#{delivery.id} - {delivery.materialType}</p>
+                            <p className="text-sm text-muted-foreground">{delivery.quantity} delivered to {delivery.deliveryLocation}</p>
+                          </div>
+                        </div>
+                        <Badge className={getStatusColor(delivery.status)}>
+                          Delivered
+                        </Badge>
+                      </div>
+                    ))}
+                    
+                    {deliveries.filter(d => d.status === 'delivered').length === 0 && (
+                      <div className="text-center py-8 text-muted-foreground">
+                        No completed deliveries yet
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         ) : (
-          /* Public Access - Request Only */
+          /* Public Access - Prompt to Sign In */
           <div className="max-w-4xl mx-auto">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Package className="h-5 w-5" />
-                  Request Delivery
-                </CardTitle>
-                <CardDescription>
-                  Fill out the form below to request a delivery for your construction materials
+            <Card className="border-teal-200 bg-gradient-to-br from-teal-50 to-blue-50">
+              <CardHeader className="text-center">
+                <div className="mx-auto w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mb-4">
+                  <Truck className="h-8 w-8 text-teal-600" />
+                </div>
+                <CardTitle className="text-2xl">Request Delivery Service</CardTitle>
+                <CardDescription className="text-base">
+                  Get your construction materials delivered to your site by verified delivery providers
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Material Information */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Material Information</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="materialType">Material Type</Label>
-                      <Select value={deliveryForm.materialType} onValueChange={(value) => handleFormChange('materialType', value)}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select material" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="cement">Cement</SelectItem>
-                          <SelectItem value="sand">Sand</SelectItem>
-                          <SelectItem value="gravel">Gravel</SelectItem>
-                          <SelectItem value="steel-bars">Steel Bars</SelectItem>
-                          <SelectItem value="bricks">Bricks</SelectItem>
-                          <SelectItem value="tiles">Tiles</SelectItem>
-                          <SelectItem value="timber">Timber</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
+                {/* Benefits */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="flex items-start gap-3 p-4 bg-white rounded-lg border">
+                    <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
+                    <div>
+                      <h4 className="font-medium">Verified Providers</h4>
+                      <p className="text-sm text-muted-foreground">All delivery providers are vetted and verified</p>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="quantity">Quantity</Label>
-                      <Input
-                        id="quantity"
-                        type="number"
-                        placeholder="Enter quantity"
-                        value={deliveryForm.quantity}
-                        onChange={(e) => handleFormChange('quantity', e.target.value)}
-                      />
+                  </div>
+                  <div className="flex items-start gap-3 p-4 bg-white rounded-lg border">
+                    <NavigationIcon className="h-5 w-5 text-blue-500 mt-0.5" />
+                    <div>
+                      <h4 className="font-medium">Real-time Tracking</h4>
+                      <p className="text-sm text-muted-foreground">Track your delivery in real-time with GPS</p>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="unit">Unit</Label>
-                      <Select value={deliveryForm.unit} onValueChange={(value) => handleFormChange('unit', value)}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select unit" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="bags">Bags</SelectItem>
-                          <SelectItem value="tons">Tons</SelectItem>
-                          <SelectItem value="cubic-meters">Cubic Meters</SelectItem>
-                          <SelectItem value="pieces">Pieces</SelectItem>
-                          <SelectItem value="square-meters">Square Meters</SelectItem>
-                        </SelectContent>
-                      </Select>
+                  </div>
+                  <div className="flex items-start gap-3 p-4 bg-white rounded-lg border">
+                    <Shield className="h-5 w-5 text-purple-500 mt-0.5" />
+                    <div>
+                      <h4 className="font-medium">Secure & Insured</h4>
+                      <p className="text-sm text-muted-foreground">Your materials are protected during transit</p>
                     </div>
                   </div>
                 </div>
 
-                {/* Location Information */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Location Information</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="pickupAddress">Pickup Address</Label>
-                      <Textarea
-                        id="pickupAddress"
-                        placeholder="Enter pickup location"
-                        value={deliveryForm.pickupAddress}
-                        onChange={(e) => handleFormChange('pickupAddress', e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="deliveryAddress">Delivery Address</Label>
-                      <Textarea
-                        id="deliveryAddress"
-                        placeholder="Enter delivery location"
-                        value={deliveryForm.deliveryAddress}
-                        onChange={(e) => handleFormChange('deliveryAddress', e.target.value)}
-                      />
-                    </div>
+                {/* Sign In Prompt */}
+                <div className="bg-white border-2 border-dashed border-teal-300 rounded-lg p-8 text-center">
+                  <User className="h-12 w-12 text-teal-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">Sign In to Request Delivery</h3>
+                  <p className="text-muted-foreground mb-6">
+                    Create a free account or sign in to request delivery services for your construction materials
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                    <Link to="/builder-signin">
+                      <Button className="bg-teal-600 hover:bg-teal-700">
+                        <User className="h-4 w-4 mr-2" />
+                        Sign In as Builder
+                      </Button>
+                    </Link>
+                    <Link to="/home">
+                      <Button variant="outline">
+                        Create Account
+                      </Button>
+                    </Link>
                   </div>
                 </div>
 
-                {/* Contact Information */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Contact Information</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="contactName">Contact Name</Label>
-                      <Input
-                        id="contactName"
-                        placeholder="Enter contact person name"
-                        value={deliveryForm.contactName}
-                        onChange={(e) => handleFormChange('contactName', e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="contactPhone">Contact Phone</Label>
-                      <Input
-                        id="contactPhone"
-                        placeholder="Enter phone number"
-                        value={deliveryForm.contactPhone}
-                        onChange={(e) => handleFormChange('contactPhone', e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Submit Button */}
-                <div className="flex justify-end">
-                  <Button 
-                    onClick={handleSubmitRequest} 
-                    disabled={submitting}
-                    className="flex items-center gap-2"
-                  >
-                    {submitting ? (
-                      <>
-                        <span className="animate-spin">⏳</span>
-                        Submitting...
-                      </>
-                    ) : (
-                      <>
-                        <Send className="h-4 w-4" />
-                        Submit Delivery Request
-                      </>
-                    )}
-                  </Button>
-                </div>
-
-                {/* Info Message for Public Users */}
+                {/* Info Message */}
                 <Alert className="border-blue-200 bg-blue-50">
                   <Truck className="h-4 w-4" />
                   <AlertDescription>
-                    <strong>How it works:</strong> Fill out the form above and click submit. 
-                    Our team will contact you within 24 hours with confirmation and tracking details.
+                    <strong>How it works:</strong> Sign in as a builder, fill out the delivery request form, 
+                    and our verified delivery providers will compete to deliver your materials. 
+                    First provider to accept gets the job!
                   </AlertDescription>
                 </Alert>
               </CardContent>
