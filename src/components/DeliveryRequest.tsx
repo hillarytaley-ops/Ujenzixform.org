@@ -39,7 +39,11 @@ const DeliveryRequest = () => {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        console.log('No user found for delivery request form');
+        setLoading(false);
+        return;
+      }
 
       const { data: roleData } = await supabase
         .from('user_roles')
