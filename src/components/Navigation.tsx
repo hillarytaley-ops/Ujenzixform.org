@@ -211,13 +211,13 @@ const Navigation = () => {
           ) : (
             <div className="flex items-center gap-2">
               <Link to="/auth">
-                <Button variant="outline" size="sm" className="text-foreground bg-background/90 border-border hover:bg-background hover:text-foreground font-semibold shadow-lg text-xs px-3">
+                <Button variant="outline" size="sm" className="bg-white text-gray-900 border-2 border-white hover:bg-gray-100 hover:text-gray-900 font-bold shadow-lg text-xs px-4">
                   Sign In
                 </Button>
               </Link>
               <Link to="/auth">
-                <Button size="sm" className="bg-construction-orange text-foreground hover:bg-construction-orange/90 font-semibold shadow-lg text-xs px-3">
-                  Get Started
+                <Button size="sm" className="bg-orange-500 text-white border-2 border-orange-400 hover:bg-orange-600 font-bold shadow-lg text-xs px-4">
+                  Register
                 </Button>
               </Link>
             </div>
@@ -266,17 +266,17 @@ const Navigation = () => {
               ) : (
                 <>
                   <Link to="/auth">
-                    <Button variant="outline" className="w-full text-primary border-primary hover:bg-primary hover:text-primary-foreground">
+                    <Button variant="outline" className="w-full bg-white text-gray-900 border-2 border-gray-300 hover:bg-gray-100 font-bold">
                       Sign In
                     </Button>
                   </Link>
                   <Link to="/auth">
-                    <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
-                      Get Started
+                    <Button className="w-full bg-orange-500 text-white border-2 border-orange-400 hover:bg-orange-600 font-bold">
+                      Register
                     </Button>
                   </Link>
                   <Link to="/admin-login">
-                    <Button variant="ghost" className="w-full text-xs text-muted-foreground hover:text-red-600 hover:bg-red-50">
+                    <Button variant="ghost" className="w-full text-xs text-gray-600 hover:text-red-600 hover:bg-red-50 font-medium">
                       🔒 Staff Portal
                     </Button>
                   </Link>
