@@ -1492,8 +1492,8 @@ export const MaterialImagesManager: React.FC = () => {
       {/* BULK UPLOAD DIALOG */}
       {/* ═══════════════════════════════════════════════════════════════════════════════ */}
       <Dialog open={showBulkUploadDialog} onOpenChange={(open) => !open && closeBulkUploadDialog()}>
-        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-4xl h-[90vh] flex flex-col">
-          <DialogHeader className="pb-2 flex-shrink-0">
+        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="pb-2">
             <DialogTitle className="flex items-center gap-2">
               <Package className="h-5 w-5 text-orange-400" />
               Bulk Upload Materials
@@ -1503,7 +1503,7 @@ export const MaterialImagesManager: React.FC = () => {
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-4 flex-1 min-h-0 flex flex-col overflow-hidden">
+          <div className="space-y-4">
             {/* Default Category and Unit Selection - For newly added items */}
             <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700 flex-shrink-0">
               <p className="text-xs text-slate-400 mb-2">📋 Default values for new images (can be changed per item below)</p>
@@ -1570,18 +1570,18 @@ export const MaterialImagesManager: React.FC = () => {
 
             {/* Spacer and divider between upload area and items list */}
             {bulkUploadItems.length > 0 && (
-              <div className="flex items-center gap-3 py-4 mt-4 flex-shrink-0 border-t border-slate-700">
-                <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-500/50 to-transparent"></div>
-                <span className="text-sm text-orange-400 font-semibold px-3 py-1 bg-slate-800 rounded-full border border-slate-600">
-                  📦 {bulkUploadItems.length} Image{bulkUploadItems.length > 1 ? 's' : ''} Selected - Edit Below ↓
+              <div className="flex items-center gap-3 py-6 mt-6 border-t-2 border-b-2 border-orange-500/30 bg-slate-800/50 rounded-lg mx-0">
+                <div className="flex-1 h-1 bg-gradient-to-r from-transparent via-orange-500 to-transparent"></div>
+                <span className="text-base text-orange-400 font-bold px-4 py-2 bg-orange-500/20 rounded-full border-2 border-orange-500/50">
+                  📦 {bulkUploadItems.length} Image{bulkUploadItems.length > 1 ? 's' : ''} Selected - SCROLL DOWN TO EDIT ⬇️
                 </span>
-                <div className="flex-1 h-px bg-gradient-to-r from-transparent via-orange-500/50 to-transparent"></div>
+                <div className="flex-1 h-1 bg-gradient-to-r from-transparent via-orange-500 to-transparent"></div>
               </div>
             )}
 
-            {/* Items List - Card Layout for better editing - SCROLLABLE */}
+            {/* Items List - Card Layout for better editing */}
             {bulkUploadItems.length > 0 && (
-              <div className="flex-1 overflow-y-auto space-y-4 pr-2 pb-4" style={{ minHeight: '200px', maxHeight: '400px' }}>
+              <div className="space-y-4 pb-4">
                 {bulkUploadItems.map((item) => (
                   <div 
                     key={item.id} 
