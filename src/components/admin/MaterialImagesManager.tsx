@@ -1568,9 +1568,18 @@ export const MaterialImagesManager: React.FC = () => {
               className="hidden"
             />
 
+            {/* Spacer and divider between upload area and items list */}
+            {bulkUploadItems.length > 0 && (
+              <div className="flex items-center gap-3 py-2 flex-shrink-0">
+                <div className="flex-1 h-px bg-slate-700"></div>
+                <span className="text-xs text-slate-500 font-medium">📦 Selected Images ({bulkUploadItems.length})</span>
+                <div className="flex-1 h-px bg-slate-700"></div>
+              </div>
+            )}
+
             {/* Items List - Card Layout for better editing - SCROLLABLE */}
             {bulkUploadItems.length > 0 && (
-              <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
+              <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-2 pt-2 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
                 {bulkUploadItems.map((item) => (
                   <div 
                     key={item.id} 
