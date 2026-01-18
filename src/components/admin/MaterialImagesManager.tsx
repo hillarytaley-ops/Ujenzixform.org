@@ -249,6 +249,8 @@ export const MaterialImagesManager: React.FC = () => {
     description: string;
     unit: string; // Individual unit per item
     suggestedPrice: number;
+    pricingType: 'single' | 'variants'; // NEW: Pricing type
+    variants: PriceVariant[]; // NEW: Variants array
     uploading: boolean;
     uploaded: boolean;
     error: string | null;
@@ -501,6 +503,8 @@ export const MaterialImagesManager: React.FC = () => {
         description: '',
         unit: bulkUploadUnit, // Use default unit (can be changed per item)
         suggestedPrice: 0,
+        pricingType: 'single', // Default to single price
+        variants: [], // Empty variants array
         uploading: false,
         uploaded: false,
         error: null
@@ -1882,20 +1886,52 @@ export const MaterialImagesManager: React.FC = () => {
                           </div>
                         </div>
                         
-                        {/* Row 3: Description and Price - BIGGER */}
-                        <div className="grid grid-cols-3 gap-4">
-                          <div className="col-span-2">
-                            <Label className="text-sm text-white font-semibold mb-2 block">Description (optional)</Label>
-                            <Input
-                              value={item.description}
-                              onChange={(e) => updateBulkItem(item.id, { description: e.target.value })}
-                              placeholder="Brief product description..."
-                              className="bg-slate-700 border-slate-500 h-12 text-base"
+                        {/* Row 3: Description */}
+                        <div>
+                          <Label className="text-sm text-white font-semibold mb-2 block">Description (optional)</Label>
+                          <Input
+                            value={item.description}
+                            onChange={(e) => updateBulkItem(item.id, { description: e.target.value })}
+                            placeholder="Brief product description..."
+                            className="bg-slate-700 border-slate-500 h-12 text-base"
+                            disabled={item.uploaded || item.uploading}
+                          />
+                        </div>
+
+                        {/* Row 4: Pricing Type Toggle */}
+                        <div className="bg-slate-700/50 rounded-lg p-3 border border-slate-600">
+                          <Label className="text-sm text-white font-semibold mb-2 block">Pricing Type</Label>
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              variant={item.pricingType === 'single' ? 'default' : 'outline'}
+                              size="sm"
+                              className={`flex-1 ${item.pricingType === 'single' ? 'bg-orange-500 hover:bg-orange-600' : 'border-slate-500 text-slate-300'}`}
+                              onClick={() => updateBulkItem(item.id, { pricingType: 'single', variants: [] })}
                               disabled={item.uploaded || item.uploading}
-                            />
+                            >
+                              💰 Single Price
+                            </Button>
+                            <Button
+                              type="button"
+                              variant={item.pricingType === 'variants' ? 'default' : 'outline'}
+                              size="sm"
+                              className={`flex-1 ${item.pricingType === 'variants' ? 'bg-purple-500 hover:bg-purple-600' : 'border-slate-500 text-slate-300'}`}
+                              onClick={() => updateBulkItem(item.id, { 
+                                pricingType: 'variants',
+                                variants: item.variants.length === 0 ? [{ id: crypto.randomUUID(), sizeLabel: '', price: 0, stock: 0 }] : item.variants
+                              })}
+                              disabled={item.uploaded || item.uploading}
+                            >
+                              📊 Multiple Sizes
+                            </Button>
                           </div>
+                        </div>
+
+                        {/* Single Price Input */}
+                        {item.pricingType === 'single' && (
                           <div>
-                            <Label className="text-sm text-white font-semibold mb-2 block">Price (KES)</Label>
+                            <Label className="text-sm text-white font-semibold mb-2 block">Price (KES) per {item.unit}</Label>
                             <Input
                               type="number"
                               value={item.suggestedPrice || ''}
@@ -1905,7 +1941,103 @@ export const MaterialImagesManager: React.FC = () => {
                               disabled={item.uploaded || item.uploading}
                             />
                           </div>
-                        </div>
+                        )}
+
+                        {/* Multiple Variants Table */}
+                        {item.pricingType === 'variants' && (
+                          <div className="bg-purple-900/20 rounded-lg p-3 border border-purple-500/30">
+                            <div className="flex items-center justify-between mb-3">
+                              <Label className="text-sm text-purple-300 font-semibold">Variants (per {item.unit})</Label>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="border-purple-500 text-purple-400 hover:bg-purple-500/20 h-7 text-xs"
+                                onClick={() => {
+                                  const newVariants = [...item.variants, { id: crypto.randomUUID(), sizeLabel: '', price: 0, stock: 0 }];
+                                  updateBulkItem(item.id, { variants: newVariants });
+                                }}
+                                disabled={item.uploaded || item.uploading}
+                              >
+                                + Add
+                              </Button>
+                            </div>
+                            
+                            <div className="space-y-2">
+                              {/* Header */}
+                              <div className="grid grid-cols-12 gap-2 text-xs text-slate-400 font-medium">
+                                <div className="col-span-5">Size/Label</div>
+                                <div className="col-span-3">Price</div>
+                                <div className="col-span-3">Stock</div>
+                                <div className="col-span-1"></div>
+                              </div>
+                              
+                              {/* Variant Rows */}
+                              {item.variants.map((variant, vIdx) => (
+                                <div key={variant.id} className="grid grid-cols-12 gap-2 items-center">
+                                  <div className="col-span-5">
+                                    <Input
+                                      placeholder="e.g., 50kg"
+                                      value={variant.sizeLabel}
+                                      onChange={(e) => {
+                                        const newVariants = [...item.variants];
+                                        newVariants[vIdx].sizeLabel = e.target.value;
+                                        updateBulkItem(item.id, { variants: newVariants });
+                                      }}
+                                      className="bg-slate-600 border-slate-500 h-8 text-sm"
+                                      disabled={item.uploaded || item.uploading}
+                                    />
+                                  </div>
+                                  <div className="col-span-3">
+                                    <Input
+                                      type="number"
+                                      placeholder="0"
+                                      value={variant.price || ''}
+                                      onChange={(e) => {
+                                        const newVariants = [...item.variants];
+                                        newVariants[vIdx].price = parseFloat(e.target.value) || 0;
+                                        updateBulkItem(item.id, { variants: newVariants });
+                                      }}
+                                      className="bg-slate-600 border-slate-500 h-8 text-sm"
+                                      disabled={item.uploaded || item.uploading}
+                                    />
+                                  </div>
+                                  <div className="col-span-3">
+                                    <Input
+                                      type="number"
+                                      placeholder="0"
+                                      value={variant.stock || ''}
+                                      onChange={(e) => {
+                                        const newVariants = [...item.variants];
+                                        newVariants[vIdx].stock = parseInt(e.target.value) || 0;
+                                        updateBulkItem(item.id, { variants: newVariants });
+                                      }}
+                                      className="bg-slate-600 border-slate-500 h-8 text-sm"
+                                      disabled={item.uploaded || item.uploading}
+                                    />
+                                  </div>
+                                  <div className="col-span-1 flex justify-center">
+                                    {item.variants.length > 1 && (
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 text-red-400 hover:text-red-300 hover:bg-red-500/20"
+                                        onClick={() => {
+                                          const newVariants = item.variants.filter(v => v.id !== variant.id);
+                                          updateBulkItem(item.id, { variants: newVariants });
+                                        }}
+                                        disabled={item.uploaded || item.uploading}
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
