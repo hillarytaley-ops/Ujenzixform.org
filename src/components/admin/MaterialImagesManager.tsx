@@ -233,7 +233,9 @@ export const MaterialImagesManager: React.FC = () => {
     category: 'Cement',
     description: '',
     unit: 'unit',
-    suggestedPrice: 0
+    suggestedPrice: 0,
+    pricingType: 'single' as 'single' | 'variants',
+    variants: [] as PriceVariant[]
   });
 
   // Bulk upload state
@@ -444,6 +446,8 @@ export const MaterialImagesManager: React.FC = () => {
         description: uploadForm.description || '',
         unit: uploadForm.unit || 'unit',
         suggested_price: uploadForm.suggestedPrice || 0,
+        pricing_type: uploadForm.pricingType || 'single',
+        variants: uploadForm.variants || [],
         image_url: imageUrl,
         is_featured: false,
         is_approved: true
@@ -566,7 +570,7 @@ export const MaterialImagesManager: React.FC = () => {
           reader.readAsDataURL(item.file);
         });
 
-        // Save to database - use individual item's category and unit
+        // Save to database - use individual item's category, unit, pricing type and variants
         const { error } = await (supabase as any)
           .from('admin_material_images')
           .insert({
@@ -575,6 +579,8 @@ export const MaterialImagesManager: React.FC = () => {
             description: item.description || '',
             unit: item.unit, // Use item's individual unit
             suggested_price: item.suggestedPrice || 0,
+            pricing_type: item.pricingType || 'single',
+            variants: item.variants || [],
             image_url: imageDataUrl,
             is_featured: false,
             is_approved: true
@@ -867,12 +873,27 @@ export const MaterialImagesManager: React.FC = () => {
   // Open edit dialog with image data
   const openEditDialog = (image: MaterialImage) => {
     setEditingImage(image);
+    // Parse variants from database (stored as JSON)
+    let variants: PriceVariant[] = [];
+    try {
+      const storedVariants = (image as any).variants;
+      if (storedVariants && Array.isArray(storedVariants)) {
+        variants = storedVariants;
+      } else if (typeof storedVariants === 'string') {
+        variants = JSON.parse(storedVariants);
+      }
+    } catch (e) {
+      variants = [];
+    }
+    
     setEditForm({
       name: image.name || '',
       category: image.category || 'Cement',
       description: (image as any).description || '',
       unit: (image as any).unit || 'unit',
-      suggestedPrice: (image as any).suggested_price || 0
+      suggestedPrice: (image as any).suggested_price || 0,
+      pricingType: ((image as any).pricing_type || 'single') as 'single' | 'variants',
+      variants: variants
     });
     setShowEditDialog(true);
   };
@@ -900,6 +921,8 @@ export const MaterialImagesManager: React.FC = () => {
           description: editForm.description || '',
           unit: editForm.unit || 'unit',
           suggested_price: editForm.suggestedPrice || 0,
+          pricing_type: editForm.pricingType || 'single',
+          variants: editForm.variants || [],
           updated_at: new Date().toISOString()
         })
         .eq('id', editingImage.id);
@@ -2139,9 +2162,9 @@ export const MaterialImagesManager: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Dialog */}
+      {/* Edit Dialog - Enhanced with Pricing Options */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader className="pb-2">
             <DialogTitle>Edit Material</DialogTitle>
           </DialogHeader>
@@ -2199,84 +2222,213 @@ export const MaterialImagesManager: React.FC = () => {
                 />
               </div>
 
-              {/* Unit and Price Row */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-xs">Unit</Label>
-                  <Select
-                    value={editForm.unit}
-                    onValueChange={(value) => setEditForm(prev => ({ ...prev, unit: value }))}
+              {/* Unit Selection */}
+              <div>
+                <Label className="text-xs">Unit</Label>
+                <Select
+                  value={editForm.unit}
+                  onValueChange={(value) => setEditForm(prev => ({ ...prev, unit: value }))}
+                >
+                  <SelectTrigger className="bg-slate-800 border-slate-600 h-8 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {/* Weight & Mass */}
+                    <SelectItem value="kg">Per Kg</SelectItem>
+                    <SelectItem value="gram">Per Gram</SelectItem>
+                    <SelectItem value="tonne">Per Tonne</SelectItem>
+                    <SelectItem value="ton">Per Ton</SelectItem>
+                    {/* Volume */}
+                    <SelectItem value="liter">Per Liter</SelectItem>
+                    <SelectItem value="ml">Per ML</SelectItem>
+                    <SelectItem value="cubic meter">Per M³</SelectItem>
+                    <SelectItem value="cubic foot">Per Cubic Foot</SelectItem>
+                    {/* Length */}
+                    <SelectItem value="meter">Per Meter</SelectItem>
+                    <SelectItem value="mm">Per MM</SelectItem>
+                    <SelectItem value="cm">Per CM</SelectItem>
+                    <SelectItem value="foot">Per Foot</SelectItem>
+                    <SelectItem value="ft">Per Ft</SelectItem>
+                    <SelectItem value="inch">Per Inch</SelectItem>
+                    {/* Area */}
+                    <SelectItem value="sqm">Per Sqm</SelectItem>
+                    <SelectItem value="sqft">Per Sqft</SelectItem>
+                    {/* Count/Quantity */}
+                    <SelectItem value="piece">Per Piece</SelectItem>
+                    <SelectItem value="unit">Per Unit</SelectItem>
+                    <SelectItem value="pair">Per Pair</SelectItem>
+                    <SelectItem value="dozen">Per Dozen</SelectItem>
+                    <SelectItem value="set">Per Set</SelectItem>
+                    <SelectItem value="bundle">Per Bundle</SelectItem>
+                    {/* Packaging */}
+                    <SelectItem value="bag">Per Bag</SelectItem>
+                    <SelectItem value="packet">Per Packet</SelectItem>
+                    <SelectItem value="carton">Per Carton</SelectItem>
+                    <SelectItem value="box">Per Box</SelectItem>
+                    <SelectItem value="pallet">Per Pallet</SelectItem>
+                    {/* Sheets & Rolls */}
+                    <SelectItem value="sheet">Per Sheet</SelectItem>
+                    <SelectItem value="roll">Per Roll</SelectItem>
+                    <SelectItem value="coil">Per Coil</SelectItem>
+                    {/* Building Specific */}
+                    <SelectItem value="trip">Per Trip</SelectItem>
+                    <SelectItem value="lorry">Per Lorry</SelectItem>
+                    <SelectItem value="wheelbarrow">Per Wheelbarrow</SelectItem>
+                    {/* Length Bundles */}
+                    <SelectItem value="length">Per Length</SelectItem>
+                    <SelectItem value="bar">Per Bar</SelectItem>
+                    <SelectItem value="rod">Per Rod</SelectItem>
+                    <SelectItem value="pole">Per Pole</SelectItem>
+                    {/* Liquid Containers */}
+                    <SelectItem value="drum">Per Drum</SelectItem>
+                    <SelectItem value="jerrycan">Per Jerrycan</SelectItem>
+                    <SelectItem value="bucket">Per Bucket</SelectItem>
+                    <SelectItem value="tin">Per Tin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Pricing Type Toggle */}
+              <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
+                <Label className="text-xs text-slate-300 mb-2 block">Pricing Type</Label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant={editForm.pricingType === 'single' ? 'default' : 'outline'}
+                    size="sm"
+                    className={`flex-1 ${editForm.pricingType === 'single' ? 'bg-orange-500 hover:bg-orange-600' : 'border-slate-600 text-slate-300'}`}
+                    onClick={() => setEditForm(prev => ({ ...prev, pricingType: 'single', variants: [] }))}
                   >
-                    <SelectTrigger className="bg-slate-800 border-slate-600 h-8 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-60">
-                      {/* Weight & Mass */}
-                      <SelectItem value="kg">Per Kg</SelectItem>
-                      <SelectItem value="gram">Per Gram</SelectItem>
-                      <SelectItem value="tonne">Per Tonne</SelectItem>
-                      <SelectItem value="ton">Per Ton</SelectItem>
-                      {/* Volume */}
-                      <SelectItem value="liter">Per Liter</SelectItem>
-                      <SelectItem value="ml">Per ML</SelectItem>
-                      <SelectItem value="cubic meter">Per M³</SelectItem>
-                      <SelectItem value="cubic foot">Per Cubic Foot</SelectItem>
-                      {/* Length */}
-                      <SelectItem value="meter">Per Meter</SelectItem>
-                      <SelectItem value="mm">Per MM</SelectItem>
-                      <SelectItem value="cm">Per CM</SelectItem>
-                      <SelectItem value="foot">Per Foot</SelectItem>
-                      <SelectItem value="ft">Per Ft</SelectItem>
-                      <SelectItem value="inch">Per Inch</SelectItem>
-                      {/* Area */}
-                      <SelectItem value="sqm">Per Sqm</SelectItem>
-                      <SelectItem value="sqft">Per Sqft</SelectItem>
-                      {/* Count/Quantity */}
-                      <SelectItem value="piece">Per Piece</SelectItem>
-                      <SelectItem value="unit">Per Unit</SelectItem>
-                      <SelectItem value="pair">Per Pair</SelectItem>
-                      <SelectItem value="dozen">Per Dozen</SelectItem>
-                      <SelectItem value="set">Per Set</SelectItem>
-                      <SelectItem value="bundle">Per Bundle</SelectItem>
-                      {/* Packaging */}
-                      <SelectItem value="bag">Per Bag</SelectItem>
-                      <SelectItem value="packet">Per Packet</SelectItem>
-                      <SelectItem value="carton">Per Carton</SelectItem>
-                      <SelectItem value="box">Per Box</SelectItem>
-                      <SelectItem value="pallet">Per Pallet</SelectItem>
-                      {/* Sheets & Rolls */}
-                      <SelectItem value="sheet">Per Sheet</SelectItem>
-                      <SelectItem value="roll">Per Roll</SelectItem>
-                      <SelectItem value="coil">Per Coil</SelectItem>
-                      {/* Building Specific */}
-                      <SelectItem value="trip">Per Trip</SelectItem>
-                      <SelectItem value="lorry">Per Lorry</SelectItem>
-                      <SelectItem value="wheelbarrow">Per Wheelbarrow</SelectItem>
-                      {/* Length Bundles */}
-                      <SelectItem value="length">Per Length</SelectItem>
-                      <SelectItem value="bar">Per Bar</SelectItem>
-                      <SelectItem value="rod">Per Rod</SelectItem>
-                      <SelectItem value="pole">Per Pole</SelectItem>
-                      {/* Liquid Containers */}
-                      <SelectItem value="drum">Per Drum</SelectItem>
-                      <SelectItem value="jerrycan">Per Jerrycan</SelectItem>
-                      <SelectItem value="bucket">Per Bucket</SelectItem>
-                      <SelectItem value="tin">Per Tin</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    💰 Single Price
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={editForm.pricingType === 'variants' ? 'default' : 'outline'}
+                    size="sm"
+                    className={`flex-1 ${editForm.pricingType === 'variants' ? 'bg-purple-500 hover:bg-purple-600' : 'border-slate-600 text-slate-300'}`}
+                    onClick={() => setEditForm(prev => ({ 
+                      ...prev, 
+                      pricingType: 'variants',
+                      variants: prev.variants.length === 0 ? [{ id: crypto.randomUUID(), sizeLabel: '', price: 0, stock: 0 }] : prev.variants
+                    }))}
+                  >
+                    📊 Multiple Sizes / Variants
+                  </Button>
                 </div>
+              </div>
+
+              {/* Single Price Input */}
+              {editForm.pricingType === 'single' && (
                 <div>
-                  <Label htmlFor="edit-suggestedPrice" className="text-xs">Suggested Price (KES)</Label>
+                  <Label htmlFor="edit-suggestedPrice" className="text-xs">Suggested Price (KES) per {editForm.unit}</Label>
                   <Input
                     id="edit-suggestedPrice"
                     type="number"
                     placeholder="0"
                     value={editForm.suggestedPrice || ''}
                     onChange={(e) => setEditForm(prev => ({ ...prev, suggestedPrice: parseFloat(e.target.value) || 0 }))}
-                    className="bg-slate-800 border-slate-600 h-8 text-sm"
+                    className="bg-slate-800 border-slate-600 h-10 text-base"
                   />
                 </div>
-              </div>
+              )}
+
+              {/* Multiple Variants Table */}
+              {editForm.pricingType === 'variants' && (
+                <div className="bg-slate-800/30 rounded-lg p-3 border border-purple-500/30">
+                  <div className="flex items-center justify-between mb-3">
+                    <Label className="text-sm text-purple-300 font-semibold">Size / Variant Pricing (per {editForm.unit})</Label>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="border-purple-500 text-purple-400 hover:bg-purple-500/20 h-7 text-xs"
+                      onClick={() => setEditForm(prev => ({
+                        ...prev,
+                        variants: [...prev.variants, { id: crypto.randomUUID(), sizeLabel: '', price: 0, stock: 0 }]
+                      }))}
+                    >
+                      + Add Variant
+                    </Button>
+                  </div>
+                  
+                  {/* Variants Table */}
+                  <div className="space-y-2">
+                    {/* Header */}
+                    <div className="grid grid-cols-12 gap-2 text-xs text-slate-400 font-medium px-1">
+                      <div className="col-span-5">Size / Label</div>
+                      <div className="col-span-3">Price (KES)</div>
+                      <div className="col-span-3">Stock</div>
+                      <div className="col-span-1"></div>
+                    </div>
+                    
+                    {/* Variant Rows */}
+                    {editForm.variants.map((variant, index) => (
+                      <div key={variant.id} className="grid grid-cols-12 gap-2 items-center">
+                        <div className="col-span-5">
+                          <Input
+                            placeholder="e.g., 50kg, Large, 2x4"
+                            value={variant.sizeLabel}
+                            onChange={(e) => {
+                              const newVariants = [...editForm.variants];
+                              newVariants[index].sizeLabel = e.target.value;
+                              setEditForm(prev => ({ ...prev, variants: newVariants }));
+                            }}
+                            className="bg-slate-700 border-slate-600 h-8 text-sm"
+                          />
+                        </div>
+                        <div className="col-span-3">
+                          <Input
+                            type="number"
+                            placeholder="0"
+                            value={variant.price || ''}
+                            onChange={(e) => {
+                              const newVariants = [...editForm.variants];
+                              newVariants[index].price = parseFloat(e.target.value) || 0;
+                              setEditForm(prev => ({ ...prev, variants: newVariants }));
+                            }}
+                            className="bg-slate-700 border-slate-600 h-8 text-sm"
+                          />
+                        </div>
+                        <div className="col-span-3">
+                          <Input
+                            type="number"
+                            placeholder="0"
+                            value={variant.stock || ''}
+                            onChange={(e) => {
+                              const newVariants = [...editForm.variants];
+                              newVariants[index].stock = parseInt(e.target.value) || 0;
+                              setEditForm(prev => ({ ...prev, variants: newVariants }));
+                            }}
+                            className="bg-slate-700 border-slate-600 h-8 text-sm"
+                          />
+                        </div>
+                        <div className="col-span-1 flex justify-center">
+                          {editForm.variants.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-red-400 hover:text-red-300 hover:bg-red-500/20"
+                              onClick={() => {
+                                setEditForm(prev => ({
+                                  ...prev,
+                                  variants: prev.variants.filter(v => v.id !== variant.id)
+                                }));
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {editForm.variants.length === 0 && (
+                    <p className="text-xs text-slate-500 text-center py-2">No variants added. Click "Add Variant" to start.</p>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
