@@ -804,6 +804,11 @@ export const MaterialsGrid = () => {
         }
         
         if (allAdminData.length > 0) {
+          // Debug: Log first item to check if pricing_type and variants are present
+          console.log('🔍 DEBUG - First item raw data:', allAdminData[0]);
+          console.log('🔍 DEBUG - pricing_type:', allAdminData[0]?.pricing_type);
+          console.log('🔍 DEBUG - variants:', allAdminData[0]?.variants);
+          
           adminMaterials = allAdminData.map((item: any) => {
             // Check if any supplier has set a price for this product
             const supplierPrice = supplierPrices[item.id];
@@ -811,10 +816,15 @@ export const MaterialsGrid = () => {
             // Parse variants from JSON if needed
             let variants: PriceVariant[] = [];
             try {
-              if (item.variants) {
-                variants = typeof item.variants === 'string' ? JSON.parse(item.variants) : item.variants;
+              if (item.variants && Array.isArray(item.variants) && item.variants.length > 0) {
+                variants = item.variants;
+                console.log(`📦 Product "${item.name}" has ${variants.length} variants:`, variants);
+              } else if (item.variants && typeof item.variants === 'string') {
+                variants = JSON.parse(item.variants);
+                console.log(`📦 Product "${item.name}" has ${variants.length} variants (parsed from string):`, variants);
               }
             } catch (e) {
+              console.warn(`⚠️ Failed to parse variants for "${item.name}":`, e);
               variants = [];
             }
             
@@ -841,10 +851,22 @@ export const MaterialsGrid = () => {
               variants: variants
             };
             
+            // Debug log for products with variants
+            if (material.pricing_type === 'variants' || (material.variants && material.variants.length > 0)) {
+              console.log(`🎯 Material with variants: "${material.name}"`, {
+                pricing_type: material.pricing_type,
+                variants: material.variants
+              });
+            }
+            
             return material;
           });
           
           console.log(`✅ Processed ${adminMaterials.length} admin materials`);
+          
+          // Count products with variants
+          const productsWithVariants = adminMaterials.filter(m => m.variants && m.variants.length > 0);
+          console.log(`📊 Products with variants: ${productsWithVariants.length}`);
         } else {
           console.warn('⚠️ No admin materials fetched');
         }
