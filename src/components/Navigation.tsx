@@ -141,8 +141,8 @@ const Navigation = () => {
   }
 
   return (
-    <header className="shadow-sm border-b sticky top-0 z-50 bg-gradient-primary relative overflow-visible">
-      <div className="container mx-auto px-4 py-3 flex items-center justify-between relative z-10 gap-4">
+    <header className="shadow-sm border-b sticky top-0 z-50 bg-gradient-primary relative overflow-visible" style={{ overflow: 'visible' }}>
+      <div className="container mx-auto px-4 py-3 flex items-center justify-between relative z-10 gap-4 overflow-visible">
         <Link to="/home" className="flex items-center group flex-shrink-0">
           <div className="relative flex-shrink-0" style={{ width: '48px', height: '48px' }}>
             <img 
@@ -183,7 +183,7 @@ const Navigation = () => {
           ))}
         </nav>
 
-        <div className="hidden lg:flex items-center space-x-3 flex-shrink-0">
+        <div className="hidden lg:flex items-center space-x-3 flex-shrink-0 overflow-visible">
           <UserGuideMenu 
             trigger={
               <Button variant="outline" size="sm" className="text-text-on-dark border-border hover:bg-background hover:text-foreground">
@@ -193,18 +193,19 @@ const Navigation = () => {
             }
           />
           {user ? (
-            <div className="flex items-center gap-4">
-              <span className="text-white text-sm font-medium">
+            <div className="flex items-center gap-3 overflow-visible">
+              <span className="text-white text-sm font-medium truncate max-w-[120px]">
                 {user.email?.split('@')[0] || 'User'}
               </span>
-              <button 
+              <Button 
                 type="button"
                 onClick={handleSignOut}
-                className="bg-red-600 hover:bg-red-700 text-white font-bold px-5 py-2 rounded-md cursor-pointer transition-colors"
-                style={{ minWidth: '100px' }}
+                variant="destructive"
+                size="sm"
+                className="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2 rounded-md shadow-lg border-2 border-red-400 whitespace-nowrap"
               >
                 LOG OUT
-              </button>
+              </Button>
             </div>
           ) : (
             <>
