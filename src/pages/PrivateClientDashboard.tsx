@@ -181,15 +181,16 @@ const PrivateClientDashboard = () => {
       const { error } = await supabase
         .from('monitoring_service_requests')
         .insert({
-          requester_id: user.id,
-          requester_name: profile?.full_name || user?.email?.split('@')[0] || 'User',
-          requester_type: 'private_client',
+          user_id: user.id,
+          contact_name: profile?.full_name || user?.email?.split('@')[0] || 'User',
+          contact_email: user?.email || '',
+          builder_type: 'private_client',
           project_name: monitoringRequest.projectName,
           project_location: monitoringRequest.projectLocation,
           project_description: monitoringRequest.projectDescription || null,
           preferred_start_date: monitoringRequest.preferredStartDate || null,
-          number_of_cameras: parseInt(monitoringRequest.numberOfCameras) || 1,
-          additional_notes: monitoringRequest.additionalNotes || null,
+          camera_count: parseInt(monitoringRequest.numberOfCameras) || 1,
+          additional_requirements: monitoringRequest.additionalNotes || null,
           status: 'pending'
         });
 
