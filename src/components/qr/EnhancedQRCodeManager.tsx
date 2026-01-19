@@ -62,13 +62,17 @@ export const EnhancedQRCodeManager: React.FC = () => {
   };
 
   const fetchMaterialItems = async (role: string | null, userId: string) => {
+    console.log('🔍 EnhancedQRCodeManager: Fetching items for role:', role, 'userId:', userId);
+    
     if (role === 'supplier') {
-      // Get supplier's items
-      const { data: supplierData } = await supabase
+      // Get supplier's record from suppliers table
+      const { data: supplierData, error: supplierError } = await supabase
         .from('suppliers')
-        .select('id')
+        .select('id, company_name')
         .eq('user_id', userId)
         .maybeSingle();
+
+      console.log('📦 Supplier record:', supplierData, 'Error:', supplierError);
 
       if (supplierData) {
         const { data, error } = await supabase
@@ -77,7 +81,17 @@ export const EnhancedQRCodeManager: React.FC = () => {
           .eq('supplier_id', supplierData.id)
           .order('created_at', { ascending: false });
 
+        console.log('🏷️ Material items found:', data?.length || 0, 'Error:', error);
         if (!error) setItems(data || []);
+      } else {
+        console.log('⚠️ No supplier record found for user. Checking all material_items...');
+        // Fallback: show all items (for debugging)
+        const { data, error } = await supabase
+          .from('material_items')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(10);
+        console.log('📋 All material items (first 10):', data);
       }
     } else if (role === 'admin') {
       // Admin sees all items
@@ -86,6 +100,7 @@ export const EnhancedQRCodeManager: React.FC = () => {
         .select('*')
         .order('created_at', { ascending: false });
 
+      console.log('👑 Admin: Material items found:', data?.length || 0);
       if (!error) setItems(data || []);
     }
   };
