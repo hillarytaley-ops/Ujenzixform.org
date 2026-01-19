@@ -2,6 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import { 
   Package, 
   Truck, 
@@ -14,7 +21,8 @@ import {
   Eye,
   ChevronDown,
   ChevronUp,
-  Download
+  Download,
+  Maximize2
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -59,15 +67,16 @@ interface BuilderOrdersTrackerProps {
   builderId: string;
 }
 
-// QR Code Image Component
-const QRCodeImage: React.FC<{ value: string; size?: number }> = ({ value, size = 80 }) => {
+// QR Code Image Component - Larger size for better scanning
+const QRCodeImage: React.FC<{ value: string; size?: number; className?: string }> = ({ value, size = 150, className = '' }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
   useEffect(() => {
     if (canvasRef.current && value) {
       QRCode.toCanvas(canvasRef.current, value, {
         width: size,
-        margin: 1,
+        margin: 2,
+        errorCorrectionLevel: 'H', // High error correction for better scanning
         color: {
           dark: '#000000',
           light: '#ffffff'
@@ -76,7 +85,101 @@ const QRCodeImage: React.FC<{ value: string; size?: number }> = ({ value, size =
     }
   }, [value, size]);
   
-  return <canvas ref={canvasRef} className="rounded border" />;
+  return <canvas ref={canvasRef} className={`rounded border bg-white ${className}`} />;
+};
+
+// Large QR Code Dialog for scanning
+const QRCodeDialog: React.FC<{ 
+  isOpen: boolean; 
+  onClose: () => void; 
+  item: MaterialItem | null;
+}> = ({ isOpen, onClose, item }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  
+  useEffect(() => {
+    if (canvasRef.current && item?.qr_code && isOpen) {
+      QRCode.toCanvas(canvasRef.current, item.qr_code, {
+        width: 300,
+        margin: 3,
+        errorCorrectionLevel: 'H',
+        color: {
+          dark: '#000000',
+          light: '#ffffff'
+        }
+      }).catch(err => console.error('QR Code generation error:', err));
+    }
+  }, [item?.qr_code, isOpen]);
+
+  const downloadQRCode = () => {
+    if (canvasRef.current && item) {
+      const link = document.createElement('a');
+      link.download = `QR-${item.material_type.replace(/\s+/g, '-')}-${item.qr_code.slice(-8)}.png`;
+      link.href = canvasRef.current.toDataURL('image/png');
+      link.click();
+    }
+  };
+
+  if (!item) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <QrCode className="h-5 w-5 text-blue-600" />
+            {item.material_type}
+          </DialogTitle>
+          <DialogDescription>
+            Scan this QR code to track material delivery
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="flex flex-col items-center space-y-4 py-4">
+          {/* Large QR Code for scanning */}
+          <div className="p-4 bg-white rounded-xl shadow-lg border-2 border-gray-200">
+            <canvas ref={canvasRef} className="rounded" />
+          </div>
+          
+          {/* QR Code Value */}
+          <div className="w-full text-center">
+            <p className="font-mono text-xs bg-gray-100 px-3 py-2 rounded-lg break-all">
+              {item.qr_code}
+            </p>
+          </div>
+          
+          {/* Item Details */}
+          <div className="w-full grid grid-cols-2 gap-3 text-sm">
+            <div className="bg-gray-50 p-3 rounded-lg">
+              <p className="text-gray-500 text-xs">Quantity</p>
+              <p className="font-semibold">{item.quantity} {item.unit}</p>
+            </div>
+            <div className="bg-gray-50 p-3 rounded-lg">
+              <p className="text-gray-500 text-xs">Category</p>
+              <p className="font-semibold">{item.category}</p>
+            </div>
+            <div className="bg-gray-50 p-3 rounded-lg col-span-2">
+              <p className="text-gray-500 text-xs">Status</p>
+              <Badge className={`mt-1 ${
+                item.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                item.status === 'dispatched' ? 'bg-blue-100 text-blue-800' :
+                item.status === 'in_transit' ? 'bg-purple-100 text-purple-800' :
+                item.status === 'received' ? 'bg-green-100 text-green-800' :
+                'bg-gray-100 text-gray-800'
+              }`}>
+                {item.status.replace('_', ' ').toUpperCase()}
+              </Badge>
+            </div>
+          </div>
+          
+          {/* Download Button */}
+          <Button onClick={downloadQRCode} className="w-full" variant="outline">
+            <Download className="h-4 w-4 mr-2" />
+            Download QR Code
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 };
 
 export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ builderId }) => {
@@ -84,6 +187,8 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
   const [scanEvents, setScanEvents] = useState<ScanEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
+  const [selectedQRItem, setSelectedQRItem] = useState<MaterialItem | null>(null);
+  const [showQRDialog, setShowQRDialog] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -407,34 +512,56 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                           <QrCode className="h-4 w-4" />
                           Material Items with QR Codes ({order.material_items?.length || 0})
                         </p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                           {order.material_items?.map((item) => (
                             <div 
                               key={item.id}
-                              className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg border"
+                              className="flex flex-col sm:flex-row items-center gap-4 p-4 bg-gray-50 rounded-lg border hover:shadow-md transition-shadow"
                             >
-                              {/* QR Code Image */}
-                              <div className="flex-shrink-0">
-                                <QRCodeImage value={item.qr_code} size={100} />
+                              {/* QR Code Image - Larger and clickable */}
+                              <div 
+                                className="flex-shrink-0 cursor-pointer hover:scale-105 transition-transform"
+                                onClick={() => {
+                                  setSelectedQRItem(item);
+                                  setShowQRDialog(true);
+                                }}
+                                title="Click to enlarge for scanning"
+                              >
+                                <div className="relative">
+                                  <QRCodeImage value={item.qr_code} size={140} />
+                                  <div className="absolute -bottom-2 -right-2 bg-blue-600 text-white p-1 rounded-full shadow-lg">
+                                    <Maximize2 className="h-3 w-3" />
+                                  </div>
+                                </div>
                               </div>
                               
                               {/* Item Details */}
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-start justify-between mb-2">
-                                  <p className="font-semibold text-sm">{item.material_type}</p>
+                              <div className="flex-1 min-w-0 text-center sm:text-left">
+                                <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between mb-2 gap-2">
+                                  <p className="font-semibold">{item.material_type}</p>
                                   <Badge className={getStatusColor(item.status)}>
                                     {getStatusIcon(item.status)}
                                     <span className="ml-1">{item.status}</span>
                                   </Badge>
                                 </div>
                                 
-                                <div className="space-y-1 text-xs text-gray-600">
+                                <div className="space-y-1 text-sm text-gray-600">
                                   <p><strong>Quantity:</strong> {item.quantity} {item.unit}</p>
                                   <p><strong>Category:</strong> {item.category}</p>
-                                  <p className="font-mono text-[10px] bg-gray-200 px-2 py-1 rounded truncate">
-                                    {item.qr_code}
-                                  </p>
                                 </div>
+                                
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="mt-3 w-full sm:w-auto"
+                                  onClick={() => {
+                                    setSelectedQRItem(item);
+                                    setShowQRDialog(true);
+                                  }}
+                                >
+                                  <Maximize2 className="h-4 w-4 mr-2" />
+                                  View Full Size
+                                </Button>
                               </div>
                             </div>
                           ))}
@@ -498,6 +625,16 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
           </CardContent>
         </Card>
       )}
+
+      {/* QR Code Full Size Dialog */}
+      <QRCodeDialog 
+        isOpen={showQRDialog} 
+        onClose={() => {
+          setShowQRDialog(false);
+          setSelectedQRItem(null);
+        }} 
+        item={selectedQRItem} 
+      />
     </div>
   );
 };
