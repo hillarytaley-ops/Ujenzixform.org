@@ -55,7 +55,7 @@ BEGIN
     -- If supplier record doesn't exist, create it
     IF supplier_record_id IS NULL THEN
         RAISE NOTICE '⚠️ No supplier record found, creating one...';
-        INSERT INTO public.suppliers (user_id, company_name, contact_email, phone, location, status)
+        INSERT INTO public.suppliers (user_id, company_name, email, phone, location, status)
         VALUES (supplier_user_id, 'Mama Ethan Supplies', 'mamaethan@gmail.com', '+254700000000', 'Nairobi, Kenya', 'active')
         RETURNING id INTO supplier_record_id;
         RAISE NOTICE '✅ Created supplier record: %', supplier_record_id;
