@@ -508,39 +508,40 @@ export const MonitoringServiceRequest: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="text-center space-y-2">
-        <h2 className="text-3xl font-bold flex items-center justify-center gap-2">
-          <Eye className="h-8 w-8 text-primary" />
+    <div className="flex flex-col h-[calc(100vh-200px)] min-h-[600px] max-h-[900px]">
+      {/* Header - Fixed */}
+      <div className="text-center space-y-2 pb-4 flex-shrink-0">
+        <h2 className="text-2xl md:text-3xl font-bold flex items-center justify-center gap-2">
+          <Eye className="h-7 w-7 md:h-8 md:w-8 text-primary" />
           Project Monitoring Services
         </h2>
-        <p className="text-muted-foreground max-w-2xl mx-auto">
+        <p className="text-muted-foreground max-w-2xl mx-auto text-sm md:text-base">
           Professional monitoring solutions to keep your construction projects secure, 
           on-track, and compliant with safety standards.
         </p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        {/* Sticky Tab Navigation */}
-        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm pb-2 -mx-4 px-4 pt-2">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 min-h-0">
+        {/* Tab Navigation - Fixed */}
+        <div className="pb-3 flex-shrink-0">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="info" className="flex items-center gap-2">
-              <Info className="h-4 w-4" />
+            <TabsTrigger value="info" className="flex items-center gap-1 md:gap-2 text-xs md:text-sm">
+              <Info className="h-3 w-3 md:h-4 md:w-4" />
               <span className="hidden sm:inline">Service</span> Info
             </TabsTrigger>
-            <TabsTrigger value="services" className="flex items-center gap-2">
-              <Zap className="h-4 w-4" />
+            <TabsTrigger value="services" className="flex items-center gap-1 md:gap-2 text-xs md:text-sm">
+              <Zap className="h-3 w-3 md:h-4 md:w-4" />
               <span className="hidden sm:inline">Select</span> Services
             </TabsTrigger>
-            <TabsTrigger value="request" className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
+            <TabsTrigger value="request" className="flex items-center gap-1 md:gap-2 text-xs md:text-sm">
+              <FileText className="h-3 w-3 md:h-4 md:w-4" />
               <span className="hidden sm:inline">Request</span> Quote
             </TabsTrigger>
           </TabsList>
         </div>
 
-        {/* Service Information Tab */}
-        <TabsContent value="info" className="space-y-6">
+        {/* Service Information Tab - Scrollable */}
+        <TabsContent value="info" className="flex-1 overflow-y-auto min-h-0 pr-2 space-y-6">
           {/* Builder Type Selection */}
           <Card className="border-2 border-primary/20 bg-gradient-to-r from-blue-50 to-green-50">
             <CardHeader>
@@ -775,19 +776,17 @@ export const MonitoringServiceRequest: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* Sticky Navigation for Info Tab */}
-          <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t pt-4 pb-4 -mx-4 px-4 mt-6 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
-            <div className="flex justify-center">
-              <Button onClick={() => setActiveTab('services')} size="lg" className="shadow-lg">
-                Explore Our Services
-                <Zap className="h-4 w-4 ml-2" />
-              </Button>
-            </div>
+          {/* Navigation Button at end of content */}
+          <div className="flex justify-center py-6">
+            <Button onClick={() => setActiveTab('services')} size="lg" className="shadow-lg">
+              Explore Our Services
+              <Zap className="h-4 w-4 ml-2" />
+            </Button>
           </div>
         </TabsContent>
 
-        {/* Service Selection Tab */}
-        <TabsContent value="services" className="space-y-6">
+        {/* Service Selection Tab - Scrollable */}
+        <TabsContent value="services" className="flex-1 overflow-y-auto min-h-0 pr-2 space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Choose Your Monitoring Services</CardTitle>
@@ -894,16 +893,16 @@ export const MonitoringServiceRequest: React.FC = () => {
             </Alert>
           )}
 
-          {/* Sticky Navigation for Services Tab */}
-          <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t pt-4 pb-4 -mx-4 px-4 mt-6 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
-            <div className="flex justify-between items-center max-w-4xl mx-auto">
+          {/* Navigation Buttons at end of content */}
+          <div className="py-6 border-t mt-6">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 max-w-4xl mx-auto">
               <Button variant="outline" onClick={() => setActiveTab('info')}>
                 Back to Information
               </Button>
               
               {/* Show estimated cost in the middle */}
               {estimatedCost > 0 && (
-                <div className="hidden md:block text-center">
+                <div className="text-center">
                   <div className="text-sm text-muted-foreground">Estimated Monthly Cost</div>
                   <div className="text-lg font-bold text-primary">KES {estimatedCost.toLocaleString()}</div>
                 </div>
@@ -921,8 +920,8 @@ export const MonitoringServiceRequest: React.FC = () => {
           </div>
         </TabsContent>
 
-        {/* Request Form Tab */}
-        <TabsContent value="request" className="space-y-6">
+        {/* Request Form Tab - Scrollable */}
+        <TabsContent value="request" className="flex-1 overflow-y-auto min-h-0 pr-2 space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Request Detailed Quotation</CardTitle>
@@ -1153,16 +1152,16 @@ export const MonitoringServiceRequest: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* Submit Button - Sticky at bottom */}
-          <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t pt-4 pb-4 -mx-4 px-4 mt-6 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
-            <div className="flex justify-between items-center max-w-4xl mx-auto">
+          {/* Submit Button at end of content */}
+          <div className="py-6 border-t mt-6">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 max-w-4xl mx-auto">
               <Button variant="outline" onClick={() => setActiveTab('services')}>
                 Back to Services
               </Button>
               
               {/* Estimated Cost Summary */}
               {estimatedCost > 0 && (
-                <div className="hidden md:block text-center">
+                <div className="text-center">
                   <div className="text-sm text-muted-foreground">Estimated Monthly Cost</div>
                   <div className="text-lg font-bold text-primary">KES {estimatedCost.toLocaleString()}</div>
                 </div>
