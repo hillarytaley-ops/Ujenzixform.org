@@ -380,3 +380,180 @@ export const EnhancedQRCodeManager: React.FC = () => {
     </div>
   );
 };
+
+// QR Code Card Component with LARGE QR Image
+const QRCodeCard: React.FC<{
+  item: MaterialItem;
+  getStatusColor: (status: string) => string;
+  getStatusIcon: (status: string) => React.ReactNode;
+  downloadQRCode: (qrCode: string, materialType: string, itemSeq: number) => void;
+  onViewFullSize: () => void;
+}> = ({ item, getStatusColor, getStatusIcon, downloadQRCode, onViewFullSize }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  
+  useEffect(() => {
+    if (canvasRef.current && item.qr_code) {
+      QRCodeLib.toCanvas(canvasRef.current, item.qr_code, {
+        width: 250,
+        margin: 3,
+        errorCorrectionLevel: 'H',
+        color: {
+          dark: '#000000',
+          light: '#ffffff'
+        }
+      }).catch(err => console.error('QR Code generation error:', err));
+    }
+  }, [item.qr_code]);
+
+  return (
+    <Card className="overflow-hidden hover:shadow-lg transition-shadow">
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg">{item.material_type}</CardTitle>
+          <Badge className={getStatusColor(item.status)}>
+            {getStatusIcon(item.status)}
+            <span className="ml-1">{item.status.replace('_', ' ').toUpperCase()}</span>
+          </Badge>
+        </div>
+        <CardDescription>Item #{item.item_sequence} • {item.category}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* LARGE QR Code Image */}
+        <div className="flex justify-center">
+          <div 
+            className="p-4 bg-white rounded-xl border-4 border-cyan-200 shadow-lg cursor-pointer hover:scale-[1.02] transition-transform"
+            onClick={onViewFullSize}
+            title="Click to view full size"
+          >
+            <div className="relative">
+              <canvas ref={canvasRef} className="rounded-lg" />
+              <div className="absolute -bottom-2 -right-2 bg-cyan-600 text-white p-1.5 rounded-full shadow-lg">
+                <Maximize2 className="h-4 w-4" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* QR Code Value */}
+        <div className="text-center">
+          <p className="font-mono text-xs bg-gray-100 px-3 py-2 rounded-lg break-all">
+            {item.qr_code}
+          </p>
+        </div>
+
+        {/* Item Details */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-gray-50 p-3 rounded-lg text-center">
+            <p className="text-gray-500 text-xs">Quantity</p>
+            <p className="font-bold text-lg">{item.quantity} {item.unit}</p>
+          </div>
+          <div className="bg-gray-50 p-3 rounded-lg text-center">
+            <p className="text-gray-500 text-xs">Category</p>
+            <p className="font-bold text-lg">{item.category}</p>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            className="flex-1"
+            onClick={onViewFullSize}
+          >
+            <Maximize2 className="h-4 w-4 mr-2" />
+            View Full Size
+          </Button>
+          <Button 
+            className="flex-1 bg-cyan-600 hover:bg-cyan-700"
+            onClick={() => downloadQRCode(item.qr_code, item.material_type, item.item_sequence)}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Download
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+// Full Size QR Dialog for Scanning
+const QRCodeFullDialog: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  item: MaterialItem | null;
+  downloadQRCode: (qrCode: string, materialType: string, itemSeq: number) => void;
+}> = ({ isOpen, onClose, item, downloadQRCode }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  
+  useEffect(() => {
+    if (canvasRef.current && item?.qr_code && isOpen) {
+      QRCodeLib.toCanvas(canvasRef.current, item.qr_code, {
+        width: 400,
+        margin: 4,
+        errorCorrectionLevel: 'H',
+        color: {
+          dark: '#000000',
+          light: '#ffffff'
+        }
+      }).catch(err => console.error('QR Code generation error:', err));
+    }
+  }, [item?.qr_code, isOpen]);
+
+  if (!item) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl w-[95vw] max-h-[95vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-2xl">
+            <QrCode className="h-7 w-7 text-cyan-600" />
+            {item.material_type}
+          </DialogTitle>
+          <DialogDescription className="text-base">
+            Print this QR code and attach it to the material before dispatch
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="flex flex-col items-center space-y-6 py-6">
+          {/* MASSIVE QR Code */}
+          <div className="p-6 bg-white rounded-2xl shadow-2xl border-4 border-cyan-300">
+            <canvas ref={canvasRef} className="rounded-lg" />
+          </div>
+          
+          {/* QR Code Value */}
+          <div className="w-full text-center">
+            <p className="font-mono text-base bg-gray-100 px-4 py-3 rounded-lg break-all">
+              {item.qr_code}
+            </p>
+          </div>
+          
+          {/* Item Details */}
+          <div className="w-full grid grid-cols-3 gap-4">
+            <div className="bg-cyan-50 p-4 rounded-xl text-center">
+              <p className="text-cyan-600 text-sm font-medium">Item #</p>
+              <p className="font-bold text-2xl">{item.item_sequence}</p>
+            </div>
+            <div className="bg-blue-50 p-4 rounded-xl text-center">
+              <p className="text-blue-600 text-sm font-medium">Quantity</p>
+              <p className="font-bold text-2xl">{item.quantity} {item.unit}</p>
+            </div>
+            <div className="bg-green-50 p-4 rounded-xl text-center">
+              <p className="text-green-600 text-sm font-medium">Category</p>
+              <p className="font-bold text-2xl">{item.category}</p>
+            </div>
+          </div>
+          
+          {/* Download Button */}
+          <Button 
+            onClick={() => downloadQRCode(item.qr_code, item.material_type, item.item_sequence)} 
+            className="w-full text-lg py-6 bg-cyan-600 hover:bg-cyan-700" 
+            size="lg"
+          >
+            <Download className="h-6 w-6 mr-3" />
+            Download High-Resolution QR Code
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
