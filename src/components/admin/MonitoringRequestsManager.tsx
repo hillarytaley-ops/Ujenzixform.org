@@ -23,7 +23,9 @@ import {
   Search,
   Download,
   Send,
-  AlertTriangle
+  AlertTriangle,
+  Edit,
+  RefreshCw
 } from "lucide-react";
 import {
   Select,
@@ -105,10 +107,27 @@ export const MonitoringRequestsManager: React.FC = () => {
   const [quoteAmount, setQuoteAmount] = useState<number>(0);
   const [quoteValidUntil, setQuoteValidUntil] = useState<string>('');
   const [adminNotes, setAdminNotes] = useState<string>('');
+  const [isEditingQuote, setIsEditingQuote] = useState(false);
 
   useEffect(() => {
     loadRequests();
   }, []);
+
+  // Load existing quote data when editing
+  const loadExistingQuote = (request: MonitoringRequest) => {
+    setQuoteAmount(request.quote_amount || 0);
+    setQuoteValidUntil(request.quote_valid_until || '');
+    setAdminNotes(request.admin_notes || '');
+    setIsEditingQuote(true);
+  };
+
+  // Reset quote form
+  const resetQuoteForm = () => {
+    setQuoteAmount(0);
+    setQuoteValidUntil('');
+    setAdminNotes('');
+    setIsEditingQuote(false);
+  };
 
   useEffect(() => {
     filterRequests();
@@ -202,17 +221,71 @@ export const MonitoringRequestsManager: React.FC = () => {
       return;
     }
 
-    await updateRequestStatus(selectedRequest.id, 'quoted', {
+    // If editing an existing quote, keep the status as 'quoted'
+    const newStatus = isEditingQuote ? 'quoted' : 'quoted';
+    
+    await updateRequestStatus(selectedRequest.id, newStatus, {
       quote_amount: quoteAmount,
       quote_valid_until: quoteValidUntil,
       admin_notes: adminNotes
     });
 
+    toast({
+      title: isEditingQuote ? 'Quote Updated' : 'Quote Sent',
+      description: isEditingQuote 
+        ? 'The quote has been updated successfully. The builder will see the new quote.'
+        : 'Quote has been sent to the builder.',
+    });
+
     // Reset form
-    setQuoteAmount(0);
-    setQuoteValidUntil('');
-    setAdminNotes('');
+    resetQuoteForm();
     setSelectedRequest(null);
+  };
+
+  // Update existing quote without changing status
+  const updateQuote = async () => {
+    if (!selectedRequest || !quoteAmount || !quoteValidUntil) {
+      toast({
+        title: 'Missing Information',
+        description: 'Please fill in quote amount and validity date',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    try {
+      setIsUpdating(true);
+
+      const { error } = await supabase
+        .from('monitoring_service_requests')
+        .update({
+          quote_amount: quoteAmount,
+          quote_valid_until: quoteValidUntil,
+          admin_notes: adminNotes,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', selectedRequest.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Quote Updated',
+        description: 'The quote has been updated successfully.',
+      });
+
+      loadRequests();
+      resetQuoteForm();
+      setSelectedRequest(null);
+    } catch (error) {
+      console.error('Error updating quote:', error);
+      toast({
+        title: 'Update Failed',
+        description: 'Failed to update the quote',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -519,6 +592,55 @@ export const MonitoringRequestsManager: React.FC = () => {
                         </TabsContent>
 
                         <TabsContent value="quote" className="space-y-4">
+                          {/* Show current quote if exists */}
+                          {selectedRequest.status === 'quoted' && selectedRequest.quote_amount && !isEditingQuote && (
+                            <Card className="border-purple-200 bg-purple-50">
+                              <CardHeader className="pb-2">
+                                <div className="flex items-center justify-between">
+                                  <CardTitle className="text-lg flex items-center gap-2">
+                                    <DollarSign className="h-5 w-5 text-purple-600" />
+                                    Current Quote (Sent to Builder)
+                                  </CardTitle>
+                                  <Badge className="bg-purple-100 text-purple-800">Awaiting Response</Badge>
+                                </div>
+                              </CardHeader>
+                              <CardContent>
+                                <div className="grid grid-cols-2 gap-4 mb-4">
+                                  <div>
+                                    <div className="text-sm text-muted-foreground mb-1">Quote Amount</div>
+                                    <div className="text-2xl font-bold text-purple-600">
+                                      KES {selectedRequest.quote_amount.toLocaleString()}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <div className="text-sm text-muted-foreground mb-1">Valid Until</div>
+                                    <div className="text-lg font-semibold">
+                                      {selectedRequest.quote_valid_until 
+                                        ? format(new Date(selectedRequest.quote_valid_until), 'MMMM dd, yyyy')
+                                        : 'Not set'}
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                {selectedRequest.admin_notes && (
+                                  <div className="mb-4 p-3 bg-white rounded-lg border">
+                                    <div className="text-sm text-muted-foreground mb-1">Admin Notes</div>
+                                    <p className="text-sm">{selectedRequest.admin_notes}</p>
+                                  </div>
+                                )}
+                                
+                                <Button
+                                  variant="outline"
+                                  onClick={() => loadExistingQuote(selectedRequest)}
+                                  className="w-full"
+                                >
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Edit Quote
+                                </Button>
+                              </CardContent>
+                            </Card>
+                          )}
+
                           {/* Builder Type & Suggested Pricing Card */}
                           <Card className={selectedRequest.builder_type === 'private' ? 'border-green-200 bg-green-50' : 'border-blue-200 bg-blue-50'}>
                             <CardHeader className="pb-2">
@@ -569,7 +691,24 @@ export const MonitoringRequestsManager: React.FC = () => {
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <Card>
                               <CardHeader>
-                                <CardTitle className="text-lg">Create Quote</CardTitle>
+                                <CardTitle className="text-lg flex items-center gap-2">
+                                  {isEditingQuote ? (
+                                    <>
+                                      <Edit className="h-5 w-5 text-amber-500" />
+                                      Edit Quote
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Send className="h-5 w-5" />
+                                      Create Quote
+                                    </>
+                                  )}
+                                </CardTitle>
+                                {isEditingQuote && (
+                                  <CardDescription className="text-amber-600">
+                                    Editing existing quote - changes will be visible to the builder
+                                  </CardDescription>
+                                )}
                               </CardHeader>
                               <CardContent className="space-y-4">
                                 <div className="space-y-2">
@@ -603,24 +742,46 @@ export const MonitoringRequestsManager: React.FC = () => {
                                 </div>
                                 
                                 <div className="space-y-2">
-                                  <Label htmlFor="adminNotes">Admin Notes</Label>
+                                  <Label htmlFor="adminNotes">Admin Notes (visible to builder)</Label>
                                   <Textarea
                                     id="adminNotes"
                                     value={adminNotes}
                                     onChange={(e) => setAdminNotes(e.target.value)}
-                                    placeholder="Internal notes about this quote..."
+                                    placeholder="Notes about this quote (e.g., payment terms, included services)..."
                                     rows={3}
                                   />
                                 </div>
 
-                                <Button 
-                                  onClick={submitQuote} 
-                                  disabled={isUpdating}
-                                  className="w-full"
-                                >
-                                  <Send className="h-4 w-4 mr-2" />
-                                  Submit Quote
-                                </Button>
+                                <div className="flex gap-2">
+                                  {isEditingQuote ? (
+                                    <>
+                                      <Button 
+                                        onClick={updateQuote} 
+                                        disabled={isUpdating}
+                                        className="flex-1"
+                                      >
+                                        <RefreshCw className="h-4 w-4 mr-2" />
+                                        Update Quote
+                                      </Button>
+                                      <Button 
+                                        variant="outline"
+                                        onClick={resetQuoteForm}
+                                        disabled={isUpdating}
+                                      >
+                                        Cancel
+                                      </Button>
+                                    </>
+                                  ) : (
+                                    <Button 
+                                      onClick={submitQuote} 
+                                      disabled={isUpdating}
+                                      className="w-full"
+                                    >
+                                      <Send className="h-4 w-4 mr-2" />
+                                      Send Quote to Builder
+                                    </Button>
+                                  )}
+                                </div>
                               </CardContent>
                             </Card>
 
@@ -641,12 +802,12 @@ export const MonitoringRequestsManager: React.FC = () => {
                                 
                                 <Button 
                                   variant="outline" 
-                                  className="w-full justify-start"
+                                  className="w-full justify-start text-green-600 hover:text-green-700"
                                   onClick={() => updateRequestStatus(selectedRequest.id, 'approved')}
                                   disabled={isUpdating}
                                 >
                                   <CheckCircle className="h-4 w-4 mr-2" />
-                                  Approve Request
+                                  Approve Request (Grant Access)
                                 </Button>
                                 
                                 <Button 
@@ -658,6 +819,14 @@ export const MonitoringRequestsManager: React.FC = () => {
                                   <XCircle className="h-4 w-4 mr-2" />
                                   Reject Request
                                 </Button>
+
+                                {selectedRequest.status === 'quoted' && (
+                                  <div className="pt-2 mt-2 border-t">
+                                    <p className="text-xs text-muted-foreground mb-2">
+                                      ⏳ Waiting for builder to accept or decline the quote
+                                    </p>
+                                  </div>
+                                )}
                               </CardContent>
                             </Card>
                           </div>
