@@ -66,15 +66,59 @@ export const EnhancedQRCodeManager: React.FC = () => {
     
     if (role === 'supplier') {
       // Get supplier's record from suppliers table
-      const { data: supplierData, error: supplierError } = await supabase
+      // Try by user_id first (direct auth user ID)
+      let { data: supplierData, error: supplierError } = await supabase
         .from('suppliers')
-        .select('id, company_name')
+        .select('id, company_name, user_id')
         .eq('user_id', userId)
         .maybeSingle();
 
-      console.log('📦 Supplier record:', supplierData, 'Error:', supplierError);
+      console.log('📦 Supplier lookup by user_id:', supplierData, 'Error:', supplierError);
+
+      // If not found, try looking up by email match
+      if (!supplierData) {
+        const { data: userData } = await supabase.auth.getUser();
+        if (userData?.user?.email) {
+          console.log('🔍 Trying to find supplier by email:', userData.user.email);
+          const { data: supplierByEmail } = await supabase
+            .from('suppliers')
+            .select('id, company_name, user_id, email')
+            .eq('email', userData.user.email)
+            .maybeSingle();
+          
+          console.log('📦 Supplier lookup by email:', supplierByEmail);
+          if (supplierByEmail) {
+            supplierData = supplierByEmail;
+          }
+        }
+      }
+
+      // Also try via profile lookup
+      if (!supplierData) {
+        console.log('🔍 Trying to find supplier via profile...');
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', userId)
+          .maybeSingle();
+        
+        if (profileData) {
+          console.log('📋 Found profile with id:', profileData.id);
+          const { data: supplierByProfile } = await supabase
+            .from('suppliers')
+            .select('id, company_name, user_id')
+            .eq('user_id', profileData.id)
+            .maybeSingle();
+          
+          console.log('📦 Supplier lookup by profile.id:', supplierByProfile);
+          if (supplierByProfile) {
+            supplierData = supplierByProfile;
+          }
+        }
+      }
 
       if (supplierData) {
+        console.log('✅ Found supplier:', supplierData.company_name, 'ID:', supplierData.id);
         const { data, error } = await supabase
           .from('material_items')
           .select('*')
@@ -84,14 +128,14 @@ export const EnhancedQRCodeManager: React.FC = () => {
         console.log('🏷️ Material items found:', data?.length || 0, 'Error:', error);
         if (!error) setItems(data || []);
       } else {
-        console.log('⚠️ No supplier record found for user. Checking all material_items...');
-        // Fallback: show all items (for debugging)
-        const { data, error } = await supabase
+        console.log('⚠️ No supplier record found for user.');
+        // Show all items for debugging
+        const { data } = await supabase
           .from('material_items')
           .select('*')
           .order('created_at', { ascending: false })
           .limit(10);
-        console.log('📋 All material items (first 10):', data);
+        console.log('📋 All material items (first 10) for debugging:', data);
       }
     } else if (role === 'admin') {
       // Admin sees all items
