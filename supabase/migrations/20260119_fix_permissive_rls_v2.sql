@@ -70,21 +70,21 @@ DROP POLICY IF EXISTS "conversations_insert" ON public.conversations;
 DROP POLICY IF EXISTS "Enable insert for all users" ON public.conversations;
 
 -- Create new policies with non-true checks where possible
--- For conversations, we need to allow creation but can add some validation
+-- conversations table has: client_id, client_name, client_email, etc.
 CREATE POLICY "conversations_insert_authenticated"
 ON public.conversations FOR INSERT
 TO authenticated
 WITH CHECK (
-  -- User must be creating a conversation they're part of
-  user_id IS NULL OR user_id = auth.uid()::text
+  -- Authenticated user must be creating a conversation for themselves or as guest
+  client_id IS NULL OR client_id = auth.uid()
 );
 
 CREATE POLICY "conversations_insert_anon"
 ON public.conversations FOR INSERT
 TO anon
 WITH CHECK (
-  -- Anonymous users can only create conversations without a user_id
-  user_id IS NULL
+  -- Anonymous users can only create conversations without a client_id (guest chat)
+  client_id IS NULL
 );
 
 -- =====================================================================
