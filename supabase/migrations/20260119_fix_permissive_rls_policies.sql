@@ -30,11 +30,12 @@ $$;
 DROP POLICY IF EXISTS "Anyone can insert chat messages" ON public.chat_messages;
 
 -- Allow authenticated users to insert messages in their own conversations
+-- Note: sender_id is TEXT, auth.uid() is UUID - cast to text for comparison
 CREATE POLICY "Users can insert own chat messages"
 ON public.chat_messages FOR INSERT
 TO authenticated
 WITH CHECK (
-  sender_id = auth.uid()
+  sender_id = auth.uid()::text
   OR sender_type = 'client'
 );
 
@@ -44,7 +45,7 @@ ON public.chat_messages FOR INSERT
 TO anon
 WITH CHECK (
   sender_type = 'client'
-  AND sender_id IS NULL
+  AND (sender_id IS NULL OR sender_id = '')
 );
 
 -- =====================================================================
@@ -72,13 +73,14 @@ WITH CHECK (true); -- Anonymous chat users need to create conversations
 DROP POLICY IF EXISTS "Anyone can create deliveries" ON public.deliveries;
 
 -- Only authenticated users (with specific roles) can create deliveries
+-- Note: buyer_id and supplier_id are UUID, auth.uid() returns UUID - should match
 CREATE POLICY "Authenticated users can create deliveries"
 ON public.deliveries FOR INSERT
 TO authenticated
 WITH CHECK (
   -- User must be the buyer, supplier, or a delivery provider
-  auth.uid() = buyer_id
-  OR auth.uid() = supplier_id
+  auth.uid()::uuid = buyer_id
+  OR auth.uid()::uuid = supplier_id
   OR EXISTS (
     SELECT 1 FROM user_roles 
     WHERE user_roles.user_id = auth.uid() 
@@ -92,11 +94,12 @@ WITH CHECK (
 DROP POLICY IF EXISTS "Builders can create delivery requests" ON public.delivery_requests;
 
 -- Only builders can create delivery requests (and it must be their own)
+-- Note: builder_id is UUID, auth.uid() returns UUID
 CREATE POLICY "Builders can create own delivery requests"
 ON public.delivery_requests FOR INSERT
 TO authenticated
 WITH CHECK (
-  builder_id = auth.uid()
+  builder_id = auth.uid()::uuid
   OR EXISTS (
     SELECT 1 FROM user_roles 
     WHERE user_roles.user_id = auth.uid() 
