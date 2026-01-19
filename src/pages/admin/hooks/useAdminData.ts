@@ -303,6 +303,11 @@ export const useFeedback = () => {
         name: f.name as string | null,
         subject: f.subject as string | null,
         user_type: f.user_type as string | null,
+        // Reply fields
+        admin_reply: f.admin_reply as string | null,
+        admin_reply_at: f.admin_reply_at as string | null,
+        replied_by: f.replied_by as string | null,
+        replied_by_name: f.replied_by_name as string | null,
       }));
 
       setFeedback(formattedFeedback);

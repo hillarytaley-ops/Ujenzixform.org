@@ -25,6 +25,11 @@ export interface FeedbackRecord {
   name?: string | null;
   subject?: string | null;
   user_type?: string | null;
+  // Reply fields
+  admin_reply?: string | null;
+  admin_reply_at?: string | null;
+  replied_by?: string | null;
+  replied_by_name?: string | null;
 }
 
 // App Page for monitoring

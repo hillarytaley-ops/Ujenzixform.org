@@ -1247,7 +1247,12 @@ const AdminDashboard = () => {
           // Additional fields from enhanced table
           name: f.name || null,
           subject: f.subject || f.category || null,
-          user_type: f.user_type || null
+          user_type: f.user_type || null,
+          // Reply fields
+          admin_reply: f.admin_reply || null,
+          admin_reply_at: f.admin_reply_at || null,
+          replied_by: f.replied_by || null,
+          replied_by_name: f.replied_by_name || null
         }));
         
         console.log('📬 Formatted feedback:', formattedFeedback);
