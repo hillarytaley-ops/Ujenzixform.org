@@ -199,16 +199,15 @@ const ProfessionalBuilderDashboardPage = () => {
       const { error } = await supabase
         .from('monitoring_service_requests')
         .insert({
-          user_id: user.id,
-          contact_name: profile?.full_name || profile?.company_name || user?.email?.split('@')[0] || 'User',
-          contact_email: user?.email || '',
-          contact_phone: profile?.phone || '',
-          company_name: profile?.company_name || '',
+          requester_id: user.id,
+          requester_name: profile?.full_name || profile?.company_name || user?.email?.split('@')[0] || 'User',
+          requester_type: 'professional_builder',
           project_name: monitoringRequest.projectName,
           project_location: monitoringRequest.projectLocation,
-          selected_services: ['cctv'],
-          camera_count: parseInt(monitoringRequest.numberOfCameras) || 1,
-          additional_requirements: monitoringRequest.additionalNotes,
+          project_description: monitoringRequest.projectDescription || null,
+          preferred_start_date: monitoringRequest.preferredStartDate || null,
+          number_of_cameras: parseInt(monitoringRequest.numberOfCameras) || 1,
+          additional_notes: monitoringRequest.additionalNotes || null,
           status: 'pending'
         });
 
