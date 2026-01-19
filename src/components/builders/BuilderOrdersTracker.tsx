@@ -67,15 +67,15 @@ interface BuilderOrdersTrackerProps {
   builderId: string;
 }
 
-// QR Code Image Component - Larger size for better scanning
-const QRCodeImage: React.FC<{ value: string; size?: number; className?: string }> = ({ value, size = 150, className = '' }) => {
+// QR Code Image Component - EXTRA LARGE for easy scanning
+const QRCodeImage: React.FC<{ value: string; size?: number; className?: string }> = ({ value, size = 250, className = '' }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
   useEffect(() => {
     if (canvasRef.current && value) {
       QRCode.toCanvas(canvasRef.current, value, {
         width: size,
-        margin: 2,
+        margin: 3,
         errorCorrectionLevel: 'H', // High error correction for better scanning
         color: {
           dark: '#000000',
@@ -85,7 +85,7 @@ const QRCodeImage: React.FC<{ value: string; size?: number; className?: string }
     }
   }, [value, size]);
   
-  return <canvas ref={canvasRef} className={`rounded border bg-white ${className}`} />;
+  return <canvas ref={canvasRef} className={`rounded-lg border-2 bg-white shadow-md ${className}`} />;
 };
 
 // Large QR Code Dialog for scanning
@@ -99,8 +99,8 @@ const QRCodeDialog: React.FC<{
   useEffect(() => {
     if (canvasRef.current && item?.qr_code && isOpen) {
       QRCode.toCanvas(canvasRef.current, item.qr_code, {
-        width: 300,
-        margin: 3,
+        width: 400, // EXTRA LARGE for dialog
+        margin: 4,
         errorCorrectionLevel: 'H',
         color: {
           dark: '#000000',
@@ -123,43 +123,43 @@ const QRCodeDialog: React.FC<{
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-2xl w-[95vw] max-h-[95vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <QrCode className="h-5 w-5 text-blue-600" />
+          <DialogTitle className="flex items-center gap-2 text-2xl">
+            <QrCode className="h-7 w-7 text-blue-600" />
             {item.material_type}
           </DialogTitle>
-          <DialogDescription>
-            Scan this QR code to track material delivery
+          <DialogDescription className="text-base">
+            Scan this QR code with your phone camera to track material delivery
           </DialogDescription>
         </DialogHeader>
         
-        <div className="flex flex-col items-center space-y-4 py-4">
-          {/* Large QR Code for scanning */}
-          <div className="p-4 bg-white rounded-xl shadow-lg border-2 border-gray-200">
-            <canvas ref={canvasRef} className="rounded" />
+        <div className="flex flex-col items-center space-y-6 py-6">
+          {/* MASSIVE QR Code for scanning */}
+          <div className="p-6 bg-white rounded-2xl shadow-2xl border-4 border-blue-300">
+            <canvas ref={canvasRef} className="rounded-lg" />
           </div>
           
           {/* QR Code Value */}
           <div className="w-full text-center">
-            <p className="font-mono text-xs bg-gray-100 px-3 py-2 rounded-lg break-all">
+            <p className="font-mono text-base bg-gray-100 px-4 py-3 rounded-lg break-all">
               {item.qr_code}
             </p>
           </div>
           
           {/* Item Details */}
-          <div className="w-full grid grid-cols-2 gap-3 text-sm">
-            <div className="bg-gray-50 p-3 rounded-lg">
-              <p className="text-gray-500 text-xs">Quantity</p>
-              <p className="font-semibold">{item.quantity} {item.unit}</p>
+          <div className="w-full grid grid-cols-2 gap-4">
+            <div className="bg-blue-50 p-4 rounded-xl text-center">
+              <p className="text-blue-600 text-sm font-medium">Quantity</p>
+              <p className="font-bold text-2xl">{item.quantity} {item.unit}</p>
             </div>
-            <div className="bg-gray-50 p-3 rounded-lg">
-              <p className="text-gray-500 text-xs">Category</p>
-              <p className="font-semibold">{item.category}</p>
+            <div className="bg-green-50 p-4 rounded-xl text-center">
+              <p className="text-green-600 text-sm font-medium">Category</p>
+              <p className="font-bold text-2xl">{item.category}</p>
             </div>
-            <div className="bg-gray-50 p-3 rounded-lg col-span-2">
-              <p className="text-gray-500 text-xs">Status</p>
-              <Badge className={`mt-1 ${
+            <div className="bg-purple-50 p-4 rounded-xl col-span-2 text-center">
+              <p className="text-purple-600 text-sm font-medium mb-2">Status</p>
+              <Badge className={`text-lg px-6 py-2 ${
                 item.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                 item.status === 'dispatched' ? 'bg-blue-100 text-blue-800' :
                 item.status === 'in_transit' ? 'bg-purple-100 text-purple-800' :
@@ -172,9 +172,9 @@ const QRCodeDialog: React.FC<{
           </div>
           
           {/* Download Button */}
-          <Button onClick={downloadQRCode} className="w-full" variant="outline">
-            <Download className="h-4 w-4 mr-2" />
-            Download QR Code
+          <Button onClick={downloadQRCode} className="w-full text-lg py-6" size="lg">
+            <Download className="h-6 w-6 mr-3" />
+            Download QR Code Image
           </Button>
         </div>
       </DialogContent>
@@ -506,63 +506,73 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                         </div>
                       </div>
                       
-                      {/* Material Items with QR Codes */}
+                      {/* Material Items with QR Codes - EXTRA LARGE */}
                       <div>
-                        <p className="font-medium mb-3 flex items-center gap-2">
-                          <QrCode className="h-4 w-4" />
+                        <p className="font-medium mb-4 flex items-center gap-2 text-lg">
+                          <QrCode className="h-5 w-5" />
                           Material Items with QR Codes ({order.material_items?.length || 0})
                         </p>
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div className="space-y-6">
                           {order.material_items?.map((item) => (
                             <div 
                               key={item.id}
-                              className="flex flex-col sm:flex-row items-center gap-4 p-4 bg-gray-50 rounded-lg border hover:shadow-md transition-shadow"
+                              className="flex flex-col items-center p-6 bg-white rounded-xl border-2 border-gray-200 shadow-lg hover:shadow-xl transition-shadow"
                             >
-                              {/* QR Code Image - Larger and clickable */}
+                              {/* Item Header */}
+                              <div className="w-full flex flex-col sm:flex-row items-center justify-between mb-4 gap-3">
+                                <h3 className="text-xl font-bold text-gray-800">{item.material_type}</h3>
+                                <Badge className={`text-base px-4 py-2 ${getStatusColor(item.status)}`}>
+                                  {getStatusIcon(item.status)}
+                                  <span className="ml-2">{item.status.replace('_', ' ').toUpperCase()}</span>
+                                </Badge>
+                              </div>
+                              
+                              {/* HUGE QR Code Image */}
                               <div 
-                                className="flex-shrink-0 cursor-pointer hover:scale-105 transition-transform"
+                                className="cursor-pointer hover:scale-[1.02] transition-transform my-4"
                                 onClick={() => {
                                   setSelectedQRItem(item);
                                   setShowQRDialog(true);
                                 }}
                                 title="Click to enlarge for scanning"
                               >
-                                <div className="relative">
-                                  <QRCodeImage value={item.qr_code} size={140} />
-                                  <div className="absolute -bottom-2 -right-2 bg-blue-600 text-white p-1 rounded-full shadow-lg">
-                                    <Maximize2 className="h-3 w-3" />
+                                <div className="relative p-4 bg-white rounded-2xl border-4 border-blue-200 shadow-xl">
+                                  <QRCodeImage value={item.qr_code} size={280} />
+                                  <div className="absolute -bottom-3 -right-3 bg-blue-600 text-white p-2 rounded-full shadow-lg">
+                                    <Maximize2 className="h-5 w-5" />
                                   </div>
                                 </div>
                               </div>
                               
+                              {/* QR Code Value */}
+                              <p className="font-mono text-sm bg-gray-100 px-4 py-2 rounded-lg my-3 break-all text-center max-w-full">
+                                {item.qr_code}
+                              </p>
+                              
                               {/* Item Details */}
-                              <div className="flex-1 min-w-0 text-center sm:text-left">
-                                <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between mb-2 gap-2">
-                                  <p className="font-semibold">{item.material_type}</p>
-                                  <Badge className={getStatusColor(item.status)}>
-                                    {getStatusIcon(item.status)}
-                                    <span className="ml-1">{item.status}</span>
-                                  </Badge>
+                              <div className="w-full grid grid-cols-2 gap-4 mt-2">
+                                <div className="bg-gray-50 p-4 rounded-lg text-center">
+                                  <p className="text-gray-500 text-sm">Quantity</p>
+                                  <p className="font-bold text-xl">{item.quantity} {item.unit}</p>
                                 </div>
-                                
-                                <div className="space-y-1 text-sm text-gray-600">
-                                  <p><strong>Quantity:</strong> {item.quantity} {item.unit}</p>
-                                  <p><strong>Category:</strong> {item.category}</p>
+                                <div className="bg-gray-50 p-4 rounded-lg text-center">
+                                  <p className="text-gray-500 text-sm">Category</p>
+                                  <p className="font-bold text-xl">{item.category}</p>
                                 </div>
-                                
-                                <Button 
-                                  variant="outline" 
-                                  size="sm" 
-                                  className="mt-3 w-full sm:w-auto"
-                                  onClick={() => {
-                                    setSelectedQRItem(item);
-                                    setShowQRDialog(true);
-                                  }}
-                                >
-                                  <Maximize2 className="h-4 w-4 mr-2" />
-                                  View Full Size
-                                </Button>
                               </div>
+                              
+                              <Button 
+                                variant="default" 
+                                size="lg" 
+                                className="mt-4 w-full sm:w-auto px-8"
+                                onClick={() => {
+                                  setSelectedQRItem(item);
+                                  setShowQRDialog(true);
+                                }}
+                              >
+                                <Maximize2 className="h-5 w-5 mr-2" />
+                                Open Full Screen for Scanning
+                              </Button>
                             </div>
                           ))}
                         </div>
