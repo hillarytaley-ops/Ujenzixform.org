@@ -73,11 +73,14 @@ BEGIN
         RAISE NOTICE '⚠️ No supplier record found for mamaethan@gmail.com';
         
         -- First, ensure profile exists (suppliers has FK to profiles)
-        IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE id = supplier_user_id) THEN
+        -- Check by both id and user_id since there are unique constraints on both
+        IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE id = supplier_user_id OR user_id = supplier_user_id) THEN
             RAISE NOTICE '   Creating profile for supplier...';
             INSERT INTO public.profiles (id, user_id, email, full_name)
             VALUES (supplier_user_id, supplier_user_id, 'mamaethan@gmail.com', 'Mama Ethan Supplies')
-            ON CONFLICT (id) DO NOTHING;
+            ON CONFLICT DO NOTHING;
+        ELSE
+            RAISE NOTICE '   Profile already exists for supplier';
         END IF;
         
         RAISE NOTICE '   Creating supplier record directly...';
