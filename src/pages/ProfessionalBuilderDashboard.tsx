@@ -202,13 +202,14 @@ const ProfessionalBuilderDashboardPage = () => {
           user_id: user.id,
           contact_name: profile?.full_name || profile?.company_name || user?.email?.split('@')[0] || 'User',
           contact_email: user?.email || '',
-          builder_type: 'professional_builder',
+          contact_phone: profile?.phone || 'N/A',
+          company_name: profile?.company_name || '',
           project_name: monitoringRequest.projectName,
           project_location: monitoringRequest.projectLocation,
-          project_description: monitoringRequest.projectDescription || null,
-          preferred_start_date: monitoringRequest.preferredStartDate || null,
+          selected_services: ['cctv'],
           camera_count: parseInt(monitoringRequest.numberOfCameras) || 1,
-          additional_requirements: monitoringRequest.additionalNotes || null,
+          special_requirements: monitoringRequest.projectDescription || null,
+          additional_notes: monitoringRequest.additionalNotes || null,
           status: 'pending'
         });
 
