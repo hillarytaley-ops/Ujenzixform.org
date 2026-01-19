@@ -137,15 +137,51 @@ const DeliveryRequest = () => {
         status: 'pending'
       };
 
-      const { error } = await supabase
+      const { data: deliveryRequest, error } = await supabase
         .from('delivery_requests')
-        .insert(requestData);
+        .insert(requestData)
+        .select()
+        .single();
 
       if (error) throw error;
 
+      // ✅ AUTO-NOTIFY: Alert nearby delivery providers immediately
+      if (deliveryRequest) {
+        try {
+          console.log('🚚 Notifying delivery providers for request:', deliveryRequest.id);
+          
+          await supabase.functions.invoke('notify-delivery-providers', {
+            body: {
+              request_type: 'manual_delivery_request',
+              request_id: deliveryRequest.id,
+              builder_id: profile.id,
+              pickup_address: formData.pickupAddress.trim(),
+              delivery_address: formData.deliveryAddress.trim(),
+              material_details: [{
+                material_type: formData.materialType,
+                quantity: parseInt(formData.quantity) || 1,
+                unit: 'units'
+              }],
+              weight_kg: parseFloat(formData.weight) || null,
+              special_instructions: formData.specialInstructions.trim() || null,
+              budget_range: formData.budgetRange || null,
+              required_vehicle_type: formData.requiredVehicleType || null,
+              preferred_date: formData.preferredDate,
+              preferred_time: formData.preferredTime || null,
+              priority_level: 'normal'
+            }
+          });
+          
+          console.log('✅ Delivery providers notified successfully');
+        } catch (notifyError) {
+          console.error('⚠️ Error notifying delivery providers:', notifyError);
+          // Continue even if notification fails - delivery request is created
+        }
+      }
+
       toast({
-        title: "Success",
-        description: "Delivery request submitted successfully"
+        title: "🚚 Delivery Request Sent!",
+        description: "Nearby delivery providers have been notified. First responder will be assigned."
       });
 
       // Reset form

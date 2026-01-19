@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 interface DeliveryNotificationRequest {
-  request_type: 'purchase_order' | 'private_purchase' | 'quote_accepted';
+  request_type: 'purchase_order' | 'private_purchase' | 'quote_accepted' | 'manual_delivery_request';
   request_id: string;
   builder_id?: string;
   pickup_address: string;
@@ -21,6 +21,11 @@ interface DeliveryNotificationRequest {
   priority_level?: 'low' | 'normal' | 'high' | 'urgent';
   po_number?: string;
   estimated_weight_kg?: number;
+  weight_kg?: number; // For manual requests
+  budget_range?: string;
+  required_vehicle_type?: string;
+  preferred_date?: string;
+  preferred_time?: string;
 }
 
 // Vehicle capacity mapping (in kg)
@@ -60,13 +65,18 @@ const handler = async (req: Request): Promise<Response> => {
       special_instructions,
       priority_level = 'normal',
       po_number,
-      estimated_weight_kg
+      estimated_weight_kg,
+      weight_kg,
+      budget_range,
+      required_vehicle_type: manual_vehicle_type,
+      preferred_date,
+      preferred_time
     }: DeliveryNotificationRequest = await req.json();
 
-    console.log('Creating delivery notification for:', request_type, request_id);
+    console.log('🚚 Creating delivery notification for:', request_type, request_id);
 
     // Calculate total weight from materials if not provided
-    let totalWeightKg = estimated_weight_kg || 0;
+    let totalWeightKg = estimated_weight_kg || weight_kg || 0;
     if (!totalWeightKg && material_details && material_details.length > 0) {
       // Estimate weight based on material type and quantity
       const MATERIAL_WEIGHTS: Record<string, number> = {
@@ -131,6 +141,20 @@ const handler = async (req: Request): Promise<Response> => {
       if (receiptError) throw receiptError;
       builder_id = receipt.buyer_id;
       supplier_id = receipt.supplier_id;
+    } else if (request_type === 'manual_delivery_request') {
+      // For manual delivery requests, get builder info from delivery_requests table
+      const { data: deliveryReq, error: deliveryReqError } = await supabaseClient
+        .from('delivery_requests')
+        .select('builder_id')
+        .eq('id', request_id)
+        .single();
+
+      if (deliveryReqError) {
+        console.log('Could not fetch delivery request details:', deliveryReqError.message);
+      } else if (deliveryReq) {
+        builder_id = deliveryReq.builder_id || provided_builder_id || '';
+      }
+      console.log('📦 Manual delivery request from builder:', builder_id);
     }
     // For 'quote_accepted', builder_id is already provided
 
@@ -210,22 +234,43 @@ const handler = async (req: Request): Promise<Response> => {
       if (capableProviders.length > 0) {
         const providerNotifications = capableProviders.map((provider: any) => {
           const details = providerDetails?.find((d: any) => d.id === provider.provider_id);
+          
+          // Build notification message based on request type
+          let notificationContent = `🚚 New delivery request! Distance: ${provider.distance_km.toFixed(1)}km | Weight: ${totalWeightKg}kg | Priority: ${priority_level}`;
+          
+          if (request_type === 'manual_delivery_request') {
+            // Add more details for manual requests
+            if (budget_range) notificationContent += ` | Budget: ${budget_range}`;
+            if (preferred_date) notificationContent += ` | Date: ${preferred_date}`;
+            if (preferred_time) notificationContent += ` @ ${preferred_time}`;
+          } else if (po_number) {
+            notificationContent += ` | PO: ${po_number}`;
+          }
+          
+          if (special_instructions) {
+            notificationContent += `. Instructions: ${special_instructions}`;
+          }
+          
           return {
             sender_id: builder_id,
             sender_type: 'builder',
             sender_name: 'Builder',
             message_type: 'delivery_request',
-            content: `🚚 New delivery request! Distance: ${provider.distance_km.toFixed(1)}km | Weight: ${totalWeightKg}kg | Priority: ${priority_level}${po_number ? ` | PO: ${po_number}` : ''}. ${special_instructions ? `Instructions: ${special_instructions}` : ''}`,
+            content: notificationContent,
             metadata: {
               notification_id: notification.id,
+              request_type,
               distance_km: provider.distance_km,
               priority_level,
               pickup_address,
               delivery_address,
               material_details,
               total_weight_kg: totalWeightKg,
-              required_vehicle_type: requiredVehicleType,
-              po_number
+              required_vehicle_type: manual_vehicle_type || requiredVehicleType,
+              po_number,
+              budget_range,
+              preferred_date,
+              preferred_time
             }
           };
         });
