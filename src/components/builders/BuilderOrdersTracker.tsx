@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,11 +13,13 @@ import {
   RefreshCw,
   Eye,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Download
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import QRCode from 'qrcode';
 
 interface MaterialItem {
   id: string;
@@ -57,6 +59,26 @@ interface BuilderOrdersTrackerProps {
   builderId: string;
 }
 
+// QR Code Image Component
+const QRCodeImage: React.FC<{ value: string; size?: number }> = ({ value, size = 80 }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  
+  useEffect(() => {
+    if (canvasRef.current && value) {
+      QRCode.toCanvas(canvasRef.current, value, {
+        width: size,
+        margin: 1,
+        color: {
+          dark: '#000000',
+          light: '#ffffff'
+        }
+      }).catch(err => console.error('QR Code generation error:', err));
+    }
+  }, [value, size]);
+  
+  return <canvas ref={canvasRef} className="rounded border" />;
+};
+
 export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ builderId }) => {
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [scanEvents, setScanEvents] = useState<ScanEvent[]>([]);
@@ -76,12 +98,16 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
     try {
       setLoading(true);
       
+      console.log('🔍 BuilderOrdersTracker: Fetching orders for builder:', builderId);
+      
       // Fetch purchase orders for this builder
       const { data: ordersData, error: ordersError } = await supabase
         .from('purchase_orders')
         .select('*')
         .eq('buyer_id', builderId)
         .order('created_at', { ascending: false });
+
+      console.log('📦 Orders fetched:', ordersData?.length || 0, 'orders', ordersError ? `Error: ${ordersError.message}` : '');
 
       if (ordersError) throw ordersError;
 
@@ -101,9 +127,10 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
         })
       );
 
+      console.log('📦 Orders with items:', ordersWithItems);
       setOrders(ordersWithItems);
     } catch (error) {
-      console.error('Error fetching orders:', error);
+      console.error('❌ Error fetching orders:', error);
       toast({
         title: 'Error',
         description: 'Failed to load orders',
@@ -374,30 +401,41 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                         </div>
                       </div>
                       
-                      {/* Material Items */}
+                      {/* Material Items with QR Codes */}
                       <div>
-                        <p className="font-medium mb-2 flex items-center gap-2">
+                        <p className="font-medium mb-3 flex items-center gap-2">
                           <QrCode className="h-4 w-4" />
-                          Material Items ({order.material_items?.length || 0})
+                          Material Items with QR Codes ({order.material_items?.length || 0})
                         </p>
-                        <div className="space-y-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           {order.material_items?.map((item) => (
                             <div 
                               key={item.id}
-                              className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                              className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg border"
                             >
-                              <div className="flex items-center gap-3">
-                                {getStatusIcon(item.status)}
-                                <div>
-                                  <p className="font-medium text-sm">{item.material_type}</p>
-                                  <p className="text-xs text-gray-500">
-                                    {item.quantity} {item.unit} • QR: {item.qr_code}
+                              {/* QR Code Image */}
+                              <div className="flex-shrink-0">
+                                <QRCodeImage value={item.qr_code} size={100} />
+                              </div>
+                              
+                              {/* Item Details */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start justify-between mb-2">
+                                  <p className="font-semibold text-sm">{item.material_type}</p>
+                                  <Badge className={getStatusColor(item.status)}>
+                                    {getStatusIcon(item.status)}
+                                    <span className="ml-1">{item.status}</span>
+                                  </Badge>
+                                </div>
+                                
+                                <div className="space-y-1 text-xs text-gray-600">
+                                  <p><strong>Quantity:</strong> {item.quantity} {item.unit}</p>
+                                  <p><strong>Category:</strong> {item.category}</p>
+                                  <p className="font-mono text-[10px] bg-gray-200 px-2 py-1 rounded truncate">
+                                    {item.qr_code}
                                   </p>
                                 </div>
                               </div>
-                              <Badge className={getStatusColor(item.status)}>
-                                {item.status}
-                              </Badge>
                             </div>
                           ))}
                         </div>
