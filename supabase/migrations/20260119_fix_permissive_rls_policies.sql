@@ -73,13 +73,13 @@ WITH CHECK (true); -- Anonymous chat users need to create conversations
 DROP POLICY IF EXISTS "Anyone can create deliveries" ON public.deliveries;
 
 -- Only authenticated users (with specific roles) can create deliveries
--- Note: buyer_id and supplier_id are UUID, auth.uid() returns UUID - should match
+-- Note: builder_id and supplier_id are UUID, auth.uid() returns UUID
 CREATE POLICY "Authenticated users can create deliveries"
 ON public.deliveries FOR INSERT
 TO authenticated
 WITH CHECK (
-  -- User must be the buyer, supplier, or a delivery provider
-  auth.uid()::uuid = buyer_id
+  -- User must be the builder, supplier, or a delivery provider
+  auth.uid()::uuid = builder_id
   OR auth.uid()::uuid = supplier_id
   OR EXISTS (
     SELECT 1 FROM user_roles 
