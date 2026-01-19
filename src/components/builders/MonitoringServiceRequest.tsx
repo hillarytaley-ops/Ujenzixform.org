@@ -521,20 +521,23 @@ export const MonitoringServiceRequest: React.FC = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="info" className="flex items-center gap-2">
-            <Info className="h-4 w-4" />
-            Service Information
-          </TabsTrigger>
-          <TabsTrigger value="services" className="flex items-center gap-2">
-            <Zap className="h-4 w-4" />
-            Select Services
-          </TabsTrigger>
-          <TabsTrigger value="request" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Request Quote
-          </TabsTrigger>
-        </TabsList>
+        {/* Sticky Tab Navigation */}
+        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm pb-2 -mx-4 px-4 pt-2">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="info" className="flex items-center gap-2">
+              <Info className="h-4 w-4" />
+              <span className="hidden sm:inline">Service</span> Info
+            </TabsTrigger>
+            <TabsTrigger value="services" className="flex items-center gap-2">
+              <Zap className="h-4 w-4" />
+              <span className="hidden sm:inline">Select</span> Services
+            </TabsTrigger>
+            <TabsTrigger value="request" className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              <span className="hidden sm:inline">Request</span> Quote
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* Service Information Tab */}
         <TabsContent value="info" className="space-y-6">
@@ -772,11 +775,14 @@ export const MonitoringServiceRequest: React.FC = () => {
             </CardContent>
           </Card>
 
-          <div className="text-center">
-            <Button onClick={() => setActiveTab('services')} size="lg">
-              Explore Our Services
-              <Zap className="h-4 w-4 ml-2" />
-            </Button>
+          {/* Sticky Navigation for Info Tab */}
+          <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t pt-4 pb-4 -mx-4 px-4 mt-6 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+            <div className="flex justify-center">
+              <Button onClick={() => setActiveTab('services')} size="lg" className="shadow-lg">
+                Explore Our Services
+                <Zap className="h-4 w-4 ml-2" />
+              </Button>
+            </div>
           </div>
         </TabsContent>
 
@@ -888,17 +894,30 @@ export const MonitoringServiceRequest: React.FC = () => {
             </Alert>
           )}
 
-          <div className="flex justify-between">
-            <Button variant="outline" onClick={() => setActiveTab('info')}>
-              Back to Information
-            </Button>
-            <Button 
-              onClick={() => setActiveTab('request')}
-              disabled={formData.selectedServices.length === 0}
-            >
-              Request Detailed Quote
-              <FileText className="h-4 w-4 ml-2" />
-            </Button>
+          {/* Sticky Navigation for Services Tab */}
+          <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t pt-4 pb-4 -mx-4 px-4 mt-6 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+            <div className="flex justify-between items-center max-w-4xl mx-auto">
+              <Button variant="outline" onClick={() => setActiveTab('info')}>
+                Back to Information
+              </Button>
+              
+              {/* Show estimated cost in the middle */}
+              {estimatedCost > 0 && (
+                <div className="hidden md:block text-center">
+                  <div className="text-sm text-muted-foreground">Estimated Monthly Cost</div>
+                  <div className="text-lg font-bold text-primary">KES {estimatedCost.toLocaleString()}</div>
+                </div>
+              )}
+              
+              <Button 
+                onClick={() => setActiveTab('request')}
+                disabled={formData.selectedServices.length === 0}
+                className="shadow-lg"
+              >
+                Request Detailed Quote
+                <FileText className="h-4 w-4 ml-2" />
+              </Button>
+            </div>
           </div>
         </TabsContent>
 
@@ -1134,28 +1153,40 @@ export const MonitoringServiceRequest: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* Submit Button */}
-          <div className="flex justify-between">
-            <Button variant="outline" onClick={() => setActiveTab('services')}>
-              Back to Services
-            </Button>
-            <Button 
-              onClick={handleSubmit}
-              disabled={isSubmitting || formData.selectedServices.length === 0}
-              size="lg"
-            >
-              {isSubmitting ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                  Submitting...
-                </>
-              ) : (
-                <>
-                  <Send className="h-4 w-4 mr-2" />
-                  Submit Request
-                </>
+          {/* Submit Button - Sticky at bottom */}
+          <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t pt-4 pb-4 -mx-4 px-4 mt-6 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+            <div className="flex justify-between items-center max-w-4xl mx-auto">
+              <Button variant="outline" onClick={() => setActiveTab('services')}>
+                Back to Services
+              </Button>
+              
+              {/* Estimated Cost Summary */}
+              {estimatedCost > 0 && (
+                <div className="hidden md:block text-center">
+                  <div className="text-sm text-muted-foreground">Estimated Monthly Cost</div>
+                  <div className="text-lg font-bold text-primary">KES {estimatedCost.toLocaleString()}</div>
+                </div>
               )}
-            </Button>
+              
+              <Button 
+                onClick={handleSubmit}
+                disabled={isSubmitting || formData.selectedServices.length === 0}
+                size="lg"
+                className="bg-primary hover:bg-primary/90 shadow-lg"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                    Submitting...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-4 w-4 mr-2" />
+                    Submit Request
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </TabsContent>
       </Tabs>
