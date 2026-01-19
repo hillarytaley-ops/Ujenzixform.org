@@ -69,9 +69,17 @@ BEGIN
     END IF;
 
     -- If supplier record doesn't exist, we need to handle this differently
-    -- Since triggers are causing issues, let's just require the supplier to exist
     IF supplier_record_id IS NULL THEN
         RAISE NOTICE '⚠️ No supplier record found for mamaethan@gmail.com';
+        
+        -- First, ensure profile exists (suppliers has FK to profiles)
+        IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE id = supplier_user_id) THEN
+            RAISE NOTICE '   Creating profile for supplier...';
+            INSERT INTO public.profiles (id, email, full_name)
+            VALUES (supplier_user_id, 'mamaethan@gmail.com', 'Mama Ethan Supplies')
+            ON CONFLICT (id) DO NOTHING;
+        END IF;
+        
         RAISE NOTICE '   Creating supplier record directly...';
         
         -- Direct insert without trigger (triggers should be disabled now)
