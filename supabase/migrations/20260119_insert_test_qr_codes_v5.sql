@@ -75,8 +75,8 @@ BEGIN
         -- First, ensure profile exists (suppliers has FK to profiles)
         IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE id = supplier_user_id) THEN
             RAISE NOTICE '   Creating profile for supplier...';
-            INSERT INTO public.profiles (id, email, full_name)
-            VALUES (supplier_user_id, 'mamaethan@gmail.com', 'Mama Ethan Supplies')
+            INSERT INTO public.profiles (id, user_id, email, full_name)
+            VALUES (supplier_user_id, supplier_user_id, 'mamaethan@gmail.com', 'Mama Ethan Supplies')
             ON CONFLICT (id) DO NOTHING;
         END IF;
         
