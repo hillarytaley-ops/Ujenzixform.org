@@ -4,6 +4,10 @@
 -- Builder: kosgeihill@gmail.com (receivable QR codes)
 -- =====================================================================
 
+-- STEP 0: Disable audit triggers on suppliers table
+DROP TRIGGER IF EXISTS audit_supplier_modifications_trigger ON public.suppliers;
+DROP TRIGGER IF EXISTS supplier_audit_trigger ON public.suppliers;
+
 -- STEP 1: Drop the QR-related triggers to prevent conflicts
 DROP TRIGGER IF EXISTS generate_qr_on_purchase_order_insert ON public.purchase_orders;
 DROP TRIGGER IF EXISTS trigger_auto_generate_item_qr_codes ON public.purchase_orders;
@@ -172,6 +176,7 @@ END $$;
 -- STEP 4: Recreate triggers only if their functions exist
 DO $$
 BEGIN
+    -- Recreate QR code triggers
     IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'auto_generate_item_qr_codes') THEN
         CREATE TRIGGER trigger_auto_generate_item_qr_codes
             BEFORE INSERT OR UPDATE ON public.purchase_orders
@@ -186,6 +191,15 @@ BEGIN
             FOR EACH ROW
             EXECUTE FUNCTION public.auto_generate_qr_codes_for_purchase_order();
         RAISE NOTICE 'Recreated trigger_auto_generate_qr_codes';
+    END IF;
+
+    -- Recreate supplier audit trigger
+    IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'audit_supplier_modifications_secure') THEN
+        CREATE TRIGGER audit_supplier_modifications_trigger
+            AFTER INSERT OR UPDATE OR DELETE ON public.suppliers
+            FOR EACH ROW
+            EXECUTE FUNCTION public.audit_supplier_modifications_secure();
+        RAISE NOTICE 'Recreated audit_supplier_modifications_trigger';
     END IF;
 END $$;
 
