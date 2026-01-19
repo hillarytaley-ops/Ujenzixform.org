@@ -32,6 +32,8 @@ export const EnhancedQRCodeManager: React.FC = () => {
   const [items, setItems] = useState<MaterialItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [selectedItem, setSelectedItem] = useState<MaterialItem | null>(null);
+  const [showQRDialog, setShowQRDialog] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -298,10 +300,6 @@ export const EnhancedQRCodeManager: React.FC = () => {
       </div>
     );
   }
-
-  // State for QR dialog
-  const [selectedItem, setSelectedItem] = useState<MaterialItem | null>(null);
-  const [showQRDialog, setShowQRDialog] = useState(false);
 
   if (!['admin', 'supplier'].includes(userRole || '')) {
     return (
