@@ -29,7 +29,9 @@ import {
   Send,
   MapPin,
   Calendar,
-  Plus
+  Plus,
+  XCircle,
+  Eye
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -646,13 +648,16 @@ const PrivateClientDashboard = () => {
                   <div className="space-y-4">
                     <h4 className="font-semibold text-gray-700">Your Monitoring Requests</h4>
                     {monitoringRequests.map((request) => (
-                      <div key={request.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                      <div key={request.id} className={`border rounded-lg p-4 transition-colors ${
+                        request.status === 'quoted' ? 'border-blue-300 bg-blue-50' : 'hover:bg-gray-50'
+                      }`}>
                         <div className="flex items-start justify-between">
                           <div className="flex items-start gap-3">
                             <div className={`p-2 rounded-lg ${
                               request.status === 'approved' ? 'bg-green-100 text-green-600' :
                               request.status === 'rejected' ? 'bg-red-100 text-red-600' :
-                              request.status === 'in_progress' ? 'bg-blue-100 text-blue-600' :
+                              request.status === 'quoted' ? 'bg-blue-100 text-blue-600' :
+                              request.status === 'completed' ? 'bg-purple-100 text-purple-600' :
                               'bg-amber-100 text-amber-600'
                             }`}>
                               <Video className="h-5 w-5" />
@@ -666,21 +671,162 @@ const PrivateClientDashboard = () => {
                               <p className="text-xs text-gray-400 mt-1">
                                 Requested: {new Date(request.created_at).toLocaleDateString()}
                               </p>
+                              {request.camera_count && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Cameras: {request.camera_count}
+                                </p>
+                              )}
                             </div>
                           </div>
                           <Badge className={`${
                             request.status === 'approved' ? 'bg-green-100 text-green-700 border-green-300' :
                             request.status === 'rejected' ? 'bg-red-100 text-red-700 border-red-300' :
-                            request.status === 'in_progress' ? 'bg-blue-100 text-blue-700 border-blue-300' :
+                            request.status === 'quoted' ? 'bg-blue-100 text-blue-700 border-blue-300' :
+                            request.status === 'completed' ? 'bg-purple-100 text-purple-700 border-purple-300' :
                             'bg-amber-100 text-amber-700 border-amber-300'
                           }`}>
-                            {request.status === 'in_progress' ? 'In Progress' : request.status?.charAt(0).toUpperCase() + request.status?.slice(1)}
+                            {request.status === 'quoted' ? '💰 Quote Received' : 
+                             request.status === 'approved' ? '✅ Active' :
+                             request.status?.charAt(0).toUpperCase() + request.status?.slice(1)}
                           </Badge>
                         </div>
-                        {request.admin_response && (
-                          <div className="mt-3 pt-3 border-t">
-                            <p className="text-sm text-gray-600">
-                              <span className="font-medium">Admin Response:</span> {request.admin_response}
+                        
+                        {/* Quote Section - Show when admin has sent a quote */}
+                        {request.status === 'quoted' && request.quote_amount && (
+                          <div className="mt-4 p-4 bg-white border-2 border-blue-200 rounded-lg">
+                            <div className="flex items-center justify-between mb-3">
+                              <h6 className="font-semibold text-blue-800">📋 Quote from MradiPro</h6>
+                              {request.quote_valid_until && (
+                                <span className="text-xs text-gray-500">
+                                  Valid until: {new Date(request.quote_valid_until).toLocaleDateString()}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-center mb-4">
+                              <p className="text-sm text-gray-600">Monthly Service Fee</p>
+                              <p className="text-3xl font-bold text-blue-600">
+                                KES {Number(request.quote_amount).toLocaleString()}
+                              </p>
+                              <p className="text-xs text-gray-500 mt-1">per month</p>
+                            </div>
+                            {request.admin_notes && (
+                              <p className="text-sm text-gray-600 mb-4 p-2 bg-gray-50 rounded">
+                                <span className="font-medium">Note:</span> {request.admin_notes}
+                              </p>
+                            )}
+                            <div className="flex gap-3">
+                              <Button 
+                                className="flex-1 bg-green-600 hover:bg-green-700"
+                                onClick={async () => {
+                                  try {
+                                    const { error } = await supabase
+                                      .from('monitoring_service_requests')
+                                      .update({ status: 'approved' })
+                                      .eq('id', request.id);
+                                    if (error) throw error;
+                                    toast({
+                                      title: "Quote Accepted! 🎉",
+                                      description: "Your monitoring service is now active. You can access your cameras.",
+                                    });
+                                    // Refresh the list
+                                    const { data } = await supabase
+                                      .from('monitoring_service_requests')
+                                      .select('*')
+                                      .eq('user_id', user?.id)
+                                      .order('created_at', { ascending: false });
+                                    if (data) setMonitoringRequests(data);
+                                  } catch (error) {
+                                    console.error('Error accepting quote:', error);
+                                    toast({
+                                      title: "Error",
+                                      description: "Failed to accept quote. Please try again.",
+                                      variant: "destructive"
+                                    });
+                                  }
+                                }}
+                              >
+                                <CheckCircle className="h-4 w-4 mr-2" />
+                                Accept Quote
+                              </Button>
+                              <Button 
+                                variant="outline"
+                                className="flex-1 border-red-300 text-red-600 hover:bg-red-50"
+                                onClick={async () => {
+                                  try {
+                                    const { error } = await supabase
+                                      .from('monitoring_service_requests')
+                                      .update({ status: 'rejected' })
+                                      .eq('id', request.id);
+                                    if (error) throw error;
+                                    toast({
+                                      title: "Quote Declined",
+                                      description: "You can request a new quote anytime.",
+                                    });
+                                    // Refresh the list
+                                    const { data } = await supabase
+                                      .from('monitoring_service_requests')
+                                      .select('*')
+                                      .eq('user_id', user?.id)
+                                      .order('created_at', { ascending: false });
+                                    if (data) setMonitoringRequests(data);
+                                  } catch (error) {
+                                    console.error('Error rejecting quote:', error);
+                                    toast({
+                                      title: "Error",
+                                      description: "Failed to decline quote. Please try again.",
+                                      variant: "destructive"
+                                    });
+                                  }
+                                }}
+                              >
+                                <XCircle className="h-4 w-4 mr-2" />
+                                Decline
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Approved - Show access info */}
+                        {request.status === 'approved' && (
+                          <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                            <div className="flex items-center gap-2 mb-2">
+                              <CheckCircle className="h-5 w-5 text-green-600" />
+                              <h6 className="font-semibold text-green-800">Monitoring Service Active</h6>
+                            </div>
+                            <p className="text-sm text-green-700 mb-3">
+                              Your cameras are set up and ready. Access your live feeds anytime.
+                            </p>
+                            {request.access_code && (
+                              <div className="bg-white p-3 rounded border border-green-300 mb-3">
+                                <p className="text-xs text-gray-500">Access Code</p>
+                                <p className="font-mono font-bold text-lg text-green-700">{request.access_code}</p>
+                              </div>
+                            )}
+                            <Button 
+                              className="w-full bg-green-600 hover:bg-green-700"
+                              onClick={() => window.open('/monitoring', '_blank')}
+                            >
+                              <Eye className="h-4 w-4 mr-2" />
+                              Access Live Cameras
+                            </Button>
+                          </div>
+                        )}
+                        
+                        {/* Pending - Waiting for admin */}
+                        {request.status === 'pending' && (
+                          <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                            <p className="text-sm text-amber-700 flex items-center gap-2">
+                              <Clock className="h-4 w-4" />
+                              Waiting for admin to review and send quote...
+                            </p>
+                          </div>
+                        )}
+                        
+                        {/* Rejected */}
+                        {request.status === 'rejected' && request.admin_notes && (
+                          <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                            <p className="text-sm text-red-700">
+                              <span className="font-medium">Reason:</span> {request.admin_notes}
                             </p>
                           </div>
                         )}
