@@ -508,7 +508,7 @@ export const MonitoringServiceRequest: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-200px)] min-h-[600px] max-h-[900px]">
+    <div className="flex flex-col h-full">
       {/* Header - Fixed */}
       <div className="text-center space-y-2 pb-4 flex-shrink-0">
         <h2 className="text-2xl md:text-3xl font-bold flex items-center justify-center gap-2">

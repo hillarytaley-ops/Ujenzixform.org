@@ -545,8 +545,8 @@ const Monitoring = () => {
             {showRequestForm ? (
               /* Show the Monitoring Service Request Form */
               <div className="max-w-5xl mx-auto">
-                <Card className="bg-slate-900/80 border-cyan-500/30 backdrop-blur-xl shadow-2xl">
-                  <CardContent className="p-6 md:p-8">
+                <Card className="bg-slate-900/80 border-cyan-500/30 backdrop-blur-xl shadow-2xl overflow-hidden">
+                  <CardContent className="p-4 md:p-6 h-[80vh] min-h-[700px]">
                     <MonitoringServiceRequest />
                   </CardContent>
                 </Card>
