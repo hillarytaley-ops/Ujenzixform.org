@@ -72,33 +72,43 @@ BEGIN
     IF supplier_record_id IS NULL THEN
         RAISE NOTICE '⚠️ No supplier record found for mamaethan@gmail.com';
         
-        -- First, ensure profile exists (suppliers has FK to profiles)
-        -- Check by both id and user_id since there are unique constraints on both
-        IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE id = supplier_user_id OR user_id = supplier_user_id) THEN
-            RAISE NOTICE '   Creating profile for supplier...';
-            INSERT INTO public.profiles (id, user_id, email, full_name)
-            VALUES (supplier_user_id, supplier_user_id, 'mamaethan@gmail.com', 'Mama Ethan Supplies')
-            ON CONFLICT DO NOTHING;
-        ELSE
-            RAISE NOTICE '   Profile already exists for supplier';
-        END IF;
-        
-        RAISE NOTICE '   Creating supplier record directly...';
-        
-        -- Direct insert without trigger (triggers should be disabled now)
-        INSERT INTO public.suppliers (id, user_id, company_name, email, phone, location, status)
-        VALUES (
-            gen_random_uuid(),
-            supplier_user_id, 
-            'Mama Ethan Supplies', 
-            'mamaethan@gmail.com', 
-            '+254700000000', 
-            'Nairobi, Kenya', 
-            'active'
-        )
-        RETURNING id INTO supplier_record_id;
-        
-        RAISE NOTICE '✅ Created supplier record: %', supplier_record_id;
+        -- The suppliers.user_id has a FK to profiles.id (not profiles.user_id!)
+        -- We need to find the profile.id for this user
+        DECLARE
+            profile_id_for_supplier UUID;
+        BEGIN
+            -- Get the profile ID (which may be different from user_id)
+            SELECT id INTO profile_id_for_supplier 
+            FROM public.profiles 
+            WHERE user_id = supplier_user_id;
+            
+            IF profile_id_for_supplier IS NULL THEN
+                -- No profile exists, create one with id = user_id
+                RAISE NOTICE '   Creating profile for supplier...';
+                INSERT INTO public.profiles (id, user_id, email, full_name)
+                VALUES (supplier_user_id, supplier_user_id, 'mamaethan@gmail.com', 'Mama Ethan Supplies');
+                profile_id_for_supplier := supplier_user_id;
+            ELSE
+                RAISE NOTICE '   Profile exists with id: %', profile_id_for_supplier;
+            END IF;
+            
+            RAISE NOTICE '   Creating supplier record with user_id = profile.id...';
+            
+            -- Insert supplier with user_id = profile.id (to satisfy FK)
+            INSERT INTO public.suppliers (id, user_id, company_name, email, phone, location, status)
+            VALUES (
+                gen_random_uuid(),
+                profile_id_for_supplier,  -- Use the profile's ID, not auth user ID
+                'Mama Ethan Supplies', 
+                'mamaethan@gmail.com', 
+                '+254700000000', 
+                'Nairobi, Kenya', 
+                'active'
+            )
+            RETURNING id INTO supplier_record_id;
+            
+            RAISE NOTICE '✅ Created supplier record: %', supplier_record_id;
+        END;
     END IF;
 
     -- =====================================================================
