@@ -512,8 +512,8 @@ const PrivateClientDashboard = () => {
                         Request Monitoring
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
-                      <DialogHeader>
+                    <DialogContent className="sm:max-w-[500px] max-h-[85vh] flex flex-col p-0">
+                      <DialogHeader className="p-6 pb-2">
                         <DialogTitle className="flex items-center gap-2">
                           <Video className="h-5 w-5 text-cyan-500" />
                           Request Site Monitoring
@@ -522,7 +522,9 @@ const PrivateClientDashboard = () => {
                           Fill in the details below to request camera monitoring services for your construction site.
                         </DialogDescription>
                       </DialogHeader>
-                      <div className="space-y-4 py-4">
+                      
+                      {/* Scrollable Form Content */}
+                      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
                         <div className="space-y-2">
                           <Label htmlFor="projectName">Project Name *</Label>
                           <Input
@@ -552,6 +554,7 @@ const PrivateClientDashboard = () => {
                             placeholder="Describe your project and monitoring needs..."
                             value={monitoringRequest.projectDescription}
                             onChange={(e) => setMonitoringRequest(prev => ({ ...prev, projectDescription: e.target.value }))}
+                            rows={2}
                           />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
@@ -587,10 +590,13 @@ const PrivateClientDashboard = () => {
                             placeholder="Any specific requirements or concerns..."
                             value={monitoringRequest.additionalNotes}
                             onChange={(e) => setMonitoringRequest(prev => ({ ...prev, additionalNotes: e.target.value }))}
+                            rows={2}
                           />
                         </div>
                       </div>
-                      <DialogFooter>
+                      
+                      {/* Fixed Footer */}
+                      <DialogFooter className="border-t p-6 pt-4 bg-background">
                         <Button variant="outline" onClick={() => setMonitoringDialogOpen(false)}>
                           Cancel
                         </Button>
