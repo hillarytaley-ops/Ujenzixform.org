@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { BuilderProfileEdit } from "@/components/builders/BuilderProfileEdit";
 import { BuilderVideoPortfolio } from "@/components/builders/BuilderVideoPortfolio";
+import { BuilderOrdersTracker } from "@/components/builders/BuilderOrdersTracker";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -437,28 +438,7 @@ const ProfessionalBuilderDashboardPage = () => {
           </TabsContent>
 
           <TabsContent value="orders">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Package className="h-5 w-5 text-blue-600" />
-                  Material Orders
-                </CardTitle>
-                <CardDescription>Track and manage bulk material orders</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-12 text-gray-500">
-                  <Package className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-                  <p className="text-lg font-medium">No orders yet</p>
-                  <p className="text-sm mb-4">Order materials for your projects</p>
-                  <Link to="/suppliers">
-                    <Button className="bg-blue-600 hover:bg-blue-700">
-                      <ShoppingCart className="h-4 w-4 mr-2" />
-                      Browse Materials
-                    </Button>
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
+            <BuilderOrdersTracker builderId={user?.id || ''} />
           </TabsContent>
 
           <TabsContent value="deliveries">
