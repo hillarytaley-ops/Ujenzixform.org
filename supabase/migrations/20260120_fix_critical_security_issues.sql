@@ -257,26 +257,27 @@ CREATE POLICY "Users can create deliveries"
 ON public.deliveries FOR INSERT TO authenticated
 WITH CHECK (builder_id = auth.uid());
 
--- Delivery providers can view deliveries assigned to them
+-- Delivery providers can view and update deliveries 
+-- (they have a role in user_roles table)
 CREATE POLICY "Delivery providers can view assigned deliveries"
 ON public.deliveries FOR SELECT TO authenticated
 USING (
-    delivery_provider_id IN (
-        SELECT id FROM public.delivery_providers 
-        WHERE user_id = auth.uid()
+    EXISTS (
+        SELECT 1 FROM public.user_roles ur
+        WHERE ur.user_id = auth.uid() 
+        AND ur.role = 'delivery_provider'
     )
-    OR driver_id = auth.uid()
 );
 
--- Delivery providers can update deliveries assigned to them
+-- Delivery providers can update deliveries
 CREATE POLICY "Delivery providers can update assigned deliveries"
 ON public.deliveries FOR UPDATE TO authenticated
 USING (
-    delivery_provider_id IN (
-        SELECT id FROM public.delivery_providers 
-        WHERE user_id = auth.uid()
+    EXISTS (
+        SELECT 1 FROM public.user_roles ur
+        WHERE ur.user_id = auth.uid() 
+        AND ur.role = 'delivery_provider'
     )
-    OR driver_id = auth.uid()
 );
 
 -- Suppliers can view deliveries for their orders
@@ -284,8 +285,9 @@ CREATE POLICY "Suppliers can view deliveries for their orders"
 ON public.deliveries FOR SELECT TO authenticated
 USING (
     EXISTS (
-        SELECT 1 FROM public.suppliers s
-        WHERE s.user_id = auth.uid()
+        SELECT 1 FROM public.user_roles ur
+        WHERE ur.user_id = auth.uid() 
+        AND ur.role = 'supplier'
     )
 );
 
