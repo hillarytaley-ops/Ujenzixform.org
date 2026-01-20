@@ -1721,46 +1721,35 @@ export const MaterialsGrid = () => {
                         )}
                       </div>
                       
-                      {/* ACTION BUTTONS - Unified for all builders */}
-                      <div className="space-y-2">
-                        {/* Add to Cart Button - Works for both Professional and Private Builders */}
-                        <Button 
-                          className="w-full h-10 text-sm font-semibold bg-green-600 hover:bg-green-700 text-white"
-                          onClick={() => {
-                            if (!isAuthenticated) {
-                              window.location.href = '/home';
-                              return;
-                            }
-                            // Both builder types use the same cart
-                            handleAddToCart();
-                            toast({
-                              title: '🛒 Added to Cart!',
-                              description: `${material.name} added. Open cart to Request Quote or Buy Now.`,
-                            });
-                          }}
-                          disabled={!material.in_stock}
-                        >
-                          <ShoppingCart className="h-4 w-4 mr-2" />
-                          Add to Cart
-                        </Button>
-                        
-                        {/* Quick Add to Cart & Open - For immediate checkout */}
-                        <Button 
-                          className="w-full h-10 text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white"
-                          onClick={() => {
-                            if (!isAuthenticated) {
-                              window.location.href = '/home';
-                              return;
-                            }
-                            handleAddToCart();
-                            setIsCartOpen(true);
-                          }}
-                          disabled={!material.in_stock}
-                        >
-                          <ShoppingCart className="h-4 w-4 mr-2" />
-                          Add & View Cart
-                        </Button>
-                      </div>
+                      {/* ACTION BUTTON - Single Add to Cart for all builders */}
+                      <Button 
+                        className="w-full h-11 text-sm font-semibold bg-green-600 hover:bg-green-700 text-white"
+                        onClick={() => {
+                          if (!isAuthenticated) {
+                            window.location.href = '/home';
+                            return;
+                          }
+                          handleAddToCart();
+                          toast({
+                            title: '🛒 Added to Cart!',
+                            description: `${material.name} added to cart.`,
+                            action: (
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => setIsCartOpen(true)}
+                                className="bg-white hover:bg-gray-100"
+                              >
+                                View Cart
+                              </Button>
+                            ),
+                          });
+                        }}
+                        disabled={!material.in_stock}
+                      >
+                        <ShoppingCart className="h-4 w-4 mr-2" />
+                        Add to Cart
+                      </Button>
                     </CardContent>
                   </Card>
                 );
