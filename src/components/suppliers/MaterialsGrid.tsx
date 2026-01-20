@@ -779,9 +779,10 @@ export const MaterialsGrid = () => {
         console.log(`📱 Device: ${isMobile ? 'Mobile' : 'Desktop'}`);
         
         // ✅ FAST: Fetch metadata only (NO image_url which contains huge base64 data)
-        const LIMIT = isMobile ? 50 : 100;
+        // Increased limit to show ALL admin images
+        const LIMIT = isMobile ? 100 : 500;
         const response = await fetch(
-          `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants&order=created_at.desc&limit=${LIMIT}`,
+          `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants&is_approved=eq.true&order=created_at.desc&limit=${LIMIT}`,
           {
             headers: {
               'apikey': SUPABASE_ANON_KEY,

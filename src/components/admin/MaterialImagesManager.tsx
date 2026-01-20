@@ -277,20 +277,25 @@ export const MaterialImagesManager: React.FC = () => {
   // ✅ PERFORMANCE OPTIMIZED: Only fetch metadata first, load images lazily
   const fetchAdminImages = async () => {
     try {
-      // ✅ FAST: Only fetch metadata (no image_url which contains huge base64 data)
+      // ✅ Fetch ALL admin images - no limit to ensure all uploaded images appear
       const { data, error, count } = await (supabase as any)
         .from('admin_material_images')
-        .select('id, name, category, is_featured, is_approved, created_at, description, unit, suggested_price', { count: 'exact' })
-        .order('created_at', { ascending: false })
-        .limit(100); // Limit to 100 items for fast initial load
+        .select('id, name, category, is_featured, is_approved, created_at, description, unit, suggested_price, pricing_type, variants', { count: 'exact' })
+        .order('created_at', { ascending: false });
       
       if (error) {
-        console.log('Admin images table not found or error:', error.message);
+        console.error('❌ Admin images fetch error:', error.message, error);
+        toast({
+          title: 'Error loading images',
+          description: error.message,
+          variant: 'destructive'
+        });
         setAdminImages([]);
         return;
       }
       
       if (!data || data.length === 0) {
+        console.log('📭 No admin images found in database');
         setAdminImages([]);
         return;
       }
@@ -307,10 +312,10 @@ export const MaterialImagesManager: React.FC = () => {
       
       setAdminImages(images);
       
-      // ✅ LAZY LOAD: Fetch image URLs in background for visible items
-      loadImageUrls(data.slice(0, 20).map((d: any) => d.id));
+      // ✅ LAZY LOAD: Fetch image URLs in background for first 30 visible items
+      loadImageUrls(data.slice(0, 30).map((d: any) => d.id));
     } catch (err) {
-      console.error('Error fetching admin images:', err);
+      console.error('❌ Error fetching admin images:', err);
       setAdminImages([]);
     }
   };
