@@ -1595,16 +1595,15 @@ export const MaterialImagesManager: React.FC = () => {
                   <div className="space-y-2">
                     {/* Header */}
                     <div className="grid grid-cols-12 gap-2 text-xs text-slate-400 font-medium px-1 border-b border-slate-700 pb-2">
-                      <div className="col-span-5">Size / Label</div>
-                      <div className="col-span-3">Price (KES)</div>
-                      <div className="col-span-3">Stock</div>
+                      <div className="col-span-6">Size / Label</div>
+                      <div className="col-span-5">Price (KES)</div>
                       <div className="col-span-1"></div>
                     </div>
                     
                     {/* Variant Rows */}
                     {uploadForm.variants.map((variant, index) => (
                       <div key={variant.id} className="grid grid-cols-12 gap-2 items-center">
-                        <div className="col-span-5">
+                        <div className="col-span-6">
                           <Input
                             placeholder="e.g., 1 inch, 2 inch"
                             value={variant.sizeLabel}
@@ -1616,7 +1615,7 @@ export const MaterialImagesManager: React.FC = () => {
                             className="bg-slate-700 border-slate-600 h-9 text-sm"
                           />
                         </div>
-                        <div className="col-span-3">
+                        <div className="col-span-5">
                           <Input
                             type="number"
                             placeholder="120"
@@ -1624,19 +1623,6 @@ export const MaterialImagesManager: React.FC = () => {
                             onChange={(e) => {
                               const newVariants = [...uploadForm.variants];
                               newVariants[index].price = parseFloat(e.target.value) || 0;
-                              setUploadForm(prev => ({ ...prev, variants: newVariants }));
-                            }}
-                            className="bg-slate-700 border-slate-600 h-9 text-sm"
-                          />
-                        </div>
-                        <div className="col-span-3">
-                          <Input
-                            type="number"
-                            placeholder="50"
-                            value={variant.stock || ''}
-                            onChange={(e) => {
-                              const newVariants = [...uploadForm.variants];
-                              newVariants[index].stock = parseInt(e.target.value) || 0;
                               setUploadForm(prev => ({ ...prev, variants: newVariants }));
                             }}
                             className="bg-slate-700 border-slate-600 h-9 text-sm"
@@ -2038,16 +2024,15 @@ export const MaterialImagesManager: React.FC = () => {
                               <div className="space-y-2">
                                 {/* Header */}
                                 <div className="grid grid-cols-12 gap-2 text-xs text-slate-400 font-medium border-b border-slate-600 pb-2">
-                                  <div className="col-span-5">Size / Label</div>
-                                  <div className="col-span-3">Price (KES)</div>
-                                  <div className="col-span-3">Stock</div>
+                                  <div className="col-span-6">Size / Label</div>
+                                  <div className="col-span-5">Price (KES)</div>
                                   <div className="col-span-1"></div>
                                 </div>
                                 
                                 {/* Variant Rows */}
                                 {item.variants.map((variant, vIdx) => (
                                   <div key={variant.id} className="grid grid-cols-12 gap-2 items-center">
-                                    <div className="col-span-5">
+                                    <div className="col-span-6">
                                       <Input
                                         placeholder="e.g., 1 inch"
                                         value={variant.sizeLabel}
@@ -2060,7 +2045,7 @@ export const MaterialImagesManager: React.FC = () => {
                                         disabled={item.uploaded || item.uploading}
                                       />
                                     </div>
-                                    <div className="col-span-3">
+                                    <div className="col-span-5">
                                       <Input
                                         type="number"
                                         placeholder="120"
@@ -2068,20 +2053,6 @@ export const MaterialImagesManager: React.FC = () => {
                                         onChange={(e) => {
                                           const newVariants = [...item.variants];
                                           newVariants[vIdx].price = parseFloat(e.target.value) || 0;
-                                          updateBulkItem(item.id, { variants: newVariants });
-                                        }}
-                                        className="bg-slate-600 border-slate-500 h-9 text-sm"
-                                        disabled={item.uploaded || item.uploading}
-                                      />
-                                    </div>
-                                    <div className="col-span-3">
-                                      <Input
-                                        type="number"
-                                        placeholder="50"
-                                        value={variant.stock || ''}
-                                        onChange={(e) => {
-                                          const newVariants = [...item.variants];
-                                          newVariants[vIdx].stock = parseInt(e.target.value) || 0;
                                           updateBulkItem(item.id, { variants: newVariants });
                                         }}
                                         className="bg-slate-600 border-slate-500 h-9 text-sm"
@@ -2409,16 +2380,15 @@ export const MaterialImagesManager: React.FC = () => {
                     <div className="space-y-2">
                       {/* Header */}
                       <div className="grid grid-cols-12 gap-2 text-xs text-slate-400 font-medium px-1 border-b border-slate-700 pb-2">
-                        <div className="col-span-5">Size / Label</div>
-                        <div className="col-span-3">Price (KES)</div>
-                        <div className="col-span-3">Stock</div>
+                        <div className="col-span-6">Size / Label</div>
+                        <div className="col-span-5">Price (KES)</div>
                         <div className="col-span-1"></div>
                       </div>
                       
                       {/* Variant Rows */}
                       {editForm.variants.map((variant, index) => (
                         <div key={variant.id} className="grid grid-cols-12 gap-2 items-center">
-                          <div className="col-span-5">
+                          <div className="col-span-6">
                             <Input
                               placeholder="e.g., 1 inch, 2 inch"
                               value={variant.sizeLabel}
@@ -2430,7 +2400,7 @@ export const MaterialImagesManager: React.FC = () => {
                               className="bg-slate-700 border-slate-600 h-9 text-sm"
                             />
                           </div>
-                          <div className="col-span-3">
+                          <div className="col-span-5">
                             <Input
                               type="number"
                               placeholder="120"
@@ -2438,19 +2408,6 @@ export const MaterialImagesManager: React.FC = () => {
                               onChange={(e) => {
                                 const newVariants = [...editForm.variants];
                                 newVariants[index].price = parseFloat(e.target.value) || 0;
-                                setEditForm(prev => ({ ...prev, variants: newVariants }));
-                              }}
-                              className="bg-slate-700 border-slate-600 h-9 text-sm"
-                            />
-                          </div>
-                          <div className="col-span-3">
-                            <Input
-                              type="number"
-                              placeholder="50"
-                              value={variant.stock || ''}
-                              onChange={(e) => {
-                                const newVariants = [...editForm.variants];
-                                newVariants[index].stock = parseInt(e.target.value) || 0;
                                 setEditForm(prev => ({ ...prev, variants: newVariants }));
                               }}
                               className="bg-slate-700 border-slate-600 h-9 text-sm"
