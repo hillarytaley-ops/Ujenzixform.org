@@ -9,6 +9,7 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+    exclude: ['node_modules', 'dist', '.idea', '.git', '.cache'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
@@ -20,6 +21,8 @@ export default defineConfig({
         '**/types/*',
       ],
     },
+    testTimeout: 10000,
+    hookTimeout: 10000,
   },
   resolve: {
     alias: {
@@ -27,8 +30,3 @@ export default defineConfig({
     },
   },
 });
-
-
-
-
-

@@ -4,60 +4,57 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { ErrorBoundary } from "@/components/ui/error-boundary";
+import { EnhancedErrorBoundary } from "@/components/ui/enhanced-error-boundary";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CartProvider } from "@/contexts/CartContext";
-// import { PrivacyPolicyBanner } from "@/components/PrivacyPolicyBanner";
-// import { DataPrivacyService } from "@/services/DataPrivacyService";
-// import { SecurityAudit } from "@/utils/SecurityAudit";
+import { OnboardingProvider } from "@/components/onboarding/OnboardingProvider";
 
-// Direct imports - NO lazy loading for instant page loads on all devices (especially iPhone)
+// Critical path imports - loaded immediately
 import Index from "./pages/Index";
-import Builders from "./pages/Builders";
-import BuilderRegistration from "./pages/BuilderRegistration";
-import ProfessionalBuilderRegistration from "./pages/ProfessionalBuilderRegistration";
-import PrivateBuilderRegistration from "./pages/PrivateBuilderRegistration";
-// Unified responsive Suppliers page (replaces SuppliersIPhone, SuppliersMobileOptimized, SupplierMarketplace)
-import Suppliers from "./pages/Suppliers";
-import BuilderPortal from "./pages/BuilderPortal";
-import About from "./pages/About";
-import Contact from "./pages/Contact";
 import Auth from "./pages/Auth";
-import AdminAuth from "./pages/AdminAuth";
-import ResetPassword from "./pages/ResetPassword";
-import Feedback from "./pages/Feedback";
-import Careers from "./pages/Careers";
-import Tracking from "./pages/Tracking";
-import Monitoring from "./pages/Monitoring";
-import Delivery from "./pages/Delivery";
-// Lazy load Scanners page for better performance (large component with camera access)
-const Scanners = React.lazy(() => import("./pages/Scanners"));
-import Analytics from "./pages/Analytics";
-import DeliveryProviderApplication from "./pages/DeliveryProviderApplication";
 import NotFound from "./pages/NotFound";
 
-// Dashboard imports
-import AdminDashboard from "./pages/AdminDashboard";
-import SupplierDashboard from "./pages/SupplierDashboard";
-import DeliveryDashboard from "./pages/DeliveryDashboard";
+// Lazy load non-critical pages for better bundle splitting
+const Builders = React.lazy(() => import("./pages/Builders"));
+const BuilderRegistration = React.lazy(() => import("./pages/BuilderRegistration"));
+const ProfessionalBuilderRegistration = React.lazy(() => import("./pages/ProfessionalBuilderRegistration"));
+const PrivateBuilderRegistration = React.lazy(() => import("./pages/PrivateBuilderRegistration"));
+const Suppliers = React.lazy(() => import("./pages/Suppliers"));
+const BuilderPortal = React.lazy(() => import("./pages/BuilderPortal"));
+const About = React.lazy(() => import("./pages/About"));
+const Contact = React.lazy(() => import("./pages/Contact"));
+const AdminAuth = React.lazy(() => import("./pages/AdminAuth"));
+const ResetPassword = React.lazy(() => import("./pages/ResetPassword"));
+const Feedback = React.lazy(() => import("./pages/Feedback"));
+const Careers = React.lazy(() => import("./pages/Careers"));
+const Tracking = React.lazy(() => import("./pages/Tracking"));
+const Monitoring = React.lazy(() => import("./pages/Monitoring"));
+const Delivery = React.lazy(() => import("./pages/Delivery"));
+const Scanners = React.lazy(() => import("./pages/Scanners"));
+const Analytics = React.lazy(() => import("./pages/Analytics"));
+const DeliveryProviderApplication = React.lazy(() => import("./pages/DeliveryProviderApplication"));
 
-// Additional pages
-import SupplierRegistration from "./pages/SupplierRegistration";
-// SupplierMarketplace replaced by unified Suppliers page
-import SupplierSignIn from "./pages/SupplierSignIn";
-import BuilderSignIn from "./pages/BuilderSignIn";
-import DeliverySignIn from "./pages/DeliverySignIn";
-import DeliveryReceivingScanner from "./pages/DeliveryReceivingScanner";
-import SupplierDispatchScanner from "./pages/SupplierDispatchScanner";
+// Dashboard imports - lazy loaded (heavy components)
+const AdminDashboard = React.lazy(() => import("./pages/AdminDashboard"));
+const SupplierDashboard = React.lazy(() => import("./pages/SupplierDashboard"));
+const DeliveryDashboard = React.lazy(() => import("./pages/DeliveryDashboard"));
 
-// New Sign-in pages for Private Clients and Professional Builders
-import PrivateClientSignIn from "./pages/PrivateClientSignIn";
-import ProfessionalBuilderSignIn from "./pages/ProfessionalBuilderSignIn";
-import PrivateClientDashboard from "./pages/PrivateClientDashboard";
-import ProfessionalBuilderDashboardPage from "./pages/ProfessionalBuilderDashboard";
-import PublicBuilderProfile from "./pages/PublicBuilderProfile";
+// Additional pages - lazy loaded
+const SupplierRegistration = React.lazy(() => import("./pages/SupplierRegistration"));
+const SupplierSignIn = React.lazy(() => import("./pages/SupplierSignIn"));
+const BuilderSignIn = React.lazy(() => import("./pages/BuilderSignIn"));
+const DeliverySignIn = React.lazy(() => import("./pages/DeliverySignIn"));
+const DeliveryReceivingScanner = React.lazy(() => import("./pages/DeliveryReceivingScanner"));
+const SupplierDispatchScanner = React.lazy(() => import("./pages/SupplierDispatchScanner"));
+
+// Sign-in pages - lazy loaded
+const PrivateClientSignIn = React.lazy(() => import("./pages/PrivateClientSignIn"));
+const ProfessionalBuilderSignIn = React.lazy(() => import("./pages/ProfessionalBuilderSignIn"));
+const PrivateClientDashboard = React.lazy(() => import("./pages/PrivateClientDashboard"));
+const ProfessionalBuilderDashboardPage = React.lazy(() => import("./pages/ProfessionalBuilderDashboard"));
+const PublicBuilderProfile = React.lazy(() => import("./pages/PublicBuilderProfile"));
 
 // Auth Guard
 import { AuthRequired } from "@/components/security/AuthRequired";
@@ -72,27 +69,21 @@ import { LiveChatWidget } from "@/components/chat/LiveChatWidget";
 // Floating Social Media Button
 import { FloatingSocialSidebar } from "@/components/FloatingSocialSidebar";
 
-// Optimized loading component
+// Optimized loading component with skeleton animation
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-screen bg-background">
-    <div className="animate-spin rounded-full h-8 w-8 border-2 border-muted border-t-primary"></div>
+    <div className="flex flex-col items-center gap-4">
+      <div className="animate-spin rounded-full h-10 w-10 border-3 border-muted border-t-primary"></div>
+      <p className="text-muted-foreground text-sm animate-pulse">Loading...</p>
+    </div>
   </div>
 );
 
-// Error fallback component
-const ErrorFallback = ({ error, resetErrorBoundary }: { error: Error; resetErrorBoundary: () => void }) => (
-  <div className="flex items-center justify-center min-h-screen bg-background">
-    <div className="text-center max-w-md mx-auto p-6">
-      <h2 className="text-2xl font-bold text-destructive mb-4">Oops! Something went wrong</h2>
-      <p className="text-muted-foreground mb-4">{error.message}</p>
-      <button 
-        onClick={resetErrorBoundary}
-        className="bg-primary text-primary-foreground px-4 py-2 rounded hover:bg-primary/90"
-      >
-        Try Again
-      </button>
-    </div>
-  </div>
+// Suspense wrapper for lazy components
+const SuspenseWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <React.Suspense fallback={<PageLoader />}>
+    {children}
+  </React.Suspense>
 );
 
 // Optimized QueryClient with aggressive caching for better performance
@@ -178,6 +169,7 @@ const App = () => {
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
           <CartProvider>
+            <OnboardingProvider>
             <TooltipProvider>
               <Toaster />
               <Sonner />
@@ -194,68 +186,64 @@ const App = () => {
                 {/* Floating Social Media Button - Global, hides on auth pages */}
                 {showChat && <FloatingSocialSidebar />}
                 
-                <ErrorBoundary fallback={<ErrorFallback error={new Error('Page failed to load')} resetErrorBoundary={() => window.location.reload()} />}>
+                <EnhancedErrorBoundary>
                 <Routes>
                     {/* Public Routes - Accessible to everyone after single sign in */}
                     <Route path="/" element={<Auth />} />
                     <Route path="/auth" element={<Auth />} />
-                    <Route path="/admin-login" element={<AdminAuth />} />
-                    <Route path="/reset-password" element={<ResetPassword />} />
+                    <Route path="/admin-login" element={<SuspenseWrapper><AdminAuth /></SuspenseWrapper>} />
+                    <Route path="/reset-password" element={<SuspenseWrapper><ResetPassword /></SuspenseWrapper>} />
                     
                     {/* All pages accessible after sign in - no repeated auth required */}
                     <Route path="/home" element={<Index />} />
-                    <Route path="/suppliers" element={<Suppliers />} />
-                    <Route path="/suppliers-mobile" element={<Suppliers />} />
-                    <Route path="/supplier-marketplace" element={<Suppliers />} />
-                    <Route path="/builders" element={<Builders />} />
-                    <Route path="/builder/:builderId" element={<PublicBuilderProfile />} />
-                    <Route path="/about" element={<About />} />
-                    <Route path="/contact" element={<Contact />} />
-                    <Route path="/monitoring" element={<Monitoring />} />
-                    <Route path="/tracking" element={<Tracking />} />
-                    <Route path="/delivery" element={<Delivery />} />
-                    <Route path="/scanners" element={
-                      <React.Suspense fallback={<PageLoader />}>
-                        <Scanners />
-                      </React.Suspense>
-                    } />
-                    <Route path="/feedback" element={<Feedback />} />
-                    <Route path="/careers" element={<Careers />} />
+                    <Route path="/suppliers" element={<SuspenseWrapper><Suppliers /></SuspenseWrapper>} />
+                    <Route path="/suppliers-mobile" element={<SuspenseWrapper><Suppliers /></SuspenseWrapper>} />
+                    <Route path="/supplier-marketplace" element={<SuspenseWrapper><Suppliers /></SuspenseWrapper>} />
+                    <Route path="/builders" element={<SuspenseWrapper><Builders /></SuspenseWrapper>} />
+                    <Route path="/builder/:builderId" element={<SuspenseWrapper><PublicBuilderProfile /></SuspenseWrapper>} />
+                    <Route path="/about" element={<SuspenseWrapper><About /></SuspenseWrapper>} />
+                    <Route path="/contact" element={<SuspenseWrapper><Contact /></SuspenseWrapper>} />
+                    <Route path="/monitoring" element={<SuspenseWrapper><Monitoring /></SuspenseWrapper>} />
+                    <Route path="/tracking" element={<SuspenseWrapper><Tracking /></SuspenseWrapper>} />
+                    <Route path="/delivery" element={<SuspenseWrapper><Delivery /></SuspenseWrapper>} />
+                    <Route path="/scanners" element={<SuspenseWrapper><Scanners /></SuspenseWrapper>} />
+                    <Route path="/feedback" element={<SuspenseWrapper><Feedback /></SuspenseWrapper>} />
+                    <Route path="/careers" element={<SuspenseWrapper><Careers /></SuspenseWrapper>} />
                     
                     {/* Auth required only for sensitive actions */}
                     <Route path="/portal" element={
                       <AuthRequired>
-                        <BuilderPortal />
+                        <SuspenseWrapper><BuilderPortal /></SuspenseWrapper>
                       </AuthRequired>
                     } />
                     <Route path="/builder-registration" element={
                       <AuthRequired>
-                        <BuilderRegistration />
+                        <SuspenseWrapper><BuilderRegistration /></SuspenseWrapper>
                       </AuthRequired>
                     } />
                     {/* Registration pages - NO auth required (new users registering) */}
-                    <Route path="/builders/register" element={<BuilderRegistration />} />
-                    <Route path="/professional-builder-registration" element={<ProfessionalBuilderRegistration />} />
-                    <Route path="/private-client-registration" element={<PrivateBuilderRegistration />} />
+                    <Route path="/builders/register" element={<SuspenseWrapper><BuilderRegistration /></SuspenseWrapper>} />
+                    <Route path="/professional-builder-registration" element={<SuspenseWrapper><ProfessionalBuilderRegistration /></SuspenseWrapper>} />
+                    <Route path="/private-client-registration" element={<SuspenseWrapper><PrivateBuilderRegistration /></SuspenseWrapper>} />
                     {/* Alias for private-client-registration (some links use this path) */}
-                    <Route path="/private-builder-registration" element={<PrivateBuilderRegistration />} />
+                    <Route path="/private-builder-registration" element={<SuspenseWrapper><PrivateBuilderRegistration /></SuspenseWrapper>} />
                     <Route path="/analytics" element={
                       <AuthRequired>
-                        <Analytics />
+                        <SuspenseWrapper><Analytics /></SuspenseWrapper>
                       </AuthRequired>
                     } />
                     <Route path="/delivery/apply" element={
                       <AuthRequired>
-                        <DeliveryProviderApplication />
+                        <SuspenseWrapper><DeliveryProviderApplication /></SuspenseWrapper>
                       </AuthRequired>
                     } />
                     
                     {/* Sign-in Routes for specific roles */}
-                    <Route path="/supplier-signin" element={<SupplierSignIn />} />
-                    <Route path="/builder-signin" element={<BuilderSignIn />} />
-                    <Route path="/delivery-signin" element={<DeliverySignIn />} />
-                    <Route path="/private-client-signin" element={<PrivateClientSignIn />} />
-                    <Route path="/professional-builder-signin" element={<ProfessionalBuilderSignIn />} />
+                    <Route path="/supplier-signin" element={<SuspenseWrapper><SupplierSignIn /></SuspenseWrapper>} />
+                    <Route path="/builder-signin" element={<SuspenseWrapper><BuilderSignIn /></SuspenseWrapper>} />
+                    <Route path="/delivery-signin" element={<SuspenseWrapper><DeliverySignIn /></SuspenseWrapper>} />
+                    <Route path="/private-client-signin" element={<SuspenseWrapper><PrivateClientSignIn /></SuspenseWrapper>} />
+                    <Route path="/professional-builder-signin" element={<SuspenseWrapper><ProfessionalBuilderSignIn /></SuspenseWrapper>} />
                     
                     {/* Redirect common URL typos (sign-in vs signin) to correct paths */}
                     <Route path="/supplier-sign-in" element={<Navigate to="/supplier-signin" replace />} />
@@ -265,8 +253,8 @@ const App = () => {
                     <Route path="/professional-builder-sign-in" element={<Navigate to="/professional-builder-signin" replace />} />
                     
                     {/* Registration Routes */}
-                    <Route path="/supplier-registration" element={<SupplierRegistration />} />
-                    <Route path="/supplier-marketplace" element={<Suppliers />} />
+                    <Route path="/supplier-registration" element={<SuspenseWrapper><SupplierRegistration /></SuspenseWrapper>} />
+                    <Route path="/supplier-marketplace" element={<SuspenseWrapper><Suppliers /></SuspenseWrapper>} />
                     
                     {/* Admin Sub-Routes - Redirect to dashboard with tab param */}
                     <Route path="/admin/pending-registrations" element={<Navigate to="/admin-dashboard?tab=registrations" replace />} />
@@ -277,7 +265,7 @@ const App = () => {
                     {/* Dashboard Routes - Protected */}
                     <Route path="/admin-dashboard" element={
                       <RoleProtectedRoute allowedRoles={['admin']}>
-                        <AdminDashboard />
+                        <SuspenseWrapper><AdminDashboard /></SuspenseWrapper>
                       </RoleProtectedRoute>
                     } />
                     {/* Redirect /builder-dashboard to appropriate dashboard based on role */}
@@ -286,42 +274,43 @@ const App = () => {
                     } />
                     <Route path="/supplier-dashboard" element={
                       <RoleProtectedRoute allowedRoles={['supplier', 'admin']}>
-                        <SupplierDashboard />
+                        <SuspenseWrapper><SupplierDashboard /></SuspenseWrapper>
                       </RoleProtectedRoute>
                     } />
                     <Route path="/delivery-dashboard" element={
                       <RoleProtectedRoute allowedRoles={['delivery', 'delivery_provider', 'admin']}>
-                        <DeliveryDashboard />
+                        <SuspenseWrapper><DeliveryDashboard /></SuspenseWrapper>
                       </RoleProtectedRoute>
                     } />
                     <Route path="/private-client-dashboard" element={
                       <RoleProtectedRoute allowedRoles={['private_client', 'admin']}>
-                        <PrivateClientDashboard />
+                        <SuspenseWrapper><PrivateClientDashboard /></SuspenseWrapper>
                       </RoleProtectedRoute>
                     } />
                     <Route path="/professional-builder-dashboard" element={
                       <RoleProtectedRoute allowedRoles={['professional_builder', 'admin']}>
-                        <ProfessionalBuilderDashboardPage />
+                        <SuspenseWrapper><ProfessionalBuilderDashboardPage /></SuspenseWrapper>
                       </RoleProtectedRoute>
                     } />
                     <Route path="/delivery-receiving-scanner" element={
                       <RoleProtectedRoute allowedRoles={['delivery', 'delivery_provider', 'admin']}>
-                        <DeliveryReceivingScanner />
+                        <SuspenseWrapper><DeliveryReceivingScanner /></SuspenseWrapper>
                       </RoleProtectedRoute>
                     } />
                     <Route path="/supplier-dispatch-scanner" element={
                       <RoleProtectedRoute allowedRoles={['supplier', 'admin']}>
-                        <SupplierDispatchScanner />
+                        <SuspenseWrapper><SupplierDispatchScanner /></SuspenseWrapper>
                       </RoleProtectedRoute>
                     } />
                     
                     {/* 404 */}
                     <Route path="*" element={<NotFound />} />
                 </Routes>
-                </ErrorBoundary>
+                </EnhancedErrorBoundary>
                 {/* Privacy features will be re-enabled once dependencies are resolved */}
               </BrowserRouter>
             </TooltipProvider>
+            </OnboardingProvider>
             </CartProvider>
           </AuthProvider>
         </QueryClientProvider>

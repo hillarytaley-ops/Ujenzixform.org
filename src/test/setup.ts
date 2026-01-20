@@ -1,12 +1,5 @@
 import '@testing-library/jest-dom';
-import React from 'react';
-import { cleanup } from '@testing-library/react';
-import { afterEach, vi } from 'vitest';
-
-// Cleanup after each test
-afterEach(() => {
-  cleanup();
-});
+import { vi } from 'vitest';
 
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {
@@ -23,22 +16,40 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 });
 
-// Mock ResizeObserver
-global.ResizeObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
-}));
-
 // Mock IntersectionObserver
-global.IntersectionObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn(),
-}));
+class MockIntersectionObserver {
+  readonly root: Element | null = null;
+  readonly rootMargin: string = '';
+  readonly thresholds: ReadonlyArray<number> = [];
+  
+  observe = vi.fn();
+  unobserve = vi.fn();
+  disconnect = vi.fn();
+  takeRecords = vi.fn().mockReturnValue([]);
+}
+
+Object.defineProperty(window, 'IntersectionObserver', {
+  writable: true,
+  value: MockIntersectionObserver,
+});
+
+// Mock ResizeObserver
+class MockResizeObserver {
+  observe = vi.fn();
+  unobserve = vi.fn();
+  disconnect = vi.fn();
+}
+
+Object.defineProperty(window, 'ResizeObserver', {
+  writable: true,
+  value: MockResizeObserver,
+});
 
 // Mock scrollTo
-window.scrollTo = vi.fn();
+Object.defineProperty(window, 'scrollTo', {
+  writable: true,
+  value: vi.fn(),
+});
 
 // Mock localStorage
 const localStorageMock = {
@@ -46,65 +57,42 @@ const localStorageMock = {
   setItem: vi.fn(),
   removeItem: vi.fn(),
   clear: vi.fn(),
+  length: 0,
+  key: vi.fn(),
 };
-Object.defineProperty(window, 'localStorage', { value: localStorageMock });
+Object.defineProperty(window, 'localStorage', {
+  value: localStorageMock,
+});
 
-// Mock Supabase client
-vi.mock('@/integrations/supabase/client', () => ({
-  supabase: {
-    auth: {
-      getUser: vi.fn().mockResolvedValue({ data: { user: null }, error: null }),
-      getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
-      signInWithPassword: vi.fn(),
-      signUp: vi.fn(),
-      signOut: vi.fn(),
-      onAuthStateChange: vi.fn().mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } }),
-      updateUser: vi.fn(),
-    },
-    from: vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnThis(),
-      insert: vi.fn().mockReturnThis(),
-      update: vi.fn().mockReturnThis(),
-      delete: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      limit: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({ data: null, error: null }),
-      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+// Mock Notification API
+Object.defineProperty(window, 'Notification', {
+  writable: true,
+  value: {
+    permission: 'default',
+    requestPermission: vi.fn().mockResolvedValue('granted'),
+  },
+});
+
+// Mock navigator.serviceWorker
+Object.defineProperty(navigator, 'serviceWorker', {
+  writable: true,
+  value: {
+    ready: Promise.resolve({
+      pushManager: {
+        getSubscription: vi.fn().mockResolvedValue(null),
+        subscribe: vi.fn().mockResolvedValue({
+          toJSON: vi.fn().mockReturnValue({}),
+        }),
+      },
+      showNotification: vi.fn(),
     }),
   },
-}));
+});
 
-// Mock AuthContext
-vi.mock('@/contexts/AuthContext', () => ({
-  useAuth: () => ({
-    user: null,
-    session: null,
-    loading: false,
-    userRole: null,
-    signOut: vi.fn(),
-    refreshSession: vi.fn(),
-    refreshUserRole: vi.fn(),
-  }),
-  AuthProvider: ({ children }: { children: React.ReactNode }) => children,
-}));
+// Suppress console errors in tests (optional)
+// vi.spyOn(console, 'error').mockImplementation(() => {});
 
-// Mock ThemeContext
-vi.mock('@/contexts/ThemeContext', () => ({
-  useTheme: () => ({
-    theme: 'light',
-    setTheme: vi.fn(),
-    toggleTheme: vi.fn(),
-  }),
-  ThemeProvider: ({ children }: { children: React.ReactNode }) => children,
-}));
-
-// Mock LanguageContext
-vi.mock('@/contexts/LanguageContext', () => ({
-  useLanguage: () => ({
-    language: 'en',
-    setLanguage: vi.fn(),
-    t: (key: string) => key,
-  }),
-  LanguageProvider: ({ children }: { children: React.ReactNode }) => children,
-}));
-
+// Reset all mocks after each test
+afterEach(() => {
+  vi.clearAllMocks();
+});
