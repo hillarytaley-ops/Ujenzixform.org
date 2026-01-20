@@ -1636,7 +1636,7 @@ export const MaterialsGrid = () => {
                           >
                             {material.variants.map((variant) => (
                               <option key={variant.id} value={variant.id}>
-                                {variant.sizeLabel} - KES {variant.price.toLocaleString()} {variant.stock > 0 ? `(${variant.stock} in stock)` : '(Out of stock)'}
+                                {variant.sizeLabel} - KES {variant.price.toLocaleString()}
                               </option>
                             ))}
                           </select>
