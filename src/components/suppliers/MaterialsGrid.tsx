@@ -1440,23 +1440,20 @@ export const MaterialsGrid = () => {
                     }, 1500);
                     return;
                   }
-                  // Only Private Builders can buy directly
-                  if (userRole !== 'private_client' && userRole !== 'admin') {
-                    if (userRole === 'professional_builder') {
-                      toast({
-                        title: '📋 Use Request Quote Instead',
-                        description: 'As a Professional Builder, please use "Request Quote" for bulk orders and competitive pricing.',
-                        variant: 'destructive',
-                      });
-                    } else {
-                      toast({
-                        title: '⚠️ Private Builder Account Required',
-                        description: 'Only Private Builders can purchase materials directly. Please register as a Private Builder.',
-                        variant: 'destructive',
-                      });
-                    }
+                  
+                  // Both Professional Builders and Private Clients can add to cart
+                  if (userRole !== 'private_client' && userRole !== 'professional_builder' && userRole !== 'admin') {
+                    toast({
+                      title: '⚠️ Builder Account Required',
+                      description: 'Please register as a Private Client or Professional Builder to purchase materials.',
+                      variant: 'destructive',
+                    });
                     return;
                   }
+                  
+                  // Ensure quantity is at least 1
+                  const qtyToAdd = currentQty > 0 ? currentQty : 1;
+                  
                   // Get the correct price based on variant selection
                   let unitPrice = material.unit_price;
                   let itemName = material.name;
@@ -1479,11 +1476,10 @@ export const MaterialsGrid = () => {
                     image_url: imageUrl,
                     supplier_name: material.supplier?.company_name || 'UjenziXform Catalog',
                     supplier_id: material.supplier_id
-                  }, currentQty);
-                  toast({
-                    title: '🛒 Added to Cart!',
-                    description: `${currentQty} x ${itemName} added to your cart.`,
-                  });
+                  }, qtyToAdd);
+                  
+                  // Reset quantity counter after adding to cart
+                  setQuantities(prev => ({ ...prev, [material.id]: 0 }));
                 };
 
                 const isSelectedForCompare = compareItems.has(material.id);
@@ -1729,10 +1725,11 @@ export const MaterialsGrid = () => {
                             window.location.href = '/home';
                             return;
                           }
+                          const qtyToAdd = currentQty > 0 ? currentQty : 1;
                           handleAddToCart();
                           toast({
                             title: '🛒 Added to Cart!',
-                            description: `${material.name} added to cart.`,
+                            description: `${qtyToAdd} x ${material.name} added to cart.`,
                             action: (
                               <Button 
                                 variant="outline" 
