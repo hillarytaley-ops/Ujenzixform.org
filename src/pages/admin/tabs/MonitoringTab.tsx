@@ -66,7 +66,7 @@ interface MonitoringTabProps {
   onToggleStatus: (id: string, currentStatus: boolean) => Promise<boolean>;
 }
 
-// Connection type configurations
+// Connection type configurations - Simplified to 4 main options
 const connectionTypes: {
   value: CameraConnectionType;
   label: string;
@@ -76,66 +76,31 @@ const connectionTypes: {
 }[] = [
   {
     value: 'url',
-    label: 'URL Link',
+    label: 'Web Link',
     icon: Link,
-    description: 'Simple HTTP/HTTPS link to camera stream or viewer',
-    fields: ['stream_url'],
-  },
-  {
-    value: 'rtsp',
-    label: 'RTSP Stream',
-    icon: Video,
-    description: 'Real-Time Streaming Protocol (rtsp://)',
-    fields: ['ip_address', 'port', 'username', 'password', 'stream_url'],
-  },
-  {
-    value: 'hls',
-    label: 'HLS Stream',
-    icon: Play,
-    description: 'HTTP Live Streaming (.m3u8)',
+    description: 'Paste any camera URL or web viewer link',
     fields: ['stream_url'],
   },
   {
     value: 'ip_camera',
     label: 'IP Camera',
     icon: Wifi,
-    description: 'Direct IP camera with authentication',
+    description: 'Connect using IP address with login credentials',
     fields: ['ip_address', 'port', 'username', 'password'],
-  },
-  {
-    value: 'onvif',
-    label: 'ONVIF Protocol',
-    icon: Server,
-    description: 'Open Network Video Interface Forum standard',
-    fields: ['ip_address', 'port', 'username', 'password'],
-  },
-  {
-    value: 'webrtc',
-    label: 'WebRTC',
-    icon: Radio,
-    description: 'Web Real-Time Communication peer connection',
-    fields: ['stream_url', 'username', 'password'],
   },
   {
     value: 'embedded',
-    label: 'Embedded Viewer',
+    label: 'Embed Code',
     icon: Code,
-    description: 'Embed code from camera provider (iframe, etc.)',
+    description: 'Paste embed code from your camera provider',
     fields: ['embed_code'],
   },
   {
-    value: 'usb',
-    label: 'USB Camera',
-    icon: Monitor,
-    description: 'Local USB webcam connected to server',
-    fields: ['stream_url'],
-  },
-  {
     value: 'mobile',
-    label: 'Mobile Device',
+    label: 'Mobile Phone',
     icon: Smartphone,
-    description: 'Phone or tablet camera as IP webcam',
-    fields: ['ip_address', 'port', 'stream_url'],
+    description: 'Use your phone as a camera with IP Webcam app',
+    fields: ['stream_url'],
   },
 ];
 
@@ -747,7 +712,7 @@ const CameraCard: React.FC<CameraCardProps> = ({
     }
 
     // For IP cameras, show connection info
-    if ((connectionType === 'ip_camera' || connectionType === 'onvif' || connectionType === 'rtsp') && camera.ip_address) {
+    if (connectionType === 'ip_camera' && camera.ip_address) {
       return (
         <div className="text-center">
           <ConnectionIcon className="h-12 w-12 text-purple-500 mx-auto mb-2" />
@@ -1017,25 +982,21 @@ const CameraModal: React.FC<CameraModalProps> = ({
             {requiredFields.includes('stream_url') && (
               <div>
                 <Label className="text-gray-300">
-                  {formData.connection_type === 'rtsp' ? 'RTSP URL' :
-                   formData.connection_type === 'hls' ? 'HLS URL (.m3u8)' :
-                   formData.connection_type === 'webrtc' ? 'WebRTC Signaling URL' :
-                   'Stream URL'}
+                  {formData.connection_type === 'mobile' ? 'IP Webcam URL' : 'Camera URL'}
                 </Label>
                 <Input
                   placeholder={
-                    formData.connection_type === 'rtsp' ? 'rtsp://192.168.1.100:554/stream1' :
-                    formData.connection_type === 'hls' ? 'https://example.com/stream.m3u8' :
-                    'https://camera.example.com/stream'
+                    formData.connection_type === 'mobile' 
+                      ? 'http://192.168.1.100:8080/video' 
+                      : 'https://camera.example.com/stream'
                   }
                   className="bg-slate-800 border-slate-700 text-white mt-1"
                   value={formData.stream_url}
                   onChange={(e) => setFormData((prev) => ({ ...prev, stream_url: e.target.value }))}
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  {formData.connection_type === 'rtsp' && 'Format: rtsp://[username:password@]ip:port/path'}
-                  {formData.connection_type === 'hls' && 'HTTP Live Streaming manifest URL'}
-                  {formData.connection_type === 'url' && 'Direct link to camera web interface or stream'}
+                  {formData.connection_type === 'mobile' && 'Get this URL from your IP Webcam app'}
+                  {formData.connection_type === 'url' && 'Paste the link to your camera viewer or stream'}
                 </p>
               </div>
             )}
@@ -1057,7 +1018,7 @@ const CameraModal: React.FC<CameraModalProps> = ({
                     <Label className="text-gray-300">Port</Label>
                     <Input
                       type="number"
-                      placeholder={formData.connection_type === 'rtsp' ? '554' : '80'}
+                      placeholder="80"
                       className="bg-slate-800 border-slate-700 text-white mt-1"
                       value={formData.port || ''}
                       onChange={(e) => setFormData((prev) => ({ ...prev, port: parseInt(e.target.value) || undefined }))}
