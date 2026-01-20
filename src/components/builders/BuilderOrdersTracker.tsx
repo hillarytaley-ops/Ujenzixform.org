@@ -22,7 +22,10 @@ import {
   ChevronDown,
   ChevronUp,
   Download,
-  Maximize2
+  Maximize2,
+  ShieldCheck,
+  ShieldX,
+  AlertCircle
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -38,6 +41,17 @@ interface MaterialItem {
   quantity: number;
   unit: string;
   status: string;
+  // New fields for enhanced tracking
+  buyer_id?: string;
+  buyer_name?: string;
+  buyer_email?: string;
+  item_unit_price?: number;
+  item_total_price?: number;
+  dispatch_scanned?: boolean;
+  dispatch_scanned_at?: string;
+  receive_scanned?: boolean;
+  receive_scanned_at?: string;
+  supplier_id?: string;
 }
 
 interface PurchaseOrder {
@@ -130,7 +144,7 @@ const QRCodeDialog: React.FC<{
             {item.material_type}
           </DialogTitle>
           <DialogDescription className="text-base">
-            Scan this QR code with your phone camera to track material delivery
+            Your unique QR code for this item. Each code can only be scanned once.
           </DialogDescription>
         </DialogHeader>
         
@@ -138,6 +152,32 @@ const QRCodeDialog: React.FC<{
           {/* MASSIVE QR Code for scanning */}
           <div className="p-6 bg-white rounded-2xl shadow-2xl border-4 border-blue-300">
             <canvas ref={canvasRef} className="rounded-lg" />
+          </div>
+
+          {/* Scan Status Indicators */}
+          <div className="w-full grid grid-cols-2 gap-4">
+            <div className={`p-4 rounded-xl text-center ${item.dispatch_scanned ? 'bg-green-100 border-2 border-green-400' : 'bg-gray-100 border-2 border-gray-300'}`}>
+              <div className="flex items-center justify-center gap-2 mb-2">
+                {item.dispatch_scanned ? <ShieldCheck className="h-6 w-6 text-green-600" /> : <ShieldX className="h-6 w-6 text-gray-400" />}
+                <p className={`font-bold ${item.dispatch_scanned ? 'text-green-700' : 'text-gray-500'}`}>Dispatch</p>
+              </div>
+              {item.dispatch_scanned ? (
+                <p className="text-sm text-green-600">✓ Supplier scanned</p>
+              ) : (
+                <p className="text-sm text-gray-500">Awaiting dispatch</p>
+              )}
+            </div>
+            <div className={`p-4 rounded-xl text-center ${item.receive_scanned ? 'bg-green-100 border-2 border-green-400' : 'bg-gray-100 border-2 border-gray-300'}`}>
+              <div className="flex items-center justify-center gap-2 mb-2">
+                {item.receive_scanned ? <ShieldCheck className="h-6 w-6 text-green-600" /> : <ShieldX className="h-6 w-6 text-gray-400" />}
+                <p className={`font-bold ${item.receive_scanned ? 'text-green-700' : 'text-gray-500'}`}>Received</p>
+              </div>
+              {item.receive_scanned ? (
+                <p className="text-sm text-green-600">✓ You confirmed receipt</p>
+              ) : (
+                <p className="text-sm text-gray-500">Scan when you receive</p>
+              )}
+            </div>
           </div>
           
           {/* QR Code Value */}
@@ -155,20 +195,20 @@ const QRCodeDialog: React.FC<{
             </div>
             <div className="bg-green-50 p-4 rounded-xl text-center">
               <p className="text-green-600 text-sm font-medium">Category</p>
-              <p className="font-bold text-2xl">{item.category}</p>
+              <p className="font-bold text-xl">{item.category}</p>
             </div>
-            <div className="bg-purple-50 p-4 rounded-xl col-span-2 text-center">
-              <p className="text-purple-600 text-sm font-medium mb-2">Status</p>
-              <Badge className={`text-lg px-6 py-2 ${
-                item.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                item.status === 'dispatched' ? 'bg-blue-100 text-blue-800' :
-                item.status === 'in_transit' ? 'bg-purple-100 text-purple-800' :
-                item.status === 'received' ? 'bg-green-100 text-green-800' :
-                'bg-gray-100 text-gray-800'
-              }`}>
-                {item.status.replace('_', ' ').toUpperCase()}
-              </Badge>
-            </div>
+            {item.item_total_price && item.item_total_price > 0 && (
+              <div className="bg-purple-50 p-4 rounded-xl col-span-2 text-center">
+                <p className="text-purple-600 text-sm font-medium">Item Value</p>
+                <p className="font-bold text-2xl text-purple-700">KES {item.item_total_price.toLocaleString()}</p>
+              </div>
+            )}
+          </div>
+
+          {/* One-Time Scan Info */}
+          <div className="w-full flex items-center gap-3 text-blue-700 bg-blue-50 border border-blue-200 px-4 py-3 rounded-xl">
+            <AlertCircle className="h-5 w-5 flex-shrink-0" />
+            <p className="text-sm">This QR code is unique to this item and can only be scanned once for dispatch and once for receiving.</p>
           </div>
           
           {/* Download Button */}
