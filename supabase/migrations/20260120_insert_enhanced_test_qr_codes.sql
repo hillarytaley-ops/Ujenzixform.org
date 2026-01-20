@@ -31,7 +31,13 @@ DROP TRIGGER IF EXISTS trigger_auto_generate_item_qr_codes ON public.purchase_or
 DROP TRIGGER IF EXISTS trigger_auto_generate_qr_codes ON public.purchase_orders;
 DROP TRIGGER IF EXISTS trigger_auto_generate_qr_on_confirm ON public.purchase_orders;
 
--- STEP 2: Clean up previous test data
+-- STEP 2: Clean up previous test data (order matters due to foreign keys!)
+-- First, clear the scan references from material_items
+UPDATE public.material_items 
+SET dispatch_scan_id = NULL, receiving_scan_id = NULL 
+WHERE qr_code LIKE 'UJP-%';
+
+-- Now delete in correct order (child tables first)
 DELETE FROM public.qr_scan_events WHERE qr_code LIKE 'UJP-%';
 DELETE FROM public.material_items WHERE qr_code LIKE 'UJP-%';
 DELETE FROM public.purchase_orders WHERE po_number LIKE 'PO-TEST-%' OR po_number LIKE 'PO-ENH-%';
