@@ -178,35 +178,12 @@ export function SupabaseSecurityAdvisor() {
         }
       }
 
-      // 5. Check for publicly accessible sensitive tables (using SecurityAudit)
-      try {
-        const criticalTables = ['profiles', 'payments', 'deliveries', 'suppliers', 'delivery_providers'];
-        for (const table of criticalTables) {
-          try {
-            const { data, error } = await supabase
-              .from(table as any)
-              .select('id')
-              .limit(1);
-
-            if (!error && data !== null) {
-              allIssues.push({
-                id: `public-${table}`,
-                type: 'error',
-                category: 'Public Access',
-                title: `Table "${table}" is publicly accessible`,
-                description: `The table "${table}" can be accessed without authentication. This is a critical security vulnerability.`,
-                severity: 'critical',
-                affectedResource: table,
-                recommendation: `Enable RLS and create restrictive policies for "${table}" table immediately.`
-              });
-            }
-          } catch (err) {
-            // Table is likely secured, which is good
-          }
-        }
-      } catch (error) {
-        console.error('Public access check failed:', error);
-      }
+      // 5. Check for publicly accessible sensitive tables
+      // NOTE: We now rely on get_all_security_issues() which correctly checks pg_class.relrowsecurity
+      // The previous method of querying tables was flawed because authenticated admins CAN access tables
+      // (that's expected behavior with proper RLS policies that allow admin access)
+      // Only add public access warnings if get_all_security_issues() returned them
+      // This is already handled in step 1 above, so we skip this redundant check
 
       // 6. Check admin_security_logs table structure
       try {
