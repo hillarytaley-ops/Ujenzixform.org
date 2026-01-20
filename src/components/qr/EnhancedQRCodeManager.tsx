@@ -12,7 +12,6 @@ import {
 import { QrCode, Package, Download, DownloadCloud, Maximize2, Truck, Clock, CheckCircle, RefreshCw } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { QRCodeWriter, BarcodeFormat, EncodeHintType } from '@zxing/library';
 import QRCodeLib from 'qrcode';
 
 interface MaterialItem {
@@ -154,10 +153,9 @@ export const EnhancedQRCodeManager: React.FC = () => {
   const downloadQRCode = async (qrCode: string, materialType: string, itemSeq: number) => {
     try {
       // Large QR code size for easy scanning on any device
-      // 800x800 pixels - optimal for printing on A4/Letter paper or stickers
-      const qrSize = 800;
-      const padding = 60; // White border around QR code
-      const labelHeight = 180; // Space for text labels below QR
+      const qrSize = 600;
+      const padding = 60;
+      const labelHeight = 180;
       
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
@@ -169,35 +167,24 @@ export const EnhancedQRCodeManager: React.FC = () => {
 
       if (!ctx) return;
 
-      const writer = new QRCodeWriter();
-      const hints = new Map();
-      hints.set(EncodeHintType.MARGIN, 2); // Slightly larger margin for better scanning
-      hints.set(EncodeHintType.ERROR_CORRECTION, 2); // High error correction (L=0, M=1, Q=2, H=3)
-      
-      // Generate QR matrix at a smaller size, then scale up for crisp rendering
-      const matrixSize = 200;
-      const matrix = writer.encode(qrCode, BarcodeFormat.QR_CODE, matrixSize, matrixSize, hints);
-
       // Fill white background
       ctx.fillStyle = 'white';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      
-      // Draw QR code scaled up for large, crisp output
-      ctx.fillStyle = 'black';
-      const scale = qrSize / matrix.getWidth();
-      
-      for (let x = 0; x < matrix.getWidth(); x++) {
-        for (let y = 0; y < matrix.getHeight(); y++) {
-          if (matrix.get(x, y)) {
-            ctx.fillRect(
-              padding + (x * scale), 
-              padding + (y * scale), 
-              Math.ceil(scale), 
-              Math.ceil(scale)
-            );
-          }
+
+      // Create temporary canvas for QR code using qrcode library
+      const qrCanvas = document.createElement('canvas');
+      await QRCodeLib.toCanvas(qrCanvas, qrCode, {
+        width: qrSize,
+        margin: 2,
+        errorCorrectionLevel: 'H',
+        color: {
+          dark: '#000000',
+          light: '#ffffff'
         }
-      }
+      });
+
+      // Draw QR code onto main canvas
+      ctx.drawImage(qrCanvas, padding, padding);
 
       // Draw border around QR code area
       ctx.strokeStyle = '#e5e7eb';
@@ -224,7 +211,9 @@ export const EnhancedQRCodeManager: React.FC = () => {
       // QR code string - monospace for readability
       ctx.fillStyle = '#64748b';
       ctx.font = '18px "Courier New", monospace';
-      ctx.fillText(qrCode, totalWidth / 2, labelY + 120);
+      // Truncate if too long
+      const displayCode = qrCode.length > 40 ? qrCode.substring(0, 37) + '...' : qrCode;
+      ctx.fillText(displayCode, totalWidth / 2, labelY + 120);
 
       // Add "SCAN ME" indicator at top
       ctx.fillStyle = '#059669';
@@ -237,13 +226,13 @@ export const EnhancedQRCodeManager: React.FC = () => {
       ctx.fillText('UjenziPro Material Tracking', totalWidth / 2, totalHeight - 15);
 
       const link = document.createElement('a');
-      link.download = `QR_${qrCode}.png`;
-      link.href = canvas.toDataURL('image/png', 1.0); // Maximum quality
+      link.download = `QR_${materialType.replace(/\s+/g, '_')}_Item${itemSeq}.png`;
+      link.href = canvas.toDataURL('image/png', 1.0);
       link.click();
 
       toast({
         title: "✅ QR Code Downloaded",
-        description: `Large format QR (${qrSize}x${qrSize}px) - ${materialType} Item #${itemSeq}`,
+        description: `${materialType} - Item #${itemSeq}`,
       });
     } catch (error) {
       console.error('Error generating QR code:', error);
