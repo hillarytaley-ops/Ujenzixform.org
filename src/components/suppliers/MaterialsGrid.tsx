@@ -1873,23 +1873,7 @@ export const MaterialsGrid = () => {
         allMaterials={materials}
       />
 
-      {/* Quote Cart for Professional Builders */}
-      {userRole === 'professional_builder' && (
-        <>
-          <QuoteCartButton 
-            itemCount={quoteCartItems.reduce((sum, item) => sum + item.quantity, 0)}
-            onClick={() => setIsQuoteCartOpen(true)}
-          />
-          <QuoteCart
-            items={quoteCartItems}
-            onUpdateQuantity={updateQuoteCartQuantity}
-            onRemoveItem={removeFromQuoteCart}
-            onClearCart={clearQuoteCart}
-            isOpen={isQuoteCartOpen}
-            onOpenChange={setIsQuoteCartOpen}
-          />
-        </>
-      )}
+      {/* Quote Cart removed - now using unified cart for all builders */}
 
       {/* ═══════════════════════════════════════════════════════════════════════════════
           MULTI-ANGLE IMAGE GALLERY DIALOG
