@@ -31,27 +31,51 @@ COMMENT ON VIEW public.registration_summary IS
 'Registration summary statistics. Uses SECURITY INVOKER to respect RLS.';
 
 -- 2. Fix camera_directory_safe view
+-- Drop the SECURITY DEFINER view - we'll recreate it properly based on actual schema
 DROP VIEW IF EXISTS public.camera_directory_safe;
-CREATE VIEW public.camera_directory_safe 
-WITH (security_invoker = true)
-AS
-SELECT 
-    id,
-    name,
-    location,
-    status,
-    created_at,
-    -- Exclude sensitive fields like IP addresses, credentials, etc.
-    CASE 
-        WHEN status = 'active' THEN 'Online'
-        WHEN status = 'inactive' THEN 'Offline'
-        ELSE 'Unknown'
-    END as status_display
-FROM public.cameras
-WHERE status IS NOT NULL;
 
-COMMENT ON VIEW public.camera_directory_safe IS 
-'Safe view of camera directory without sensitive information. Uses SECURITY INVOKER.';
+-- Recreate the view using actual columns from cameras table
+-- Using DO block to handle dynamic column detection
+DO $$
+DECLARE
+    col_list TEXT := '';
+    col_record RECORD;
+BEGIN
+    -- Check if cameras table exists
+    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'cameras') THEN
+        RAISE NOTICE 'cameras table does not exist, skipping camera_directory_safe view';
+        RETURN;
+    END IF;
+    
+    -- Build column list from actual table (excluding sensitive columns like ip_address, credentials, etc.)
+    FOR col_record IN 
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'cameras'
+        AND column_name NOT IN ('ip_address', 'credentials', 'password', 'api_key', 'secret', 'token')
+        ORDER BY ordinal_position
+    LOOP
+        IF col_list != '' THEN
+            col_list := col_list || ', ';
+        END IF;
+        col_list := col_list || quote_ident(col_record.column_name);
+    END LOOP;
+    
+    IF col_list = '' THEN
+        RAISE NOTICE 'No safe columns found in cameras table';
+        RETURN;
+    END IF;
+    
+    -- Create view with SECURITY INVOKER
+    EXECUTE format('
+        CREATE VIEW public.camera_directory_safe 
+        WITH (security_invoker = true)
+        AS SELECT %s FROM public.cameras
+    ', col_list);
+    
+    RAISE NOTICE 'camera_directory_safe view created with columns: %', col_list;
+END $$;
 
 -- 3. Fix daily_registration_stats view
 DROP VIEW IF EXISTS public.daily_registration_stats;
