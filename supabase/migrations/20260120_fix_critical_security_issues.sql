@@ -326,10 +326,10 @@ DROP POLICY IF EXISTS "Admins can view all suppliers" ON public.suppliers;
 DROP POLICY IF EXISTS "Admins can update all suppliers" ON public.suppliers;
 DROP POLICY IF EXISTS "Public can view active suppliers" ON public.suppliers;
 
--- Public can view basic info of active suppliers (for marketplace)
-CREATE POLICY "Public can view active suppliers"
+-- Authenticated users can view all suppliers (for marketplace)
+CREATE POLICY "Public can view suppliers"
 ON public.suppliers FOR SELECT TO authenticated
-USING (status = 'active');
+USING (true);
 
 -- Suppliers can view their own full record
 CREATE POLICY "Suppliers can view own record"
@@ -389,10 +389,10 @@ DROP POLICY IF EXISTS "Admins can view all delivery providers" ON public.deliver
 DROP POLICY IF EXISTS "Admins can update all delivery providers" ON public.delivery_providers;
 DROP POLICY IF EXISTS "Public can view active delivery providers" ON public.delivery_providers;
 
--- Public can view active delivery providers
-CREATE POLICY "Public can view active delivery providers"
+-- Authenticated users can view all delivery providers
+CREATE POLICY "Public can view delivery providers"
 ON public.delivery_providers FOR SELECT TO authenticated
-USING (status = 'active' OR status = 'approved');
+USING (true);
 
 -- Delivery providers can view their own record
 CREATE POLICY "Delivery providers can view own record"
