@@ -1423,8 +1423,9 @@ export const MaterialsGrid = () => {
       ) : (
         <div ref={gridRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredMaterials.map((material) => {
-                // Get image URL - prefer material's own image, fallback to category default
-                const imageUrl = material.image_url || getDefaultCategoryImage(material.category) || '/cement.png';
+                // Get image URL - ONLY use actual image, don't fallback to category images during loading
+                // Category default images will only be used in onError handler when actual image fails
+                const imageUrl = material.image_url || '';
                 const currentQty = getQuantity(material.id);
                 const itemInCart = isInCart(material.id);
                 const cartQty = getItemQuantity(material.id);
@@ -1507,15 +1508,15 @@ export const MaterialsGrid = () => {
                         />
                       ) : (
                         <div 
-                          className="w-full h-full flex items-center justify-center bg-gray-100 cursor-pointer hover:bg-gray-200 transition-colors"
+                          className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 cursor-pointer animate-pulse"
                           onClick={() => {
                             // ✅ LAZY LOAD: Load this material's image when clicked
                             loadMaterialImages([material.id], materials);
                           }}
                         >
                           <div className="text-center text-gray-400">
-                            <Package className="h-12 w-12 mx-auto mb-1" />
-                            <span className="text-xs">Click to load image</span>
+                            <div className="w-16 h-16 mx-auto mb-2 rounded-lg bg-gray-300 animate-pulse" />
+                            <span className="text-xs text-gray-400">Loading...</span>
                           </div>
                         </div>
                       )}
