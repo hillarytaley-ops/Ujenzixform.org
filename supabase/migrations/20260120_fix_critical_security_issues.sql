@@ -204,12 +204,12 @@ DROP POLICY IF EXISTS "Admins can update payments" ON public.payments;
 -- Users can view their own payments
 CREATE POLICY "Users can view own payments"
 ON public.payments FOR SELECT TO authenticated
-USING (user_id = auth.uid() OR buyer_id = auth.uid());
+USING (user_id = auth.uid());
 
 -- Users can create payments for themselves
 CREATE POLICY "Users can insert own payments"
 ON public.payments FOR INSERT TO authenticated
-WITH CHECK (user_id = auth.uid() OR buyer_id = auth.uid());
+WITH CHECK (user_id = auth.uid());
 
 -- Admins can view all payments
 CREATE POLICY "Admins can view all payments"
