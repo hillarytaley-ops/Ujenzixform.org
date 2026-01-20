@@ -261,29 +261,31 @@ WITH CHECK (builder_id = auth.uid());
 CREATE POLICY "Delivery providers can view assigned deliveries"
 ON public.deliveries FOR SELECT TO authenticated
 USING (
-    provider_id IN (
+    delivery_provider_id IN (
         SELECT id FROM public.delivery_providers 
         WHERE user_id = auth.uid()
     )
+    OR driver_id = auth.uid()
 );
 
 -- Delivery providers can update deliveries assigned to them
 CREATE POLICY "Delivery providers can update assigned deliveries"
 ON public.deliveries FOR UPDATE TO authenticated
 USING (
-    provider_id IN (
+    delivery_provider_id IN (
         SELECT id FROM public.delivery_providers 
         WHERE user_id = auth.uid()
     )
+    OR driver_id = auth.uid()
 );
 
 -- Suppliers can view deliveries for their orders
 CREATE POLICY "Suppliers can view deliveries for their orders"
 ON public.deliveries FOR SELECT TO authenticated
 USING (
-    supplier_id IN (
-        SELECT id FROM public.suppliers 
-        WHERE user_id = auth.uid()
+    EXISTS (
+        SELECT 1 FROM public.suppliers s
+        WHERE s.user_id = auth.uid()
     )
 );
 
