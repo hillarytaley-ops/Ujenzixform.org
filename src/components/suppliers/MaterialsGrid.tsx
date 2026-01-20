@@ -336,7 +336,7 @@ export const MaterialsGrid = () => {
   const [galleryIndex, setGalleryIndex] = useState(0);
   
   const { toast } = useToast();
-  const { addToCart, isInCart, getItemQuantity, setIsCartOpen } = useCart();
+  const { addToCart, isInCart, getItemQuantity, setIsCartOpen, items: cartItems, getTotalItems } = useCart();
 
   // Quote Cart functions for Professional Builders
   const addToQuoteCart = (material: Material) => {
@@ -1262,25 +1262,13 @@ export const MaterialsGrid = () => {
       )}
 
       {/* Role-specific guidance banner */}
-      {isAuthenticated && userRole === 'professional_builder' && (
-        <Alert className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-300 border-2">
-          <Package className="h-5 w-5 text-blue-600" />
-          <AlertDescription className="ml-2">
-            <strong className="text-blue-800">📋 Professional Builder Mode</strong>
-            <p className="text-sm text-blue-700 mt-1">
-              As a Professional Builder, you can <strong>request quotes</strong> from suppliers for bulk orders and competitive pricing.
-            </p>
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {isAuthenticated && userRole === 'private_client' && (
+      {isAuthenticated && (userRole === 'professional_builder' || userRole === 'private_client') && (
         <Alert className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-300 border-2">
           <ShoppingCart className="h-5 w-5 text-green-600" />
           <AlertDescription className="ml-2">
-            <strong className="text-green-800">🛒 Private Builder Mode</strong>
+            <strong className="text-green-800">🛒 {userRole === 'professional_builder' ? 'Professional Builder' : 'Private Client'} Mode</strong>
             <p className="text-sm text-green-700 mt-1">
-              As a Private Builder, you can <strong>buy materials directly</strong> from suppliers. Add items to your cart and checkout!
+              Add items to your cart, then choose to <strong className="text-blue-600">Request Quote</strong> for competitive pricing or <strong className="text-green-600">Buy Now</strong> for immediate purchase!
             </p>
           </AlertDescription>
         </Alert>
@@ -1304,11 +1292,7 @@ export const MaterialsGrid = () => {
           <AlertDescription className="ml-2">
             <strong className="text-green-800">🎉 Welcome to UjenziXform!</strong>
             <p className="mt-1">
-              {searchParams.get('welcome') === 'private_client' ? (
-                <>You can now <strong>purchase materials directly</strong> using the <span className="text-green-600 font-bold">"Buy Now"</span> buttons below. Start shopping!</>
-              ) : (
-                <>You can now <strong>request quotes from suppliers</strong> using the <span className="text-blue-600 font-bold">"Request Quote"</span> buttons below. Get the best deals!</>
-              )}
+              <>Add items to your cart, then choose <span className="text-blue-600 font-bold">"Request Quote"</span> for competitive pricing or <span className="text-green-600 font-bold">"Buy Now"</span> for immediate purchase!</>
             </p>
           </AlertDescription>
         </Alert>
@@ -1323,15 +1307,15 @@ export const MaterialsGrid = () => {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Quote Cart Button for Professional Builders - in header */}
-          {userRole === 'professional_builder' && (
+          {/* Shopping Cart Button - For all builders */}
+          {(userRole === 'professional_builder' || userRole === 'private_client' || userRole === 'admin') && (
             <Button 
-              onClick={() => setIsQuoteCartOpen(true)} 
-              className={`${quoteCartItems.length > 0 ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-500 hover:bg-gray-600'}`}
+              onClick={() => setIsCartOpen(true)} 
+              className={`${cartItems.length > 0 ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-500 hover:bg-gray-600'}`}
             >
-              <FileText className="h-4 w-4 mr-2" />
-              Quote Cart
-              <Badge className="ml-2 bg-white text-blue-600">{quoteCartItems.reduce((sum, item) => sum + item.quantity, 0)}</Badge>
+              <ShoppingCart className="h-4 w-4 mr-2" />
+              Cart
+              <Badge className="ml-2 bg-white text-green-600">{getTotalItems()}</Badge>
             </Button>
           )}
           <Button 
@@ -1737,9 +1721,9 @@ export const MaterialsGrid = () => {
                         )}
                       </div>
                       
-                      {/* ACTION BUTTONS - Always visible */}
+                      {/* ACTION BUTTONS - Unified for all builders */}
                       <div className="space-y-2">
-                        {/* Buy Now Button */}
+                        {/* Add to Cart Button - Works for both Professional and Private Builders */}
                         <Button 
                           className="w-full h-10 text-sm font-semibold bg-green-600 hover:bg-green-700 text-white"
                           onClick={() => {
@@ -1747,19 +1731,20 @@ export const MaterialsGrid = () => {
                               window.location.href = '/home';
                               return;
                             }
-                            if (userRole === 'professional_builder') {
-                              addToQuoteCart(material);
-                            } else {
-                              handleAddToCart();
-                              setIsCartOpen(true);
-                            }
+                            // Both builder types use the same cart
+                            handleAddToCart();
+                            toast({
+                              title: '🛒 Added to Cart!',
+                              description: `${material.name} added. Open cart to Request Quote or Buy Now.`,
+                            });
                           }}
                           disabled={!material.in_stock}
                         >
-                          🛒 Buy Now
+                          <ShoppingCart className="h-4 w-4 mr-2" />
+                          Add to Cart
                         </Button>
                         
-                        {/* Request Quote Button */}
+                        {/* Quick Add to Cart & Open - For immediate checkout */}
                         <Button 
                           className="w-full h-10 text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white"
                           onClick={() => {
@@ -1767,12 +1752,13 @@ export const MaterialsGrid = () => {
                               window.location.href = '/home';
                               return;
                             }
-                            addToQuoteCart(material);
+                            handleAddToCart();
+                            setIsCartOpen(true);
                           }}
                           disabled={!material.in_stock}
                         >
-                          <FileText className="h-4 w-4 mr-2" />
-                          Request Quote
+                          <ShoppingCart className="h-4 w-4 mr-2" />
+                          Add & View Cart
                         </Button>
                       </div>
                     </CardContent>
