@@ -274,20 +274,20 @@ export function LiveChatWidget({ position = 'bottom-right' }: LiveChatWidgetProp
 
   return (
     <>
-      {/* Chat Button */}
+      {/* Chat Button - Round Icon */}
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
           className={cn(
-            "fixed bottom-4 sm:bottom-6 z-50 flex items-center gap-2 px-4 py-3 rounded-full",
+            "fixed bottom-4 sm:bottom-6 z-50 w-14 h-14 rounded-full",
             "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg",
             "hover:from-orange-600 hover:to-orange-700 transition-all duration-300",
-            "hover:scale-105 hover:shadow-xl",
+            "hover:scale-110 hover:shadow-xl flex items-center justify-center",
             positionClasses
           )}
+          title="Live Chat"
         >
-          <MessageCircle className="w-5 h-5" />
-          <span className="font-medium">Live Chat</span>
+          <MessageCircle className="w-6 h-6" />
         </button>
       )}
 
