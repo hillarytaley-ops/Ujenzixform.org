@@ -728,112 +728,152 @@ How can I help you today?`;
     setQueuePosition(1);
     addSystemMessage('🔄 Connecting you to a staff member...');
 
-    console.log('🔄 Creating live chat conversation...', { userId, userName, userEmail });
-
-    let convId: string | null = null;
+    console.log('🔄 requestLiveChat called', { userId, userName, userEmail });
 
     try {
-      // Try to create conversation - status must be: open, pending, resolved, or closed
+      // Get current user session for proper UUID
+      const { data: { user } } = await supabase.auth.getUser();
+      const clientId = user?.id || null;
+      
+      console.log('🔄 Creating conversation with client_id:', clientId);
+      
+      // Create conversation - status must be: open, pending, resolved, or closed
       const { data: conv, error } = await supabase
         .from('conversations')
         .insert({
-          client_id: userId || null,
-          client_name: userName || 'Guest',
-          client_email: userEmail || null,
-          status: 'open'
+          client_id: clientId,
+          client_name: userName || user?.email?.split('@')[0] || 'Guest',
+          client_email: userEmail || user?.email || null,
+          status: 'open',
+          source: 'chatbot',
+          priority: 'normal'
         })
         .select('id')
         .single();
 
       if (error) {
         console.error('❌ Error creating conversation:', error);
-        // Don't fail - continue with simulated mode
-      } else if (conv) {
+        toast({
+          variant: 'destructive',
+          title: 'Connection failed',
+          description: error.message || 'Could not start live chat. Please try again.'
+        });
+        setChatMode('ai');
+        return;
+      }
+      
+      if (conv) {
         console.log('✅ Conversation created:', conv.id);
-        convId = conv.id;
         setConversationId(conv.id);
         
-        // Save initial message to show context
-        const initialMsg = `Live chat started. Previous context: ${messages.slice(-3).map(m => m.content).join(' | ')}`;
-        await supabase.from('chat_messages').insert({
+        // Save initial message
+        const initialMsg = `Live chat started by ${userName || 'Guest'}`;
+        const { error: msgError } = await supabase.from('chat_messages').insert({
           conversation_id: conv.id,
-          sender_id: null,
-          sender_type: 'bot',
+          sender_id: clientId ? String(clientId) : null,
+          sender_type: 'system',
           sender_name: 'System',
           content: initialMsg,
-          message_type: 'text'
-        }).catch(e => console.error('Error saving initial message:', e));
+          message_type: 'text',
+          read: false
+        });
         
-        console.log('✅ Conversation ready for live chat');
+        if (msgError) {
+          console.error('⚠️ Error saving initial message:', msgError);
+        } else {
+          console.log('✅ Initial message saved');
+        }
+
+        toast({
+          title: '📞 Connected!',
+          description: 'You are now in live chat. A staff member will respond shortly.',
+        });
+
+        // Transition to live mode
+        setTimeout(() => {
+          setQueuePosition(null);
+          setChatMode('live');
+          setStaffName('Support Staff');
+          addSystemMessage('👤 **Support Staff** has joined the chat. Your messages are being sent to our team. Please wait for a response.');
+        }, 1500);
       }
     } catch (err) {
-      console.error('❌ Exception creating conversation:', err);
+      console.error('❌ Exception in requestLiveChat:', err);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Could not start live chat. Please try again.'
+      });
+      setChatMode('ai');
     }
-
-    toast({
-      title: '📞 Connecting to staff',
-      description: staffOnline > 0 ? 'A staff member will be with you shortly...' : 'Please wait...',
-    });
-
-    // Transition to live mode
-    setTimeout(() => {
-      setQueuePosition(null);
-      setChatMode('live');
-      setStaffName('Support Staff');
-      if (convId) {
-        addSystemMessage('👤 **Support Staff** has joined the chat. Your messages are being sent to our team.');
-      } else {
-        addSystemMessage('👤 **Support Staff** has joined the chat. How can I help you?');
-      }
-    }, 3000);
   };
 
   // Send message to staff
   const sendToStaff = async (content: string) => {
-    console.log('📤 Sending message to staff...', { conversationId, userId, content: content.substring(0, 50) });
+    console.log('📤 sendToStaff called', { conversationId, userId, content: content.substring(0, 50) });
     
-    if (conversationId) {
-      try {
-        // Insert the message
-        const { data: msgData, error: msgError } = await supabase.from('chat_messages').insert({
+    if (!conversationId) {
+      console.error('❌ No conversation ID - cannot send message');
+      toast({
+        variant: 'destructive',
+        title: 'Chat not connected',
+        description: 'Please restart the live chat.'
+      });
+      return;
+    }
+
+    try {
+      // Insert the message - sender_id is TEXT type
+      console.log('📤 Inserting message into chat_messages...');
+      const { data: msgData, error: msgError } = await supabase
+        .from('chat_messages')
+        .insert({
           conversation_id: conversationId,
-          sender_id: userId || null,
+          sender_id: userId ? String(userId) : null,
           sender_type: 'client',
           sender_name: userName || 'Guest',
           content: content,
-          message_type: 'text'
-        }).select('id').single();
+          message_type: 'text',
+          read: false
+        })
+        .select('id')
+        .single();
 
-        if (msgError) {
-          console.error('❌ Error inserting message:', msgError);
-          toast({
-            variant: 'destructive',
-            title: 'Message failed',
-            description: 'Could not send message. Please try again.'
-          });
-          return;
-        }
-        
-        console.log('✅ Message saved to database:', msgData?.id);
-
-        // Update conversation - mark as open with last message
-        await supabase
-          .from('conversations')
-          .update({ 
-            status: 'open',
-            last_message: content.substring(0, 100),
-            last_message_at: new Date().toISOString(),
-            unread_count: 1
-          })
-          .eq('id', conversationId)
-          .then(({ error }) => {
-            if (error) console.log('Note: Could not update conversation:', error.message);
-          });
-      } catch (error) {
-        console.error('❌ Exception sending message:', error);
+      if (msgError) {
+        console.error('❌ Error inserting message:', msgError);
+        toast({
+          variant: 'destructive',
+          title: 'Message failed',
+          description: msgError.message || 'Could not send message. Please try again.'
+        });
+        return;
       }
-    } else {
-      console.warn('⚠️ No conversation ID - message not saved to database');
+      
+      console.log('✅ Message saved to database:', msgData?.id);
+
+      // Update conversation
+      const { error: convError } = await supabase
+        .from('conversations')
+        .update({ 
+          status: 'open',
+          last_message: content.substring(0, 100),
+          last_message_at: new Date().toISOString(),
+          unread_count: 1
+        })
+        .eq('id', conversationId);
+      
+      if (convError) {
+        console.log('⚠️ Could not update conversation:', convError.message);
+      } else {
+        console.log('✅ Conversation updated');
+      }
+    } catch (error) {
+      console.error('❌ Exception sending message:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to send message. Please try again.'
+      });
     }
   };
 
