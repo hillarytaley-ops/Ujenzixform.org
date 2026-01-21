@@ -80,7 +80,8 @@ import {
   LineChart,
   QrCode,
   Scan,
-  ShoppingBag
+  ShoppingBag,
+  ClipboardList
 } from "lucide-react";
 import { AdminScanDashboard } from "@/components/qr/AdminScanDashboard";
 import { EnhancedQRCodeManager } from "@/components/qr/EnhancedQRCodeManager";
@@ -240,7 +241,7 @@ interface MLStats {
 // Financial Documents Interfaces
 interface FinancialDocument {
   id: string;
-  type: 'invoice' | 'payment' | 'purchase_order' | 'purchase_receipt';
+  type: 'invoice' | 'payment' | 'purchase_order' | 'purchase_receipt' | 'delivery_order' | 'quotation';
   reference: string;
   amount: number;
   currency: string;
@@ -257,6 +258,8 @@ interface FinancialStats {
   totalPayments: number;
   totalPurchaseOrders: number;
   totalReceipts: number;
+  totalDeliveryOrders: number;
+  totalQuotations: number;
   totalRevenue: number;
   pendingPayments: number;
   completedPayments: number;
@@ -370,12 +373,14 @@ const AdminDashboard = () => {
     totalPayments: 0,
     totalPurchaseOrders: 0,
     totalReceipts: 0,
+    totalDeliveryOrders: 0,
+    totalQuotations: 0,
     totalRevenue: 0,
     pendingPayments: 0,
     completedPayments: 0,
     overdueInvoices: 0
   });
-  const [financialFilter, setFinancialFilter] = useState<'all' | 'invoice' | 'payment' | 'purchase_order' | 'purchase_receipt'>('all');
+  const [financialFilter, setFinancialFilter] = useState<'all' | 'invoice' | 'payment' | 'purchase_order' | 'purchase_receipt' | 'delivery_order' | 'quotation'>('all');
   const [searchTerm, setSearchTerm] = useState("");
   const [filterRole, setFilterRole] = useState("all");
   const [activeTab, setActiveTab] = useState("overview");
@@ -1008,19 +1013,27 @@ const AdminDashboard = () => {
         totalPayments: 0,
         totalPurchaseOrders: 0,
         totalReceipts: 0,
+        totalDeliveryOrders: 0,
+        totalQuotations: 0,
         totalRevenue: 0,
         pendingPayments: 0,
         completedPayments: 0,
         overdueInvoices: 0
       };
 
-      // Load Invoices
-      const { data: invoices, error: invoicesError } = await client
-        .from('invoices')
-        .select('id, invoice_number, total_amount, status, created_at, due_date, issuer_id, supplier_id, items, notes')
-        .order('created_at', { ascending: false });
+      // Load all financial data in parallel for better performance
+      const [invoicesRes, paymentsRes, poRes, receiptsRes, deliveryOrdersRes, quotationsRes] = await Promise.all([
+        client.from('invoices').select('id, invoice_number, total_amount, status, created_at, due_date, issuer_id, supplier_id, items, notes').order('created_at', { ascending: false }),
+        client.from('payments').select('id, amount, currency, provider, reference, description, status, transaction_id, created_at, user_id').order('created_at', { ascending: false }),
+        client.from('purchase_orders').select('id, po_number, total_amount, status, created_at, delivery_address, items, special_instructions, buyer_id, supplier_id').order('created_at', { ascending: false }),
+        client.from('purchase_receipts').select('id, receipt_number, total_amount, status, created_at, payment_method, payment_reference, items, special_instructions, buyer_id').order('created_at', { ascending: false }),
+        client.from('delivery_orders').select('id, order_number, status, created_at, delivery_address, pickup_address, materials, notes, total_items, qr_coded_items, builder_id, supplier_id').order('created_at', { ascending: false }),
+        client.from('quotation_requests').select('id, material_name, quantity, unit, quote_amount, status, created_at, delivery_address, project_description, special_requirements, requester_id, supplier_id, supplier_notes').order('created_at', { ascending: false })
+      ]);
 
-      if (!invoicesError && invoices) {
+      // Process Invoices
+      if (!invoicesRes.error && invoicesRes.data) {
+        const invoices = invoicesRes.data;
         stats.totalInvoices = invoices.length;
         stats.overdueInvoices = invoices.filter(inv => inv.status === 'overdue').length;
         
@@ -1040,13 +1053,9 @@ const AdminDashboard = () => {
         });
       }
 
-      // Load Payments
-      const { data: payments, error: paymentsError } = await client
-        .from('payments')
-        .select('id, amount, currency, provider, reference, description, status, transaction_id, created_at, user_id')
-        .order('created_at', { ascending: false });
-
-      if (!paymentsError && payments) {
+      // Process Payments
+      if (!paymentsRes.error && paymentsRes.data) {
+        const payments = paymentsRes.data;
         stats.totalPayments = payments.length;
         stats.completedPayments = payments.filter(p => p.status === 'completed').length;
         stats.pendingPayments = payments.filter(p => p.status === 'pending').length;
@@ -1069,13 +1078,9 @@ const AdminDashboard = () => {
         });
       }
 
-      // Load Purchase Orders
-      const { data: purchaseOrders, error: poError } = await client
-        .from('purchase_orders')
-        .select('id, po_number, total_amount, status, created_at, delivery_address, items, special_instructions, buyer_id, supplier_id')
-        .order('created_at', { ascending: false });
-
-      if (!poError && purchaseOrders) {
+      // Process Purchase Orders
+      if (!poRes.error && poRes.data) {
+        const purchaseOrders = poRes.data;
         stats.totalPurchaseOrders = purchaseOrders.length;
         
         purchaseOrders.forEach((po: any) => {
@@ -1094,13 +1099,9 @@ const AdminDashboard = () => {
         });
       }
 
-      // Load Purchase Receipts
-      const { data: receipts, error: receiptsError } = await client
-        .from('purchase_receipts')
-        .select('id, receipt_number, total_amount, status, created_at, payment_method, payment_reference, items, special_instructions, buyer_id')
-        .order('created_at', { ascending: false });
-
-      if (!receiptsError && receipts) {
+      // Process Purchase Receipts
+      if (!receiptsRes.error && receiptsRes.data) {
+        const receipts = receiptsRes.data;
         stats.totalReceipts = receipts.length;
         
         receipts.forEach((rec: any) => {
@@ -1118,12 +1119,68 @@ const AdminDashboard = () => {
         });
       }
 
+      // Process Delivery Orders
+      if (!deliveryOrdersRes.error && deliveryOrdersRes.data) {
+        const deliveryOrders = deliveryOrdersRes.data;
+        stats.totalDeliveryOrders = deliveryOrders.length;
+        
+        deliveryOrders.forEach((dOrder: any) => {
+          // Calculate total from materials if available
+          let totalAmount = 0;
+          if (dOrder.materials && Array.isArray(dOrder.materials)) {
+            totalAmount = dOrder.materials.reduce((sum: number, item: any) => {
+              return sum + ((item.price || 0) * (item.quantity || 1));
+            }, 0);
+          }
+          
+          allFinancialDocs.push({
+            id: dOrder.id,
+            type: 'delivery_order',
+            reference: dOrder.order_number,
+            amount: totalAmount,
+            currency: 'KES',
+            status: dOrder.status,
+            date: dOrder.created_at,
+            partyName: `Delivery #${dOrder.order_number}`,
+            description: dOrder.notes || `${dOrder.total_items} items (${dOrder.qr_coded_items || 0} QR coded) - From: ${dOrder.pickup_address?.substring(0, 30) || 'N/A'}...`,
+            items: dOrder.materials
+          });
+        });
+      }
+
+      // Process Quotation Requests
+      if (!quotationsRes.error && quotationsRes.data) {
+        const quotations = quotationsRes.data;
+        stats.totalQuotations = quotations.length;
+        
+        quotations.forEach((quote: any) => {
+          allFinancialDocs.push({
+            id: quote.id,
+            type: 'quotation',
+            reference: `QR-${quote.id.substring(0, 8).toUpperCase()}`,
+            amount: quote.quote_amount || 0,
+            currency: 'KES',
+            status: quote.status,
+            date: quote.created_at,
+            partyName: quote.material_name,
+            description: `${quote.quantity} ${quote.unit} - ${quote.project_description || quote.special_requirements || 'Quote Request'}`
+          });
+        });
+      }
+
       // Sort all financial documents by date (newest first)
       allFinancialDocs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       
       setFinancialDocuments(allFinancialDocs);
       setFinancialStats(stats);
-      console.log('💰 Loaded', allFinancialDocs.length, 'financial documents');
+      console.log('💰 Loaded', allFinancialDocs.length, 'financial documents:', {
+        invoices: stats.totalInvoices,
+        payments: stats.totalPayments,
+        purchaseOrders: stats.totalPurchaseOrders,
+        receipts: stats.totalReceipts,
+        deliveryOrders: stats.totalDeliveryOrders,
+        quotations: stats.totalQuotations
+      });
       
     } catch (error) {
       console.error('Error loading financial data:', error);
@@ -3366,8 +3423,8 @@ const AdminDashboard = () => {
 
           {/* Financial Documents Tab */}
           <TabsContent value="financial" className="space-y-6">
-            {/* Financial Stats */}
-            <div className="grid md:grid-cols-4 lg:grid-cols-8 gap-4">
+            {/* Financial Stats - Top Row */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               <Card className="bg-gradient-to-br from-emerald-900/40 to-emerald-800/20 border-emerald-700/50">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
@@ -3424,6 +3481,37 @@ const AdminDashboard = () => {
                 </CardContent>
               </Card>
               
+              <Card className="bg-gradient-to-br from-teal-900/40 to-teal-800/20 border-teal-700/50">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-teal-600/30 rounded-xl">
+                      <Truck className="h-6 w-6 text-teal-400" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-white">{financialStats.totalDeliveryOrders}</p>
+                      <p className="text-sm text-teal-300">Delivery Orders</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card className="bg-gradient-to-br from-pink-900/40 to-pink-800/20 border-pink-700/50">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-pink-600/30 rounded-xl">
+                      <ClipboardList className="h-6 w-6 text-pink-400" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-white">{financialStats.totalQuotations}</p>
+                      <p className="text-sm text-pink-300">Quotations</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+            
+            {/* Financial Stats - Bottom Row */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <Card className="bg-gradient-to-br from-green-900/40 to-green-800/20 border-green-700/50">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
@@ -3446,7 +3534,7 @@ const AdminDashboard = () => {
                     </div>
                     <div>
                       <p className="text-2xl font-bold text-white">{financialStats.pendingPayments}</p>
-                      <p className="text-sm text-yellow-300">Pending</p>
+                      <p className="text-sm text-yellow-300">Pending Payments</p>
                     </div>
                   </div>
                 </CardContent>
@@ -3486,11 +3574,11 @@ const AdminDashboard = () => {
               <CardHeader>
                 <CardTitle className="text-white flex items-center gap-2">
                   <PieChart className="h-5 w-5 text-emerald-400" />
-                  Financial Overview by Category
+                  Filter by Document Type
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
                   <div 
                     className={`p-4 rounded-lg cursor-pointer transition-all ${financialFilter === 'invoice' ? 'bg-emerald-600/40 border-2 border-emerald-500' : 'bg-slate-800/50 hover:bg-slate-700/50'}`}
                     onClick={() => setFinancialFilter(financialFilter === 'invoice' ? 'all' : 'invoice')}
@@ -3523,6 +3611,22 @@ const AdminDashboard = () => {
                     <p className="text-xl font-bold text-white text-center">{financialStats.totalReceipts}</p>
                     <p className="text-xs text-gray-400 text-center">Receipts</p>
                   </div>
+                  <div 
+                    className={`p-4 rounded-lg cursor-pointer transition-all ${financialFilter === 'delivery_order' ? 'bg-teal-600/40 border-2 border-teal-500' : 'bg-slate-800/50 hover:bg-slate-700/50'}`}
+                    onClick={() => setFinancialFilter(financialFilter === 'delivery_order' ? 'all' : 'delivery_order')}
+                  >
+                    <Truck className="h-8 w-8 text-teal-400 mx-auto mb-2" />
+                    <p className="text-xl font-bold text-white text-center">{financialStats.totalDeliveryOrders}</p>
+                    <p className="text-xs text-gray-400 text-center">Delivery Orders</p>
+                  </div>
+                  <div 
+                    className={`p-4 rounded-lg cursor-pointer transition-all ${financialFilter === 'quotation' ? 'bg-pink-600/40 border-2 border-pink-500' : 'bg-slate-800/50 hover:bg-slate-700/50'}`}
+                    onClick={() => setFinancialFilter(financialFilter === 'quotation' ? 'all' : 'quotation')}
+                  >
+                    <ClipboardList className="h-8 w-8 text-pink-400 mx-auto mb-2" />
+                    <p className="text-xl font-bold text-white text-center">{financialStats.totalQuotations}</p>
+                    <p className="text-xs text-gray-400 text-center">Quotations</p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -3546,6 +3650,8 @@ const AdminDashboard = () => {
                         <SelectItem value="payment" className="text-white">Payments</SelectItem>
                         <SelectItem value="purchase_order" className="text-white">Purchase Orders</SelectItem>
                         <SelectItem value="purchase_receipt" className="text-white">Receipts</SelectItem>
+                        <SelectItem value="delivery_order" className="text-white">Delivery Orders</SelectItem>
+                        <SelectItem value="quotation" className="text-white">Quotations</SelectItem>
                       </SelectContent>
                     </Select>
                     <Button
@@ -3592,14 +3698,19 @@ const AdminDashboard = () => {
                               doc.type === 'invoice' ? 'bg-emerald-600' :
                               doc.type === 'payment' ? 'bg-blue-600' :
                               doc.type === 'purchase_order' ? 'bg-orange-600' :
-                              'bg-purple-600'
+                              doc.type === 'purchase_receipt' ? 'bg-purple-600' :
+                              doc.type === 'delivery_order' ? 'bg-teal-600' :
+                              doc.type === 'quotation' ? 'bg-pink-600' :
+                              'bg-gray-600'
                             }>
                               <div className="flex items-center gap-1">
                                 {doc.type === 'invoice' && <FileText className="h-3 w-3" />}
                                 {doc.type === 'payment' && <CreditCard className="h-3 w-3" />}
                                 {doc.type === 'purchase_order' && <ShoppingCart className="h-3 w-3" />}
                                 {doc.type === 'purchase_receipt' && <FileCheck className="h-3 w-3" />}
-                                {doc.type.replace('_', ' ')}
+                                {doc.type === 'delivery_order' && <Truck className="h-3 w-3" />}
+                                {doc.type === 'quotation' && <ClipboardList className="h-3 w-3" />}
+                                {doc.type.replace(/_/g, ' ')}
                               </div>
                             </Badge>
                           </TableCell>
