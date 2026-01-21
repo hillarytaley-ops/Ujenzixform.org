@@ -61,10 +61,8 @@ import { AuthRequired } from "@/components/security/AuthRequired";
 import { RoleProtectedRoute } from "@/components/security/RoleProtectedRoute";
 import { Navigate, useSearchParams } from "react-router-dom";
 
-// AI Chatbot with Live Staff Support
-import { AIConstructionChatbot } from "@/components/chat/AIConstructionChatbot";
-import { SimpleChatButton } from "@/components/chat/SimpleChatButton";
-import { LiveChatWidget } from "@/components/chat/LiveChatWidget";
+// Enhanced AI Chatbot with context awareness, feedback, and database integration
+import { EnhancedChatbot } from "@/components/chat/EnhancedChatbot";
 
 // Floating Social Media Button
 import { FloatingSocialSidebar } from "@/components/FloatingSocialSidebar";
@@ -174,9 +172,9 @@ const App = () => {
               <Toaster />
               <Sonner />
               <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-                {/* Live Chat Widget - AI + Human Staff Support */}
+                {/* Enhanced AI Chatbot - with context, feedback, and database prices */}
                 {showChat && (
-                  <LiveChatWidget 
+                  <EnhancedChatbot 
                     userId={user?.id}
                     userName={user?.email?.split('@')[0] || 'Guest'}
                     userEmail={user?.email}
