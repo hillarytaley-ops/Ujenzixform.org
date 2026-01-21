@@ -140,9 +140,11 @@ const PRODUCT_CATEGORIES = [
   'Timber', 'Plywood', 'Particle Board', 'Timber Trusses', 'Formwork', 'Treated Poles',
   // DOORS, WINDOWS & OPENINGS
   'Doors', 'Steel Doors', 'Windows', 'Aluminium Windows', 'Glass', 'Door Frames', 'Door Hardware', 'Window Hardware',
-  // PLUMBING & WATER
+  // WATER TANKS (Separate category - comes in various sizes: 100L, 200L, 500L, 1000L, 2000L, 5000L, 10000L etc.)
+  'Water Tanks',
+  // PLUMBING (Pipes, fittings, and plumbing accessories)
   'Plumbing', 'PVC Pipes', 'PPR Pipes', 'GI Pipes', 'HDPE Pipes', 'Pipe Fittings', 'Valves',
-  'Water Tanks', 'Pumps', 'Taps & Mixers', 'Sanitary Ware', 'Bathroom Accessories', 'Septic Tanks', 'Water Heaters',
+  'Pumps', 'Taps & Mixers', 'Sanitary Ware', 'Bathroom Accessories', 'Septic Tanks', 'Water Heaters',
   // ELECTRICAL
   'Electrical', 'Cables & Wires', 'Switches & Sockets', 'Distribution Boards', 'Lighting', 'Conduits',
   'Electrical Accessories', 'Solar Equipment', 'Generators', 'UPS & Stabilizers',
@@ -1529,6 +1531,18 @@ export const MaterialImagesManager: React.FC = () => {
                   <SelectItem value="jerrycan">Per Jerrycan</SelectItem>
                   <SelectItem value="bucket">Per Bucket</SelectItem>
                   <SelectItem value="tin">Per Tin</SelectItem>
+                  {/* Water Tank Sizes */}
+                  <SelectItem value="100L">100 Litres</SelectItem>
+                  <SelectItem value="200L">200 Litres</SelectItem>
+                  <SelectItem value="250L">250 Litres</SelectItem>
+                  <SelectItem value="500L">500 Litres</SelectItem>
+                  <SelectItem value="750L">750 Litres</SelectItem>
+                  <SelectItem value="1000L">1,000 Litres</SelectItem>
+                  <SelectItem value="1500L">1,500 Litres</SelectItem>
+                  <SelectItem value="2000L">2,000 Litres</SelectItem>
+                  <SelectItem value="3000L">3,000 Litres</SelectItem>
+                  <SelectItem value="5000L">5,000 Litres</SelectItem>
+                  <SelectItem value="10000L">10,000 Litres</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1746,6 +1760,18 @@ export const MaterialImagesManager: React.FC = () => {
                       <SelectItem value="roll">Per Roll</SelectItem>
                       <SelectItem value="box">Per Box</SelectItem>
                       <SelectItem value="pallet">Per Pallet</SelectItem>
+                      {/* Water Tank Sizes */}
+                      <SelectItem value="100L">100 Litres</SelectItem>
+                      <SelectItem value="200L">200 Litres</SelectItem>
+                      <SelectItem value="250L">250 Litres</SelectItem>
+                      <SelectItem value="500L">500 Litres</SelectItem>
+                      <SelectItem value="750L">750 Litres</SelectItem>
+                      <SelectItem value="1000L">1,000 Litres</SelectItem>
+                      <SelectItem value="1500L">1,500 Litres</SelectItem>
+                      <SelectItem value="2000L">2,000 Litres</SelectItem>
+                      <SelectItem value="3000L">3,000 Litres</SelectItem>
+                      <SelectItem value="5000L">5,000 Litres</SelectItem>
+                      <SelectItem value="10000L">10,000 Litres</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1944,6 +1970,18 @@ export const MaterialImagesManager: React.FC = () => {
                                 <SelectItem value="jerrycan">Per Jerrycan</SelectItem>
                                 <SelectItem value="bucket">Per Bucket</SelectItem>
                                 <SelectItem value="tin">Per Tin</SelectItem>
+                                {/* Water Tank Sizes */}
+                                <SelectItem value="100L">100 Litres</SelectItem>
+                                <SelectItem value="200L">200 Litres</SelectItem>
+                                <SelectItem value="250L">250 Litres</SelectItem>
+                                <SelectItem value="500L">500 Litres</SelectItem>
+                                <SelectItem value="750L">750 Litres</SelectItem>
+                                <SelectItem value="1000L">1,000 Litres</SelectItem>
+                                <SelectItem value="1500L">1,500 Litres</SelectItem>
+                                <SelectItem value="2000L">2,000 Litres</SelectItem>
+                                <SelectItem value="3000L">3,000 Litres</SelectItem>
+                                <SelectItem value="5000L">5,000 Litres</SelectItem>
+                                <SelectItem value="10000L">10,000 Litres</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
@@ -2313,6 +2351,18 @@ export const MaterialImagesManager: React.FC = () => {
                     <SelectItem value="jerrycan">Per Jerrycan</SelectItem>
                     <SelectItem value="bucket">Per Bucket</SelectItem>
                     <SelectItem value="tin">Per Tin</SelectItem>
+                    {/* Water Tank Sizes */}
+                    <SelectItem value="100L">100 Litres</SelectItem>
+                    <SelectItem value="200L">200 Litres</SelectItem>
+                    <SelectItem value="250L">250 Litres</SelectItem>
+                    <SelectItem value="500L">500 Litres</SelectItem>
+                    <SelectItem value="750L">750 Litres</SelectItem>
+                    <SelectItem value="1000L">1,000 Litres</SelectItem>
+                    <SelectItem value="1500L">1,500 Litres</SelectItem>
+                    <SelectItem value="2000L">2,000 Litres</SelectItem>
+                    <SelectItem value="3000L">3,000 Litres</SelectItem>
+                    <SelectItem value="5000L">5,000 Litres</SelectItem>
+                    <SelectItem value="10000L">10,000 Litres</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
