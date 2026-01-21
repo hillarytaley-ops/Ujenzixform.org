@@ -274,21 +274,40 @@ export function LiveChatWidget({ position = 'bottom-right' }: LiveChatWidgetProp
 
   return (
     <>
-      {/* Chat Button - Round Icon */}
+      {/* Chat Button - Round with Radiating Animation */}
       {!isOpen && (
-        <button
-          onClick={() => setIsOpen(true)}
-          className={cn(
-            "fixed bottom-4 sm:bottom-6 z-50 w-14 h-14 rounded-full",
-            "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg",
-            "hover:from-orange-600 hover:to-orange-700 transition-all duration-300",
-            "hover:scale-110 hover:shadow-xl flex items-center justify-center",
-            positionClasses
-          )}
-          title="Live Chat"
-        >
-          <MessageCircle className="w-6 h-6" />
-        </button>
+        <div className={cn("fixed bottom-4 sm:bottom-6 z-50", positionClasses)}>
+          {/* Radiating pulse rings */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="absolute w-14 h-14 rounded-full bg-orange-500/30 animate-ping" />
+            <div className="absolute w-16 h-16 rounded-full bg-orange-500/20 animate-pulse" />
+            <div 
+              className="absolute w-20 h-20 rounded-full bg-orange-500/10"
+              style={{ animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }}
+            />
+          </div>
+          
+          {/* Main button */}
+          <button
+            onClick={() => setIsOpen(true)}
+            className={cn(
+              "relative w-14 h-14 rounded-full",
+              "bg-gradient-to-br from-orange-500 via-orange-600 to-red-500",
+              "text-white shadow-lg shadow-orange-500/40",
+              "hover:shadow-xl hover:shadow-orange-500/50 hover:scale-110",
+              "transition-all duration-300 flex items-center justify-center",
+              "border-2 border-orange-400/50"
+            )}
+            title="Live Chat"
+          >
+            <MessageCircle className="w-6 h-6 drop-shadow-md" />
+            
+            {/* Online indicator dot */}
+            <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full border-2 border-white shadow-md">
+              <span className="absolute inset-0 rounded-full bg-green-400 animate-ping opacity-75" />
+            </span>
+          </button>
+        </div>
       )}
 
       {/* Chat Window */}
