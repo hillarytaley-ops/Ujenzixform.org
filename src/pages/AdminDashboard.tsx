@@ -1473,8 +1473,9 @@ const AdminDashboard = () => {
       // Use admin client if available
       const client = getAdminClient() || supabase;
       
+      // Fetch from delivery_provider_registrations (where applications are saved)
       const { data: deliveryApps, error } = await client
-        .from('delivery_providers')
+        .from('delivery_provider_registrations')
         .select('*')
         .order('created_at', { ascending: false });
 
