@@ -151,10 +151,10 @@ export const RegistersTab: React.FC = () => {
       
       console.log('📊 Fetching registered users data ONLY from registration tables...');
 
-      // Fetch from correct tables - supplier_applications and delivery_providers
+      // Fetch from correct tables - supplier_applications and delivery_provider_registrations
       const [suppliersRes, deliveryRes] = await Promise.all([
         client.from('supplier_applications').select('*').order('created_at', { ascending: false }),
-        client.from('delivery_providers').select('*').order('created_at', { ascending: false }),
+        client.from('delivery_provider_registrations').select('*').order('created_at', { ascending: false }),
       ]);
       
       // Builders are registered via profiles table with user_roles
