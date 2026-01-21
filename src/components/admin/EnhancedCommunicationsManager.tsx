@@ -69,7 +69,7 @@ interface Conversation {
   client_id: string | null;
   client_name: string;
   client_email: string | null;
-  status: 'waiting' | 'active' | 'closed';
+  status: 'open' | 'pending' | 'resolved' | 'closed';
   source: string;
   priority: 'low' | 'normal' | 'high' | 'urgent';
   agent_id: string | null;
@@ -345,7 +345,7 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
       await supabase
         .from('conversations')
         .update({
-          status: 'active',
+          status: 'open',
           agent_id: currentUserId,
           agent_name: staffName,
           last_message: content,
@@ -404,8 +404,9 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
   // Stats
   const stats = {
     total: conversations.length,
-    waiting: conversations.filter(c => c.status === 'waiting').length,
-    active: conversations.filter(c => c.status === 'active').length,
+    open: conversations.filter(c => c.status === 'open').length,
+    pending: conversations.filter(c => c.status === 'pending').length,
+    resolved: conversations.filter(c => c.status === 'resolved').length,
     closed: conversations.filter(c => c.status === 'closed').length,
     unread: conversations.reduce((sum, c) => sum + (c.unread_count || 0), 0),
     positiveFeedback: feedbacks.filter(f => f.feedback_type === 'positive').length,
@@ -425,8 +426,9 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
   // Get status color
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'waiting': return 'bg-yellow-500';
-      case 'active': return 'bg-green-500';
+      case 'open': return 'bg-green-500';
+      case 'pending': return 'bg-yellow-500';
+      case 'resolved': return 'bg-blue-500';
       case 'closed': return 'bg-gray-500';
       default: return 'bg-gray-500';
     }
@@ -497,16 +499,16 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
             <p className="text-xs text-gray-400">Total Chats</p>
           </CardContent>
         </Card>
-        <Card className="bg-yellow-900/30 border-yellow-700">
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-yellow-400">{stats.waiting}</p>
-            <p className="text-xs text-yellow-400/70">Waiting</p>
-          </CardContent>
-        </Card>
         <Card className="bg-green-900/30 border-green-700">
           <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-green-400">{stats.active}</p>
-            <p className="text-xs text-green-400/70">Active</p>
+            <p className="text-2xl font-bold text-green-400">{stats.open}</p>
+            <p className="text-xs text-green-400/70">Open</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-yellow-900/30 border-yellow-700">
+          <CardContent className="p-4 text-center">
+            <p className="text-2xl font-bold text-yellow-400">{stats.pending}</p>
+            <p className="text-xs text-yellow-400/70">Pending</p>
           </CardContent>
         </Card>
         <Card className="bg-gray-800/50 border-gray-700">
@@ -545,8 +547,8 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
           <TabsTrigger value="live" className="data-[state=active]:bg-cyan-600">
             <MessageSquare className="w-4 h-4 mr-2" />
             Live Chats
-            {stats.waiting > 0 && (
-              <Badge className="ml-2 bg-red-500">{stats.waiting}</Badge>
+            {stats.open > 0 && (
+              <Badge className="ml-2 bg-red-500">{stats.open}</Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="feedback" className="data-[state=active]:bg-cyan-600">

@@ -733,14 +733,14 @@ How can I help you today?`;
     let convId: string | null = null;
 
     try {
-      // Try to create conversation - use only basic columns that should exist
+      // Try to create conversation - status must be: open, pending, resolved, or closed
       const { data: conv, error } = await supabase
         .from('conversations')
         .insert({
           client_id: userId || null,
           client_name: userName || 'Guest',
           client_email: userEmail || null,
-          status: 'waiting'
+          status: 'open'
         })
         .select('id')
         .single();
@@ -816,15 +816,18 @@ How can I help you today?`;
         
         console.log('✅ Message saved to database:', msgData?.id);
 
-        // Update conversation status - ignore errors here
+        // Update conversation - mark as open with last message
         await supabase
           .from('conversations')
           .update({ 
-            status: 'active'
+            status: 'open',
+            last_message: content.substring(0, 100),
+            last_message_at: new Date().toISOString(),
+            unread_count: 1
           })
           .eq('id', conversationId)
           .then(({ error }) => {
-            if (error) console.log('Note: Could not update conversation status');
+            if (error) console.log('Note: Could not update conversation:', error.message);
           });
       } catch (error) {
         console.error('❌ Exception sending message:', error);
