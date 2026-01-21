@@ -138,10 +138,22 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [showTranscriptDialog, setShowTranscriptDialog] = useState(false);
   const [selectedTranscript, setSelectedTranscript] = useState<ChatTranscript | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const { toast } = useToast();
+
+  // Get current user ID
+  useEffect(() => {
+    const getUserId = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setCurrentUserId(user.id);
+      }
+    };
+    getUserId();
+  }, []);
 
   // Initialize notification sound
   useEffect(() => {
@@ -292,8 +304,8 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
       try {
         await supabase
           .from('admin_staff')
-          .update({ is_online: isOnline, last_active: new Date().toISOString() })
-          .eq('id', staffId);
+          .update({ is_online: isOnline, last_seen_at: new Date().toISOString() })
+          .eq('email', staffId);
       } catch (error) {
         // Silently fail
       }
@@ -309,12 +321,12 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
     setReplyMessage('');
 
     try {
-      // Insert message
+      // Insert message - use currentUserId (UUID) for sender_id
       const { error } = await supabase
         .from('chat_messages')
         .insert({
           conversation_id: selectedConversation.id,
-          sender_id: staffId,
+          sender_id: currentUserId,
           sender_type: 'staff',
           sender_name: staffName,
           content: content,
@@ -324,12 +336,12 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
 
       if (error) throw error;
 
-      // Update conversation
+      // Update conversation - use currentUserId (UUID) for agent_id
       await supabase
         .from('conversations')
         .update({
           status: 'active',
-          agent_id: staffId,
+          agent_id: currentUserId,
           agent_name: staffName,
           last_message: content,
           last_message_at: new Date().toISOString(),
