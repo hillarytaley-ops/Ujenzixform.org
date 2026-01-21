@@ -132,9 +132,9 @@ import { AdminTab } from "@/config/staffPermissions";
 import { 
   OverviewTab, 
   MonitoringTab, 
-  RegistrationsTab, 
   FeedbackTab 
 } from "@/pages/admin/tabs";
+import { RegistersTab } from "@/pages/admin/tabs/RegistersTab";
 import { 
   useRegistrations, 
   useFeedback, 
@@ -2421,14 +2421,9 @@ const AdminDashboard = () => {
             </Card>
           </TabsContent>
 
-          {/* Registrations Tab - Using New Modular Component */}
+          {/* User Registrations Tab - Suppliers, Professional Builders, Private Builders */}
           <TabsContent value="registrations" className="space-y-6">
-            <RegistrationsTab
-              registrations={modularRegistrations.length > 0 ? modularRegistrations : registrations}
-              loading={registrationsLoading}
-              onRefresh={refetchRegistrations}
-              onUpdateStatus={updateRegistrationStatus}
-            />
+            <RegistersTab />
           </TabsContent>
 
           {/* Pending Products Tab - Admin Product Approval */}
