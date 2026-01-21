@@ -17,12 +17,17 @@ import {
   CheckCheck,
   Headphones,
   Paperclip,
-  Image as ImageIcon,
   FileText,
   Star,
   Mail,
   Download,
-  Zap
+  Zap,
+  Package,
+  Truck,
+  Camera,
+  UserPlus,
+  ShoppingCart,
+  Search
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,14 +48,14 @@ import { Textarea } from '@/components/ui/textarea';
 // Types
 interface Message {
   id: string;
-  role: 'user' | 'bot' | 'system' | 'agent';
+  role: 'user' | 'bot' | 'system' | 'staff';
   content: string;
   timestamp: Date;
   suggestions?: string[];
   feedback?: 'positive' | 'negative' | null;
   isLoading?: boolean;
   sources?: string[];
-  agentName?: string;
+  staffName?: string;
   read?: boolean;
   attachment?: {
     type: 'image' | 'file';
@@ -64,19 +69,22 @@ interface ConversationContext {
   lastTopic?: string;
   mentionedMaterials: string[];
   mentionedLocations: string[];
+  mentionedCategories: string[];
   userPreferences: {
     language: 'en' | 'sw';
     priceRange?: 'budget' | 'mid' | 'premium';
   };
 }
 
-interface MaterialPrice {
+interface ProductInfo {
+  id: string;
   name: string;
   category: string;
   price: number;
   unit: string;
+  description?: string;
   supplier_name?: string;
-  last_updated?: string;
+  image_url?: string;
 }
 
 interface EnhancedChatbotProps {
@@ -86,25 +94,33 @@ interface EnhancedChatbotProps {
   position?: 'bottom-right' | 'bottom-left';
 }
 
-type ChatMode = 'ai' | 'human' | 'waiting';
+type ChatMode = 'ai' | 'live' | 'waiting';
 
-// Quick reply templates
+// Quick reply templates - expanded
 const QUICK_REPLIES = [
-  { icon: '💰', label: 'Prices', query: 'Show me material prices' },
-  { icon: '🧮', label: 'Calculate', query: 'Help me calculate materials' },
-  { icon: '🏪', label: 'Suppliers', query: 'Find suppliers near me' },
-  { icon: '🚚', label: 'Delivery', query: 'Delivery options and costs' },
-  { icon: '👤', label: 'Human', query: 'Talk to human agent' },
+  { icon: '🛒', label: 'Products', query: 'What products do you sell?' },
+  { icon: '🚚', label: 'Delivery', query: 'How does delivery work?' },
+  { icon: '📹', label: 'Monitoring', query: 'Tell me about monitoring service' },
+  { icon: '📝', label: 'Register', query: 'How do I register?' },
+  { icon: '💬', label: 'Live Chat', query: 'Connect me to staff' },
 ];
 
-// Kenya-specific knowledge base
-const KENYA_CONSTRUCTION_KB = {
+// Comprehensive knowledge base
+const UJENZIXFORM_KB = {
+  // Product categories sold on the platform
+  productCategories: [
+    'Cement', 'Steel & Iron', 'Sand & Aggregates', 'Blocks & Bricks', 
+    'Roofing Materials', 'Paint & Finishes', 'Plumbing', 'Electrical',
+    'Timber & Wood', 'Tiles & Flooring', 'Hardware & Tools', 'Glass & Windows'
+  ],
+  
+  // Material pricing (fallback)
   materials: {
     cement: {
       brands: ['Bamburi', 'Savannah', 'Mombasa Cement', 'Simba Cement', 'Nguvu Cement'],
-      units: '50kg bag',
+      unit: '50kg bag',
       priceRange: { min: 750, max: 950 },
-      tips: 'Prices lower in coastal regions due to factory proximity'
+      description: 'Portland cement for construction'
     },
     steel: {
       brands: ['Devki Steel', 'Tononoka', 'Mabati Rolling Mills'],
@@ -112,24 +128,147 @@ const KENYA_CONSTRUCTION_KB = {
       priceRange: { min: 85000, max: 95000 },
       unit: 'per ton'
     },
+    sand: {
+      types: ['River Sand', 'Machine Sand', 'Plaster Sand'],
+      priceRange: { min: 1800, max: 2500 },
+      unit: 'per ton'
+    },
+    ballast: {
+      sizes: ['3/4 inch', '1/2 inch', 'Dust'],
+      priceRange: { min: 2800, max: 3500 },
+      unit: 'per ton'
+    },
+    blocks: {
+      sizes: ['4 inch', '6 inch', '8 inch'],
+      priceRange: { min: 35, max: 80 },
+      unit: 'per piece'
+    },
+    roofing: {
+      types: ['Iron Sheets (Gauge 28-32)', 'Roofing Tiles', 'Polycarbonate'],
+      priceRange: { min: 550, max: 1200 },
+      unit: 'per sheet/piece'
+    },
     paint: {
       brands: ['Crown Paints', 'Galaxy', 'Basco', 'Sadolin'],
-      coverage: '10-12 sqm per liter'
+      types: ['Emulsion', 'Gloss', 'Weathercoat'],
+      priceRange: { min: 3800, max: 8500 },
+      unit: 'per 20L'
+    },
+    timber: {
+      types: ['Cypress', 'Pine', 'Mahogany', 'Treated Poles'],
+      priceRange: { min: 80, max: 350 },
+      unit: 'per foot/piece'
+    },
+    tiles: {
+      types: ['Ceramic', 'Porcelain', 'Granite'],
+      priceRange: { min: 800, max: 3500 },
+      unit: 'per sqm'
     }
   },
-  locations: ['Nairobi', 'Mombasa', 'Kisumu', 'Nakuru', 'Eldoret', 'Thika', 'Kiambu', 'Machakos'],
-  calculations: {
-    cementPerSqm: { foundation: 8, slab: 6, plaster: 1.5 },
-    steelPerSqm: { residential: 40, commercial: 60 }
+  
+  // Delivery information
+  delivery: {
+    coverage: ['Nairobi', 'Mombasa', 'Kisumu', 'Nakuru', 'Eldoret', 'Thika', 'Kiambu', 'Machakos', 'Kajiado', 'Naivasha'],
+    features: [
+      'Real-time GPS tracking',
+      'QR code verification at delivery',
+      'Delivery confirmation with photos',
+      'Insurance coverage available',
+      'Same-day delivery in Nairobi'
+    ],
+    costs: {
+      'Within Nairobi': 'KES 3,000 - 8,000',
+      'Kiambu/Thika': 'KES 5,000 - 12,000',
+      'Machakos/Kajiado': 'KES 8,000 - 15,000',
+      'Nakuru/Naivasha': 'KES 15,000 - 25,000',
+      'Mombasa': 'KES 35,000 - 50,000',
+      'Kisumu': 'KES 40,000 - 60,000'
+    },
+    process: [
+      '1. Add items to cart and checkout',
+      '2. Select delivery option',
+      '3. Enter delivery address',
+      '4. Choose delivery date',
+      '5. Track your order in real-time',
+      '6. Receive and verify with QR code'
+    ]
+  },
+  
+  // Monitoring service information
+  monitoring: {
+    description: 'Professional construction site monitoring with CCTV cameras',
+    features: [
+      '24/7 live camera feeds',
+      'Motion detection alerts',
+      'Cloud recording storage',
+      'Mobile app access',
+      'Multiple camera support',
+      'Night vision capability'
+    ],
+    packages: [
+      { name: 'Basic', cameras: '1-2', price: 'KES 5,000/month', storage: '7 days' },
+      { name: 'Standard', cameras: '3-5', price: 'KES 12,000/month', storage: '14 days' },
+      { name: 'Premium', cameras: '6-10', price: 'KES 25,000/month', storage: '30 days' },
+      { name: 'Enterprise', cameras: '10+', price: 'Custom quote', storage: '90 days' }
+    ],
+    process: [
+      '1. Request monitoring service from your dashboard',
+      '2. Receive a quote from our team',
+      '3. Accept the quote to proceed',
+      '4. Our team installs cameras at your site',
+      '5. Access live feeds from your dashboard'
+    ]
+  },
+  
+  // Registration information
+  registration: {
+    userTypes: [
+      {
+        type: 'Private Client',
+        description: 'Individual homeowners building their own property',
+        benefits: ['Direct purchase from suppliers', 'Delivery tracking', 'Order history'],
+        howTo: 'Click "Register as Builder" → Select "Private Client" → Fill details → Verify email'
+      },
+      {
+        type: 'Professional Builder',
+        description: 'Contractors and construction companies',
+        benefits: ['Request quotes for bulk orders', 'Project management', 'Client management', 'Monitoring service'],
+        howTo: 'Click "Register as Builder" → Select "Professional Builder" → Provide company details → Verify'
+      },
+      {
+        type: 'Supplier',
+        description: 'Material suppliers and hardware stores',
+        benefits: ['List products', 'Receive orders', 'Manage inventory', 'Analytics dashboard'],
+        howTo: 'Click "Register as Supplier" → Provide business details → Upload documents → Await verification'
+      },
+      {
+        type: 'Delivery Provider',
+        description: 'Logistics and transport companies',
+        benefits: ['Receive delivery requests', 'Route optimization', 'Payment tracking'],
+        howTo: 'Click "Register as Delivery" → Provide vehicle details → Upload license → Await verification'
+      }
+    ]
+  },
+  
+  // Locations
+  locations: ['Nairobi', 'Mombasa', 'Kisumu', 'Nakuru', 'Eldoret', 'Thika', 'Kiambu', 'Machakos', 'Kajiado', 'Naivasha', 'Nyeri', 'Meru'],
+  
+  // Contact information
+  contact: {
+    phone: '+254 700 000 000',
+    email: 'support@ujenzixform.co.ke',
+    hours: 'Monday - Saturday: 8:00 AM - 6:00 PM',
+    address: 'Nairobi, Kenya'
   }
 };
 
 // Swahili translations
 const SWAHILI_RESPONSES: Record<string, string> = {
   welcome: 'Karibu! Mimi ni UJbot, msaidizi wako wa ujenzi.',
-  price: 'Bei ya',
-  cement: 'saruji',
-  steel: 'chuma',
+  products: 'Bidhaa',
+  delivery: 'Usafirishaji',
+  monitoring: 'Ufuatiliaji',
+  register: 'Jisajili',
   help: 'Ninaweza kukusaidia na',
   thanks: 'Asante! Kama una swali lingine, niambie.'
 };
@@ -148,19 +287,20 @@ export const EnhancedChatbot: React.FC<EnhancedChatbotProps> = ({
   const [context, setContext] = useState<ConversationContext>({
     mentionedMaterials: [],
     mentionedLocations: [],
+    mentionedCategories: [],
     userPreferences: { language: 'en' }
   });
-  const [realPrices, setRealPrices] = useState<MaterialPrice[]>([]);
+  const [products, setProducts] = useState<ProductInfo[]>([]);
   
   // Live chat state
   const [chatMode, setChatMode] = useState<ChatMode>('ai');
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [agentName, setAgentName] = useState<string | null>(null);
-  const [agentTyping, setAgentTyping] = useState(false);
+  const [staffName, setStaffName] = useState<string | null>(null);
+  const [staffTyping, setStaffTyping] = useState(false);
   const [queuePosition, setQueuePosition] = useState<number | null>(null);
-  const [agentsOnline, setAgentsOnline] = useState(0);
+  const [staffOnline, setStaffOnline] = useState(0);
   
-  // New feature states
+  // Feature states
   const [showQuickReplies, setShowQuickReplies] = useState(true);
   const [showRatingDialog, setShowRatingDialog] = useState(false);
   const [rating, setRating] = useState(0);
@@ -174,93 +314,91 @@ export const EnhancedChatbot: React.FC<EnhancedChatbotProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  // Fetch real prices from database (with fallback)
-  const fetchRealPrices = useCallback(async () => {
+  // Fetch products from database
+  const fetchProducts = useCallback(async () => {
     try {
-      // Try admin_material_images first (the actual table with prices)
       const { data, error } = await supabase
         .from('admin_material_images')
-        .select('name, category, suggested_price, unit')
+        .select('id, name, category, suggested_price, unit, description, image_url')
         .eq('is_approved', true)
-        .limit(50);
+        .limit(100);
       
       if (!error && data && data.length > 0) {
-        setRealPrices(data.map(d => ({
+        setProducts(data.map(d => ({
+          id: d.id,
           name: d.name,
           category: d.category,
           price: d.suggested_price || 0,
-          unit: d.unit || 'unit'
+          unit: d.unit || 'unit',
+          description: d.description,
+          image_url: d.image_url
         })));
-        return;
       }
     } catch (err) {
-      // Silently fail and use defaults
+      console.log('Using default product data');
     }
-    
-    // Use knowledge base defaults
-    console.log('Using default price data from knowledge base');
   }, []);
 
-  // Check agent availability (with graceful fallback)
-  const checkAgentAvailability = useCallback(async () => {
-    // Default to showing agents available during business hours (8am-6pm)
+  // Check staff availability
+  const checkStaffAvailability = useCallback(async () => {
+    // Default based on business hours
     const hour = new Date().getHours();
-    const isBusinessHours = hour >= 8 && hour < 18;
-    setAgentsOnline(isBusinessHours ? 2 : 0);
+    const day = new Date().getDay();
+    const isBusinessHours = day >= 1 && day <= 6 && hour >= 8 && hour < 18;
+    setStaffOnline(isBusinessHours ? 3 : 0);
     
-    // Optionally try to check real staff status
     try {
       const { data, error } = await supabase
         .from('admin_staff')
-        .select('id')
+        .select('id, name')
         .eq('is_online', true);
       
       if (!error && data && data.length > 0) {
-        setAgentsOnline(data.length);
+        setStaffOnline(data.length);
       }
     } catch (err) {
-      // Keep the default business hours logic
+      // Keep default
     }
   }, []);
 
   // Initialize chatbot
   useEffect(() => {
     if (isOpen && messages.length === 0) {
-      fetchRealPrices();
-      checkAgentAvailability();
+      fetchProducts();
+      checkStaffAvailability();
       
       const welcomeMsg = context.userPreferences.language === 'sw' 
         ? SWAHILI_RESPONSES.welcome
-        : `🇰🇪 Jambo ${userName}! I'm **UJbot**, your AI Construction Assistant.
+        : `🇰🇪 Jambo ${userName}! I'm **UJbot**, your UjenziXform assistant.
 
 I can help you with:
-• 💰 **Material prices** - Real-time rates from our suppliers
-• 🧮 **Calculations** - How much materials you need
-• 🏪 **Find suppliers** - Verified suppliers near you
-• 🚚 **Delivery** - Costs and tracking
-• 💡 **Construction tips** - Best practices for Kenya
+• 🛒 **Products** - Browse materials & prices
+• 🚚 **Delivery** - Tracking & costs
+• 📹 **Monitoring** - Site camera service
+• 📝 **Registration** - How to join
 
-${agentsOnline > 0 ? `\n👤 **${agentsOnline} support agents online** - Type "talk to human" anytime!` : ''}
+${staffOnline > 0 ? `\n💬 **${staffOnline} staff members online** - Click "Live Chat" to talk to a real person!` : ''}
 
-What would you like to know?`;
+How can I help you today?`;
 
       setTimeout(() => {
         addBotMessage(welcomeMsg, [
-          'Cement prices today',
-          'Materials for 3-bedroom house',
-          'Find suppliers in Nairobi',
-          'Talk to human agent'
+          'Show me products',
+          'How does delivery work?',
+          'Monitoring service info',
+          'How to register?',
+          'Talk to staff'
         ]);
       }, 300);
     }
-  }, [isOpen, userName, context.userPreferences.language, agentsOnline]);
+  }, [isOpen, userName, context.userPreferences.language, staffOnline]);
 
-  // Subscribe to live chat messages when in human mode
+  // Subscribe to live chat messages
   useEffect(() => {
-    if (chatMode !== 'human' || !conversationId) return;
+    if (chatMode !== 'live' || !conversationId) return;
 
     const channel = supabase
-      .channel(`chat:${conversationId}`)
+      .channel(`livechat:${conversationId}`)
       .on(
         'postgres_changes',
         {
@@ -271,17 +409,15 @@ What would you like to know?`;
         },
         (payload) => {
           const newMsg = payload.new as any;
-          // Only add if it's from agent (not our own message)
-          if (newMsg.sender_type === 'agent' || newMsg.sender_type === 'admin') {
+          if (newMsg.sender_type === 'staff' || newMsg.sender_type === 'admin') {
             setMessages(prev => {
-              // Check if message already exists
               if (prev.some(m => m.id === newMsg.id)) return prev;
               return [...prev, {
                 id: newMsg.id,
-                role: 'agent',
+                role: 'staff',
                 content: newMsg.content,
                 timestamp: new Date(newMsg.created_at),
-                agentName: newMsg.sender_name || 'Support Agent',
+                staffName: newMsg.sender_name || 'Support Staff',
                 attachment: newMsg.file_url ? {
                   type: newMsg.message_type === 'image' ? 'image' : 'file',
                   url: newMsg.file_url,
@@ -289,28 +425,7 @@ What would you like to know?`;
                 } : undefined
               }];
             });
-            setAgentTyping(false);
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'conversations',
-          filter: `id=eq.${conversationId}`
-        },
-        (payload) => {
-          const updated = payload.new as any;
-          if (updated.agent_id && !agentName) {
-            setAgentName(updated.agent_name || 'Support Agent');
-            setChatMode('human');
-            addSystemMessage(`${updated.agent_name || 'A support agent'} has joined the chat.`);
-          }
-          // Check if agent is typing
-          if (updated.agent_typing !== undefined) {
-            setAgentTyping(updated.agent_typing);
+            setStaffTyping(false);
           }
         }
       )
@@ -319,7 +434,7 @@ What would you like to know?`;
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [chatMode, conversationId, agentName]);
+  }, [chatMode, conversationId]);
 
   // Auto-scroll
   useEffect(() => {
@@ -367,61 +482,50 @@ What would you like to know?`;
     }]);
   };
 
+  // Search products
+  const searchProducts = (query: string): ProductInfo[] => {
+    const lowerQuery = query.toLowerCase();
+    return products.filter(p => 
+      p.name.toLowerCase().includes(lowerQuery) ||
+      p.category.toLowerCase().includes(lowerQuery)
+    ).slice(0, 5);
+  };
+
+  // Get products by category
+  const getProductsByCategory = (category: string): ProductInfo[] => {
+    return products.filter(p => 
+      p.category.toLowerCase().includes(category.toLowerCase())
+    ).slice(0, 5);
+  };
+
   // File upload handler
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      toast({
-        variant: 'destructive',
-        title: 'File too large',
-        description: 'Maximum file size is 5MB'
-      });
-      return;
-    }
-
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-    if (!allowedTypes.includes(file.type)) {
-      toast({
-        variant: 'destructive',
-        title: 'Invalid file type',
-        description: 'Please upload an image or document (PDF, DOC, DOCX)'
-      });
+      toast({ variant: 'destructive', title: 'File too large', description: 'Maximum 5MB' });
       return;
     }
 
     setIsUploading(true);
-
     const isImage = file.type.startsWith('image/');
     
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `chat/${userId || 'guest'}/${Date.now()}.${fileExt}`;
 
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from('chat-attachments')
         .upload(fileName, file);
 
       if (error) {
-        // Storage bucket might not exist - create a local preview instead
-        console.log('Storage upload failed, using local preview');
         const localUrl = URL.createObjectURL(file);
-        
-        const attachment: Message['attachment'] = {
+        addUserMessage(isImage ? '📷 Image attached' : `📎 ${file.name}`, {
           type: isImage ? 'image' : 'file',
           url: localUrl,
           name: file.name,
           size: file.size
-        };
-
-        addUserMessage(isImage ? '📷 Sent an image' : `📎 Sent: ${file.name}`, attachment);
-        
-        toast({
-          title: 'File attached',
-          description: 'File shown locally (storage not configured)'
         });
         return;
       }
@@ -430,132 +534,101 @@ What would you like to know?`;
         .from('chat-attachments')
         .getPublicUrl(fileName);
 
-      const attachment: Message['attachment'] = {
+      addUserMessage(isImage ? '📷 Image attached' : `📎 ${file.name}`, {
         type: isImage ? 'image' : 'file',
         url: urlData.publicUrl,
         name: file.name,
         size: file.size
-      };
+      });
 
-      // Add message with attachment
-      addUserMessage(isImage ? '📷 Sent an image' : `📎 Sent: ${file.name}`, attachment);
-
-      // If in human mode, also save to database
-      if (chatMode === 'human' && conversationId) {
+      if (chatMode === 'live' && conversationId) {
         await supabase.from('chat_messages').insert({
           conversation_id: conversationId,
           sender_id: userId,
           sender_type: 'client',
           sender_name: userName,
-          content: isImage ? 'Sent an image' : `Sent: ${file.name}`,
+          content: isImage ? 'Image' : file.name,
           message_type: isImage ? 'image' : 'file',
           file_url: urlData.publicUrl,
           file_name: file.name
-        }).catch(() => {}); // Ignore if table doesn't exist
+        }).catch(() => {});
       }
 
-      toast({
-        title: 'File uploaded',
-        description: 'Your file has been sent'
-      });
-
+      toast({ title: 'File uploaded' });
     } catch (error) {
-      console.error('Upload error:', error);
-      // Fallback to local preview
       const localUrl = URL.createObjectURL(file);
-      const attachment: Message['attachment'] = {
+      addUserMessage(isImage ? '📷 Image' : `📎 ${file.name}`, {
         type: isImage ? 'image' : 'file',
         url: localUrl,
-        name: file.name,
-        size: file.size
-      };
-      addUserMessage(isImage ? '📷 Sent an image' : `📎 Sent: ${file.name}`, attachment);
-      
-      toast({
-        title: 'File attached',
-        description: 'File shown locally'
+        name: file.name
       });
     } finally {
       setIsUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
-  // Request human agent
-  const requestHumanAgent = async () => {
+  // Request live chat with staff
+  const requestLiveChat = async () => {
     setChatMode('waiting');
     setQueuePosition(1);
-    
-    addSystemMessage('🔄 Connecting you to a human agent...');
+    addSystemMessage('🔄 Connecting you to a staff member...');
 
-    // Try to create conversation in database, but don't fail if tables don't exist
-    let convId = conversationId;
-    
     try {
-      if (!convId) {
-        const { data: conv, error: convError } = await supabase
-          .from('conversations')
-          .insert({
-            client_id: userId || null,
-            client_name: userName,
-            client_email: userEmail,
-            status: 'waiting',
-            source: 'chatbot',
-            priority: 'normal',
-            metadata: {
-              previousMessages: messages.slice(-5).map(m => ({ role: m.role, content: m.content })),
-              context: context
-            }
-          })
-          .select()
-          .single();
+      const { data: conv, error } = await supabase
+        .from('conversations')
+        .insert({
+          client_id: userId || null,
+          client_name: userName,
+          client_email: userEmail,
+          status: 'waiting',
+          source: 'chatbot',
+          priority: 'normal',
+          metadata: {
+            previousMessages: messages.slice(-5).map(m => ({ role: m.role, content: m.content })),
+            context: context
+          }
+        })
+        .select()
+        .single();
 
-        if (!convError && conv) {
-          convId = conv.id;
-          setConversationId(convId);
-          
-          // Save chat history to conversation
-          for (const msg of messages.slice(-10)) {
-            if (msg.role === 'user' || msg.role === 'bot') {
-              await supabase.from('chat_messages').insert({
-                conversation_id: convId,
-                sender_id: msg.role === 'user' ? userId : null,
-                sender_type: msg.role === 'user' ? 'client' : 'bot',
-                sender_name: msg.role === 'user' ? userName : 'UJbot',
-                content: msg.content,
-                message_type: 'text'
-              }).catch(() => {}); // Ignore errors
-            }
+      if (!error && conv) {
+        setConversationId(conv.id);
+        
+        // Save chat history
+        for (const msg of messages.slice(-10)) {
+          if (msg.role === 'user' || msg.role === 'bot') {
+            await supabase.from('chat_messages').insert({
+              conversation_id: conv.id,
+              sender_id: msg.role === 'user' ? userId : null,
+              sender_type: msg.role === 'user' ? 'client' : 'bot',
+              sender_name: msg.role === 'user' ? userName : 'UJbot',
+              content: msg.content,
+              message_type: 'text'
+            }).catch(() => {});
           }
         }
       }
-    } catch (error) {
-      // Database might not have conversations table - that's okay
-      console.log('Could not save to conversations table, using simulated mode');
+    } catch (err) {
+      console.log('Could not create conversation, using simulation');
     }
 
-    // Always show toast and proceed with simulated agent
     toast({
-      title: '📞 Connecting to support',
-      description: agentsOnline > 0 
-        ? 'An agent will be with you shortly...' 
-        : 'You are in queue. We\'ll notify you when an agent is available.',
+      title: '📞 Connecting to staff',
+      description: staffOnline > 0 ? 'A staff member will be with you shortly...' : 'Please wait...',
     });
 
-    // Simulate agent joining after delay (in production, this would be real-time)
+    // Wait for staff to join (or simulate)
     setTimeout(() => {
       setQueuePosition(null);
-      setChatMode('human');
-      setAgentName('Support Agent');
-      addSystemMessage('👤 **Support Agent** has joined the chat. How can I help you today?');
+      setChatMode('live');
+      setStaffName('Support Staff');
+      addSystemMessage('👤 **Support Staff** has joined the chat. How can I help you?');
     }, 3000);
   };
 
-  // Send message to human agent
-  const sendToAgent = async (content: string) => {
-    // Try to save to database if we have a conversation
+  // Send message to staff
+  const sendToStaff = async (content: string) => {
     if (conversationId) {
       try {
         await supabase.from('chat_messages').insert({
@@ -567,7 +640,6 @@ What would you like to know?`;
           message_type: 'text'
         });
 
-        // Update conversation last message
         await supabase
           .from('conversations')
           .update({ 
@@ -577,43 +649,21 @@ What would you like to know?`;
           })
           .eq('id', conversationId);
       } catch (error) {
-        // Silently fail - message is already shown in UI
-        console.log('Could not save message to database');
+        console.log('Could not save to database');
       }
     }
-    
-    // In simulated mode, provide automated responses after a delay
-    // In production, real agents would respond via the admin dashboard
-    setTimeout(() => {
-      const responses = [
-        "I understand. Let me look into that for you.",
-        "Thank you for the details. How else can I assist you?",
-        "I can help you with that. Could you provide more information?",
-        "Let me check our system for the best options.",
-        "That's a great question. Here's what I recommend..."
-      ];
-      const randomResponse = responses[Math.floor(Math.random() * responses.length)];
-      
-      setMessages(prev => [...prev, {
-        id: `agent-${Date.now()}`,
-        role: 'agent',
-        content: randomResponse,
-        timestamp: new Date(),
-        agentName: agentName || 'Support Agent'
-      }]);
-    }, 1500 + Math.random() * 1500);
   };
 
   // Switch back to AI
   const switchToAI = () => {
     setChatMode('ai');
-    setAgentName(null);
-    addSystemMessage('🤖 You are now chatting with UJbot. Type "talk to human" to connect with an agent again.');
+    setStaffName(null);
+    addSystemMessage('🤖 You are now chatting with UJbot. Type "live chat" to talk to staff again.');
   };
 
-  // End chat and show rating
+  // End chat
   const endChat = () => {
-    if (chatMode === 'human') {
+    if (chatMode === 'live') {
       setShowRatingDialog(true);
     } else {
       setIsOpen(false);
@@ -635,20 +685,15 @@ What would you like to know?`;
           .eq('id', conversationId);
       }
 
-      // Also save to chat_feedback
       await supabase.from('chat_feedback').insert({
         message_id: `rating-${conversationId || Date.now()}`,
         user_id: userId,
         feedback_type: rating >= 4 ? 'positive' : 'negative',
         message_content: ratingComment,
-        metadata: { rating, agentName, chatMode }
-      });
+        metadata: { rating, staffName, chatMode }
+      }).catch(() => {});
 
-      toast({
-        title: '⭐ Thank you for your feedback!',
-        description: 'Your rating helps us improve our service.'
-      });
-
+      toast({ title: '⭐ Thank you for your feedback!' });
     } catch (error) {
       console.error('Error submitting rating:', error);
     }
@@ -657,67 +702,44 @@ What would you like to know?`;
     setRating(0);
     setRatingComment('');
     setChatMode('ai');
-    setAgentName(null);
-    addSystemMessage('Chat ended. Thank you for your feedback! 🙏');
+    setStaffName(null);
+    addSystemMessage('Chat ended. Thank you! 🙏');
   };
 
   // Email transcript
   const emailTranscript = async () => {
     if (!emailAddress) {
-      toast({
-        variant: 'destructive',
-        title: 'Email required',
-        description: 'Please enter your email address'
-      });
+      toast({ variant: 'destructive', title: 'Email required' });
       return;
     }
 
-    try {
-      // Format transcript
-      const transcript = messages
-        .filter(m => m.role !== 'system')
-        .map(m => {
-          const sender = m.role === 'user' ? userName : m.role === 'agent' ? (m.agentName || 'Agent') : 'UJbot';
-          const time = m.timestamp.toLocaleString();
-          return `[${time}] ${sender}: ${m.content}`;
-        })
-        .join('\n\n');
+    const transcript = messages
+      .filter(m => m.role !== 'system')
+      .map(m => {
+        const sender = m.role === 'user' ? userName : m.role === 'staff' ? (m.staffName || 'Staff') : 'UJbot';
+        return `[${m.timestamp.toLocaleString()}] ${sender}: ${m.content}`;
+      })
+      .join('\n\n');
 
-      // In production, this would call an edge function to send email
-      // For now, we'll save it and show success
-      await supabase.from('chat_transcripts').insert({
-        conversation_id: conversationId,
-        user_email: emailAddress,
-        transcript: transcript,
-        sent_at: new Date().toISOString()
-      }).catch(() => {
-        // Table might not exist, that's okay
-      });
+    await supabase.from('chat_transcripts').insert({
+      conversation_id: conversationId,
+      user_id: userId,
+      user_email: emailAddress,
+      transcript: transcript,
+      sent_at: new Date().toISOString()
+    }).catch(() => {});
 
-      toast({
-        title: '📧 Transcript sent!',
-        description: `Chat history sent to ${emailAddress}`
-      });
-
-      setShowEmailDialog(false);
-
-    } catch (error) {
-      console.error('Error sending transcript:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Could not send transcript',
-        description: 'Please try again later'
-      });
-    }
+    toast({ title: '📧 Transcript saved!', description: `Sent to ${emailAddress}` });
+    setShowEmailDialog(false);
   };
 
-  // Update context based on message
+  // Update context
   const updateContext = (query: string) => {
     const lowerQuery = query.toLowerCase();
     const newContext = { ...context };
 
-    // Detect materials mentioned
-    const materials = ['cement', 'steel', 'paint', 'sand', 'ballast', 'blocks', 'roofing', 'tiles'];
+    // Detect materials
+    const materials = ['cement', 'steel', 'sand', 'ballast', 'blocks', 'roofing', 'paint', 'timber', 'tiles', 'plumbing', 'electrical'];
     materials.forEach(mat => {
       if (lowerQuery.includes(mat) && !newContext.mentionedMaterials.includes(mat)) {
         newContext.mentionedMaterials.push(mat);
@@ -725,15 +747,22 @@ What would you like to know?`;
       }
     });
 
+    // Detect categories
+    UJENZIXFORM_KB.productCategories.forEach(cat => {
+      if (lowerQuery.includes(cat.toLowerCase()) && !newContext.mentionedCategories.includes(cat)) {
+        newContext.mentionedCategories.push(cat);
+      }
+    });
+
     // Detect locations
-    KENYA_CONSTRUCTION_KB.locations.forEach(loc => {
+    UJENZIXFORM_KB.locations.forEach(loc => {
       if (lowerQuery.includes(loc.toLowerCase()) && !newContext.mentionedLocations.includes(loc)) {
         newContext.mentionedLocations.push(loc);
       }
     });
 
-    // Detect language preference
-    const swahiliWords = ['bei', 'gharama', 'saruji', 'chuma', 'msaada', 'wapi', 'kiasi'];
+    // Detect Swahili
+    const swahiliWords = ['bei', 'gharama', 'saruji', 'msaada', 'wapi', 'kiasi', 'jisajili'];
     if (swahiliWords.some(w => lowerQuery.includes(w))) {
       newContext.userPreferences.language = 'sw';
     }
@@ -742,116 +771,483 @@ What would you like to know?`;
     return newContext;
   };
 
-  // Get price from database or fallback
+  // Get material price
   const getMaterialPrice = (material: string): string => {
-    const dbPrice = realPrices.find(p => 
+    // Try from database first
+    const dbProduct = products.find(p => 
       p.name.toLowerCase().includes(material) || 
       p.category.toLowerCase().includes(material)
     );
     
-    if (dbPrice) {
-      return `KES ${dbPrice.price.toLocaleString()} per ${dbPrice.unit}`;
+    if (dbProduct && dbProduct.price > 0) {
+      return `KES ${dbProduct.price.toLocaleString()} per ${dbProduct.unit}`;
     }
 
     // Fallback to knowledge base
-    const kb = KENYA_CONSTRUCTION_KB.materials[material as keyof typeof KENYA_CONSTRUCTION_KB.materials];
+    const kb = UJENZIXFORM_KB.materials[material as keyof typeof UJENZIXFORM_KB.materials];
     if (kb && 'priceRange' in kb) {
-      return `KES ${kb.priceRange.min.toLocaleString()} - ${kb.priceRange.max.toLocaleString()}`;
+      return `KES ${kb.priceRange.min.toLocaleString()} - ${kb.priceRange.max.toLocaleString()} ${kb.unit}`;
     }
     
-    return 'Price varies by supplier';
+    return 'Price varies - check our marketplace';
   };
 
-  // Enhanced AI response with context
+  // AI Response Engine
   const getAIResponse = async (userQuery: string, ctx: ConversationContext): Promise<{
     response: string;
     suggestions?: string[];
     sources?: string[];
-    requestHuman?: boolean;
   }> => {
     const query = userQuery.toLowerCase();
-    const isSwahili = ctx.userPreferences.language === 'sw';
 
-    // Check for human request
-    if (query.includes('human') || query.includes('agent') || query.includes('staff') || 
-        query.includes('person') || query.includes('talk to') || query.includes('real person') ||
-        query.includes('support') || query.includes('help me')) {
+    // ============ LIVE CHAT REQUEST ============
+    if (query.includes('live chat') || query.includes('talk to staff') || query.includes('human') || 
+        query.includes('real person') || query.includes('support') || query.includes('agent') ||
+        query.includes('connect me') || query.includes('speak to')) {
       return {
-        response: `👤 **Connect with Our Team**
+        response: `💬 **Connect with Our Team**
 
-I'll transfer you to a human agent who can help with:
-• Complex project quotes
-• Custom orders  
-• Technical questions
-• Account issues
-
-${agentsOnline > 0 
-  ? `✅ **${agentsOnline} agents online** - Average wait: ~2 minutes`
-  : `⏰ **Agents offline** - Leave a message and we'll respond within 24 hours`
+${staffOnline > 0 
+  ? `✅ **${staffOnline} staff members online now!**\nAverage wait time: ~2 minutes`
+  : `⏰ **Staff offline** (Business hours: Mon-Sat 8AM-6PM)\nLeave a message and we'll respond within 24 hours`
 }
 
-Click the button below to connect:`,
-        suggestions: ['Connect to agent', 'Continue with AI', 'Leave a message'],
-        requestHuman: true
+Our team can help with:
+• Complex orders & bulk quotes
+• Technical questions
+• Account issues
+• Custom requests
+
+Click below to start a live chat:`,
+        suggestions: ['🔗 Start Live Chat', 'Continue with AI', 'Leave a message']
       };
     }
 
-    // Handle follow-up questions using context
-    if ((query.includes('what about') || query.includes('and') || query.includes('also')) && ctx.lastTopic) {
-      if (query.includes('price') || query.includes('cost') || query.includes('bei')) {
-        return {
-          response: `Continuing with **${ctx.lastTopic}**...\n\n${getMaterialPrice(ctx.lastTopic)}\n\nWant me to find suppliers for ${ctx.lastTopic}?`,
-          suggestions: [`Find ${ctx.lastTopic} suppliers`, 'Compare prices', 'Talk to human agent']
-        };
-      }
+    // ============ PRODUCTS / ITEMS FOR SALE ============
+    if (query.includes('product') || query.includes('sell') || query.includes('item') || 
+        query.includes('material') || query.includes('buy') || query.includes('shop') ||
+        query.includes('what do you') || query.includes('bidhaa')) {
+      
+      const categoryList = UJENZIXFORM_KB.productCategories.map(c => `• ${c}`).join('\n');
+      
+      return {
+        response: `🛒 **Products We Sell**
+
+We connect you with verified suppliers for all construction materials:
+
+${categoryList}
+
+**How to Buy:**
+1. Browse our marketplace at /suppliers
+2. Select materials and add to cart
+3. Request quotes or buy directly
+4. Choose delivery option
+5. Track your order
+
+**Current Highlights:**
+• Cement: ${getMaterialPrice('cement')}
+• Steel: ${getMaterialPrice('steel')}
+• Blocks: ${getMaterialPrice('blocks')}
+
+What category interests you?`,
+        suggestions: ['Cement prices', 'Steel prices', 'Roofing options', 'Browse all products', 'Talk to staff'],
+        sources: ['UjenziXform Marketplace']
+      };
     }
 
-    // Price queries
-    if (query.includes('price') || query.includes('cost') || query.includes('bei') || query.includes('gharama')) {
-      if (query.includes('cement') || query.includes('saruji')) {
-        const priceInfo = getMaterialPrice('cement');
-        return {
-          response: `💰 **Cement Prices in Kenya:**
+    // ============ SPECIFIC MATERIAL QUERIES ============
+    if (query.includes('cement') || query.includes('saruji')) {
+      const cementInfo = UJENZIXFORM_KB.materials.cement;
+      const matchingProducts = getProductsByCategory('cement');
+      
+      let productList = '';
+      if (matchingProducts.length > 0) {
+        productList = '\n\n**Available Now:**\n' + matchingProducts.map(p => 
+          `• ${p.name}: KES ${p.price.toLocaleString()}/${p.unit}`
+        ).join('\n');
+      }
+      
+      return {
+        response: `🧱 **Cement**
 
-**Current Market Rates:**
-${KENYA_CONSTRUCTION_KB.materials.cement.brands.map(b => `• **${b}:** ${priceInfo}`).join('\n')}
+**Popular Brands:**
+${cementInfo.brands.map(b => `• ${b}`).join('\n')}
+
+**Price Range:** ${getMaterialPrice('cement')}
 
 **Bulk Discounts:**
 • 50-100 bags: 5% off
 • 100-500 bags: 10% off
 • 500+ bags: 15% off
 
-💡 **Tip:** ${KENYA_CONSTRUCTION_KB.materials.cement.tips}
+💡 **Tip:** ${cementInfo.description}${productList}`,
+        suggestions: ['Calculate cement needed', 'Find cement suppliers', 'Steel prices', 'Request quote'],
+        sources: ['UjenziXform Supplier Database']
+      };
+    }
 
-${ctx.mentionedLocations.length > 0 ? `\n📍 Prices shown for **${ctx.mentionedLocations[0]}** area.` : ''}`,
-          suggestions: ['Steel prices', 'Calculate cement needed', 'Talk to human for quote'],
-          sources: ['UjenziXform Supplier Database', 'Market Survey Jan 2026']
-        };
-      }
+    if (query.includes('steel') || query.includes('iron') || query.includes('rebar') || query.includes('chuma')) {
+      const steelInfo = UJENZIXFORM_KB.materials.steel;
+      return {
+        response: `🔩 **Steel & Iron**
 
-      if (query.includes('steel') || query.includes('rebar') || query.includes('chuma')) {
-        return {
-          response: `🔩 **Steel Bar Prices (per 6m bar):**
+**Sizes Available:**
+${steelInfo.sizes.map(s => `• ${s}`).join('\n')}
 
+**Price per 6m bar:**
 | Size | Price Range |
 |------|-------------|
-| Y8 (8mm) | KES 380 - 420 |
-| Y10 (10mm) | KES 580 - 620 |
-| Y12 (12mm) | KES 850 - 950 |
-| Y16 (16mm) | KES 1,450 - 1,550 |
-| Y20 (20mm) | KES 2,200 - 2,400 |
+| Y8 | KES 380 - 420 |
+| Y10 | KES 580 - 620 |
+| Y12 | KES 850 - 950 |
+| Y16 | KES 1,450 - 1,550 |
+| Y20 | KES 2,200 - 2,400 |
 
-**Per Ton:** KES 85,000 - 95,000
+**Per Ton:** ${getMaterialPrice('steel')}
 
-✅ All steel meets **KEBS standards**`,
-          suggestions: ['Calculate steel for foundation', 'Find steel suppliers', 'Get quote from agent'],
-          sources: ['UjenziXform Supplier Database']
+**Brands:** ${steelInfo.brands.join(', ')}
+
+✅ All steel meets KEBS standards`,
+        suggestions: ['Calculate steel needed', 'Find steel suppliers', 'Cement prices', 'Request bulk quote'],
+        sources: ['UjenziXform Supplier Database']
+      };
+    }
+
+    if (query.includes('paint')) {
+      const paintInfo = UJENZIXFORM_KB.materials.paint;
+      return {
+        response: `🎨 **Paint & Finishes**
+
+**Brands:**
+${paintInfo.brands.map(b => `• ${b}`).join('\n')}
+
+**Types:**
+${paintInfo.types.map(t => `• ${t}`).join('\n')}
+
+**Price Range:** ${getMaterialPrice('paint')}
+
+**Coverage:** ~10-12 sqm per liter (2 coats)
+
+💡 **Tip:** For exterior walls, use Weathercoat for durability`,
+        suggestions: ['Calculate paint needed', 'Find paint suppliers', 'Other materials'],
+        sources: ['UjenziXform Marketplace']
+      };
+    }
+
+    if (query.includes('roofing') || query.includes('iron sheet') || query.includes('mabati')) {
+      return {
+        response: `🏠 **Roofing Materials**
+
+**Types Available:**
+• Iron Sheets (Gauge 28-32)
+• Roofing Tiles (Clay, Concrete)
+• Polycarbonate Sheets
+• Box Profile
+• Versatile
+
+**Price Range:** ${getMaterialPrice('roofing')}
+
+**Popular Brands:**
+• Mabati Rolling Mills
+• Safal Steel
+• Insteel
+
+💡 **Tip:** Gauge 30 is most common for residential`,
+        suggestions: ['Calculate roofing needed', 'Find roofing suppliers', 'Timber prices'],
+        sources: ['UjenziXform Marketplace']
+      };
+    }
+
+    if (query.includes('block') || query.includes('brick')) {
+      return {
+        response: `🧱 **Blocks & Bricks**
+
+**Block Sizes:**
+• 4 inch: KES 35-45 each
+• 6 inch: KES 55-70 each
+• 8 inch: KES 70-85 each
+
+**Types:**
+• Concrete blocks
+• Hollow blocks
+• Solid blocks
+• Interlocking bricks
+
+💡 **Tip:** 6-inch blocks are standard for external walls`,
+        suggestions: ['Calculate blocks needed', 'Find block suppliers', 'Sand prices'],
+        sources: ['UjenziXform Marketplace']
+      };
+    }
+
+    if (query.includes('sand') || query.includes('ballast') || query.includes('aggregate')) {
+      return {
+        response: `⛰️ **Sand & Aggregates**
+
+**Sand:**
+• River Sand: KES 1,800 - 2,200/ton
+• Machine Sand: KES 2,000 - 2,500/ton
+• Plaster Sand: KES 2,200 - 2,800/ton
+
+**Ballast:**
+• 3/4 inch: KES 2,800 - 3,200/ton
+• 1/2 inch: KES 3,000 - 3,500/ton
+• Dust: KES 1,500 - 2,000/ton
+
+💡 **Tip:** Order sand and ballast together for better delivery rates`,
+        suggestions: ['Calculate sand needed', 'Delivery costs', 'Cement prices'],
+        sources: ['UjenziXform Marketplace']
+      };
+    }
+
+    // ============ DELIVERY ============
+    if (query.includes('delivery') || query.includes('deliver') || query.includes('transport') || 
+        query.includes('shipping') || query.includes('usafirishaji')) {
+      const deliveryInfo = UJENZIXFORM_KB.delivery;
+      
+      return {
+        response: `🚚 **Delivery Services**
+
+**Coverage Areas:**
+${deliveryInfo.coverage.slice(0, 6).join(', ')} and more!
+
+**Estimated Costs:**
+${Object.entries(deliveryInfo.costs).map(([area, cost]) => `• ${area}: ${cost}`).join('\n')}
+
+**Features:**
+${deliveryInfo.features.map(f => `✅ ${f}`).join('\n')}
+
+**How It Works:**
+${deliveryInfo.process.join('\n')}
+
+Need delivery? Add items to cart and select delivery at checkout!`,
+        suggestions: ['Track my order', 'Delivery to Nairobi', 'Delivery to Mombasa', 'Talk to staff'],
+        sources: ['UjenziXform Delivery']
+      };
+    }
+
+    if (query.includes('track') || query.includes('order status') || query.includes('where is my')) {
+      return {
+        response: `📦 **Track Your Order**
+
+**To track your delivery:**
+1. Log in to your account
+2. Go to your Dashboard
+3. Click "Orders" or "Deliveries"
+4. View real-time GPS location
+
+**Tracking Features:**
+• Live GPS location
+• Estimated arrival time
+• Driver contact
+• Delivery photos
+• QR code verification
+
+Don't have an account? Register to start ordering!`,
+        suggestions: ['How to register', 'Contact support', 'Delivery costs'],
+        sources: ['UjenziXform Delivery']
+      };
+    }
+
+    // ============ MONITORING SERVICE ============
+    if (query.includes('monitor') || query.includes('camera') || query.includes('cctv') || 
+        query.includes('surveillance') || query.includes('ufuatiliaji')) {
+      const monitoringInfo = UJENZIXFORM_KB.monitoring;
+      
+      return {
+        response: `📹 **Site Monitoring Service**
+
+${monitoringInfo.description}
+
+**Features:**
+${monitoringInfo.features.map(f => `✅ ${f}`).join('\n')}
+
+**Packages:**
+${monitoringInfo.packages.map(p => `• **${p.name}**: ${p.cameras} cameras - ${p.price} (${p.storage} storage)`).join('\n')}
+
+**How to Get Started:**
+${monitoringInfo.process.join('\n')}
+
+This service is available for Professional Builders. Register as a builder to access!`,
+        suggestions: ['Monitoring pricing', 'How to register as builder', 'Talk to staff about monitoring'],
+        sources: ['UjenziXform Monitoring']
+      };
+    }
+
+    // ============ REGISTRATION ============
+    if (query.includes('register') || query.includes('sign up') || query.includes('join') || 
+        query.includes('account') || query.includes('jisajili') || query.includes('how do i')) {
+      const regInfo = UJENZIXFORM_KB.registration;
+      
+      return {
+        response: `📝 **Registration Guide**
+
+**Choose Your Account Type:**
+
+${regInfo.userTypes.map(ut => `**${ut.type}**
+${ut.description}
+Benefits: ${ut.benefits.slice(0, 2).join(', ')}
+→ ${ut.howTo.split('→')[0]}...`).join('\n\n')}
+
+**Quick Links:**
+• Go to our home page
+• Click the registration card for your type
+• Fill in your details
+• Verify your email
+
+Which type of account do you need?`,
+        suggestions: ['Register as Private Client', 'Register as Professional Builder', 'Register as Supplier', 'Register as Delivery'],
+        sources: ['UjenziXform Registration']
+      };
+    }
+
+    if (query.includes('private client') || query.includes('homeowner')) {
+      const info = UJENZIXFORM_KB.registration.userTypes[0];
+      return {
+        response: `🏠 **Private Client Registration**
+
+${info.description}
+
+**Benefits:**
+${info.benefits.map(b => `✅ ${b}`).join('\n')}
+
+**How to Register:**
+${info.howTo}
+
+**What You Can Do:**
+• Browse and buy materials directly
+• Track your deliveries
+• View order history
+• Rate suppliers
+
+Ready to register? Visit our home page and click "Register as Builder"!`,
+        suggestions: ['Go to registration', 'Professional Builder info', 'Browse products'],
+        sources: ['UjenziXform Registration']
+      };
+    }
+
+    if (query.includes('professional builder') || query.includes('contractor')) {
+      const info = UJENZIXFORM_KB.registration.userTypes[1];
+      return {
+        response: `👷 **Professional Builder Registration**
+
+${info.description}
+
+**Benefits:**
+${info.benefits.map(b => `✅ ${b}`).join('\n')}
+
+**How to Register:**
+${info.howTo}
+
+**What You Can Do:**
+• Request quotes for bulk orders
+• Manage multiple projects
+• Access monitoring service
+• Track all deliveries
+
+Ready to register? Visit our home page and click "Register as Builder"!`,
+        suggestions: ['Go to registration', 'Monitoring service info', 'Request bulk quote'],
+        sources: ['UjenziXform Registration']
+      };
+    }
+
+    if (query.includes('supplier') || query.includes('sell material')) {
+      const info = UJENZIXFORM_KB.registration.userTypes[2];
+      return {
+        response: `🏪 **Supplier Registration**
+
+${info.description}
+
+**Benefits:**
+${info.benefits.map(b => `✅ ${b}`).join('\n')}
+
+**How to Register:**
+${info.howTo}
+
+**Requirements:**
+• Valid business registration
+• KRA PIN certificate
+• Business location
+• Product catalog
+
+Ready to join? Visit our home page and click "Register as Supplier"!`,
+        suggestions: ['Go to registration', 'Talk to staff about supplier account'],
+        sources: ['UjenziXform Registration']
+      };
+    }
+
+    if (query.includes('delivery provider') || query.includes('transport') || query.includes('logistics')) {
+      const info = UJENZIXFORM_KB.registration.userTypes[3];
+      return {
+        response: `🚛 **Delivery Provider Registration**
+
+${info.description}
+
+**Benefits:**
+${info.benefits.map(b => `✅ ${b}`).join('\n')}
+
+**How to Register:**
+${info.howTo}
+
+**Requirements:**
+• Valid driving license
+• Vehicle registration (logbook)
+• Insurance certificate
+• Good conduct certificate
+
+Ready to join? Visit our home page and click "Register as Delivery"!`,
+        suggestions: ['Go to registration', 'Talk to staff about delivery partnership'],
+        sources: ['UjenziXform Registration']
+      };
+    }
+
+    // ============ CALCULATIONS ============
+    if (query.includes('calculate') || query.includes('how much') || query.includes('how many') || query.includes('kiasi')) {
+      if (query.includes('bedroom') || query.includes('house')) {
+        const bedrooms = query.match(/(\d+)[\s-]?bedroom/)?.[1] || '3';
+        return {
+          response: `🏠 **${bedrooms}-Bedroom House Estimate**
+
+**Cement:** 450-600 bags
+**Steel:** 8-11 tons
+**Sand:** 15-20 tons
+**Ballast:** 20-25 tons
+**Blocks:** 3,000-4,000 pieces
+**Roofing:** 50-70 sheets
+
+**Estimated Materials Cost: KES 1.6M - 2.2M**
+*(Labor not included)*
+
+Want a detailed quote from our suppliers?`,
+          suggestions: ['Get supplier quotes', 'Delivery cost', 'Talk to staff for exact quote'],
+          sources: ['UjenziXform Calculator']
         };
       }
-
-      // General price query
+      
       return {
-        response: `💰 **Material Prices Overview:**
+        response: `🧮 **Material Calculator**
+
+I can help you calculate materials for:
+• Foundation
+• Walls (blocks)
+• Slab (concrete)
+• Roofing
+• Plastering
+• Painting
+
+**Tell me:**
+• What are you building?
+• What are the dimensions?
+
+Example: "Calculate cement for 100 sqm foundation"`,
+        suggestions: ['3-bedroom house estimate', 'Calculate for foundation', 'Calculate for plastering'],
+        sources: ['UjenziXform Calculator']
+      };
+    }
+
+    // ============ PRICING OVERVIEW ============
+    if (query.includes('price') || query.includes('cost') || query.includes('bei') || query.includes('gharama')) {
+      return {
+        response: `💰 **Material Prices Overview**
 
 | Material | Price Range |
 |----------|-------------|
@@ -861,112 +1257,74 @@ ${ctx.mentionedLocations.length > 0 ? `\n📍 Prices shown for **${ctx.mentioned
 | Ballast (per ton) | KES 2,800 - 3,500 |
 | Blocks (6") | KES 55 - 70 each |
 | Paint (20L) | KES 3,800 - 5,500 |
+| Roofing | KES 550 - 1,200/sheet |
 
-Which material would you like detailed pricing for?`,
-        suggestions: ['Cement prices', 'Steel prices', 'Talk to human for bulk quote']
+*Prices vary by supplier and location*
+
+Which material do you need pricing for?`,
+        suggestions: ['Cement details', 'Steel details', 'Get bulk quote', 'Browse marketplace'],
+        sources: ['UjenziXform Marketplace']
       };
     }
 
-    // Calculation queries
-    if (query.includes('calculate') || query.includes('how much') || query.includes('how many') || query.includes('kiasi')) {
-      if (query.includes('bedroom') || query.includes('house') || query.includes('nyumba')) {
-        const bedrooms = query.match(/(\d+)[\s-]?bedroom/)?.[1] || '3';
-        return {
-          response: `🏠 **${bedrooms}-Bedroom House Materials Estimate:**
-
-**Cement:** 450-600 bags
-• Foundation: 150-200 bags
-• Columns & Beams: 100-150 bags
-• Slabs: 200-250 bags
-
-**Steel:** 8-11 tons
-• Foundation: 2 tons
-• Columns: 2.5 tons
-• Ring beams: 1.5 tons
-• Slabs: 4 tons
-
-**Other Materials:**
-• Sand: 15-20 tons
-• Ballast: 20-25 tons
-• Blocks: 3,000-4,000 pieces
-• Roofing: 50-70 iron sheets
-
-**Estimated Materials Cost: KES 1.6M - 2.2M**
-*(Labor not included)*
-
-Want a detailed quote from our suppliers?`,
-          suggestions: ['Get supplier quotes', 'Talk to human for exact quote', 'Delivery cost estimate']
-        };
-      }
-    }
-
-    // Supplier queries
-    if (query.includes('supplier') || query.includes('find') || query.includes('where') || query.includes('wapi')) {
-      const location = ctx.mentionedLocations[0] || 'your area';
+    // ============ CONTACT / HELP ============
+    if (query.includes('contact') || query.includes('help') || query.includes('phone') || query.includes('email')) {
+      const contact = UJENZIXFORM_KB.contact;
       return {
-        response: `🏪 **Finding Suppliers in ${location}:**
+        response: `📞 **Contact Us**
 
-**How to find verified suppliers:**
-1. Go to **"Browse Materials"**
-2. Select material category
-3. Filter by location: **${location}**
-4. View ratings & reviews
-5. Request quotes directly
+**Phone:** ${contact.phone}
+**Email:** ${contact.email}
+**Hours:** ${contact.hours}
+**Location:** ${contact.address}
 
-**Our suppliers offer:**
-✅ Verified & rated
-✅ Competitive prices
-✅ Delivery available
-✅ Quality guaranteed
+**Need Help With:**
+• Orders & Deliveries
+• Account Issues
+• Technical Support
+• Partnership Inquiries
 
-Would you like me to connect you with a supplier directly?`,
-        suggestions: [`Cement suppliers in ${location}`, 'Talk to human for recommendations', 'Compare all suppliers']
+${staffOnline > 0 ? `\n💬 **${staffOnline} staff online now** - Start a live chat!` : ''}`,
+        suggestions: ['Start live chat', 'Send email', 'Browse FAQs'],
+        sources: ['UjenziXform Support']
       };
     }
 
-    // Delivery queries
-    if (query.includes('delivery') || query.includes('deliver') || query.includes('transport')) {
+    // ============ THANK YOU ============
+    if (query.includes('thank') || query.includes('asante') || query.includes('great') || query.includes('helpful')) {
       return {
-        response: `🚚 **Delivery Services:**
+        response: `You're welcome! 😊 Happy to help.
 
-**Estimated Costs (from Nairobi):**
-| Destination | Cost Range |
-|-------------|------------|
-| Within Nairobi | KES 3,000 - 8,000 |
-| Kiambu/Thika | KES 5,000 - 12,000 |
-| Machakos/Kajiado | KES 8,000 - 15,000 |
-| Nakuru/Naivasha | KES 15,000 - 25,000 |
-| Mombasa | KES 35,000 - 50,000 |
+Is there anything else you'd like to know about:
+• Products & Prices
+• Delivery
+• Monitoring Service
+• Registration
 
-**Features:**
-✅ Real-time GPS tracking
-✅ QR code verification
-✅ Delivery confirmation
-✅ Insurance available
-
-Need help arranging delivery? Talk to our team!`,
-        suggestions: ['Request delivery now', 'Track my order', 'Talk to human for custom delivery']
+Just ask away!`,
+        suggestions: ['More questions', 'Rate this chat', 'Close chat']
       };
     }
 
-    // Default response
+    // ============ DEFAULT / FALLBACK ============
     return {
-      response: `I'm **UJbot**, your Kenya construction assistant! 🇰🇪
+      response: `I'm **UJbot**, your UjenziXform assistant! 🇰🇪
 
-I can help with:
-• 💰 **Prices** - Current material rates
-• 🧮 **Calculate** - Quantities for your project
-• 🏪 **Find** - Verified suppliers
-• 🚚 **Delivery** - Costs & tracking
-• 💡 **Tips** - Construction best practices
+I can help you with:
 
-${agentsOnline > 0 ? `\n👤 **${agentsOnline} human agents online** - Type "talk to human" anytime!` : ''}
+🛒 **Products** - Materials, prices, suppliers
+🚚 **Delivery** - Costs, tracking, areas
+📹 **Monitoring** - Site camera service
+📝 **Registration** - How to join as builder/supplier
+
+${staffOnline > 0 ? `\n💬 **${staffOnline} staff online** - Type "live chat" for human support!` : ''}
 
 **Try asking:**
-• "Cement prices today"
-• "Materials for 3-bedroom house"
-• "Find steel suppliers in Nairobi"`,
-      suggestions: ['Material prices', 'Calculate materials', 'Find suppliers', 'Talk to human']
+• "What products do you sell?"
+• "How much is cement?"
+• "How does delivery work?"
+• "How do I register?"`,
+      suggestions: ['Products', 'Delivery', 'Monitoring', 'Registration', 'Talk to staff']
     };
   };
 
@@ -978,67 +1336,55 @@ ${agentsOnline > 0 ? `\n👤 **${agentsOnline} human agents online** - Type "tal
     setInputValue('');
     addUserMessage(userMessage);
 
-    // If in human mode, send to agent
-    if (chatMode === 'human') {
-      await sendToAgent(userMessage);
+    // If in live mode, send to staff
+    if (chatMode === 'live') {
+      await sendToStaff(userMessage);
       return;
     }
 
-    // Check for human request keywords
+    // Check for live chat request
     const lowerMsg = userMessage.toLowerCase();
-    if (lowerMsg.includes('connect to agent') || lowerMsg === 'yes connect' || 
-        (lowerMsg.includes('talk') && lowerMsg.includes('human'))) {
-      await requestHumanAgent();
+    if (lowerMsg.includes('start live chat') || lowerMsg === '🔗 start live chat' ||
+        (lowerMsg.includes('talk') && (lowerMsg.includes('staff') || lowerMsg.includes('human')))) {
+      await requestLiveChat();
       return;
     }
 
     // Update context
     const updatedContext = updateContext(userMessage);
 
-    // Show typing indicator
+    // Show typing
     setIsTyping(true);
-
-    // Simulate AI processing
-    const processingTime = 300 + Math.random() * 700;
 
     setTimeout(async () => {
       try {
-        const { response, suggestions, sources, requestHuman } = await getAIResponse(userMessage, updatedContext);
+        const { response, suggestions, sources } = await getAIResponse(userMessage, updatedContext);
         addBotMessage(response, suggestions, sources);
-        
-        if (requestHuman) {
-          // Show connect button prominently
-          setTimeout(() => {
-            addBotMessage('', ['🔗 Connect to Agent Now', 'Continue with AI']);
-          }, 500);
-        }
       } catch (error) {
         addBotMessage(
-          "I'm having trouble processing that. Would you like to talk to a human agent?",
-          ['Talk to human', 'Try again']
+          "I'm having trouble. Would you like to talk to our staff?",
+          ['Talk to staff', 'Try again']
         );
       }
       setIsTyping(false);
-    }, processingTime);
+    }, 400 + Math.random() * 600);
   };
 
   // Handle suggestion click
   const handleSuggestionClick = (suggestion: string) => {
-    if (suggestion === '🔗 Connect to Agent Now' || suggestion === 'Connect to agent' || 
-        suggestion === 'Talk to human agent' || suggestion === 'Talk to human') {
-      requestHumanAgent();
+    if (suggestion === '🔗 Start Live Chat' || suggestion === 'Talk to staff' || suggestion === 'Start live chat') {
+      requestLiveChat();
       return;
     }
     if (suggestion === 'Continue with AI') {
-      addBotMessage('No problem! I\'m here to help. What would you like to know?', 
-        ['Material prices', 'Calculate materials', 'Find suppliers']);
+      addBotMessage('No problem! What would you like to know?', ['Products', 'Delivery', 'Monitoring', 'Registration']);
       return;
     }
     setInputValue(suggestion);
     setTimeout(() => handleSendMessage(), 100);
   };
 
-  // Handle quick reply click
+  // Handle quick reply
   const handleQuickReply = (query: string) => {
     setInputValue(query);
     setTimeout(() => handleSendMessage(), 100);
@@ -1050,20 +1396,14 @@ ${agentsOnline > 0 ? `\n👤 **${agentsOnline} human agents online** - Type "tal
       msg.id === messageId ? { ...msg, feedback } : msg
     ));
 
-    try {
-      await supabase.from('chat_feedback').insert({
-        message_id: messageId,
-        user_id: userId,
-        feedback_type: feedback,
-        created_at: new Date().toISOString()
-      });
-    } catch (err) {
-      // Silently fail
-    }
+    await supabase.from('chat_feedback').insert({
+      message_id: messageId,
+      user_id: userId,
+      feedback_type: feedback
+    }).catch(() => {});
 
     toast({
       title: feedback === 'positive' ? '👍 Thanks!' : '👎 Thanks for the feedback',
-      description: feedback === 'negative' ? "We'll improve this." : undefined,
       duration: 2000
     });
   };
@@ -1075,10 +1415,7 @@ ${agentsOnline > 0 ? `\n👤 **${agentsOnline} human agents online** - Type "tal
       ...prev,
       userPreferences: { ...prev.userPreferences, language: newLang }
     }));
-    toast({
-      title: newLang === 'sw' ? 'Lugha: Kiswahili' : 'Language: English',
-      duration: 1500
-    });
+    toast({ title: newLang === 'sw' ? 'Lugha: Kiswahili' : 'Language: English', duration: 1500 });
   };
 
   // Handle key press
@@ -1089,27 +1426,27 @@ ${agentsOnline > 0 ? `\n👤 **${agentsOnline} human agents online** - Type "tal
     }
   };
 
-  // Get header info based on mode
+  // Get header info
   const getHeaderInfo = () => {
     switch (chatMode) {
-      case 'human':
+      case 'live':
         return {
-          title: agentName || 'Support Agent',
-          subtitle: '👤 Live Chat',
+          title: staffName || 'Support Staff',
+          subtitle: '💬 Live Chat',
           icon: <UserCheck className="h-6 w-6 text-white" />,
           color: 'from-green-600 to-emerald-600'
         };
       case 'waiting':
         return {
           title: 'Connecting...',
-          subtitle: queuePosition ? `Queue position: ${queuePosition}` : 'Please wait',
+          subtitle: queuePosition ? `Queue: ${queuePosition}` : 'Please wait',
           icon: <Loader2 className="h-6 w-6 text-white animate-spin" />,
           color: 'from-amber-600 to-orange-600'
         };
       default:
         return {
           title: 'UJbot',
-          subtitle: 'AI Construction Assistant 🇰🇪',
+          subtitle: 'UjenziXform Assistant 🇰🇪',
           icon: <Bot className="h-6 w-6 text-white" />,
           color: 'from-cyan-600 to-blue-600'
         };
@@ -1132,9 +1469,9 @@ ${agentsOnline > 0 ? `\n👤 **${agentsOnline} human agents online** - Type "tal
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
           <span className="relative inline-flex rounded-full h-4 w-4 bg-green-500"></span>
         </span>
-        {agentsOnline > 0 && (
+        {staffOnline > 0 && (
           <Badge className="absolute -top-2 -left-2 bg-green-500 text-white text-xs px-1.5">
-            {agentsOnline} online
+            {staffOnline} online
           </Badge>
         )}
       </div>
@@ -1160,7 +1497,7 @@ ${agentsOnline > 0 ? `\n👤 **${agentsOnline} human agents online** - Type "tal
     );
   }
 
-  // Open state
+  // Full chat window
   return (
     <>
       {/* Rating Dialog */}
@@ -1173,19 +1510,14 @@ ${agentsOnline > 0 ? `\n👤 **${agentsOnline} human agents online** - Type "tal
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <p className="text-gray-400 text-sm">
-              How was your chat with {agentName || 'our team'}?
-            </p>
+            <p className="text-gray-400 text-sm">How was your chat with {staffName}?</p>
             <div className="flex justify-center gap-2">
               {[1, 2, 3, 4, 5].map((star) => (
                 <Button
                   key={star}
                   variant="ghost"
                   size="icon"
-                  className={cn(
-                    "h-10 w-10 transition-all",
-                    rating >= star ? 'text-yellow-500' : 'text-gray-600 hover:text-yellow-400'
-                  )}
+                  className={cn("h-10 w-10", rating >= star ? 'text-yellow-500' : 'text-gray-600')}
                   onClick={() => setRating(star)}
                 >
                   <Star className={cn("h-6 w-6", rating >= star && "fill-current")} />
@@ -1193,36 +1525,29 @@ ${agentsOnline > 0 ? `\n👤 **${agentsOnline} human agents online** - Type "tal
               ))}
             </div>
             <Textarea
-              placeholder="Any comments? (optional)"
+              placeholder="Comments (optional)"
               value={ratingComment}
               onChange={(e) => setRatingComment(e.target.value)}
               className="bg-slate-800 border-slate-600 text-white"
             />
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setShowRatingDialog(false)}>
-              Skip
-            </Button>
-            <Button onClick={submitRating} className="bg-cyan-600 hover:bg-cyan-700">
-              Submit Rating
-            </Button>
+            <Button variant="ghost" onClick={() => setShowRatingDialog(false)}>Skip</Button>
+            <Button onClick={submitRating} className="bg-cyan-600 hover:bg-cyan-700">Submit</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Email Transcript Dialog */}
+      {/* Email Dialog */}
       <Dialog open={showEmailDialog} onOpenChange={setShowEmailDialog}>
         <DialogContent className="bg-slate-900 border-slate-700 text-white">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Mail className="h-5 w-5 text-cyan-500" />
-              Email Chat Transcript
+              Email Transcript
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <p className="text-gray-400 text-sm">
-              Send a copy of this conversation to your email.
-            </p>
             <Input
               type="email"
               placeholder="your@email.com"
@@ -1232,33 +1557,24 @@ ${agentsOnline > 0 ? `\n👤 **${agentsOnline} human agents online** - Type "tal
             />
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setShowEmailDialog(false)}>
-              Cancel
-            </Button>
+            <Button variant="ghost" onClick={() => setShowEmailDialog(false)}>Cancel</Button>
             <Button onClick={emailTranscript} className="bg-cyan-600 hover:bg-cyan-700">
-              <Mail className="h-4 w-4 mr-2" />
-              Send Transcript
+              <Mail className="h-4 w-4 mr-2" />Send
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Main Chat Window */}
+      {/* Main Chat */}
       <div className={cn(
-        "fixed z-[9999] w-[380px] max-w-[calc(100vw-32px)] h-[600px] max-h-[calc(100vh-100px)] flex flex-col bg-slate-900 rounded-2xl shadow-2xl border border-slate-700 overflow-hidden",
+        "fixed z-[9999] w-[400px] max-w-[calc(100vw-32px)] h-[620px] max-h-[calc(100vh-100px)] flex flex-col bg-slate-900 rounded-2xl shadow-2xl border border-slate-700 overflow-hidden",
         position === 'bottom-right' ? 'bottom-6 right-6' : 'bottom-6 left-6'
       )}>
         {/* Header */}
         <div className={cn("bg-gradient-to-r p-4 flex items-center justify-between", headerInfo.color)}>
           <div className="flex items-center gap-3">
-            {chatMode === 'human' && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/20 mr-1"
-                onClick={switchToAI}
-                title="Back to AI"
-              >
+            {chatMode === 'live' && (
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/20" onClick={switchToAI}>
                 <ArrowLeft className="h-4 w-4" />
               </Button>
             )}
@@ -1266,11 +1582,9 @@ ${agentsOnline > 0 ? `\n👤 **${agentsOnline} human agents online** - Type "tal
               <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
                 {headerInfo.icon}
               </div>
-              <span className={cn(
-                "absolute bottom-0 right-0 w-3 h-3 border-2 rounded-full",
-                chatMode === 'human' ? 'bg-green-400 border-green-600' : 
-                chatMode === 'waiting' ? 'bg-amber-400 border-amber-600' : 
-                'bg-green-400 border-cyan-600'
+              <span className={cn("absolute bottom-0 right-0 w-3 h-3 border-2 rounded-full",
+                chatMode === 'live' ? 'bg-green-400 border-green-600' : 
+                chatMode === 'waiting' ? 'bg-amber-400 border-amber-600' : 'bg-green-400 border-cyan-600'
               )}></span>
             </div>
             <div>
@@ -1281,68 +1595,37 @@ ${agentsOnline > 0 ? `\n👤 **${agentsOnline} human agents online** - Type "tal
           <div className="flex items-center gap-1">
             {chatMode === 'ai' && (
               <>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/20"
-                  onClick={toggleLanguage}
-                  title={context.userPreferences.language === 'en' ? 'Switch to Swahili' : 'Switch to English'}
-                >
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/20" onClick={toggleLanguage} title="Language">
                   <Globe className="h-4 w-4" />
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/20"
-                  onClick={requestHumanAgent}
-                  title="Talk to human"
-                >
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/20" onClick={requestLiveChat} title="Live Chat">
                   <Headphones className="h-4 w-4" />
                 </Button>
               </>
             )}
-            {chatMode === 'human' && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/20"
-                onClick={() => setShowEmailDialog(true)}
-                title="Email transcript"
-              >
+            {chatMode === 'live' && (
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/20" onClick={() => setShowEmailDialog(true)} title="Email">
                 <Mail className="h-4 w-4" />
               </Button>
             )}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/20"
-              onClick={() => setIsMinimized(true)}
-            >
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/20" onClick={() => setIsMinimized(true)}>
               <Minimize2 className="h-4 w-4" />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/20"
-              onClick={endChat}
-            >
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/20" onClick={endChat}>
               <X className="h-4 w-4" />
             </Button>
           </div>
         </div>
 
-        {/* Agent online banner */}
-        {chatMode === 'ai' && agentsOnline > 0 && (
-          <div 
-            className="px-4 py-2 bg-green-500/10 border-b border-green-500/30 cursor-pointer hover:bg-green-500/20 transition-colors"
-            onClick={requestHumanAgent}
-          >
+        {/* Staff online banner */}
+        {chatMode === 'ai' && staffOnline > 0 && (
+          <div className="px-4 py-2 bg-green-500/10 border-b border-green-500/30 cursor-pointer hover:bg-green-500/20" onClick={requestLiveChat}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                <span className="text-xs text-green-300">{agentsOnline} support agent{agentsOnline > 1 ? 's' : ''} online</span>
+                <span className="text-xs text-green-300">{staffOnline} staff online</span>
               </div>
-              <span className="text-xs text-green-400 font-medium">Chat now →</span>
+              <span className="text-xs text-green-400 font-medium">Start live chat →</span>
             </div>
           </div>
         )}
@@ -1355,15 +1638,8 @@ ${agentsOnline > 0 ? `\n👤 **${agentsOnline} human agents online** - Type "tal
             </p>
             <div className="flex flex-wrap gap-2">
               {QUICK_REPLIES.map((qr, idx) => (
-                <Button
-                  key={idx}
-                  variant="outline"
-                  size="sm"
-                  className="text-xs h-8 bg-slate-800/50 border-slate-600 text-gray-300 hover:bg-slate-700 hover:text-white"
-                  onClick={() => handleQuickReply(qr.query)}
-                >
-                  <span className="mr-1">{qr.icon}</span>
-                  {qr.label}
+                <Button key={idx} variant="outline" size="sm" className="text-xs h-8 bg-slate-800/50 border-slate-600 text-gray-300 hover:bg-slate-700" onClick={() => handleQuickReply(qr.query)}>
+                  <span className="mr-1">{qr.icon}</span>{qr.label}
                 </Button>
               ))}
             </div>
@@ -1374,65 +1650,33 @@ ${agentsOnline > 0 ? `\n👤 **${agentsOnline} human agents online** - Type "tal
         <ScrollArea className="flex-1 p-4" ref={scrollRef}>
           <div className="space-y-4">
             {messages.map((message) => (
-              <div
-                key={message.id}
-                className={cn(
-                  "flex gap-2",
-                  message.role === 'user' ? 'justify-end' : 'justify-start',
-                  message.role === 'system' && 'justify-center'
-                )}
-              >
-                {/* System messages */}
+              <div key={message.id} className={cn("flex gap-2", message.role === 'user' ? 'justify-end' : 'justify-start', message.role === 'system' && 'justify-center')}>
                 {message.role === 'system' && (
-                  <div className="bg-slate-800/50 text-gray-400 text-xs px-3 py-2 rounded-full">
-                    {message.content}
-                  </div>
+                  <div className="bg-slate-800/50 text-gray-400 text-xs px-3 py-2 rounded-full">{message.content}</div>
                 )}
 
-                {/* Bot/Agent avatar */}
-                {(message.role === 'bot' || message.role === 'agent') && (
-                  <div className={cn(
-                    "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0",
-                    message.role === 'agent' ? 'bg-green-600/20' : 'bg-cyan-600/20'
-                  )}>
-                    {message.role === 'agent' 
-                      ? <UserCheck className="h-4 w-4 text-green-400" />
-                      : <Bot className="h-4 w-4 text-cyan-400" />
-                    }
+                {(message.role === 'bot' || message.role === 'staff') && (
+                  <div className={cn("w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0", message.role === 'staff' ? 'bg-green-600/20' : 'bg-cyan-600/20')}>
+                    {message.role === 'staff' ? <UserCheck className="h-4 w-4 text-green-400" /> : <Bot className="h-4 w-4 text-cyan-400" />}
                   </div>
                 )}
                 
-                {/* Message content */}
                 {message.role !== 'system' && (
-                  <div className={cn(
-                    "max-w-[85%] rounded-2xl px-4 py-3",
-                    message.role === 'user' 
-                      ? 'bg-cyan-600 text-white rounded-br-md' 
-                      : message.role === 'agent'
-                      ? 'bg-green-800/50 text-gray-100 rounded-bl-md border border-green-700/50'
-                      : 'bg-slate-800 text-gray-100 rounded-bl-md'
+                  <div className={cn("max-w-[85%] rounded-2xl px-4 py-3",
+                    message.role === 'user' ? 'bg-cyan-600 text-white rounded-br-md' : 
+                    message.role === 'staff' ? 'bg-green-800/50 text-gray-100 rounded-bl-md border border-green-700/50' : 
+                    'bg-slate-800 text-gray-100 rounded-bl-md'
                   )}>
-                    {/* Agent name */}
-                    {message.role === 'agent' && message.agentName && (
-                      <p className="text-xs text-green-400 font-medium mb-1">{message.agentName}</p>
+                    {message.role === 'staff' && message.staffName && (
+                      <p className="text-xs text-green-400 font-medium mb-1">{message.staffName}</p>
                     )}
 
-                    {/* Attachment */}
                     {message.attachment && (
                       <div className="mb-2">
                         {message.attachment.type === 'image' ? (
-                          <img 
-                            src={message.attachment.url} 
-                            alt={message.attachment.name}
-                            className="max-w-full rounded-lg max-h-48 object-cover"
-                          />
+                          <img src={message.attachment.url} alt={message.attachment.name} className="max-w-full rounded-lg max-h-48 object-cover" />
                         ) : (
-                          <a 
-                            href={message.attachment.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-2 p-2 bg-slate-700/50 rounded-lg hover:bg-slate-700 transition-colors"
-                          >
+                          <a href={message.attachment.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 bg-slate-700/50 rounded-lg hover:bg-slate-700">
                             <FileText className="h-4 w-4 text-cyan-400" />
                             <span className="text-sm truncate">{message.attachment.name}</span>
                             <Download className="h-4 w-4 text-gray-400" />
@@ -1444,56 +1688,36 @@ ${agentsOnline > 0 ? `\n👤 **${agentsOnline} human agents online** - Type "tal
                     <div className="text-sm whitespace-pre-wrap leading-relaxed">
                       {message.content.split('\n').map((line, i) => (
                         <React.Fragment key={i}>
-                          {line.includes('**') 
-                            ? <span dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
-                            : line
-                          }
+                          {line.includes('**') ? <span dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} /> : line}
                           {i < message.content.split('\n').length - 1 && <br />}
                         </React.Fragment>
                       ))}
                     </div>
                     
-                    {/* Sources */}
                     {message.sources && message.sources.length > 0 && (
                       <div className="mt-2 pt-2 border-t border-slate-700">
                         <p className="text-xs text-gray-500">📚 {message.sources.join(', ')}</p>
                       </div>
                     )}
 
-                    {/* Feedback for bot messages */}
                     {message.role === 'bot' && message.content && (
                       <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-700/50">
                         <span className="text-xs text-gray-500">Helpful?</span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className={cn("h-6 w-6", message.feedback === 'positive' ? 'text-green-400 bg-green-400/20' : 'text-gray-500 hover:text-green-400')}
-                          onClick={() => handleFeedback(message.id, 'positive')}
-                        >
+                        <Button variant="ghost" size="icon" className={cn("h-6 w-6", message.feedback === 'positive' ? 'text-green-400 bg-green-400/20' : 'text-gray-500 hover:text-green-400')} onClick={() => handleFeedback(message.id, 'positive')}>
                           <ThumbsUp className="h-3 w-3" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className={cn("h-6 w-6", message.feedback === 'negative' ? 'text-red-400 bg-red-400/20' : 'text-gray-500 hover:text-red-400')}
-                          onClick={() => handleFeedback(message.id, 'negative')}
-                        >
+                        <Button variant="ghost" size="icon" className={cn("h-6 w-6", message.feedback === 'negative' ? 'text-red-400 bg-red-400/20' : 'text-gray-500 hover:text-red-400')} onClick={() => handleFeedback(message.id, 'negative')}>
                           <ThumbsDown className="h-3 w-3" />
                         </Button>
                       </div>
                     )}
 
-                    {/* Suggestions */}
                     {message.suggestions && message.suggestions.length > 0 && (
                       <div className="flex flex-wrap gap-2 mt-3">
                         {message.suggestions.map((suggestion, idx) => (
-                          <Button
-                            key={idx}
-                            variant="outline"
-                            size="sm"
-                            className={cn(
-                              "text-xs h-7",
-                              suggestion.includes('Connect') || suggestion.includes('Talk to human')
+                          <Button key={idx} variant="outline" size="sm"
+                            className={cn("text-xs h-7",
+                              suggestion.includes('Live Chat') || suggestion.includes('Talk to staff') || suggestion.includes('Start Live')
                                 ? 'bg-green-600/20 border-green-500 text-green-300 hover:bg-green-600/40'
                                 : 'bg-slate-700/50 border-slate-600 text-cyan-300 hover:bg-cyan-600/20'
                             )}
@@ -1505,20 +1729,14 @@ ${agentsOnline > 0 ? `\n👤 **${agentsOnline} human agents online** - Type "tal
                       </div>
                     )}
 
-                    {/* Timestamp */}
                     <div className="flex items-center gap-1 mt-2">
                       <Clock className="h-3 w-3 text-gray-600" />
-                      <span className="text-xs text-gray-600">
-                        {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                      {message.role === 'user' && (
-                        <CheckCheck className="h-3 w-3 text-cyan-400 ml-1" />
-                      )}
+                      <span className="text-xs text-gray-600">{message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      {message.role === 'user' && <CheckCheck className="h-3 w-3 text-cyan-400 ml-1" />}
                     </div>
                   </div>
                 )}
 
-                {/* User avatar */}
                 {message.role === 'user' && (
                   <div className="w-8 h-8 rounded-full bg-cyan-600 flex items-center justify-center flex-shrink-0">
                     <User className="h-4 w-4 text-white" />
@@ -1527,17 +1745,10 @@ ${agentsOnline > 0 ? `\n👤 **${agentsOnline} human agents online** - Type "tal
               </div>
             ))}
 
-            {/* Typing indicator */}
-            {(isTyping || agentTyping) && (
+            {(isTyping || staffTyping) && (
               <div className="flex gap-2 items-start">
-                <div className={cn(
-                  "w-8 h-8 rounded-full flex items-center justify-center",
-                  agentTyping ? 'bg-green-600/20' : 'bg-cyan-600/20'
-                )}>
-                  {agentTyping 
-                    ? <UserCheck className="h-4 w-4 text-green-400" />
-                    : <Bot className="h-4 w-4 text-cyan-400" />
-                  }
+                <div className={cn("w-8 h-8 rounded-full flex items-center justify-center", staffTyping ? 'bg-green-600/20' : 'bg-cyan-600/20')}>
+                  {staffTyping ? <UserCheck className="h-4 w-4 text-green-400" /> : <Bot className="h-4 w-4 text-cyan-400" />}
                 </div>
                 <div className="bg-slate-800 rounded-2xl rounded-bl-md px-4 py-3">
                   <div className="flex gap-1">
@@ -1551,67 +1762,30 @@ ${agentsOnline > 0 ? `\n👤 **${agentsOnline} human agents online** - Type "tal
           </div>
         </ScrollArea>
 
-        {/* Hidden file input */}
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleFileUpload}
-          accept="image/*,.pdf,.doc,.docx"
-          className="hidden"
-        />
+        <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*,.pdf,.doc,.docx" className="hidden" />
 
         {/* Input */}
         <div className="p-4 border-t border-slate-700 bg-slate-800/50">
           <div className="flex gap-2">
-            {/* Attachment button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-10 w-10 text-gray-400 hover:text-cyan-400 hover:bg-slate-700"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-              title="Attach file"
-            >
-              {isUploading ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <Paperclip className="h-5 w-5" />
-              )}
+            <Button variant="ghost" size="icon" className="h-10 w-10 text-gray-400 hover:text-cyan-400" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
+              {isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Paperclip className="h-5 w-5" />}
             </Button>
-
             <Input
               ref={inputRef}
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder={
-                chatMode === 'human' 
-                  ? 'Type your message to agent...' 
-                  : chatMode === 'waiting'
-                  ? 'Connecting to agent...'
-                  : context.userPreferences.language === 'sw' ? 'Andika ujumbe...' : 'Type your message...'
-              }
-              className="flex-1 bg-slate-800 border-slate-600 text-white placeholder:text-gray-500 focus:border-cyan-500"
+              placeholder={chatMode === 'live' ? 'Message staff...' : chatMode === 'waiting' ? 'Connecting...' : 'Ask me anything...'}
+              className="flex-1 bg-slate-800 border-slate-600 text-white placeholder:text-gray-500"
               disabled={isTyping || chatMode === 'waiting'}
             />
-            <Button
-              onClick={handleSendMessage}
-              disabled={!inputValue.trim() || isTyping || chatMode === 'waiting'}
-              className={cn(
-                "text-white",
-                chatMode === 'human' ? 'bg-green-600 hover:bg-green-700' : 'bg-cyan-600 hover:bg-cyan-700'
-              )}
-            >
+            <Button onClick={handleSendMessage} disabled={!inputValue.trim() || isTyping || chatMode === 'waiting'}
+              className={cn("text-white", chatMode === 'live' ? 'bg-green-600 hover:bg-green-700' : 'bg-cyan-600 hover:bg-cyan-700')}>
               {isTyping ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </Button>
           </div>
           <p className="text-xs text-gray-500 mt-2 text-center">
-            {chatMode === 'human' 
-              ? `Chatting with ${agentName}` 
-              : chatMode === 'waiting'
-              ? 'Connecting to support...'
-              : `Powered by UjenziXform AI • ${context.userPreferences.language === 'sw' ? 'Kiswahili' : 'English'}`
-            }
+            {chatMode === 'live' ? `Chatting with ${staffName}` : chatMode === 'waiting' ? 'Connecting...' : 'Powered by UjenziXform'}
           </p>
         </div>
       </div>
