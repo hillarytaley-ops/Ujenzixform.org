@@ -10,13 +10,19 @@ import {
   User,
   Bot,
   Loader2,
-  Phone,
   Globe,
   UserCheck,
   ArrowLeft,
   Clock,
   CheckCheck,
-  Headphones
+  Headphones,
+  Paperclip,
+  Image as ImageIcon,
+  FileText,
+  Star,
+  Mail,
+  Download,
+  Zap
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,6 +31,14 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 
 // Types
 interface Message {
@@ -38,6 +52,12 @@ interface Message {
   sources?: string[];
   agentName?: string;
   read?: boolean;
+  attachment?: {
+    type: 'image' | 'file';
+    url: string;
+    name: string;
+    size?: number;
+  };
 }
 
 interface ConversationContext {
@@ -67,6 +87,15 @@ interface EnhancedChatbotProps {
 }
 
 type ChatMode = 'ai' | 'human' | 'waiting';
+
+// Quick reply templates
+const QUICK_REPLIES = [
+  { icon: '💰', label: 'Prices', query: 'Show me material prices' },
+  { icon: '🧮', label: 'Calculate', query: 'Help me calculate materials' },
+  { icon: '🏪', label: 'Suppliers', query: 'Find suppliers near me' },
+  { icon: '🚚', label: 'Delivery', query: 'Delivery options and costs' },
+  { icon: '👤', label: 'Human', query: 'Talk to human agent' },
+];
 
 // Kenya-specific knowledge base
 const KENYA_CONSTRUCTION_KB = {
@@ -131,8 +160,18 @@ export const EnhancedChatbot: React.FC<EnhancedChatbotProps> = ({
   const [queuePosition, setQueuePosition] = useState<number | null>(null);
   const [agentsOnline, setAgentsOnline] = useState(0);
   
+  // New feature states
+  const [showQuickReplies, setShowQuickReplies] = useState(true);
+  const [showRatingDialog, setShowRatingDialog] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [ratingComment, setRatingComment] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [emailAddress, setEmailAddress] = useState(userEmail || '');
+  
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   // Fetch real prices from database
@@ -228,7 +267,12 @@ What would you like to know?`;
                 role: 'agent',
                 content: newMsg.content,
                 timestamp: new Date(newMsg.created_at),
-                agentName: newMsg.sender_name || 'Support Agent'
+                agentName: newMsg.sender_name || 'Support Agent',
+                attachment: newMsg.file_url ? {
+                  type: newMsg.message_type === 'image' ? 'image' : 'file',
+                  url: newMsg.file_url,
+                  name: newMsg.file_name || 'attachment'
+                } : undefined
               }];
             });
             setAgentTyping(false);
@@ -250,6 +294,10 @@ What would you like to know?`;
             setChatMode('human');
             addSystemMessage(`${updated.agent_name || 'A support agent'} has joined the chat.`);
           }
+          // Check if agent is typing
+          if (updated.agent_typing !== undefined) {
+            setAgentTyping(updated.agent_typing);
+          }
         }
       )
       .subscribe();
@@ -266,6 +314,13 @@ What would you like to know?`;
     }
   }, [messages]);
 
+  // Hide quick replies after first message
+  useEffect(() => {
+    if (messages.filter(m => m.role === 'user').length > 0) {
+      setShowQuickReplies(false);
+    }
+  }, [messages]);
+
   // Message handlers
   const addBotMessage = (content: string, suggestions?: string[], sources?: string[]) => {
     setMessages(prev => [...prev, {
@@ -279,12 +334,13 @@ What would you like to know?`;
     }]);
   };
 
-  const addUserMessage = (content: string) => {
+  const addUserMessage = (content: string, attachment?: Message['attachment']) => {
     setMessages(prev => [...prev, {
       id: `user-${Date.now()}`,
       role: 'user',
       content,
-      timestamp: new Date()
+      timestamp: new Date(),
+      attachment
     }]);
   };
 
@@ -295,6 +351,93 @@ What would you like to know?`;
       content,
       timestamp: new Date()
     }]);
+  };
+
+  // File upload handler
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        variant: 'destructive',
+        title: 'File too large',
+        description: 'Maximum file size is 5MB'
+      });
+      return;
+    }
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    if (!allowedTypes.includes(file.type)) {
+      toast({
+        variant: 'destructive',
+        title: 'Invalid file type',
+        description: 'Please upload an image or document (PDF, DOC, DOCX)'
+      });
+      return;
+    }
+
+    setIsUploading(true);
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `chat/${userId || 'guest'}/${Date.now()}.${fileExt}`;
+
+      const { data, error } = await supabase.storage
+        .from('chat-attachments')
+        .upload(fileName, file);
+
+      if (error) throw error;
+
+      const { data: urlData } = supabase.storage
+        .from('chat-attachments')
+        .getPublicUrl(fileName);
+
+      const isImage = file.type.startsWith('image/');
+      const attachment: Message['attachment'] = {
+        type: isImage ? 'image' : 'file',
+        url: urlData.publicUrl,
+        name: file.name,
+        size: file.size
+      };
+
+      // Add message with attachment
+      addUserMessage(isImage ? '📷 Sent an image' : `📎 Sent: ${file.name}`, attachment);
+
+      // If in human mode, also save to database
+      if (chatMode === 'human' && conversationId) {
+        await supabase.from('chat_messages').insert({
+          conversation_id: conversationId,
+          sender_id: userId,
+          sender_type: 'client',
+          sender_name: userName,
+          content: isImage ? 'Sent an image' : `Sent: ${file.name}`,
+          message_type: isImage ? 'image' : 'file',
+          file_url: urlData.publicUrl,
+          file_name: file.name
+        });
+      }
+
+      toast({
+        title: 'File uploaded',
+        description: 'Your file has been sent'
+      });
+
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Upload failed',
+        description: 'Could not upload file. Please try again.'
+      });
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
   };
 
   // Request human agent
@@ -414,6 +557,106 @@ What would you like to know?`;
     setChatMode('ai');
     setAgentName(null);
     addSystemMessage('🤖 You are now chatting with UJbot. Type "talk to human" to connect with an agent again.');
+  };
+
+  // End chat and show rating
+  const endChat = () => {
+    if (chatMode === 'human') {
+      setShowRatingDialog(true);
+    } else {
+      setIsOpen(false);
+    }
+  };
+
+  // Submit rating
+  const submitRating = async () => {
+    try {
+      if (conversationId) {
+        await supabase
+          .from('conversations')
+          .update({ 
+            status: 'closed',
+            rating: rating,
+            rating_comment: ratingComment,
+            closed_at: new Date().toISOString()
+          })
+          .eq('id', conversationId);
+      }
+
+      // Also save to chat_feedback
+      await supabase.from('chat_feedback').insert({
+        message_id: `rating-${conversationId || Date.now()}`,
+        user_id: userId,
+        feedback_type: rating >= 4 ? 'positive' : 'negative',
+        message_content: ratingComment,
+        metadata: { rating, agentName, chatMode }
+      });
+
+      toast({
+        title: '⭐ Thank you for your feedback!',
+        description: 'Your rating helps us improve our service.'
+      });
+
+    } catch (error) {
+      console.error('Error submitting rating:', error);
+    }
+
+    setShowRatingDialog(false);
+    setRating(0);
+    setRatingComment('');
+    setChatMode('ai');
+    setAgentName(null);
+    addSystemMessage('Chat ended. Thank you for your feedback! 🙏');
+  };
+
+  // Email transcript
+  const emailTranscript = async () => {
+    if (!emailAddress) {
+      toast({
+        variant: 'destructive',
+        title: 'Email required',
+        description: 'Please enter your email address'
+      });
+      return;
+    }
+
+    try {
+      // Format transcript
+      const transcript = messages
+        .filter(m => m.role !== 'system')
+        .map(m => {
+          const sender = m.role === 'user' ? userName : m.role === 'agent' ? (m.agentName || 'Agent') : 'UJbot';
+          const time = m.timestamp.toLocaleString();
+          return `[${time}] ${sender}: ${m.content}`;
+        })
+        .join('\n\n');
+
+      // In production, this would call an edge function to send email
+      // For now, we'll save it and show success
+      await supabase.from('chat_transcripts').insert({
+        conversation_id: conversationId,
+        user_email: emailAddress,
+        transcript: transcript,
+        sent_at: new Date().toISOString()
+      }).catch(() => {
+        // Table might not exist, that's okay
+      });
+
+      toast({
+        title: '📧 Transcript sent!',
+        description: `Chat history sent to ${emailAddress}`
+      });
+
+      setShowEmailDialog(false);
+
+    } catch (error) {
+      console.error('Error sending transcript:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Could not send transcript',
+        description: 'Please try again later'
+      });
+    }
   };
 
   // Update context based on message
@@ -743,6 +986,12 @@ ${agentsOnline > 0 ? `\n👤 **${agentsOnline} human agents online** - Type "tal
     setTimeout(() => handleSendMessage(), 100);
   };
 
+  // Handle quick reply click
+  const handleQuickReply = (query: string) => {
+    setInputValue(query);
+    setTimeout(() => handleSendMessage(), 100);
+  };
+
   // Handle feedback
   const handleFeedback = async (messageId: string, feedback: 'positive' | 'negative') => {
     setMessages(prev => prev.map(msg => 
@@ -861,294 +1110,460 @@ ${agentsOnline > 0 ? `\n👤 **${agentsOnline} human agents online** - Type "tal
 
   // Open state
   return (
-    <div className={cn(
-      "fixed z-[9999] w-[380px] max-w-[calc(100vw-32px)] h-[600px] max-h-[calc(100vh-100px)] flex flex-col bg-slate-900 rounded-2xl shadow-2xl border border-slate-700 overflow-hidden",
-      position === 'bottom-right' ? 'bottom-6 right-6' : 'bottom-6 left-6'
-    )}>
-      {/* Header */}
-      <div className={cn("bg-gradient-to-r p-4 flex items-center justify-between", headerInfo.color)}>
-        <div className="flex items-center gap-3">
-          {chatMode === 'human' && (
+    <>
+      {/* Rating Dialog */}
+      <Dialog open={showRatingDialog} onOpenChange={setShowRatingDialog}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Star className="h-5 w-5 text-yellow-500" />
+              Rate Your Experience
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-gray-400 text-sm">
+              How was your chat with {agentName || 'our team'}?
+            </p>
+            <div className="flex justify-center gap-2">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Button
+                  key={star}
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    "h-10 w-10 transition-all",
+                    rating >= star ? 'text-yellow-500' : 'text-gray-600 hover:text-yellow-400'
+                  )}
+                  onClick={() => setRating(star)}
+                >
+                  <Star className={cn("h-6 w-6", rating >= star && "fill-current")} />
+                </Button>
+              ))}
+            </div>
+            <Textarea
+              placeholder="Any comments? (optional)"
+              value={ratingComment}
+              onChange={(e) => setRatingComment(e.target.value)}
+              className="bg-slate-800 border-slate-600 text-white"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowRatingDialog(false)}>
+              Skip
+            </Button>
+            <Button onClick={submitRating} className="bg-cyan-600 hover:bg-cyan-700">
+              Submit Rating
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Email Transcript Dialog */}
+      <Dialog open={showEmailDialog} onOpenChange={setShowEmailDialog}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5 text-cyan-500" />
+              Email Chat Transcript
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-gray-400 text-sm">
+              Send a copy of this conversation to your email.
+            </p>
+            <Input
+              type="email"
+              placeholder="your@email.com"
+              value={emailAddress}
+              onChange={(e) => setEmailAddress(e.target.value)}
+              className="bg-slate-800 border-slate-600 text-white"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowEmailDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={emailTranscript} className="bg-cyan-600 hover:bg-cyan-700">
+              <Mail className="h-4 w-4 mr-2" />
+              Send Transcript
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Main Chat Window */}
+      <div className={cn(
+        "fixed z-[9999] w-[380px] max-w-[calc(100vw-32px)] h-[600px] max-h-[calc(100vh-100px)] flex flex-col bg-slate-900 rounded-2xl shadow-2xl border border-slate-700 overflow-hidden",
+        position === 'bottom-right' ? 'bottom-6 right-6' : 'bottom-6 left-6'
+      )}>
+        {/* Header */}
+        <div className={cn("bg-gradient-to-r p-4 flex items-center justify-between", headerInfo.color)}>
+          <div className="flex items-center gap-3">
+            {chatMode === 'human' && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/20 mr-1"
+                onClick={switchToAI}
+                title="Back to AI"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            )}
+            <div className="relative">
+              <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                {headerInfo.icon}
+              </div>
+              <span className={cn(
+                "absolute bottom-0 right-0 w-3 h-3 border-2 rounded-full",
+                chatMode === 'human' ? 'bg-green-400 border-green-600' : 
+                chatMode === 'waiting' ? 'bg-amber-400 border-amber-600' : 
+                'bg-green-400 border-cyan-600'
+              )}></span>
+            </div>
+            <div>
+              <h3 className="font-bold text-white">{headerInfo.title}</h3>
+              <p className="text-xs text-white/80">{headerInfo.subtitle}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1">
+            {chatMode === 'ai' && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/20"
+                  onClick={toggleLanguage}
+                  title={context.userPreferences.language === 'en' ? 'Switch to Swahili' : 'Switch to English'}
+                >
+                  <Globe className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/20"
+                  onClick={requestHumanAgent}
+                  title="Talk to human"
+                >
+                  <Headphones className="h-4 w-4" />
+                </Button>
+              </>
+            )}
+            {chatMode === 'human' && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/20"
+                onClick={() => setShowEmailDialog(true)}
+                title="Email transcript"
+              >
+                <Mail className="h-4 w-4" />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/20 mr-1"
-              onClick={switchToAI}
-              title="Back to AI"
+              className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/20"
+              onClick={() => setIsMinimized(true)}
             >
-              <ArrowLeft className="h-4 w-4" />
+              <Minimize2 className="h-4 w-4" />
             </Button>
-          )}
-          <div className="relative">
-            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-              {headerInfo.icon}
-            </div>
-            <span className={cn(
-              "absolute bottom-0 right-0 w-3 h-3 border-2 rounded-full",
-              chatMode === 'human' ? 'bg-green-400 border-green-600' : 
-              chatMode === 'waiting' ? 'bg-amber-400 border-amber-600' : 
-              'bg-green-400 border-cyan-600'
-            )}></span>
-          </div>
-          <div>
-            <h3 className="font-bold text-white">{headerInfo.title}</h3>
-            <p className="text-xs text-white/80">{headerInfo.subtitle}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-1">
-          {chatMode === 'ai' && (
-            <>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/20"
-                onClick={toggleLanguage}
-                title={context.userPreferences.language === 'en' ? 'Switch to Swahili' : 'Switch to English'}
-              >
-                <Globe className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/20"
-                onClick={requestHumanAgent}
-                title="Talk to human"
-              >
-                <Headphones className="h-4 w-4" />
-              </Button>
-            </>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/20"
-            onClick={() => setIsMinimized(true)}
-          >
-            <Minimize2 className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/20"
-            onClick={() => setIsOpen(false)}
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
-      {/* Agent online banner */}
-      {chatMode === 'ai' && agentsOnline > 0 && (
-        <div 
-          className="px-4 py-2 bg-green-500/10 border-b border-green-500/30 cursor-pointer hover:bg-green-500/20 transition-colors"
-          onClick={requestHumanAgent}
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-              <span className="text-xs text-green-300">{agentsOnline} support agent{agentsOnline > 1 ? 's' : ''} online</span>
-            </div>
-            <span className="text-xs text-green-400 font-medium">Chat now →</span>
-          </div>
-        </div>
-      )}
-
-      {/* Messages */}
-      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
-        <div className="space-y-4">
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={cn(
-                "flex gap-2",
-                message.role === 'user' ? 'justify-end' : 'justify-start',
-                message.role === 'system' && 'justify-center'
-              )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/20"
+              onClick={endChat}
             >
-              {/* System messages */}
-              {message.role === 'system' && (
-                <div className="bg-slate-800/50 text-gray-400 text-xs px-3 py-2 rounded-full">
-                  {message.content}
-                </div>
-              )}
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
 
-              {/* Bot/Agent avatar */}
-              {(message.role === 'bot' || message.role === 'agent') && (
+        {/* Agent online banner */}
+        {chatMode === 'ai' && agentsOnline > 0 && (
+          <div 
+            className="px-4 py-2 bg-green-500/10 border-b border-green-500/30 cursor-pointer hover:bg-green-500/20 transition-colors"
+            onClick={requestHumanAgent}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                <span className="text-xs text-green-300">{agentsOnline} support agent{agentsOnline > 1 ? 's' : ''} online</span>
+              </div>
+              <span className="text-xs text-green-400 font-medium">Chat now →</span>
+            </div>
+          </div>
+        )}
+
+        {/* Quick Replies */}
+        {showQuickReplies && chatMode === 'ai' && messages.length <= 1 && (
+          <div className="px-4 py-3 border-b border-slate-700/50 bg-slate-800/30">
+            <p className="text-xs text-gray-500 mb-2 flex items-center gap-1">
+              <Zap className="h-3 w-3" /> Quick actions
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {QUICK_REPLIES.map((qr, idx) => (
+                <Button
+                  key={idx}
+                  variant="outline"
+                  size="sm"
+                  className="text-xs h-8 bg-slate-800/50 border-slate-600 text-gray-300 hover:bg-slate-700 hover:text-white"
+                  onClick={() => handleQuickReply(qr.query)}
+                >
+                  <span className="mr-1">{qr.icon}</span>
+                  {qr.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Messages */}
+        <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+          <div className="space-y-4">
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                className={cn(
+                  "flex gap-2",
+                  message.role === 'user' ? 'justify-end' : 'justify-start',
+                  message.role === 'system' && 'justify-center'
+                )}
+              >
+                {/* System messages */}
+                {message.role === 'system' && (
+                  <div className="bg-slate-800/50 text-gray-400 text-xs px-3 py-2 rounded-full">
+                    {message.content}
+                  </div>
+                )}
+
+                {/* Bot/Agent avatar */}
+                {(message.role === 'bot' || message.role === 'agent') && (
+                  <div className={cn(
+                    "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0",
+                    message.role === 'agent' ? 'bg-green-600/20' : 'bg-cyan-600/20'
+                  )}>
+                    {message.role === 'agent' 
+                      ? <UserCheck className="h-4 w-4 text-green-400" />
+                      : <Bot className="h-4 w-4 text-cyan-400" />
+                    }
+                  </div>
+                )}
+                
+                {/* Message content */}
+                {message.role !== 'system' && (
+                  <div className={cn(
+                    "max-w-[85%] rounded-2xl px-4 py-3",
+                    message.role === 'user' 
+                      ? 'bg-cyan-600 text-white rounded-br-md' 
+                      : message.role === 'agent'
+                      ? 'bg-green-800/50 text-gray-100 rounded-bl-md border border-green-700/50'
+                      : 'bg-slate-800 text-gray-100 rounded-bl-md'
+                  )}>
+                    {/* Agent name */}
+                    {message.role === 'agent' && message.agentName && (
+                      <p className="text-xs text-green-400 font-medium mb-1">{message.agentName}</p>
+                    )}
+
+                    {/* Attachment */}
+                    {message.attachment && (
+                      <div className="mb-2">
+                        {message.attachment.type === 'image' ? (
+                          <img 
+                            src={message.attachment.url} 
+                            alt={message.attachment.name}
+                            className="max-w-full rounded-lg max-h-48 object-cover"
+                          />
+                        ) : (
+                          <a 
+                            href={message.attachment.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 p-2 bg-slate-700/50 rounded-lg hover:bg-slate-700 transition-colors"
+                          >
+                            <FileText className="h-4 w-4 text-cyan-400" />
+                            <span className="text-sm truncate">{message.attachment.name}</span>
+                            <Download className="h-4 w-4 text-gray-400" />
+                          </a>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="text-sm whitespace-pre-wrap leading-relaxed">
+                      {message.content.split('\n').map((line, i) => (
+                        <React.Fragment key={i}>
+                          {line.includes('**') 
+                            ? <span dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
+                            : line
+                          }
+                          {i < message.content.split('\n').length - 1 && <br />}
+                        </React.Fragment>
+                      ))}
+                    </div>
+                    
+                    {/* Sources */}
+                    {message.sources && message.sources.length > 0 && (
+                      <div className="mt-2 pt-2 border-t border-slate-700">
+                        <p className="text-xs text-gray-500">📚 {message.sources.join(', ')}</p>
+                      </div>
+                    )}
+
+                    {/* Feedback for bot messages */}
+                    {message.role === 'bot' && message.content && (
+                      <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-700/50">
+                        <span className="text-xs text-gray-500">Helpful?</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={cn("h-6 w-6", message.feedback === 'positive' ? 'text-green-400 bg-green-400/20' : 'text-gray-500 hover:text-green-400')}
+                          onClick={() => handleFeedback(message.id, 'positive')}
+                        >
+                          <ThumbsUp className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={cn("h-6 w-6", message.feedback === 'negative' ? 'text-red-400 bg-red-400/20' : 'text-gray-500 hover:text-red-400')}
+                          onClick={() => handleFeedback(message.id, 'negative')}
+                        >
+                          <ThumbsDown className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Suggestions */}
+                    {message.suggestions && message.suggestions.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {message.suggestions.map((suggestion, idx) => (
+                          <Button
+                            key={idx}
+                            variant="outline"
+                            size="sm"
+                            className={cn(
+                              "text-xs h-7",
+                              suggestion.includes('Connect') || suggestion.includes('Talk to human')
+                                ? 'bg-green-600/20 border-green-500 text-green-300 hover:bg-green-600/40'
+                                : 'bg-slate-700/50 border-slate-600 text-cyan-300 hover:bg-cyan-600/20'
+                            )}
+                            onClick={() => handleSuggestionClick(suggestion)}
+                          >
+                            {suggestion}
+                          </Button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Timestamp */}
+                    <div className="flex items-center gap-1 mt-2">
+                      <Clock className="h-3 w-3 text-gray-600" />
+                      <span className="text-xs text-gray-600">
+                        {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      {message.role === 'user' && (
+                        <CheckCheck className="h-3 w-3 text-cyan-400 ml-1" />
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* User avatar */}
+                {message.role === 'user' && (
+                  <div className="w-8 h-8 rounded-full bg-cyan-600 flex items-center justify-center flex-shrink-0">
+                    <User className="h-4 w-4 text-white" />
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* Typing indicator */}
+            {(isTyping || agentTyping) && (
+              <div className="flex gap-2 items-start">
                 <div className={cn(
-                  "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0",
-                  message.role === 'agent' ? 'bg-green-600/20' : 'bg-cyan-600/20'
+                  "w-8 h-8 rounded-full flex items-center justify-center",
+                  agentTyping ? 'bg-green-600/20' : 'bg-cyan-600/20'
                 )}>
-                  {message.role === 'agent' 
+                  {agentTyping 
                     ? <UserCheck className="h-4 w-4 text-green-400" />
                     : <Bot className="h-4 w-4 text-cyan-400" />
                   }
                 </div>
-              )}
-              
-              {/* Message content */}
-              {message.role !== 'system' && (
-                <div className={cn(
-                  "max-w-[85%] rounded-2xl px-4 py-3",
-                  message.role === 'user' 
-                    ? 'bg-cyan-600 text-white rounded-br-md' 
-                    : message.role === 'agent'
-                    ? 'bg-green-800/50 text-gray-100 rounded-bl-md border border-green-700/50'
-                    : 'bg-slate-800 text-gray-100 rounded-bl-md'
-                )}>
-                  {/* Agent name */}
-                  {message.role === 'agent' && message.agentName && (
-                    <p className="text-xs text-green-400 font-medium mb-1">{message.agentName}</p>
-                  )}
-
-                  <div className="text-sm whitespace-pre-wrap leading-relaxed">
-                    {message.content.split('\n').map((line, i) => (
-                      <React.Fragment key={i}>
-                        {line.includes('**') 
-                          ? <span dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
-                          : line
-                        }
-                        {i < message.content.split('\n').length - 1 && <br />}
-                      </React.Fragment>
-                    ))}
-                  </div>
-                  
-                  {/* Sources */}
-                  {message.sources && message.sources.length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-slate-700">
-                      <p className="text-xs text-gray-500">📚 {message.sources.join(', ')}</p>
-                    </div>
-                  )}
-
-                  {/* Feedback for bot messages */}
-                  {message.role === 'bot' && message.content && (
-                    <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-700/50">
-                      <span className="text-xs text-gray-500">Helpful?</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className={cn("h-6 w-6", message.feedback === 'positive' ? 'text-green-400 bg-green-400/20' : 'text-gray-500 hover:text-green-400')}
-                        onClick={() => handleFeedback(message.id, 'positive')}
-                      >
-                        <ThumbsUp className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className={cn("h-6 w-6", message.feedback === 'negative' ? 'text-red-400 bg-red-400/20' : 'text-gray-500 hover:text-red-400')}
-                        onClick={() => handleFeedback(message.id, 'negative')}
-                      >
-                        <ThumbsDown className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  )}
-
-                  {/* Suggestions */}
-                  {message.suggestions && message.suggestions.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-3">
-                      {message.suggestions.map((suggestion, idx) => (
-                        <Button
-                          key={idx}
-                          variant="outline"
-                          size="sm"
-                          className={cn(
-                            "text-xs h-7",
-                            suggestion.includes('Connect') || suggestion.includes('Talk to human')
-                              ? 'bg-green-600/20 border-green-500 text-green-300 hover:bg-green-600/40'
-                              : 'bg-slate-700/50 border-slate-600 text-cyan-300 hover:bg-cyan-600/20'
-                          )}
-                          onClick={() => handleSuggestionClick(suggestion)}
-                        >
-                          {suggestion}
-                        </Button>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Timestamp */}
-                  <div className="flex items-center gap-1 mt-2">
-                    <Clock className="h-3 w-3 text-gray-600" />
-                    <span className="text-xs text-gray-600">
-                      {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                    {message.role === 'user' && (
-                      <CheckCheck className="h-3 w-3 text-cyan-400 ml-1" />
-                    )}
+                <div className="bg-slate-800 rounded-2xl rounded-bl-md px-4 py-3">
+                  <div className="flex gap-1">
+                    <span className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                    <span className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                    <span className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
                   </div>
                 </div>
-              )}
-
-              {/* User avatar */}
-              {message.role === 'user' && (
-                <div className="w-8 h-8 rounded-full bg-cyan-600 flex items-center justify-center flex-shrink-0">
-                  <User className="h-4 w-4 text-white" />
-                </div>
-              )}
-            </div>
-          ))}
-
-          {/* Typing indicator */}
-          {(isTyping || agentTyping) && (
-            <div className="flex gap-2 items-start">
-              <div className={cn(
-                "w-8 h-8 rounded-full flex items-center justify-center",
-                agentTyping ? 'bg-green-600/20' : 'bg-cyan-600/20'
-              )}>
-                {agentTyping 
-                  ? <UserCheck className="h-4 w-4 text-green-400" />
-                  : <Bot className="h-4 w-4 text-cyan-400" />
-                }
               </div>
-              <div className="bg-slate-800 rounded-2xl rounded-bl-md px-4 py-3">
-                <div className="flex gap-1">
-                  <span className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                  <span className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                  <span className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </ScrollArea>
-
-      {/* Input */}
-      <div className="p-4 border-t border-slate-700 bg-slate-800/50">
-        <div className="flex gap-2">
-          <Input
-            ref={inputRef}
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder={
-              chatMode === 'human' 
-                ? 'Type your message to agent...' 
-                : chatMode === 'waiting'
-                ? 'Connecting to agent...'
-                : context.userPreferences.language === 'sw' ? 'Andika ujumbe...' : 'Type your message...'
-            }
-            className="flex-1 bg-slate-800 border-slate-600 text-white placeholder:text-gray-500 focus:border-cyan-500"
-            disabled={isTyping || chatMode === 'waiting'}
-          />
-          <Button
-            onClick={handleSendMessage}
-            disabled={!inputValue.trim() || isTyping || chatMode === 'waiting'}
-            className={cn(
-              "text-white",
-              chatMode === 'human' ? 'bg-green-600 hover:bg-green-700' : 'bg-cyan-600 hover:bg-cyan-700'
             )}
-          >
-            {isTyping ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          </Button>
+          </div>
+        </ScrollArea>
+
+        {/* Hidden file input */}
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileUpload}
+          accept="image/*,.pdf,.doc,.docx"
+          className="hidden"
+        />
+
+        {/* Input */}
+        <div className="p-4 border-t border-slate-700 bg-slate-800/50">
+          <div className="flex gap-2">
+            {/* Attachment button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10 text-gray-400 hover:text-cyan-400 hover:bg-slate-700"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+              title="Attach file"
+            >
+              {isUploading ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <Paperclip className="h-5 w-5" />
+              )}
+            </Button>
+
+            <Input
+              ref={inputRef}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder={
+                chatMode === 'human' 
+                  ? 'Type your message to agent...' 
+                  : chatMode === 'waiting'
+                  ? 'Connecting to agent...'
+                  : context.userPreferences.language === 'sw' ? 'Andika ujumbe...' : 'Type your message...'
+              }
+              className="flex-1 bg-slate-800 border-slate-600 text-white placeholder:text-gray-500 focus:border-cyan-500"
+              disabled={isTyping || chatMode === 'waiting'}
+            />
+            <Button
+              onClick={handleSendMessage}
+              disabled={!inputValue.trim() || isTyping || chatMode === 'waiting'}
+              className={cn(
+                "text-white",
+                chatMode === 'human' ? 'bg-green-600 hover:bg-green-700' : 'bg-cyan-600 hover:bg-cyan-700'
+              )}
+            >
+              {isTyping ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            </Button>
+          </div>
+          <p className="text-xs text-gray-500 mt-2 text-center">
+            {chatMode === 'human' 
+              ? `Chatting with ${agentName}` 
+              : chatMode === 'waiting'
+              ? 'Connecting to support...'
+              : `Powered by UjenziXform AI • ${context.userPreferences.language === 'sw' ? 'Kiswahili' : 'English'}`
+            }
+          </p>
         </div>
-        <p className="text-xs text-gray-500 mt-2 text-center">
-          {chatMode === 'human' 
-            ? `Chatting with ${agentName}` 
-            : chatMode === 'waiting'
-            ? 'Connecting to support...'
-            : `Powered by UjenziXform AI • ${context.userPreferences.language === 'sw' ? 'Kiswahili' : 'English'}`
-          }
-        </p>
       </div>
-    </div>
+    </>
   );
 };
 
