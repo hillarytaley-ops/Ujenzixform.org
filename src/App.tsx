@@ -61,8 +61,8 @@ import { AuthRequired } from "@/components/security/AuthRequired";
 import { RoleProtectedRoute } from "@/components/security/RoleProtectedRoute";
 import { Navigate, useSearchParams } from "react-router-dom";
 
-// Enhanced AI Chatbot with context awareness, feedback, and database integration
-import { EnhancedChatbot } from "@/components/chat/EnhancedChatbot";
+// Simple Live Chat Widget for staff support
+import { LiveChatWidget } from "@/components/chat/LiveChatWidget";
 
 // Floating Social Media Button
 import { FloatingSocialSidebar } from "@/components/FloatingSocialSidebar";
@@ -172,14 +172,8 @@ const App = () => {
               <Toaster />
               <Sonner />
               <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-                {/* Enhanced AI Chatbot - with context, feedback, and database prices */}
-                {showChat && (
-                  <EnhancedChatbot 
-                    userId={user?.id}
-                    userName={user?.email?.split('@')[0] || 'Guest'}
-                    userEmail={user?.email}
-                  />
-                )}
+                {/* Live Chat Widget for staff support */}
+                {showChat && <LiveChatWidget />}
                 
                 {/* Floating Social Media Button - Global, hides on auth pages */}
                 {showChat && <FloatingSocialSidebar />}
