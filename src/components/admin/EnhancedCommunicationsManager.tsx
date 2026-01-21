@@ -169,15 +169,20 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
   // Fetch conversations
   const fetchConversations = useCallback(async () => {
     try {
+      console.log('🔄 Fetching conversations...');
       const { data, error } = await supabase
         .from('conversations')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error fetching conversations:', error);
+        throw error;
+      }
+      console.log('✅ Conversations fetched:', data?.length || 0, data);
       setConversations(data || []);
     } catch (error) {
-      console.error('Error fetching conversations:', error);
+      console.error('❌ Exception fetching conversations:', error);
     }
   }, []);
 
