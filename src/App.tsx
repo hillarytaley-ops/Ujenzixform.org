@@ -67,6 +67,9 @@ import { LiveChatWidget } from "@/components/chat/LiveChatWidget";
 // Floating Social Media Button
 import { FloatingSocialSidebar } from "@/components/FloatingSocialSidebar";
 
+// Offline Status Indicator
+import { OfflineIndicator } from "@/components/OfflineIndicator";
+
 // Optimized loading component with skeleton animation
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-screen bg-background">
@@ -172,6 +175,9 @@ const App = () => {
               <Toaster />
               <Sonner />
               <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+                {/* Offline Status Indicator - Shows when offline */}
+                <OfflineIndicator />
+                
                 {/* Live Chat Widget for staff support */}
                 {showChat && <LiveChatWidget />}
                 
