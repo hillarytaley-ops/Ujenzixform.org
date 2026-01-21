@@ -93,6 +93,7 @@ import { AdminVideoApproval } from "@/components/admin/AdminVideoApproval";
 import { UserRolesManager } from "@/components/admin/UserRolesManager";
 import { AdminMessaging } from "@/components/admin/AdminMessaging";
 import { LiveChatManager } from "@/components/admin/LiveChatManager";
+import { EnhancedCommunicationsManager } from "@/components/admin/EnhancedCommunicationsManager";
 import { SupabaseSecurityAdvisor } from "@/components/admin/SupabaseSecurityAdvisor";
 import { Camera, UserCog, MessageCircle } from "lucide-react";
 import {
@@ -4110,10 +4111,10 @@ const AdminDashboard = () => {
             </Card>
           </TabsContent>
 
-          {/* Communications Tab - Live Chat with Clients */}
+          {/* Communications Tab - Enhanced Live Chat with Clients */}
           <TabsContent value="communications" className="space-y-6">
-            {/* Live Chat Manager - Real-time client-staff chat */}
-            <LiveChatManager 
+            {/* Enhanced Communications Manager - Live chat, feedback, transcripts */}
+            <EnhancedCommunicationsManager 
               staffId={adminEmail || 'admin'}
               staffName={adminEmail?.split('@')[0] || 'Support Team'}
             />
