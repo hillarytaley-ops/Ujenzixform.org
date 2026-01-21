@@ -724,18 +724,24 @@ How can I help you today?`;
 
   // Request live chat with staff
   const requestLiveChat = async () => {
+    console.log('🚀 requestLiveChat START');
     setChatMode('waiting');
     setQueuePosition(1);
     addSystemMessage('🔄 Connecting you to a staff member...');
 
-    console.log('🔄 requestLiveChat called', { userId, userName, userEmail });
+    console.log('🔄 requestLiveChat - props:', { userId, userName, userEmail });
 
     try {
       // Get current user session for proper UUID
-      const { data: { user } } = await supabase.auth.getUser();
-      const clientId = user?.id || null;
+      console.log('🔄 Getting user from supabase.auth...');
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
       
-      console.log('🔄 Creating conversation with client_id:', clientId);
+      if (authError) {
+        console.error('❌ Auth error:', authError);
+      }
+      
+      const clientId = user?.id || null;
+      console.log('🔄 User retrieved:', { clientId, email: user?.email });
       
       // Create conversation - status must be: open, pending, resolved, or closed
       const { data: conv, error } = await supabase
@@ -797,8 +803,9 @@ How can I help you today?`;
           addSystemMessage('👤 **Support Staff** has joined the chat. Your messages are being sent to our team. Please wait for a response.');
         }, 1500);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('❌ Exception in requestLiveChat:', err);
+      console.error('❌ Error details:', err?.message, err?.stack);
       toast({
         variant: 'destructive',
         title: 'Error',
@@ -806,6 +813,7 @@ How can I help you today?`;
       });
       setChatMode('ai');
     }
+    console.log('🏁 requestLiveChat END');
   };
 
   // Send message to staff
