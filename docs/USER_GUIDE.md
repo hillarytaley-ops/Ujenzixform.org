@@ -1,8 +1,8 @@
-# MradiPro User Guide
+# UjenziXform User Guide
 
-## Welcome to MradiPro! 🏗️
+## Welcome to UjenziXform! 🏗️
 
-MradiPro is Kenya's premier construction marketplace connecting builders with verified suppliers across all 47 counties.
+UjenziXform is Kenya's premier construction marketplace connecting builders with verified suppliers across all 47 counties.
 
 ---
 
@@ -10,7 +10,7 @@ MradiPro is Kenya's premier construction marketplace connecting builders with ve
 
 ### 1. Create an Account
 
-1. Visit [mradipro.com](https://mradipro.com)
+1. Visit [ujenzixform.com](https://ujenzixform.com)
 2. Click **"Get Started"**
 3. Choose your account type:
    - **Private Client** - For individual home builders
@@ -181,7 +181,7 @@ Need help? Use our live chat:
 
 ## Offline Mode
 
-MradiPro works offline! When you lose internet:
+UjenziXform works offline! When you lose internet:
 
 - Browse cached materials
 - View saved orders
@@ -193,9 +193,9 @@ MradiPro works offline! When you lose internet:
 
 ### Install as PWA
 
-1. Open MradiPro in Chrome/Safari
+1. Open UjenziXform in Chrome/Safari
 2. Click **"Add to Home Screen"**
-3. Access MradiPro like a native app
+3. Access UjenziXform like a native app
 
 ### Features
 
@@ -252,7 +252,7 @@ Complete supplier registration with all required documents. Verification takes 2
 
 ## Contact Us
 
-- **Email:** support@mradipro.com
+- **Email:** support@ujenzixform.com
 - **Phone:** +254 XXX XXX XXX
 - **Live Chat:** Available 8am - 8pm EAT
 - **Address:** Nairobi, Kenya
@@ -269,5 +269,5 @@ Complete supplier registration with all required documents. Verification takes 2
 
 ---
 
-Thank you for choosing MradiPro! 🇰🇪
+Thank you for choosing UjenziXform! 🇰🇪
 

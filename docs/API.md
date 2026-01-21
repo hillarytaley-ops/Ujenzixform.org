@@ -1,8 +1,8 @@
-# MradiPro API Documentation
+# UjenziXform API Documentation
 
 ## Overview
 
-MradiPro uses **Supabase** as its backend, providing a PostgreSQL database with Row Level Security (RLS), real-time subscriptions, and authentication.
+UjenziXform uses **Supabase** as its backend, providing a PostgreSQL database with Row Level Security (RLS), real-time subscriptions, and authentication.
 
 **Base URL:** `https://wuuyjjpgzgeimiptuuws.supabase.co`
 
@@ -388,6 +388,6 @@ Webhooks will be available for:
 ## Support
 
 For API support, contact:
-- Email: support@mradipro.com
+- Email: support@ujenzixform.com
 - Live Chat: Available in-app
 
