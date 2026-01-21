@@ -1960,7 +1960,7 @@ const AdminDashboard = () => {
             {shouldShowTab('registrations') && (
               <TabsTrigger value="registrations" className="data-[state=active]:bg-blue-600">
                 <Users className="h-4 w-4 mr-2" />
-                Registrations
+                User Registrations
               </TabsTrigger>
             )}
             {shouldShowTab('pending-products') && (

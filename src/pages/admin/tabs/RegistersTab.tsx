@@ -1,14 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building2, Store, Truck, Users, RefreshCw } from 'lucide-react';
+import { Building2, Store, Users, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { getAdminClient } from '@/integrations/supabase/adminClient';
 import { useToast } from '@/hooks/use-toast';
 import { SuppliersRegister } from '../components/SuppliersRegister';
 import { BuildersRegister } from '../components/BuildersRegister';
-import { DeliveryProvidersRegister } from '../components/DeliveryProvidersRegister';
 
 // Type definitions for the raw database records
 interface RawSupplierRecord {
@@ -86,59 +85,11 @@ interface RawBuilderRecord {
   updated_at?: string;
 }
 
-interface RawDeliveryProviderRecord {
-  id: string;
-  auth_user_id?: string;
-  full_name: string;
-  email: string;
-  phone: string;
-  id_number?: string;
-  company_name?: string;
-  business_registration_number?: string;
-  is_company?: boolean;
-  county: string;
-  town?: string;
-  physical_address?: string;
-  service_areas: string[];
-  vehicle_type: string;
-  vehicle_registration: string;
-  vehicle_capacity_kg?: number;
-  vehicle_capacity_description?: string;
-  vehicle_photo_url?: string;
-  driving_license_number: string;
-  driving_license_class?: string;
-  driving_license_expiry?: string;
-  years_driving_experience?: number;
-  insurance_provider?: string;
-  insurance_policy_number?: string;
-  insurance_expiry?: string;
-  ntsa_compliance?: boolean;
-  good_conduct_certificate_url?: string;
-  base_rate_per_km?: number;
-  minimum_charge?: number;
-  available_days?: string[];
-  available_hours_start?: string;
-  available_hours_end?: string;
-  emergency_contact_name?: string;
-  emergency_contact_phone?: string;
-  background_check_consent?: boolean;
-  terms_accepted?: boolean;
-  is_verified?: boolean;
-  is_active?: boolean;
-  status: string;
-  source?: 'registration' | 'active';
-  created_at: string;
-  updated_at?: string;
-  reviewed_at?: string;
-  reviewed_by?: string;
-}
-
 export const RegistersTab: React.FC = () => {
   const [activeTab, setActiveTab] = useState('suppliers');
   const [loading, setLoading] = useState(true);
   const [suppliers, setSuppliers] = useState<RawSupplierRecord[]>([]);
   const [builders, setBuilders] = useState<RawBuilderRecord[]>([]);
-  const [deliveryProviders, setDeliveryProviders] = useState<RawDeliveryProviderRecord[]>([]);
   const { toast } = useToast();
 
   const fetchAllData = useCallback(async () => {
@@ -149,43 +100,37 @@ export const RegistersTab: React.FC = () => {
       const adminClient = getAdminClient();
       const client = adminClient || supabase;
       
-      console.log('📊 Fetching registered users data ONLY from registration tables...');
+      console.log('📊 Fetching user registrations...');
 
-      // Fetch from correct tables - supplier_applications and delivery_provider_registrations
-      const [suppliersRes, deliveryRes] = await Promise.all([
+      // Fetch suppliers and builders
+      const [suppliersRes, buildersRes] = await Promise.all([
         client.from('supplier_applications').select('*').order('created_at', { ascending: false }),
-        client.from('delivery_provider_registrations').select('*').order('created_at', { ascending: false }),
+        client.from('builder_registrations').select('*').order('created_at', { ascending: false }),
       ]);
-      
-      // Builders are registered via profiles table with user_roles
-      const buildersRes = { data: [], error: null };
 
       // Log any errors
       if (suppliersRes.error) {
         console.error('Error fetching supplier applications:', suppliersRes.error);
       }
-      if (deliveryRes.error) {
-        console.error('Error fetching delivery providers:', deliveryRes.error);
+      if (buildersRes.error) {
+        console.error('Error fetching builder registrations:', buildersRes.error);
       }
 
-      // Get data from registration tables only
+      // Get data from registration tables
       const suppliersData = (suppliersRes.data || []) as RawSupplierRecord[];
       const buildersData = (buildersRes.data || []) as RawBuilderRecord[];
-      const deliveryProvidersData = (deliveryRes.data || []) as RawDeliveryProviderRecord[];
 
-      console.log('📊 Registered users data loaded:', {
+      console.log('📊 User registrations loaded:', {
         suppliers: suppliersData.length,
-        builders: buildersData.length,
-        deliveryProviders: deliveryProvidersData.length
+        builders: buildersData.length
       });
 
       setSuppliers(suppliersData);
       setBuilders(buildersData);
-      setDeliveryProviders(deliveryProvidersData);
 
       // Show warning if any fetch failed but others succeeded
-      const hasErrors = suppliersRes.error || deliveryRes.error;
-      const hasData = suppliersData.length > 0 || buildersData.length > 0 || deliveryProvidersData.length > 0;
+      const hasErrors = suppliersRes.error || buildersRes.error;
+      const hasData = suppliersData.length > 0 || buildersData.length > 0;
       
       if (hasErrors && !hasData) {
         toast({
@@ -267,44 +212,24 @@ export const RegistersTab: React.FC = () => {
     }
   }, [toast]);
 
-  const updateDeliveryProviderStatus = useCallback(async (id: string, status: string) => {
-    try {
-      const client = getAdminClient() || supabase;
-      const { error } = await client
-        .from('delivery_provider_registrations')
-        .update({ 
-          status, 
-          updated_at: new Date().toISOString(),
-          reviewed_at: new Date().toISOString(),
-        })
-        .eq('id', id);
-
-      if (error) throw error;
-
-      setDeliveryProviders(prev => prev.map(d => d.id === id ? { ...d, status } : d));
-      toast({
-        title: 'Status Updated',
-        description: `Delivery provider status changed to ${status}`,
-      });
-    } catch (error) {
-      console.error('Error updating delivery provider status:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to update delivery provider status',
-        variant: 'destructive',
-      });
-    }
-  }, [toast]);
-
   // Calculate totals for tab badges
+  // Separate builders into Professional and Private
+  const professionalBuilders = builders.filter(b => 
+    b.builder_type === 'professional' || b.builder_category === 'professional'
+  );
+  const privateBuilders = builders.filter(b => 
+    b.builder_type === 'private' || b.builder_category === 'private' || 
+    (!b.builder_type && !b.builder_category) // Default to private if not specified
+  );
+
   const totals = {
     suppliers: suppliers.length,
-    builders: builders.length,
-    delivery: deliveryProviders.length,
+    professionalBuilders: professionalBuilders.length,
+    privateBuilders: privateBuilders.length,
     pending: {
       suppliers: suppliers.filter(s => s.status === 'pending').length,
-      builders: builders.filter(b => b.status === 'pending').length,
-      delivery: deliveryProviders.filter(d => d.status === 'pending').length,
+      professionalBuilders: professionalBuilders.filter(b => b.status === 'pending').length,
+      privateBuilders: privateBuilders.filter(b => b.status === 'pending').length,
     }
   };
 
@@ -315,10 +240,10 @@ export const RegistersTab: React.FC = () => {
         <div>
           <h2 className="text-2xl font-bold text-white flex items-center gap-2">
             <Users className="h-6 w-6 text-blue-500" />
-            Registration Registers
+            User Registrations
           </h2>
           <p className="text-gray-400 mt-1">
-            Complete registers of all suppliers, builders, and delivery providers
+            Manage Suppliers, Professional Builders, and Private Builders
           </p>
         </div>
         <Button
@@ -344,7 +269,7 @@ export const RegistersTab: React.FC = () => {
                   <Store className="h-6 w-6 text-green-400" />
                 </div>
                 <div>
-                  <p className="text-white font-medium">Suppliers Register</p>
+                  <p className="text-white font-medium">Suppliers</p>
                   <p className="text-xs text-gray-400">
                     {totals.pending.suppliers} pending review
                   </p>
@@ -356,8 +281,8 @@ export const RegistersTab: React.FC = () => {
         </Card>
 
         <Card
-          className={`bg-slate-900/50 border-slate-800 cursor-pointer transition-all ${activeTab === 'builders' ? 'border-blue-500 ring-1 ring-blue-500/50' : 'hover:border-blue-500/50'}`}
-          onClick={() => setActiveTab('builders')}
+          className={`bg-slate-900/50 border-slate-800 cursor-pointer transition-all ${activeTab === 'professional-builders' ? 'border-blue-500 ring-1 ring-blue-500/50' : 'hover:border-blue-500/50'}`}
+          onClick={() => setActiveTab('professional-builders')}
         >
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -366,35 +291,35 @@ export const RegistersTab: React.FC = () => {
                   <Building2 className="h-6 w-6 text-blue-400" />
                 </div>
                 <div>
-                  <p className="text-white font-medium">Builders Register</p>
+                  <p className="text-white font-medium">Professional Builders</p>
                   <p className="text-xs text-gray-400">
-                    {totals.pending.builders} pending review
+                    {totals.pending.professionalBuilders} pending review
                   </p>
                 </div>
               </div>
-              <p className="text-2xl font-bold text-blue-400">{totals.builders}</p>
+              <p className="text-2xl font-bold text-blue-400">{totals.professionalBuilders}</p>
             </div>
           </CardContent>
         </Card>
 
         <Card
-          className={`bg-slate-900/50 border-slate-800 cursor-pointer transition-all ${activeTab === 'delivery' ? 'border-orange-500 ring-1 ring-orange-500/50' : 'hover:border-orange-500/50'}`}
-          onClick={() => setActiveTab('delivery')}
+          className={`bg-slate-900/50 border-slate-800 cursor-pointer transition-all ${activeTab === 'private-builders' ? 'border-purple-500 ring-1 ring-purple-500/50' : 'hover:border-purple-500/50'}`}
+          onClick={() => setActiveTab('private-builders')}
         >
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-orange-600/20 rounded-lg">
-                  <Truck className="h-6 w-6 text-orange-400" />
+                <div className="p-2 bg-purple-600/20 rounded-lg">
+                  <Users className="h-6 w-6 text-purple-400" />
                 </div>
                 <div>
-                  <p className="text-white font-medium">Delivery Providers Register</p>
+                  <p className="text-white font-medium">Private Builders</p>
                   <p className="text-xs text-gray-400">
-                    {totals.pending.delivery} pending review
+                    {totals.pending.privateBuilders} pending review
                   </p>
                 </div>
               </div>
-              <p className="text-2xl font-bold text-orange-400">{totals.delivery}</p>
+              <p className="text-2xl font-bold text-purple-400">{totals.privateBuilders}</p>
             </div>
           </CardContent>
         </Card>
@@ -411,18 +336,18 @@ export const RegistersTab: React.FC = () => {
             Suppliers ({totals.suppliers})
           </TabsTrigger>
           <TabsTrigger 
-            value="builders" 
+            value="professional-builders" 
             className="data-[state=active]:bg-blue-600 flex items-center gap-2"
           >
             <Building2 className="h-4 w-4" />
-            Builders ({totals.builders})
+            Professional ({totals.professionalBuilders})
           </TabsTrigger>
           <TabsTrigger 
-            value="delivery" 
-            className="data-[state=active]:bg-orange-600 flex items-center gap-2"
+            value="private-builders" 
+            className="data-[state=active]:bg-purple-600 flex items-center gap-2"
           >
-            <Truck className="h-4 w-4" />
-            Delivery ({totals.delivery})
+            <Users className="h-4 w-4" />
+            Private ({totals.privateBuilders})
           </TabsTrigger>
         </TabsList>
 
@@ -435,21 +360,21 @@ export const RegistersTab: React.FC = () => {
           />
         </TabsContent>
 
-        <TabsContent value="builders" className="mt-6">
+        <TabsContent value="professional-builders" className="mt-6">
           <BuildersRegister
-            builders={builders}
+            builders={professionalBuilders}
             loading={loading}
             onRefresh={fetchAllData}
             onUpdateStatus={updateBuilderStatus}
           />
         </TabsContent>
 
-        <TabsContent value="delivery" className="mt-6">
-          <DeliveryProvidersRegister
-            providers={deliveryProviders}
+        <TabsContent value="private-builders" className="mt-6">
+          <BuildersRegister
+            builders={privateBuilders}
             loading={loading}
             onRefresh={fetchAllData}
-            onUpdateStatus={updateDeliveryProviderStatus}
+            onUpdateStatus={updateBuilderStatus}
           />
         </TabsContent>
       </Tabs>
