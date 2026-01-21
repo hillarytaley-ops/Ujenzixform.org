@@ -11,10 +11,12 @@ import {
   Bot,
   Loader2,
   Phone,
-  RefreshCw,
-  Mic,
-  MicOff,
-  Globe
+  Globe,
+  UserCheck,
+  ArrowLeft,
+  Clock,
+  CheckCheck,
+  Headphones
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,13 +29,15 @@ import { cn } from '@/lib/utils';
 // Types
 interface Message {
   id: string;
-  role: 'user' | 'bot' | 'system';
+  role: 'user' | 'bot' | 'system' | 'agent';
   content: string;
   timestamp: Date;
   suggestions?: string[];
   feedback?: 'positive' | 'negative' | null;
   isLoading?: boolean;
   sources?: string[];
+  agentName?: string;
+  read?: boolean;
 }
 
 interface ConversationContext {
@@ -61,6 +65,8 @@ interface EnhancedChatbotProps {
   userEmail?: string;
   position?: 'bottom-right' | 'bottom-left';
 }
+
+type ChatMode = 'ai' | 'human' | 'waiting';
 
 // Kenya-specific knowledge base
 const KENYA_CONSTRUCTION_KB = {
@@ -115,9 +121,15 @@ export const EnhancedChatbot: React.FC<EnhancedChatbotProps> = ({
     mentionedLocations: [],
     userPreferences: { language: 'en' }
   });
-  const [isListening, setIsListening] = useState(false);
   const [realPrices, setRealPrices] = useState<MaterialPrice[]>([]);
-  const [showHumanOption, setShowHumanOption] = useState(false);
+  
+  // Live chat state
+  const [chatMode, setChatMode] = useState<ChatMode>('ai');
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [agentName, setAgentName] = useState<string | null>(null);
+  const [agentTyping, setAgentTyping] = useState(false);
+  const [queuePosition, setQueuePosition] = useState<number | null>(null);
+  const [agentsOnline, setAgentsOnline] = useState(0);
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -139,10 +151,31 @@ export const EnhancedChatbot: React.FC<EnhancedChatbotProps> = ({
     }
   }, []);
 
+  // Check agent availability
+  const checkAgentAvailability = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('admin_staff')
+        .select('id')
+        .eq('is_online', true)
+        .eq('can_handle_chat', true);
+      
+      if (!error && data) {
+        setAgentsOnline(data.length);
+      }
+    } catch (err) {
+      // Default to showing agents available during business hours
+      const hour = new Date().getHours();
+      setAgentsOnline(hour >= 8 && hour < 18 ? 2 : 0);
+    }
+  }, []);
+
   // Initialize chatbot
   useEffect(() => {
     if (isOpen && messages.length === 0) {
       fetchRealPrices();
+      checkAgentAvailability();
+      
       const welcomeMsg = context.userPreferences.language === 'sw' 
         ? SWAHILI_RESPONSES.welcome
         : `🇰🇪 Jambo ${userName}! I'm **UJbot**, your AI Construction Assistant.
@@ -154,6 +187,8 @@ I can help you with:
 • 🚚 **Delivery** - Costs and tracking
 • 💡 **Construction tips** - Best practices for Kenya
 
+${agentsOnline > 0 ? `\n👤 **${agentsOnline} support agents online** - Type "talk to human" anytime!` : ''}
+
 What would you like to know?`;
 
       setTimeout(() => {
@@ -161,11 +196,68 @@ What would you like to know?`;
           'Cement prices today',
           'Materials for 3-bedroom house',
           'Find suppliers in Nairobi',
-          'How to request delivery'
+          'Talk to human agent'
         ]);
       }, 300);
     }
-  }, [isOpen, userName, context.userPreferences.language]);
+  }, [isOpen, userName, context.userPreferences.language, agentsOnline]);
+
+  // Subscribe to live chat messages when in human mode
+  useEffect(() => {
+    if (chatMode !== 'human' || !conversationId) return;
+
+    const channel = supabase
+      .channel(`chat:${conversationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'chat_messages',
+          filter: `conversation_id=eq.${conversationId}`
+        },
+        (payload) => {
+          const newMsg = payload.new as any;
+          // Only add if it's from agent (not our own message)
+          if (newMsg.sender_type === 'agent' || newMsg.sender_type === 'admin') {
+            setMessages(prev => {
+              // Check if message already exists
+              if (prev.some(m => m.id === newMsg.id)) return prev;
+              return [...prev, {
+                id: newMsg.id,
+                role: 'agent',
+                content: newMsg.content,
+                timestamp: new Date(newMsg.created_at),
+                agentName: newMsg.sender_name || 'Support Agent'
+              }];
+            });
+            setAgentTyping(false);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'conversations',
+          filter: `id=eq.${conversationId}`
+        },
+        (payload) => {
+          const updated = payload.new as any;
+          if (updated.agent_id && !agentName) {
+            setAgentName(updated.agent_name || 'Support Agent');
+            setChatMode('human');
+            addSystemMessage(`${updated.agent_name || 'A support agent'} has joined the chat.`);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [chatMode, conversationId, agentName]);
 
   // Auto-scroll
   useEffect(() => {
@@ -194,6 +286,134 @@ What would you like to know?`;
       content,
       timestamp: new Date()
     }]);
+  };
+
+  const addSystemMessage = (content: string) => {
+    setMessages(prev => [...prev, {
+      id: `system-${Date.now()}`,
+      role: 'system',
+      content,
+      timestamp: new Date()
+    }]);
+  };
+
+  // Request human agent
+  const requestHumanAgent = async () => {
+    setChatMode('waiting');
+    setQueuePosition(1);
+    
+    addSystemMessage('🔄 Connecting you to a human agent...');
+
+    try {
+      // Create or get conversation
+      let convId = conversationId;
+      
+      if (!convId) {
+        const { data: conv, error: convError } = await supabase
+          .from('conversations')
+          .insert({
+            client_id: userId || null,
+            client_name: userName,
+            client_email: userEmail,
+            status: 'waiting',
+            source: 'chatbot',
+            priority: 'normal',
+            metadata: {
+              previousMessages: messages.slice(-5).map(m => ({ role: m.role, content: m.content })),
+              context: context
+            }
+          })
+          .select()
+          .single();
+
+        if (convError) throw convError;
+        convId = conv.id;
+        setConversationId(convId);
+      } else {
+        // Update existing conversation
+        await supabase
+          .from('conversations')
+          .update({ status: 'waiting' })
+          .eq('id', convId);
+      }
+
+      // Save chat history to conversation
+      for (const msg of messages.slice(-10)) {
+        if (msg.role === 'user' || msg.role === 'bot') {
+          await supabase.from('chat_messages').insert({
+            conversation_id: convId,
+            sender_id: msg.role === 'user' ? userId : null,
+            sender_type: msg.role === 'user' ? 'client' : 'bot',
+            sender_name: msg.role === 'user' ? userName : 'UJbot',
+            content: msg.content,
+            message_type: 'text'
+          });
+        }
+      }
+
+      // Simulate queue (in production, this would be real-time)
+      setTimeout(() => {
+        if (chatMode === 'waiting') {
+          setQueuePosition(null);
+          setChatMode('human');
+          setAgentName('Support Agent');
+          addSystemMessage('👤 **Support Agent** has joined the chat. How can I help you today?');
+        }
+      }, 3000);
+
+      toast({
+        title: '📞 Connecting to support',
+        description: agentsOnline > 0 
+          ? 'An agent will be with you shortly...' 
+          : 'You are in queue. We\'ll notify you when an agent is available.',
+      });
+
+    } catch (error) {
+      console.error('Error requesting human agent:', error);
+      setChatMode('ai');
+      addSystemMessage('❌ Could not connect to support. Please try again or call +254 700 000 000');
+    }
+  };
+
+  // Send message to human agent
+  const sendToAgent = async (content: string) => {
+    if (!conversationId) return;
+
+    try {
+      await supabase.from('chat_messages').insert({
+        conversation_id: conversationId,
+        sender_id: userId,
+        sender_type: 'client',
+        sender_name: userName,
+        content: content,
+        message_type: 'text'
+      });
+
+      // Update conversation last message
+      await supabase
+        .from('conversations')
+        .update({ 
+          last_message: content,
+          last_message_at: new Date().toISOString(),
+          unread_count: 1
+        })
+        .eq('id', conversationId);
+
+    } catch (error) {
+      console.error('Error sending message:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Message failed',
+        description: 'Could not send message. Please try again.'
+      });
+    }
+  };
+
+  // Switch back to AI
+  const switchToAI = () => {
+    setChatMode('ai');
+    setAgentName(null);
+    addSystemMessage('🤖 You are now chatting with UJbot. Type "talk to human" to connect with an agent again.');
   };
 
   // Update context based on message
@@ -252,17 +472,41 @@ What would you like to know?`;
     response: string;
     suggestions?: string[];
     sources?: string[];
+    requestHuman?: boolean;
   }> => {
     const query = userQuery.toLowerCase();
     const isSwahili = ctx.userPreferences.language === 'sw';
 
+    // Check for human request
+    if (query.includes('human') || query.includes('agent') || query.includes('staff') || 
+        query.includes('person') || query.includes('talk to') || query.includes('real person') ||
+        query.includes('support') || query.includes('help me')) {
+      return {
+        response: `👤 **Connect with Our Team**
+
+I'll transfer you to a human agent who can help with:
+• Complex project quotes
+• Custom orders  
+• Technical questions
+• Account issues
+
+${agentsOnline > 0 
+  ? `✅ **${agentsOnline} agents online** - Average wait: ~2 minutes`
+  : `⏰ **Agents offline** - Leave a message and we'll respond within 24 hours`
+}
+
+Click the button below to connect:`,
+        suggestions: ['Connect to agent', 'Continue with AI', 'Leave a message'],
+        requestHuman: true
+      };
+    }
+
     // Handle follow-up questions using context
     if ((query.includes('what about') || query.includes('and') || query.includes('also')) && ctx.lastTopic) {
-      // User is asking follow-up about previous topic
       if (query.includes('price') || query.includes('cost') || query.includes('bei')) {
         return {
           response: `Continuing with **${ctx.lastTopic}**...\n\n${getMaterialPrice(ctx.lastTopic)}\n\nWant me to find suppliers for ${ctx.lastTopic}?`,
-          suggestions: [`Find ${ctx.lastTopic} suppliers`, 'Compare prices', 'Calculate quantity needed']
+          suggestions: [`Find ${ctx.lastTopic} suppliers`, 'Compare prices', 'Talk to human agent']
         };
       }
     }
@@ -285,7 +529,7 @@ ${KENYA_CONSTRUCTION_KB.materials.cement.brands.map(b => `• **${b}:** ${priceI
 💡 **Tip:** ${KENYA_CONSTRUCTION_KB.materials.cement.tips}
 
 ${ctx.mentionedLocations.length > 0 ? `\n📍 Prices shown for **${ctx.mentionedLocations[0]}** area.` : ''}`,
-          suggestions: ['Steel prices', 'Calculate cement needed', `Cement suppliers${ctx.mentionedLocations[0] ? ' in ' + ctx.mentionedLocations[0] : ''}`],
+          suggestions: ['Steel prices', 'Calculate cement needed', 'Talk to human for quote'],
           sources: ['UjenziXform Supplier Database', 'Market Survey Jan 2026']
         };
       }
@@ -305,7 +549,7 @@ ${ctx.mentionedLocations.length > 0 ? `\n📍 Prices shown for **${ctx.mentioned
 **Per Ton:** KES 85,000 - 95,000
 
 ✅ All steel meets **KEBS standards**`,
-          suggestions: ['Calculate steel for foundation', 'Find steel suppliers', 'Compare Y12 vs Y16'],
+          suggestions: ['Calculate steel for foundation', 'Find steel suppliers', 'Get quote from agent'],
           sources: ['UjenziXform Supplier Database']
         };
       }
@@ -324,7 +568,7 @@ ${ctx.mentionedLocations.length > 0 ? `\n📍 Prices shown for **${ctx.mentioned
 | Paint (20L) | KES 3,800 - 5,500 |
 
 Which material would you like detailed pricing for?`,
-        suggestions: ['Cement prices', 'Steel prices', 'Paint prices', 'Roofing prices']
+        suggestions: ['Cement prices', 'Steel prices', 'Talk to human for bulk quote']
       };
     }
 
@@ -356,27 +600,7 @@ Which material would you like detailed pricing for?`,
 *(Labor not included)*
 
 Want a detailed quote from our suppliers?`,
-          suggestions: ['Get supplier quotes', 'Find builders', 'Delivery cost estimate', 'Calculate exact quantities']
-        };
-      }
-
-      if (query.includes('cement') || query.includes('saruji')) {
-        return {
-          response: `🧮 **Cement Calculator:**
-
-**Per Square Meter:**
-• Foundation slab: 8-10 bags/sqm
-• Floor slab: 6-8 bags/sqm
-• Plastering: 1.5 bags/sqm
-
-**Formula:**
-\`Cement bags = (L × W × Thickness) ÷ 0.035\`
-
-**Example:** For 10m × 12m foundation (15cm thick):
-\`(10 × 12 × 0.15) ÷ 0.035 = 514 bags\`
-
-Tell me your dimensions and I'll calculate exactly!`,
-          suggestions: ['Calculate for 100 sqm', 'Calculate for 200 sqm', 'Include plastering']
+          suggestions: ['Get supplier quotes', 'Talk to human for exact quote', 'Delivery cost estimate']
         };
       }
     }
@@ -400,8 +624,8 @@ Tell me your dimensions and I'll calculate exactly!`,
 ✅ Delivery available
 ✅ Quality guaranteed
 
-Would you like me to show specific suppliers?`,
-        suggestions: [`Cement suppliers in ${location}`, `Steel suppliers in ${location}`, 'Compare all suppliers']
+Would you like me to connect you with a supplier directly?`,
+        suggestions: [`Cement suppliers in ${location}`, 'Talk to human for recommendations', 'Compare all suppliers']
       };
     }
 
@@ -425,96 +649,12 @@ Would you like me to show specific suppliers?`,
 ✅ Delivery confirmation
 ✅ Insurance available
 
-**How to request:**
-1. Add items to cart
-2. Click "Request Delivery"
-3. Enter delivery address
-4. Track in real-time!`,
-        suggestions: ['Request delivery now', 'Track my order', 'Delivery to Kiambu cost']
+Need help arranging delivery? Talk to our team!`,
+        suggestions: ['Request delivery now', 'Track my order', 'Talk to human for custom delivery']
       };
     }
 
-    // Help/How-to queries
-    if (query.includes('help') || query.includes('how to') || query.includes('msaada')) {
-      return {
-        response: `🆘 **How Can I Help?**
-
-**I can assist with:**
-
-📊 **Prices & Calculations**
-• Current material prices
-• Quantity calculations
-• Cost estimates
-
-🏪 **Suppliers**
-• Find verified suppliers
-• Compare prices
-• Request quotes
-
-🚚 **Delivery**
-• Cost estimates
-• Request delivery
-• Track orders
-
-🏗️ **Construction Tips**
-• Best practices
-• Material selection
-• Quality standards
-
-**Or talk to our team:**
-📞 Call: +254 700 000 000
-💬 Live chat with staff
-
-What do you need help with?`,
-        suggestions: ['Material prices', 'Find suppliers', 'Calculate materials', 'Talk to human']
-      };
-    }
-
-    // Talk to human
-    if (query.includes('human') || query.includes('staff') || query.includes('agent') || query.includes('call')) {
-      setShowHumanOption(true);
-      return {
-        response: `👤 **Connect with Our Team:**
-
-I'll connect you with a human agent who can help with:
-• Complex project quotes
-• Custom orders
-• Technical questions
-• Account issues
-
-**Contact Options:**
-📞 **Call:** +254 700 000 000
-📧 **Email:** support@ujenzixform.co.ke
-💬 **Live Chat:** Click below
-
-*Average response time: 5 minutes during business hours*`,
-        suggestions: ['Continue with AI', 'Call now', 'Send email']
-      };
-    }
-
-    // Thank you / positive feedback
-    if (query.includes('thank') || query.includes('asante') || query.includes('great') || query.includes('helpful')) {
-      return {
-        response: isSwahili 
-          ? SWAHILI_RESPONSES.thanks
-          : `You're welcome! 😊 I'm glad I could help.
-
-Is there anything else you'd like to know about:
-• Material prices
-• Supplier recommendations
-• Delivery options
-• Construction calculations
-
-Just ask away!`,
-        suggestions: ['More questions', 'Rate this chat', 'Close chat']
-      };
-    }
-
-    // Default response with context awareness
-    const contextHint = ctx.lastTopic 
-      ? `\n\n*I remember you were asking about **${ctx.lastTopic}**. Want to continue?*`
-      : '';
-
+    // Default response
     return {
       response: `I'm **UJbot**, your Kenya construction assistant! 🇰🇪
 
@@ -525,11 +665,12 @@ I can help with:
 • 🚚 **Delivery** - Costs & tracking
 • 💡 **Tips** - Construction best practices
 
+${agentsOnline > 0 ? `\n👤 **${agentsOnline} human agents online** - Type "talk to human" anytime!` : ''}
+
 **Try asking:**
 • "Cement prices today"
 • "Materials for 3-bedroom house"
-• "Find steel suppliers in Nairobi"
-• "Delivery cost to Kiambu"${contextHint}`,
+• "Find steel suppliers in Nairobi"`,
       suggestions: ['Material prices', 'Calculate materials', 'Find suppliers', 'Talk to human']
     };
   };
@@ -542,23 +683,44 @@ I can help with:
     setInputValue('');
     addUserMessage(userMessage);
 
+    // If in human mode, send to agent
+    if (chatMode === 'human') {
+      await sendToAgent(userMessage);
+      return;
+    }
+
+    // Check for human request keywords
+    const lowerMsg = userMessage.toLowerCase();
+    if (lowerMsg.includes('connect to agent') || lowerMsg === 'yes connect' || 
+        (lowerMsg.includes('talk') && lowerMsg.includes('human'))) {
+      await requestHumanAgent();
+      return;
+    }
+
     // Update context
     const updatedContext = updateContext(userMessage);
 
     // Show typing indicator
     setIsTyping(true);
 
-    // Simulate AI processing (300-1000ms for realism)
+    // Simulate AI processing
     const processingTime = 300 + Math.random() * 700;
 
     setTimeout(async () => {
       try {
-        const { response, suggestions, sources } = await getAIResponse(userMessage, updatedContext);
+        const { response, suggestions, sources, requestHuman } = await getAIResponse(userMessage, updatedContext);
         addBotMessage(response, suggestions, sources);
+        
+        if (requestHuman) {
+          // Show connect button prominently
+          setTimeout(() => {
+            addBotMessage('', ['🔗 Connect to Agent Now', 'Continue with AI']);
+          }, 500);
+        }
       } catch (error) {
         addBotMessage(
-          "I'm having trouble processing that. Please try again or talk to our support team.",
-          ['Try again', 'Talk to human']
+          "I'm having trouble processing that. Would you like to talk to a human agent?",
+          ['Talk to human', 'Try again']
         );
       }
       setIsTyping(false);
@@ -567,10 +729,18 @@ I can help with:
 
   // Handle suggestion click
   const handleSuggestionClick = (suggestion: string) => {
+    if (suggestion === '🔗 Connect to Agent Now' || suggestion === 'Connect to agent' || 
+        suggestion === 'Talk to human agent' || suggestion === 'Talk to human') {
+      requestHumanAgent();
+      return;
+    }
+    if (suggestion === 'Continue with AI') {
+      addBotMessage('No problem! I\'m here to help. What would you like to know?', 
+        ['Material prices', 'Calculate materials', 'Find suppliers']);
+      return;
+    }
     setInputValue(suggestion);
-    setTimeout(() => {
-      handleSendMessage();
-    }, 100);
+    setTimeout(() => handleSendMessage(), 100);
   };
 
   // Handle feedback
@@ -579,7 +749,6 @@ I can help with:
       msg.id === messageId ? { ...msg, feedback } : msg
     ));
 
-    // Save feedback to database
     try {
       await supabase.from('chat_feedback').insert({
         message_id: messageId,
@@ -588,12 +757,12 @@ I can help with:
         created_at: new Date().toISOString()
       });
     } catch (err) {
-      // Silently fail - feedback is optional
+      // Silently fail
     }
 
     toast({
-      title: feedback === 'positive' ? '👍 Thanks for the feedback!' : '👎 Thanks for letting us know',
-      description: feedback === 'negative' ? "We'll work on improving this." : undefined,
+      title: feedback === 'positive' ? '👍 Thanks!' : '👎 Thanks for the feedback',
+      description: feedback === 'negative' ? "We'll improve this." : undefined,
       duration: 2000
     });
   };
@@ -619,15 +788,39 @@ I can help with:
     }
   };
 
-  // Closed state - floating button
+  // Get header info based on mode
+  const getHeaderInfo = () => {
+    switch (chatMode) {
+      case 'human':
+        return {
+          title: agentName || 'Support Agent',
+          subtitle: '👤 Live Chat',
+          icon: <UserCheck className="h-6 w-6 text-white" />,
+          color: 'from-green-600 to-emerald-600'
+        };
+      case 'waiting':
+        return {
+          title: 'Connecting...',
+          subtitle: queuePosition ? `Queue position: ${queuePosition}` : 'Please wait',
+          icon: <Loader2 className="h-6 w-6 text-white animate-spin" />,
+          color: 'from-amber-600 to-orange-600'
+        };
+      default:
+        return {
+          title: 'UJbot',
+          subtitle: 'AI Construction Assistant 🇰🇪',
+          icon: <Bot className="h-6 w-6 text-white" />,
+          color: 'from-cyan-600 to-blue-600'
+        };
+    }
+  };
+
+  const headerInfo = getHeaderInfo();
+
+  // Closed state
   if (!isOpen) {
     return (
-      <div 
-        className={cn(
-          "fixed z-[9999]",
-          position === 'bottom-right' ? 'bottom-6 right-6' : 'bottom-6 left-6'
-        )}
-      >
+      <div className={cn("fixed z-[9999]", position === 'bottom-right' ? 'bottom-6 right-6' : 'bottom-6 left-6')}>
         <Button
           onClick={() => setIsOpen(true)}
           className="rounded-full h-14 w-14 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110"
@@ -638,6 +831,11 @@ I can help with:
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
           <span className="relative inline-flex rounded-full h-4 w-4 bg-green-500"></span>
         </span>
+        {agentsOnline > 0 && (
+          <Badge className="absolute -top-2 -left-2 bg-green-500 text-white text-xs px-1.5">
+            {agentsOnline} online
+          </Badge>
+        )}
       </div>
     );
   }
@@ -645,20 +843,15 @@ I can help with:
   // Minimized state
   if (isMinimized) {
     return (
-      <div 
-        className={cn(
-          "fixed z-[9999]",
-          position === 'bottom-right' ? 'bottom-6 right-6' : 'bottom-6 left-6'
-        )}
-      >
+      <div className={cn("fixed z-[9999]", position === 'bottom-right' ? 'bottom-6 right-6' : 'bottom-6 left-6')}>
         <div 
-          className="bg-gradient-to-r from-cyan-600 to-blue-600 text-white px-4 py-3 rounded-full shadow-lg cursor-pointer flex items-center gap-2 hover:shadow-xl transition-all"
+          className={cn("bg-gradient-to-r text-white px-4 py-3 rounded-full shadow-lg cursor-pointer flex items-center gap-2 hover:shadow-xl transition-all", headerInfo.color)}
           onClick={() => setIsMinimized(false)}
         >
-          <Bot className="h-5 w-5" />
-          <span className="font-medium">UJbot</span>
+          {headerInfo.icon}
+          <span className="font-medium">{headerInfo.title}</span>
           <Badge variant="secondary" className="bg-white/20 text-white text-xs">
-            {messages.filter(m => m.role === 'bot').length}
+            {messages.filter(m => m.role !== 'system').length}
           </Badge>
           <Maximize2 className="h-4 w-4 ml-2" />
         </div>
@@ -666,38 +859,65 @@ I can help with:
     );
   }
 
-  // Open state - full chat window
+  // Open state
   return (
-    <div 
-      className={cn(
-        "fixed z-[9999] w-[380px] max-w-[calc(100vw-32px)] h-[600px] max-h-[calc(100vh-100px)] flex flex-col bg-slate-900 rounded-2xl shadow-2xl border border-slate-700 overflow-hidden",
-        position === 'bottom-right' ? 'bottom-6 right-6' : 'bottom-6 left-6'
-      )}
-    >
+    <div className={cn(
+      "fixed z-[9999] w-[380px] max-w-[calc(100vw-32px)] h-[600px] max-h-[calc(100vh-100px)] flex flex-col bg-slate-900 rounded-2xl shadow-2xl border border-slate-700 overflow-hidden",
+      position === 'bottom-right' ? 'bottom-6 right-6' : 'bottom-6 left-6'
+    )}>
       {/* Header */}
-      <div className="bg-gradient-to-r from-cyan-600 to-blue-600 p-4 flex items-center justify-between">
+      <div className={cn("bg-gradient-to-r p-4 flex items-center justify-between", headerInfo.color)}>
         <div className="flex items-center gap-3">
+          {chatMode === 'human' && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/20 mr-1"
+              onClick={switchToAI}
+              title="Back to AI"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          )}
           <div className="relative">
             <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-              <Bot className="h-6 w-6 text-white" />
+              {headerInfo.icon}
             </div>
-            <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-400 border-2 border-cyan-600 rounded-full"></span>
+            <span className={cn(
+              "absolute bottom-0 right-0 w-3 h-3 border-2 rounded-full",
+              chatMode === 'human' ? 'bg-green-400 border-green-600' : 
+              chatMode === 'waiting' ? 'bg-amber-400 border-amber-600' : 
+              'bg-green-400 border-cyan-600'
+            )}></span>
           </div>
           <div>
-            <h3 className="font-bold text-white">UJbot</h3>
-            <p className="text-xs text-cyan-100">AI Construction Assistant 🇰🇪</p>
+            <h3 className="font-bold text-white">{headerInfo.title}</h3>
+            <p className="text-xs text-white/80">{headerInfo.subtitle}</p>
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/20"
-            onClick={toggleLanguage}
-            title={context.userPreferences.language === 'en' ? 'Switch to Swahili' : 'Switch to English'}
-          >
-            <Globe className="h-4 w-4" />
-          </Button>
+          {chatMode === 'ai' && (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/20"
+                onClick={toggleLanguage}
+                title={context.userPreferences.language === 'en' ? 'Switch to Swahili' : 'Switch to English'}
+              >
+                <Globe className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-white/80 hover:text-white hover:bg-white/20"
+                onClick={requestHumanAgent}
+                title="Talk to human"
+              >
+                <Headphones className="h-4 w-4" />
+              </Button>
+            </>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -717,6 +937,22 @@ I can help with:
         </div>
       </div>
 
+      {/* Agent online banner */}
+      {chatMode === 'ai' && agentsOnline > 0 && (
+        <div 
+          className="px-4 py-2 bg-green-500/10 border-b border-green-500/30 cursor-pointer hover:bg-green-500/20 transition-colors"
+          onClick={requestHumanAgent}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+              <span className="text-xs text-green-300">{agentsOnline} support agent{agentsOnline > 1 ? 's' : ''} online</span>
+            </div>
+            <span className="text-xs text-green-400 font-medium">Chat now →</span>
+          </div>
+        </div>
+      )}
+
       {/* Messages */}
       <ScrollArea className="flex-1 p-4" ref={scrollRef}>
         <div className="space-y-4">
@@ -725,95 +961,123 @@ I can help with:
               key={message.id}
               className={cn(
                 "flex gap-2",
-                message.role === 'user' ? 'justify-end' : 'justify-start'
+                message.role === 'user' ? 'justify-end' : 'justify-start',
+                message.role === 'system' && 'justify-center'
               )}
             >
-              {message.role === 'bot' && (
-                <div className="w-8 h-8 rounded-full bg-cyan-600/20 flex items-center justify-center flex-shrink-0">
-                  <Bot className="h-4 w-4 text-cyan-400" />
+              {/* System messages */}
+              {message.role === 'system' && (
+                <div className="bg-slate-800/50 text-gray-400 text-xs px-3 py-2 rounded-full">
+                  {message.content}
+                </div>
+              )}
+
+              {/* Bot/Agent avatar */}
+              {(message.role === 'bot' || message.role === 'agent') && (
+                <div className={cn(
+                  "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0",
+                  message.role === 'agent' ? 'bg-green-600/20' : 'bg-cyan-600/20'
+                )}>
+                  {message.role === 'agent' 
+                    ? <UserCheck className="h-4 w-4 text-green-400" />
+                    : <Bot className="h-4 w-4 text-cyan-400" />
+                  }
                 </div>
               )}
               
-              <div className={cn(
-                "max-w-[85%] rounded-2xl px-4 py-3",
-                message.role === 'user' 
-                  ? 'bg-cyan-600 text-white rounded-br-md' 
-                  : 'bg-slate-800 text-gray-100 rounded-bl-md'
-              )}>
-                <div className="text-sm whitespace-pre-wrap leading-relaxed prose prose-invert prose-sm max-w-none">
-                  {message.content.split('\n').map((line, i) => (
-                    <React.Fragment key={i}>
-                      {line.startsWith('**') && line.endsWith('**') 
-                        ? <strong>{line.slice(2, -2)}</strong>
-                        : line.includes('**') 
+              {/* Message content */}
+              {message.role !== 'system' && (
+                <div className={cn(
+                  "max-w-[85%] rounded-2xl px-4 py-3",
+                  message.role === 'user' 
+                    ? 'bg-cyan-600 text-white rounded-br-md' 
+                    : message.role === 'agent'
+                    ? 'bg-green-800/50 text-gray-100 rounded-bl-md border border-green-700/50'
+                    : 'bg-slate-800 text-gray-100 rounded-bl-md'
+                )}>
+                  {/* Agent name */}
+                  {message.role === 'agent' && message.agentName && (
+                    <p className="text-xs text-green-400 font-medium mb-1">{message.agentName}</p>
+                  )}
+
+                  <div className="text-sm whitespace-pre-wrap leading-relaxed">
+                    {message.content.split('\n').map((line, i) => (
+                      <React.Fragment key={i}>
+                        {line.includes('**') 
                           ? <span dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
                           : line
-                      }
-                      {i < message.content.split('\n').length - 1 && <br />}
-                    </React.Fragment>
-                  ))}
-                </div>
-                
-                {/* Sources */}
-                {message.sources && message.sources.length > 0 && (
-                  <div className="mt-2 pt-2 border-t border-slate-700">
-                    <p className="text-xs text-gray-500">
-                      📚 Sources: {message.sources.join(', ')}
-                    </p>
-                  </div>
-                )}
-
-                {/* Feedback buttons for bot messages */}
-                {message.role === 'bot' && !message.isLoading && (
-                  <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-700/50">
-                    <span className="text-xs text-gray-500">Helpful?</span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={cn(
-                        "h-6 w-6",
-                        message.feedback === 'positive' 
-                          ? 'text-green-400 bg-green-400/20' 
-                          : 'text-gray-500 hover:text-green-400'
-                      )}
-                      onClick={() => handleFeedback(message.id, 'positive')}
-                    >
-                      <ThumbsUp className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={cn(
-                        "h-6 w-6",
-                        message.feedback === 'negative' 
-                          ? 'text-red-400 bg-red-400/20' 
-                          : 'text-gray-500 hover:text-red-400'
-                      )}
-                      onClick={() => handleFeedback(message.id, 'negative')}
-                    >
-                      <ThumbsDown className="h-3 w-3" />
-                    </Button>
-                  </div>
-                )}
-
-                {/* Suggestions */}
-                {message.suggestions && message.suggestions.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {message.suggestions.map((suggestion, idx) => (
-                      <Button
-                        key={idx}
-                        variant="outline"
-                        size="sm"
-                        className="text-xs h-7 bg-slate-700/50 border-slate-600 text-cyan-300 hover:bg-cyan-600/20 hover:text-cyan-200 hover:border-cyan-500"
-                        onClick={() => handleSuggestionClick(suggestion)}
-                      >
-                        {suggestion}
-                      </Button>
+                        }
+                        {i < message.content.split('\n').length - 1 && <br />}
+                      </React.Fragment>
                     ))}
                   </div>
-                )}
-              </div>
+                  
+                  {/* Sources */}
+                  {message.sources && message.sources.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-slate-700">
+                      <p className="text-xs text-gray-500">📚 {message.sources.join(', ')}</p>
+                    </div>
+                  )}
 
+                  {/* Feedback for bot messages */}
+                  {message.role === 'bot' && message.content && (
+                    <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-700/50">
+                      <span className="text-xs text-gray-500">Helpful?</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={cn("h-6 w-6", message.feedback === 'positive' ? 'text-green-400 bg-green-400/20' : 'text-gray-500 hover:text-green-400')}
+                        onClick={() => handleFeedback(message.id, 'positive')}
+                      >
+                        <ThumbsUp className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={cn("h-6 w-6", message.feedback === 'negative' ? 'text-red-400 bg-red-400/20' : 'text-gray-500 hover:text-red-400')}
+                        onClick={() => handleFeedback(message.id, 'negative')}
+                      >
+                        <ThumbsDown className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Suggestions */}
+                  {message.suggestions && message.suggestions.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {message.suggestions.map((suggestion, idx) => (
+                        <Button
+                          key={idx}
+                          variant="outline"
+                          size="sm"
+                          className={cn(
+                            "text-xs h-7",
+                            suggestion.includes('Connect') || suggestion.includes('Talk to human')
+                              ? 'bg-green-600/20 border-green-500 text-green-300 hover:bg-green-600/40'
+                              : 'bg-slate-700/50 border-slate-600 text-cyan-300 hover:bg-cyan-600/20'
+                          )}
+                          onClick={() => handleSuggestionClick(suggestion)}
+                        >
+                          {suggestion}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Timestamp */}
+                  <div className="flex items-center gap-1 mt-2">
+                    <Clock className="h-3 w-3 text-gray-600" />
+                    <span className="text-xs text-gray-600">
+                      {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    {message.role === 'user' && (
+                      <CheckCheck className="h-3 w-3 text-cyan-400 ml-1" />
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* User avatar */}
               {message.role === 'user' && (
                 <div className="w-8 h-8 rounded-full bg-cyan-600 flex items-center justify-center flex-shrink-0">
                   <User className="h-4 w-4 text-white" />
@@ -823,10 +1087,16 @@ I can help with:
           ))}
 
           {/* Typing indicator */}
-          {isTyping && (
+          {(isTyping || agentTyping) && (
             <div className="flex gap-2 items-start">
-              <div className="w-8 h-8 rounded-full bg-cyan-600/20 flex items-center justify-center">
-                <Bot className="h-4 w-4 text-cyan-400" />
+              <div className={cn(
+                "w-8 h-8 rounded-full flex items-center justify-center",
+                agentTyping ? 'bg-green-600/20' : 'bg-cyan-600/20'
+              )}>
+                {agentTyping 
+                  ? <UserCheck className="h-4 w-4 text-green-400" />
+                  : <Bot className="h-4 w-4 text-cyan-400" />
+                }
               </div>
               <div className="bg-slate-800 rounded-2xl rounded-bl-md px-4 py-3">
                 <div className="flex gap-1">
@@ -840,29 +1110,6 @@ I can help with:
         </div>
       </ScrollArea>
 
-      {/* Talk to Human Banner */}
-      {showHumanOption && (
-        <div className="px-4 py-2 bg-amber-500/10 border-t border-amber-500/30">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-amber-300">Need human help?</span>
-            <div className="flex gap-2">
-              <Button size="sm" variant="ghost" className="h-7 text-xs text-amber-300 hover:bg-amber-500/20">
-                <Phone className="h-3 w-3 mr-1" />
-                Call
-              </Button>
-              <Button 
-                size="sm" 
-                variant="ghost" 
-                className="h-7 text-xs text-gray-400"
-                onClick={() => setShowHumanOption(false)}
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Input */}
       <div className="p-4 border-t border-slate-700 bg-slate-800/50">
         <div className="flex gap-2">
@@ -871,24 +1118,34 @@ I can help with:
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder={context.userPreferences.language === 'sw' ? 'Andika ujumbe...' : 'Type your message...'}
+            placeholder={
+              chatMode === 'human' 
+                ? 'Type your message to agent...' 
+                : chatMode === 'waiting'
+                ? 'Connecting to agent...'
+                : context.userPreferences.language === 'sw' ? 'Andika ujumbe...' : 'Type your message...'
+            }
             className="flex-1 bg-slate-800 border-slate-600 text-white placeholder:text-gray-500 focus:border-cyan-500"
-            disabled={isTyping}
+            disabled={isTyping || chatMode === 'waiting'}
           />
           <Button
             onClick={handleSendMessage}
-            disabled={!inputValue.trim() || isTyping}
-            className="bg-cyan-600 hover:bg-cyan-700 text-white"
-          >
-            {isTyping ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
+            disabled={!inputValue.trim() || isTyping || chatMode === 'waiting'}
+            className={cn(
+              "text-white",
+              chatMode === 'human' ? 'bg-green-600 hover:bg-green-700' : 'bg-cyan-600 hover:bg-cyan-700'
             )}
+          >
+            {isTyping ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </div>
         <p className="text-xs text-gray-500 mt-2 text-center">
-          Powered by UjenziXform AI • {context.userPreferences.language === 'sw' ? 'Kiswahili' : 'English'}
+          {chatMode === 'human' 
+            ? `Chatting with ${agentName}` 
+            : chatMode === 'waiting'
+            ? 'Connecting to support...'
+            : `Powered by UjenziXform AI • ${context.userPreferences.language === 'sw' ? 'Kiswahili' : 'English'}`
+          }
         </p>
       </div>
     </div>
@@ -896,4 +1153,3 @@ I can help with:
 };
 
 export default EnhancedChatbot;
-
