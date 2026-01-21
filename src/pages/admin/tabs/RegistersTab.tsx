@@ -105,23 +105,13 @@ export const RegistersTab: React.FC = () => {
       // Fetch from multiple sources:
       // 1. supplier_applications - for supplier registration forms
       // 2. builder_registrations - for builder registration forms  
-      // 3. user_roles + profiles - for users who signed up directly
-      const [suppliersRes, buildersRes, userRolesRes] = await Promise.all([
+      // 3. user_roles - for users who signed up directly
+      // 4. profiles - for user details
+      const [suppliersRes, buildersRes, userRolesRes, profilesRes] = await Promise.all([
         client.from('supplier_applications').select('*').order('created_at', { ascending: false }),
         client.from('builder_registrations').select('*').order('created_at', { ascending: false }),
-        client.from('user_roles').select(`
-          user_id,
-          role,
-          created_at,
-          profiles:user_id (
-            id,
-            full_name,
-            email,
-            phone,
-            avatar_url,
-            created_at
-          )
-        `).in('role', ['supplier', 'professional_builder', 'private_builder', 'builder']).order('created_at', { ascending: false }),
+        client.from('user_roles').select('user_id, role, created_at').order('created_at', { ascending: false }),
+        client.from('profiles').select('id, full_name, email, phone, avatar_url, created_at').order('created_at', { ascending: false }),
       ]);
 
       // Log any errors
@@ -134,21 +124,31 @@ export const RegistersTab: React.FC = () => {
       if (userRolesRes.error) {
         console.error('Error fetching user roles:', userRolesRes.error);
       }
+      if (profilesRes.error) {
+        console.error('Error fetching profiles:', profilesRes.error);
+      }
 
       // Get data from registration tables
       let suppliersData = (suppliersRes.data || []) as RawSupplierRecord[];
       let buildersData = (buildersRes.data || []) as RawBuilderRecord[];
 
-      // Add users from user_roles who don't have applications
-      const userRolesData = userRolesRes.data || [];
+      // Create a map of profiles by user_id for quick lookup
+      const profilesMap = new Map<string, any>();
+      (profilesRes.data || []).forEach((p: any) => {
+        profilesMap.set(p.id, p);
+      });
+
+      // Filter user_roles to relevant roles
+      const relevantRoles = ['supplier', 'professional_builder', 'private_builder', 'builder'];
+      const userRolesData = (userRolesRes.data || []).filter((ur: any) => relevantRoles.includes(ur.role));
       
       // Get existing emails to avoid duplicates
       const existingSupplierEmails = new Set(suppliersData.map(s => s.email?.toLowerCase()));
       const existingBuilderEmails = new Set(buildersData.map(b => b.email?.toLowerCase()));
 
-      // Add suppliers from user_roles
+      // Add users from user_roles who don't have applications
       userRolesData.forEach((ur: any) => {
-        const profile = ur.profiles;
+        const profile = profilesMap.get(ur.user_id);
         if (!profile) return;
         
         const email = profile.email?.toLowerCase();
@@ -189,7 +189,8 @@ export const RegistersTab: React.FC = () => {
       console.log('📊 User registrations loaded:', {
         suppliers: suppliersData.length,
         builders: buildersData.length,
-        fromUserRoles: userRolesData.length
+        fromUserRoles: userRolesData.length,
+        profiles: profilesRes.data?.length || 0
       });
 
       setSuppliers(suppliersData);
