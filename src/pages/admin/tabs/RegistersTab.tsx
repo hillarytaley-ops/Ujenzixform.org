@@ -102,10 +102,26 @@ export const RegistersTab: React.FC = () => {
       
       console.log('📊 Fetching user registrations...');
 
-      // Fetch suppliers and builders
-      const [suppliersRes, buildersRes] = await Promise.all([
+      // Fetch from multiple sources:
+      // 1. supplier_applications - for supplier registration forms
+      // 2. builder_registrations - for builder registration forms  
+      // 3. user_roles + profiles - for users who signed up directly
+      const [suppliersRes, buildersRes, userRolesRes] = await Promise.all([
         client.from('supplier_applications').select('*').order('created_at', { ascending: false }),
         client.from('builder_registrations').select('*').order('created_at', { ascending: false }),
+        client.from('user_roles').select(`
+          user_id,
+          role,
+          created_at,
+          profiles:user_id (
+            id,
+            full_name,
+            email,
+            phone,
+            avatar_url,
+            created_at
+          )
+        `).in('role', ['supplier', 'professional_builder', 'private_builder', 'builder']).order('created_at', { ascending: false }),
       ]);
 
       // Log any errors
@@ -115,14 +131,65 @@ export const RegistersTab: React.FC = () => {
       if (buildersRes.error) {
         console.error('Error fetching builder registrations:', buildersRes.error);
       }
+      if (userRolesRes.error) {
+        console.error('Error fetching user roles:', userRolesRes.error);
+      }
 
       // Get data from registration tables
-      const suppliersData = (suppliersRes.data || []) as RawSupplierRecord[];
-      const buildersData = (buildersRes.data || []) as RawBuilderRecord[];
+      let suppliersData = (suppliersRes.data || []) as RawSupplierRecord[];
+      let buildersData = (buildersRes.data || []) as RawBuilderRecord[];
+
+      // Add users from user_roles who don't have applications
+      const userRolesData = userRolesRes.data || [];
+      
+      // Get existing emails to avoid duplicates
+      const existingSupplierEmails = new Set(suppliersData.map(s => s.email?.toLowerCase()));
+      const existingBuilderEmails = new Set(buildersData.map(b => b.email?.toLowerCase()));
+
+      // Add suppliers from user_roles
+      userRolesData.forEach((ur: any) => {
+        const profile = ur.profiles;
+        if (!profile) return;
+        
+        const email = profile.email?.toLowerCase();
+        
+        if (ur.role === 'supplier' && email && !existingSupplierEmails.has(email)) {
+          suppliersData.push({
+            id: ur.user_id,
+            auth_user_id: ur.user_id,
+            contact_person: profile.full_name || profile.email?.split('@')[0] || 'Unknown',
+            email: profile.email || '',
+            phone: profile.phone || '',
+            company_name: profile.full_name || 'Not specified',
+            county: 'Not specified',
+            material_categories: [],
+            status: 'active',
+            created_at: ur.created_at || profile.created_at,
+          });
+          existingSupplierEmails.add(email);
+        }
+        
+        if (['builder', 'professional_builder', 'private_builder'].includes(ur.role) && email && !existingBuilderEmails.has(email)) {
+          buildersData.push({
+            id: ur.user_id,
+            auth_user_id: ur.user_id,
+            full_name: profile.full_name || profile.email?.split('@')[0] || 'Unknown',
+            email: profile.email || '',
+            phone: profile.phone || '',
+            county: 'Not specified',
+            builder_type: ur.role === 'professional_builder' ? 'professional' : 'private',
+            builder_category: ur.role === 'professional_builder' ? 'professional' : 'private',
+            status: 'active',
+            created_at: ur.created_at || profile.created_at,
+          });
+          existingBuilderEmails.add(email);
+        }
+      });
 
       console.log('📊 User registrations loaded:', {
         suppliers: suppliersData.length,
-        builders: buildersData.length
+        builders: buildersData.length,
+        fromUserRoles: userRolesData.length
       });
 
       setSuppliers(suppliersData);
@@ -137,12 +204,6 @@ export const RegistersTab: React.FC = () => {
           title: 'Error',
           description: 'Failed to load registration data. Please check permissions.',
           variant: 'destructive',
-        });
-      } else if (hasErrors) {
-        toast({
-          title: 'Warning',
-          description: 'Some data could not be loaded. Check console for details.',
-          variant: 'default',
         });
       }
     } catch (error) {
