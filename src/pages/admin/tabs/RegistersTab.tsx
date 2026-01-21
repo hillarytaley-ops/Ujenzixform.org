@@ -105,13 +105,11 @@ export const RegistersTab: React.FC = () => {
       // Fetch from multiple sources:
       // 1. supplier_applications - for supplier registration forms
       // 2. builder_registrations - for builder registration forms  
-      // 3. user_roles - for users who signed up directly
-      // 4. profiles - for user details
-      const [suppliersRes, buildersRes, userRolesRes, profilesRes] = await Promise.all([
+      // 3. get_users_with_roles() - database function that gets users from auth.users with roles
+      const [suppliersRes, buildersRes, usersWithRolesRes] = await Promise.all([
         client.from('supplier_applications').select('*').order('created_at', { ascending: false }),
         client.from('builder_registrations').select('*').order('created_at', { ascending: false }),
-        client.from('user_roles').select('user_id, role, created_at').order('created_at', { ascending: false }),
-        client.from('profiles').select('id, full_name, email, phone, avatar_url, created_at').order('created_at', { ascending: false }),
+        client.rpc('get_users_with_roles'),
       ]);
 
       // Log any errors
@@ -121,66 +119,57 @@ export const RegistersTab: React.FC = () => {
       if (buildersRes.error) {
         console.error('Error fetching builder registrations:', buildersRes.error);
       }
-      if (userRolesRes.error) {
-        console.error('Error fetching user roles:', userRolesRes.error);
-      }
-      if (profilesRes.error) {
-        console.error('Error fetching profiles:', profilesRes.error);
+      if (usersWithRolesRes.error) {
+        console.error('Error fetching users with roles:', usersWithRolesRes.error);
       }
 
       // Get data from registration tables
       let suppliersData = (suppliersRes.data || []) as RawSupplierRecord[];
       let buildersData = (buildersRes.data || []) as RawBuilderRecord[];
 
-      // Create a map of profiles by user_id for quick lookup
-      const profilesMap = new Map<string, any>();
-      (profilesRes.data || []).forEach((p: any) => {
-        profilesMap.set(p.id, p);
-      });
-
-      // Filter user_roles to relevant roles
-      const relevantRoles = ['supplier', 'professional_builder', 'private_builder', 'builder'];
-      const userRolesData = (userRolesRes.data || []).filter((ur: any) => relevantRoles.includes(ur.role));
+      // Get users with roles from database function
+      const usersWithRoles = usersWithRolesRes.data || [];
+      console.log('📊 Users with roles from DB:', usersWithRoles.length);
       
       // Get existing emails to avoid duplicates
       const existingSupplierEmails = new Set(suppliersData.map(s => s.email?.toLowerCase()));
       const existingBuilderEmails = new Set(buildersData.map(b => b.email?.toLowerCase()));
 
-      // Add users from user_roles who don't have applications
-      userRolesData.forEach((ur: any) => {
-        const profile = profilesMap.get(ur.user_id);
-        if (!profile) return;
+      // Add users from auth.users who have relevant roles
+      usersWithRoles.forEach((user: any) => {
+        const email = user.email?.toLowerCase();
+        const role = user.role;
         
-        const email = profile.email?.toLowerCase();
+        if (!email || !role) return;
         
-        if (ur.role === 'supplier' && email && !existingSupplierEmails.has(email)) {
+        if (role === 'supplier' && !existingSupplierEmails.has(email)) {
           suppliersData.push({
-            id: ur.user_id,
-            auth_user_id: ur.user_id,
-            contact_person: profile.full_name || profile.email?.split('@')[0] || 'Unknown',
-            email: profile.email || '',
-            phone: profile.phone || '',
-            company_name: profile.full_name || 'Not specified',
+            id: user.user_id,
+            auth_user_id: user.user_id,
+            contact_person: user.full_name || email.split('@')[0] || 'Unknown',
+            email: user.email || '',
+            phone: '',
+            company_name: user.full_name || 'Not specified',
             county: 'Not specified',
             material_categories: [],
             status: 'active',
-            created_at: ur.created_at || profile.created_at,
+            created_at: user.role_created_at || user.user_created_at,
           });
           existingSupplierEmails.add(email);
         }
         
-        if (['builder', 'professional_builder', 'private_builder'].includes(ur.role) && email && !existingBuilderEmails.has(email)) {
+        if (['builder', 'professional_builder', 'private_builder'].includes(role) && !existingBuilderEmails.has(email)) {
           buildersData.push({
-            id: ur.user_id,
-            auth_user_id: ur.user_id,
-            full_name: profile.full_name || profile.email?.split('@')[0] || 'Unknown',
-            email: profile.email || '',
-            phone: profile.phone || '',
+            id: user.user_id,
+            auth_user_id: user.user_id,
+            full_name: user.full_name || email.split('@')[0] || 'Unknown',
+            email: user.email || '',
+            phone: '',
             county: 'Not specified',
-            builder_type: ur.role === 'professional_builder' ? 'professional' : 'private',
-            builder_category: ur.role === 'professional_builder' ? 'professional' : 'private',
+            builder_type: role === 'professional_builder' ? 'professional' : 'private',
+            builder_category: role === 'professional_builder' ? 'professional' : 'private',
             status: 'active',
-            created_at: ur.created_at || profile.created_at,
+            created_at: user.role_created_at || user.user_created_at,
           });
           existingBuilderEmails.add(email);
         }
@@ -189,8 +178,7 @@ export const RegistersTab: React.FC = () => {
       console.log('📊 User registrations loaded:', {
         suppliers: suppliersData.length,
         builders: buildersData.length,
-        fromUserRoles: userRolesData.length,
-        profiles: profilesRes.data?.length || 0
+        fromAuthUsers: usersWithRoles.length
       });
 
       setSuppliers(suppliersData);
