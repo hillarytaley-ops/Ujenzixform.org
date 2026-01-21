@@ -256,9 +256,163 @@ const UJENZIXFORM_KB = {
   // Contact information
   contact: {
     phone: '+254 700 000 000',
+    whatsapp: '+254 700 000 000',
     email: 'support@ujenzixform.co.ke',
     hours: 'Monday - Saturday: 8:00 AM - 6:00 PM',
     address: 'Nairobi, Kenya'
+  },
+  
+  // Payment options
+  payment: {
+    methods: [
+      { name: 'M-Pesa', description: 'Pay via Safaricom M-Pesa (Paybill/Till)', popular: true },
+      { name: 'Bank Transfer', description: 'Direct bank deposit/transfer', popular: false },
+      { name: 'Card Payment', description: 'Visa/Mastercard via secure gateway', popular: false },
+      { name: 'Cash on Delivery', description: 'Pay when materials arrive (select areas)', popular: true }
+    ],
+    process: [
+      '1. Add items to cart',
+      '2. Proceed to checkout',
+      '3. Select payment method',
+      '4. Complete payment',
+      '5. Receive confirmation via SMS/Email'
+    ],
+    security: 'All payments are secured with SSL encryption'
+  },
+  
+  // Returns & Refunds
+  returns: {
+    policy: '7-day return policy for unused items in original packaging',
+    conditions: [
+      'Item must be unused and in original packaging',
+      'Return request within 7 days of delivery',
+      'Original receipt/order confirmation required',
+      'Some items (cement, mixed materials) non-returnable'
+    ],
+    process: [
+      '1. Contact support within 7 days',
+      '2. Provide order number and reason',
+      '3. Get return authorization',
+      '4. Arrange pickup or drop-off',
+      '5. Refund processed within 5-7 business days'
+    ],
+    refundMethods: ['M-Pesa reversal', 'Bank transfer', 'Store credit']
+  },
+  
+  // Quality & Warranty
+  quality: {
+    standards: [
+      'All materials meet KEBS (Kenya Bureau of Standards) requirements',
+      'Verified suppliers only',
+      'Quality inspection before dispatch',
+      'Supplier ratings and reviews available'
+    ],
+    warranty: {
+      cement: 'Use within 3 months of purchase for best results',
+      steel: 'Manufacturer warranty applies (typically 1 year)',
+      paint: '5-year warranty on premium brands',
+      roofing: '10-25 year warranty depending on brand',
+      tiles: 'Replacement for manufacturing defects'
+    }
+  },
+  
+  // FAQs
+  faqs: [
+    {
+      question: 'How do I place an order?',
+      answer: 'Browse products, add to cart, checkout, select delivery, and pay. You\'ll receive confirmation via SMS/email.'
+    },
+    {
+      question: 'What areas do you deliver to?',
+      answer: 'We deliver across Kenya including Nairobi, Mombasa, Kisumu, Nakuru, Eldoret, and more. Delivery costs vary by location.'
+    },
+    {
+      question: 'How long does delivery take?',
+      answer: 'Same-day delivery available in Nairobi. Other areas typically 1-3 days depending on location and stock availability.'
+    },
+    {
+      question: 'Can I track my delivery?',
+      answer: 'Yes! All deliveries have real-time GPS tracking. You\'ll receive a tracking link via SMS.'
+    },
+    {
+      question: 'What payment methods do you accept?',
+      answer: 'M-Pesa, bank transfer, card payments (Visa/Mastercard), and cash on delivery in select areas.'
+    },
+    {
+      question: 'Are your materials genuine?',
+      answer: 'Yes! We only work with verified suppliers. All materials meet KEBS standards and come with proper documentation.'
+    },
+    {
+      question: 'Can I return items?',
+      answer: 'Yes, unused items in original packaging can be returned within 7 days. Some items like cement are non-returnable.'
+    },
+    {
+      question: 'Do you offer bulk discounts?',
+      answer: 'Yes! Professional builders can request quotes for bulk orders with special pricing.'
+    },
+    {
+      question: 'How does the monitoring service work?',
+      answer: 'We install CCTV cameras at your site. You can view live feeds 24/7 from your dashboard or mobile app.'
+    },
+    {
+      question: 'Is my payment secure?',
+      answer: 'Absolutely! All payments are encrypted with SSL. M-Pesa transactions go through Safaricom\'s secure gateway.'
+    }
+  ],
+  
+  // Safety tips
+  safetyTips: [
+    'Always verify materials upon delivery using the QR code',
+    'Check expiry dates on cement bags (use within 3 months)',
+    'Store materials in dry, covered areas',
+    'Ensure steel bars are rust-free before use',
+    'Keep paint in cool, dry storage',
+    'Wear protective gear when handling materials'
+  ],
+  
+  // Construction tips
+  constructionTips: {
+    cement: [
+      'Use clean water for mixing',
+      'Mix ratio: 1 cement : 2 sand : 4 ballast for concrete',
+      'Cure concrete for at least 7 days',
+      'Don\'t use cement older than 3 months'
+    ],
+    steel: [
+      'Minimum cover: 25mm for columns, 40mm for foundation',
+      'Overlap length: 40 times the bar diameter',
+      'Use binding wire to secure joints',
+      'Store off the ground to prevent rust'
+    ],
+    blocks: [
+      'Wet blocks before laying',
+      'Use level and plumb line for straight walls',
+      'Allow mortar to cure before next course',
+      'Leave openings for doors and windows'
+    ],
+    roofing: [
+      'Minimum roof pitch: 15 degrees for iron sheets',
+      'Overlap sheets by at least 150mm',
+      'Use proper fasteners with rubber washers',
+      'Ensure proper ventilation'
+    ]
+  },
+  
+  // Promotions (example)
+  promotions: {
+    current: [
+      { name: 'Bulk Cement Deal', description: '10% off on 100+ bags', validUntil: 'End of month' },
+      { name: 'Free Delivery', description: 'Orders above KES 50,000 in Nairobi', validUntil: 'Ongoing' },
+      { name: 'New User Discount', description: '5% off first order', validUntil: 'Ongoing' }
+    ]
+  },
+  
+  // Business hours by service
+  businessHours: {
+    customerSupport: 'Mon-Sat: 8:00 AM - 6:00 PM',
+    deliveries: 'Mon-Sat: 7:00 AM - 7:00 PM',
+    liveChat: 'Mon-Sat: 8:00 AM - 6:00 PM',
+    emergencyLine: '24/7 for urgent delivery issues'
   }
 };
 
@@ -1274,6 +1428,7 @@ Which material do you need pricing for?`,
         response: `📞 **Contact Us**
 
 **Phone:** ${contact.phone}
+**WhatsApp:** ${contact.whatsapp}
 **Email:** ${contact.email}
 **Hours:** ${contact.hours}
 **Location:** ${contact.address}
@@ -1286,6 +1441,281 @@ Which material do you need pricing for?`,
 
 ${staffOnline > 0 ? `\n💬 **${staffOnline} staff online now** - Start a live chat!` : ''}`,
         suggestions: ['Start live chat', 'Send email', 'Browse FAQs'],
+        sources: ['UjenziXform Support']
+      };
+    }
+
+    // ============ PAYMENT ============
+    if (query.includes('pay') || query.includes('mpesa') || query.includes('m-pesa') || query.includes('payment') || 
+        query.includes('lipa') || query.includes('card') || query.includes('bank')) {
+      const payment = UJENZIXFORM_KB.payment;
+      return {
+        response: `💳 **Payment Options**
+
+**Accepted Methods:**
+${payment.methods.map(m => `• **${m.name}** ${m.popular ? '⭐' : ''}\n  ${m.description}`).join('\n')}
+
+**How to Pay:**
+${payment.process.join('\n')}
+
+🔒 **Security:** ${payment.security}
+
+**M-Pesa Instructions:**
+1. Go to M-Pesa menu
+2. Select Lipa na M-Pesa
+3. Enter Paybill/Till number (shown at checkout)
+4. Enter your Order ID as reference
+5. Complete payment
+
+Payment confirmation is instant for M-Pesa!`,
+        suggestions: ['Cash on delivery areas', 'Payment issues', 'Talk to staff'],
+        sources: ['UjenziXform Payments']
+      };
+    }
+
+    // ============ RETURNS & REFUNDS ============
+    if (query.includes('return') || query.includes('refund') || query.includes('exchange') || 
+        query.includes('money back') || query.includes('cancel')) {
+      const returns = UJENZIXFORM_KB.returns;
+      return {
+        response: `🔄 **Returns & Refunds**
+
+**Policy:** ${returns.policy}
+
+**Conditions:**
+${returns.conditions.map(c => `• ${c}`).join('\n')}
+
+**How to Return:**
+${returns.process.join('\n')}
+
+**Refund Methods:**
+${returns.refundMethods.map(m => `• ${m}`).join('\n')}
+
+⚠️ **Non-Returnable Items:**
+• Cement (once delivered)
+• Mixed/custom materials
+• Items without original packaging
+
+Need to return something? Contact our support team!`,
+        suggestions: ['Contact support', 'Return process', 'Talk to staff'],
+        sources: ['UjenziXform Returns Policy']
+      };
+    }
+
+    // ============ QUALITY & WARRANTY ============
+    if (query.includes('quality') || query.includes('warranty') || query.includes('genuine') || 
+        query.includes('original') || query.includes('fake') || query.includes('kebs')) {
+      const quality = UJENZIXFORM_KB.quality;
+      return {
+        response: `✅ **Quality & Warranty**
+
+**Our Quality Standards:**
+${quality.standards.map(s => `• ${s}`).join('\n')}
+
+**Warranty by Product:**
+• **Cement:** ${quality.warranty.cement}
+• **Steel:** ${quality.warranty.steel}
+• **Paint:** ${quality.warranty.paint}
+• **Roofing:** ${quality.warranty.roofing}
+• **Tiles:** ${quality.warranty.tiles}
+
+**How We Ensure Quality:**
+1. Verified suppliers only
+2. KEBS certification required
+3. Quality checks before dispatch
+4. Customer reviews & ratings
+
+All materials come with proper documentation and receipts!`,
+        suggestions: ['KEBS standards', 'Report quality issue', 'Talk to staff'],
+        sources: ['UjenziXform Quality']
+      };
+    }
+
+    // ============ FAQs ============
+    if (query.includes('faq') || query.includes('question') || query.includes('common')) {
+      const faqs = UJENZIXFORM_KB.faqs.slice(0, 5);
+      return {
+        response: `❓ **Frequently Asked Questions**
+
+${faqs.map((faq, i) => `**${i + 1}. ${faq.question}**\n${faq.answer}`).join('\n\n')}
+
+Want to know more? Ask me anything!`,
+        suggestions: ['More FAQs', 'Payment questions', 'Delivery questions', 'Talk to staff'],
+        sources: ['UjenziXform FAQs']
+      };
+    }
+
+    // ============ SAFETY TIPS ============
+    if (query.includes('safety') || query.includes('safe') || query.includes('store') || query.includes('storage')) {
+      const tips = UJENZIXFORM_KB.safetyTips;
+      return {
+        response: `🦺 **Safety & Storage Tips**
+
+${tips.map(t => `• ${t}`).join('\n')}
+
+**Material-Specific Storage:**
+• **Cement:** Keep dry, off the ground, use within 3 months
+• **Steel:** Store off ground, cover to prevent rust
+• **Paint:** Cool, dry place, away from sunlight
+• **Timber:** Stack properly, protect from rain
+
+Stay safe on your construction site! 🏗️`,
+        suggestions: ['Construction tips', 'Quality standards', 'More help'],
+        sources: ['UjenziXform Safety']
+      };
+    }
+
+    // ============ CONSTRUCTION TIPS ============
+    if (query.includes('tip') || query.includes('advice') || query.includes('how to build') || 
+        query.includes('best practice') || query.includes('recommendation')) {
+      const tips = UJENZIXFORM_KB.constructionTips;
+      return {
+        response: `💡 **Construction Tips**
+
+**Cement & Concrete:**
+${tips.cement.map(t => `• ${t}`).join('\n')}
+
+**Steel Work:**
+${tips.steel.map(t => `• ${t}`).join('\n')}
+
+**Block Work:**
+${tips.blocks.map(t => `• ${t}`).join('\n')}
+
+**Roofing:**
+${tips.roofing.map(t => `• ${t}`).join('\n')}
+
+Need specific advice? Ask me or talk to our experts!`,
+        suggestions: ['Cement mixing tips', 'Steel placement', 'Talk to expert'],
+        sources: ['UjenziXform Construction Guide']
+      };
+    }
+
+    // ============ PROMOTIONS / OFFERS ============
+    if (query.includes('promo') || query.includes('offer') || query.includes('discount') || 
+        query.includes('deal') || query.includes('sale') || query.includes('special')) {
+      const promos = UJENZIXFORM_KB.promotions.current;
+      return {
+        response: `🎉 **Current Promotions**
+
+${promos.map(p => `**${p.name}**\n${p.description}\n⏰ Valid: ${p.validUntil}`).join('\n\n')}
+
+**How to Get Discounts:**
+• Bulk orders (100+ items)
+• First-time user discount
+• Refer a friend program
+• Seasonal promotions
+
+Check our marketplace for more deals!`,
+        suggestions: ['Bulk discounts', 'Browse products', 'Talk to staff for special pricing'],
+        sources: ['UjenziXform Promotions']
+      };
+    }
+
+    // ============ BUSINESS HOURS ============
+    if (query.includes('hour') || query.includes('open') || query.includes('close') || 
+        query.includes('time') || query.includes('when') || query.includes('available')) {
+      const hours = UJENZIXFORM_KB.businessHours;
+      return {
+        response: `🕐 **Business Hours**
+
+**Customer Support:** ${hours.customerSupport}
+**Deliveries:** ${hours.deliveries}
+**Live Chat:** ${hours.liveChat}
+**Emergency Line:** ${hours.emergencyLine}
+
+**Current Status:**
+${staffOnline > 0 ? `✅ We're open! ${staffOnline} staff online` : '⏰ Currently closed - Leave a message'}
+
+**Public Holidays:**
+We're closed on public holidays but emergency support is available.`,
+        suggestions: ['Contact support', 'Start live chat', 'Leave message'],
+        sources: ['UjenziXform Hours']
+      };
+    }
+
+    // ============ ORDER STATUS ============
+    if (query.includes('order') || query.includes('status') || query.includes('where is') || 
+        query.includes('my purchase') || query.includes('bought')) {
+      return {
+        response: `📦 **Check Your Order**
+
+**To view your orders:**
+1. Log in to your account
+2. Go to Dashboard
+3. Click "My Orders"
+4. View status and tracking
+
+**Order Statuses:**
+• **Pending** - Awaiting payment/confirmation
+• **Confirmed** - Order accepted by supplier
+• **Processing** - Being prepared
+• **Dispatched** - On the way
+• **Delivered** - Completed
+
+**Can't find your order?**
+Make sure you're logged in with the same account you used to order.
+
+Need help? Talk to our support team!`,
+        suggestions: ['Track delivery', 'Payment status', 'Talk to staff'],
+        sources: ['UjenziXform Orders']
+      };
+    }
+
+    // ============ ACCOUNT ISSUES ============
+    if (query.includes('account') || query.includes('login') || query.includes('password') || 
+        query.includes('forgot') || query.includes('reset') || query.includes('sign in')) {
+      return {
+        response: `🔐 **Account Help**
+
+**Can't Log In?**
+1. Click "Forgot Password" on login page
+2. Enter your email
+3. Check inbox for reset link
+4. Create new password
+
+**Account Issues:**
+• **Wrong email?** Contact support to update
+• **Locked out?** Wait 15 minutes or contact support
+• **Two accounts?** We can merge them
+
+**Security Tips:**
+• Use a strong password
+• Don't share login details
+• Log out on shared devices
+
+Need help? Our support team can assist!`,
+        suggestions: ['Reset password', 'Contact support', 'Talk to staff'],
+        sources: ['UjenziXform Account']
+      };
+    }
+
+    // ============ COMPLAINTS ============
+    if (query.includes('complaint') || query.includes('problem') || query.includes('issue') || 
+        query.includes('wrong') || query.includes('bad') || query.includes('damaged')) {
+      return {
+        response: `😔 **We're Sorry to Hear That**
+
+**Report an Issue:**
+1. Describe what happened
+2. Include your order number
+3. Add photos if applicable
+4. Our team will respond within 24 hours
+
+**Common Issues We Handle:**
+• Damaged goods on delivery
+• Wrong items received
+• Missing items
+• Quality concerns
+• Delivery delays
+
+**Resolution Options:**
+• Replacement
+• Refund
+• Store credit
+• Compensation
+
+Let me connect you with our support team to resolve this quickly!`,
+        suggestions: ['🔗 Start Live Chat', 'Report damaged goods', 'Request refund'],
         sources: ['UjenziXform Support']
       };
     }
