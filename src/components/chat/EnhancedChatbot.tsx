@@ -725,31 +725,48 @@ How can I help you today?`;
   // Request live chat with staff
   const requestLiveChat = async () => {
     console.log('🚀 requestLiveChat START');
+    
+    // Prevent multiple calls
+    if (chatMode === 'waiting') {
+      console.log('⚠️ Already waiting, ignoring duplicate call');
+      return;
+    }
+    
     setChatMode('waiting');
     setQueuePosition(1);
     addSystemMessage('🔄 Connecting you to a staff member...');
 
-    console.log('🔄 requestLiveChat - props:', { userId, userName, userEmail });
+    console.log('🔄 Props:', { userId, userName, userEmail });
 
     try {
-      // Get current user session for proper UUID
-      console.log('🔄 Getting user from supabase.auth...');
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      // Use existing userId if available, otherwise try to get from session
+      let clientId = userId || null;
+      let clientName = userName || 'Guest';
+      let clientEmail = userEmail || null;
       
-      if (authError) {
-        console.error('❌ Auth error:', authError);
+      // Only try to get user if we don't have userId
+      if (!clientId) {
+        console.log('🔄 No userId prop, checking session...');
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          clientId = session.user.id;
+          clientName = session.user.email?.split('@')[0] || clientName;
+          clientEmail = session.user.email || clientEmail;
+          console.log('✅ Got user from session:', clientId);
+        } else {
+          console.log('⚠️ No session, proceeding as guest');
+        }
       }
       
-      const clientId = user?.id || null;
-      console.log('🔄 User retrieved:', { clientId, email: user?.email });
+      console.log('🔄 Creating conversation...', { clientId, clientName, clientEmail });
       
-      // Create conversation - status must be: open, pending, resolved, or closed
+      // Create conversation
       const { data: conv, error } = await supabase
         .from('conversations')
         .insert({
           client_id: clientId,
-          client_name: userName || user?.email?.split('@')[0] || 'Guest',
-          client_email: userEmail || user?.email || null,
+          client_name: clientName,
+          client_email: clientEmail,
           status: 'open',
           source: 'chatbot',
           priority: 'normal'
@@ -762,58 +779,53 @@ How can I help you today?`;
         toast({
           variant: 'destructive',
           title: 'Connection failed',
-          description: error.message || 'Could not start live chat. Please try again.'
+          description: error.message || 'Could not start live chat.'
         });
         setChatMode('ai');
         return;
       }
       
-      if (conv) {
-        console.log('✅ Conversation created:', conv.id);
-        setConversationId(conv.id);
-        
-        // Save initial message
-        const initialMsg = `Live chat started by ${userName || 'Guest'}`;
-        const { error: msgError } = await supabase.from('chat_messages').insert({
-          conversation_id: conv.id,
-          sender_id: clientId ? String(clientId) : null,
-          sender_type: 'system',
-          sender_name: 'System',
-          content: initialMsg,
-          message_type: 'text',
-          read: false
-        });
-        
-        if (msgError) {
-          console.error('⚠️ Error saving initial message:', msgError);
-        } else {
-          console.log('✅ Initial message saved');
-        }
-
-        toast({
-          title: '📞 Connected!',
-          description: 'You are now in live chat. A staff member will respond shortly.',
-        });
-
-        // Transition to live mode
-        setTimeout(() => {
-          setQueuePosition(null);
-          setChatMode('live');
-          setStaffName('Support Staff');
-          addSystemMessage('👤 **Support Staff** has joined the chat. Your messages are being sent to our team. Please wait for a response.');
-        }, 1500);
+      console.log('✅ Conversation created:', conv.id);
+      setConversationId(conv.id);
+      
+      // Save initial message
+      const { error: msgError } = await supabase.from('chat_messages').insert({
+        conversation_id: conv.id,
+        sender_id: clientId ? String(clientId) : null,
+        sender_type: 'system',
+        sender_name: 'System',
+        content: `Live chat started by ${clientName}`,
+        message_type: 'text',
+        read: false
+      });
+      
+      if (msgError) {
+        console.error('⚠️ Error saving initial message:', msgError);
+      } else {
+        console.log('✅ Initial message saved');
       }
+
+      toast({
+        title: '📞 Connected!',
+        description: 'You are now in live chat.',
+      });
+
+      // Transition to live mode
+      setQueuePosition(null);
+      setChatMode('live');
+      setStaffName('Support Staff');
+      addSystemMessage('👤 **Support Staff** is available. Your messages are being sent to our team.');
+      
+      console.log('🏁 requestLiveChat SUCCESS');
     } catch (err: any) {
-      console.error('❌ Exception in requestLiveChat:', err);
-      console.error('❌ Error details:', err?.message, err?.stack);
+      console.error('❌ Exception:', err?.message || err);
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Could not start live chat. Please try again.'
+        description: 'Could not start live chat.'
       });
       setChatMode('ai');
     }
-    console.log('🏁 requestLiveChat END');
   };
 
   // Send message to staff
