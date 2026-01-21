@@ -1549,7 +1549,7 @@ export const MaterialsGrid = () => {
                         </div>
                       )}
                       
-                      {/* View Image Button (shows on hover) */}
+                      {/* View Product Button (shows on hover) */}
                       <div className="absolute inset-0 bg-black/0 group-hover/image:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover/image:opacity-100">
                         <button
                           onClick={(e) => {
@@ -1559,7 +1559,7 @@ export const MaterialsGrid = () => {
                           className="bg-white/90 hover:bg-white text-gray-800 px-3 py-2 rounded-lg shadow-lg flex items-center gap-2 transition-all transform scale-90 group-hover/image:scale-100"
                         >
                           <Eye className="h-4 w-4" />
-                          <span className="text-sm font-medium">View {hasMultipleImages(material) ? 'All Angles' : 'Image'}</span>
+                          <span className="text-sm font-medium">View Product</span>
                         </button>
                       </div>
                       
