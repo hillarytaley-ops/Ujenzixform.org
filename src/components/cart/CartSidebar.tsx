@@ -15,17 +15,18 @@
  * ╚══════════════════════════════════════════════════════════════════════════════════════╝
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { useCart } from '@/contexts/CartContext';
-import { ShoppingCart, Trash2, Plus, Minus, Package, X, FileText, CreditCard } from 'lucide-react';
+import { useCart, CartItem } from '@/contexts/CartContext';
+import { ShoppingCart, Trash2, Plus, Minus, Package, X, FileText, CreditCard, Scale } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { CartPriceComparison } from './CartPriceComparison';
 
 export const CartSidebar: React.FC = () => {
   const { 
@@ -39,6 +40,8 @@ export const CartSidebar: React.FC = () => {
     setIsCartOpen 
   } = useCart();
   const { toast } = useToast();
+  const [comparisonItem, setComparisonItem] = useState<CartItem | null>(null);
+  const [showComparison, setShowComparison] = useState(false);
 
   const handleQuantityChange = (itemId: string, newQuantity: number) => {
     if (newQuantity >= 1) {
@@ -287,6 +290,20 @@ export const CartSidebar: React.FC = () => {
                         KES {(item.unit_price * item.quantity).toLocaleString()}
                       </span>
                     </div>
+                    
+                    {/* Compare Prices Button */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-purple-600 border-purple-200 hover:bg-purple-50 hover:border-purple-300"
+                      onClick={() => {
+                        setComparisonItem(item);
+                        setShowComparison(true);
+                      }}
+                    >
+                      <Scale className="h-3 w-3 mr-1.5" />
+                      Compare Prices
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -336,6 +353,16 @@ export const CartSidebar: React.FC = () => {
             </div>
           </>
         )}
+
+        {/* Price Comparison Modal */}
+        <CartPriceComparison
+          isOpen={showComparison}
+          onClose={() => {
+            setShowComparison(false);
+            setComparisonItem(null);
+          }}
+          cartItem={comparisonItem}
+        />
       </SheetContent>
     </Sheet>
   );
