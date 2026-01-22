@@ -20,7 +20,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useCart } from '@/contexts/CartContext';
 import { useToast } from '@/hooks/use-toast';
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   Scale, 
   Store, 
@@ -87,36 +87,19 @@ export const CartPriceComparison: React.FC<CartPriceComparisonProps> = ({
     setLoading(true);
     try {
       // Fetch all supplier prices for similar products
-      const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/supplier_product_prices?select=*`,
-        {
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+      const { data: pricesData, error: pricesError } = await supabase
+        .from('supplier_product_prices')
+        .select('*');
 
-      if (!response.ok) throw new Error('Failed to fetch prices');
-      
-      const pricesData = await response.json();
+      if (pricesError) throw pricesError;
 
       // Fetch admin materials to get product names
-      const materialsResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,image_url&is_approved=eq.true`,
-        {
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+      const { data: materialsData, error: materialsError } = await supabase
+        .from('admin_material_images')
+        .select('id, name, category, image_url')
+        .eq('is_approved', true);
 
-      if (!materialsResponse.ok) throw new Error('Failed to fetch materials');
-      
-      const materialsData = await materialsResponse.json();
+      if (materialsError) throw materialsError;
       const materialsMap = new Map(materialsData.map((m: any) => [m.id, m]));
 
       // Find products in the same category or with similar names
