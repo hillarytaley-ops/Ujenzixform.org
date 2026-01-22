@@ -12,7 +12,7 @@
  * ║                                                                                      ║
  * ║   SETUP:                                                                             ║
  * ║   1. Sign up at https://resend.com                                                   ║
- * ║   2. Verify your domain (ujenzixform.com)                                            ║
+ * ║   2. Verify your domain (ujenzixform.org)                                             ║
  * ║   3. Get API key and add to Supabase Edge Functions                                  ║
  * ║                                                                                      ║
  * ╚══════════════════════════════════════════════════════════════════════════════════════╝
@@ -63,7 +63,7 @@ export const emailTemplates = {
                   <li>✅ Secure payment with M-Pesa</li>
                 `}
               </ul>
-              <a href="https://ujenzixform.com/home" class="button">Get Started →</a>
+              <a href="https://ujenzixform.org/home" class="button">Get Started →</a>
               <p>Need help? Our support team is available 24/7 via live chat.</p>
             </div>
             <div class="footer">
@@ -132,7 +132,7 @@ export const emailTemplates = {
                 <p><strong>Estimated Delivery:</strong> ${orderDetails.estimatedDelivery}</p>
               </div>
 
-              <a href="https://ujenzixform.com/tracking" class="button">Track Your Order →</a>
+              <a href="https://ujenzixform.org/tracking" class="button">Track Your Order →</a>
             </div>
             <div class="footer">
               <p>Questions? Reply to this email or use our live chat.</p>
@@ -201,7 +201,7 @@ export const emailTemplates = {
                 `).join('')}
               </div>
 
-              <a href="https://ujenzixform.com/supplier-dashboard" class="button">Respond to Quote →</a>
+              <a href="https://ujenzixform.org/supplier-dashboard" class="button">Respond to Quote →</a>
             </div>
             <div class="footer">
               <p>© 2026 UjenziXform. All rights reserved.</p>
@@ -272,7 +272,7 @@ export const emailTemplates = {
                   </div>
                 ` : ''}
 
-                <a href="https://ujenzixform.com/tracking" class="button">Track Live →</a>
+                <a href="https://ujenzixform.org/tracking" class="button">Track Live →</a>
               </div>
               <div class="footer">
                 <p>© 2026 UjenziXform. All rights reserved.</p>

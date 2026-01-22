@@ -388,6 +388,6 @@ Webhooks will be available for:
 ## Support
 
 For API support, contact:
-- Email: support@ujenzixform.com
+- Email: info@ujenzixform.org
 - Live Chat: Available in-app
 

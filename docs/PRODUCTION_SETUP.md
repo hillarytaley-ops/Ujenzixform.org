@@ -14,7 +14,7 @@ This guide covers everything needed to deploy UjenziXform to production.
 
 2. **Verify Your Domain**
    - In Resend dashboard, go to **Domains**
-   - Add `ujenzixform.com`
+   - Add `ujenzixform.org`
    - Add the DNS records Resend provides:
      ```
      Type: TXT
@@ -142,7 +142,7 @@ This guide covers everything needed to deploy UjenziXform to production.
    - Go to [analytics.google.com](https://analytics.google.com)
    - Create account → Create property
    - Choose "Web" platform
-   - Enter `ujenzixform.com`
+   - Enter `ujenzixform.org`
 
 2. **Get Measurement ID**
    - Format: `G-XXXXXXXXXX`
@@ -244,7 +244,7 @@ supabase storage download avatars --output ./storage_backup/avatars
      },
    };
 
-   const BASE_URL = 'https://ujenzixform.com';
+   const BASE_URL = 'https://ujenzixform.org';
 
    export default function () {
      // Test homepage
@@ -353,7 +353,7 @@ Before going live, verify:
 
 2. **Add Custom Domain**
    - In Vercel dashboard → Settings → Domains
-   - Add `ujenzixform.com`
+   - Add `ujenzixform.org`
    - Update DNS records as instructed
 
 3. **SSL is automatic** with Vercel

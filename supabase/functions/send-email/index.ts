@@ -3,7 +3,7 @@
  * 
  * SETUP INSTRUCTIONS:
  * 1. Sign up at https://resend.com
- * 2. Verify your domain (ujenzixform.com)
+ * 2. Verify your domain (ujenzixform.org)
  * 3. Get your API key from Resend dashboard
  * 4. Add secret: supabase secrets set RESEND_API_KEY=re_xxxxxxxxxxxxx
  * 5. Deploy: supabase functions deploy send-email
@@ -52,11 +52,11 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: from || "UjenziXform <noreply@ujenzixform.com>",
+        from: from || "UjenziXform <info@ujenzixform.org>",
         to: Array.isArray(to) ? to : [to],
         subject,
         html,
-        reply_to: replyTo || "support@ujenzixform.com",
+        reply_to: replyTo || "info@ujenzixform.org",
       }),
     });
 
