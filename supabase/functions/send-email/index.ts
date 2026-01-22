@@ -52,7 +52,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: from || "UjenziPro <noreply@ujenzixform.com>",
+        from: from || "UjenziXform <noreply@ujenzixform.com>",
         to: Array.isArray(to) ? to : [to],
         subject,
         html,

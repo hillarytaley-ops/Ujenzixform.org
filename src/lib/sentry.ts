@@ -1,7 +1,7 @@
 /**
  * ╔══════════════════════════════════════════════════════════════════════════════════════╗
  * ║                                                                                      ║
- * ║   🐛 SENTRY ERROR MONITORING - UjenziPro                                             ║
+ * ║   🐛 SENTRY ERROR MONITORING - UjenziXform                                             ║
  * ║                                                                                      ║
  * ║   CREATED: January 22, 2026                                                          ║
  * ║   SETUP:                                                                             ║

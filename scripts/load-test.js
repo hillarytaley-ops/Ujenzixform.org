@@ -1,7 +1,7 @@
 /**
  * ╔══════════════════════════════════════════════════════════════════════════════════════╗
  * ║                                                                                      ║
- * ║   🔥 LOAD TESTING SCRIPT - UjenziPro                                                 ║
+ * ║   🔥 LOAD TESTING SCRIPT - UjenziXform                                                 ║
  * ║                                                                                      ║
  * ║   USAGE:                                                                             ║
  * ║   1. Install k6: choco install k6 (Windows) or brew install k6 (Mac)                ║

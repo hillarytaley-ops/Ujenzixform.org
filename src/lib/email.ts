@@ -1,7 +1,7 @@
 /**
  * ╔══════════════════════════════════════════════════════════════════════════════════════╗
  * ║                                                                                      ║
- * ║   📧 EMAIL SERVICE - Resend Integration for UjenziPro                                ║
+ * ║   📧 EMAIL SERVICE - Resend Integration for UjenziXform                                ║
  * ║                                                                                      ║
  * ║   CREATED: January 22, 2026                                                          ║
  * ║   FEATURES:                                                                          ║
@@ -22,7 +22,7 @@
 export const emailTemplates = {
   // Welcome email for new users
   welcome: (userName: string, role: string) => ({
-    subject: `Welcome to UjenziPro - Kenya's Construction Marketplace`,
+    subject: `Welcome to UjenziXform - Kenya's Construction Marketplace`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -39,11 +39,11 @@ export const emailTemplates = {
         <body>
           <div class="container">
             <div class="header">
-              <h1>🏗️ Welcome to UjenziPro!</h1>
+              <h1>🏗️ Welcome to UjenziXform!</h1>
             </div>
             <div class="content">
               <h2>Karibu, ${userName}!</h2>
-              <p>Thank you for joining UjenziPro - Kenya's premier construction materials marketplace.</p>
+              <p>Thank you for joining UjenziXform - Kenya's premier construction materials marketplace.</p>
               <p>As a <strong>${role}</strong>, you now have access to:</p>
               <ul>
                 ${role === 'supplier' ? `
@@ -67,8 +67,8 @@ export const emailTemplates = {
               <p>Need help? Our support team is available 24/7 via live chat.</p>
             </div>
             <div class="footer">
-              <p>UjenziPro - Building Kenya, One Project at a Time</p>
-              <p>© 2026 UjenziPro. All rights reserved.</p>
+              <p>UjenziXform - Building Kenya, One Project at a Time</p>
+              <p>© 2026 UjenziXform. All rights reserved.</p>
             </div>
           </div>
         </body>
@@ -85,7 +85,7 @@ export const emailTemplates = {
     deliveryAddress: string;
     estimatedDelivery: string;
   }) => ({
-    subject: `Order Confirmed - ${orderDetails.orderNumber} | UjenziPro`,
+    subject: `Order Confirmed - ${orderDetails.orderNumber} | UjenziXform`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -136,7 +136,7 @@ export const emailTemplates = {
             </div>
             <div class="footer">
               <p>Questions? Reply to this email or use our live chat.</p>
-              <p>© 2026 UjenziPro. All rights reserved.</p>
+              <p>© 2026 UjenziXform. All rights reserved.</p>
             </div>
           </div>
         </body>
@@ -153,7 +153,7 @@ export const emailTemplates = {
     deliveryAddress: string;
     projectDescription?: string;
   }) => ({
-    subject: `New Quote Request from ${details.builderName} | UjenziPro`,
+    subject: `New Quote Request from ${details.builderName} | UjenziXform`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -204,7 +204,7 @@ export const emailTemplates = {
               <a href="https://ujenzixform.com/supplier-dashboard" class="button">Respond to Quote →</a>
             </div>
             <div class="footer">
-              <p>© 2026 UjenziPro. All rights reserved.</p>
+              <p>© 2026 UjenziXform. All rights reserved.</p>
             </div>
           </div>
         </body>
@@ -231,7 +231,7 @@ export const emailTemplates = {
     const statusInfo = statusMessages[details.status];
     
     return {
-      subject: `${statusInfo.emoji} ${statusInfo.title} - Order ${details.orderNumber} | UjenziPro`,
+      subject: `${statusInfo.emoji} ${statusInfo.title} - Order ${details.orderNumber} | UjenziXform`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -275,7 +275,7 @@ export const emailTemplates = {
                 <a href="https://ujenzixform.com/tracking" class="button">Track Live →</a>
               </div>
               <div class="footer">
-                <p>© 2026 UjenziPro. All rights reserved.</p>
+                <p>© 2026 UjenziXform. All rights reserved.</p>
               </div>
             </div>
           </body>
@@ -286,7 +286,7 @@ export const emailTemplates = {
 
   // Password reset email
   passwordReset: (userName: string, resetLink: string) => ({
-    subject: `Reset Your Password | UjenziPro`,
+    subject: `Reset Your Password | UjenziXform`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -320,7 +320,7 @@ export const emailTemplates = {
               <p style="word-break: break-all; color: #6366f1;">${resetLink}</p>
             </div>
             <div class="footer">
-              <p>© 2026 UjenziPro. All rights reserved.</p>
+              <p>© 2026 UjenziXform. All rights reserved.</p>
             </div>
           </div>
         </body>

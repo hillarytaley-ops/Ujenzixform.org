@@ -1,6 +1,6 @@
-# 🚀 UjenziPro Production Setup Guide
+# 🚀 UjenziXform Production Setup Guide
 
-This guide covers everything needed to deploy UjenziPro to production.
+This guide covers everything needed to deploy UjenziXform to production.
 
 ---
 
@@ -53,7 +53,7 @@ This guide covers everything needed to deploy UjenziPro to production.
      -d '{
        "to": "test@example.com",
        "subject": "Test Email",
-       "html": "<h1>Hello from UjenziPro!</h1>"
+       "html": "<h1>Hello from UjenziXform!</h1>"
      }'
    ```
 
