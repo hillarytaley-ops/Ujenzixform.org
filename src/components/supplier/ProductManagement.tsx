@@ -246,12 +246,13 @@ const CATEGORIES = [
 
 export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId, isDarkMode = false }) => {
   const [adminProducts, setAdminProducts] = useState<any[]>([]);
-  const [supplierPrices, setSupplierPrices] = useState<Record<string, { price: number; in_stock: boolean; description?: string }>>({});
+  const [supplierPrices, setSupplierPrices] = useState<Record<string, { price: number; in_stock: boolean; description?: string; variant_prices?: any[] }>>({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [showRequestDialog, setShowRequestDialog] = useState(false);
   const [pricingProduct, setPricingProduct] = useState<any | null>(null);
+  const [editingVariantPrices, setEditingVariantPrices] = useState<Record<string, number>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const { t } = useLanguage();
@@ -314,12 +315,13 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
         .eq('supplier_id', supplierId));
       
       if (!error && data) {
-        const priceMap: Record<string, { price: number; in_stock: boolean; description?: string }> = {};
+        const priceMap: Record<string, { price: number; in_stock: boolean; description?: string; variant_prices?: any[] }> = {};
         data.forEach((item: any) => {
           priceMap[item.product_id] = { 
             price: item.price, 
             in_stock: item.in_stock,
-            description: item.description || ''
+            description: item.description || '',
+            variant_prices: item.variant_prices || []
           };
         });
         setSupplierPrices(priceMap);
@@ -329,12 +331,12 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
     }
   };
 
-  // Set price for an admin-uploaded product
-  const handleSetPrice = async (productId: string, price: number, inStock: boolean, description?: string) => {
+  // Set price for an admin-uploaded product (single price or variant prices)
+  const handleSetPrice = async (productId: string, price: number, inStock: boolean, description?: string, variantPrices?: any[]) => {
     try {
       setIsSubmitting(true);
       
-      console.log('💾 Saving price for product:', productId, 'price:', price, 'supplier:', supplierId);
+      console.log('💾 Saving price for product:', productId, 'price:', price, 'variants:', variantPrices, 'supplier:', supplierId);
       
       const { data, error } = await (supabase
         .from('supplier_product_prices' as any)
@@ -344,6 +346,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
           price: price,
           in_stock: inStock,
           description: description || null,
+          variant_prices: variantPrices || [],
           updated_at: new Date().toISOString()
         }, { onConflict: 'supplier_id,product_id' })
         .select());
@@ -362,14 +365,15 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
       
       setSupplierPrices(prev => ({
         ...prev,
-        [productId]: { price, in_stock: inStock, description: description || '' }
+        [productId]: { price, in_stock: inStock, description: description || '', variant_prices: variantPrices || [] }
       }));
       
       setPricingProduct(null);
+      setEditingVariantPrices({});
       
       toast({
         title: 'Price Updated',
-        description: 'Your price and description have been saved successfully'
+        description: 'Your prices have been saved successfully'
       });
     } catch (error) {
       console.error('Error setting price:', error);
@@ -956,10 +960,15 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
       )}
 
       {/* Pricing Dialog */}
-      <Dialog open={pricingProduct !== null} onOpenChange={(open) => !open && setPricingProduct(null)}>
-        <DialogContent className="max-w-lg">
+      <Dialog open={pricingProduct !== null} onOpenChange={(open) => {
+        if (!open) {
+          setPricingProduct(null);
+          setEditingVariantPrices({});
+        }
+      }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Set Your Price & Description</DialogTitle>
+            <DialogTitle>Set Your Prices</DialogTitle>
             <DialogDescription>
               Set your selling price for: {pricingProduct?.name}
             </DialogDescription>
@@ -982,18 +991,70 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
                 <div>
                   <p className="font-medium">{pricingProduct.name}</p>
                   <p className="text-sm text-gray-500">{pricingProduct.category}</p>
+                  {pricingProduct.pricing_type === 'variants' && pricingProduct.variants?.length > 0 && (
+                    <Badge variant="outline" className="mt-1 text-xs">
+                      {pricingProduct.variants.length} variants
+                    </Badge>
+                  )}
                 </div>
               </div>
               
-              <div className="space-y-2">
-                <Label>Your Price (KES) *</Label>
-                <Input
-                  type="number"
-                  defaultValue={supplierPrices[pricingProduct.id]?.price || 0}
-                  id="pricing-input"
-                  placeholder="Enter your price"
-                />
-              </div>
+              {/* Variant Pricing - Show if product has variants */}
+              {pricingProduct.pricing_type === 'variants' && pricingProduct.variants?.length > 0 ? (
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">Set Price for Each Size/Variant</Label>
+                  <div className="space-y-2 max-h-60 overflow-y-auto border rounded-lg p-3 bg-gray-50">
+                    {pricingProduct.variants
+                      .filter((v: any) => v.sizeLabel) // Only show variants with labels
+                      .map((variant: any) => {
+                        const existingSupplierPrice = supplierPrices[pricingProduct.id]?.variant_prices?.find(
+                          (vp: any) => vp.variant_id === variant.id
+                        );
+                        const currentValue = editingVariantPrices[variant.id] ?? existingSupplierPrice?.price ?? variant.price ?? 0;
+                        
+                        return (
+                          <div key={variant.id} className="flex items-center justify-between gap-3 p-2 bg-white rounded border">
+                            <div className="flex-1">
+                              <span className="font-medium">{variant.sizeLabel}</span>
+                              <span className="text-xs text-gray-500 ml-2">
+                                (Admin: KES {variant.price?.toLocaleString() || 0})
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span className="text-sm text-gray-500">KES</span>
+                              <Input
+                                type="number"
+                                className="w-24 h-8 text-sm"
+                                value={currentValue}
+                                onChange={(e) => {
+                                  setEditingVariantPrices(prev => ({
+                                    ...prev,
+                                    [variant.id]: parseFloat(e.target.value) || 0
+                                  }));
+                                }}
+                                placeholder="Price"
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    💡 Your prices will override admin prices on the frontend
+                  </p>
+                </div>
+              ) : (
+                /* Single Price - Show for non-variant products */
+                <div className="space-y-2">
+                  <Label>Your Price (KES) *</Label>
+                  <Input
+                    type="number"
+                    defaultValue={supplierPrices[pricingProduct.id]?.price || 0}
+                    id="pricing-input"
+                    placeholder="Enter your price"
+                  />
+                </div>
+              )}
               
               {/* Description Field - Optional */}
               <div className="space-y-2">
@@ -1010,11 +1071,6 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
                   rows={3}
                   className="resize-none"
                 />
-                {pricingProduct.description && (
-                  <p className="text-xs text-muted-foreground">
-                    Admin description: {pricingProduct.description}
-                  </p>
-                )}
               </div>
               
               <div className="flex items-center space-x-2">
@@ -1029,25 +1085,57 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPricingProduct(null)}>
+            <Button variant="outline" onClick={() => {
+              setPricingProduct(null);
+              setEditingVariantPrices({});
+            }}>
               Cancel
             </Button>
             <Button 
               onClick={() => {
-                const priceInput = document.getElementById('pricing-input') as HTMLInputElement;
                 const stockCheckbox = document.getElementById('in-stock-checkbox') as HTMLInputElement;
                 const descriptionInput = document.getElementById('description-input') as HTMLTextAreaElement;
-                handleSetPrice(
-                  pricingProduct!.id, 
-                  parseFloat(priceInput.value) || 0,
-                  stockCheckbox.checked,
-                  descriptionInput.value.trim() || undefined
-                );
+                
+                // Handle variant pricing
+                if (pricingProduct?.pricing_type === 'variants' && pricingProduct?.variants?.length > 0) {
+                  const variantPrices = pricingProduct.variants
+                    .filter((v: any) => v.sizeLabel)
+                    .map((variant: any) => {
+                      const existingPrice = supplierPrices[pricingProduct.id]?.variant_prices?.find(
+                        (vp: any) => vp.variant_id === variant.id
+                      );
+                      return {
+                        variant_id: variant.id,
+                        sizeLabel: variant.sizeLabel,
+                        price: editingVariantPrices[variant.id] ?? existingPrice?.price ?? variant.price ?? 0
+                      };
+                    });
+                  
+                  // Use the first variant price as the main price (for backwards compatibility)
+                  const mainPrice = variantPrices[0]?.price || 0;
+                  
+                  handleSetPrice(
+                    pricingProduct.id,
+                    mainPrice,
+                    stockCheckbox.checked,
+                    descriptionInput.value.trim() || undefined,
+                    variantPrices
+                  );
+                } else {
+                  // Single price product
+                  const priceInput = document.getElementById('pricing-input') as HTMLInputElement;
+                  handleSetPrice(
+                    pricingProduct!.id, 
+                    parseFloat(priceInput.value) || 0,
+                    stockCheckbox.checked,
+                    descriptionInput.value.trim() || undefined
+                  );
+                }
               }}
               disabled={isSubmitting}
               className="bg-green-600 hover:bg-green-700"
             >
-              {isSubmitting ? 'Saving...' : 'Save'}
+              {isSubmitting ? 'Saving...' : 'Save All Prices'}
             </Button>
           </DialogFooter>
         </DialogContent>

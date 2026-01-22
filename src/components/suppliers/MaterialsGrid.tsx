@@ -731,8 +731,8 @@ export const MaterialsGrid = () => {
       }
       
       // STEP 1: Fetch supplier prices from supplier_product_prices table
-      // This is where suppliers set their actual selling prices and optional descriptions
-      let supplierPrices: Record<string, { price: number; in_stock: boolean; supplier_id: string; description?: string }> = {};
+      // This is where suppliers set their actual selling prices, variant prices, and optional descriptions
+      let supplierPrices: Record<string, { price: number; in_stock: boolean; supplier_id: string; description?: string; variant_prices?: any[] }> = {};
       
       try {
         const pricesResponse = await fetch(
@@ -759,7 +759,8 @@ export const MaterialsGrid = () => {
                   price: item.price,
                   in_stock: item.in_stock,
                   supplier_id: item.supplier_id,
-                  description: item.description || '' // Include supplier description
+                  description: item.description || '',
+                  variant_prices: item.variant_prices || [] // Include supplier variant prices
                 };
               }
             });
@@ -824,6 +825,22 @@ export const MaterialsGrid = () => {
               }
             } catch (e) {
               variants = [];
+            }
+            
+            // Apply supplier variant prices if available
+            if (supplierPrice?.variant_prices && supplierPrice.variant_prices.length > 0 && variants.length > 0) {
+              variants = variants.map((variant: PriceVariant) => {
+                const supplierVariantPrice = supplierPrice.variant_prices?.find(
+                  (svp: any) => svp.variant_id === variant.id || svp.sizeLabel === variant.sizeLabel
+                );
+                if (supplierVariantPrice) {
+                  return {
+                    ...variant,
+                    price: supplierVariantPrice.price // Override with supplier price
+                  };
+                }
+                return variant;
+              });
             }
             
             // Use supplier description if available, otherwise use admin description
