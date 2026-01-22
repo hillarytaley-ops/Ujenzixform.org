@@ -731,8 +731,8 @@ export const MaterialsGrid = () => {
       }
       
       // STEP 1: Fetch supplier prices from supplier_product_prices table
-      // This is where suppliers set their actual selling prices
-      let supplierPrices: Record<string, { price: number; in_stock: boolean; supplier_id: string }> = {};
+      // This is where suppliers set their actual selling prices and optional descriptions
+      let supplierPrices: Record<string, { price: number; in_stock: boolean; supplier_id: string; description?: string }> = {};
       
       try {
         const pricesResponse = await fetch(
@@ -757,7 +757,8 @@ export const MaterialsGrid = () => {
                 supplierPrices[item.product_id] = {
                   price: item.price,
                   in_stock: item.in_stock,
-                  supplier_id: item.supplier_id
+                  supplier_id: item.supplier_id,
+                  description: item.description || '' // Include supplier description
                 };
               }
             });
@@ -821,12 +822,15 @@ export const MaterialsGrid = () => {
               variants = [];
             }
             
+            // Use supplier description if available, otherwise use admin description
+            const description = supplierPrice?.description || item.description || '';
+            
             return {
               id: item.id,
               supplier_id: 'admin-catalog',
               name: item.name || 'Unnamed Material',
               category: item.category || 'Uncategorized',
-              description: item.description || '',
+              description: description,
               unit: item.unit || 'unit',
               unit_price: supplierPrice?.price || item.suggested_price || 0,
               image_url: '', // Will be loaded lazily

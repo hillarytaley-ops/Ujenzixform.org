@@ -246,7 +246,7 @@ const CATEGORIES = [
 
 export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId, isDarkMode = false }) => {
   const [adminProducts, setAdminProducts] = useState<any[]>([]);
-  const [supplierPrices, setSupplierPrices] = useState<Record<string, { price: number; in_stock: boolean }>>({});
+  const [supplierPrices, setSupplierPrices] = useState<Record<string, { price: number; in_stock: boolean; description?: string }>>({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -314,9 +314,13 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
         .eq('supplier_id', supplierId));
       
       if (!error && data) {
-        const priceMap: Record<string, { price: number; in_stock: boolean }> = {};
+        const priceMap: Record<string, { price: number; in_stock: boolean; description?: string }> = {};
         data.forEach((item: any) => {
-          priceMap[item.product_id] = { price: item.price, in_stock: item.in_stock };
+          priceMap[item.product_id] = { 
+            price: item.price, 
+            in_stock: item.in_stock,
+            description: item.description || ''
+          };
         });
         setSupplierPrices(priceMap);
       }
@@ -326,7 +330,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
   };
 
   // Set price for an admin-uploaded product
-  const handleSetPrice = async (productId: string, price: number, inStock: boolean) => {
+  const handleSetPrice = async (productId: string, price: number, inStock: boolean, description?: string) => {
     try {
       setIsSubmitting(true);
       
@@ -337,6 +341,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
           product_id: productId,
           price: price,
           in_stock: inStock,
+          description: description || null,
           updated_at: new Date().toISOString()
         }, { onConflict: 'supplier_id,product_id' }));
       
@@ -346,20 +351,20 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
       
       setSupplierPrices(prev => ({
         ...prev,
-        [productId]: { price, in_stock: inStock }
+        [productId]: { price, in_stock: inStock, description: description || '' }
       }));
       
       setPricingProduct(null);
       
       toast({
         title: 'Price Updated',
-        description: 'Your price has been saved successfully'
+        description: 'Your price and description have been saved successfully'
       });
     } catch (error) {
       console.error('Error setting price:', error);
       toast({
         title: 'Error',
-        description: 'Failed to save price. Please try again.',
+        description: 'Failed to save. Please try again.',
         variant: 'destructive'
       });
     } finally {
@@ -892,8 +897,14 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
                     {/* Product Info */}
                     <h3 className={`font-semibold ${textColor} line-clamp-2`}>{product.name}</h3>
                     <p className={`${mutedText} text-sm line-clamp-2 mt-1`}>
-                      {product.description || 'No description'}
+                      {/* Show supplier description if set, otherwise admin description */}
+                      {supplierPrice?.description || product.description || 'No description'}
                     </p>
+                    {supplierPrice?.description && (
+                      <Badge variant="outline" className="mt-1 text-xs bg-blue-50 text-blue-700 border-blue-200">
+                        Your description
+                      </Badge>
+                    )}
                     
                     {/* Pricing Section */}
                     <div className="mt-4 pt-3 border-t">
@@ -935,9 +946,9 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
 
       {/* Pricing Dialog */}
       <Dialog open={pricingProduct !== null} onOpenChange={(open) => !open && setPricingProduct(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Set Your Price</DialogTitle>
+            <DialogTitle>Set Your Price & Description</DialogTitle>
             <DialogDescription>
               Set your selling price for: {pricingProduct?.name}
             </DialogDescription>
@@ -973,6 +984,28 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
                 />
               </div>
               
+              {/* Description Field - Optional */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  Your Description (Optional)
+                  <span className="text-xs text-muted-foreground font-normal">
+                    Leave empty to use admin description
+                  </span>
+                </Label>
+                <Textarea
+                  id="description-input"
+                  defaultValue={supplierPrices[pricingProduct.id]?.description || ''}
+                  placeholder={pricingProduct.description || 'Add your own product description...'}
+                  rows={3}
+                  className="resize-none"
+                />
+                {pricingProduct.description && (
+                  <p className="text-xs text-muted-foreground">
+                    Admin description: {pricingProduct.description}
+                  </p>
+                )}
+              </div>
+              
               <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
@@ -992,16 +1025,18 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
               onClick={() => {
                 const priceInput = document.getElementById('pricing-input') as HTMLInputElement;
                 const stockCheckbox = document.getElementById('in-stock-checkbox') as HTMLInputElement;
+                const descriptionInput = document.getElementById('description-input') as HTMLTextAreaElement;
                 handleSetPrice(
                   pricingProduct!.id, 
                   parseFloat(priceInput.value) || 0,
-                  stockCheckbox.checked
+                  stockCheckbox.checked,
+                  descriptionInput.value.trim() || undefined
                 );
               }}
               disabled={isSubmitting}
               className="bg-green-600 hover:bg-green-700"
             >
-              {isSubmitting ? 'Saving...' : 'Save Price'}
+              {isSubmitting ? 'Saving...' : 'Save'}
             </Button>
           </DialogFooter>
         </DialogContent>
