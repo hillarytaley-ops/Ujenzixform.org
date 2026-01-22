@@ -96,7 +96,8 @@ import { AdminMessaging } from "@/components/admin/AdminMessaging";
 import { LiveChatManager } from "@/components/admin/LiveChatManager";
 import { EnhancedCommunicationsManager } from "@/components/admin/EnhancedCommunicationsManager";
 import { SupabaseSecurityAdvisor } from "@/components/admin/SupabaseSecurityAdvisor";
-import { Camera, UserCog, MessageCircle } from "lucide-react";
+import { Camera, UserCog, MessageCircle, Link2 } from "lucide-react";
+import { CameraAssignment } from "@/components/admin/CameraAssignment";
 import {
   Table,
   TableBody,
@@ -2050,6 +2051,12 @@ const AdminDashboard = () => {
                 Monitoring Requests
               </TabsTrigger>
             )}
+            {shouldShowTab('monitoring-requests') && (
+              <TabsTrigger value="camera-assignment" className="data-[state=active]:bg-purple-600">
+                <Link2 className="h-4 w-4 mr-2" />
+                Camera Assignment
+              </TabsTrigger>
+            )}
             {shouldShowTab('feedback') && (
               <TabsTrigger value="feedback" className="data-[state=active]:bg-blue-600">
                 <MessageSquare className="h-4 w-4 mr-2" />
@@ -3148,6 +3155,24 @@ const AdminDashboard = () => {
               </CardHeader>
               <CardContent>
                 <MonitoringRequestsManager />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Camera Assignment Tab */}
+          <TabsContent value="camera-assignment" className="space-y-6">
+            <Card className="bg-slate-900/50 border-slate-800">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <Link2 className="h-5 w-5 text-purple-500" />
+                  Camera Assignment
+                </CardTitle>
+                <CardDescription className="text-gray-400">
+                  Assign cameras to approved monitoring requests. Clients will receive an access code to view their assigned cameras.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <CameraAssignment />
               </CardContent>
             </Card>
           </TabsContent>
