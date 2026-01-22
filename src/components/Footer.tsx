@@ -134,11 +134,11 @@ const Footer = () => {
             {/* Contact Info */}
             <div className="mt-4 space-y-2">
               <a 
-                href="mailto:support@mradipro.co.ke" 
+                href="mailto:info@ujenzixform.org" 
                 className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
               >
                 <EmailIcon size={16} />
-                <span>support@mradipro.co.ke</span>
+                <span>info@ujenzixform.org</span>
               </a>
               <a 
                 href="tel:+254700000000" 

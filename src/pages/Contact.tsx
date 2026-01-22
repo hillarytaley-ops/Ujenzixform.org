@@ -527,10 +527,9 @@ const Contact = () => {
                         <Mail className="h-8 w-8 text-white" />
                       </div>
                       <div>
-                        <h3 className="font-bold text-2xl mb-2 text-gray-900">Email Addresses</h3>
+                        <h3 className="font-bold text-2xl mb-2 text-gray-900">Email Address</h3>
                         <p className="text-gray-700 text-lg leading-relaxed">
-                          <a href="mailto:info@ujenzipro.com" className="hover:text-primary transition-colors">info@ujenzipro.com</a><br />
-                          <a href="mailto:support@ujenzipro.com" className="hover:text-primary transition-colors">support@ujenzipro.com</a>
+                          <a href="mailto:info@ujenzixform.org" className="hover:text-primary transition-colors">info@ujenzixform.org</a>
                         </p>
                         <p className="text-sm text-red-600 font-medium mt-2">
                           ✉️ 24-hour response guarantee for all inquiries
