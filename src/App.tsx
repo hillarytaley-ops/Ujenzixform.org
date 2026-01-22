@@ -56,6 +56,10 @@ const PrivateClientDashboard = React.lazy(() => import("./pages/PrivateClientDas
 const ProfessionalBuilderDashboardPage = React.lazy(() => import("./pages/ProfessionalBuilderDashboard"));
 const PublicBuilderProfile = React.lazy(() => import("./pages/PublicBuilderProfile"));
 
+// Legal pages - lazy loaded
+const PrivacyPolicy = React.lazy(() => import("./pages/PrivacyPolicy"));
+const TermsOfService = React.lazy(() => import("./pages/TermsOfService"));
+
 // Auth Guard
 import { AuthRequired } from "@/components/security/AuthRequired";
 import { RoleProtectedRoute } from "@/components/security/RoleProtectedRoute";
@@ -207,6 +211,12 @@ const App = () => {
                     <Route path="/scanners" element={<SuspenseWrapper><Scanners /></SuspenseWrapper>} />
                     <Route path="/feedback" element={<SuspenseWrapper><Feedback /></SuspenseWrapper>} />
                     <Route path="/careers" element={<SuspenseWrapper><Careers /></SuspenseWrapper>} />
+                    
+                    {/* Legal pages */}
+                    <Route path="/privacy-policy" element={<SuspenseWrapper><PrivacyPolicy /></SuspenseWrapper>} />
+                    <Route path="/terms-of-service" element={<SuspenseWrapper><TermsOfService /></SuspenseWrapper>} />
+                    <Route path="/terms" element={<Navigate to="/terms-of-service" replace />} />
+                    <Route path="/privacy" element={<Navigate to="/privacy-policy" replace />} />
                     
                     {/* Auth required only for sensitive actions */}
                     <Route path="/portal" element={
