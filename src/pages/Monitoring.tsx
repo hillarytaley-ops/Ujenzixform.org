@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -7,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
 import AnimatedSection from "@/components/AnimatedSection";
 import { 
   Video, 
@@ -29,7 +31,9 @@ import {
   Monitor,
   Zap,
   Plane,
-  Truck
+  Truck,
+  Key,
+  Lock
 } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -65,6 +69,7 @@ interface ProjectMonitoring {
 }
 
 const Monitoring = () => {
+  const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState("cameras");
   // DEFAULT TO NULL - don't trust any role until verified from database
   const [userRole, setUserRole] = useState<string | null>(null);
@@ -76,6 +81,13 @@ const Monitoring = () => {
   const [showRequestForm, setShowRequestForm] = useState<boolean>(false);
   const [dbVerified, setDbVerified] = useState<boolean>(false); // Track if DB check is complete
   const { toast } = useToast();
+  
+  // Access code from URL for clients viewing their assigned cameras
+  const accessCodeFromUrl = searchParams.get('access_code');
+  const projectFromUrl = searchParams.get('project');
+  const [accessCodeInput, setAccessCodeInput] = useState('');
+  const [assignedCameras, setAssignedCameras] = useState<any[]>([]);
+  const [loadingCameras, setLoadingCameras] = useState(false);
 
   // Sample monitoring data
   const [cameras] = useState<CameraFeed[]>([
@@ -203,6 +215,13 @@ const Monitoring = () => {
     checkUserRole();
   }, []);
 
+  // Load cameras when access code is provided in URL
+  useEffect(() => {
+    if (accessCodeFromUrl) {
+      loadCamerasFromAccessCode(accessCodeFromUrl);
+    }
+  }, [accessCodeFromUrl]);
+
   useEffect(() => {
     // Set default tab based on role
     if (userRole === 'admin') {
@@ -211,6 +230,96 @@ const Monitoring = () => {
       setActiveTab("cameras");
     }
   }, [userRole]);
+
+  // Load cameras assigned to a monitoring request via access code
+  const loadCamerasFromAccessCode = async (code: string) => {
+    setLoadingCameras(true);
+    try {
+      // Find the monitoring request with this access code
+      const { data: requestData, error: requestError } = await supabase
+        .from('monitoring_service_requests')
+        .select('*')
+        .eq('access_code', code.toUpperCase())
+        .in('status', ['approved', 'completed'])
+        .maybeSingle();
+
+      if (requestError || !requestData) {
+        toast({
+          title: 'Invalid Access Code',
+          description: 'The access code is invalid or has expired.',
+          variant: 'destructive'
+        });
+        setAssignedCameras([]);
+        return;
+      }
+
+      // Set the monitoring request for context
+      setMonitoringRequest(requestData);
+      setHasMonitoringAccess(true);
+
+      // Get the assigned camera IDs
+      const cameraIds = requestData.assigned_cameras || [];
+      
+      if (cameraIds.length === 0) {
+        toast({
+          title: 'No Cameras Assigned',
+          description: 'No cameras have been assigned to this project yet. Please contact admin.',
+        });
+        setAssignedCameras([]);
+        return;
+      }
+
+      // Fetch the actual camera records
+      const { data: camerasData, error: camerasError } = await supabase
+        .from('cameras')
+        .select('*')
+        .in('id', cameraIds);
+
+      if (camerasError) throw camerasError;
+
+      // Transform to CameraFeed format
+      const transformedCameras = (camerasData || []).map((cam: any) => ({
+        id: cam.id,
+        name: cam.name,
+        location: cam.location || 'Location not specified',
+        projectSite: requestData.project_name,
+        status: cam.is_active ? 'online' : 'offline',
+        quality: cam.resolution || '1080p',
+        viewers: 1,
+        uptime: 'Live',
+        lastActivity: new Date(),
+        isRecording: cam.is_active,
+        signalStrength: cam.is_active ? 95 : 0,
+        stream_url: cam.stream_url,
+        embed_code: cam.embed_code,
+        connection_type: cam.connection_type
+      }));
+
+      setAssignedCameras(transformedCameras);
+      
+      toast({
+        title: '✅ Cameras Loaded',
+        description: `${transformedCameras.length} camera(s) loaded for ${requestData.project_name}`,
+      });
+
+    } catch (error) {
+      console.error('Error loading cameras:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load cameras. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoadingCameras(false);
+    }
+  };
+
+  // Handle manual access code entry
+  const handleAccessCodeSubmit = () => {
+    if (accessCodeInput.trim()) {
+      loadCamerasFromAccessCode(accessCodeInput.trim());
+    }
+  };
 
   const checkUserRole = async () => {
     setCheckingAccess(true);
@@ -1232,17 +1341,50 @@ const Monitoring = () => {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></div>
-                            <CardTitle className="text-lg text-white">Camera Feeds</CardTitle>
+                            <CardTitle className="text-lg text-white">
+                              {monitoringRequest ? `${monitoringRequest.project_name} - Cameras` : 'Camera Feeds'}
+                            </CardTitle>
                           </div>
                           <Badge className="bg-green-500/20 text-green-400 border border-green-500/30">
-                            {cameras.filter(c => c.status === 'online' || c.status === 'recording').length} Online
+                            {(assignedCameras.length > 0 ? assignedCameras : cameras).filter(c => c.status === 'online' || c.status === 'recording').length} Online
                           </Badge>
                         </div>
-                        <CardDescription className="text-sm text-slate-400 mt-1">Click to view live feed</CardDescription>
+                        <CardDescription className="text-sm text-slate-400 mt-1">
+                          {monitoringRequest ? `Access Code: ${monitoringRequest.access_code}` : 'Click to view live feed'}
+                        </CardDescription>
                       </CardHeader>
                       <CardContent className="p-4">
+                        {/* Access Code Entry for clients without URL param */}
+                        {!accessCodeFromUrl && !isAdmin && assignedCameras.length === 0 && (
+                          <div className="mb-4 p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Key className="h-4 w-4 text-cyan-400" />
+                              <span className="text-sm text-white font-medium">Enter Access Code</span>
+                            </div>
+                            <div className="flex gap-2">
+                              <Input
+                                placeholder="Enter your access code..."
+                                value={accessCodeInput}
+                                onChange={(e) => setAccessCodeInput(e.target.value.toUpperCase())}
+                                className="bg-slate-900 border-slate-600 text-white font-mono"
+                                maxLength={8}
+                              />
+                              <Button 
+                                onClick={handleAccessCodeSubmit}
+                                disabled={loadingCameras || !accessCodeInput.trim()}
+                                className="bg-cyan-600 hover:bg-cyan-700"
+                              >
+                                {loadingCameras ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
+                              </Button>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-2">
+                              Enter the access code provided by UjenziXform to view your project cameras
+                            </p>
+                          </div>
+                        )}
+                        
                         <div className="space-y-3 max-h-[500px] lg:max-h-[calc(100vh-500px)] overflow-y-auto pr-2 custom-scrollbar">
-                          {cameras.map((camera) => {
+                          {(assignedCameras.length > 0 ? assignedCameras : cameras).map((camera) => {
                             const isDrone = camera.id.startsWith('drone-');
                             const isOnline = camera.status === 'online' || camera.status === 'recording';
                             const isSelected = selectedCamera === camera.id;
