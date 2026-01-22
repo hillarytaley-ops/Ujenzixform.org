@@ -4,9 +4,17 @@ import App from './App.tsx'
 import './index.css'
 import { initErrorTracking } from './utils/errorTracking'
 import { logger } from './utils/logger'
+import { initSentry } from './lib/sentry'
+import { initGoogleAnalytics } from './lib/analytics'
 
-// Initialize error tracking
+// Initialize error tracking (legacy)
 initErrorTracking();
+
+// Initialize Sentry for production error monitoring
+initSentry();
+
+// Initialize Google Analytics
+initGoogleAnalytics();
 
 const container = document.getElementById("root");
 if (!container) {
