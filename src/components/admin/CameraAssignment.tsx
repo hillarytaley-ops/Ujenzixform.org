@@ -428,34 +428,34 @@ export const CameraAssignment: React.FC = () => {
 
       {/* Assign Cameras Modal */}
       <Dialog open={showAssignModal} onOpenChange={setShowAssignModal}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl bg-slate-900 border-slate-700 text-white">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Camera className="h-5 w-5 text-purple-600" />
+            <DialogTitle className="flex items-center gap-2 text-white">
+              <Camera className="h-5 w-5 text-purple-400" />
               Assign Cameras to {selectedRequest?.project_name}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-slate-400">
               Select cameras to assign to this monitoring request. The client will receive an access code to view these cameras.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             {/* Request Summary */}
-            <div className="p-3 bg-gray-50 rounded-lg">
+            <div className="p-3 bg-slate-800 rounded-lg border border-slate-700">
               <div className="grid grid-cols-2 gap-2 text-sm">
-                <div><span className="text-gray-500">Client:</span> {selectedRequest?.contact_name}</div>
-                <div><span className="text-gray-500">Email:</span> {selectedRequest?.contact_email}</div>
-                <div><span className="text-gray-500">Location:</span> {selectedRequest?.project_location}</div>
-                <div><span className="text-gray-500">Requested:</span> {selectedRequest?.camera_count} camera(s)</div>
+                <div><span className="text-slate-400">Client:</span> <span className="text-white font-medium">{selectedRequest?.contact_name}</span></div>
+                <div><span className="text-slate-400">Email:</span> <span className="text-white font-medium">{selectedRequest?.contact_email}</span></div>
+                <div><span className="text-slate-400">Location:</span> <span className="text-white font-medium">{selectedRequest?.project_location}</span></div>
+                <div><span className="text-slate-400">Requested:</span> <span className="text-white font-medium">{selectedRequest?.camera_count} camera(s)</span></div>
               </div>
             </div>
 
             {/* Camera Selection */}
             <div>
-              <Label className="mb-2 block">Select Cameras ({selectedCameras.length} selected)</Label>
-              <ScrollArea className="h-[300px] border rounded-lg p-3">
+              <Label className="mb-2 block text-white">Select Cameras ({selectedCameras.length} selected)</Label>
+              <ScrollArea className="h-[300px] border border-slate-700 rounded-lg p-3 bg-slate-900">
                 {cameras.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
+                  <div className="text-center py-8 text-slate-400">
                     <Camera className="h-8 w-8 mx-auto mb-2 opacity-50" />
                     <p>No cameras available</p>
                     <p className="text-sm">Add cameras in the Monitoring tab first</p>
@@ -467,32 +467,36 @@ export const CameraAssignment: React.FC = () => {
                         key={camera.id}
                         className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                           selectedCameras.includes(camera.id)
-                            ? 'bg-purple-50 border-purple-300'
-                            : 'bg-white hover:bg-gray-50'
+                            ? 'bg-purple-900/50 border-purple-500'
+                            : 'bg-slate-800 border-slate-700 hover:bg-slate-700 hover:border-slate-600'
                         }`}
                         onClick={() => handleCameraToggle(camera.id)}
                       >
                         <Checkbox
                           checked={selectedCameras.includes(camera.id)}
                           onCheckedChange={() => handleCameraToggle(camera.id)}
+                          className="border-slate-500 data-[state=checked]:bg-purple-600"
                         />
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <Camera className="h-4 w-4 text-gray-400" />
-                            <span className="font-medium">{camera.name}</span>
-                            <Badge variant={camera.is_active ? 'default' : 'secondary'} className="text-xs">
+                            <Camera className="h-4 w-4 text-purple-400" />
+                            <span className="font-medium text-white">{camera.name}</span>
+                            <Badge 
+                              variant={camera.is_active ? 'default' : 'secondary'} 
+                              className={`text-xs ${camera.is_active ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}
+                            >
                               {camera.is_active ? 'Online' : 'Offline'}
                             </Badge>
                           </div>
                           {camera.location && (
-                            <p className="text-sm text-gray-500 mt-1 flex items-center gap-1">
+                            <p className="text-sm text-slate-400 mt-1 flex items-center gap-1">
                               <MapPin className="h-3 w-3" />
                               {camera.location}
                             </p>
                           )}
                         </div>
                         {selectedCameras.includes(camera.id) && (
-                          <CheckCircle className="h-5 w-5 text-purple-600" />
+                          <CheckCircle className="h-5 w-5 text-purple-400" />
                         )}
                       </div>
                     ))}
@@ -503,8 +507,8 @@ export const CameraAssignment: React.FC = () => {
 
             {/* Access Code Preview */}
             {selectedCameras.length > 0 && (
-              <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                <div className="flex items-center gap-2 text-green-700">
+              <div className="p-3 bg-green-900/30 border border-green-600/50 rounded-lg">
+                <div className="flex items-center gap-2 text-green-400">
                   <Key className="h-4 w-4" />
                   <span className="font-medium">
                     {selectedRequest?.access_code 
@@ -512,21 +516,21 @@ export const CameraAssignment: React.FC = () => {
                       : 'A new access code will be generated'}
                   </span>
                 </div>
-                <p className="text-sm text-green-600 mt-1">
+                <p className="text-sm text-green-300 mt-1">
                   Share this code with the client so they can view their cameras on the Monitoring page.
                 </p>
               </div>
             )}
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAssignModal(false)}>
+          <DialogFooter className="border-t border-slate-700 pt-4">
+            <Button variant="outline" onClick={() => setShowAssignModal(false)} className="border-slate-600 text-slate-300 hover:bg-slate-800">
               Cancel
             </Button>
             <Button 
               onClick={saveAssignment} 
               disabled={saving}
-              className="bg-purple-600 hover:bg-purple-700"
+              className="bg-purple-600 hover:bg-purple-700 text-white"
             >
               {saving ? (
                 <>
