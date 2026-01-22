@@ -334,7 +334,9 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
     try {
       setIsSubmitting(true);
       
-      const { error } = await (supabase
+      console.log('💾 Saving price for product:', productId, 'price:', price, 'supplier:', supplierId);
+      
+      const { data, error } = await (supabase
         .from('supplier_product_prices' as any)
         .upsert({
           supplier_id: supplierId,
@@ -343,11 +345,20 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
           in_stock: inStock,
           description: description || null,
           updated_at: new Date().toISOString()
-        }, { onConflict: 'supplier_id,product_id' }));
+        }, { onConflict: 'supplier_id,product_id' })
+        .select());
       
       if (error) {
-        console.log('Database save failed, updating local state only');
+        console.error('❌ Database save failed:', error);
+        toast({
+          title: 'Error Saving Price',
+          description: `Database error: ${error.message}. Please check your permissions.`,
+          variant: 'destructive'
+        });
+        return; // Don't update local state if database save failed
       }
+      
+      console.log('✅ Price saved successfully:', data);
       
       setSupplierPrices(prev => ({
         ...prev,

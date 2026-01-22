@@ -748,6 +748,7 @@ export const MaterialsGrid = () => {
         
         if (pricesResponse.ok) {
           const pricesData = await pricesResponse.json();
+          console.log(`💰 Supplier prices loaded: ${pricesData?.length || 0} entries`);
           if (pricesData && pricesData.length > 0) {
             // Create a map of product_id -> price info
             // If multiple suppliers have prices, use the lowest price
@@ -762,7 +763,10 @@ export const MaterialsGrid = () => {
                 };
               }
             });
+            console.log(`💰 Supplier prices mapped: ${Object.keys(supplierPrices).length} products with prices`);
           }
+        } else {
+          console.log(`❌ Failed to load supplier prices: ${pricesResponse.status}`);
         }
       } catch (pricesErr: any) {
         console.log('Supplier prices table not available');
