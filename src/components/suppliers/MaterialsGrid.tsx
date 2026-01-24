@@ -37,7 +37,8 @@ import { useSearchParams } from 'react-router-dom';
 import { useCart } from '@/contexts/CartContext';
 import { PriceComparisonModal } from './PriceComparisonModal';
 import { QuoteCart, QuoteCartButton, QuoteCartItem } from './QuoteCart';
-import { FileText } from 'lucide-react';
+import { MobileBookView } from './MobileBookView';
+import { FileText, BookOpen } from 'lucide-react';
 
 // iOS/Safari compatibility check
 const isIOSSafari = () => {
@@ -334,6 +335,19 @@ export const MaterialsGrid = () => {
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryMaterial, setGalleryMaterial] = useState<Material | null>(null);
   const [galleryIndex, setGalleryIndex] = useState(0);
+  
+  // Mobile book view state
+  const [showBookView, setShowBookView] = useState(false);
+  const [bookViewStartIndex, setBookViewStartIndex] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
+  
+  // Detect mobile device
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   
   const { toast } = useToast();
   const { addToCart, isInCart, getItemQuantity, setIsCartOpen, items: cartItems, getTotalItems } = useCart();
@@ -1424,9 +1438,27 @@ export const MaterialsGrid = () => {
               </SelectContent>
             </Select>
 
-            <div className="md:col-span-2 flex items-center gap-2 text-sm text-muted-foreground">
-              <Filter className="h-4 w-4" />
-              <span>Showing {filteredMaterials.length} of {materials.length} materials</span>
+            <div className="md:col-span-2 flex items-center justify-between gap-2 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4" />
+                <span>Showing {filteredMaterials.length} of {materials.length} materials</span>
+              </div>
+              
+              {/* Mobile Book View Button - Only show on mobile */}
+              {isMobile && filteredMaterials.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white border-0 hover:from-emerald-700 hover:to-teal-700"
+                  onClick={() => {
+                    setBookViewStartIndex(0);
+                    setShowBookView(true);
+                  }}
+                >
+                  <BookOpen className="h-4 w-4 mr-1" />
+                  Book View
+                </Button>
+              )}
             </div>
           </div>
         </CardContent>
@@ -1774,6 +1806,22 @@ export const MaterialsGrid = () => {
                         <ShoppingCart className="h-4 w-4 mr-2" />
                         Add to Cart
                       </Button>
+                      
+                      {/* Mobile Book View Button */}
+                      {isMobile && (
+                        <Button
+                          variant="outline"
+                          className="w-full h-9 text-xs mt-2 border-emerald-500 text-emerald-600 hover:bg-emerald-50"
+                          onClick={() => {
+                            const idx = filteredMaterials.findIndex(m => m.id === material.id);
+                            setBookViewStartIndex(idx >= 0 ? idx : 0);
+                            setShowBookView(true);
+                          }}
+                        >
+                          <BookOpen className="h-3 w-3 mr-1" />
+                          Browse from here
+                        </Button>
+                      )}
                     </CardContent>
                   </Card>
                 );
@@ -2022,6 +2070,27 @@ export const MaterialsGrid = () => {
           })()}
         </DialogContent>
       </Dialog>
+      
+      {/* Mobile Book View - Full screen swipeable product cards */}
+      {showBookView && (
+        <MobileBookView
+          materials={filteredMaterials.map(m => ({
+            id: m.id,
+            name: m.name,
+            category: m.category,
+            unit: m.unit,
+            unit_price: m.unit_price,
+            description: m.description,
+            image_url: m.image_url,
+            in_stock: m.in_stock,
+            supplier_id: m.supplier_id,
+            supplier_name: m.supplier?.company_name
+          }))}
+          onClose={() => setShowBookView(false)}
+          initialIndex={bookViewStartIndex}
+          userRole={userRole || undefined}
+        />
+      )}
     </div>
   );
 };
