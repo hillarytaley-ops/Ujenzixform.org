@@ -129,23 +129,29 @@ export const CartPriceComparison: React.FC<CartPriceComparisonProps> = ({
         .eq('id', productId)
         .maybeSingle();
 
-      // Add supplier prices for this exact product
+      // Add supplier prices for this exact product - ONLY from registered suppliers
       if (supplierPricesData) {
         for (const sp of supplierPricesData) {
           // Skip if it's the same supplier as current selection
           if (sp.supplier_id === cartItem.supplier_id) continue;
 
-          // Get supplier info
+          // Get supplier info - MUST be a registered supplier
           const supplier = suppliersByIdMap.get(sp.supplier_id) || suppliersByUserIdMap.get(sp.supplier_id);
+          
+          // ONLY include if supplier is registered (exists in suppliers table)
+          if (!supplier || !supplier.company_name) {
+            console.log('⏭️ Skipping unregistered supplier:', sp.supplier_id);
+            continue;
+          }
           
           alternativesWithPrices.push({
             product_id: sp.product_id,
             product_name: adminMaterial?.name || productName,
             supplier_id: sp.supplier_id,
-            supplier_name: supplier?.company_name || 'Verified Supplier',
+            supplier_name: supplier.company_name,
             price: sp.price,
             in_stock: sp.in_stock ?? true,
-            rating: supplier?.rating,
+            rating: supplier.rating,
             image_url: adminMaterial?.image_url || cartItem.image_url
           });
         }
@@ -166,17 +172,23 @@ export const CartPriceComparison: React.FC<CartPriceComparisonProps> = ({
 
       console.log('📦 Found materials with exact name match:', materialsData?.length || 0);
 
-      // Add materials with exact name match
+      // Add materials with exact name match - ONLY from registered suppliers
       if (materialsData) {
         for (const material of materialsData) {
           // Skip if it's the same item or same supplier
           if (material.id === cartItem.id) continue;
           if (material.supplier_id === cartItem.supplier_id) continue;
 
-          // Get supplier info
+          // Get supplier info - MUST be a registered supplier
           const supplier = material.supplier_id 
             ? (suppliersByIdMap.get(material.supplier_id) || suppliersByUserIdMap.get(material.supplier_id))
             : null;
+
+          // ONLY include if supplier is registered (exists in suppliers table)
+          if (!supplier || !supplier.company_name) {
+            console.log('⏭️ Skipping material from unregistered supplier:', material.supplier_id);
+            continue;
+          }
 
           // Check if we already have this supplier in alternatives
           const alreadyExists = alternativesWithPrices.some(
@@ -187,11 +199,11 @@ export const CartPriceComparison: React.FC<CartPriceComparisonProps> = ({
           alternativesWithPrices.push({
             product_id: material.id,
             product_name: material.name,
-            supplier_id: material.supplier_id || 'unknown',
-            supplier_name: supplier?.company_name || 'Verified Supplier',
+            supplier_id: material.supplier_id,
+            supplier_name: supplier.company_name,
             price: material.unit_price,
             in_stock: material.in_stock ?? true,
-            rating: supplier?.rating,
+            rating: supplier.rating,
             image_url: material.image_url || cartItem.image_url
           });
         }
