@@ -178,13 +178,17 @@ const SupplierDashboard = () => {
     const fetchQuoteRequests = async () => {
       if (!user?.id) return;
       
+      console.log('🔄 Fetching quotes for supplier user.id:', user.id, 'email:', user.email);
+      
       try {
         // First, get this supplier's record to find their suppliers.id
-        const { data: supplierRecord } = await supabase
+        const { data: supplierRecord, error: supplierError } = await supabase
           .from('suppliers')
-          .select('id, user_id')
+          .select('id, user_id, company_name')
           .eq('user_id', user.id)
           .maybeSingle();
+        
+        console.log('📦 Supplier record found:', supplierRecord, 'error:', supplierError);
         
         // Build list of IDs to check (user_id AND suppliers.id)
         const supplierIds = [user.id];
@@ -202,6 +206,18 @@ const SupplierDashboard = () => {
           .in('supplier_id', supplierIds)
           .in('status', ['pending', 'quoted', 'rejected'])
           .order('created_at', { ascending: false });
+        
+        console.log('📋 Raw purchase_orders query result:', purchaseOrderQuotes?.length || 0, 'quotes, error:', poError);
+        
+        // Also log ALL pending quotes in the system for debugging
+        const { data: allPendingQuotes } = await supabase
+          .from('purchase_orders')
+          .select('id, supplier_id, buyer_id, status, po_number, created_at')
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false })
+          .limit(10);
+        
+        console.log('🔎 DEBUG - All pending quotes in system:', allPendingQuotes);
         
         if (poError) {
           console.error('Error fetching purchase order quotes:', poError);
