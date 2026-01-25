@@ -87,109 +87,103 @@ export const CartPriceComparison: React.FC<CartPriceComparisonProps> = ({
     setLoading(true);
     try {
       // 1. Fetch all suppliers first (to map IDs to names)
-      // Note: supplier_id in supplier_product_prices is the user's auth.uid(), 
-      // which maps to user_id in the suppliers table, NOT the suppliers.id
       const { data: suppliersData, error: suppliersError } = await supabase
         .from('suppliers')
-        .select('id, user_id, company_name, rating');
+        .select('id, user_id, company_name, rating, location');
 
       if (suppliersError) {
         console.error('Error fetching suppliers:', suppliersError);
       }
 
-      // Create TWO maps: one by id, one by user_id (since supplier_product_prices uses user_id as supplier_id)
+      // Create TWO maps: one by id, one by user_id
       const suppliersByIdMap = new Map((suppliersData || []).map((s: any) => [s.id, s]));
       const suppliersByUserIdMap = new Map((suppliersData || []).map((s: any) => [s.user_id, s]));
       console.log('📦 Suppliers loaded:', suppliersData?.length, 'entries');
-      console.log('📦 Sample suppliers:', suppliersData?.slice(0, 3).map((s: any) => ({ id: s.id, user_id: s.user_id, name: s.company_name })));
 
-      // 2. Fetch supplier prices (without join)
+      // 2. Get the EXACT product ID we're comparing
+      // The cart item ID should match either admin_material_images.id or materials.id
+      const productId = cartItem.id;
+      const productName = cartItem.name;
+      
+      console.log('🔍 Looking for prices for product:', productId, productName);
+
+      const alternativesWithPrices: AlternativePrice[] = [];
+
+      // 3. Fetch supplier prices for THIS EXACT PRODUCT from supplier_product_prices table
       const { data: supplierPricesData, error: pricesError } = await supabase
         .from('supplier_product_prices')
         .select('product_id, price, in_stock, supplier_id')
+        .eq('product_id', productId)  // EXACT match on product ID
         .gt('price', 0);
 
       if (pricesError) {
         console.error('Error fetching supplier prices:', pricesError);
       }
 
-      // 3. Fetch materials from the materials table (without join)
+      console.log('📦 Found supplier prices for this product:', supplierPricesData?.length || 0);
+
+      // Get the product image from admin_material_images
+      const { data: adminMaterial } = await supabase
+        .from('admin_material_images')
+        .select('id, name, image_url')
+        .eq('id', productId)
+        .maybeSingle();
+
+      // Add supplier prices for this exact product
+      if (supplierPricesData) {
+        for (const sp of supplierPricesData) {
+          // Skip if it's the same supplier as current selection
+          if (sp.supplier_id === cartItem.supplier_id) continue;
+
+          // Get supplier info
+          const supplier = suppliersByIdMap.get(sp.supplier_id) || suppliersByUserIdMap.get(sp.supplier_id);
+          
+          alternativesWithPrices.push({
+            product_id: sp.product_id,
+            product_name: adminMaterial?.name || productName,
+            supplier_id: sp.supplier_id,
+            supplier_name: supplier?.company_name || 'Verified Supplier',
+            price: sp.price,
+            in_stock: sp.in_stock ?? true,
+            rating: supplier?.rating,
+            image_url: adminMaterial?.image_url || cartItem.image_url
+          });
+        }
+      }
+
+      // 4. Also check materials table for exact name match (for supplier's own products)
+      // This handles cases where suppliers upload their own products with the same name
       const { data: materialsData, error: materialsError } = await supabase
         .from('materials')
         .select('id, name, category, unit, unit_price, image_url, in_stock, supplier_id, approval_status')
         .eq('approval_status', 'approved')
+        .eq('name', productName)  // EXACT name match
         .gt('unit_price', 0);
 
       if (materialsError) {
         console.error('Error fetching materials:', materialsError);
       }
 
-      // 4. Fetch admin material images for product names
-      const { data: adminMaterialsData, error: adminError } = await supabase
-        .from('admin_material_images')
-        .select('id, name, category, image_url')
-        .eq('is_approved', true);
+      console.log('📦 Found materials with exact name match:', materialsData?.length || 0);
 
-      if (adminError) {
-        console.error('Error fetching admin materials:', adminError);
-      }
-
-      const adminMaterialsMap = new Map((adminMaterialsData || []).map((m: any) => [m.id, m]));
-
-      // Find products in the same category or with similar names
-      const searchTerms = cartItem.name.toLowerCase().split(' ').filter(t => t.length > 2);
-      
-      const alternativesWithPrices: AlternativePrice[] = [];
-
-      // Add supplier prices from supplier_product_prices table
-      if (supplierPricesData) {
-        for (const sp of supplierPricesData) {
-          const adminMaterial = adminMaterialsMap.get(sp.product_id);
-          if (!adminMaterial) continue;
-
-          // Check if this product matches our search criteria
-          const nameLower = adminMaterial.name.toLowerCase();
-          const matchesCategory = adminMaterial.category === cartItem.category;
-          const matchesName = searchTerms.some(term => nameLower.includes(term));
-          
-          if (!matchesCategory && !matchesName) continue;
-
-          // Skip if it's the same item we're comparing
-          if (sp.product_id === cartItem.id && sp.supplier_id === cartItem.supplier_id) continue;
-
-          // Try both maps - supplier_id could be either the suppliers.id OR the user_id
-          let supplier = suppliersByIdMap.get(sp.supplier_id) || suppliersByUserIdMap.get(sp.supplier_id);
-          console.log('🔍 Supplier lookup:', sp.supplier_id, '->', supplier?.company_name || 'NOT FOUND');
-          alternativesWithPrices.push({
-            product_id: sp.product_id,
-            product_name: adminMaterial.name,
-            supplier_id: sp.supplier_id,
-            supplier_name: supplier?.company_name || 'Verified Supplier',
-            price: sp.price,
-            in_stock: sp.in_stock ?? true,
-            rating: supplier?.rating,
-            image_url: adminMaterial.image_url
-          });
-        }
-      }
-
-      // Add materials from materials table (supplier's own products)
+      // Add materials with exact name match
       if (materialsData) {
         for (const material of materialsData) {
-          // Check if this product matches our search criteria
-          const nameLower = material.name.toLowerCase();
-          const matchesCategory = material.category === cartItem.category;
-          const matchesName = searchTerms.some(term => nameLower.includes(term));
-          
-          if (!matchesCategory && !matchesName) continue;
-
-          // Skip if it's the same item we're comparing
+          // Skip if it's the same item or same supplier
           if (material.id === cartItem.id) continue;
+          if (material.supplier_id === cartItem.supplier_id) continue;
 
-          // Try both maps - supplier_id could be either the suppliers.id OR the user_id
+          // Get supplier info
           const supplier = material.supplier_id 
             ? (suppliersByIdMap.get(material.supplier_id) || suppliersByUserIdMap.get(material.supplier_id))
             : null;
+
+          // Check if we already have this supplier in alternatives
+          const alreadyExists = alternativesWithPrices.some(
+            a => a.supplier_id === material.supplier_id
+          );
+          if (alreadyExists) continue;
+
           alternativesWithPrices.push({
             product_id: material.id,
             product_name: material.name,
@@ -198,25 +192,17 @@ export const CartPriceComparison: React.FC<CartPriceComparisonProps> = ({
             price: material.unit_price,
             in_stock: material.in_stock ?? true,
             rating: supplier?.rating,
-            image_url: material.image_url
+            image_url: material.image_url || cartItem.image_url
           });
         }
       }
 
-      // Remove duplicates (same product from same supplier) and sort by price
-      const uniqueAlternatives = alternativesWithPrices.reduce((acc, curr) => {
-        const key = `${curr.product_id}-${curr.supplier_id}`;
-        if (!acc.has(key) || acc.get(key)!.price > curr.price) {
-          acc.set(key, curr);
-        }
-        return acc;
-      }, new Map<string, AlternativePrice>());
-
-      const validAlternatives = Array.from(uniqueAlternatives.values())
+      // Sort by price (cheapest first)
+      const validAlternatives = alternativesWithPrices
         .filter(a => a.price > 0)
         .sort((a, b) => a.price - b.price);
 
-      console.log('Found alternatives:', validAlternatives.length, validAlternatives);
+      console.log('✅ Found alternatives for exact product:', validAlternatives.length, validAlternatives);
       setAlternatives(validAlternatives);
     } catch (error) {
       console.error('Error fetching alternatives:', error);
