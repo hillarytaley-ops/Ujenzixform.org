@@ -134,6 +134,7 @@ const SupplierDashboard = () => {
     supplierNotes: ''
   });
   const [processingQuote, setProcessingQuote] = useState(false);
+  const [loadingQuotes, setLoadingQuotes] = useState(false);
 
   // Show UI immediately - don't wait for data
   useEffect(() => {
@@ -172,52 +173,54 @@ const SupplierDashboard = () => {
     }
   }, [user?.id]);
 
-  // Fetch quote requests for this supplier
-  // Quote requests come from purchase_orders table with status 'pending' or 'quoted'
-  useEffect(() => {
-    const fetchQuoteRequests = async () => {
-      if (!user?.id) return;
+  // Fetch quote requests function - extracted for reuse
+  const fetchQuoteRequests = async () => {
+    if (!user?.id) {
+      console.log('❌ Cannot fetch quotes - no user.id');
+      return;
+    }
+    
+    setLoadingQuotes(true);
+    console.log('🔄 Fetching quotes for supplier user.id:', user.id, 'email:', user.email);
+    
+    try {
+      // First, get this supplier's record to find their suppliers.id
+      const { data: supplierRecord, error: supplierError } = await supabase
+        .from('suppliers')
+        .select('id, user_id, company_name')
+        .eq('user_id', user.id)
+        .maybeSingle();
       
-      console.log('🔄 Fetching quotes for supplier user.id:', user.id, 'email:', user.email);
+      console.log('📦 Supplier record found:', supplierRecord, 'error:', supplierError);
       
-      try {
-        // First, get this supplier's record to find their suppliers.id
-        const { data: supplierRecord, error: supplierError } = await supabase
-          .from('suppliers')
-          .select('id, user_id, company_name')
-          .eq('user_id', user.id)
-          .maybeSingle();
-        
-        console.log('📦 Supplier record found:', supplierRecord, 'error:', supplierError);
-        
-        // Build list of IDs to check (user_id AND suppliers.id)
-        const supplierIds = [user.id];
-        if (supplierRecord?.id && supplierRecord.id !== user.id) {
-          supplierIds.push(supplierRecord.id);
-        }
-        
-        console.log('🔍 Looking for quotes with supplier_id in:', supplierIds);
+      // Build list of IDs to check (user_id AND suppliers.id)
+      const supplierIds = [user.id];
+      if (supplierRecord?.id && supplierRecord.id !== user.id) {
+        supplierIds.push(supplierRecord.id);
+      }
+      
+      console.log('🔍 Looking for quotes with supplier_id in:', supplierIds);
 
-        // Fetch from purchase_orders where this supplier is the target
-        // Check BOTH user.id AND suppliers.id since quotes might use either
-        const { data: purchaseOrderQuotes, error: poError } = await supabase
-          .from('purchase_orders')
-          .select('*')
-          .in('supplier_id', supplierIds)
-          .in('status', ['pending', 'quoted', 'rejected'])
-          .order('created_at', { ascending: false });
-        
-        console.log('📋 Raw purchase_orders query result:', purchaseOrderQuotes?.length || 0, 'quotes, error:', poError);
-        
-        // Also log ALL pending quotes in the system for debugging
-        const { data: allPendingQuotes } = await supabase
-          .from('purchase_orders')
-          .select('id, supplier_id, buyer_id, status, po_number, created_at')
-          .eq('status', 'pending')
-          .order('created_at', { ascending: false })
-          .limit(10);
-        
-        console.log('🔎 DEBUG - All pending quotes in system:', allPendingQuotes);
+      // Fetch from purchase_orders where this supplier is the target
+      // Check BOTH user.id AND suppliers.id since quotes might use either
+      const { data: purchaseOrderQuotes, error: poError } = await supabase
+        .from('purchase_orders')
+        .select('*')
+        .in('supplier_id', supplierIds)
+        .in('status', ['pending', 'quoted', 'rejected'])
+        .order('created_at', { ascending: false });
+      
+      console.log('📋 Raw purchase_orders query result:', purchaseOrderQuotes?.length || 0, 'quotes, error:', poError);
+      
+      // Also log ALL pending quotes in the system for debugging
+      const { data: allPendingQuotes } = await supabase
+        .from('purchase_orders')
+        .select('id, supplier_id, buyer_id, status, po_number, created_at')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(10);
+      
+      console.log('🔎 DEBUG - All pending quotes in system:', allPendingQuotes);
         
         if (poError) {
           console.error('Error fetching purchase order quotes:', poError);
@@ -269,10 +272,16 @@ const SupplierDashboard = () => {
         setQuoteRequests(uniqueQuotes);
       } catch (error) {
         console.error('Error fetching quote requests:', error);
+      } finally {
+        setLoadingQuotes(false);
       }
-    };
+  };
 
-    fetchQuoteRequests();
+  // Fetch quote requests on mount and when user changes
+  useEffect(() => {
+    if (user?.id) {
+      fetchQuoteRequests();
+    }
     
     // Set up real-time subscription for new quote requests
     // Listen to all purchase_orders changes and filter in callback
@@ -818,6 +827,20 @@ const SupplierDashboard = () => {
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={fetchQuoteRequests}
+                      disabled={loadingQuotes}
+                      className="mr-2"
+                    >
+                      {loadingQuotes ? (
+                        <Clock className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Bell className="h-4 w-4" />
+                      )}
+                      <span className="ml-1">Refresh</span>
+                    </Button>
                     <Badge className="bg-amber-100 text-amber-700 border border-amber-300">
                       {quoteRequests.filter(q => q.status === 'pending').length} Pending
                     </Badge>
