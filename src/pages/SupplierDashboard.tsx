@@ -173,25 +173,91 @@ const SupplierDashboard = () => {
   }, [user?.id]);
 
   // Fetch quote requests for this supplier
+  // Quote requests come from purchase_orders table with status 'pending' or 'quoted'
   useEffect(() => {
     const fetchQuoteRequests = async () => {
       if (!user?.id) return;
       
       try {
-        const { data, error } = await supabase
+        // Fetch from purchase_orders where this supplier is the target
+        // These are quote requests from professional builders
+        const { data: purchaseOrderQuotes, error: poError } = await supabase
+          .from('purchase_orders')
+          .select('*')
+          .eq('supplier_id', user.id)
+          .in('status', ['pending', 'quoted', 'rejected'])
+          .order('created_at', { ascending: false });
+        
+        if (poError) {
+          console.error('Error fetching purchase order quotes:', poError);
+        }
+
+        // Also fetch from quotation_requests table (legacy)
+        const { data: legacyQuotes, error: qrError } = await supabase
           .from('quotation_requests')
           .select('*')
           .eq('supplier_id', user.id)
           .order('created_at', { ascending: false });
         
-        if (error) throw error;
-        setQuoteRequests(data || []);
+        if (qrError) {
+          console.error('Error fetching legacy quote requests:', qrError);
+        }
+
+        // Transform purchase_orders to match quote display format
+        const transformedPOQuotes = (purchaseOrderQuotes || []).map(po => ({
+          id: po.id,
+          material_name: po.items?.[0]?.material_name || po.project_name || 'Quote Request',
+          quantity: po.items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || 1,
+          unit: po.items?.[0]?.unit || 'items',
+          delivery_address: po.delivery_address || 'To be provided',
+          project_description: po.project_name,
+          special_requirements: null,
+          preferred_delivery_date: po.delivery_date,
+          status: po.status,
+          quote_amount: po.quote_amount || po.total_amount,
+          quote_valid_until: null,
+          supplier_notes: null,
+          created_at: po.created_at,
+          buyer_id: po.buyer_id,
+          purchase_order_id: po.id,
+          // Include all items for display
+          items: po.items,
+          po_number: po.po_number,
+          total_amount: po.total_amount
+        }));
+
+        // Combine both sources, with purchase_orders taking priority
+        const allQuotes = [...transformedPOQuotes, ...(legacyQuotes || [])];
+        
+        // Remove duplicates by id
+        const uniqueQuotes = allQuotes.filter((quote, index, self) => 
+          index === self.findIndex(q => q.id === quote.id)
+        );
+
+        console.log('📋 Quote requests loaded:', uniqueQuotes.length, 'from purchase_orders:', transformedPOQuotes.length);
+        setQuoteRequests(uniqueQuotes);
       } catch (error) {
         console.error('Error fetching quote requests:', error);
       }
     };
 
     fetchQuoteRequests();
+    
+    // Set up real-time subscription for new quote requests
+    const subscription = supabase
+      .channel('supplier-quotes')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'purchase_orders', filter: `supplier_id=eq.${user?.id}` },
+        (payload) => {
+          console.log('📬 New quote activity:', payload);
+          fetchQuoteRequests();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [user?.id]);
 
   const handleQuoteAction = async (action: 'approve' | 'reject') => {
@@ -199,59 +265,94 @@ const SupplierDashboard = () => {
     
     setProcessingQuote(true);
     try {
-      const updateData: any = {
-        status: action === 'approve' ? 'quoted' : 'rejected',
-        updated_at: new Date().toISOString()
-      };
-
-      if (action === 'approve') {
-        if (!quoteResponse.quoteAmount) {
-          throw new Error('Please enter a quote amount');
-        }
-        updateData.quote_amount = parseFloat(quoteResponse.quoteAmount);
-        updateData.quote_valid_until = quoteResponse.validUntil || null;
-        updateData.supplier_notes = quoteResponse.supplierNotes || null;
-      } else {
-        updateData.supplier_notes = quoteResponse.supplierNotes || 'Quote request rejected';
+      const newStatus = action === 'approve' ? 'quoted' : 'rejected';
+      
+      if (action === 'approve' && !quoteResponse.quoteAmount) {
+        throw new Error('Please enter a quote amount');
       }
 
-      const { error } = await supabase
-        .from('quotation_requests')
-        .update(updateData)
-        .eq('id', selectedQuote.id);
+      // Check if this is a purchase_order quote (has purchase_order_id or po_number)
+      const isPurchaseOrderQuote = selectedQuote.purchase_order_id || selectedQuote.po_number;
+      
+      if (isPurchaseOrderQuote) {
+        // Update purchase_orders table directly
+        const updateData: any = {
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        };
+        
+        if (action === 'approve') {
+          updateData.quote_amount = parseFloat(quoteResponse.quoteAmount);
+        }
 
-      if (error) throw error;
-
-      // Update purchase order status to 'quoted' (NOT 'confirmed' yet)
-      // QR codes will be generated when BUILDER accepts the quote
-      if (action === 'approve' && selectedQuote.purchase_order_id) {
         const { error: poError } = await supabase
           .from('purchase_orders')
-          .update({ 
-            status: 'quoted',
-            quote_amount: parseFloat(quoteResponse.quoteAmount),
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', selectedQuote.purchase_order_id);
+          .update(updateData)
+          .eq('id', selectedQuote.purchase_order_id || selectedQuote.id);
         
         if (poError) {
           console.error('Error updating purchase order:', poError);
-        } else {
-          console.log('Quote sent to builder - awaiting builder acceptance');
+          throw poError;
         }
+        
+        console.log(`✅ Quote ${action === 'approve' ? 'sent' : 'rejected'} - Purchase order updated`);
+      } else {
+        // Legacy: Update quotation_requests table
+        const updateData: any = {
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        };
+
+        if (action === 'approve') {
+          updateData.quote_amount = parseFloat(quoteResponse.quoteAmount);
+          updateData.quote_valid_until = quoteResponse.validUntil || null;
+          updateData.supplier_notes = quoteResponse.supplierNotes || null;
+        } else {
+          updateData.supplier_notes = quoteResponse.supplierNotes || 'Quote request rejected';
+        }
+
+        const { error } = await supabase
+          .from('quotation_requests')
+          .update(updateData)
+          .eq('id', selectedQuote.id);
+
+        if (error) throw error;
       }
 
-      // Refresh quote requests
-      const { data: newData } = await supabase
-        .from('quotation_requests')
+      // Refresh quote requests - fetch from both tables
+      const { data: purchaseOrderQuotes } = await supabase
+        .from('purchase_orders')
         .select('*')
         .eq('supplier_id', user?.id)
+        .in('status', ['pending', 'quoted', 'rejected'])
         .order('created_at', { ascending: false });
-      
-      setQuoteRequests(newData || []);
+
+      const transformedPOQuotes = (purchaseOrderQuotes || []).map(po => ({
+        id: po.id,
+        material_name: po.items?.[0]?.material_name || po.project_name || 'Quote Request',
+        quantity: po.items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || 1,
+        unit: po.items?.[0]?.unit || 'items',
+        delivery_address: po.delivery_address || 'To be provided',
+        project_description: po.project_name,
+        status: po.status,
+        quote_amount: po.quote_amount || po.total_amount,
+        created_at: po.created_at,
+        buyer_id: po.buyer_id,
+        purchase_order_id: po.id,
+        items: po.items,
+        po_number: po.po_number,
+        total_amount: po.total_amount
+      }));
+
+      setQuoteRequests(transformedPOQuotes);
       setQuoteDialogOpen(false);
       setSelectedQuote(null);
       setQuoteResponse({ quoteAmount: '', validUntil: '', supplierNotes: '' });
+
+      alert(action === 'approve' 
+        ? '✅ Quote sent to builder! They will review and accept/reject.' 
+        : '❌ Quote request rejected.'
+      );
 
     } catch (error: any) {
       console.error('Error processing quote:', error);
@@ -703,17 +804,46 @@ const SupplierDashboard = () => {
                                 <Package className="h-5 w-5" />
                               </div>
                               <div className="flex-1">
-                                <h4 className={`font-semibold ${textColor}`}>{quote.material_name}</h4>
-                                <div className="flex flex-wrap items-center gap-3 mt-1 text-sm">
-                                  <span className={mutedText}>
-                                    <strong>Qty:</strong> {quote.quantity} {quote.unit}
-                                  </span>
-                                  <span className={mutedText}>•</span>
-                                  <span className={`flex items-center gap-1 ${mutedText}`}>
-                                    <MapPin className="h-3 w-3" />
-                                    {quote.delivery_address}
-                                  </span>
+                                <h4 className={`font-semibold ${textColor}`}>
+                                  {quote.po_number || quote.material_name}
+                                </h4>
+                                
+                                {/* Show all items if available */}
+                                {quote.items && quote.items.length > 0 ? (
+                                  <div className={`mt-2 space-y-1 text-sm ${mutedText}`}>
+                                    <strong>Items ({quote.items.length}):</strong>
+                                    <ul className="list-disc list-inside ml-2 space-y-0.5">
+                                      {quote.items.slice(0, 5).map((item: any, idx: number) => (
+                                        <li key={idx} className="text-xs">
+                                          {item.material_name || item.name} - Qty: {item.quantity} {item.unit}
+                                        </li>
+                                      ))}
+                                      {quote.items.length > 5 && (
+                                        <li className="text-xs text-blue-500">
+                                          +{quote.items.length - 5} more items...
+                                        </li>
+                                      )}
+                                    </ul>
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-wrap items-center gap-3 mt-1 text-sm">
+                                    <span className={mutedText}>
+                                      <strong>Qty:</strong> {quote.quantity} {quote.unit}
+                                    </span>
+                                  </div>
+                                )}
+                                
+                                <div className={`flex items-center gap-1 mt-2 text-sm ${mutedText}`}>
+                                  <MapPin className="h-3 w-3" />
+                                  {quote.delivery_address}
                                 </div>
+                                
+                                {quote.total_amount && (
+                                  <p className={`text-sm mt-1 ${mutedText}`}>
+                                    <strong>Estimated Total:</strong> KES {quote.total_amount.toLocaleString()}
+                                  </p>
+                                )}
+                                
                                 {quote.project_description && (
                                   <p className={`text-sm mt-2 ${mutedText}`}>
                                     <strong>Project:</strong> {quote.project_description}
