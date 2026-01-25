@@ -63,7 +63,7 @@ const TermsOfService = React.lazy(() => import("./pages/TermsOfService"));
 // Auth Guard
 import { AuthRequired } from "@/components/security/AuthRequired";
 import { RoleProtectedRoute } from "@/components/security/RoleProtectedRoute";
-import { Navigate, useSearchParams } from "react-router-dom";
+import { Navigate, useSearchParams, useLocation } from "react-router-dom";
 
 // Simple Live Chat Widget for staff support
 import { LiveChatWidget } from "@/components/chat/LiveChatWidget";
@@ -103,6 +103,28 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+// Component that hides floating widgets on auth pages
+const FloatingWidgets = () => {
+  const location = useLocation();
+  
+  // Hide on auth-related pages
+  const authPaths = ['/', '/auth', '/admin-login', '/reset-password', '/builder-signin', '/supplier-signin', '/delivery-signin', '/professional-builder-signin', '/private-builder-signin'];
+  const isAuthPage = authPaths.some(path => location.pathname === path) || 
+                     location.pathname.includes('-registration') ||
+                     location.pathname.includes('-signin');
+  
+  if (isAuthPage) {
+    return null;
+  }
+  
+  return (
+    <>
+      <LiveChatWidget />
+      <FloatingSocialSidebar />
+    </>
+  );
+};
 
 const App = () => {
   const [user, setUser] = React.useState<any>(null);
@@ -182,11 +204,8 @@ const App = () => {
                 {/* Offline Status Indicator - Shows when offline */}
                 <OfflineIndicator />
                 
-                {/* Live Chat Widget for staff support */}
-                {showChat && <LiveChatWidget />}
-                
-                {/* Floating Social Media Button - Global, hides on auth pages */}
-                {showChat && <FloatingSocialSidebar />}
+                {/* Floating widgets that hide on auth pages */}
+                {showChat && <FloatingWidgets />}
                 
                 <EnhancedErrorBoundary>
                 <Routes>
