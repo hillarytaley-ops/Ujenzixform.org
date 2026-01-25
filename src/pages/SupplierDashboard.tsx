@@ -184,22 +184,40 @@ const SupplierDashboard = () => {
     console.log('🔄 Fetching quotes for supplier user.id:', user.id, 'email:', user.email);
     
     try {
-      // First, get this supplier's record to find their suppliers.id
-      const { data: supplierRecord, error: supplierError } = await supabase
+      // First, try to find supplier record by user_id
+      let supplierRecord = null;
+      const { data: byUserId, error: userIdError } = await supabase
         .from('suppliers')
-        .select('id, user_id, company_name')
+        .select('id, user_id, company_name, email')
         .eq('user_id', user.id)
         .maybeSingle();
       
-      console.log('📦 Supplier record found:', supplierRecord, 'error:', supplierError);
+      supplierRecord = byUserId;
+      console.log('📦 Supplier record by user_id:', byUserId, 'error:', userIdError);
       
-      // Build list of IDs to check (user_id AND suppliers.id)
+      // If not found by user_id, try by email
+      if (!supplierRecord && user.email) {
+        const { data: byEmail, error: emailError } = await supabase
+          .from('suppliers')
+          .select('id, user_id, company_name, email')
+          .eq('email', user.email)
+          .maybeSingle();
+        
+        supplierRecord = byEmail;
+        console.log('📦 Supplier record by email:', byEmail, 'error:', emailError);
+      }
+      
+      // Build list of IDs to check (user.id, suppliers.id, AND suppliers.user_id)
       const supplierIds = [user.id];
-      if (supplierRecord?.id && supplierRecord.id !== user.id) {
+      if (supplierRecord?.id && !supplierIds.includes(supplierRecord.id)) {
         supplierIds.push(supplierRecord.id);
+      }
+      if (supplierRecord?.user_id && !supplierIds.includes(supplierRecord.user_id)) {
+        supplierIds.push(supplierRecord.user_id);
       }
       
       console.log('🔍 Looking for quotes with supplier_id in:', supplierIds);
+      console.log('📦 Final supplier record:', supplierRecord);
 
       // Fetch from purchase_orders where this supplier is the target
       // Check BOTH user.id AND suppliers.id since quotes might use either
