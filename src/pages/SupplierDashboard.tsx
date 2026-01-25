@@ -459,11 +459,40 @@ const SupplierDashboard = () => {
 
         setSupplierProfile(profile);
 
-        // Fetch orders where this supplier is the vendor - ONLY for current user
+        // Fetch orders where this supplier is the vendor
+        // Look up supplier by user_id OR email to handle account mismatches
+        let supplierRecordForOrders = null;
+        const { data: byUserIdOrders } = await supabase
+          .from('suppliers')
+          .select('id, user_id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        
+        supplierRecordForOrders = byUserIdOrders;
+        
+        // If not found by user_id, try by email
+        if (!supplierRecordForOrders && user.email) {
+          const { data: byEmailOrders } = await supabase
+            .from('suppliers')
+            .select('id, user_id')
+            .eq('email', user.email)
+            .maybeSingle();
+          supplierRecordForOrders = byEmailOrders;
+        }
+        
+        // Build list of IDs to check
+        const orderSupplierIds = [user.id];
+        if (supplierRecordForOrders?.id && !orderSupplierIds.includes(supplierRecordForOrders.id)) {
+          orderSupplierIds.push(supplierRecordForOrders.id);
+        }
+        if (supplierRecordForOrders?.user_id && !orderSupplierIds.includes(supplierRecordForOrders.user_id)) {
+          orderSupplierIds.push(supplierRecordForOrders.user_id);
+        }
+
         const { data: ordersData } = await supabase
           .from('purchase_orders')
           .select('*')
-          .eq('supplier_id', user.id)
+          .in('supplier_id', orderSupplierIds)
           .order('created_at', { ascending: false })
           .limit(10);
 

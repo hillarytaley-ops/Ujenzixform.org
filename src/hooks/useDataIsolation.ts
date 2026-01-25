@@ -220,11 +220,40 @@ export const useSupplierData = () => {
         .eq('applicant_user_id', user.id)
         .maybeSingle();
 
-      // Fetch orders where this supplier is the vendor - ONLY for current user
+      // Fetch orders where this supplier is the vendor
+      // Look up supplier by user_id OR email to handle account mismatches
+      let supplierRecord = null;
+      const { data: byUserId } = await supabase
+        .from('suppliers')
+        .select('id, user_id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      supplierRecord = byUserId;
+      
+      // If not found by user_id, try by email
+      if (!supplierRecord && user.email) {
+        const { data: byEmail } = await supabase
+          .from('suppliers')
+          .select('id, user_id')
+          .eq('email', user.email)
+          .maybeSingle();
+        supplierRecord = byEmail;
+      }
+      
+      // Build list of IDs to check
+      const supplierIds = [user.id];
+      if (supplierRecord?.id && !supplierIds.includes(supplierRecord.id)) {
+        supplierIds.push(supplierRecord.id);
+      }
+      if (supplierRecord?.user_id && !supplierIds.includes(supplierRecord.user_id)) {
+        supplierIds.push(supplierRecord.user_id);
+      }
+
       const { data: ordersData, error: ordersError } = await supabase
         .from('purchase_orders')
         .select('*')
-        .eq('supplier_id', user.id)
+        .in('supplier_id', supplierIds)
         .order('created_at', { ascending: false });
 
       if (ordersError) throw ordersError;

@@ -94,11 +94,14 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
   const fetchQuotes = async () => {
     setLoading(true);
     try {
-      // Fetch quotation requests for this builder's purchase orders
+      // Fetch purchase orders that have been quoted by suppliers
+      // These are the supplier responses to our quote requests
       const { data: purchaseOrders, error: poError } = await supabase
         .from('purchase_orders')
-        .select('id')
-        .eq('buyer_id', builderId);
+        .select('*')
+        .eq('buyer_id', builderId)
+        .in('status', ['pending', 'quoted', 'confirmed', 'rejected'])
+        .order('updated_at', { ascending: false });
 
       if (poError) throw poError;
 
@@ -107,35 +110,58 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
         return;
       }
 
-      const poIds = purchaseOrders.map(po => po.id);
+      // Fetch all suppliers to map IDs to names
+      const { data: suppliersData } = await supabase
+        .from('suppliers')
+        .select('id, user_id, company_name, address, location, rating');
 
-      // Fetch quotation requests with supplier info
-      const { data, error } = await supabase
-        .from('quotation_requests')
-        .select(`
-          *,
-          supplier:suppliers(company_name, address, rating)
-        `)
-        .in('purchase_order_id', poIds)
-        .order('updated_at', { ascending: false });
+      // Create maps for both id and user_id lookups
+      const suppliersMap = new Map();
+      (suppliersData || []).forEach(s => {
+        suppliersMap.set(s.id, s);
+        if (s.user_id) suppliersMap.set(s.user_id, s);
+      });
 
-      if (error) throw error;
-
-      // Also fetch purchase order details
-      const quotesWithPO = await Promise.all((data || []).map(async (quote) => {
-        const { data: poData } = await supabase
-          .from('purchase_orders')
-          .select('po_number, project_name, delivery_address, delivery_date, items, total_amount')
-          .eq('id', quote.purchase_order_id)
-          .single();
+      // Transform purchase orders to quote format
+      const transformedQuotes = purchaseOrders.map(po => {
+        const supplier = suppliersMap.get(po.supplier_id);
+        const firstItem = po.items?.[0] || {};
         
         return {
-          ...quote,
-          purchase_order: poData
+          id: po.id,
+          purchase_order_id: po.id,
+          supplier_id: po.supplier_id,
+          material_name: firstItem.material_name || po.project_name || 'Quote Request',
+          quantity: po.items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || 1,
+          unit: firstItem.unit || 'items',
+          delivery_address: po.delivery_address || 'To be provided',
+          preferred_delivery_date: po.delivery_date,
+          project_description: po.project_name,
+          special_requirements: null,
+          status: po.status === 'confirmed' ? 'accepted' : po.status,
+          quote_amount: po.quote_amount || (po.status === 'quoted' ? po.total_amount : null),
+          quote_valid_until: null,
+          supplier_notes: null,
+          created_at: po.created_at,
+          updated_at: po.updated_at || po.created_at,
+          supplier: supplier ? {
+            company_name: supplier.company_name,
+            address: supplier.address || supplier.location || '',
+            rating: supplier.rating || 0
+          } : null,
+          purchase_order: {
+            po_number: po.po_number,
+            project_name: po.project_name,
+            delivery_address: po.delivery_address,
+            delivery_date: po.delivery_date,
+            items: po.items,
+            total_amount: po.total_amount
+          }
         };
-      }));
+      });
 
-      setQuotes(quotesWithPO);
+      console.log('📋 Loaded quotes from purchase_orders:', transformedQuotes.length);
+      setQuotes(transformedQuotes);
     } catch (error) {
       console.error('Error fetching quotes:', error);
       toast({
@@ -151,27 +177,16 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
   const handleAcceptQuote = async (quote: QuotationRequest) => {
     setProcessingId(quote.id);
     try {
-      // 1. Update quotation request status to 'accepted'
-      const { error: quoteError } = await supabase
-        .from('quotation_requests')
-        .update({ 
-          status: 'accepted',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', quote.id);
-
-      if (quoteError) throw quoteError;
-
-      // 2. Update purchase order to 'confirmed' - THIS triggers QR code auto-generation
+      // Update purchase order to 'confirmed' - THIS triggers QR code auto-generation
+      // Note: We now store quotes directly in purchase_orders, not quotation_requests
       const { data: poData, error: poError } = await supabase
         .from('purchase_orders')
         .update({ 
           status: 'confirmed',
-          supplier_id: quote.supplier_id,
           total_amount: quote.quote_amount || quote.purchase_order?.total_amount,
           updated_at: new Date().toISOString()
         })
-        .eq('id', quote.purchase_order_id)
+        .eq('id', quote.id)
         .select()
         .single();
 
@@ -180,14 +195,15 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
       // 3. Get supplier info for pickup address
       let pickupAddress = quote.supplier?.address || 'Supplier location';
       if (quote.supplier_id) {
+        // Try both id and user_id lookups
         const { data: supplierData } = await supabase
           .from('suppliers')
-          .select('address, company_name')
-          .eq('id', quote.supplier_id)
+          .select('address, location, company_name')
+          .or(`id.eq.${quote.supplier_id},user_id.eq.${quote.supplier_id}`)
           .maybeSingle();
         
         if (supplierData) {
-          pickupAddress = supplierData.address || `${supplierData.company_name} - Pickup Location`;
+          pickupAddress = supplierData.address || supplierData.location || `${supplierData.company_name} - Pickup Location`;
         }
       }
 
@@ -199,7 +215,7 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
         .from('delivery_requests')
         .insert({
           builder_id: builderId,
-          purchase_order_id: quote.purchase_order_id,
+          purchase_order_id: quote.id, // quote.id IS the purchase_order id now
           pickup_address: pickupAddress,
           delivery_address: deliveryAddress,
           pickup_date: deliveryDate,
@@ -255,8 +271,8 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
 
       // 6. Prepare purchase order data for delivery details dialog
       const purchaseOrderForDelivery = {
-        id: quote.purchase_order_id,
-        po_number: quote.purchase_order?.po_number || `PO-${quote.purchase_order_id.slice(0, 8)}`,
+        id: quote.id,
+        po_number: quote.purchase_order?.po_number || `PO-${quote.id.slice(0, 8)}`,
         supplier_id: quote.supplier_id,
         supplier_name: quote.supplier?.company_name || 'Supplier',
         supplier_address: quote.supplier?.address || '',
@@ -308,12 +324,12 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
     
     setProcessingId(selectedQuote.id);
     try {
-      // Update quotation request status to 'rejected'
+      // Update purchase order status to 'rejected'
+      // Note: We now store quotes directly in purchase_orders, not quotation_requests
       const { error } = await supabase
-        .from('quotation_requests')
+        .from('purchase_orders')
         .update({ 
           status: 'rejected',
-          builder_rejection_reason: rejectReason || 'No reason provided',
           updated_at: new Date().toISOString()
         })
         .eq('id', selectedQuote.id);
@@ -322,7 +338,7 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
 
       toast({
         title: 'Quote Rejected',
-        description: `You've rejected the quote from ${selectedQuote.supplier?.company_name}.`,
+        description: `You've rejected the quote from ${selectedQuote.supplier?.company_name || 'the supplier'}.`,
       });
 
       setShowRejectDialog(false);
@@ -605,7 +621,7 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
                       className="border-blue-300 text-blue-600"
                       onClick={() => {
                         setAcceptedPurchaseOrder({
-                          id: quote.purchase_order_id,
+                          id: quote.id,
                           po_number: quote.purchase_order?.po_number,
                           supplier_id: quote.supplier_id,
                           supplier_name: quote.supplier?.company_name,
