@@ -96,6 +96,8 @@ export const CartPriceComparison: React.FC<CartPriceComparisonProps> = ({
       }
 
       const suppliersMap = new Map((suppliersData || []).map((s: any) => [s.id, s]));
+      console.log('📦 Suppliers loaded:', suppliersData?.length, 'entries');
+      console.log('📦 Suppliers map:', Array.from(suppliersMap.entries()).slice(0, 5));
 
       // 2. Fetch supplier prices (without join)
       const { data: supplierPricesData, error: pricesError } = await supabase
@@ -152,6 +154,7 @@ export const CartPriceComparison: React.FC<CartPriceComparisonProps> = ({
           if (sp.product_id === cartItem.id && sp.supplier_id === cartItem.supplier_id) continue;
 
           const supplier = suppliersMap.get(sp.supplier_id);
+          console.log('🔍 Supplier lookup:', sp.supplier_id, '->', supplier?.company_name || 'NOT FOUND');
           alternativesWithPrices.push({
             product_id: sp.product_id,
             product_name: adminMaterial.name,
@@ -372,27 +375,44 @@ export const CartPriceComparison: React.FC<CartPriceComparisonProps> = ({
                                 -{Math.round((savings / cartItem.unit_price) * 100)}%
                               </Badge>
                             )}
+                            {!isCheaper && alt.price > cartItem.unit_price && (
+                              <Badge variant="outline" className="text-orange-500 border-orange-300 text-[10px]">
+                                +{Math.round(((alt.price - cartItem.unit_price) / cartItem.unit_price) * 100)}%
+                              </Badge>
+                            )}
                             <span className={`font-bold ${isCheaper ? 'text-green-600' : 'text-gray-700'}`}>
                               KES {alt.price.toLocaleString()}
                             </span>
                           </div>
-                          {isCheaper && (
+                          {isCheaper ? (
                             <p className="text-[10px] text-green-600">
                               Save KES {totalSavings.toLocaleString()}
                             </p>
+                          ) : alt.price > cartItem.unit_price ? (
+                            <p className="text-[10px] text-orange-500">
+                              +KES {Math.abs(totalSavings).toLocaleString()}
+                            </p>
+                          ) : (
+                            <p className="text-[10px] text-gray-500">Same price</p>
                           )}
                         </div>
                       </div>
-                      {isCheaper && (
-                        <Button
-                          size="sm"
-                          className="w-full mt-2 bg-green-600 hover:bg-green-700"
-                          onClick={() => handleSwitchToAlternative(alt)}
-                        >
-                          <RefreshCw className="h-3 w-3 mr-1" />
-                          Switch & Save KES {totalSavings.toLocaleString()}
-                        </Button>
-                      )}
+                      {/* Always show select button - let buyer choose any supplier */}
+                      <Button
+                        size="sm"
+                        className={`w-full mt-2 ${
+                          isCheaper 
+                            ? 'bg-green-600 hover:bg-green-700' 
+                            : 'bg-purple-600 hover:bg-purple-700'
+                        }`}
+                        onClick={() => handleSwitchToAlternative(alt)}
+                      >
+                        <ShoppingCart className="h-3 w-3 mr-1" />
+                        {isCheaper 
+                          ? `Switch & Save KES ${totalSavings.toLocaleString()}`
+                          : `Select This Supplier`
+                        }
+                      </Button>
                     </div>
                   );
                 })}
