@@ -179,12 +179,27 @@ const SupplierDashboard = () => {
       if (!user?.id) return;
       
       try {
+        // First, get this supplier's record to find their suppliers.id
+        const { data: supplierRecord } = await supabase
+          .from('suppliers')
+          .select('id, user_id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        
+        // Build list of IDs to check (user_id AND suppliers.id)
+        const supplierIds = [user.id];
+        if (supplierRecord?.id && supplierRecord.id !== user.id) {
+          supplierIds.push(supplierRecord.id);
+        }
+        
+        console.log('🔍 Looking for quotes with supplier_id in:', supplierIds);
+
         // Fetch from purchase_orders where this supplier is the target
-        // These are quote requests from professional builders
+        // Check BOTH user.id AND suppliers.id since quotes might use either
         const { data: purchaseOrderQuotes, error: poError } = await supabase
           .from('purchase_orders')
           .select('*')
-          .eq('supplier_id', user.id)
+          .in('supplier_id', supplierIds)
           .in('status', ['pending', 'quoted', 'rejected'])
           .order('created_at', { ascending: false });
         
@@ -244,13 +259,18 @@ const SupplierDashboard = () => {
     fetchQuoteRequests();
     
     // Set up real-time subscription for new quote requests
+    // Listen to all purchase_orders changes and filter in callback
     const subscription = supabase
       .channel('supplier-quotes')
       .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'purchase_orders', filter: `supplier_id=eq.${user?.id}` },
-        (payload) => {
-          console.log('📬 New quote activity:', payload);
-          fetchQuoteRequests();
+        { event: '*', schema: 'public', table: 'purchase_orders' },
+        (payload: any) => {
+          // Check if this quote is for us (either by user_id or suppliers.id)
+          const newRecord = payload.new;
+          if (newRecord?.supplier_id) {
+            console.log('📬 Quote activity detected, refreshing...');
+            fetchQuoteRequests();
+          }
         }
       )
       .subscribe();
@@ -320,10 +340,20 @@ const SupplierDashboard = () => {
       }
 
       // Refresh quote requests - fetch from both tables
+      // Get supplier record to find their suppliers.id
+      const { data: supplierRecord } = await supabase
+        .from('suppliers')
+        .select('id')
+        .eq('user_id', user?.id)
+        .maybeSingle();
+      
+      const supplierIds = [user?.id];
+      if (supplierRecord?.id) supplierIds.push(supplierRecord.id);
+
       const { data: purchaseOrderQuotes } = await supabase
         .from('purchase_orders')
         .select('*')
-        .eq('supplier_id', user?.id)
+        .in('supplier_id', supplierIds)
         .in('status', ['pending', 'quoted', 'rejected'])
         .order('created_at', { ascending: false });
 

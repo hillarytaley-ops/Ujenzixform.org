@@ -170,16 +170,22 @@ export const MultiSupplierQuoteDialog: React.FC<MultiSupplierQuoteDialogProps> =
       for (const supplierId of selectedSuppliers) {
         const supplier = suppliers.find(s => s.id === supplierId);
         const supplierName = supplier?.company_name || 'Supplier';
+        
+        // IMPORTANT: Use user_id (auth ID) for supplier_id, NOT suppliers.id
+        // The supplier dashboard queries by user.id, so we need to match that
+        const supplierUserId = supplier?.user_id || supplierId;
 
         const poNumber = `QR-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
         const totalAmount = cartItems.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
+
+        console.log(`📤 Sending quote to ${supplierName} (user_id: ${supplierUserId})`);
 
         const { error } = await supabase
           .from('purchase_orders')
           .insert({
             po_number: poNumber,
             buyer_id: user.id,
-            supplier_id: supplierId,
+            supplier_id: supplierUserId, // Use user_id so supplier dashboard can find it
             total_amount: totalAmount,
             delivery_address: 'To be provided',
             delivery_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 14 days
