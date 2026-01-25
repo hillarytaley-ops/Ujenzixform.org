@@ -86,45 +86,31 @@ export const CartPriceComparison: React.FC<CartPriceComparisonProps> = ({
     
     setLoading(true);
     try {
-      // 1. Fetch supplier prices WITH supplier details
+      // 1. Fetch all suppliers first (to map IDs to names)
+      const { data: suppliersData, error: suppliersError } = await supabase
+        .from('suppliers')
+        .select('id, company_name, rating');
+
+      if (suppliersError) {
+        console.error('Error fetching suppliers:', suppliersError);
+      }
+
+      const suppliersMap = new Map((suppliersData || []).map((s: any) => [s.id, s]));
+
+      // 2. Fetch supplier prices (without join)
       const { data: supplierPricesData, error: pricesError } = await supabase
         .from('supplier_product_prices')
-        .select(`
-          product_id,
-          price,
-          in_stock,
-          supplier_id,
-          suppliers:supplier_id (
-            id,
-            company_name,
-            rating
-          )
-        `)
-        .gt('price', 0); // Only get items with valid prices
+        .select('product_id, price, in_stock, supplier_id')
+        .gt('price', 0);
 
       if (pricesError) {
         console.error('Error fetching supplier prices:', pricesError);
       }
 
-      // 2. Fetch materials from the materials table (supplier's own products)
+      // 3. Fetch materials from the materials table (without join)
       const { data: materialsData, error: materialsError } = await supabase
         .from('materials')
-        .select(`
-          id,
-          name,
-          category,
-          unit,
-          unit_price,
-          image_url,
-          in_stock,
-          supplier_id,
-          approval_status,
-          suppliers:supplier_id (
-            id,
-            company_name,
-            rating
-          )
-        `)
+        .select('id, name, category, unit, unit_price, image_url, in_stock, supplier_id, approval_status')
         .eq('approval_status', 'approved')
         .gt('unit_price', 0);
 
@@ -132,7 +118,7 @@ export const CartPriceComparison: React.FC<CartPriceComparisonProps> = ({
         console.error('Error fetching materials:', materialsError);
       }
 
-      // 3. Fetch admin material images for product names
+      // 4. Fetch admin material images for product names
       const { data: adminMaterialsData, error: adminError } = await supabase
         .from('admin_material_images')
         .select('id, name, category, image_url')
@@ -165,7 +151,7 @@ export const CartPriceComparison: React.FC<CartPriceComparisonProps> = ({
           // Skip if it's the same item we're comparing
           if (sp.product_id === cartItem.id && sp.supplier_id === cartItem.supplier_id) continue;
 
-          const supplier = sp.suppliers as any;
+          const supplier = suppliersMap.get(sp.supplier_id);
           alternativesWithPrices.push({
             product_id: sp.product_id,
             product_name: adminMaterial.name,
@@ -192,7 +178,7 @@ export const CartPriceComparison: React.FC<CartPriceComparisonProps> = ({
           // Skip if it's the same item we're comparing
           if (material.id === cartItem.id) continue;
 
-          const supplier = material.suppliers as any;
+          const supplier = material.supplier_id ? suppliersMap.get(material.supplier_id) : null;
           alternativesWithPrices.push({
             product_id: material.id,
             product_name: material.name,
