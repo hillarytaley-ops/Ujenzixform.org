@@ -43,6 +43,39 @@ export class ErrorBoundary extends Component<Props, State> {
       console.error('ErrorBoundary caught an error:', error, errorInfo);
     }
 
+    // Check if this is a chunk loading error (happens after deployments)
+    const isChunkLoadError = 
+      error.message.includes('Failed to fetch dynamically imported module') ||
+      error.message.includes('Loading chunk') ||
+      error.message.includes('Loading CSS chunk') ||
+      error.message.includes('ChunkLoadError') ||
+      error.name === 'ChunkLoadError';
+
+    if (isChunkLoadError) {
+      console.log('🔄 Chunk loading error detected - attempting auto-reload...');
+      
+      // Check if we've already tried reloading recently (prevent infinite loops)
+      const lastReload = sessionStorage.getItem('chunk_error_reload');
+      const now = Date.now();
+      
+      if (!lastReload || (now - parseInt(lastReload)) > 10000) { // 10 second cooldown
+        sessionStorage.setItem('chunk_error_reload', now.toString());
+        
+        // Clear caches and reload
+        if ('caches' in window) {
+          caches.keys().then(names => {
+            names.forEach(name => caches.delete(name));
+          });
+        }
+        
+        // Force reload without cache
+        window.location.reload();
+        return;
+      } else {
+        console.log('⚠️ Already reloaded recently, showing error UI instead');
+      }
+    }
+
     // Call custom error handler if provided
     this.props.onError?.(error, errorInfo);
 
@@ -134,6 +167,21 @@ export const DefaultErrorFallback: React.FC<FallbackProps> = ({
 }) => {
   const [showStack, setShowStack] = React.useState(false);
 
+  // Check if this is a chunk loading error
+  const isChunkError = error?.message?.includes('Failed to fetch dynamically imported module') ||
+    error?.message?.includes('Loading chunk') ||
+    error?.message?.includes('ChunkLoadError');
+
+  const handleHardReload = () => {
+    // Clear caches and reload
+    if ('caches' in window) {
+      caches.keys().then(names => {
+        names.forEach(name => caches.delete(name));
+      });
+    }
+    window.location.reload();
+  };
+
   return (
     <div className="min-h-[400px] flex items-center justify-center p-4">
       <Card className="w-full max-w-lg border-destructive/50">
@@ -142,14 +190,16 @@ export const DefaultErrorFallback: React.FC<FallbackProps> = ({
             <AlertTriangle className="h-8 w-8 text-destructive" />
           </div>
           <CardTitle className="text-xl text-destructive">
-            Something went wrong
+            {isChunkError ? 'App Updated' : 'Something went wrong'}
           </CardTitle>
           <CardDescription>
-            An unexpected error occurred. Our team has been notified.
+            {isChunkError 
+              ? 'A new version of UjenziXform is available. Please reload to get the latest version.'
+              : 'An unexpected error occurred. Our team has been notified.'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {error && (
+          {!isChunkError && error && (
             <div className="bg-muted/50 rounded-lg p-3 text-sm">
               <code className="text-destructive font-mono">
                 {error.message || 'Unknown error'}
@@ -158,21 +208,30 @@ export const DefaultErrorFallback: React.FC<FallbackProps> = ({
           )}
 
           <div className="flex flex-col sm:flex-row gap-2">
-            <Button onClick={resetError} className="flex-1">
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Try Again
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => (window.location.href = '/home')}
-              className="flex-1"
-            >
-              <Home className="mr-2 h-4 w-4" />
-              Go Home
-            </Button>
+            {isChunkError ? (
+              <Button onClick={handleHardReload} className="flex-1 bg-green-600 hover:bg-green-700">
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Reload App
+              </Button>
+            ) : (
+              <>
+                <Button onClick={resetError} className="flex-1">
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Try Again
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => (window.location.href = '/home')}
+                  className="flex-1"
+                >
+                  <Home className="mr-2 h-4 w-4" />
+                  Go Home
+                </Button>
+              </>
+            )}
           </div>
 
-          {showDetails && errorInfo && (
+          {showDetails && errorInfo && !isChunkError && (
             <div className="pt-4 border-t">
               <Button
                 variant="ghost"
