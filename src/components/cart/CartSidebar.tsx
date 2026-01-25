@@ -62,35 +62,38 @@ export const CartSidebar: React.FC = () => {
         return;
       }
 
+      // Generate PO number
+      const poNumber = `QR-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+      
+      // Get a default supplier (use first item's supplier or find one)
+      const supplierId = items[0]?.supplier_id || user.id;
+      
       // Create purchase order with cart items
       const { data: orderData, error: orderError } = await supabase
         .from('purchase_orders')
         .insert({
-          builder_id: user.id,
+          po_number: poNumber,
+          buyer_id: user.id,
+          supplier_id: supplierId,
+          total_amount: getTotalPrice(),
+          delivery_address: 'To be provided',
+          delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 days from now
           project_name: 'Cart Order - ' + new Date().toLocaleDateString(),
           status: 'pending',
+          items: items.map(item => ({
+            material_id: item.id,
+            material_name: item.name,
+            category: item.category,
+            quantity: item.quantity,
+            unit: item.unit,
+            unit_price: item.unit_price
+          })),
           created_at: new Date().toISOString()
         })
         .select()
         .single();
 
       if (orderError) throw orderError;
-
-      // Add all cart items to order
-      const orderItems = items.map(item => ({
-        order_id: orderData.id,
-        material_name: item.name,
-        category: item.category,
-        quantity: item.quantity,
-        unit: item.unit,
-        notes: `Price: KES ${item.unit_price.toLocaleString()} per ${item.unit}`
-      }));
-
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItems);
-
-      if (itemsError) throw itemsError;
 
       toast({
         title: '✅ Quote Requested!',
@@ -122,35 +125,38 @@ export const CartSidebar: React.FC = () => {
         return;
       }
 
+      // Generate PO number
+      const poNumber = `PO-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+      
+      // Get a default supplier (use first item's supplier or find one)
+      const supplierId = items[0]?.supplier_id || user.id;
+      
       // Create purchase order
       const { data: orderData, error: orderError } = await supabase
         .from('purchase_orders')
         .insert({
-          builder_id: user.id,
+          po_number: poNumber,
+          buyer_id: user.id,
+          supplier_id: supplierId,
+          total_amount: getTotalPrice(),
+          delivery_address: 'To be provided',
+          delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 days from now
           project_name: 'Direct Purchase - ' + new Date().toLocaleDateString(),
           status: 'confirmed',
+          items: items.map(item => ({
+            material_id: item.id,
+            material_name: item.name,
+            category: item.category,
+            quantity: item.quantity,
+            unit: item.unit,
+            unit_price: item.unit_price
+          })),
           created_at: new Date().toISOString()
         })
         .select()
         .single();
 
       if (orderError) throw orderError;
-
-      // Add all cart items
-      const orderItems = items.map(item => ({
-        order_id: orderData.id,
-        material_name: item.name,
-        category: item.category,
-        quantity: item.quantity,
-        unit: item.unit,
-        notes: `Price: KES ${item.unit_price.toLocaleString()} per ${item.unit}`
-      }));
-
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItems);
-
-      if (itemsError) throw itemsError;
 
       toast({
         title: '🎉 Order Placed!',
