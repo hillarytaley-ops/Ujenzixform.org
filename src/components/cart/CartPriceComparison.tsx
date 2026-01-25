@@ -24,7 +24,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { 
   Scale, 
   Store, 
-  Star, 
+  Star,
   ShoppingCart, 
   X,
   Trophy,
@@ -86,71 +86,140 @@ export const CartPriceComparison: React.FC<CartPriceComparisonProps> = ({
     
     setLoading(true);
     try {
-      // Fetch all supplier prices for similar products
-      const { data: pricesData, error: pricesError } = await supabase
+      // 1. Fetch supplier prices WITH supplier details
+      const { data: supplierPricesData, error: pricesError } = await supabase
         .from('supplier_product_prices')
-        .select('*');
+        .select(`
+          product_id,
+          price,
+          in_stock,
+          supplier_id,
+          suppliers:supplier_id (
+            id,
+            company_name,
+            rating
+          )
+        `)
+        .gt('price', 0); // Only get items with valid prices
 
-      if (pricesError) throw pricesError;
+      if (pricesError) {
+        console.error('Error fetching supplier prices:', pricesError);
+      }
 
-      // Fetch admin materials to get product names
+      // 2. Fetch materials from the materials table (supplier's own products)
       const { data: materialsData, error: materialsError } = await supabase
+        .from('materials')
+        .select(`
+          id,
+          name,
+          category,
+          unit,
+          unit_price,
+          image_url,
+          in_stock,
+          supplier_id,
+          approval_status,
+          suppliers:supplier_id (
+            id,
+            company_name,
+            rating
+          )
+        `)
+        .eq('approval_status', 'approved')
+        .gt('unit_price', 0);
+
+      if (materialsError) {
+        console.error('Error fetching materials:', materialsError);
+      }
+
+      // 3. Fetch admin material images for product names
+      const { data: adminMaterialsData, error: adminError } = await supabase
         .from('admin_material_images')
         .select('id, name, category, image_url')
         .eq('is_approved', true);
 
-      if (materialsError) throw materialsError;
-      const materialsMap = new Map(materialsData.map((m: any) => [m.id, m]));
+      if (adminError) {
+        console.error('Error fetching admin materials:', adminError);
+      }
+
+      const adminMaterialsMap = new Map((adminMaterialsData || []).map((m: any) => [m.id, m]));
 
       // Find products in the same category or with similar names
-      const searchTerms = cartItem.name.toLowerCase().split(' ').filter(t => t.length > 3);
+      const searchTerms = cartItem.name.toLowerCase().split(' ').filter(t => t.length > 2);
       
-      const alternativeProducts = materialsData.filter((m: any) => {
-        // Same category
-        if (m.category === cartItem.category) return true;
-        // Similar name
-        const nameLower = m.name.toLowerCase();
-        return searchTerms.some(term => nameLower.includes(term));
-      });
-
-      // Map prices to alternatives
       const alternativesWithPrices: AlternativePrice[] = [];
-      
-      for (const product of alternativeProducts) {
-        // Find supplier prices for this product
-        const supplierPrices = pricesData.filter((p: any) => p.product_id === product.id);
-        
-        for (const sp of supplierPrices) {
-          alternativesWithPrices.push({
-            product_id: product.id,
-            product_name: product.name,
-            supplier_id: sp.supplier_id,
-            supplier_name: 'Supplier', // Could fetch supplier name if needed
-            price: sp.price,
-            in_stock: sp.in_stock,
-            image_url: product.image_url
-          });
-        }
 
-        // Also add the admin price if no supplier price exists
-        if (supplierPrices.length === 0) {
+      // Add supplier prices from supplier_product_prices table
+      if (supplierPricesData) {
+        for (const sp of supplierPricesData) {
+          const adminMaterial = adminMaterialsMap.get(sp.product_id);
+          if (!adminMaterial) continue;
+
+          // Check if this product matches our search criteria
+          const nameLower = adminMaterial.name.toLowerCase();
+          const matchesCategory = adminMaterial.category === cartItem.category;
+          const matchesName = searchTerms.some(term => nameLower.includes(term));
+          
+          if (!matchesCategory && !matchesName) continue;
+
+          // Skip if it's the same item we're comparing
+          if (sp.product_id === cartItem.id && sp.supplier_id === cartItem.supplier_id) continue;
+
+          const supplier = sp.suppliers as any;
           alternativesWithPrices.push({
-            product_id: product.id,
-            product_name: product.name,
-            supplier_id: 'admin',
-            supplier_name: 'UjenziXform Catalog',
-            price: 0, // Admin products may not have a price
-            in_stock: true,
-            image_url: product.image_url
+            product_id: sp.product_id,
+            product_name: adminMaterial.name,
+            supplier_id: sp.supplier_id,
+            supplier_name: supplier?.company_name || 'Verified Supplier',
+            price: sp.price,
+            in_stock: sp.in_stock ?? true,
+            rating: supplier?.rating,
+            image_url: adminMaterial.image_url
           });
         }
       }
 
-      // Filter out items with 0 price and sort by price
-      const validAlternatives = alternativesWithPrices
-        .filter(a => a.price > 0 && a.product_id !== cartItem.id)
+      // Add materials from materials table (supplier's own products)
+      if (materialsData) {
+        for (const material of materialsData) {
+          // Check if this product matches our search criteria
+          const nameLower = material.name.toLowerCase();
+          const matchesCategory = material.category === cartItem.category;
+          const matchesName = searchTerms.some(term => nameLower.includes(term));
+          
+          if (!matchesCategory && !matchesName) continue;
+
+          // Skip if it's the same item we're comparing
+          if (material.id === cartItem.id) continue;
+
+          const supplier = material.suppliers as any;
+          alternativesWithPrices.push({
+            product_id: material.id,
+            product_name: material.name,
+            supplier_id: material.supplier_id || 'unknown',
+            supplier_name: supplier?.company_name || 'Verified Supplier',
+            price: material.unit_price,
+            in_stock: material.in_stock ?? true,
+            rating: supplier?.rating,
+            image_url: material.image_url
+          });
+        }
+      }
+
+      // Remove duplicates (same product from same supplier) and sort by price
+      const uniqueAlternatives = alternativesWithPrices.reduce((acc, curr) => {
+        const key = `${curr.product_id}-${curr.supplier_id}`;
+        if (!acc.has(key) || acc.get(key)!.price > curr.price) {
+          acc.set(key, curr);
+        }
+        return acc;
+      }, new Map<string, AlternativePrice>());
+
+      const validAlternatives = Array.from(uniqueAlternatives.values())
+        .filter(a => a.price > 0)
         .sort((a, b) => a.price - b.price);
 
+      console.log('Found alternatives:', validAlternatives.length, validAlternatives);
       setAlternatives(validAlternatives);
     } catch (error) {
       console.error('Error fetching alternatives:', error);
@@ -300,7 +369,15 @@ export const CartPriceComparison: React.FC<CartPriceComparisonProps> = ({
                         )}
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-sm line-clamp-1">{alt.product_name}</p>
-                          <p className="text-xs text-gray-500">{alt.supplier_name}</p>
+                          <div className="flex items-center gap-1">
+                            <p className="text-xs text-gray-500">{alt.supplier_name}</p>
+                            {alt.rating && (
+                              <div className="flex items-center gap-0.5 text-yellow-500">
+                                <Star className="h-3 w-3 fill-current" />
+                                <span className="text-[10px]">{alt.rating.toFixed(1)}</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                         <div className="text-right">
                           <div className="flex items-center gap-1 justify-end">
