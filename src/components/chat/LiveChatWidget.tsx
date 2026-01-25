@@ -276,31 +276,20 @@ export function LiveChatWidget({ position = 'bottom-right' }: LiveChatWidgetProp
     <>
       {/* Chat Button - Round with Radiating Animation */}
       {!isOpen && (
-        <div className={cn("fixed bottom-4 sm:bottom-6 z-50", positionClasses)}>
-          {/* Radiating pulse rings */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="absolute w-14 h-14 rounded-full bg-orange-500/30 animate-ping" />
-            <div className="absolute w-16 h-16 rounded-full bg-orange-500/20 animate-pulse" />
-            <div 
-              className="absolute w-20 h-20 rounded-full bg-orange-500/10"
-              style={{ animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }}
-            />
-          </div>
-          
-          {/* Main button */}
+        <div className={cn("fixed bottom-6 z-[9999]", positionClasses)} style={{ bottom: '24px' }}>
+          {/* Main button - Blue, matches FloatingSocialSidebar size (56px) */}
           <button
             onClick={() => setIsOpen(true)}
             className={cn(
               "relative w-14 h-14 rounded-full",
-              "bg-gradient-to-br from-orange-500 via-orange-600 to-red-500",
-              "text-white shadow-lg shadow-orange-500/40",
-              "hover:shadow-xl hover:shadow-orange-500/50 hover:scale-110",
-              "transition-all duration-300 flex items-center justify-center",
-              "border-2 border-orange-400/50"
+              "bg-blue-600 hover:bg-blue-700",
+              "text-white shadow-lg",
+              "hover:shadow-xl hover:scale-110",
+              "transition-all duration-300 flex items-center justify-center"
             )}
             title="Live Chat"
           >
-            <MessageCircle className="w-6 h-6 drop-shadow-md" />
+            <MessageCircle className="w-6 h-6" />
             
             {/* Online indicator dot */}
             <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full border-2 border-white shadow-md">
@@ -321,7 +310,7 @@ export function LiveChatWidget({ position = 'bottom-right' }: LiveChatWidgetProp
         style={{ height: '500px', maxHeight: 'calc(100vh - 100px)' }}
         >
           {/* Header */}
-          <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-4 flex items-center justify-between">
+          <div className="bg-blue-600 p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
                 <MessageCircle className="w-5 h-5 text-white" />
