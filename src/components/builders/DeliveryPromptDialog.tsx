@@ -199,7 +199,6 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
           special_instructions: deliveryData.specialInstructions || null,
           budget_range: deliveryData.budgetRange,
           status: 'pending',
-          auto_rotation_enabled: true,
           max_rotation_attempts: 5,
           created_at: new Date().toISOString()
         })

@@ -248,8 +248,6 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
           special_instructions: quote.special_requirements || null,
           budget_range: '10000-20000', // Default budget range
           status: 'pending',
-          auto_rotation_enabled: true,
-          max_rotation_attempts: 5,
           created_at: new Date().toISOString()
         })
         .select()

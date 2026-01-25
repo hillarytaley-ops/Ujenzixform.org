@@ -160,7 +160,6 @@ export const QuoteComparison: React.FC<QuoteComparisonProps> = ({ orderId, build
           special_instructions: null,
           budget_range: '10000-20000',
           status: 'pending',
-          auto_rotation_enabled: true,
           max_rotation_attempts: 5,
           created_at: new Date().toISOString()
         })
