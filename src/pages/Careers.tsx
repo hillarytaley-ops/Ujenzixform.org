@@ -200,6 +200,8 @@ const Careers = () => {
     portfolio: '',
     coverLetter: ''
   });
+  const [jobResumeFile, setJobResumeFile] = useState<File | null>(null);
+  const [jobCoverLetterFile, setJobCoverLetterFile] = useState<File | null>(null);
   
   // General application portal state
   const [generalApplication, setGeneralApplication] = useState({
@@ -334,6 +336,19 @@ const Careers = () => {
 
     setIsApplying(true);
     try {
+      let resumeUrl = null;
+      let coverLetterUrl = null;
+
+      // Upload resume if provided
+      if (jobResumeFile) {
+        resumeUrl = await handleFileUpload(jobResumeFile, 'resume');
+      }
+
+      // Upload cover letter file if provided
+      if (jobCoverLetterFile) {
+        coverLetterUrl = await handleFileUpload(jobCoverLetterFile, 'cover_letter');
+      }
+
       const { error } = await supabase
         .from('job_applications')
         .insert({
@@ -345,6 +360,8 @@ const Careers = () => {
           linkedin_url: applicationForm.linkedin,
           portfolio_url: applicationForm.portfolio,
           cover_letter: applicationForm.coverLetter,
+          resume_url: resumeUrl,
+          cover_letter_file_url: coverLetterUrl,
           status: 'new',
           created_at: new Date().toISOString()
         } as any);
@@ -365,6 +382,8 @@ const Careers = () => {
         portfolio: '',
         coverLetter: ''
       });
+      setJobResumeFile(null);
+      setJobCoverLetterFile(null);
     } catch (error) {
       console.error('Application error:', error);
       toast({
@@ -738,15 +757,95 @@ const Careers = () => {
                                   />
                                 </div>
 
+                                {/* Resume Upload */}
                                 <div>
-                                  <Label htmlFor="coverLetter">Cover Letter *</Label>
+                                  <Label htmlFor="job-resume" className="flex items-center gap-2">
+                                    <Upload className="h-4 w-4" />
+                                    Resume/CV *
+                                  </Label>
+                                  <div className="mt-2">
+                                    <label 
+                                      htmlFor="job-resume"
+                                      className={`flex items-center justify-center w-full h-20 border-2 border-dashed rounded-lg cursor-pointer transition-all duration-300 ${
+                                        jobResumeFile 
+                                          ? 'border-green-400 bg-green-50' 
+                                          : 'border-gray-300 bg-gray-50 hover:bg-gray-100 hover:border-primary'
+                                      }`}
+                                    >
+                                      {jobResumeFile ? (
+                                        <div className="flex items-center gap-2">
+                                          <CheckCircle className="h-5 w-5 text-green-600" />
+                                          <span className="text-sm font-medium text-green-700">{jobResumeFile.name}</span>
+                                        </div>
+                                      ) : (
+                                        <div className="flex items-center gap-2 text-gray-500">
+                                          <Upload className="h-5 w-5" />
+                                          <span className="text-sm">Click to upload resume (PDF, DOC, DOCX)</span>
+                                        </div>
+                                      )}
+                                      <input
+                                        id="job-resume"
+                                        type="file"
+                                        className="hidden"
+                                        accept=".pdf,.doc,.docx"
+                                        required
+                                        onChange={(e) => {
+                                          const file = e.target.files?.[0];
+                                          if (file) setJobResumeFile(file);
+                                        }}
+                                      />
+                                    </label>
+                                  </div>
+                                </div>
+
+                                {/* Cover Letter File Upload */}
+                                <div>
+                                  <Label htmlFor="job-cover-file" className="flex items-center gap-2">
+                                    <FileText className="h-4 w-4" />
+                                    Cover Letter File (Optional)
+                                  </Label>
+                                  <div className="mt-2">
+                                    <label 
+                                      htmlFor="job-cover-file"
+                                      className={`flex items-center justify-center w-full h-20 border-2 border-dashed rounded-lg cursor-pointer transition-all duration-300 ${
+                                        jobCoverLetterFile 
+                                          ? 'border-green-400 bg-green-50' 
+                                          : 'border-gray-300 bg-gray-50 hover:bg-gray-100 hover:border-primary'
+                                      }`}
+                                    >
+                                      {jobCoverLetterFile ? (
+                                        <div className="flex items-center gap-2">
+                                          <CheckCircle className="h-5 w-5 text-green-600" />
+                                          <span className="text-sm font-medium text-green-700">{jobCoverLetterFile.name}</span>
+                                        </div>
+                                      ) : (
+                                        <div className="flex items-center gap-2 text-gray-500">
+                                          <FileText className="h-5 w-5" />
+                                          <span className="text-sm">Click to upload cover letter (PDF, DOC, DOCX)</span>
+                                        </div>
+                                      )}
+                                      <input
+                                        id="job-cover-file"
+                                        type="file"
+                                        className="hidden"
+                                        accept=".pdf,.doc,.docx"
+                                        onChange={(e) => {
+                                          const file = e.target.files?.[0];
+                                          if (file) setJobCoverLetterFile(file);
+                                        }}
+                                      />
+                                    </label>
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <Label htmlFor="coverLetter">Additional Message</Label>
                                   <Textarea
                                     id="coverLetter"
-                                    required
-                                    rows={4}
+                                    rows={3}
                                     value={applicationForm.coverLetter}
                                     onChange={(e) => setApplicationForm(prev => ({ ...prev, coverLetter: e.target.value }))}
-                                    placeholder="Tell us why you're excited about this role and what makes you a great fit..."
+                                    placeholder="Any additional information you'd like to share..."
                                   />
                                 </div>
 
