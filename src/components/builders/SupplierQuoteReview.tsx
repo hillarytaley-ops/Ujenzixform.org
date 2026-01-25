@@ -89,6 +89,28 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
 
   useEffect(() => {
     fetchQuotes();
+    
+    // Set up real-time subscription to purchase_orders changes
+    const subscription = supabase
+      .channel('builder-quotes-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'purchase_orders',
+          filter: `buyer_id=eq.${builderId}`
+        },
+        (payload) => {
+          console.log('📬 Quote update received:', payload);
+          fetchQuotes(); // Refresh when any change happens
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [builderId]);
 
   const fetchQuotes = async () => {
@@ -161,6 +183,7 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
       });
 
       console.log('📋 Loaded quotes from purchase_orders:', transformedQuotes.length);
+      console.log('📊 Quote statuses:', transformedQuotes.map(q => ({ id: q.id.slice(0,8), status: q.status, quote_amount: q.quote_amount })));
       setQuotes(transformedQuotes);
     } catch (error) {
       console.error('Error fetching quotes:', error);
