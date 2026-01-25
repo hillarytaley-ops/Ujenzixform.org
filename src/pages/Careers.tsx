@@ -285,14 +285,14 @@ const Careers = () => {
         .insert({
           job_id: 'general-application',
           job_title: generalApplication.position || 'General Application',
-          applicant_name: generalApplication.name,
-          applicant_email: generalApplication.email,
-          applicant_phone: generalApplication.phone,
+          full_name: generalApplication.name,
+          email: generalApplication.email,
+          phone: generalApplication.phone,
           linkedin_url: generalApplication.linkedin,
           cover_letter: generalApplication.coverLetter,
           resume_url: resumeUrl,
-          cover_letter_url: coverLetterUrl,
-          status: 'pending',
+          cover_letter_file_url: coverLetterUrl,
+          status: 'new',
           created_at: new Date().toISOString()
         } as any);
 
@@ -339,13 +339,13 @@ const Careers = () => {
         .insert({
           job_id: selectedJob.id,
           job_title: selectedJob.title,
-          applicant_name: applicationForm.name,
-          applicant_email: applicationForm.email,
-          applicant_phone: applicationForm.phone,
+          full_name: applicationForm.name,
+          email: applicationForm.email,
+          phone: applicationForm.phone,
           linkedin_url: applicationForm.linkedin,
           portfolio_url: applicationForm.portfolio,
           cover_letter: applicationForm.coverLetter,
-          status: 'pending',
+          status: 'new',
           created_at: new Date().toISOString()
         } as any);
 

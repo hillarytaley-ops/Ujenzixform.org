@@ -48,6 +48,8 @@ import {
   RefreshCw,
   CheckCircle,
   XCircle,
+  Download,
+  FileText as FileTextIcon,
   Mail,
   Phone,
   FileText,
@@ -87,15 +89,20 @@ interface JobApplication {
   id: string;
   job_id: string;
   job_title: string;
-  applicant_name: string;
-  applicant_email: string;
-  applicant_phone: string;
+  full_name: string;
+  email: string;
+  phone: string;
   linkedin_url?: string;
   portfolio_url?: string;
   resume_url?: string;
   cover_letter?: string;
+  cover_letter_file_url?: string;
   status: string;
   created_at: string;
+  // Legacy field mappings (for backwards compatibility)
+  applicant_name?: string;
+  applicant_email?: string;
+  applicant_phone?: string;
 }
 
 const DEPARTMENTS = [
@@ -132,8 +139,9 @@ const ICON_OPTIONS = [
 ];
 
 const APPLICATION_STATUSES = [
+  { value: 'new', label: 'New', color: 'bg-blue-100 text-blue-800' },
   { value: 'pending', label: 'Pending', color: 'bg-gray-100 text-gray-800' },
-  { value: 'reviewing', label: 'Reviewing', color: 'bg-blue-100 text-blue-800' },
+  { value: 'reviewing', label: 'Reviewing', color: 'bg-cyan-100 text-cyan-800' },
   { value: 'shortlisted', label: 'Shortlisted', color: 'bg-yellow-100 text-yellow-800' },
   { value: 'interview', label: 'Interview', color: 'bg-purple-100 text-purple-800' },
   { value: 'offered', label: 'Offered', color: 'bg-green-100 text-green-800' },
@@ -593,73 +601,101 @@ export const JobPositionsManager: React.FC = () => {
           </div>
 
           <div className="grid gap-4">
-            {applications.map((application) => (
-              <Card key={application.id}>
-                <CardContent className="p-4">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-bold">{application.applicant_name}</h3>
-                        <Badge className={getStatusBadge(application.status).color}>
-                          {getStatusBadge(application.status).label}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        Applied for: <strong>{application.job_title}</strong>
-                      </p>
-                      <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Mail className="h-3 w-3" />
-                          {application.applicant_email}
-                        </span>
-                        {application.applicant_phone && (
+            {applications.map((application) => {
+              // Support both old and new field names
+              const name = application.full_name || application.applicant_name || 'Unknown';
+              const email = application.email || application.applicant_email || '';
+              const phone = application.phone || application.applicant_phone || '';
+              
+              return (
+                <Card key={application.id}>
+                  <CardContent className="p-4">
+                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-bold">{name}</h3>
+                          <Badge className={getStatusBadge(application.status).color}>
+                            {getStatusBadge(application.status).label}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Applied for: <strong>{application.job_title}</strong>
+                        </p>
+                        <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-muted-foreground">
                           <span className="flex items-center gap-1">
-                            <Phone className="h-3 w-3" />
-                            {application.applicant_phone}
+                            <Mail className="h-3 w-3" />
+                            {email}
                           </span>
-                        )}
-                        <span className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          {new Date(application.created_at).toLocaleDateString()}
-                        </span>
+                          {phone && (
+                            <span className="flex items-center gap-1">
+                              <Phone className="h-3 w-3" />
+                              {phone}
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            {new Date(application.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                        
+                        {/* Document Links */}
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          {application.resume_url && (
+                            <Button variant="outline" size="sm" className="gap-1 h-8" asChild>
+                              <a href={application.resume_url} target="_blank" rel="noopener noreferrer">
+                                <Download className="h-3 w-3" />
+                                Resume
+                              </a>
+                            </Button>
+                          )}
+                          {application.cover_letter_file_url && (
+                            <Button variant="outline" size="sm" className="gap-1 h-8" asChild>
+                              <a href={application.cover_letter_file_url} target="_blank" rel="noopener noreferrer">
+                                <FileTextIcon className="h-3 w-3" />
+                                Cover Letter
+                              </a>
+                            </Button>
+                          )}
+                          {application.linkedin_url && (
+                            <Button variant="outline" size="sm" className="gap-1 h-8" asChild>
+                              <a href={application.linkedin_url} target="_blank" rel="noopener noreferrer">
+                                <ExternalLink className="h-3 w-3" />
+                                LinkedIn
+                              </a>
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <Select
+                          value={application.status}
+                          onValueChange={(value) => handleUpdateApplicationStatus(application.id, value)}
+                        >
+                          <SelectTrigger className="w-[140px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {APPLICATION_STATUSES.map(status => (
+                              <SelectItem key={status.value} value={status.value}>
+                                {status.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSelectedApplication(application)}
+                        >
+                          View Details
+                        </Button>
                       </div>
                     </div>
-                    
-                    <div className="flex items-center gap-2">
-                      {application.linkedin_url && (
-                        <Button variant="ghost" size="icon" asChild>
-                          <a href={application.linkedin_url} target="_blank" rel="noopener noreferrer">
-                            <ExternalLink className="h-4 w-4" />
-                          </a>
-                        </Button>
-                      )}
-                      <Select
-                        value={application.status}
-                        onValueChange={(value) => handleUpdateApplicationStatus(application.id, value)}
-                      >
-                        <SelectTrigger className="w-[140px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {APPLICATION_STATUSES.map(status => (
-                            <SelectItem key={status.value} value={status.value}>
-                              {status.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedApplication(application)}
-                      >
-                        View Details
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
 
             {applications.length === 0 && (
               <div className="text-center py-12 text-muted-foreground">
@@ -898,7 +934,7 @@ export const JobPositionsManager: React.FC = () => {
 
       {/* Application Details Dialog */}
       <Dialog open={!!selectedApplication} onOpenChange={() => setSelectedApplication(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Application Details</DialogTitle>
             <DialogDescription>
@@ -906,79 +942,114 @@ export const JobPositionsManager: React.FC = () => {
             </DialogDescription>
           </DialogHeader>
 
-          {selectedApplication && (
-            <div className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-muted-foreground">Name</Label>
-                  <p className="font-medium">{selectedApplication.applicant_name}</p>
+          {selectedApplication && (() => {
+            // Support both old and new field names
+            const name = selectedApplication.full_name || selectedApplication.applicant_name || 'Unknown';
+            const email = selectedApplication.email || selectedApplication.applicant_email || '';
+            const phone = selectedApplication.phone || selectedApplication.applicant_phone || '';
+            
+            return (
+              <div className="space-y-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-muted-foreground">Name</Label>
+                    <p className="font-medium">{name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Email</Label>
+                    <p className="font-medium">{email}</p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Phone</Label>
+                    <p className="font-medium">{phone || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Applied On</Label>
+                    <p className="font-medium">{new Date(selectedApplication.created_at).toLocaleDateString()}</p>
+                  </div>
                 </div>
-                <div>
-                  <Label className="text-muted-foreground">Email</Label>
-                  <p className="font-medium">{selectedApplication.applicant_email}</p>
+
+                {/* Documents Section */}
+                <div className="border rounded-lg p-4 bg-muted/30">
+                  <Label className="text-muted-foreground mb-3 block">Uploaded Documents</Label>
+                  <div className="flex flex-wrap gap-3">
+                    {selectedApplication.resume_url ? (
+                      <Button variant="default" size="sm" className="gap-2" asChild>
+                        <a href={selectedApplication.resume_url} target="_blank" rel="noopener noreferrer">
+                          <Download className="h-4 w-4" />
+                          Download Resume
+                        </a>
+                      </Button>
+                    ) : (
+                      <Badge variant="secondary" className="text-muted-foreground">No resume uploaded</Badge>
+                    )}
+                    
+                    {selectedApplication.cover_letter_file_url ? (
+                      <Button variant="default" size="sm" className="gap-2" asChild>
+                        <a href={selectedApplication.cover_letter_file_url} target="_blank" rel="noopener noreferrer">
+                          <FileTextIcon className="h-4 w-4" />
+                          Download Cover Letter
+                        </a>
+                      </Button>
+                    ) : (
+                      <Badge variant="secondary" className="text-muted-foreground">No cover letter file</Badge>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <Label className="text-muted-foreground">Phone</Label>
-                  <p className="font-medium">{selectedApplication.applicant_phone || 'N/A'}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Applied On</Label>
-                  <p className="font-medium">{new Date(selectedApplication.created_at).toLocaleDateString()}</p>
+
+                {selectedApplication.linkedin_url && (
+                  <div>
+                    <Label className="text-muted-foreground">LinkedIn</Label>
+                    <a href={selectedApplication.linkedin_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
+                      {selectedApplication.linkedin_url}
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                )}
+
+                {selectedApplication.portfolio_url && (
+                  <div>
+                    <Label className="text-muted-foreground">Portfolio</Label>
+                    <a href={selectedApplication.portfolio_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
+                      {selectedApplication.portfolio_url}
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                )}
+
+                {selectedApplication.cover_letter && (
+                  <div>
+                    <Label className="text-muted-foreground">Cover Letter / Message</Label>
+                    <p className="mt-1 p-3 bg-muted rounded-lg text-sm whitespace-pre-wrap">
+                      {selectedApplication.cover_letter}
+                    </p>
+                  </div>
+                )}
+
+                <div className="pt-4 border-t">
+                  <Label className="text-muted-foreground">Update Status</Label>
+                  <Select
+                    value={selectedApplication.status}
+                    onValueChange={(value) => {
+                      handleUpdateApplicationStatus(selectedApplication.id, value);
+                      setSelectedApplication({ ...selectedApplication, status: value });
+                    }}
+                  >
+                    <SelectTrigger className="mt-2">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {APPLICATION_STATUSES.map(status => (
+                        <SelectItem key={status.value} value={status.value}>
+                          {status.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
-
-              {selectedApplication.linkedin_url && (
-                <div>
-                  <Label className="text-muted-foreground">LinkedIn</Label>
-                  <a href={selectedApplication.linkedin_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
-                    {selectedApplication.linkedin_url}
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
-                </div>
-              )}
-
-              {selectedApplication.portfolio_url && (
-                <div>
-                  <Label className="text-muted-foreground">Portfolio</Label>
-                  <a href={selectedApplication.portfolio_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
-                    {selectedApplication.portfolio_url}
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
-                </div>
-              )}
-
-              {selectedApplication.cover_letter && (
-                <div>
-                  <Label className="text-muted-foreground">Cover Letter</Label>
-                  <p className="mt-1 p-3 bg-muted rounded-lg text-sm whitespace-pre-wrap">
-                    {selectedApplication.cover_letter}
-                  </p>
-                </div>
-              )}
-
-              <div className="pt-4 border-t">
-                <Label className="text-muted-foreground">Update Status</Label>
-                <Select
-                  value={selectedApplication.status}
-                  onValueChange={(value) => {
-                    handleUpdateApplicationStatus(selectedApplication.id, value);
-                    setSelectedApplication({ ...selectedApplication, status: value });
-                  }}
-                >
-                  <SelectTrigger className="mt-2">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {APPLICATION_STATUSES.map(status => (
-                      <SelectItem key={status.value} value={status.value}>
-                        {status.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
+            );
+          })()}
         </DialogContent>
       </Dialog>
     </div>

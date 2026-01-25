@@ -18,6 +18,7 @@ import {
   BarChart3, 
   Settings, 
   LogOut,
+  Briefcase,
   Search,
   RefreshCw,
   AlertTriangle,
@@ -96,6 +97,7 @@ import { AdminMessaging } from "@/components/admin/AdminMessaging";
 import { LiveChatManager } from "@/components/admin/LiveChatManager";
 import { EnhancedCommunicationsManager } from "@/components/admin/EnhancedCommunicationsManager";
 import { SupabaseSecurityAdvisor } from "@/components/admin/SupabaseSecurityAdvisor";
+import { JobPositionsManager } from "@/components/admin/JobPositionsManager";
 import { Camera, UserCog, MessageCircle, Link2 } from "lucide-react";
 import { CameraAssignment } from "@/components/admin/CameraAssignment";
 import {
@@ -1802,7 +1804,7 @@ const AdminDashboard = () => {
   // Helper function to check if a tab should be shown
   const shouldShowTab = (tab: string): boolean => {
     // Admin-only tabs (not in permissions config)
-    const adminOnlyTabs = ['pending-products', 'qr-codes', 'videos', 'user-roles', 'messaging'];
+    const adminOnlyTabs = ['pending-products', 'qr-codes', 'videos', 'user-roles', 'messaging', 'careers'];
     if (adminOnlyTabs.includes(tab)) {
       return isAdminStaff || isSuperAdminStaff;
     }
@@ -2133,6 +2135,12 @@ const AdminDashboard = () => {
               <TabsTrigger value="settings" className="data-[state=active]:bg-blue-600">
                 <Settings className="h-4 w-4 mr-2" />
                 Settings
+              </TabsTrigger>
+            )}
+            {shouldShowTab('careers') && (
+              <TabsTrigger value="careers" className="data-[state=active]:bg-amber-600">
+                <Briefcase className="h-4 w-4 mr-2" />
+                Careers
               </TabsTrigger>
             )}
             {shouldShowTab('user-roles') && (
@@ -4425,6 +4433,11 @@ const AdminDashboard = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Careers & Job Applications Tab */}
+          <TabsContent value="careers" className="space-y-6">
+            <JobPositionsManager />
           </TabsContent>
 
           {/* User Roles Management Tab */}
