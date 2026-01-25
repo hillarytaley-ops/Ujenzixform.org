@@ -101,7 +101,7 @@ export const FloatingSocialSidebar: React.FC = () => {
   }
 
   return (
-    <div ref={containerRef} className="fixed left-6 bottom-6 z-50">
+    <div ref={containerRef} className="fixed left-6 bottom-6 z-[9999]" style={{ position: 'fixed', bottom: '24px', left: '24px', zIndex: 9999 }}>
       {/* Backdrop overlay when open */}
       {isOpen && (
         <div 
