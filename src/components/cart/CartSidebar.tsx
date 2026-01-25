@@ -15,7 +15,7 @@
  * ╚══════════════════════════════════════════════════════════════════════════════════════╝
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,10 +23,11 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useCart, CartItem } from '@/contexts/CartContext';
-import { ShoppingCart, Trash2, Plus, Minus, Package, X, FileText, CreditCard, Scale, Store } from 'lucide-react';
+import { ShoppingCart, Trash2, Plus, Minus, Package, X, FileText, CreditCard, Scale, Store, Users } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { CartPriceComparison } from './CartPriceComparison';
+import { MultiSupplierQuoteDialog } from './MultiSupplierQuoteDialog';
 
 export const CartSidebar: React.FC = () => {
   const { 
@@ -42,6 +43,24 @@ export const CartSidebar: React.FC = () => {
   const { toast } = useToast();
   const [comparisonItem, setComparisonItem] = useState<CartItem | null>(null);
   const [showComparison, setShowComparison] = useState(false);
+  const [showMultiSupplierQuote, setShowMultiSupplierQuote] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  // Check user role on mount
+  useEffect(() => {
+    const checkUserRole = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        setUserRole(roleData?.role || null);
+      }
+    };
+    checkUserRole();
+  }, [isCartOpen]);
 
   const handleQuantityChange = (itemId: string, newQuantity: number) => {
     if (newQuantity >= 1) {
@@ -398,27 +417,48 @@ export const CartSidebar: React.FC = () => {
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="grid grid-cols-2 gap-2">
-                <Button 
-                  className="bg-blue-600 hover:bg-blue-700 h-12 flex flex-col items-center justify-center"
-                  onClick={handleRequestQuote}
-                >
-                  <FileText className="h-4 w-4 mb-0.5" />
-                  <span className="text-xs">Request Quote</span>
-                </Button>
-                <Button 
-                  className="bg-green-600 hover:bg-green-700 h-12 flex flex-col items-center justify-center"
-                  onClick={handleBuyNow}
-                >
-                  <CreditCard className="h-4 w-4 mb-0.5" />
-                  <span className="text-xs">Buy Now</span>
-                </Button>
-              </div>
-              
-              <p className="text-[10px] text-center text-gray-500">
-                💡 Tip: Request a quote for bulk orders to get the best prices from suppliers
-              </p>
+              {/* Action Buttons - Different for Professional Builders */}
+              {userRole === 'professional_builder' ? (
+                <>
+                  {/* Professional Builder: Multi-Supplier Quote Flow */}
+                  <Button 
+                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 h-14 flex items-center justify-center gap-3"
+                    onClick={() => setShowMultiSupplierQuote(true)}
+                  >
+                    <Users className="h-5 w-5" />
+                    <div className="text-left">
+                      <span className="text-sm font-semibold">Request Quotes from Multiple Suppliers</span>
+                      <p className="text-[10px] opacity-80">Compare prices & get the best deal</p>
+                    </div>
+                  </Button>
+                  <p className="text-[10px] text-center text-blue-600 font-medium">
+                    🏗️ Professional Builder: Send your list to multiple suppliers and compare their quotes!
+                  </p>
+                </>
+              ) : (
+                <>
+                  {/* Private Client / Other: Standard Flow */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button 
+                      className="bg-blue-600 hover:bg-blue-700 h-12 flex flex-col items-center justify-center"
+                      onClick={handleRequestQuote}
+                    >
+                      <FileText className="h-4 w-4 mb-0.5" />
+                      <span className="text-xs">Request Quote</span>
+                    </Button>
+                    <Button 
+                      className="bg-green-600 hover:bg-green-700 h-12 flex flex-col items-center justify-center"
+                      onClick={handleBuyNow}
+                    >
+                      <CreditCard className="h-4 w-4 mb-0.5" />
+                      <span className="text-xs">Buy Now</span>
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-center text-gray-500">
+                    💡 Tip: Request a quote for bulk orders to get the best prices from suppliers
+                  </p>
+                </>
+              )}
             </div>
           </>
         )}
@@ -431,6 +471,17 @@ export const CartSidebar: React.FC = () => {
             setComparisonItem(null);
           }}
           cartItem={comparisonItem}
+        />
+
+        {/* Multi-Supplier Quote Dialog (for Professional Builders) */}
+        <MultiSupplierQuoteDialog
+          isOpen={showMultiSupplierQuote}
+          onClose={() => setShowMultiSupplierQuote(false)}
+          cartItems={items}
+          onQuotesSent={() => {
+            clearCart();
+            setIsCartOpen(false);
+          }}
         />
       </SheetContent>
     </Sheet>

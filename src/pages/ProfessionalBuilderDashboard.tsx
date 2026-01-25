@@ -53,6 +53,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { SupplierQuoteReview } from "@/components/builders/SupplierQuoteReview";
+import { PendingQuoteRequests } from "@/components/builders/PendingQuoteRequests";
 import DeliveryRequest from "@/components/DeliveryRequest";
 
 const ProfessionalBuilderDashboardPage = () => {
@@ -434,7 +435,18 @@ const ProfessionalBuilderDashboardPage = () => {
 
           {/* Quotes Tab - Review supplier pricing */}
           <TabsContent value="quotes">
-            <SupplierQuoteReview builderId={user?.id || ''} />
+            <Tabs defaultValue="my-requests" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-4">
+                <TabsTrigger value="my-requests">My Quote Requests</TabsTrigger>
+                <TabsTrigger value="supplier-quotes">Supplier Responses</TabsTrigger>
+              </TabsList>
+              <TabsContent value="my-requests">
+                <PendingQuoteRequests builderId={user?.id || ''} />
+              </TabsContent>
+              <TabsContent value="supplier-quotes">
+                <SupplierQuoteReview builderId={user?.id || ''} />
+              </TabsContent>
+            </Tabs>
           </TabsContent>
 
           <TabsContent value="orders">
