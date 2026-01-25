@@ -87,17 +87,21 @@ export const CartPriceComparison: React.FC<CartPriceComparisonProps> = ({
     setLoading(true);
     try {
       // 1. Fetch all suppliers first (to map IDs to names)
+      // Note: supplier_id in supplier_product_prices is the user's auth.uid(), 
+      // which maps to user_id in the suppliers table, NOT the suppliers.id
       const { data: suppliersData, error: suppliersError } = await supabase
         .from('suppliers')
-        .select('id, company_name, rating');
+        .select('id, user_id, company_name, rating');
 
       if (suppliersError) {
         console.error('Error fetching suppliers:', suppliersError);
       }
 
-      const suppliersMap = new Map((suppliersData || []).map((s: any) => [s.id, s]));
+      // Create TWO maps: one by id, one by user_id (since supplier_product_prices uses user_id as supplier_id)
+      const suppliersByIdMap = new Map((suppliersData || []).map((s: any) => [s.id, s]));
+      const suppliersByUserIdMap = new Map((suppliersData || []).map((s: any) => [s.user_id, s]));
       console.log('📦 Suppliers loaded:', suppliersData?.length, 'entries');
-      console.log('📦 Suppliers map:', Array.from(suppliersMap.entries()).slice(0, 5));
+      console.log('📦 Sample suppliers:', suppliersData?.slice(0, 3).map((s: any) => ({ id: s.id, user_id: s.user_id, name: s.company_name })));
 
       // 2. Fetch supplier prices (without join)
       const { data: supplierPricesData, error: pricesError } = await supabase
@@ -153,7 +157,8 @@ export const CartPriceComparison: React.FC<CartPriceComparisonProps> = ({
           // Skip if it's the same item we're comparing
           if (sp.product_id === cartItem.id && sp.supplier_id === cartItem.supplier_id) continue;
 
-          const supplier = suppliersMap.get(sp.supplier_id);
+          // Try both maps - supplier_id could be either the suppliers.id OR the user_id
+          let supplier = suppliersByIdMap.get(sp.supplier_id) || suppliersByUserIdMap.get(sp.supplier_id);
           console.log('🔍 Supplier lookup:', sp.supplier_id, '->', supplier?.company_name || 'NOT FOUND');
           alternativesWithPrices.push({
             product_id: sp.product_id,
@@ -181,7 +186,10 @@ export const CartPriceComparison: React.FC<CartPriceComparisonProps> = ({
           // Skip if it's the same item we're comparing
           if (material.id === cartItem.id) continue;
 
-          const supplier = material.supplier_id ? suppliersMap.get(material.supplier_id) : null;
+          // Try both maps - supplier_id could be either the suppliers.id OR the user_id
+          const supplier = material.supplier_id 
+            ? (suppliersByIdMap.get(material.supplier_id) || suppliersByUserIdMap.get(material.supplier_id))
+            : null;
           alternativesWithPrices.push({
             product_id: material.id,
             product_name: material.name,
