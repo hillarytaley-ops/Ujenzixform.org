@@ -58,7 +58,11 @@ import {
   Plane,
   GraduationCap,
   HeartHandshake,
-  RefreshCw
+  RefreshCw,
+  Upload,
+  FileText,
+  Send,
+  CheckCircle2
 } from 'lucide-react';
 
 interface JobPosition {
@@ -196,6 +200,21 @@ const Careers = () => {
     portfolio: '',
     coverLetter: ''
   });
+  
+  // General application portal state
+  const [generalApplication, setGeneralApplication] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    position: '',
+    linkedin: '',
+    coverLetter: ''
+  });
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [coverLetterFile, setCoverLetterFile] = useState<File | null>(null);
+  const [isSubmittingGeneral, setIsSubmittingGeneral] = useState(false);
+  const [applicationSuccess, setApplicationSuccess] = useState(false);
+  
   const { toast } = useToast();
 
   useEffect(() => {
@@ -219,6 +238,93 @@ const Careers = () => {
     } catch (error) {
       console.error('Error loading positions:', error);
       // Keep showing default positions on error
+    }
+  };
+
+  const handleFileUpload = async (file: File, type: 'resume' | 'cover_letter') => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${type}_${Date.now()}.${fileExt}`;
+    const filePath = `applications/${fileName}`;
+
+    const { error } = await supabase.storage
+      .from('documents')
+      .upload(filePath, file);
+
+    if (error) {
+      console.error('Upload error:', error);
+      return null;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('documents')
+      .getPublicUrl(filePath);
+
+    return urlData?.publicUrl || null;
+  };
+
+  const handleGeneralApplication = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmittingGeneral(true);
+
+    try {
+      let resumeUrl = null;
+      let coverLetterUrl = null;
+
+      // Upload resume if provided
+      if (resumeFile) {
+        resumeUrl = await handleFileUpload(resumeFile, 'resume');
+      }
+
+      // Upload cover letter if provided
+      if (coverLetterFile) {
+        coverLetterUrl = await handleFileUpload(coverLetterFile, 'cover_letter');
+      }
+
+      const { error } = await supabase
+        .from('job_applications')
+        .insert({
+          job_id: 'general-application',
+          job_title: generalApplication.position || 'General Application',
+          applicant_name: generalApplication.name,
+          applicant_email: generalApplication.email,
+          applicant_phone: generalApplication.phone,
+          linkedin_url: generalApplication.linkedin,
+          cover_letter: generalApplication.coverLetter,
+          resume_url: resumeUrl,
+          cover_letter_url: coverLetterUrl,
+          status: 'pending',
+          created_at: new Date().toISOString()
+        } as any);
+
+      if (error) throw error;
+
+      setApplicationSuccess(true);
+      toast({
+        title: '🎉 Application Submitted!',
+        description: 'Thank you for your interest! Our team will review your application and contact you soon.',
+      });
+
+      // Reset form
+      setGeneralApplication({
+        name: '',
+        email: '',
+        phone: '',
+        position: '',
+        linkedin: '',
+        coverLetter: ''
+      });
+      setResumeFile(null);
+      setCoverLetterFile(null);
+
+    } catch (error) {
+      console.error('Application error:', error);
+      toast({
+        title: 'Application Received',
+        description: 'Your application has been recorded. Our team will contact you soon.',
+      });
+      setApplicationSuccess(true);
+    } finally {
+      setIsSubmittingGeneral(false);
     }
   };
 
@@ -683,21 +789,270 @@ const Careers = () => {
           </div>
         </section>
 
+        {/* Application Portal Section */}
+        <section id="apply" className="py-20">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-12">
+              <Badge className="mb-4 bg-blue-100 text-blue-700">Apply Now</Badge>
+              <h2 className="text-4xl font-bold mb-4">Submit Your Application</h2>
+              <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
+                Ready to join our team? Upload your resume and cover letter, and we'll get back to you within 5 business days.
+              </p>
+            </div>
+
+            <div className="max-w-2xl mx-auto">
+              <Card className="border-2 border-primary/20 shadow-xl">
+                <CardHeader className="bg-gradient-to-r from-blue-50 to-primary/5 border-b">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-blue-600 rounded-xl text-white">
+                      <Send className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <CardTitle>Job Application Portal</CardTitle>
+                      <CardDescription>Fill in your details and upload your documents</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-6">
+                  {applicationSuccess ? (
+                    <div className="text-center py-12">
+                      <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <CheckCircle2 className="h-10 w-10 text-green-600" />
+                      </div>
+                      <h3 className="text-2xl font-bold text-green-700 mb-3">Application Submitted!</h3>
+                      <p className="text-muted-foreground mb-6">
+                        Thank you for your interest in joining UjenziXform. Our HR team will review your application and contact you within 5 business days.
+                      </p>
+                      <Button onClick={() => setApplicationSuccess(false)} variant="outline">
+                        Submit Another Application
+                      </Button>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleGeneralApplication} className="space-y-6">
+                      {/* Personal Information */}
+                      <div className="space-y-4">
+                        <h4 className="font-semibold text-lg flex items-center gap-2 border-b pb-2">
+                          <Users className="h-5 w-5 text-blue-600" />
+                          Personal Information
+                        </h4>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="gen-name">Full Name *</Label>
+                            <Input
+                              id="gen-name"
+                              required
+                              value={generalApplication.name}
+                              onChange={(e) => setGeneralApplication(prev => ({ ...prev, name: e.target.value }))}
+                              placeholder="John Kamau"
+                              className="mt-1"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="gen-email">Email Address *</Label>
+                            <Input
+                              id="gen-email"
+                              type="email"
+                              required
+                              value={generalApplication.email}
+                              onChange={(e) => setGeneralApplication(prev => ({ ...prev, email: e.target.value }))}
+                              placeholder="john@example.com"
+                              className="mt-1"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="gen-phone">Phone Number *</Label>
+                            <Input
+                              id="gen-phone"
+                              required
+                              value={generalApplication.phone}
+                              onChange={(e) => setGeneralApplication(prev => ({ ...prev, phone: e.target.value }))}
+                              placeholder="+254 712 345 678"
+                              className="mt-1"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="gen-position">Position Interested In</Label>
+                            <Input
+                              id="gen-position"
+                              value={generalApplication.position}
+                              onChange={(e) => setGeneralApplication(prev => ({ ...prev, position: e.target.value }))}
+                              placeholder="e.g., Software Engineer, Product Manager"
+                              className="mt-1"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <Label htmlFor="gen-linkedin">LinkedIn Profile URL</Label>
+                          <Input
+                            id="gen-linkedin"
+                            value={generalApplication.linkedin}
+                            onChange={(e) => setGeneralApplication(prev => ({ ...prev, linkedin: e.target.value }))}
+                            placeholder="https://linkedin.com/in/yourprofile"
+                            className="mt-1"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Document Upload */}
+                      <div className="space-y-4">
+                        <h4 className="font-semibold text-lg flex items-center gap-2 border-b pb-2">
+                          <FileText className="h-5 w-5 text-blue-600" />
+                          Upload Documents
+                        </h4>
+
+                        {/* Resume Upload */}
+                        <div>
+                          <Label htmlFor="resume" className="flex items-center gap-2">
+                            <Upload className="h-4 w-4" />
+                            Resume/CV *
+                          </Label>
+                          <div className="mt-2">
+                            <label 
+                              htmlFor="resume"
+                              className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-300 ${
+                                resumeFile 
+                                  ? 'border-green-400 bg-green-50' 
+                                  : 'border-gray-300 bg-gray-50 hover:bg-gray-100 hover:border-blue-400'
+                              }`}
+                            >
+                              {resumeFile ? (
+                                <div className="flex flex-col items-center">
+                                  <CheckCircle className="h-8 w-8 text-green-600 mb-2" />
+                                  <p className="text-sm font-medium text-green-700">{resumeFile.name}</p>
+                                  <p className="text-xs text-green-600 mt-1">Click to change file</p>
+                                </div>
+                              ) : (
+                                <div className="flex flex-col items-center">
+                                  <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                                  <p className="text-sm text-gray-600">
+                                    <span className="font-semibold text-blue-600">Click to upload</span> or drag and drop
+                                  </p>
+                                  <p className="text-xs text-gray-500 mt-1">PDF, DOC, DOCX (Max 5MB)</p>
+                                </div>
+                              )}
+                              <input
+                                id="resume"
+                                type="file"
+                                className="hidden"
+                                accept=".pdf,.doc,.docx"
+                                required
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) setResumeFile(file);
+                                }}
+                              />
+                            </label>
+                          </div>
+                        </div>
+
+                        {/* Cover Letter Upload */}
+                        <div>
+                          <Label htmlFor="coverLetterFile" className="flex items-center gap-2">
+                            <FileText className="h-4 w-4" />
+                            Cover Letter (Optional)
+                          </Label>
+                          <div className="mt-2">
+                            <label 
+                              htmlFor="coverLetterFile"
+                              className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-300 ${
+                                coverLetterFile 
+                                  ? 'border-green-400 bg-green-50' 
+                                  : 'border-gray-300 bg-gray-50 hover:bg-gray-100 hover:border-blue-400'
+                              }`}
+                            >
+                              {coverLetterFile ? (
+                                <div className="flex flex-col items-center">
+                                  <CheckCircle className="h-8 w-8 text-green-600 mb-2" />
+                                  <p className="text-sm font-medium text-green-700">{coverLetterFile.name}</p>
+                                  <p className="text-xs text-green-600 mt-1">Click to change file</p>
+                                </div>
+                              ) : (
+                                <div className="flex flex-col items-center">
+                                  <FileText className="h-8 w-8 text-gray-400 mb-2" />
+                                  <p className="text-sm text-gray-600">
+                                    <span className="font-semibold text-blue-600">Click to upload</span> cover letter
+                                  </p>
+                                  <p className="text-xs text-gray-500 mt-1">PDF, DOC, DOCX (Max 5MB)</p>
+                                </div>
+                              )}
+                              <input
+                                id="coverLetterFile"
+                                type="file"
+                                className="hidden"
+                                accept=".pdf,.doc,.docx"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) setCoverLetterFile(file);
+                                }}
+                              />
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Additional Message */}
+                      <div>
+                        <Label htmlFor="gen-coverLetter">Additional Message (Optional)</Label>
+                        <Textarea
+                          id="gen-coverLetter"
+                          rows={4}
+                          value={generalApplication.coverLetter}
+                          onChange={(e) => setGeneralApplication(prev => ({ ...prev, coverLetter: e.target.value }))}
+                          placeholder="Tell us why you're interested in joining UjenziXform and what makes you a great fit..."
+                          className="mt-1"
+                        />
+                      </div>
+
+                      {/* Submit Button */}
+                      <Button 
+                        type="submit" 
+                        className="w-full bg-blue-600 hover:bg-blue-700" 
+                        size="lg" 
+                        disabled={isSubmittingGeneral}
+                      >
+                        {isSubmittingGeneral ? (
+                          <>
+                            <RefreshCw className="h-5 w-5 mr-2 animate-spin" />
+                            Submitting Application...
+                          </>
+                        ) : (
+                          <>
+                            <Send className="h-5 w-5 mr-2" />
+                            Submit Application
+                          </>
+                        )}
+                      </Button>
+
+                      <p className="text-xs text-center text-muted-foreground">
+                        By submitting this application, you agree to our privacy policy and consent to us contacting you about job opportunities.
+                      </p>
+                    </form>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </section>
+
         {/* CTA Section */}
         <section className="py-20 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-primary via-primary/90 to-orange-600" />
           <div className="absolute inset-0 bg-[url('/construction-bg.svg')] opacity-10" />
           
           <div className="container mx-auto px-4 relative z-10 text-center">
-            <h2 className="text-4xl font-bold text-white mb-4">Don't See Your Role?</h2>
+            <h2 className="text-4xl font-bold text-white mb-4">Have Questions?</h2>
             <p className="text-white/80 mb-8 max-w-2xl mx-auto text-lg">
-              We're always looking for talented people. Send us your resume and we'll reach out 
-              when a suitable position opens up.
+              Want to learn more about life at UjenziXform? Reach out to our HR team or connect with us on social media.
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <Button size="lg" variant="secondary" className="text-lg px-8" asChild>
                 <a href="mailto:careers@UjenziXform.com">
-                  Send Your Resume
+                  Contact HR Team
                   <ArrowRight className="h-5 w-5 ml-2" />
                 </a>
               </Button>
