@@ -154,10 +154,10 @@ export const SimpleChatButton = () => {
       >
         <Button
           onClick={() => setIsOpen(true)}
-          className="rounded-full h-10 w-10 bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300 p-0"
-          style={{ borderRadius: '50%', width: '40px', height: '40px' }}
+          className="rounded-full h-14 w-14 bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300 p-0"
+          style={{ borderRadius: '50%', width: '56px', height: '56px' }}
         >
-          <MessageCircle className="h-5 w-5 text-white" />
+          <MessageCircle className="h-6 w-6 text-white" />
         </Button>
       </div>
     );
