@@ -23,7 +23,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useCart, CartItem } from '@/contexts/CartContext';
-import { ShoppingCart, Trash2, Plus, Minus, Package, X, FileText, CreditCard, Scale } from 'lucide-react';
+import { ShoppingCart, Trash2, Plus, Minus, Package, X, FileText, CreditCard, Scale, Store } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { CartPriceComparison } from './CartPriceComparison';
@@ -62,46 +62,88 @@ export const CartSidebar: React.FC = () => {
         return;
       }
 
-      // Generate PO number
-      const poNumber = `QR-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+      // Group items by supplier
+      const itemsBySupplier: Record<string, CartItem[]> = {};
+      for (const item of items) {
+        const supplierId = item.supplier_id || 'general';
+        if (!itemsBySupplier[supplierId]) {
+          itemsBySupplier[supplierId] = [];
+        }
+        itemsBySupplier[supplierId].push(item);
+      }
+
+      // Fetch supplier names for display
+      const supplierIds = Object.keys(itemsBySupplier).filter(id => id !== 'general');
+      let suppliersMap: Record<string, string> = {};
       
-      // Get a default supplier (use first item's supplier or find one)
-      const supplierId = items[0]?.supplier_id || user.id;
-      
-      // Create purchase order with cart items
-      const { data: orderData, error: orderError } = await supabase
-        .from('purchase_orders')
-        .insert({
-          po_number: poNumber,
-          buyer_id: user.id,
-          supplier_id: supplierId,
-          total_amount: getTotalPrice(),
-          delivery_address: 'To be provided',
-          delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 days from now
-          project_name: 'Cart Order - ' + new Date().toLocaleDateString(),
-          status: 'pending',
-          items: items.map(item => ({
-            material_id: item.id,
-            material_name: item.name,
-            category: item.category,
-            quantity: item.quantity,
-            unit: item.unit,
-            unit_price: item.unit_price
-          })),
-          created_at: new Date().toISOString()
-        })
-        .select()
-        .single();
+      if (supplierIds.length > 0) {
+        // Try to get supplier names by both id and user_id
+        const { data: suppliersData } = await supabase
+          .from('suppliers')
+          .select('id, user_id, company_name');
+        
+        if (suppliersData) {
+          suppliersData.forEach(s => {
+            suppliersMap[s.id] = s.company_name;
+            if (s.user_id) suppliersMap[s.user_id] = s.company_name;
+          });
+        }
+      }
 
-      if (orderError) throw orderError;
+      // Create separate quote requests for each supplier
+      let successCount = 0;
+      const supplierNames: string[] = [];
 
-      toast({
-        title: '✅ Quote Requested!',
-        description: `Your quote request for ${getTotalItems()} items has been submitted. Suppliers will respond shortly.`,
-      });
+      for (const [supplierId, supplierItems] of Object.entries(itemsBySupplier)) {
+        const supplierTotal = supplierItems.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
+        const poNumber = `QR-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+        
+        // Get supplier name
+        const supplierName = suppliersMap[supplierId] || supplierItems[0]?.supplier_name || 'General Catalog';
+        
+        const { error: orderError } = await supabase
+          .from('purchase_orders')
+          .insert({
+            po_number: poNumber,
+            buyer_id: user.id,
+            supplier_id: supplierId === 'general' ? user.id : supplierId,
+            total_amount: supplierTotal,
+            delivery_address: 'To be provided',
+            delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            project_name: `Quote Request - ${supplierName}`,
+            status: 'pending',
+            items: supplierItems.map(item => ({
+              material_id: item.id,
+              material_name: item.name,
+              category: item.category,
+              quantity: item.quantity,
+              unit: item.unit,
+              unit_price: item.unit_price,
+              supplier_name: item.supplier_name
+            })),
+            created_at: new Date().toISOString()
+          });
 
-      clearCart();
-      setIsCartOpen(false);
+        if (!orderError) {
+          successCount++;
+          if (!supplierNames.includes(supplierName)) {
+            supplierNames.push(supplierName);
+          }
+        } else {
+          console.error('Quote request error for supplier:', supplierId, orderError);
+        }
+      }
+
+      if (successCount > 0) {
+        toast({
+          title: '✅ Quote Requested!',
+          description: `Quote sent to ${supplierNames.length} supplier(s): ${supplierNames.join(', ')}. They will respond shortly.`,
+        });
+        clearCart();
+        setIsCartOpen(false);
+      } else {
+        throw new Error('Failed to create any quote requests');
+      }
     } catch (error) {
       console.error('Error requesting quote:', error);
       toast({
@@ -218,50 +260,68 @@ export const CartSidebar: React.FC = () => {
           <>
             <ScrollArea className="flex-1 -mx-6 px-6">
               <div className="space-y-4 py-4">
-                {items.map((item) => (
-                  <div key={item.id} className="bg-gray-50 rounded-lg p-3 space-y-3">
-                    <div className="flex gap-3">
-                      {/* Item Image */}
-                      <div className="w-16 h-16 bg-white rounded-md overflow-hidden flex-shrink-0 border">
-                        {item.image_url ? (
-                          <img 
-                            src={item.image_url} 
-                            alt={item.name}
-                            className="w-full h-full object-contain p-1"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Package className="h-6 w-6 text-gray-400" />
+                {/* Group items by supplier for display */}
+                {(() => {
+                  const groupedItems: Record<string, CartItem[]> = {};
+                  items.forEach(item => {
+                    const supplierKey = item.supplier_name || 'UjenziXform Catalog';
+                    if (!groupedItems[supplierKey]) {
+                      groupedItems[supplierKey] = [];
+                    }
+                    groupedItems[supplierKey].push(item);
+                  });
+                  
+                  return Object.entries(groupedItems).map(([supplierName, supplierItems]) => (
+                    <div key={supplierName} className="space-y-2">
+                      {/* Supplier Header */}
+                      <div className="flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-2 border border-blue-200">
+                        <Store className="h-4 w-4 text-blue-600" />
+                        <span className="text-sm font-semibold text-blue-800">{supplierName}</span>
+                        <Badge className="bg-blue-600 ml-auto">{supplierItems.length} item(s)</Badge>
+                      </div>
+                      
+                      {/* Items from this supplier */}
+                      {supplierItems.map((item) => (
+                        <div key={item.id} className="bg-gray-50 rounded-lg p-3 space-y-3 ml-2 border-l-2 border-blue-200">
+                          <div className="flex gap-3">
+                            {/* Item Image */}
+                            <div className="w-14 h-14 bg-white rounded-md overflow-hidden flex-shrink-0 border">
+                              {item.image_url ? (
+                                <img 
+                                  src={item.image_url} 
+                                  alt={item.name}
+                                  className="w-full h-full object-contain p-1"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <Package className="h-5 w-5 text-gray-400" />
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* Item Details */}
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium text-sm line-clamp-2 leading-tight">
+                                {item.name}
+                              </h4>
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 mt-1">
+                                {item.category}
+                              </Badge>
+                              <p className="text-sm font-semibold text-blue-600 mt-1">
+                                KES {item.unit_price.toLocaleString()}/{item.unit}
+                              </p>
+                            </div>
+                            
+                            {/* Remove Button */}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50 flex-shrink-0"
+                              onClick={() => removeFromCart(item.id)}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
                           </div>
-                        )}
-                      </div>
-                      
-                      {/* Item Details */}
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-sm line-clamp-2 leading-tight">
-                          {item.name}
-                        </h4>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                            {item.category}
-                          </Badge>
-                          <span className="text-xs text-gray-500">{item.supplier_name}</span>
-                        </div>
-                        <p className="text-sm font-semibold text-blue-600 mt-1">
-                          KES {item.unit_price.toLocaleString()}/{item.unit}
-                        </p>
-                      </div>
-                      
-                      {/* Remove Button */}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50 flex-shrink-0"
-                        onClick={() => removeFromCart(item.id)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
                     
                     {/* Quantity Controls */}
                     <div className="flex items-center justify-between bg-white rounded-md p-2">
@@ -297,21 +357,24 @@ export const CartSidebar: React.FC = () => {
                       </span>
                     </div>
                     
-                    {/* Compare Prices Button */}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full text-purple-600 border-purple-200 hover:bg-purple-50 hover:border-purple-300"
-                      onClick={() => {
-                        setComparisonItem(item);
-                        setShowComparison(true);
-                      }}
-                    >
-                      <Scale className="h-3 w-3 mr-1.5" />
-                      Compare Prices
-                    </Button>
-                  </div>
-                ))}
+                          {/* Compare Prices Button */}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full text-purple-600 border-purple-200 hover:bg-purple-50 hover:border-purple-300"
+                            onClick={() => {
+                              setComparisonItem(item);
+                              setShowComparison(true);
+                            }}
+                          >
+                            <Scale className="h-3 w-3 mr-1.5" />
+                            Compare Prices
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ));
+                })()}
               </div>
             </ScrollArea>
 
