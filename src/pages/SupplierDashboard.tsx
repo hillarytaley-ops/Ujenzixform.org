@@ -348,17 +348,28 @@ const SupplierDashboard = () => {
           updateData.quote_amount = parseFloat(quoteResponse.quoteAmount);
         }
 
-        const { error: poError } = await supabase
+        const quoteId = selectedQuote.purchase_order_id || selectedQuote.id;
+        console.log('🔄 Attempting to update purchase_order:', quoteId, 'with data:', updateData);
+
+        const { data: updateResult, error: poError } = await supabase
           .from('purchase_orders')
           .update(updateData)
-          .eq('id', selectedQuote.purchase_order_id || selectedQuote.id);
+          .eq('id', quoteId)
+          .select();
         
         if (poError) {
-          console.error('Error updating purchase order:', poError);
+          console.error('❌ Error updating purchase order:', poError);
           throw poError;
         }
         
-        console.log(`✅ Quote ${action === 'approve' ? 'sent' : 'rejected'} - Purchase order updated`);
+        // Check if any rows were actually updated
+        if (!updateResult || updateResult.length === 0) {
+          console.error('⚠️ No rows updated! RLS policy may be blocking the update.');
+          console.error('Quote ID:', quoteId, 'Supplier user.id:', user?.id);
+          throw new Error('Failed to update quote - you may not have permission to update this order');
+        }
+        
+        console.log(`✅ Quote ${action === 'approve' ? 'sent' : 'rejected'} - Purchase order updated:`, updateResult);
       } else {
         // Legacy: Update quotation_requests table
         const updateData: any = {
