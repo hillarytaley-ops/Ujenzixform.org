@@ -50,10 +50,20 @@ export const RoleProtectedRoute = ({
       const isAdminAuthenticated = localStorage.getItem('admin_authenticated') === 'true';
       const adminLoginTime = localStorage.getItem('admin_login_time');
       
-      // ✅ SPEED OPTIMIZATION: Trust localStorage if recently verified (within 5 minutes)
-      const TRUST_DURATION = 5 * 60 * 1000; // 5 minutes
+      // ✅ SPEED OPTIMIZATION: Trust localStorage if recently verified (within 10 minutes)
+      const TRUST_DURATION = 10 * 60 * 1000; // 10 minutes (increased from 5)
       const roleAge = roleVerifiedTime ? Date.now() - parseInt(roleVerifiedTime) : Infinity;
       const isRecentlyVerified = roleAge < TRUST_DURATION;
+      
+      // ✅ INSTANT ACCESS: If localStorage has valid recent role, grant access immediately
+      if (isRecentlyVerified && localRole && allowedRoles.includes(localRole)) {
+        console.log('⚡ INSTANT ACCESS: Using fresh localStorage role:', localRole);
+        setUserRole(localRole);
+        setAccessGranted(true);
+        setChecking(false);
+        hasCompletedCheck.current = true;
+        return;
+      }
       
       // ✅ ADMIN BYPASS: Check admin session (within 24 hours)
       const adminSessionAge = adminLoginTime ? Date.now() - parseInt(adminLoginTime) : Infinity;

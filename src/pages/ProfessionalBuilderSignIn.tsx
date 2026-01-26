@@ -57,7 +57,10 @@ const ProfessionalBuilderSignIn = () => {
         description: "Redirecting to your dashboard...",
       });
 
-      // Navigate immediately - RoleProtectedRoute will use localStorage
+      // ✅ FIX: Small delay to ensure auth state propagates before navigation
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Navigate with replace to prevent back button issues
       navigate('/professional-builder-dashboard', { replace: true });
     } catch (error: any) {
       toast({
