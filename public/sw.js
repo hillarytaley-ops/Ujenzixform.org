@@ -56,10 +56,24 @@ const DB_VERSION = 1;
 // INSTALL EVENT - Cache static assets
 // ============================================================
 self.addEventListener('install', (event) => {
-  console.log('[SW] Installing UjenziXform service worker v5...');
+  console.log(`[SW] Installing UjenziXform service worker ${CACHE_VERSION}...`);
+  
+  // Skip waiting to activate immediately
+  self.skipWaiting();
   
   event.waitUntil(
     Promise.all([
+      // Clear ALL old caches first to prevent stale chunk errors
+      caches.keys().then((cacheNames) => {
+        return Promise.all(
+          cacheNames.map((cacheName) => {
+            if (!cacheName.includes(CACHE_VERSION)) {
+              console.log(`[SW] Deleting old cache: ${cacheName}`);
+              return caches.delete(cacheName);
+            }
+          })
+        );
+      }),
       // Cache static assets
       caches.open(STATIC_CACHE).then((cache) => {
         console.log('[SW] Caching static assets');
