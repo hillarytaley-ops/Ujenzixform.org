@@ -45,233 +45,10 @@ const SupplierSignIn = () => {
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [showEmailNotVerified, setShowEmailNotVerified] = useState(false);
   const [resendingEmail, setResendingEmail] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(false); // Toggle between sign-in and sign-up
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const redirectTo = searchParams.get('redirect') || '/supplier-dashboard';
-
-  // Quick Sign Up (creates account and signs in immediately - NO email confirmation)
-  const handleQuickSignUp = async () => {
-    if (!email || !password) {
-      toast({
-        variant: "destructive",
-        title: "Missing Information",
-        description: "Please enter both email and password."
-      });
-      return;
-    }
-
-    if (password.length < 6) {
-      toast({
-        variant: "destructive",
-        title: "Password Too Short",
-        description: "Password must be at least 6 characters."
-      });
-      return;
-    }
-
-    setLoading(true);
-    console.log('🔐 Quick sign up for:', email);
-
-    try {
-      // Create account
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: email.trim().toLowerCase(),
-        password: password,
-        options: {
-          data: {
-            role: 'supplier',
-            user_type: 'supplier'
-          },
-          emailRedirectTo: undefined // Disable email redirect
-        }
-      });
-
-      if (authError) {
-        console.error('🔐 Sign up error:', authError);
-        
-        if (authError.message.includes('already registered') || authError.message.includes('already been registered')) {
-          toast({
-            variant: "destructive",
-            title: "Account Exists",
-            description: "This email is already registered. Try signing in instead."
-          });
-          setIsSignUp(false);
-        } else {
-          toast({
-            variant: "destructive",
-            title: "Sign up failed",
-            description: authError.message
-          });
-        }
-        setLoading(false);
-        return;
-      }
-
-      if (!authData.user) {
-        toast({
-          variant: "destructive",
-          title: "Sign up failed",
-          description: "Could not create account."
-        });
-        setLoading(false);
-        return;
-      }
-
-      console.log('🔐 Sign up successful:', authData.user.email);
-      
-      const userId = authData.user.id;
-      const userEmail = authData.user.email?.toLowerCase() || '';
-
-      // If no session (email confirmation required), try to sign in directly
-      if (!authData.session) {
-        console.log('🔐 No session after signup, attempting direct sign in...');
-        
-        // Try signing in immediately
-        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-          email: email.trim().toLowerCase(),
-          password: password
-        });
-
-        if (signInError) {
-          // If sign-in fails due to email confirmation, show message
-          if (signInError.message.includes('Email not confirmed')) {
-            toast({
-              title: "📧 Almost Done!",
-              description: "Please check your email for a verification link, then sign in.",
-              duration: 10000
-            });
-          } else {
-            toast({
-              title: "✅ Account Created!",
-              description: "Please sign in with your new credentials.",
-            });
-            setIsSignUp(false);
-          }
-          setLoading(false);
-          return;
-        }
-
-        // Sign in successful
-        if (signInData.user) {
-          // SECURITY: Check if user already has a role in the database
-          const { data: existingRole } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', signInData.user.id)
-            .maybeSingle();
-          
-          if (existingRole?.role && existingRole.role !== 'supplier' && existingRole.role !== 'admin') {
-            // User has a DIFFERENT role - BLOCK them
-            console.log('🔐 User already has role:', existingRole.role, '- blocking supplier access');
-            toast({
-              variant: "destructive",
-              title: "❌ Access Denied",
-              description: `You are already registered as a ${existingRole.role}. You cannot register as a Supplier.`,
-              duration: 5000
-            });
-            await supabase.auth.signOut();
-            setLoading(false);
-            return;
-          }
-          
-          // Create supplier role only if no role exists
-          if (!existingRole?.role) {
-            console.log('🔐 Creating supplier role in database for new user');
-            const { error: insertError } = await supabase
-              .from('user_roles')
-              .insert({ user_id: signInData.user.id, role: 'supplier' as any });
-            
-            if (insertError) {
-              console.warn('🔐 Could not create supplier role:', insertError);
-            } else {
-              console.log('🔐 Successfully created supplier role in database');
-            }
-          }
-
-          localStorage.setItem('user_role', 'supplier');
-          localStorage.setItem('user_role_id', signInData.user.id);
-          localStorage.setItem('user_role_verified', Date.now().toString());
-          saveUserSession(signInData.user.id, userEmail, 'supplier');
-
-          toast({
-            title: "✅ Account Created & Signed In!",
-            description: "Welcome! Redirecting to your dashboard...",
-          });
-
-          setTimeout(() => {
-            window.location.href = redirectTo;
-          }, 500);
-          return;
-        }
-      }
-
-      // Session exists - user is signed in immediately
-      // SECURITY: Check if user already has a role in the database
-      const { data: existingRole } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-        .maybeSingle();
-      
-      if (existingRole?.role && existingRole.role !== 'supplier' && existingRole.role !== 'admin') {
-        // User has a DIFFERENT role - BLOCK them
-        console.log('🔐 User already has role:', existingRole.role, '- blocking supplier access');
-        toast({
-          variant: "destructive",
-          title: "❌ Access Denied",
-          description: `You are already registered as a ${existingRole.role}. You cannot register as a Supplier.`,
-          duration: 5000
-        });
-        await supabase.auth.signOut();
-        setLoading(false);
-        return;
-      }
-      
-      // Create supplier role only if no role exists
-      if (!existingRole?.role) {
-        console.log('🔐 Creating supplier role in database for new user (session exists)');
-        const { error: insertError } = await supabase
-          .from('user_roles')
-          .insert({ user_id: userId, role: 'supplier' as any });
-        
-        if (insertError) {
-          console.warn('🔐 Could not create supplier role:', insertError);
-        } else {
-          console.log('🔐 Successfully created supplier role in database');
-        }
-      }
-
-      localStorage.setItem('user_role', 'supplier');
-      localStorage.setItem('user_role_id', userId);
-      localStorage.setItem('user_role_verified', Date.now().toString());
-      saveUserSession(userId, userEmail, 'supplier');
-
-      // Update metadata
-      supabase.auth.updateUser({
-        data: { role: 'supplier', user_type: 'supplier' }
-      }).catch(() => {});
-
-      toast({
-        title: "✅ Account Created!",
-        description: "Welcome! Redirecting to your dashboard...",
-      });
-
-      setTimeout(() => {
-        window.location.href = redirectTo;
-      }, 500);
-
-    } catch (error: any) {
-      console.error('Sign up exception:', error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "An unexpected error occurred."
-      });
-      setLoading(false);
-    }
-  };
 
   // Resend verification email
   const resendVerificationEmail = async () => {
@@ -597,33 +374,7 @@ const SupplierSignIn = () => {
                 </AlertDescription>
               </Alert>
 
-              {/* Toggle between Sign In and Sign Up */}
-              <div className="flex mb-4 border rounded-lg overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setIsSignUp(false)}
-                  className={`flex-1 py-2 text-sm font-medium transition-colors ${
-                    !isSignUp 
-                      ? 'bg-orange-600 text-white' 
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  Sign In
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsSignUp(true)}
-                  className={`flex-1 py-2 text-sm font-medium transition-colors ${
-                    isSignUp 
-                      ? 'bg-orange-600 text-white' 
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  Quick Sign Up
-                </button>
-              </div>
-
-              <form onSubmit={isSignUp ? (e) => { e.preventDefault(); handleQuickSignUp(); } : handleSignIn} className="space-y-4">
+              <form onSubmit={handleSignIn} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">Email Address</Label>
                   <div className="relative">
@@ -642,17 +393,17 @@ const SupplierSignIn = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="password">{isSignUp ? 'Create Password' : 'Password'}</Label>
+                  <Label htmlFor="password">Password</Label>
                   <div className="relative">
                     <KeyRound className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
                       id="password"
                       type={showPassword ? "text" : "password"}
-                      placeholder={isSignUp ? "Min 6 characters" : "Enter your password"}
+                      placeholder="Enter your password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="pl-10 pr-10"
-                      autoComplete={isSignUp ? "new-password" : "current-password"}
+                      autoComplete="current-password"
                       required
                     />
                     <button
@@ -673,12 +424,12 @@ const SupplierSignIn = () => {
                   {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {isSignUp ? 'Creating Account...' : 'Signing In...'}
+                      Signing In...
                     </>
                   ) : (
                     <>
                       <Store className="mr-2 h-4 w-4" />
-                      {isSignUp ? 'Create Supplier Account' : 'Sign In as Supplier'}
+                      Sign In as Supplier
                     </>
                   )}
                 </Button>
