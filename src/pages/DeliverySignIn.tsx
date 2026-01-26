@@ -314,24 +314,25 @@ const DeliverySignIn = () => {
         return;
       }
       
-      // If STILL no role in database, create the delivery role now
+      // If NO role in database, BLOCK them - they must register first
       if (!dbRole) {
-        console.log('🔐 No role found, creating delivery role in database...');
-        const { error: insertError } = await supabase
-          .from('user_roles')
-          .insert({ user_id: userId, role: 'delivery' as any }); // Cast to any - DB accepts 'delivery'
-        
-        if (insertError) {
-          console.warn('🔐 Could not create role in DB:', insertError);
-          // Continue anyway - RoleProtectedRoute will handle it
-        } else {
-          console.log('🔐 Successfully created delivery role in database');
-        }
+        console.log('🔐 No role found - user must register first');
+        toast({
+          variant: "destructive",
+          title: "❌ Not Registered",
+          description: "You are not registered as a Delivery Provider. Please register first.",
+          duration: 5000
+        });
+        await supabase.auth.signOut();
+        localStorage.removeItem('user_role');
+        localStorage.removeItem('user_role_id');
+        localStorage.removeItem('user_role_verified');
+        setLoading(false);
+        return;
       }
       
-      // Set localStorage to their actual role
-      const effectiveRole = dbRole || 'delivery';
-      localStorage.setItem('user_role', effectiveRole);
+      // User has valid delivery role - allow access
+      localStorage.setItem('user_role', dbRole);
       localStorage.setItem('user_role_id', userId);
       localStorage.setItem('user_role_verified', Date.now().toString());
       localStorage.setItem('user_email', userEmail);

@@ -97,28 +97,13 @@ const BuilderSignIn = () => {
         return;
       }
       
-      // If user is a builder (professional_builder, private_client, or legacy 'builder') OR has no role yet, allow access
+      // If user is a builder (professional_builder, private_client, or legacy 'builder'), allow access
       const isBuilderRole = ['builder', 'professional_builder', 'private_client'].includes(dbRole || '');
       
-      if (isBuilderRole || !dbRole) {
-        // If no role exists, CREATE it in the database first (default to private_client)
-        if (!dbRole) {
-          console.log('🔐 No role found, creating private_client role in database');
-          const { error: insertError } = await supabase
-            .from('user_roles')
-            .insert({ user_id: user.id, role: 'private_client' as any });
-          
-          if (insertError) {
-            console.warn('🔐 Could not create private_client role:', insertError);
-          } else {
-            console.log('🔐 Successfully created private_client role in database');
-          }
-        }
-        
-        // Store the actual role (or default to private_client)
-        const roleToStore = dbRole || 'private_client';
-        localStorage.setItem('user_role', roleToStore);
+      if (isBuilderRole) {
+        localStorage.setItem('user_role', dbRole);
         localStorage.setItem('user_role_id', user.id);
+        localStorage.setItem('user_role_verified', Date.now().toString());
         toast({
           title: "✅ Welcome Back!",
           description: redirectTo.includes('marketplace') 
@@ -126,6 +111,23 @@ const BuilderSignIn = () => {
             : "Redirecting to your Dashboard...",
         });
         window.location.href = redirectTo;
+        return;
+      }
+      
+      // User has NO role - they need to register first
+      if (!dbRole) {
+        console.log('🔐 User has no role - must register first');
+        toast({
+          variant: "destructive",
+          title: "❌ Not Registered",
+          description: "You need to register first. Please use the appropriate registration link.",
+          duration: 5000
+        });
+        await supabase.auth.signOut();
+        localStorage.removeItem('user_role');
+        localStorage.removeItem('user_role_id');
+        localStorage.removeItem('user_role_verified');
+        setCheckingAuth(false);
         return;
       }
       
@@ -264,36 +266,30 @@ const BuilderSignIn = () => {
       // Check if user is a builder type (professional_builder, private_client, or legacy 'builder')
       const isBuilderRole = ['builder', 'professional_builder', 'private_client'].includes(dbRole || '');
       
-      // User is builder OR has no role yet - GRANT ACCESS
-      console.log('✅ Granting builder access, role:', dbRole || 'none (will create)');
-      
-      // Only create/update role if user STILL doesn't have one
+      // If NO role exists, BLOCK them - they must register first
       if (!dbRole) {
-        console.log('🔐 User has no role, creating private_client role in database...');
-        
-        // CRITICAL: Insert into user_roles table BEFORE redirecting
-        const { error: insertError } = await supabase
-          .from('user_roles')
-          .insert({ user_id: userId, role: 'private_client' as any });
-        
-        if (insertError) {
-          console.warn('🔐 Could not create private_client role:', insertError);
-        } else {
-          console.log('🔐 Successfully created private_client role in database');
-          dbRole = 'private_client';
-        }
-        
-        // Update user metadata (background, don't wait)
-        supabase.auth.updateUser({
-          data: { role: 'private_client', user_type: 'private_client' }
-        }).catch(() => {});
+        console.log('🔐 No role found - user must register first');
+        toast({
+          variant: "destructive",
+          title: "❌ Not Registered",
+          description: "You are not registered. Please register first using the link below.",
+          duration: 5000
+        });
+        await supabase.auth.signOut();
+        localStorage.removeItem('user_role');
+        localStorage.removeItem('user_role_id');
+        localStorage.removeItem('user_role_verified');
+        setLoading(false);
+        return;
       }
       
-      // Set localStorage with the actual role (or default to private_client)
-      const roleToStore = dbRole || 'private_client';
-      localStorage.setItem('user_role', roleToStore);
+      // User has valid builder role - allow access
+      console.log('✅ Granting builder access, role:', dbRole);
+      
+      localStorage.setItem('user_role', dbRole);
       localStorage.setItem('user_role_id', userId);
-      saveUserSession(userId, userEmail, roleToStore);
+      localStorage.setItem('user_role_verified', Date.now().toString());
+      saveUserSession(userId, userEmail, dbRole);
 
       toast({
         title: "✅ Welcome!",

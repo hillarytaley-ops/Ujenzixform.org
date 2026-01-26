@@ -123,14 +123,14 @@ export const RoleProtectedRoute = ({
         }
 
         if (!roleData?.role) {
-          // No role in DB - check localStorage
-          if (localRole && localRoleId === user.id && (allowedRoles.includes(localRole) || localRole === 'admin')) {
-            setUserRole(localRole);
-            setAccessGranted(true);
-          } else {
-            setUserRole(null);
-            setAccessGranted(false);
-          }
+          // No role in DB - DENY ACCESS (don't trust localStorage alone)
+          console.log('🔐 No role in database - access denied');
+          // Clear potentially stale localStorage
+          localStorage.removeItem('user_role');
+          localStorage.removeItem('user_role_id');
+          localStorage.removeItem('user_role_verified');
+          setUserRole(null);
+          setAccessGranted(false);
           setChecking(false);
           return;
         }

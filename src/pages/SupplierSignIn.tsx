@@ -143,9 +143,9 @@ const SupplierSignIn = () => {
         return;
       }
       
-      // User is supplier OR admin OR has no role yet - allow access
-      if (dbRole === 'supplier' || dbRole === 'admin' || !dbRole) {
-        localStorage.setItem('user_role', dbRole || 'supplier');
+      // User is supplier OR admin - allow access
+      if (dbRole === 'supplier' || dbRole === 'admin') {
+        localStorage.setItem('user_role', dbRole);
         localStorage.setItem('user_role_id', user.id);
         localStorage.setItem('user_role_verified', Date.now().toString());
         toast({
@@ -153,6 +153,24 @@ const SupplierSignIn = () => {
           description: "Redirecting to your Supplier Dashboard...",
         });
         window.location.href = redirectTo;
+        return;
+      }
+      
+      // User has NO role - they need to register first
+      if (!dbRole) {
+        console.log('🔐 User has no role - must register first');
+        toast({
+          variant: "destructive",
+          title: "❌ Not Registered",
+          description: "You need to register as a Supplier first. Please use the Register link below.",
+          duration: 5000
+        });
+        // Sign them out to prevent auto-login issues
+        await supabase.auth.signOut();
+        localStorage.removeItem('user_role');
+        localStorage.removeItem('user_role_id');
+        localStorage.removeItem('user_role_verified');
+        setCheckingAuth(false);
         return;
       }
       
@@ -238,27 +256,6 @@ const SupplierSignIn = () => {
       let dbRole = roleData?.role;
       console.log('🔐 Database role:', dbRole);
       
-      // If no role in DB, check user metadata (set during registration)
-      if (!dbRole) {
-        const metadataRole = authData.user.user_metadata?.role;
-        console.log('🔐 Metadata role:', metadataRole);
-        
-        if (metadataRole === 'supplier') {
-          // User registered as supplier but role wasn't saved to DB - fix it now
-          console.log('🔐 Found supplier role in metadata, creating in database...');
-          const { error: insertError } = await supabase
-            .from('user_roles')
-            .insert({ user_id: userId, role: 'supplier' as any });
-          
-          if (insertError) {
-            console.warn('🔐 Could not create supplier role from metadata:', insertError);
-          } else {
-            console.log('🔐 Successfully created supplier role from metadata');
-            dbRole = 'supplier';
-          }
-        }
-      }
-      
       // If user has a DIFFERENT role (not supplier/admin), BLOCK them
       // @ts-ignore - TypeScript types may not match actual DB values
       if (dbRole && dbRole !== 'supplier' && dbRole !== 'admin') {
@@ -274,19 +271,22 @@ const SupplierSignIn = () => {
         return;
       }
       
-      // If STILL no role exists, CREATE the supplier role in database
-      // (This is for users who sign in through supplier portal without prior registration)
+      // If NO role exists, BLOCK them - they must register first
       if (!dbRole) {
-        console.log('🔐 No role found, creating supplier role in database');
-        const { error: insertError } = await supabase
-          .from('user_roles')
-          .insert({ user_id: userId, role: 'supplier' as any });
-        
-        if (insertError) {
-          console.warn('🔐 Could not create supplier role:', insertError);
-        } else {
-          console.log('🔐 Successfully created supplier role in database');
-        }
+        console.log('🔐 No role found - user must register first');
+        toast({
+          variant: "destructive",
+          title: "❌ Not Registered",
+          description: "You are not registered as a Supplier. Please register first using the link below.",
+          duration: 5000
+        });
+        // Sign them out to prevent unauthorized access
+        await supabase.auth.signOut();
+        localStorage.removeItem('user_role');
+        localStorage.removeItem('user_role_id');
+        localStorage.removeItem('user_role_verified');
+        setLoading(false);
+        return;
       }
       
       // Set localStorage to supplier (or admin if they're admin)
