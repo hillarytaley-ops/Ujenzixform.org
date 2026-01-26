@@ -243,25 +243,31 @@ const Careers = () => {
     }
   };
 
-  const handleFileUpload = async (file: File, type: 'resume' | 'cover_letter') => {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${type}_${Date.now()}.${fileExt}`;
-    const filePath = `applications/${fileName}`;
+  const handleFileUpload = async (file: File, type: 'resume' | 'cover_letter'): Promise<string | null> => {
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${type}_${Date.now()}.${fileExt}`;
+      const filePath = `applications/${fileName}`;
 
-    const { error } = await supabase.storage
-      .from('documents')
-      .upload(filePath, file);
+      const { error } = await supabase.storage
+        .from('documents')
+        .upload(filePath, file);
 
-    if (error) {
-      console.error('Upload error:', error);
-      return null;
+      if (error) {
+        console.error('Upload error:', error);
+        // Return a placeholder indicating file was provided but upload failed
+        return `[File: ${file.name} - Upload pending: Storage bucket not configured]`;
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('documents')
+        .getPublicUrl(filePath);
+
+      return urlData?.publicUrl || null;
+    } catch (err) {
+      console.error('File upload exception:', err);
+      return `[File: ${file.name} - Upload failed]`;
     }
-
-    const { data: urlData } = supabase.storage
-      .from('documents')
-      .getPublicUrl(filePath);
-
-    return urlData?.publicUrl || null;
   };
 
   const handleGeneralApplication = async (e: React.FormEvent) => {
@@ -788,7 +794,6 @@ const Careers = () => {
                                         type="file"
                                         className="hidden"
                                         accept=".pdf,.doc,.docx"
-                                        required
                                         onChange={(e) => {
                                           const file = e.target.files?.[0];
                                           if (file) setJobResumeFile(file);
@@ -1039,7 +1044,6 @@ const Careers = () => {
                                 type="file"
                                 className="hidden"
                                 accept=".pdf,.doc,.docx"
-                                required
                                 onChange={(e) => {
                                   const file = e.target.files?.[0];
                                   if (file) setResumeFile(file);
