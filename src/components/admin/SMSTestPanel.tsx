@@ -30,8 +30,8 @@ export const SMSTestPanel: React.FC = () => {
   const [testResults, setTestResults] = useState<TestResult[]>([]);
   const { toast } = useToast();
 
-  // Check if API is configured
-  const isConfigured = notificationService.isConfigured();
+  // SMS is currently in simulation mode
+  const isConfigured = false; // Will be true when Edge Function is deployed
 
   const handleSendTestSMS = async () => {
     if (!phoneNumber) {
@@ -111,28 +111,22 @@ export const SMSTestPanel: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Configuration Status */}
-      <Card className={isConfigured ? 'border-green-500/50' : 'border-yellow-500/50'}>
+      <Card className="border-blue-500/50 bg-blue-50/50 dark:bg-blue-950/20">
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {isConfigured ? (
-                <CheckCircle className="h-5 w-5 text-green-500" />
-              ) : (
-                <XCircle className="h-5 w-5 text-yellow-500" />
-              )}
+              <CheckCircle className="h-5 w-5 text-blue-500" />
               <div>
                 <p className="font-medium">
-                  {isConfigured ? 'SMS API Configured' : 'SMS API Not Configured'}
+                  SMS Simulation Mode Active
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  {isConfigured 
-                    ? 'Africa\'s Talking credentials are set up'
-                    : 'Messages will be simulated (check console logs)'}
+                  Messages are logged to browser console. Check DevTools (F12) → Console to see SMS details.
                 </p>
               </div>
             </div>
-            <Badge variant={isConfigured ? 'default' : 'secondary'}>
-              {isConfigured ? 'Live' : 'Simulation Mode'}
+            <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+              Simulation
             </Badge>
           </div>
         </CardContent>
@@ -301,32 +295,31 @@ export const SMSTestPanel: React.FC = () => {
       {/* Instructions */}
       <Card>
         <CardHeader>
-          <CardTitle>📱 Testing Instructions</CardTitle>
+          <CardTitle>📱 How SMS Simulation Works</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
           <div className="flex gap-2">
             <span className="font-bold text-blue-500">1.</span>
-            <span>Open <strong>Africa's Talking Dashboard</strong></span>
+            <span>Click <strong>"Send Test SMS"</strong> above</span>
           </div>
           <div className="flex gap-2">
             <span className="font-bold text-blue-500">2.</span>
-            <span>Click <strong>"Launch Simulator"</strong> in the sidebar</span>
+            <span>Open <strong>Browser DevTools</strong> (Press F12)</span>
           </div>
           <div className="flex gap-2">
             <span className="font-bold text-blue-500">3.</span>
-            <span>Enter the phone number: <code className="bg-muted px-1 rounded">+254798441351</code></span>
+            <span>Go to the <strong>"Console"</strong> tab</span>
           </div>
           <div className="flex gap-2">
             <span className="font-bold text-blue-500">4.</span>
-            <span>Click <strong>"Connect"</strong> to start the simulator</span>
+            <span>You'll see the SMS details logged there with 📱 icon</span>
           </div>
-          <div className="flex gap-2">
-            <span className="font-bold text-blue-500">5.</span>
-            <span>Come back here and click <strong>"Send Test SMS"</strong></span>
-          </div>
-          <div className="flex gap-2">
-            <span className="font-bold text-blue-500">6.</span>
-            <span>Check the simulator - the SMS should appear there!</span>
+          
+          <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-950/30 rounded-lg border border-yellow-200 dark:border-yellow-800">
+            <p className="font-medium text-yellow-800 dark:text-yellow-200">🚀 To Enable Real SMS:</p>
+            <p className="text-yellow-700 dark:text-yellow-300 mt-1">
+              Deploy the Supabase Edge Function or set up a backend server to proxy requests to Africa's Talking API (required due to CORS restrictions).
+            </p>
           </div>
         </CardContent>
       </Card>

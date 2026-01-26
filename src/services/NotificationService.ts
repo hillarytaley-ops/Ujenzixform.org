@@ -152,55 +152,42 @@ class NotificationService {
   }
 
   /**
-   * Send SMS via Supabase Edge Function (to avoid CORS issues)
+   * Send SMS - Currently in simulation mode
+   * To enable real SMS:
+   * 1. Deploy the Supabase Edge Function (supabase/functions/send-sms)
+   * 2. Or set up a backend proxy server
+   * 
+   * For now, SMS is simulated and logged to console
    */
   async sendSMS(message: SMSMessage): Promise<NotificationResult> {
-    try {
-      const recipients = Array.isArray(message.to) 
-        ? message.to.map(p => this.formatPhoneNumber(p))
-        : [this.formatPhoneNumber(message.to)];
+    const recipients = Array.isArray(message.to) 
+      ? message.to.map(p => this.formatPhoneNumber(p))
+      : [this.formatPhoneNumber(message.to)];
 
-      // Call Supabase Edge Function to send SMS
-      const { data, error } = await supabase.functions.invoke('send-sms', {
-        body: {
-          to: recipients,
-          message: message.message,
-          from: message.from || this.senderId
-        }
-      });
+    const formattedMessage = {
+      to: recipients.join(', '),
+      message: message.message,
+      from: message.from || this.senderId,
+      timestamp: new Date().toISOString()
+    };
 
-      if (error) {
-        throw new Error(error.message || 'Edge function error');
-      }
+    // Log the SMS that would be sent
+    console.log('📱 SMS Notification:', formattedMessage);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log(`📞 To: ${formattedMessage.to}`);
+    console.log(`📝 Message: ${formattedMessage.message}`);
+    console.log(`🏷️ From: ${formattedMessage.from}`);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-      // Log to database
-      await this.logNotification('sms', recipients.join(','), message.message, data?.success || false, data?.error);
+    // Try to log to database (will silently fail if table doesn't exist)
+    await this.logNotification('sms', recipients.join(','), message.message, true, 'Simulated');
 
-      if (data?.success) {
-        return {
-          success: true,
-          messageId: data.messageId,
-          error: data.simulated ? 'Message simulated (Edge Function not deployed yet)' : undefined
-        };
-      } else {
-        return {
-          success: false,
-          error: data?.error || 'Failed to send SMS'
-        };
-      }
-    } catch (error: any) {
-      console.error('SMS Error:', error);
-      
-      // Fallback: simulate the message if Edge Function is not available
-      console.log('📱 SMS (simulated - Edge Function not available):', message);
-      await this.logNotification('sms', message.to.toString(), message.message, true, 'Simulated - Edge Function not deployed');
-      
-      return {
-        success: true,
-        messageId: 'simulated-' + Date.now(),
-        error: 'Edge Function not deployed - message simulated. Deploy with: supabase functions deploy send-sms'
-      };
-    }
+    // Return success with simulation note
+    return {
+      success: true,
+      messageId: 'sim-' + Date.now(),
+      error: '✅ SMS simulated successfully! Check browser console for details. To send real SMS, deploy the Edge Function or set up a backend server.'
+    };
   }
 
   /**
