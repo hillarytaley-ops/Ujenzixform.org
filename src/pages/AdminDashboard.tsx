@@ -98,6 +98,8 @@ import { LiveChatManager } from "@/components/admin/LiveChatManager";
 import { EnhancedCommunicationsManager } from "@/components/admin/EnhancedCommunicationsManager";
 import { SupabaseSecurityAdvisor } from "@/components/admin/SupabaseSecurityAdvisor";
 import { JobPositionsManager } from "@/components/admin/JobPositionsManager";
+import { AnalyticsDashboard } from "@/components/analytics/AnalyticsDashboard";
+import { ReviewsManager } from "@/components/reviews/ReviewsManager";
 import { Camera, UserCog, MessageCircle, Link2 } from "lucide-react";
 import { CameraAssignment } from "@/components/admin/CameraAssignment";
 import {
@@ -1804,7 +1806,7 @@ const AdminDashboard = () => {
   // Helper function to check if a tab should be shown
   const shouldShowTab = (tab: string): boolean => {
     // Admin-only tabs (not in permissions config)
-    const adminOnlyTabs = ['pending-products', 'qr-codes', 'videos', 'user-roles', 'messaging', 'careers'];
+    const adminOnlyTabs = ['pending-products', 'qr-codes', 'videos', 'user-roles', 'messaging', 'careers', 'analytics', 'reviews'];
     if (adminOnlyTabs.includes(tab)) {
       return isAdminStaff || isSuperAdminStaff;
     }
@@ -2153,6 +2155,18 @@ const AdminDashboard = () => {
               <TabsTrigger value="messaging" className="data-[state=active]:bg-cyan-600">
                 <MessageCircle className="h-4 w-4 mr-2" />
                 Messaging
+              </TabsTrigger>
+            )}
+            {shouldShowTab('analytics') && (
+              <TabsTrigger value="analytics" className="data-[state=active]:bg-emerald-600">
+                <BarChart3 className="h-4 w-4 mr-2" />
+                Analytics
+              </TabsTrigger>
+            )}
+            {shouldShowTab('reviews') && (
+              <TabsTrigger value="reviews" className="data-[state=active]:bg-yellow-600">
+                <Star className="h-4 w-4 mr-2" />
+                Reviews
               </TabsTrigger>
             )}
           </TabsList>
@@ -4447,6 +4461,29 @@ const AdminDashboard = () => {
 
           <TabsContent value="messaging" className="space-y-6">
             <AdminMessaging />
+          </TabsContent>
+
+          {/* Analytics Tab */}
+          <TabsContent value="analytics" className="space-y-6">
+            <AnalyticsDashboard />
+          </TabsContent>
+
+          {/* Reviews Tab */}
+          <TabsContent value="reviews" className="space-y-6">
+            <Card className="bg-slate-900/50 border-slate-800">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <Star className="h-5 w-5 text-yellow-500" />
+                  Supplier Reviews Management
+                </CardTitle>
+                <CardDescription className="text-gray-400">
+                  Manage and moderate customer reviews for all suppliers
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ReviewsManager isAdmin={true} />
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </main>

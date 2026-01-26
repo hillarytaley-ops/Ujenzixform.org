@@ -1,645 +1,423 @@
 /**
- * ╔══════════════════════════════════════════════════════════════════════════════════════╗
- * ║                                                                                      ║
- * ║   🔔 NOTIFICATION SERVICE - Email, SMS & Push Notifications                         ║
- * ║                                                                                      ║
- * ║   Created: December 27, 2025                                                         ║
- * ║   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ║
- * ║                                                                                      ║
- * ║   FEATURES:                                                                          ║
- * ║   ┌─────────────────────────────────────────────────────────────────────────────┐   ║
- * ║   │  ✅ Email notifications via Supabase Edge Functions                         │   ║
- * ║   │  ✅ SMS notifications via Africa's Talking integration                      │   ║
- * ║   │  ✅ Push notifications via Web Push API                                     │   ║
- * ║   │  ✅ In-app notifications via Supabase Realtime                              │   ║
- * ║   │  ✅ Notification preferences management                                      │   ║
- * ║   │  ✅ Notification templates for common events                                 │   ║
- * ║   └─────────────────────────────────────────────────────────────────────────────┘   ║
- * ║                                                                                      ║
- * ╚══════════════════════════════════════════════════════════════════════════════════════╝
+ * Notification Service
+ * Handles SMS and WhatsApp notifications via Africa's Talking API
+ * 
+ * SETUP REQUIRED:
+ * 1. Create account at https://africastalking.com
+ * 2. Get API Key and Username
+ * 3. Add to environment variables:
+ *    - VITE_AFRICASTALKING_USERNAME
+ *    - VITE_AFRICASTALKING_API_KEY
+ *    - VITE_AFRICASTALKING_SENDER_ID (optional)
+ * 
+ * For WhatsApp:
+ * 1. Apply for WhatsApp Business API access
+ * 2. Or use Twilio WhatsApp API as alternative
  */
 
 import { supabase } from '@/integrations/supabase/client';
 
-// Notification types
-export type NotificationType = 
-  | 'order_created'
-  | 'order_confirmed'
-  | 'order_shipped'
-  | 'order_delivered'
-  | 'quote_received'
-  | 'quote_accepted'
-  | 'payment_received'
-  | 'delivery_assigned'
-  | 'delivery_update'
-  | 'new_message'
-  | 'price_alert'
-  | 'stock_alert';
-
-export interface Notification {
-  id?: string;
-  user_id: string;
-  type: NotificationType;
-  title: string;
+// Types
+export interface SMSMessage {
+  to: string | string[];
   message: string;
-  data?: Record<string, any>;
-  read: boolean;
-  created_at?: string;
-  channels?: ('email' | 'sms' | 'push' | 'in_app')[];
+  from?: string;
 }
 
-export interface NotificationPreferences {
-  user_id: string;
-  email_enabled: boolean;
-  sms_enabled: boolean;
-  push_enabled: boolean;
-  in_app_enabled: boolean;
-  order_updates: boolean;
-  quote_updates: boolean;
-  delivery_updates: boolean;
-  marketing: boolean;
-  quiet_hours_start?: string; // e.g., "22:00"
-  quiet_hours_end?: string;   // e.g., "07:00"
+export interface WhatsAppMessage {
+  to: string;
+  message: string;
+  templateId?: string;
+  templateParams?: Record<string, string>;
 }
 
-// Notification templates
-const NOTIFICATION_TEMPLATES: Record<NotificationType, { title: string; message: string }> = {
-  order_created: {
-    title: '📦 Order Created',
-    message: 'Your order #{orderNumber} has been created successfully.'
+export interface NotificationResult {
+  success: boolean;
+  messageId?: string;
+  error?: string;
+}
+
+export interface NotificationTemplate {
+  id: string;
+  name: string;
+  smsTemplate: string;
+  whatsappTemplate: string;
+  variables: string[];
+}
+
+// Notification Templates
+export const NOTIFICATION_TEMPLATES: Record<string, NotificationTemplate> = {
+  ORDER_CONFIRMED: {
+    id: 'order_confirmed',
+    name: 'Order Confirmed',
+    smsTemplate: 'MradiPro: Your order #{orderNumber} has been confirmed! Total: KES {amount}. Track at: {trackingUrl}',
+    whatsappTemplate: '🎉 *Order Confirmed!*\n\nOrder: #{orderNumber}\nTotal: KES {amount}\n\nTrack your order: {trackingUrl}',
+    variables: ['orderNumber', 'amount', 'trackingUrl']
   },
-  order_confirmed: {
-    title: '✅ Order Confirmed',
-    message: 'Your order #{orderNumber} has been confirmed by the supplier.'
+  QUOTE_RECEIVED: {
+    id: 'quote_received',
+    name: 'Quote Received',
+    smsTemplate: 'MradiPro: New quote received from {supplierName}! Amount: KES {amount}. Review at: {reviewUrl}',
+    whatsappTemplate: '📋 *New Quote Received!*\n\nFrom: {supplierName}\nAmount: KES {amount}\n\nReview: {reviewUrl}',
+    variables: ['supplierName', 'amount', 'reviewUrl']
   },
-  order_shipped: {
-    title: '🚚 Order Shipped',
-    message: 'Your order #{orderNumber} is on its way! Track delivery in the app.'
+  DELIVERY_UPDATE: {
+    id: 'delivery_update',
+    name: 'Delivery Update',
+    smsTemplate: 'MradiPro: Delivery update for #{trackingNumber} - Status: {status}. {message}',
+    whatsappTemplate: '🚚 *Delivery Update*\n\nTracking: #{trackingNumber}\nStatus: {status}\n\n{message}',
+    variables: ['trackingNumber', 'status', 'message']
   },
-  order_delivered: {
-    title: '🎉 Order Delivered',
-    message: 'Your order #{orderNumber} has been delivered. Thank you for shopping with UjenziXform!'
+  DELIVERY_ASSIGNED: {
+    id: 'delivery_assigned',
+    name: 'Delivery Assigned',
+    smsTemplate: 'MradiPro: Driver {driverName} ({driverPhone}) is on the way! ETA: {eta}',
+    whatsappTemplate: '🚛 *Driver Assigned!*\n\nDriver: {driverName}\nPhone: {driverPhone}\nETA: {eta}\n\nTrack live: {trackingUrl}',
+    variables: ['driverName', 'driverPhone', 'eta', 'trackingUrl']
   },
-  quote_received: {
-    title: '💰 Quote Received',
-    message: 'You have received a quote for your request #{orderNumber}. Total: KES {amount}'
+  QUOTE_REQUEST: {
+    id: 'quote_request',
+    name: 'Quote Request (for Suppliers)',
+    smsTemplate: 'MradiPro: New quote request from {builderName}! {itemCount} items. Respond at: {responseUrl}',
+    whatsappTemplate: '📩 *New Quote Request!*\n\nFrom: {builderName}\nItems: {itemCount}\n\nRespond now: {responseUrl}',
+    variables: ['builderName', 'itemCount', 'responseUrl']
   },
-  quote_accepted: {
-    title: '✅ Quote Accepted',
-    message: 'Your quote for order #{orderNumber} has been accepted by the builder.'
+  PAYMENT_RECEIVED: {
+    id: 'payment_received',
+    name: 'Payment Received',
+    smsTemplate: 'MradiPro: Payment of KES {amount} received for order #{orderNumber}. Thank you!',
+    whatsappTemplate: '✅ *Payment Received!*\n\nAmount: KES {amount}\nOrder: #{orderNumber}\n\nThank you for your business!',
+    variables: ['amount', 'orderNumber']
   },
-  payment_received: {
-    title: '💳 Payment Received',
-    message: 'Payment of KES {amount} received for order #{orderNumber}.'
+  WELCOME: {
+    id: 'welcome',
+    name: 'Welcome Message',
+    smsTemplate: 'Welcome to MradiPro, {name}! Your account is ready. Start exploring: {appUrl}',
+    whatsappTemplate: '👋 *Welcome to MradiPro!*\n\nHi {name},\n\nYour account is ready. Explore construction materials from verified suppliers.\n\nGet started: {appUrl}',
+    variables: ['name', 'appUrl']
   },
-  delivery_assigned: {
-    title: '🚛 Delivery Assigned',
-    message: 'A delivery provider has been assigned to your order #{orderNumber}.'
-  },
-  delivery_update: {
-    title: '📍 Delivery Update',
-    message: '{message}'
-  },
-  new_message: {
-    title: '💬 New Message',
-    message: 'You have a new message from {senderName}.'
-  },
-  price_alert: {
-    title: '🏷️ Price Alert',
-    message: 'Price dropped! {productName} is now KES {newPrice} (was KES {oldPrice}).'
-  },
-  stock_alert: {
-    title: '📢 Stock Alert',
-    message: '{productName} is now back in stock!'
+  OTP: {
+    id: 'otp',
+    name: 'OTP Verification',
+    smsTemplate: 'MradiPro: Your verification code is {otp}. Valid for 10 minutes. Do not share.',
+    whatsappTemplate: '🔐 *Verification Code*\n\nYour code: *{otp}*\n\nValid for 10 minutes.\n⚠️ Never share this code.',
+    variables: ['otp']
   }
 };
 
-export class NotificationService {
-  private static vapidPublicKey = 'YOUR_VAPID_PUBLIC_KEY'; // Configure in production
+class NotificationService {
+  private apiUsername: string;
+  private apiKey: string;
+  private senderId: string;
+  private baseUrl: string;
+
+  constructor() {
+    this.apiUsername = import.meta.env.VITE_AFRICASTALKING_USERNAME || '';
+    this.apiKey = import.meta.env.VITE_AFRICASTALKING_API_KEY || '';
+    this.senderId = import.meta.env.VITE_AFRICASTALKING_SENDER_ID || 'MradiPro';
+    this.baseUrl = 'https://api.africastalking.com/version1';
+  }
 
   /**
-   * Send notification through all enabled channels
+   * Format phone number to E.164 format for Kenya
    */
-  static async send(
-    userId: string,
-    type: NotificationType,
-    data: Record<string, any> = {},
-    channels?: ('email' | 'sms' | 'push' | 'in_app')[]
-  ): Promise<{ success: boolean; error?: string }> {
+  private formatPhoneNumber(phone: string): string {
+    // Remove all non-numeric characters
+    let cleaned = phone.replace(/\D/g, '');
+    
+    // Handle different formats
+    if (cleaned.startsWith('0')) {
+      // Convert 07XXXXXXXX to +254XXXXXXXX
+      cleaned = '254' + cleaned.substring(1);
+    } else if (cleaned.startsWith('7')) {
+      // Convert 7XXXXXXXX to +254XXXXXXXX
+      cleaned = '254' + cleaned;
+    } else if (!cleaned.startsWith('254')) {
+      // Assume it's already in correct format or add Kenya code
+      cleaned = '254' + cleaned;
+    }
+    
+    return '+' + cleaned;
+  }
+
+  /**
+   * Replace template variables with actual values
+   */
+  private processTemplate(template: string, variables: Record<string, string>): string {
+    let processed = template;
+    for (const [key, value] of Object.entries(variables)) {
+      processed = processed.replace(new RegExp(`{${key}}`, 'g'), value);
+    }
+    return processed;
+  }
+
+  /**
+   * Send SMS via Africa's Talking API
+   */
+  async sendSMS(message: SMSMessage): Promise<NotificationResult> {
+    if (!this.apiKey || !this.apiUsername) {
+      console.log('📱 SMS (simulated):', message);
+      return {
+        success: true,
+        messageId: 'simulated-' + Date.now(),
+        error: 'API not configured - message simulated'
+      };
+    }
+
     try {
-      // Get user preferences
-      const preferences = await this.getPreferences(userId);
-      
-      // Get template
-      const template = NOTIFICATION_TEMPLATES[type];
-      const title = this.interpolate(template.title, data);
-      const message = this.interpolate(template.message, data);
+      const recipients = Array.isArray(message.to) 
+        ? message.to.map(p => this.formatPhoneNumber(p)).join(',')
+        : this.formatPhoneNumber(message.to);
 
-      // Determine which channels to use
-      const enabledChannels = channels || this.getEnabledChannels(preferences, type);
+      const response = await fetch(`${this.baseUrl}/messaging`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'apiKey': this.apiKey
+        },
+        body: new URLSearchParams({
+          username: this.apiUsername,
+          to: recipients,
+          message: message.message,
+          from: message.from || this.senderId
+        })
+      });
 
-      // Check quiet hours
-      if (this.isQuietHours(preferences)) {
-        // Only send in-app during quiet hours
-        enabledChannels.splice(0, enabledChannels.length, 'in_app');
+      const data = await response.json();
+
+      if (data.SMSMessageData?.Recipients?.[0]?.status === 'Success') {
+        // Log to database
+        await this.logNotification('sms', recipients, message.message, true);
+        
+        return {
+          success: true,
+          messageId: data.SMSMessageData.Recipients[0].messageId
+        };
+      } else {
+        throw new Error(data.SMSMessageData?.Recipients?.[0]?.status || 'Unknown error');
       }
-
-      // Send through each channel
-      const results = await Promise.allSettled([
-        enabledChannels.includes('email') ? this.sendEmail(userId, title, message, data) : Promise.resolve(),
-        enabledChannels.includes('sms') ? this.sendSMS(userId, message) : Promise.resolve(),
-        enabledChannels.includes('push') ? this.sendPush(userId, title, message, data) : Promise.resolve(),
-        enabledChannels.includes('in_app') ? this.createInAppNotification(userId, type, title, message, data) : Promise.resolve()
-      ]);
-
-      // Log notification
-      await this.logNotification(userId, type, title, message, enabledChannels);
-
-      return { success: true };
     } catch (error: any) {
-      console.error('Error sending notification:', error);
-      return { success: false, error: error.message };
+      console.error('SMS Error:', error);
+      await this.logNotification('sms', message.to.toString(), message.message, false, error.message);
+      
+      return {
+        success: false,
+        error: error.message
+      };
     }
   }
 
   /**
-   * Send email notification
+   * Send WhatsApp message
+   * Note: Requires WhatsApp Business API approval
    */
-  private static async sendEmail(
-    userId: string,
-    subject: string,
-    body: string,
-    data: Record<string, any>
-  ): Promise<void> {
-    try {
-      // Get user email
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('email')
-        .eq('id', userId)
-        .single();
-
-      if (!profile?.email) return;
-
-      // Send via Supabase Edge Function
-      await supabase.functions.invoke('send-email', {
-        body: {
-          to: profile.email,
-          subject: `UjenziXform: ${subject}`,
-          html: this.generateEmailHTML(subject, body, data),
-          text: body
-        }
-      });
-
-      console.log('📧 Email sent to:', profile.email);
-    } catch (error) {
-      console.error('Email send error:', error);
-    }
+  async sendWhatsApp(message: WhatsAppMessage): Promise<NotificationResult> {
+    // WhatsApp Business API typically requires a backend service
+    // For now, we'll use a fallback to SMS or simulate
+    console.log('📱 WhatsApp (simulated):', message);
+    
+    // Log the attempt
+    await this.logNotification('whatsapp', message.to, message.message, true, 'Simulated');
+    
+    return {
+      success: true,
+      messageId: 'whatsapp-simulated-' + Date.now(),
+      error: 'WhatsApp API not configured - message simulated'
+    };
   }
 
   /**
-   * Send SMS notification
+   * Send notification using a template
    */
-  private static async sendSMS(userId: string, message: string): Promise<void> {
-    try {
-      // Get user phone
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('phone')
-        .eq('id', userId)
-        .single();
-
-      if (!profile?.phone) return;
-
-      // Format phone for Kenya (+254)
-      let phone = profile.phone.replace(/\s/g, '');
-      if (phone.startsWith('0')) {
-        phone = '+254' + phone.substring(1);
-      } else if (!phone.startsWith('+')) {
-        phone = '+254' + phone;
-      }
-
-      // Send via Supabase Edge Function (Africa's Talking integration)
-      await supabase.functions.invoke('send-sms', {
-        body: {
-          to: phone,
-          message: `UjenziXform: ${message}`
-        }
-      });
-
-      console.log('📱 SMS sent to:', phone);
-    } catch (error) {
-      console.error('SMS send error:', error);
+  async sendTemplateNotification(
+    templateId: string,
+    recipient: string,
+    variables: Record<string, string>,
+    channel: 'sms' | 'whatsapp' | 'both' = 'sms'
+  ): Promise<NotificationResult> {
+    const template = NOTIFICATION_TEMPLATES[templateId];
+    
+    if (!template) {
+      return {
+        success: false,
+        error: `Template ${templateId} not found`
+      };
     }
+
+    const results: NotificationResult[] = [];
+
+    if (channel === 'sms' || channel === 'both') {
+      const smsMessage = this.processTemplate(template.smsTemplate, variables);
+      results.push(await this.sendSMS({ to: recipient, message: smsMessage }));
+    }
+
+    if (channel === 'whatsapp' || channel === 'both') {
+      const whatsappMessage = this.processTemplate(template.whatsappTemplate, variables);
+      results.push(await this.sendWhatsApp({ to: recipient, message: whatsappMessage }));
+    }
+
+    return {
+      success: results.every(r => r.success),
+      messageId: results.map(r => r.messageId).join(','),
+      error: results.find(r => r.error)?.error
+    };
   }
 
   /**
-   * Send push notification
+   * Send order confirmation notification
    */
-  private static async sendPush(
-    userId: string,
-    title: string,
-    body: string,
-    data: Record<string, any>
-  ): Promise<void> {
-    try {
-      // Get user's push subscription
-      const { data: subscription } = await supabase
-        .from('push_subscriptions')
-        .select('subscription')
-        .eq('user_id', userId)
-        .single();
-
-      if (!subscription?.subscription) return;
-
-      // Send via Supabase Edge Function
-      await supabase.functions.invoke('send-push', {
-        body: {
-          subscription: subscription.subscription,
-          payload: {
-            title,
-            body,
-            icon: '/UjenziXform-logo.png',
-            badge: '/UjenziXform-favicon.svg',
-            data: {
-              url: data.url || '/',
-              ...data
-            }
-          }
-        }
-      });
-
-      console.log('🔔 Push notification sent');
-    } catch (error) {
-      console.error('Push send error:', error);
-    }
+  async sendOrderConfirmation(
+    phone: string,
+    orderNumber: string,
+    amount: number,
+    trackingUrl: string
+  ): Promise<NotificationResult> {
+    return this.sendTemplateNotification('ORDER_CONFIRMED', phone, {
+      orderNumber,
+      amount: amount.toLocaleString(),
+      trackingUrl
+    });
   }
 
   /**
-   * Create in-app notification
+   * Send quote received notification
    */
-  private static async createInAppNotification(
-    userId: string,
-    type: NotificationType,
-    title: string,
+  async sendQuoteNotification(
+    phone: string,
+    supplierName: string,
+    amount: number,
+    reviewUrl: string
+  ): Promise<NotificationResult> {
+    return this.sendTemplateNotification('QUOTE_RECEIVED', phone, {
+      supplierName,
+      amount: amount.toLocaleString(),
+      reviewUrl
+    });
+  }
+
+  /**
+   * Send delivery update notification
+   */
+  async sendDeliveryUpdate(
+    phone: string,
+    trackingNumber: string,
+    status: string,
+    message: string
+  ): Promise<NotificationResult> {
+    return this.sendTemplateNotification('DELIVERY_UPDATE', phone, {
+      trackingNumber,
+      status,
+      message
+    });
+  }
+
+  /**
+   * Send delivery assigned notification
+   */
+  async sendDeliveryAssigned(
+    phone: string,
+    driverName: string,
+    driverPhone: string,
+    eta: string,
+    trackingUrl: string
+  ): Promise<NotificationResult> {
+    return this.sendTemplateNotification('DELIVERY_ASSIGNED', phone, {
+      driverName,
+      driverPhone,
+      eta,
+      trackingUrl
+    });
+  }
+
+  /**
+   * Send quote request notification to supplier
+   */
+  async sendQuoteRequest(
+    phone: string,
+    builderName: string,
+    itemCount: number,
+    responseUrl: string
+  ): Promise<NotificationResult> {
+    return this.sendTemplateNotification('QUOTE_REQUEST', phone, {
+      builderName,
+      itemCount: itemCount.toString(),
+      responseUrl
+    });
+  }
+
+  /**
+   * Send welcome message to new user
+   */
+  async sendWelcome(
+    phone: string,
+    name: string,
+    appUrl: string = 'https://mradipro.com'
+  ): Promise<NotificationResult> {
+    return this.sendTemplateNotification('WELCOME', phone, {
+      name,
+      appUrl
+    });
+  }
+
+  /**
+   * Send OTP verification code
+   */
+  async sendOTP(phone: string, otp: string): Promise<NotificationResult> {
+    return this.sendTemplateNotification('OTP', phone, { otp });
+  }
+
+  /**
+   * Log notification to database
+   */
+  private async logNotification(
+    channel: string,
+    recipient: string,
     message: string,
-    data: Record<string, any>
+    success: boolean,
+    error?: string
   ): Promise<void> {
     try {
-      await supabase.from('notifications').insert({
-        user_id: userId,
-        type,
-        title,
-        message,
-        data,
-        read: false,
+      await supabase.from('notification_logs').insert({
+        channel,
+        recipient,
+        message: message.substring(0, 500), // Truncate long messages
+        success,
+        error,
         created_at: new Date().toISOString()
-      } as any);
-
-      console.log('📬 In-app notification created');
-    } catch (error) {
-      console.error('In-app notification error:', error);
+      });
+    } catch (e) {
+      console.error('Failed to log notification:', e);
     }
   }
 
   /**
-   * Get user's notifications
+   * Get notification history for a user
    */
-  static async getNotifications(
-    userId: string,
-    options?: { unreadOnly?: boolean; limit?: number }
-  ): Promise<Notification[]> {
+  async getNotificationHistory(userId: string, limit: number = 50): Promise<any[]> {
     try {
-      let query = supabase
-        .from('notifications')
+      const { data } = await supabase
+        .from('notification_logs')
         .select('*')
         .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-
-      if (options?.unreadOnly) {
-        query = query.eq('read', false);
-      }
-
-      if (options?.limit) {
-        query = query.limit(options.limit);
-      }
-
-      const { data } = await query;
-      return (data || []) as any;
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      
+      return data || [];
     } catch (error) {
-      console.error('Error fetching notifications:', error);
+      console.error('Error fetching notification history:', error);
       return [];
     }
   }
 
   /**
-   * Mark notification as read
+   * Check if API is configured
    */
-  static async markAsRead(notificationId: string): Promise<void> {
-    try {
-      await supabase
-        .from('notifications')
-        .update({ read: true } as any)
-        .eq('id', notificationId);
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
-    }
-  }
-
-  /**
-   * Mark all notifications as read
-   */
-  static async markAllAsRead(userId: string): Promise<void> {
-    try {
-      await supabase
-        .from('notifications')
-        .update({ read: true } as any)
-        .eq('user_id', userId)
-        .eq('read', false);
-    } catch (error) {
-      console.error('Error marking all notifications as read:', error);
-    }
-  }
-
-  /**
-   * Get notification preferences
-   */
-  static async getPreferences(userId: string): Promise<NotificationPreferences> {
-    try {
-      const { data } = await supabase
-        .from('notification_preferences')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
-
-      if (data) return data as any;
-
-      // Return defaults
-      return {
-        user_id: userId,
-        email_enabled: true,
-        sms_enabled: true,
-        push_enabled: true,
-        in_app_enabled: true,
-        order_updates: true,
-        quote_updates: true,
-        delivery_updates: true,
-        marketing: false
-      };
-    } catch (error) {
-      // Return defaults on error
-      return {
-        user_id: userId,
-        email_enabled: true,
-        sms_enabled: true,
-        push_enabled: true,
-        in_app_enabled: true,
-        order_updates: true,
-        quote_updates: true,
-        delivery_updates: true,
-        marketing: false
-      };
-    }
-  }
-
-  /**
-   * Update notification preferences
-   */
-  static async updatePreferences(
-    userId: string,
-    preferences: Partial<NotificationPreferences>
-  ): Promise<{ success: boolean; error?: string }> {
-    try {
-      const { error } = await supabase
-        .from('notification_preferences')
-        .upsert({
-          user_id: userId,
-          ...preferences,
-          updated_at: new Date().toISOString()
-        } as any);
-
-      if (error) throw error;
-      return { success: true };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  }
-
-  /**
-   * Subscribe to push notifications
-   */
-  static async subscribeToPush(userId: string): Promise<{ success: boolean; error?: string }> {
-    try {
-      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-        return { success: false, error: 'Push notifications not supported' };
-      }
-
-      const registration = await navigator.serviceWorker.ready;
-      
-      // Request permission
-      const permission = await Notification.requestPermission();
-      if (permission !== 'granted') {
-        return { success: false, error: 'Notification permission denied' };
-      }
-
-      // Subscribe
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: this.urlBase64ToUint8Array(this.vapidPublicKey)
-      });
-
-      // Save subscription to database
-      await supabase.from('push_subscriptions').upsert({
-        user_id: userId,
-        subscription: JSON.stringify(subscription),
-        created_at: new Date().toISOString()
-      } as any);
-
-      return { success: true };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  }
-
-  /**
-   * Unsubscribe from push notifications
-   */
-  static async unsubscribeFromPush(userId: string): Promise<void> {
-    try {
-      const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
-      
-      if (subscription) {
-        await subscription.unsubscribe();
-      }
-
-      await supabase
-        .from('push_subscriptions')
-        .delete()
-        .eq('user_id', userId);
-    } catch (error) {
-      console.error('Error unsubscribing from push:', error);
-    }
-  }
-
-  // Helper methods
-  private static interpolate(template: string, data: Record<string, any>): string {
-    return template.replace(/\{(\w+)\}/g, (_, key) => data[key] || `{${key}}`);
-  }
-
-  private static getEnabledChannels(
-    prefs: NotificationPreferences,
-    type: NotificationType
-  ): ('email' | 'sms' | 'push' | 'in_app')[] {
-    const channels: ('email' | 'sms' | 'push' | 'in_app')[] = [];
-
-    // Check if notification type is enabled
-    const isOrderType = type.startsWith('order_');
-    const isQuoteType = type.startsWith('quote_');
-    const isDeliveryType = type.startsWith('delivery_');
-
-    if (isOrderType && !prefs.order_updates) return ['in_app'];
-    if (isQuoteType && !prefs.quote_updates) return ['in_app'];
-    if (isDeliveryType && !prefs.delivery_updates) return ['in_app'];
-
-    if (prefs.email_enabled) channels.push('email');
-    if (prefs.sms_enabled) channels.push('sms');
-    if (prefs.push_enabled) channels.push('push');
-    if (prefs.in_app_enabled) channels.push('in_app');
-
-    return channels.length > 0 ? channels : ['in_app'];
-  }
-
-  private static isQuietHours(prefs: NotificationPreferences): boolean {
-    if (!prefs.quiet_hours_start || !prefs.quiet_hours_end) return false;
-
-    const now = new Date();
-    const currentTime = now.getHours() * 60 + now.getMinutes();
-
-    const [startHour, startMin] = prefs.quiet_hours_start.split(':').map(Number);
-    const [endHour, endMin] = prefs.quiet_hours_end.split(':').map(Number);
-
-    const startTime = startHour * 60 + startMin;
-    const endTime = endHour * 60 + endMin;
-
-    if (startTime < endTime) {
-      return currentTime >= startTime && currentTime < endTime;
-    } else {
-      // Quiet hours span midnight
-      return currentTime >= startTime || currentTime < endTime;
-    }
-  }
-
-  private static async logNotification(
-    userId: string,
-    type: NotificationType,
-    title: string,
-    message: string,
-    channels: string[]
-  ): Promise<void> {
-    try {
-      await supabase.from('notification_logs').insert({
-        user_id: userId,
-        type,
-        title,
-        message,
-        channels,
-        created_at: new Date().toISOString()
-      } as any);
-    } catch (error) {
-      // Silent fail for logging
-    }
-  }
-
-  private static generateEmailHTML(
-    title: string,
-    body: string,
-    data: Record<string, any>
-  ): string {
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>${title}</title>
-      </head>
-      <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f5;">
-        <table role="presentation" style="width: 100%; border-collapse: collapse;">
-          <tr>
-            <td align="center" style="padding: 40px 0;">
-              <table role="presentation" style="width: 600px; max-width: 100%; border-collapse: collapse; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
-                <!-- Header -->
-                <tr>
-                  <td style="padding: 32px; background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); border-radius: 12px 12px 0 0;">
-                    <table role="presentation" style="width: 100%;">
-                      <tr>
-                        <td>
-                          <img src="https://UjenziXform.com/UjenziXform-logo.png" alt="UjenziXform" style="height: 40px; width: auto;">
-                        </td>
-                        <td align="right">
-                          <span style="color: #ffffff; font-size: 14px;">Kenya's Construction Platform</span>
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-                
-                <!-- Content -->
-                <tr>
-                  <td style="padding: 32px;">
-                    <h1 style="margin: 0 0 16px 0; font-size: 24px; font-weight: 600; color: #18181b;">
-                      ${title}
-                    </h1>
-                    <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #52525b;">
-                      ${body}
-                    </p>
-                    ${data.url ? `
-                    <a href="${data.url}" style="display: inline-block; padding: 12px 24px; background-color: #2563eb; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 500;">
-                      View Details
-                    </a>
-                    ` : ''}
-                  </td>
-                </tr>
-                
-                <!-- Footer -->
-                <tr>
-                  <td style="padding: 24px 32px; background-color: #f4f4f5; border-radius: 0 0 12px 12px;">
-                    <p style="margin: 0; font-size: 12px; color: #71717a; text-align: center;">
-                      © ${new Date().getFullYear()} UjenziXform. Connecting Kenya's Construction Industry.
-                      <br>
-                      <a href="https://UjenziXform.com/unsubscribe" style="color: #2563eb;">Unsubscribe</a> | 
-                      <a href="https://UjenziXform.com/preferences" style="color: #2563eb;">Notification Preferences</a>
-                    </p>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-        </table>
-      </body>
-      </html>
-    `;
-  }
-
-  private static urlBase64ToUint8Array(base64String: string): Uint8Array {
-    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-    for (let i = 0; i < rawData.length; ++i) {
-      outputArray[i] = rawData.charCodeAt(i);
-    }
-    return outputArray;
+  isConfigured(): boolean {
+    return !!(this.apiKey && this.apiUsername);
   }
 }
 
-export default NotificationService;
-
-
-
-
-
-
-
-
+// Export singleton instance
+export const notificationService = new NotificationService();
+export default notificationService;

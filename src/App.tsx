@@ -74,6 +74,9 @@ import { FloatingSocialSidebar } from "@/components/FloatingSocialSidebar";
 // Offline Status Indicator
 import { OfflineIndicator } from "@/components/OfflineIndicator";
 
+// PWA Install Prompt
+import { PWAInstallPrompt } from "@/components/pwa/PWAInstallPrompt";
+
 // Optimized loading component with skeleton animation
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-screen bg-background">
@@ -203,6 +206,9 @@ const App = () => {
               <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
                 {/* Offline Status Indicator - Shows when offline */}
                 <OfflineIndicator />
+                
+                {/* PWA Install Prompt - Shows after 30 seconds of browsing */}
+                <PWAInstallPrompt />
                 
                 {/* Floating widgets that hide on auth pages */}
                 {showChat && <FloatingWidgets />}
