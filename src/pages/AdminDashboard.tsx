@@ -100,6 +100,7 @@ import { SupabaseSecurityAdvisor } from "@/components/admin/SupabaseSecurityAdvi
 import { JobPositionsManager } from "@/components/admin/JobPositionsManager";
 import { AnalyticsDashboard } from "@/components/analytics/AnalyticsDashboard";
 import { ReviewsManager } from "@/components/reviews/ReviewsManager";
+import { SMSTestPanel } from "@/components/admin/SMSTestPanel";
 import { Camera, UserCog, MessageCircle, Link2 } from "lucide-react";
 import { CameraAssignment } from "@/components/admin/CameraAssignment";
 import {
@@ -1806,7 +1807,7 @@ const AdminDashboard = () => {
   // Helper function to check if a tab should be shown
   const shouldShowTab = (tab: string): boolean => {
     // Admin-only tabs (not in permissions config)
-    const adminOnlyTabs = ['pending-products', 'qr-codes', 'videos', 'user-roles', 'messaging', 'careers', 'analytics', 'reviews'];
+    const adminOnlyTabs = ['pending-products', 'qr-codes', 'videos', 'user-roles', 'messaging', 'careers', 'analytics', 'reviews', 'sms-test'];
     if (adminOnlyTabs.includes(tab)) {
       return isAdminStaff || isSuperAdminStaff;
     }
@@ -2167,6 +2168,12 @@ const AdminDashboard = () => {
               <TabsTrigger value="reviews" className="data-[state=active]:bg-yellow-600">
                 <Star className="h-4 w-4 mr-2" />
                 Reviews
+              </TabsTrigger>
+            )}
+            {shouldShowTab('sms-test') && (
+              <TabsTrigger value="sms-test" className="data-[state=active]:bg-green-600">
+                <MessageSquare className="h-4 w-4 mr-2" />
+                SMS Test
               </TabsTrigger>
             )}
           </TabsList>
@@ -4482,6 +4489,24 @@ const AdminDashboard = () => {
               </CardHeader>
               <CardContent>
                 <ReviewsManager isAdmin={true} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* SMS Test Tab */}
+          <TabsContent value="sms-test" className="space-y-6">
+            <Card className="bg-slate-900/50 border-slate-800">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5 text-green-500" />
+                  SMS & WhatsApp Testing
+                </CardTitle>
+                <CardDescription className="text-gray-400">
+                  Test SMS and WhatsApp notifications before going live
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <SMSTestPanel />
               </CardContent>
             </Card>
           </TabsContent>
