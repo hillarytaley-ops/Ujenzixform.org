@@ -241,15 +241,59 @@ export const DeliveryProviderNotifications: React.FC<{ providerId: string }> = (
   };
 
   const handleAcceptDelivery = async (requestId: string) => {
-    toast({
-      title: 'Delivery Accepted',
-      description: 'You have accepted this delivery request',
-    });
-    
-    setNotifications(prev => 
-      prev.map(n => n.id === requestId ? { ...n, status: 'accepted' as const } : n)
-    );
-    setUnreadCount(prev => Math.max(0, prev - 1));
+    try {
+      // CHECK: Does this provider already have an active delivery?
+      const { data: activeDeliveries, error: activeError } = await supabase
+        .from('delivery_requests')
+        .select('id, status, tracking_number')
+        .eq('provider_id', providerId)
+        .in('status', ['accepted', 'picked_up', 'in_transit', 'assigned'])
+        .limit(1);
+
+      if (activeError) {
+        console.error('Error checking active deliveries:', activeError);
+      }
+
+      if (activeDeliveries && activeDeliveries.length > 0) {
+        const activeDelivery = activeDeliveries[0];
+        toast({
+          title: '⚠️ Active Delivery In Progress',
+          description: `You already have an active delivery (${activeDelivery.tracking_number || 'No tracking #'}). Please complete or cancel it before accepting a new one.`,
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      // Update the delivery request status
+      const { error: updateError } = await supabase
+        .from('delivery_requests')
+        .update({ 
+          status: 'accepted',
+          provider_id: providerId 
+        })
+        .eq('id', requestId);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      toast({
+        title: '✅ Delivery Accepted',
+        description: 'You have accepted this delivery request. Navigate to pickup location.',
+      });
+      
+      setNotifications(prev => 
+        prev.map(n => n.id === requestId ? { ...n, status: 'accepted' as const } : n)
+      );
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch (error: any) {
+      console.error('Error accepting delivery:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to accept delivery. Please try again.',
+        variant: 'destructive'
+      });
+    }
   };
 
   const handleRejectDelivery = async (requestId: string) => {

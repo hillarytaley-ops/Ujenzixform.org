@@ -55,12 +55,33 @@ class TrackingNumberService {
    * Called when a delivery provider ACCEPTS a delivery request.
    * Implements FIRST-COME-FIRST-SERVED: Only the first provider to accept gets the job.
    * Generates a tracking number (or reuses existing one) and notifies the builder.
+   * 
+   * IMPORTANT: Provider can only accept ONE delivery at a time. Must complete current delivery first.
    */
   async onProviderAcceptsDelivery(
     deliveryRequestId: string,
     providerId: string
   ): Promise<TrackingNumberResult | null> {
     try {
+      // CHECK: Does this provider already have an active delivery?
+      const { data: activeDeliveries, error: activeError } = await supabase
+        .from('delivery_requests')
+        .select('id, status, tracking_number')
+        .eq('provider_id', providerId)
+        .in('status', ['accepted', 'picked_up', 'in_transit', 'assigned'])
+        .neq('id', deliveryRequestId) // Exclude the current request (in case of re-acceptance)
+        .limit(1);
+
+      if (activeError) {
+        console.error('Error checking active deliveries:', activeError);
+      }
+
+      if (activeDeliveries && activeDeliveries.length > 0) {
+        const activeDelivery = activeDeliveries[0];
+        console.log(`Provider ${providerId} already has active delivery: ${activeDelivery.id}`);
+        throw new Error(`You already have an active delivery in progress (${activeDelivery.tracking_number || 'ID: ' + activeDelivery.id.slice(0, 8)}). Please complete it before accepting a new one.`);
+      }
+
       // First, check if this delivery request is still available (FIRST-COME-FIRST-SERVED check)
       const { data: existingRequest, error: fetchError } = await supabase
         .from('delivery_requests')

@@ -132,6 +132,30 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
 
       if (!providerData) throw new Error('Provider not found');
 
+      // CHECK: Does this provider already have an active delivery?
+      const { data: activeDeliveries, error: activeError } = await supabase
+        .from('delivery_requests')
+        .select('id, status, tracking_number')
+        .eq('provider_id', providerData.id)
+        .in('status', ['accepted', 'picked_up', 'in_transit', 'assigned'])
+        .limit(1);
+
+      if (activeError) {
+        console.error('Error checking active deliveries:', activeError);
+      }
+
+      if (activeDeliveries && activeDeliveries.length > 0) {
+        const activeDelivery = activeDeliveries[0];
+        toast({
+          title: "⚠️ Active Delivery In Progress",
+          description: `You already have an active delivery (${activeDelivery.tracking_number || 'No tracking #'}). Please complete or cancel it before accepting a new one.`,
+          variant: "destructive"
+        });
+        setIsAccepting(false);
+        setShowAcceptDialog(false);
+        return;
+      }
+
       // Use TrackingNumberService to handle acceptance and generate tracking number
       const result = await trackingNumberService.onProviderAcceptsDelivery(
         delivery.id,
@@ -151,11 +175,11 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
 
       onAccept?.(delivery.id);
       setShowAcceptDialog(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error accepting delivery:', error);
       toast({
         title: "Error",
-        description: "Failed to accept delivery. Please try again.",
+        description: error.message || "Failed to accept delivery. Please try again.",
         variant: "destructive"
       });
     } finally {
