@@ -47,10 +47,22 @@ import {
 } from "@/components/ui/dialog";
 import DeliveryRequest from "@/components/DeliveryRequest";
 
+interface Order {
+  id: string;
+  po_number: string;
+  status: string;
+  total_amount: number;
+  created_at: string;
+  delivery_address: string;
+  project_name: string;
+  items: any[];
+}
+
 const PrivateClientDashboard = () => {
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [stats, setStats] = useState({
     totalOrders: 0,
     pendingOrders: 0,
@@ -136,13 +148,40 @@ const PrivateClientDashboard = () => {
         return;
       }
 
-      // Mock stats - replace with real data
-      setStats({
-        totalOrders: 12,
-        pendingOrders: 2,
-        completedOrders: 10,
-        totalSpent: 245000,
-      });
+      // Fetch real orders from purchase_orders table
+      const { data: ordersData, error: ordersError } = await supabase
+        .from('purchase_orders')
+        .select('*')
+        .eq('buyer_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (ordersError) {
+        console.error('Error fetching orders:', ordersError);
+      } else {
+        const fetchedOrders = ordersData || [];
+        setOrders(fetchedOrders);
+        
+        // Calculate real stats from orders
+        const totalOrders = fetchedOrders.length;
+        const pendingOrders = fetchedOrders.filter(o => 
+          o.status === 'pending' || o.status === 'quoted' || o.status === 'processing'
+        ).length;
+        const completedOrders = fetchedOrders.filter(o => 
+          o.status === 'completed' || o.status === 'delivered' || o.status === 'confirmed'
+        ).length;
+        const totalSpent = fetchedOrders
+          .filter(o => o.status === 'completed' || o.status === 'delivered' || o.status === 'confirmed')
+          .reduce((sum, o) => sum + (o.total_amount || 0), 0);
+
+        setStats({
+          totalOrders,
+          pendingOrders,
+          completedOrders,
+          totalSpent,
+        });
+        
+        console.log('📦 Private client orders loaded:', totalOrders);
+      }
 
       // Fetch monitoring requests - use user_id (original schema column)
       const { data: monitoringData, error: monitoringError } = await supabase
@@ -383,17 +422,96 @@ const PrivateClientDashboard = () => {
                 <CardDescription>Track and manage your material orders</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-12 text-gray-500">
-                  <ShoppingBag className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-                  <p className="text-lg font-medium">No orders yet</p>
-                  <p className="text-sm mb-4">Start shopping for construction materials</p>
-                  <Link to="/suppliers">
-                    <Button className="bg-green-600 hover:bg-green-700">
-                      <ShoppingCart className="h-4 w-4 mr-2" />
-                      Browse Materials
-                    </Button>
-                  </Link>
-                </div>
+                {orders.length === 0 ? (
+                  <div className="text-center py-12 text-gray-500">
+                    <ShoppingBag className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+                    <p className="text-lg font-medium">No orders yet</p>
+                    <p className="text-sm mb-4">Start shopping for construction materials</p>
+                    <Link to="/suppliers">
+                      <Button className="bg-green-600 hover:bg-green-700">
+                        <ShoppingCart className="h-4 w-4 mr-2" />
+                        Browse Materials
+                      </Button>
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {orders.map((order) => (
+                      <div key={order.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-semibold text-gray-900">
+                                Order #{order.po_number}
+                              </span>
+                              <Badge 
+                                className={
+                                  order.status === 'completed' || order.status === 'delivered' ? 'bg-green-100 text-green-800' :
+                                  order.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
+                                  order.status === 'pending' || order.status === 'quoted' ? 'bg-amber-100 text-amber-800' :
+                                  order.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                  'bg-gray-100 text-gray-800'
+                                }
+                              >
+                                {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-gray-600 mb-1">
+                              {order.project_name || 'Purchase Order'}
+                            </p>
+                            <div className="flex items-center gap-4 text-xs text-gray-500">
+                              <span className="flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                {new Date(order.created_at).toLocaleDateString()}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Package className="h-3 w-3" />
+                                {Array.isArray(order.items) ? order.items.length : 0} item(s)
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-lg font-bold text-green-600">
+                              KES {(order.total_amount || 0).toLocaleString()}
+                            </p>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="mt-2"
+                              onClick={() => {
+                                toast({
+                                  title: `Order #${order.po_number}`,
+                                  description: `Status: ${order.status}. Items: ${Array.isArray(order.items) ? order.items.map((i: any) => i.material_name).join(', ') : 'N/A'}`,
+                                });
+                              }}
+                            >
+                              <Eye className="h-3 w-3 mr-1" />
+                              View Details
+                            </Button>
+                          </div>
+                        </div>
+                        {/* Order Items Preview */}
+                        {Array.isArray(order.items) && order.items.length > 0 && (
+                          <div className="mt-3 pt-3 border-t">
+                            <p className="text-xs text-gray-500 mb-2">Items:</p>
+                            <div className="flex flex-wrap gap-2">
+                              {order.items.slice(0, 3).map((item: any, idx: number) => (
+                                <Badge key={idx} variant="outline" className="text-xs">
+                                  {item.material_name || item.name} × {item.quantity}
+                                </Badge>
+                              ))}
+                              {order.items.length > 3 && (
+                                <Badge variant="outline" className="text-xs bg-gray-50">
+                                  +{order.items.length - 3} more
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
