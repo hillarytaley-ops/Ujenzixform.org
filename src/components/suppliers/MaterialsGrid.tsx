@@ -1627,8 +1627,8 @@ export const MaterialsGrid = () => {
                     supplier_id: material.supplier_id
                   }, qtyToAdd);
                   
-                  // Reset quantity counter after adding to cart
-                  setQuantities(prev => ({ ...prev, [material.id]: 0 }));
+                  // Reset quantity counter after adding to cart (back to default of 1)
+                  setQuantities(prev => ({ ...prev, [material.id]: 1 }));
                 };
 
                 const isSelectedForCompare = compareItems.has(material.id);

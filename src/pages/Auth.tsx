@@ -42,12 +42,30 @@ const Auth = () => {
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         
         // Redirect authenticated users to home page or redirect URL
         if (session?.user && event === 'SIGNED_IN') {
+          // Fetch and store user role for seamless experience
+          try {
+            const { data: roleData } = await supabase
+              .from('user_roles')
+              .select('role')
+              .eq('user_id', session.user.id)
+              .maybeSingle();
+            
+            if (roleData?.role) {
+              localStorage.setItem('user_role', roleData.role);
+              localStorage.setItem('user_role_id', session.user.id);
+              localStorage.setItem('user_role_verified', Date.now().toString());
+              console.log('🔐 Auth page: User role stored:', roleData.role);
+            }
+          } catch (e) {
+            console.warn('Could not fetch user role:', e);
+          }
+          
           if (redirectTo) {
             window.location.href = redirectTo;
           } else {
@@ -59,12 +77,29 @@ const Auth = () => {
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       
       // Redirect if already authenticated - don't show auth page
       if (session?.user) {
+        // Fetch and store user role
+        try {
+          const { data: roleData } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', session.user.id)
+            .maybeSingle();
+          
+          if (roleData?.role) {
+            localStorage.setItem('user_role', roleData.role);
+            localStorage.setItem('user_role_id', session.user.id);
+            localStorage.setItem('user_role_verified', Date.now().toString());
+          }
+        } catch (e) {
+          console.warn('Could not fetch user role:', e);
+        }
+        
         const returnTo = sessionStorage.getItem('returnTo');
         if (returnTo) {
           sessionStorage.removeItem('returnTo');
