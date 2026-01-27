@@ -519,12 +519,12 @@ export const MaterialsGrid = () => {
     return filteredMaterials.filter(m => compareItems.has(m.id));
   };
   
-  // Get quantity for a material (default to 0)
-  const getQuantity = (materialId: string) => quantities[materialId] || 0;
+  // Get quantity for a material (default to 1)
+  const getQuantity = (materialId: string) => quantities[materialId] || 1;
   
-  // Update quantity for a material
+  // Update quantity for a material (minimum 1)
   const updateQuantity = (materialId: string, qty: number) => {
-    setQuantities(prev => ({ ...prev, [materialId]: Math.max(0, qty) }));
+    setQuantities(prev => ({ ...prev, [materialId]: Math.max(1, qty) }));
   };
   
   // Toggle item selection
