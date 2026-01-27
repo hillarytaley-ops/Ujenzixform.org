@@ -848,7 +848,23 @@ const SupplierRegistration = () => {
                     </div>
 
                     <div className="space-y-3">
-                      <Label>Select Material Categories You Supply *</Label>
+                      <div className="flex items-center justify-between">
+                        <Label>Select Material Categories You Supply *</Label>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            if (selectedCategories.length === MATERIAL_CATEGORIES.length) {
+                              setSelectedCategories([]);
+                            } else {
+                              setSelectedCategories([...MATERIAL_CATEGORIES]);
+                            }
+                          }}
+                        >
+                          {selectedCategories.length === MATERIAL_CATEGORIES.length ? 'Deselect All' : 'Select All'}
+                        </Button>
+                      </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-96 overflow-y-auto p-4 border rounded-lg">
                         {MATERIAL_CATEGORIES.map((category) => (
                           <div key={category} className="flex items-center space-x-2">
@@ -867,65 +883,17 @@ const SupplierRegistration = () => {
                         ))}
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Selected: {selectedCategories.length} categories
+                        Selected: {selectedCategories.length} of {MATERIAL_CATEGORIES.length} categories
                       </p>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="materialsList">List Your Materials</Label>
-                      <Textarea
-                        id="materialsList"
-                        placeholder="Example:&#10;- Portland Cement 50kg bags&#10;- Ballast per ton&#10;- 1/2&quot; Steel bars (12m)&#10;- etc."
-                        value={materialsList}
-                        onChange={(e) => setMaterialsList(e.target.value)}
-                        rows={6}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        List the specific materials and products you offer
-                      </p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="priceList">Price List</Label>
-                      <Textarea
-                        id="priceList"
-                        placeholder="Example:&#10;- Portland Cement 50kg: KSh 750&#10;- Ballast per ton: KSh 3,500&#10;- 1/2&quot; Steel bars: KSh 4,200&#10;- etc."
-                        value={priceList}
-                        onChange={(e) => setPriceList(e.target.value)}
-                        rows={6}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        List your prices (you can update these later in your dashboard)
-                      </p>
-                    </div>
-
-                    <Separator />
-
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-2">
-                        <ImageIcon className="h-5 w-5 text-primary" />
-                        <Label>Product Photos (Coming Soon)</Label>
-                      </div>
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center bg-gray-50">
-                        <Upload className="h-12 w-12 mx-auto text-gray-400 mb-2" />
-                        <p className="text-sm text-gray-600">
-                          Photo upload feature will be available in your dashboard after registration
+                    <Card className="bg-blue-50 border-blue-200">
+                      <CardContent className="pt-4">
+                        <p className="text-sm text-blue-700">
+                          <strong>💡 Note:</strong> You can add your specific materials, prices, product photos, and marketing videos in your supplier dashboard after registration.
                         </p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-2">
-                        <Video className="h-5 w-5 text-primary" />
-                        <Label>Marketing Videos (Coming Soon)</Label>
-                      </div>
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center bg-gray-50">
-                        <Upload className="h-12 w-12 mx-auto text-gray-400 mb-2" />
-                        <p className="text-sm text-gray-600">
-                          Video upload feature will be available in your dashboard after registration
-                        </p>
-                      </div>
-                    </div>
+                      </CardContent>
+                    </Card>
                   </div>
                 )}
 
