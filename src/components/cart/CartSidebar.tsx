@@ -23,11 +23,13 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useCart, CartItem } from '@/contexts/CartContext';
-import { ShoppingCart, Trash2, Plus, Minus, Package, X, FileText, CreditCard, Scale, Store, Users } from 'lucide-react';
+import { ShoppingCart, Trash2, Plus, Minus, Package, X, FileText, CreditCard, Scale, Store, Users, Truck, Video } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { CartPriceComparison } from './CartPriceComparison';
 import { MultiSupplierQuoteDialog } from './MultiSupplierQuoteDialog';
+import { DeliveryPromptDialog } from '@/components/builders/DeliveryPromptDialog';
+import { MonitoringServicePrompt } from '@/components/builders/MonitoringServicePrompt';
 
 export const CartSidebar: React.FC = () => {
   const { 
@@ -46,6 +48,10 @@ export const CartSidebar: React.FC = () => {
   const [showMultiSupplierQuote, setShowMultiSupplierQuote] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showDeliveryPrompt, setShowDeliveryPrompt] = useState(false);
+  const [showMonitoringPrompt, setShowMonitoringPrompt] = useState(false);
+  const [lastOrderId, setLastOrderId] = useState<string | null>(null);
+  const [lastOrderTotal, setLastOrderTotal] = useState<number>(0);
 
   // Check user role on mount
   useEffect(() => {
@@ -239,18 +245,28 @@ export const CartSidebar: React.FC = () => {
 
       if (orderError) throw orderError;
 
-      // Success! Clear cart and show confirmation
+      // Success! Store order info for delivery/monitoring prompts
       const orderTotal = getTotalPrice();
       const orderItemCount = getTotalItems();
+      
+      setLastOrderId(orderData.id);
+      setLastOrderTotal(orderTotal);
       
       clearCart();
       setIsCartOpen(false);
       
       toast({
         title: '🎉 Order Placed Successfully!',
-        description: `Your order #${poNumber} for ${orderItemCount} items (KES ${orderTotal.toLocaleString()}) has been confirmed. You can view it in your dashboard.`,
-        duration: 6000,
+        description: `Your order #${poNumber} for ${orderItemCount} items (KES ${orderTotal.toLocaleString()}) has been confirmed.`,
+        duration: 4000,
       });
+
+      // Show delivery prompt for private clients
+      if (userRole === 'private_client') {
+        setTimeout(() => {
+          setShowDeliveryPrompt(true);
+        }, 500);
+      }
 
     } catch (error) {
       console.error('Error placing order:', error);
@@ -522,6 +538,44 @@ export const CartSidebar: React.FC = () => {
           }}
         />
       </SheetContent>
+
+      {/* Delivery Prompt Dialog (for Private Clients after purchase) */}
+      {lastOrderId && (
+        <DeliveryPromptDialog
+          isOpen={showDeliveryPrompt}
+          onClose={() => {
+            setShowDeliveryPrompt(false);
+            // Show monitoring prompt after delivery decision
+            setTimeout(() => {
+              setShowMonitoringPrompt(true);
+            }, 300);
+          }}
+          purchaseOrderId={lastOrderId}
+          orderTotal={lastOrderTotal}
+          onDeliveryRequested={() => {
+            setShowDeliveryPrompt(false);
+            toast({
+              title: '🚚 Delivery Requested!',
+              description: 'A delivery provider will be assigned to your order soon.',
+            });
+            // Show monitoring prompt after delivery request
+            setTimeout(() => {
+              setShowMonitoringPrompt(true);
+            }, 500);
+          }}
+        />
+      )}
+
+      {/* Monitoring Service Prompt (after delivery decision) */}
+      <MonitoringServicePrompt
+        isOpen={showMonitoringPrompt}
+        onClose={() => {
+          setShowMonitoringPrompt(false);
+          setLastOrderId(null);
+          setLastOrderTotal(0);
+        }}
+        orderTotal={lastOrderTotal}
+      />
     </Sheet>
   );
 };
