@@ -31,10 +31,12 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
-  DollarSign
+  DollarSign,
+  Eye
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { MonitoringServicePrompt } from './MonitoringServicePrompt';
 
 interface PurchaseOrderItem {
   material_name?: string;
@@ -96,6 +98,7 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
 }) => {
   const [step, setStep] = useState<'prompt' | 'form' | 'success'>('prompt');
   const [submitting, setSubmitting] = useState(false);
+  const [showMonitoringPrompt, setShowMonitoringPrompt] = useState(false);
   const [deliveryData, setDeliveryData] = useState({
     deliveryAddress: '',
     preferredDate: '',
@@ -289,12 +292,17 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
       
       toast({
         title: '📦 Pickup Order Confirmed!',
-        description: 'You can collect your materials directly from the supplier. No QR code will be generated.',
+        description: 'You can collect your materials directly from the supplier.',
       });
       
-      if (onDeclined) onDeclined(); // Use onDeclined as it closes without delivery
+      // Close this dialog and show monitoring prompt
       onOpenChange(false);
       setStep('prompt');
+      
+      // Show monitoring service prompt after a short delay
+      setTimeout(() => {
+        setShowMonitoringPrompt(true);
+      }, 500);
       
     } catch (error: any) {
       console.error('Error setting pickup order:', error);
@@ -308,6 +316,18 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
     }
   };
 
+  // Handle when delivery is confirmed (from prompt or form)
+  const handleDeliveryConfirmed = () => {
+    if (onDeliveryRequested) onDeliveryRequested();
+    onOpenChange(false);
+    setStep('prompt');
+    
+    // Show monitoring service prompt after a short delay
+    setTimeout(() => {
+      setShowMonitoringPrompt(true);
+    }, 500);
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-KE', {
       style: 'currency',
@@ -319,6 +339,7 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
   if (!purchaseOrder) return null;
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={(open) => {
       if (!open) setStep('prompt');
       onOpenChange(open);
@@ -414,10 +435,7 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
             <DialogFooter className="flex flex-col gap-2">
               {/* Primary action - Accept delivery */}
               <Button 
-                onClick={() => {
-                  if (onDeliveryRequested) onDeliveryRequested();
-                  onOpenChange(false);
-                }}
+                onClick={handleDeliveryConfirmed}
                 className="w-full bg-green-600 hover:bg-green-700"
               >
                 <Truck className="h-4 w-4 mr-2" />
@@ -636,6 +654,20 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
         )}
       </DialogContent>
     </Dialog>
+
+    {/* Monitoring Service Prompt - Shows after delivery/pickup choice */}
+    <MonitoringServicePrompt
+      isOpen={showMonitoringPrompt}
+      onOpenChange={setShowMonitoringPrompt}
+      purchaseOrder={purchaseOrder}
+      onServiceRequested={() => {
+        if (onDeclined) onDeclined(); // Close the flow
+      }}
+      onDeclined={() => {
+        if (onDeclined) onDeclined(); // Close the flow
+      }}
+    />
+    </>
   );
 };
 
