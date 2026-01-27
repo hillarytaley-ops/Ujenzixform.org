@@ -543,25 +543,34 @@ export const CartSidebar: React.FC = () => {
       {lastOrderId && (
         <DeliveryPromptDialog
           isOpen={showDeliveryPrompt}
-          onClose={() => {
-            setShowDeliveryPrompt(false);
-            // Show monitoring prompt after delivery decision
-            setTimeout(() => {
-              setShowMonitoringPrompt(true);
-            }, 300);
+          onOpenChange={(open) => {
+            setShowDeliveryPrompt(open);
+            if (!open) {
+              // Show monitoring prompt after delivery decision
+              setTimeout(() => {
+                setShowMonitoringPrompt(true);
+              }, 300);
+            }
           }}
-          purchaseOrderId={lastOrderId}
-          orderTotal={lastOrderTotal}
+          purchaseOrder={{
+            id: lastOrderId,
+            po_number: `PO-${lastOrderId.slice(0, 8)}`,
+            supplier_id: '',
+            total_amount: lastOrderTotal,
+            delivery_address: 'To be provided',
+            delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            items: [],
+            project_name: 'Direct Purchase'
+          }}
           onDeliveryRequested={() => {
             setShowDeliveryPrompt(false);
             toast({
               title: '🚚 Delivery Requested!',
               description: 'A delivery provider will be assigned to your order soon.',
             });
-            // Show monitoring prompt after delivery request
-            setTimeout(() => {
-              setShowMonitoringPrompt(true);
-            }, 500);
+          }}
+          onDeclined={() => {
+            setShowDeliveryPrompt(false);
           }}
         />
       )}
@@ -569,12 +578,29 @@ export const CartSidebar: React.FC = () => {
       {/* Monitoring Service Prompt (after delivery decision) */}
       <MonitoringServicePrompt
         isOpen={showMonitoringPrompt}
-        onClose={() => {
+        onOpenChange={(open) => {
+          setShowMonitoringPrompt(open);
+          if (!open) {
+            setLastOrderId(null);
+            setLastOrderTotal(0);
+          }
+        }}
+        purchaseOrder={lastOrderId ? {
+          id: lastOrderId,
+          po_number: `PO-${lastOrderId.slice(0, 8)}`,
+          total_amount: lastOrderTotal,
+          project_name: 'Direct Purchase'
+        } : undefined}
+        onServiceRequested={() => {
           setShowMonitoringPrompt(false);
           setLastOrderId(null);
           setLastOrderTotal(0);
         }}
-        orderTotal={lastOrderTotal}
+        onDeclined={() => {
+          setShowMonitoringPrompt(false);
+          setLastOrderId(null);
+          setLastOrderTotal(0);
+        }}
       />
     </Sheet>
   );

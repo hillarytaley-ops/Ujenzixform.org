@@ -1062,38 +1062,69 @@ const PrivateClientDashboard = () => {
       {selectedOrderForDelivery && (
         <DeliveryPromptDialog
           isOpen={showDeliveryPrompt}
-          onClose={() => {
-            setShowDeliveryPrompt(false);
-            // Show monitoring prompt after closing delivery dialog
-            setTimeout(() => {
-              setShowMonitoringServicePrompt(true);
-            }, 300);
+          onOpenChange={(open) => {
+            setShowDeliveryPrompt(open);
+            if (!open) {
+              // Show monitoring prompt after closing delivery dialog
+              setTimeout(() => {
+                setShowMonitoringServicePrompt(true);
+              }, 300);
+            }
           }}
-          purchaseOrderId={selectedOrderForDelivery.id}
-          orderTotal={selectedOrderForDelivery.total_amount || 0}
+          purchaseOrder={{
+            id: selectedOrderForDelivery.id,
+            po_number: selectedOrderForDelivery.po_number,
+            supplier_id: '', // Will be fetched by the dialog if needed
+            total_amount: selectedOrderForDelivery.total_amount || 0,
+            delivery_address: selectedOrderForDelivery.delivery_address || 'To be provided',
+            delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            items: selectedOrderForDelivery.items || [],
+            project_name: selectedOrderForDelivery.project_name
+          }}
           onDeliveryRequested={() => {
             setShowDeliveryPrompt(false);
             toast({
               title: '🚚 Delivery Requested!',
               description: `Delivery has been requested for order #${selectedOrderForDelivery.po_number}. A provider will be assigned soon.`,
             });
-            // Show monitoring prompt after delivery request
-            setTimeout(() => {
-              setShowMonitoringServicePrompt(true);
-            }, 500);
+          }}
+          onDeclined={() => {
+            setShowDeliveryPrompt(false);
+            setSelectedOrderForDelivery(null);
           }}
         />
       )}
 
       {/* Monitoring Service Prompt */}
-      <MonitoringServicePrompt
-        isOpen={showMonitoringServicePrompt}
-        onClose={() => {
-          setShowMonitoringServicePrompt(false);
-          setSelectedOrderForDelivery(null);
-        }}
-        orderTotal={selectedOrderForDelivery?.total_amount || 0}
-      />
+      {selectedOrderForDelivery && (
+        <MonitoringServicePrompt
+          isOpen={showMonitoringServicePrompt}
+          onOpenChange={(open) => {
+            setShowMonitoringServicePrompt(open);
+            if (!open) {
+              setSelectedOrderForDelivery(null);
+            }
+          }}
+          purchaseOrder={{
+            id: selectedOrderForDelivery.id,
+            po_number: selectedOrderForDelivery.po_number,
+            supplier_id: '',
+            total_amount: selectedOrderForDelivery.total_amount || 0,
+            delivery_address: selectedOrderForDelivery.delivery_address || '',
+            delivery_date: '',
+            items: selectedOrderForDelivery.items || [],
+            project_name: selectedOrderForDelivery.project_name
+          }}
+          onServiceRequested={() => {
+            setShowMonitoringServicePrompt(false);
+            setSelectedOrderForDelivery(null);
+          }}
+          onDeclined={() => {
+            setShowMonitoringServicePrompt(false);
+            setSelectedOrderForDelivery(null);
+          }}
+        />
+      )}
     </div>
   );
 };
