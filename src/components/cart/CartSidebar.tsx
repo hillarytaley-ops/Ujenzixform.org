@@ -45,6 +45,7 @@ export const CartSidebar: React.FC = () => {
   const [showComparison, setShowComparison] = useState(false);
   const [showMultiSupplierQuote, setShowMultiSupplierQuote] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Check user role on mount
   useEffect(() => {
@@ -179,6 +180,9 @@ export const CartSidebar: React.FC = () => {
   };
 
   const handleBuyNow = async () => {
+    if (isProcessing) return;
+    setIsProcessing(true);
+    
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -235,13 +239,19 @@ export const CartSidebar: React.FC = () => {
 
       if (orderError) throw orderError;
 
-      toast({
-        title: '🎉 Order Placed!',
-        description: `Your order for ${getTotalItems()} items (KES ${getTotalPrice().toLocaleString()}) has been placed successfully!`,
-      });
-
+      // Success! Clear cart and show confirmation
+      const orderTotal = getTotalPrice();
+      const orderItemCount = getTotalItems();
+      
       clearCart();
       setIsCartOpen(false);
+      
+      toast({
+        title: '🎉 Order Placed Successfully!',
+        description: `Your order #${poNumber} for ${orderItemCount} items (KES ${orderTotal.toLocaleString()}) has been confirmed. You can view it in your dashboard.`,
+        duration: 6000,
+      });
+
     } catch (error) {
       console.error('Error placing order:', error);
       toast({
@@ -249,6 +259,8 @@ export const CartSidebar: React.FC = () => {
         description: 'Failed to place order. Please try again.',
         variant: 'destructive'
       });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -465,9 +477,19 @@ export const CartSidebar: React.FC = () => {
                     <Button 
                       className="bg-green-600 hover:bg-green-700 h-12 flex flex-col items-center justify-center"
                       onClick={handleBuyNow}
+                      disabled={isProcessing}
                     >
-                      <CreditCard className="h-4 w-4 mb-0.5" />
-                      <span className="text-xs">Buy Now</span>
+                      {isProcessing ? (
+                        <>
+                          <div className="h-4 w-4 mb-0.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <span className="text-xs">Processing...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CreditCard className="h-4 w-4 mb-0.5" />
+                          <span className="text-xs">Buy Now</span>
+                        </>
+                      )}
                     </Button>
                   </div>
                   <p className="text-[10px] text-center text-gray-500">
