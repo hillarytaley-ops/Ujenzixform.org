@@ -221,16 +221,16 @@ const Auth = () => {
           // Instant signup (no confirmation)
           toast({
             title: "✅ Account created!",
-            description: "Welcome to UjenziPro! Taking you to browse materials...",
+            description: "Welcome to UjenziXform! Taking you to home...",
           });
-          // Auto-redirect to saved location or suppliers page after signup
+          // Auto-redirect to saved location or home page after signup
           setTimeout(() => {
             const returnTo = sessionStorage.getItem('returnTo');
             if (returnTo) {
               sessionStorage.removeItem('returnTo');
               window.location.href = returnTo;
             } else {
-              window.location.href = '/suppliers';
+              window.location.href = '/home';
             }
           }, 1500);
         }
@@ -260,7 +260,7 @@ const Auth = () => {
         if (returnTo) {
           toast({
             title: "✅ Signed In!",
-            description: "Taking you to browse materials...",
+            description: "Redirecting...",
           });
           sessionStorage.removeItem('returnTo');
           window.location.href = returnTo;
@@ -269,7 +269,7 @@ const Auth = () => {
             title: "Welcome back!",
             description: "You've been signed in successfully."
           });
-          const target = redirectTo || '/suppliers?tab=purchase';
+          const target = redirectTo || '/home';
           window.location.href = target;
         }
       }

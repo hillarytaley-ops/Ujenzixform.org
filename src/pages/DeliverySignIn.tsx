@@ -62,7 +62,7 @@ const DeliverySignIn = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
-  const redirectTo = searchParams.get('redirect') || '/delivery-dashboard';
+  const redirectTo = searchParams.get('redirect') || '/home';
 
   useEffect(() => {
     checkExistingAuth();
@@ -339,11 +339,11 @@ const DeliverySignIn = () => {
       
       toast({
         title: "✅ Welcome Delivery Provider!",
-        description: "Redirecting to your Dashboard...",
+        description: "Redirecting to home...",
       });
 
-      // Redirect to delivery dashboard
-      window.location.replace('/delivery-dashboard');
+      // Redirect to home
+      window.location.replace('/home');
 
     } catch (error: any) {
       console.error('Sign in exception:', error);
@@ -499,11 +499,11 @@ const DeliverySignIn = () => {
 
           toast({
             title: "✅ Account Created & Signed In!",
-            description: "Welcome! Redirecting to your dashboard...",
+            description: "Welcome! Redirecting to home...",
           });
 
           setTimeout(() => {
-            window.location.href = redirectTo;
+            window.location.href = '/home';
           }, 500);
           return;
         }
@@ -557,11 +557,11 @@ const DeliverySignIn = () => {
 
       toast({
         title: "✅ Account Created!",
-        description: "Welcome! Redirecting to your dashboard...",
+        description: "Welcome! Redirecting to home...",
       });
 
       setTimeout(() => {
-        window.location.href = redirectTo;
+        window.location.href = '/home';
       }, 500);
 
     } catch (error: any) {

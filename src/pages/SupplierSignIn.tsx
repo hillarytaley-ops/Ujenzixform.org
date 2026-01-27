@@ -48,7 +48,7 @@ const SupplierSignIn = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
-  const redirectTo = searchParams.get('redirect') || '/supplier-dashboard';
+  const redirectTo = searchParams.get('redirect') || '/home';
 
   // Resend verification email
   const resendVerificationEmail = async () => {
@@ -150,7 +150,7 @@ const SupplierSignIn = () => {
         localStorage.setItem('user_role_verified', Date.now().toString());
         toast({
           title: "✅ Welcome Back!",
-          description: "Redirecting to your Supplier Dashboard...",
+          description: "Redirecting to home...",
         });
         window.location.href = redirectTo;
         return;
@@ -298,7 +298,7 @@ const SupplierSignIn = () => {
 
       toast({
         title: "✅ Welcome!",
-        description: "Redirecting to your Supplier Dashboard...",
+        description: "Redirecting to home...",
       });
 
       // Redirect to dashboard

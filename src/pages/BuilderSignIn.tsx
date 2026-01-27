@@ -48,8 +48,8 @@ const BuilderSignIn = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
-  // Get redirect parameter - default to builder-dashboard
-  const redirectTo = searchParams.get('redirect') || '/builder-dashboard';
+  // Get redirect parameter - default to home
+  const redirectTo = searchParams.get('redirect') || '/home';
 
   useEffect(() => {
     checkExistingAuth();
@@ -106,9 +106,7 @@ const BuilderSignIn = () => {
         localStorage.setItem('user_role_verified', Date.now().toString());
         toast({
           title: "✅ Welcome Back!",
-          description: redirectTo.includes('marketplace') 
-            ? "Redirecting to Supplier Marketplace..." 
-            : "Redirecting to your Dashboard...",
+          description: "Redirecting to home...",
         });
         window.location.href = redirectTo;
         return;
@@ -293,9 +291,7 @@ const BuilderSignIn = () => {
 
       toast({
         title: "✅ Welcome!",
-        description: redirectTo.includes('marketplace') 
-          ? "Redirecting to Supplier Marketplace..." 
-          : "Redirecting to your Dashboard...",
+        description: "Redirecting to home...",
       });
 
       // Redirect to appropriate page
@@ -458,11 +454,11 @@ const BuilderSignIn = () => {
 
           toast({
             title: "✅ Account Created & Signed In!",
-            description: "Welcome! Redirecting to your dashboard...",
+            description: "Welcome! Redirecting to home...",
           });
 
           setTimeout(() => {
-            window.location.href = redirectTo;
+            window.location.href = '/home';
           }, 500);
           return;
         }
@@ -517,11 +513,11 @@ const BuilderSignIn = () => {
 
       toast({
         title: "✅ Account Created!",
-        description: "Welcome! Redirecting to your dashboard...",
+        description: "Welcome! Redirecting to home...",
       });
 
       setTimeout(() => {
-        window.location.href = redirectTo;
+        window.location.href = '/home';
       }, 500);
 
     } catch (error: any) {
