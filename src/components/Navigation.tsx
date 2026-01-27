@@ -15,6 +15,7 @@ const Navigation = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
   const location = useLocation();
   const { toast } = useToast();
 
@@ -23,11 +24,13 @@ const Navigation = () => {
     // ✅ PERFORMANCE: Use cached data immediately for instant display
     const cachedEmail = localStorage.getItem('user_email');
     const cachedRole = localStorage.getItem('user_role');
-    if (cachedEmail) {
-      setUser({ email: cachedEmail } as any);
-    }
-    if (cachedRole) {
+    const cachedRoleId = localStorage.getItem('user_role_id');
+    
+    // If we have cached data, show user as logged in immediately
+    if (cachedEmail && cachedRole && cachedRoleId) {
+      setUser({ email: cachedEmail, id: cachedRoleId } as any);
       setUserRole(cachedRole);
+      setIsAuthLoading(false);
     }
 
     // Track last fetched user ID to prevent duplicate DB calls
@@ -92,6 +95,7 @@ const Navigation = () => {
         if (cachedRole && cachedRoleId === session.user.id) {
           setUserRole(cachedRole);
           lastFetchedUserId = session.user.id;
+          setIsAuthLoading(false);
           return; // Skip DB call
         }
         
@@ -109,9 +113,18 @@ const Navigation = () => {
           localStorage.setItem('user_role_id', session.user.id);
         }
       }
+      setIsAuthLoading(false);
+    }).catch(() => {
+      setIsAuthLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    // Safety timeout - stop loading after 2 seconds max
+    const timeout = setTimeout(() => setIsAuthLoading(false), 2000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
 
   // Public navigation items (visible to everyone)
@@ -235,6 +248,11 @@ const Navigation = () => {
                 LOG OUT
               </Button>
             </div>
+          ) : isAuthLoading ? (
+            // Show loading placeholder while checking auth - prevents flash of Sign In buttons
+            <div className="flex items-center gap-2">
+              <div className="w-20 h-8 bg-white/20 rounded animate-pulse"></div>
+            </div>
           ) : (
             <div className="flex items-center gap-2">
               <Link to="/auth">
@@ -289,6 +307,10 @@ const Navigation = () => {
                   >
                     LOG OUT
                   </button>
+                </div>
+              ) : isAuthLoading ? (
+                <div className="space-y-4">
+                  <div className="w-full h-10 bg-gray-200 rounded animate-pulse"></div>
                 </div>
               ) : (
                 <>
