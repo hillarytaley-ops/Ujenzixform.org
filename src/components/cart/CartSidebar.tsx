@@ -81,32 +81,37 @@ export const CartSidebar: React.FC = () => {
         return;
       }
 
-      // Group items by supplier
+      // Fetch all suppliers for mapping
+      const { data: suppliersData } = await supabase
+        .from('suppliers')
+        .select('id, user_id, company_name');
+      
+      let suppliersMap: Record<string, string> = {};
+      let defaultSupplierId: string | null = null;
+      
+      if (suppliersData && suppliersData.length > 0) {
+        suppliersData.forEach(s => {
+          suppliersMap[s.id] = s.company_name;
+          if (s.user_id) suppliersMap[s.user_id] = s.company_name;
+        });
+        // Use first supplier as default for admin catalog items
+        defaultSupplierId = suppliersData[0].user_id || suppliersData[0].id;
+      }
+
+      // Group items by supplier (normalize admin-catalog and general to use default supplier)
       const itemsBySupplier: Record<string, CartItem[]> = {};
       for (const item of items) {
-        const supplierId = item.supplier_id || 'general';
+        let supplierId = item.supplier_id;
+        
+        // Handle admin-catalog and general items - they need a real supplier UUID
+        if (!supplierId || supplierId === 'general' || supplierId === 'admin-catalog') {
+          supplierId = defaultSupplierId || user.id;
+        }
+        
         if (!itemsBySupplier[supplierId]) {
           itemsBySupplier[supplierId] = [];
         }
         itemsBySupplier[supplierId].push(item);
-      }
-
-      // Fetch supplier names for display
-      const supplierIds = Object.keys(itemsBySupplier).filter(id => id !== 'general');
-      let suppliersMap: Record<string, string> = {};
-      
-      if (supplierIds.length > 0) {
-        // Try to get supplier names by both id and user_id
-        const { data: suppliersData } = await supabase
-          .from('suppliers')
-          .select('id, user_id, company_name');
-        
-        if (suppliersData) {
-          suppliersData.forEach(s => {
-            suppliersMap[s.id] = s.company_name;
-            if (s.user_id) suppliersMap[s.user_id] = s.company_name;
-          });
-        }
       }
 
       // Create separate quote requests for each supplier
@@ -125,7 +130,7 @@ export const CartSidebar: React.FC = () => {
           .insert({
             po_number: poNumber,
             buyer_id: user.id,
-            supplier_id: supplierId === 'general' ? user.id : supplierId,
+            supplier_id: supplierId,
             total_amount: supplierTotal,
             delivery_address: 'To be provided',
             delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -189,8 +194,19 @@ export const CartSidebar: React.FC = () => {
       // Generate PO number
       const poNumber = `PO-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
       
-      // Get a default supplier (use first item's supplier or find one)
-      const supplierId = items[0]?.supplier_id || user.id;
+      // Get a valid supplier UUID (not 'admin-catalog' or 'general')
+      let supplierId = items[0]?.supplier_id;
+      
+      // If supplier_id is not a valid UUID, fetch a real supplier
+      if (!supplierId || supplierId === 'admin-catalog' || supplierId === 'general') {
+        const { data: suppliers } = await supabase
+          .from('suppliers')
+          .select('id, user_id')
+          .limit(1)
+          .single();
+        
+        supplierId = suppliers?.user_id || suppliers?.id || user.id;
+      }
       
       // Create purchase order
       const { data: orderData, error: orderError } = await supabase
