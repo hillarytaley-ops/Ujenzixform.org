@@ -629,13 +629,18 @@ export const MaterialsGrid = () => {
   useEffect(() => {
     const fetchSuppliers = async () => {
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('suppliers')
-          .select('id, user_id, company_name, location, rating')
-          .eq('status', 'active')
-          .order('rating', { ascending: false })
-          .limit(50);
-        setAllSuppliers(data || []);
+          .select('id, user_id, company_name, rating');
+        
+        if (!error && data) {
+          // Filter active suppliers and sort by rating
+          const activeSuppliers = data
+            .filter((s: any) => s.status !== 'inactive')
+            .sort((a: any, b: any) => (b.rating || 0) - (a.rating || 0))
+            .slice(0, 50);
+          setAllSuppliers(activeSuppliers);
+        }
       } catch (e) {
         setAllSuppliers([]);
       }
@@ -700,7 +705,7 @@ export const MaterialsGrid = () => {
   }, [visibleStart, visibleEnd, filteredMaterials]);
 
   // Track which images are being loaded to prevent duplicate requests
-  const loadingImagesRef = React.useRef<Set<string>>(new Set());
+  const loadingImagesRef = useRef<Set<string>>(new Set());
 
   // ✅ OPTIMIZED: Fetch image URLs for specific material IDs with caching
   const loadMaterialImages = async (ids: string[]) => {
@@ -1704,7 +1709,7 @@ export const MaterialsGrid = () => {
                           className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 cursor-pointer animate-pulse"
                           onClick={() => {
                             // ✅ LAZY LOAD: Load this material's image when clicked
-                            loadMaterialImages([material.id], materials);
+                            loadMaterialImages([material.id]);
                           }}
                         >
                           <div className="text-center text-gray-400">
