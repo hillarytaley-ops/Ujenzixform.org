@@ -40,72 +40,47 @@ const Auth = () => {
   const liteMode = liteParam === '1';
 
   useEffect(() => {
-    // Set up auth state listener FIRST
+    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
+        console.log('🔐 Auth state change:', event);
         setSession(session);
         setUser(session?.user ?? null);
         
-        // Redirect authenticated users to home page or redirect URL
-        if (session?.user && event === 'SIGNED_IN') {
-          // Fetch and store user role for seamless experience
-          try {
-            const { data: roleData } = await supabase
-              .from('user_roles')
-              .select('role')
-              .eq('user_id', session.user.id)
-              .maybeSingle();
-            
-            if (roleData?.role) {
-              localStorage.setItem('user_role', roleData.role);
-              localStorage.setItem('user_role_id', session.user.id);
-              localStorage.setItem('user_role_verified', Date.now().toString());
-              console.log('🔐 Auth page: User role stored:', roleData.role);
-            }
-          } catch (e) {
-            console.warn('Could not fetch user role:', e);
-          }
-          
-          if (redirectTo) {
-            window.location.href = redirectTo;
-          } else {
-            // Redirect to home page after sign in
-            window.location.href = '/home';
-          }
-        }
+        // Don't auto-redirect on SIGNED_IN - let handleSubmit handle it
+        // This prevents double-redirect issues
       }
     );
 
-    // THEN check for existing session
+    // Check for existing session on mount
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       
       // Redirect if already authenticated - don't show auth page
       if (session?.user) {
-        // Fetch and store user role
-        try {
-          const { data: roleData } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', session.user.id)
-            .maybeSingle();
-          
-          if (roleData?.role) {
-            localStorage.setItem('user_role', roleData.role);
-            localStorage.setItem('user_role_id', session.user.id);
-            localStorage.setItem('user_role_verified', Date.now().toString());
-          }
-        } catch (e) {
-          console.warn('Could not fetch user role:', e);
-        }
+        console.log('🔐 Already authenticated, redirecting...');
+        
+        // Fetch and store user role (non-blocking)
+        supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .maybeSingle()
+          .then(({ data: roleData }) => {
+            if (roleData?.role) {
+              localStorage.setItem('user_role', roleData.role);
+              localStorage.setItem('user_role_id', session.user.id);
+              localStorage.setItem('user_role_verified', Date.now().toString());
+            }
+          })
+          .catch(() => {});
         
         const returnTo = sessionStorage.getItem('returnTo');
         if (returnTo) {
           sessionStorage.removeItem('returnTo');
           navigate(returnTo);
         } else {
-          // Redirect to home page (main app)
           navigate("/home");
         }
       }
@@ -260,7 +235,27 @@ const Auth = () => {
           }, 1500);
         }
       } else {
-        // Successful sign in
+        // Successful sign in - fetch role and redirect
+        try {
+          const { data: { user: currentUser } } = await supabase.auth.getUser();
+          if (currentUser) {
+            const { data: roleData } = await supabase
+              .from('user_roles')
+              .select('role')
+              .eq('user_id', currentUser.id)
+              .maybeSingle();
+            
+            if (roleData?.role) {
+              localStorage.setItem('user_role', roleData.role);
+              localStorage.setItem('user_role_id', currentUser.id);
+              localStorage.setItem('user_role_verified', Date.now().toString());
+              console.log('🔐 Auth: User role stored:', roleData.role);
+            }
+          }
+        } catch (e) {
+          console.warn('Could not fetch user role:', e);
+        }
+        
         const returnTo = sessionStorage.getItem('returnTo');
         if (returnTo) {
           toast({
@@ -268,18 +263,14 @@ const Auth = () => {
             description: "Taking you to browse materials...",
           });
           sessionStorage.removeItem('returnTo');
-          setTimeout(() => {
-            window.location.href = returnTo;
-          }, 1000);
+          window.location.href = returnTo;
         } else {
           toast({
             title: "Welcome back!",
             description: "You've been signed in successfully."
           });
-          setTimeout(() => {
-            const target = redirectTo || '/suppliers?tab=purchase';
-            window.location.href = target;
-          }, 800);
+          const target = redirectTo || '/suppliers?tab=purchase';
+          window.location.href = target;
         }
       }
     } catch (error) {
