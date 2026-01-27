@@ -46,6 +46,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import DeliveryRequest from "@/components/DeliveryRequest";
+import { DeliveryPromptDialog } from "@/components/builders/DeliveryPromptDialog";
+import { MonitoringServicePrompt } from "@/components/builders/MonitoringServicePrompt";
 
 interface Order {
   id: string;
@@ -70,6 +72,10 @@ const PrivateClientDashboard = () => {
     totalSpent: 0,
   });
   const [monitoringDialogOpen, setMonitoringDialogOpen] = useState(false);
+  // Delivery and Monitoring prompts state
+  const [showDeliveryPrompt, setShowDeliveryPrompt] = useState(false);
+  const [showMonitoringServicePrompt, setShowMonitoringServicePrompt] = useState(false);
+  const [selectedOrderForDelivery, setSelectedOrderForDelivery] = useState<Order | null>(null);
   const [monitoringRequest, setMonitoringRequest] = useState({
     projectName: '',
     projectLocation: '',
@@ -474,20 +480,35 @@ const PrivateClientDashboard = () => {
                             <p className="text-lg font-bold text-green-600">
                               KES {(order.total_amount || 0).toLocaleString()}
                             </p>
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              className="mt-2"
-                              onClick={() => {
-                                toast({
-                                  title: `Order #${order.po_number}`,
-                                  description: `Status: ${order.status}. Items: ${Array.isArray(order.items) ? order.items.map((i: any) => i.material_name).join(', ') : 'N/A'}`,
-                                });
-                              }}
-                            >
-                              <Eye className="h-3 w-3 mr-1" />
-                              View Details
-                            </Button>
+                            <div className="flex flex-col gap-1 mt-2">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => {
+                                  toast({
+                                    title: `Order #${order.po_number}`,
+                                    description: `Status: ${order.status}. Items: ${Array.isArray(order.items) ? order.items.map((i: any) => i.material_name).join(', ') : 'N/A'}`,
+                                  });
+                                }}
+                              >
+                                <Eye className="h-3 w-3 mr-1" />
+                                View Details
+                              </Button>
+                              {/* Request Delivery Button - only for confirmed/pending orders */}
+                              {(order.status === 'confirmed' || order.status === 'pending' || order.status === 'quoted') && (
+                                <Button 
+                                  size="sm"
+                                  className="bg-blue-600 hover:bg-blue-700"
+                                  onClick={() => {
+                                    setSelectedOrderForDelivery(order);
+                                    setShowDeliveryPrompt(true);
+                                  }}
+                                >
+                                  <Truck className="h-3 w-3 mr-1" />
+                                  Request Delivery
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         </div>
                         {/* Order Items Preview */}
@@ -1036,6 +1057,43 @@ const PrivateClientDashboard = () => {
       </div>
 
       <Footer />
+
+      {/* Delivery Prompt Dialog */}
+      {selectedOrderForDelivery && (
+        <DeliveryPromptDialog
+          isOpen={showDeliveryPrompt}
+          onClose={() => {
+            setShowDeliveryPrompt(false);
+            // Show monitoring prompt after closing delivery dialog
+            setTimeout(() => {
+              setShowMonitoringServicePrompt(true);
+            }, 300);
+          }}
+          purchaseOrderId={selectedOrderForDelivery.id}
+          orderTotal={selectedOrderForDelivery.total_amount || 0}
+          onDeliveryRequested={() => {
+            setShowDeliveryPrompt(false);
+            toast({
+              title: '🚚 Delivery Requested!',
+              description: `Delivery has been requested for order #${selectedOrderForDelivery.po_number}. A provider will be assigned soon.`,
+            });
+            // Show monitoring prompt after delivery request
+            setTimeout(() => {
+              setShowMonitoringServicePrompt(true);
+            }, 500);
+          }}
+        />
+      )}
+
+      {/* Monitoring Service Prompt */}
+      <MonitoringServicePrompt
+        isOpen={showMonitoringServicePrompt}
+        onClose={() => {
+          setShowMonitoringServicePrompt(false);
+          setSelectedOrderForDelivery(null);
+        }}
+        orderTotal={selectedOrderForDelivery?.total_amount || 0}
+      />
     </div>
   );
 };
