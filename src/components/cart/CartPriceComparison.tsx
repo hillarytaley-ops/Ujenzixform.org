@@ -13,7 +13,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -262,6 +262,9 @@ export const CartPriceComparison: React.FC<CartPriceComparisonProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md p-0 overflow-hidden">
+        <DialogDescription className="sr-only">
+          Compare prices from different suppliers for your cart items
+        </DialogDescription>
         {/* Header */}
         <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-4">
           <div className="flex items-center justify-between">
