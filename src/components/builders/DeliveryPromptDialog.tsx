@@ -269,6 +269,45 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
     setStep('prompt');
   };
 
+  const handlePickup = async () => {
+    if (!purchaseOrder) return;
+    
+    setSubmitting(true);
+    
+    try {
+      // Update purchase order to mark as pickup (no delivery, no QR codes needed)
+      const { error: updateError } = await supabase
+        .from('purchase_orders')
+        .update({
+          delivery_required: false,
+          special_instructions: (purchaseOrder.special_instructions || '') + '\n[PICKUP ORDER - No delivery required]',
+          qr_code_generated: false // Ensure no QR code generation
+        })
+        .eq('id', purchaseOrder.id);
+      
+      if (updateError) throw updateError;
+      
+      toast({
+        title: '📦 Pickup Order Confirmed!',
+        description: 'You can collect your materials directly from the supplier. No QR code will be generated.',
+      });
+      
+      if (onDeclined) onDeclined(); // Use onDeclined as it closes without delivery
+      onOpenChange(false);
+      setStep('prompt');
+      
+    } catch (error: any) {
+      console.error('Error setting pickup order:', error);
+      toast({
+        title: 'Error',
+        description: 'Could not update order. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-KE', {
       style: 'currency',
@@ -342,52 +381,68 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
                 </div>
               </div>
 
-              {/* What's next */}
-              <Alert className="bg-amber-50 border-amber-200">
-                <AlertCircle className="h-4 w-4 text-amber-600" />
-                <AlertDescription className="text-amber-800 text-xs">
-                  <strong>What happens next:</strong>
-                  <ul className="mt-1 ml-4 list-disc">
-                    <li>QR codes are being generated for your materials</li>
-                    <li>Supplier will prepare items with QR labels</li>
-                    <li>Delivery provider will pick up and deliver</li>
-                    <li>Scan QR codes on receipt to verify</li>
-                  </ul>
-                </AlertDescription>
-              </Alert>
+              {/* Delivery vs Pickup info */}
+              <div className="space-y-2">
+                <Alert className="bg-green-50 border-green-200">
+                  <Truck className="h-4 w-4 text-green-600" />
+                  <AlertDescription className="text-green-800 text-xs">
+                    <strong>🚚 Delivery Option:</strong>
+                    <ul className="mt-1 ml-4 list-disc">
+                      <li>QR codes generated for tracking</li>
+                      <li>Delivery provider picks up from supplier</li>
+                      <li>Materials delivered to your location</li>
+                      <li>Scan QR codes on receipt to verify</li>
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+                
+                <Alert className="bg-blue-50 border-blue-200">
+                  <Package className="h-4 w-4 text-blue-600" />
+                  <AlertDescription className="text-blue-800 text-xs">
+                    <strong>📦 Pickup Option:</strong>
+                    <ul className="mt-1 ml-4 list-disc">
+                      <li>No QR codes needed</li>
+                      <li>Collect materials directly from supplier</li>
+                      <li>Show your order number at pickup</li>
+                      <li>No additional delivery charges</li>
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+              </div>
             </div>
 
-            <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:gap-2">
+            <DialogFooter className="flex flex-col gap-2">
               {/* Primary action - Accept delivery */}
               <Button 
                 onClick={() => {
                   if (onDeliveryRequested) onDeliveryRequested();
                   onOpenChange(false);
                 }}
-                className="w-full sm:flex-1 bg-green-600 hover:bg-green-700"
+                className="w-full bg-green-600 hover:bg-green-700"
               >
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Yes, Proceed with Delivery
+                <Truck className="h-4 w-4 mr-2" />
+                🚚 Yes, I Need Delivery
               </Button>
               
-              {/* Secondary - Update details */}
+              {/* Pickup option - No delivery, no QR codes */}
               <Button 
                 variant="outline" 
-                onClick={() => setStep('form')}
-                className="w-full sm:flex-1"
+                onClick={handlePickup}
+                disabled={submitting}
+                className="w-full border-blue-300 text-blue-700 hover:bg-blue-50"
               >
-                <MapPin className="h-4 w-4 mr-2" />
-                Update Details
+                <Package className="h-4 w-4 mr-2" />
+                📦 I'll Pick Up Myself (No QR Code)
               </Button>
               
-              {/* Reject - No delivery needed */}
+              {/* Update details */}
               <Button 
                 variant="ghost" 
-                onClick={handleDecline}
-                className="w-full sm:w-auto text-gray-500 hover:text-red-600"
+                onClick={() => setStep('form')}
+                className="w-full text-gray-600"
               >
-                <XCircle className="h-4 w-4 mr-2" />
-                No Delivery Needed
+                <MapPin className="h-4 w-4 mr-2" />
+                Update Delivery Details
               </Button>
             </DialogFooter>
           </>

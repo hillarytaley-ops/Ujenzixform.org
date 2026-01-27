@@ -55,6 +55,90 @@ export const QuoteComparison: React.FC<QuoteComparisonProps> = ({ orderId, build
   const [acceptedPurchaseOrder, setAcceptedPurchaseOrder] = useState<any>(null);
   const { toast } = useToast();
 
+  // Handle when user chooses DELIVERY (called from DeliveryPromptDialog)
+  const handleDeliveryRequested = async () => {
+    if (!acceptedPurchaseOrder) return;
+    
+    try {
+      // Get supplier info for pickup address
+      let pickupAddress = acceptedPurchaseOrder.supplier_address || 'Supplier location';
+      if (acceptedPurchaseOrder.supplier_id) {
+        const { data: supplierData } = await supabase
+          .from('suppliers')
+          .select('address, company_name')
+          .eq('id', acceptedPurchaseOrder.supplier_id)
+          .maybeSingle();
+        
+        if (supplierData) {
+          pickupAddress = supplierData.address || `${supplierData.company_name} - Pickup Location`;
+        }
+      }
+
+      // Create delivery request
+      const { data: deliveryRequest, error: deliveryError } = await supabase
+        .from('delivery_requests')
+        .insert({
+          builder_id: builderId,
+          purchase_order_id: acceptedPurchaseOrder.id,
+          pickup_address: pickupAddress,
+          delivery_address: acceptedPurchaseOrder.delivery_address,
+          pickup_date: acceptedPurchaseOrder.delivery_date,
+          material_type: 'mixed',
+          quantity: acceptedPurchaseOrder.items?.length || 1,
+          weight_kg: (acceptedPurchaseOrder.items?.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0) || 1) * 50,
+          special_instructions: null,
+          budget_range: '10000-20000',
+          status: 'pending',
+          max_rotation_attempts: 5,
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (deliveryError) {
+        console.error('Error creating delivery request:', deliveryError);
+      }
+
+      // Notify delivery providers
+      if (deliveryRequest) {
+        try {
+          await supabase.functions.invoke('notify-delivery-providers', {
+            body: {
+              request_type: 'quote_accepted',
+              request_id: deliveryRequest.id,
+              builder_id: builderId,
+              pickup_address: pickupAddress,
+              delivery_address: acceptedPurchaseOrder.delivery_address,
+              material_details: acceptedPurchaseOrder.items?.map((item: any) => ({
+                material_type: item.material_name,
+                quantity: item.quantity,
+                unit: item.unit || 'units'
+              })),
+              priority_level: 'normal',
+              po_number: acceptedPurchaseOrder.po_number
+            }
+          });
+          console.log('Delivery providers notified successfully');
+        } catch (notifyError) {
+          console.error('Error notifying delivery providers:', notifyError);
+        }
+      }
+
+      toast({
+        title: '🚚 Delivery Requested!',
+        description: 'QR codes will be generated. Nearby delivery providers have been notified.',
+      });
+      
+    } catch (error: any) {
+      console.error('Error requesting delivery:', error);
+      toast({
+        title: 'Delivery request failed',
+        description: error.message || 'Please try again from the Delivery page.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   useEffect(() => {
     fetchQuotes();
   }, [orderId]);
@@ -113,14 +197,16 @@ export const QuoteComparison: React.FC<QuoteComparisonProps> = ({ orderId, build
 
       if (quoteError) throw quoteError;
 
-      // Update order status to 'confirmed' - this triggers QR code auto-generation
+      // Update order status to 'confirmed'
+      // Note: delivery_required defaults to true, will be updated if user chooses pickup
       const { data: orderData, error: orderError } = await supabase
         .from('purchase_orders')
         .update({ 
           status: 'confirmed',
           accepted_quote_id: quoteId,
           supplier_id: quote.supplier_id,
-          total_amount: quote.total_price
+          total_amount: quote.total_price,
+          delivery_required: true // Default to delivery, user can change to pickup
         })
         .eq('id', orderId)
         .select('*')
@@ -128,79 +214,15 @@ export const QuoteComparison: React.FC<QuoteComparisonProps> = ({ orderId, build
 
       if (orderError) throw orderError;
 
-      // Get supplier info for pickup address
-      let pickupAddress = quote.supplier_location || 'Supplier location';
-      if (quote.supplier_id) {
-        const { data: supplierData } = await supabase
-          .from('suppliers')
-          .select('address, company_name')
-          .eq('id', quote.supplier_id)
-          .maybeSingle();
-        
-        if (supplierData) {
-          pickupAddress = supplierData.address || `${supplierData.company_name} - Pickup Location`;
-        }
-      }
+      toast({
+        title: '✅ Quote Accepted!',
+        description: 'Please choose delivery or pickup option.',
+      });
 
-      // AUTOMATICALLY create delivery request and notify providers (First-come-first-served)
+      // Prepare purchase order data for delivery/pickup choice dialog
       const deliveryAddress = orderData?.delivery_address || '';
       const deliveryDate = orderData?.delivery_date || new Date().toISOString().split('T')[0];
       
-      const { data: deliveryRequest, error: deliveryError } = await supabase
-        .from('delivery_requests')
-        .insert({
-          builder_id: builderId,
-          purchase_order_id: orderId,
-          pickup_address: pickupAddress,
-          delivery_address: deliveryAddress,
-          pickup_date: deliveryDate,
-          material_type: 'mixed',
-          quantity: quote.items?.length || 1,
-          weight_kg: (quote.items?.reduce((sum, item) => sum + (item.quantity || 1), 0) || 1) * 50,
-          special_instructions: null,
-          budget_range: '10000-20000',
-          status: 'pending',
-          max_rotation_attempts: 5,
-          created_at: new Date().toISOString()
-        })
-        .select()
-        .single();
-
-      if (deliveryError) {
-        console.error('Error creating delivery request:', deliveryError);
-      }
-
-      // Notify nearby delivery providers via edge function (First-come-first-served)
-      if (deliveryRequest) {
-        try {
-          await supabase.functions.invoke('notify-delivery-providers', {
-            body: {
-              request_type: 'quote_accepted',
-              request_id: deliveryRequest.id,
-              builder_id: builderId,
-              pickup_address: pickupAddress,
-              delivery_address: deliveryAddress,
-              material_details: quote.items?.map(item => ({
-                material_type: item.material_name,
-                quantity: item.quantity,
-                unit: item.unit || 'units'
-              })),
-              priority_level: 'normal',
-              po_number: orderData?.po_number
-            }
-          });
-          console.log('Delivery providers notified successfully');
-        } catch (notifyError) {
-          console.error('Error notifying delivery providers:', notifyError);
-        }
-      }
-
-      toast({
-        title: '✅ Quote Accepted!',
-        description: `Quote accepted! QR codes generated. Nearby delivery providers notified (first-come-first-served).`,
-      });
-
-      // Prepare purchase order data for delivery prompt
       const purchaseOrderForDelivery = {
         id: orderId,
         po_number: orderData?.po_number || `PO-${orderId.slice(0, 8)}`,
@@ -526,21 +548,17 @@ export const QuoteComparison: React.FC<QuoteComparisonProps> = ({ orderId, build
         </CardContent>
       </Card>
 
-      {/* Delivery Prompt Dialog - Shows after quote acceptance */}
+      {/* Delivery/Pickup Choice Dialog - Shows after quote acceptance */}
       <DeliveryPromptDialog
         isOpen={showDeliveryPrompt}
         onOpenChange={setShowDeliveryPrompt}
         purchaseOrder={acceptedPurchaseOrder}
-        onDeliveryRequested={() => {
-          toast({
-            title: '🚚 Delivery Arranged!',
-            description: 'Nearby delivery providers have been notified.',
-          });
-        }}
+        onDeliveryRequested={handleDeliveryRequested}
         onDeclined={() => {
+          // User chose pickup - no delivery, no QR codes
           toast({
-            title: 'No Problem!',
-            description: 'You can request delivery anytime from the Delivery page.',
+            title: '📦 Pickup Order Confirmed!',
+            description: 'Collect your materials directly from the supplier. No QR code needed.',
           });
         }}
       />

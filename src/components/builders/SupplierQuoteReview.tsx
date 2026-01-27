@@ -200,13 +200,14 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
   const handleAcceptQuote = async (quote: QuotationRequest) => {
     setProcessingId(quote.id);
     try {
-      // Update purchase order to 'confirmed' - THIS triggers QR code auto-generation
-      // Note: We now store quotes directly in purchase_orders, not quotation_requests
+      // Update purchase order to 'confirmed'
+      // Note: delivery_required defaults to true, will be updated if user chooses pickup
       const { data: poData, error: poError } = await supabase
         .from('purchase_orders')
         .update({ 
           status: 'confirmed',
           total_amount: quote.quote_amount || quote.purchase_order?.total_amount,
+          delivery_required: true, // Default to delivery, user can change to pickup
           updated_at: new Date().toISOString()
         })
         .eq('id', quote.id)
@@ -215,85 +216,18 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
 
       if (poError) throw poError;
 
-      // 3. Get supplier info for pickup address
-      let pickupAddress = quote.supplier?.address || 'Supplier location';
-      if (quote.supplier_id) {
-        // Try both id and user_id lookups
-        const { data: supplierData } = await supabase
-          .from('suppliers')
-          .select('address, location, company_name')
-          .or(`id.eq.${quote.supplier_id},user_id.eq.${quote.supplier_id}`)
-          .maybeSingle();
-        
-        if (supplierData) {
-          pickupAddress = supplierData.address || supplierData.location || `${supplierData.company_name} - Pickup Location`;
-        }
-      }
+      toast({
+        title: '✅ Quote Accepted!',
+        description: 'Please choose delivery or pickup option.',
+      });
 
-      // 4. AUTOMATICALLY create delivery request and notify providers (First-come-first-served)
+      // Prepare purchase order data for delivery/pickup choice dialog
       const deliveryAddress = quote.delivery_address || quote.purchase_order?.delivery_address || '';
       const deliveryDate = quote.preferred_delivery_date || quote.purchase_order?.delivery_date || new Date().toISOString().split('T')[0];
       
-      const { data: deliveryRequest, error: deliveryError } = await supabase
-        .from('delivery_requests')
-        .insert({
-          builder_id: builderId,
-          purchase_order_id: quote.id, // quote.id IS the purchase_order id now
-          pickup_address: pickupAddress,
-          delivery_address: deliveryAddress,
-          pickup_date: deliveryDate,
-          material_type: detectMaterialType(quote.material_name),
-          quantity: quote.quantity || 1,
-          weight_kg: (quote.quantity || 1) * 50, // Estimate 50kg per unit
-          special_instructions: quote.special_requirements || null,
-          budget_range: '10000-20000', // Default budget range
-          status: 'pending',
-          created_at: new Date().toISOString()
-        })
-        .select()
-        .single();
-
-      if (deliveryError) {
-        console.error('Error creating delivery request:', deliveryError);
-        // Continue even if delivery request fails - quote is already accepted
-      }
-
-      // 5. Notify nearby delivery providers via edge function (First-come-first-served)
-      if (deliveryRequest) {
-        try {
-          await supabase.functions.invoke('notify-delivery-providers', {
-            body: {
-              request_type: 'quote_accepted',
-              request_id: deliveryRequest.id,
-              builder_id: builderId,
-              pickup_address: pickupAddress,
-              delivery_address: deliveryAddress,
-              material_details: [{
-                material_type: quote.material_name,
-                quantity: quote.quantity,
-                unit: quote.unit || 'units'
-              }],
-              special_instructions: quote.special_requirements,
-              priority_level: 'normal',
-              po_number: quote.purchase_order?.po_number || poData?.po_number
-            }
-          });
-          console.log('Delivery providers notified successfully');
-        } catch (notifyError) {
-          console.error('Error notifying delivery providers:', notifyError);
-          // Continue even if notification fails
-        }
-      }
-
-      toast({
-        title: '✅ Quote Accepted!',
-        description: `Quote accepted! QR codes generated. Nearby delivery providers have been notified (first-come-first-served).`,
-      });
-
-      // 6. Prepare purchase order data for delivery details dialog
       const purchaseOrderForDelivery = {
         id: quote.id,
-        po_number: quote.purchase_order?.po_number || `PO-${quote.id.slice(0, 8)}`,
+        po_number: quote.purchase_order?.po_number || poData?.po_number || `PO-${quote.id.slice(0, 8)}`,
         supplier_id: quote.supplier_id,
         supplier_name: quote.supplier?.company_name || 'Supplier',
         supplier_address: quote.supplier?.address || '',
@@ -305,12 +239,13 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
           quantity: quote.quantity,
           unit: quote.unit
         }],
-        project_name: quote.project_description || quote.purchase_order?.project_name
+        project_name: quote.project_description || quote.purchase_order?.project_name,
+        special_instructions: quote.special_requirements || ''
       };
 
       setAcceptedPurchaseOrder(purchaseOrderForDelivery);
       
-      // 7. Show delivery confirmation/details dialog
+      // Show delivery/pickup choice dialog
       setTimeout(() => {
         setShowDeliveryPrompt(true);
       }, 500);
@@ -327,6 +262,90 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
       });
     } finally {
       setProcessingId(null);
+    }
+  };
+
+  // Handle when user chooses DELIVERY (called from DeliveryPromptDialog)
+  const handleDeliveryRequested = async () => {
+    if (!acceptedPurchaseOrder) return;
+    
+    try {
+      // Get supplier info for pickup address
+      let pickupAddress = acceptedPurchaseOrder.supplier_address || 'Supplier location';
+      if (acceptedPurchaseOrder.supplier_id) {
+        const { data: supplierData } = await supabase
+          .from('suppliers')
+          .select('address, location, company_name')
+          .or(`id.eq.${acceptedPurchaseOrder.supplier_id},user_id.eq.${acceptedPurchaseOrder.supplier_id}`)
+          .maybeSingle();
+        
+        if (supplierData) {
+          pickupAddress = supplierData.address || supplierData.location || `${supplierData.company_name} - Pickup Location`;
+        }
+      }
+
+      // Create delivery request
+      const { data: deliveryRequest, error: deliveryError } = await supabase
+        .from('delivery_requests')
+        .insert({
+          builder_id: builderId,
+          purchase_order_id: acceptedPurchaseOrder.id,
+          pickup_address: pickupAddress,
+          delivery_address: acceptedPurchaseOrder.delivery_address,
+          pickup_date: acceptedPurchaseOrder.delivery_date,
+          material_type: detectMaterialType(acceptedPurchaseOrder.items?.[0]?.material_name || ''),
+          quantity: acceptedPurchaseOrder.items?.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0) || 1,
+          weight_kg: (acceptedPurchaseOrder.items?.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0) || 1) * 50,
+          special_instructions: acceptedPurchaseOrder.special_instructions || null,
+          budget_range: '10000-20000',
+          status: 'pending',
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (deliveryError) {
+        console.error('Error creating delivery request:', deliveryError);
+      }
+
+      // Notify delivery providers
+      if (deliveryRequest) {
+        try {
+          await supabase.functions.invoke('notify-delivery-providers', {
+            body: {
+              request_type: 'quote_accepted',
+              request_id: deliveryRequest.id,
+              builder_id: builderId,
+              pickup_address: pickupAddress,
+              delivery_address: acceptedPurchaseOrder.delivery_address,
+              material_details: acceptedPurchaseOrder.items?.map((item: any) => ({
+                material_type: item.material_name || item.name,
+                quantity: item.quantity,
+                unit: item.unit || 'units'
+              })),
+              special_instructions: acceptedPurchaseOrder.special_instructions,
+              priority_level: 'normal',
+              po_number: acceptedPurchaseOrder.po_number
+            }
+          });
+          console.log('Delivery providers notified successfully');
+        } catch (notifyError) {
+          console.error('Error notifying delivery providers:', notifyError);
+        }
+      }
+
+      toast({
+        title: '🚚 Delivery Requested!',
+        description: 'QR codes will be generated. Nearby delivery providers have been notified.',
+      });
+      
+    } catch (error: any) {
+      console.error('Error requesting delivery:', error);
+      toast({
+        title: 'Delivery request failed',
+        description: error.message || 'Please try again from the Delivery page.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -732,21 +751,17 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
         </DialogContent>
       </Dialog>
 
-      {/* Delivery Prompt Dialog */}
+      {/* Delivery/Pickup Choice Dialog */}
       <DeliveryPromptDialog
         isOpen={showDeliveryPrompt}
         onOpenChange={setShowDeliveryPrompt}
         purchaseOrder={acceptedPurchaseOrder}
-        onDeliveryRequested={() => {
-          toast({
-            title: '🚚 Delivery Arranged!',
-            description: 'Nearby delivery providers have been notified.',
-          });
-        }}
+        onDeliveryRequested={handleDeliveryRequested}
         onDeclined={() => {
+          // User chose pickup - no delivery, no QR codes
           toast({
-            title: 'No Problem!',
-            description: 'You can request delivery anytime from the Delivery page.',
+            title: '📦 Pickup Order Confirmed!',
+            description: 'Collect your materials directly from the supplier. No QR code needed.',
           });
         }}
       />
