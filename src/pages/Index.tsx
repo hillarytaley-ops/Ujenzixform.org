@@ -296,124 +296,105 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Registration Section - All User Types */}
-      <section className="pt-12 pb-6 bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 text-white">
+      {/* Choose Your Portal Section - Combined Sign In & Register */}
+      <section className="py-16 bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 text-white">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-8">
-            <Badge className="mb-4 bg-white/10 text-white border-white/20">New to UjenziXform?</Badge>
-            <h2 className="text-3xl font-bold mb-2">Join Our Platform</h2>
-            <p className="text-white/70 max-w-xl mx-auto">Register based on your role to access tailored features</p>
+          <div className="text-center mb-10">
+            <p className="text-sm uppercase tracking-widest text-white/60 mb-2">CHOOSE YOUR PORTAL</p>
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
             {/* Private Builder */}
-            <Link to="/private-builder-registration">
-              <Card className="h-full hover:scale-[1.03] transition-all duration-300 cursor-pointer bg-gradient-to-br from-emerald-600 to-emerald-700 border-2 border-emerald-500/30 hover:border-emerald-400 shadow-xl hover:shadow-2xl">
-                <CardContent className="p-8 text-center">
-                  <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <ShoppingCart className="h-8 w-8 text-white" />
-                  </div>
-                  <h3 className="text-white font-bold text-xl mb-2">Private Builder</h3>
-                  <p className="text-emerald-100/80 text-sm mb-4">Home projects & personal purchases</p>
-                  <Badge className="bg-white text-emerald-700 px-4 py-1">Register →</Badge>
-                </CardContent>
-              </Card>
-            </Link>
+            <Card className="h-full hover:scale-[1.02] transition-all duration-300 bg-gradient-to-br from-emerald-500 to-emerald-600 border-0 shadow-xl hover:shadow-2xl rounded-2xl overflow-hidden">
+              <CardContent className="p-6 text-center flex flex-col h-full">
+                <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center mx-auto mb-4">
+                  <ShoppingCart className="h-7 w-7 text-white" />
+                </div>
+                <h3 className="text-white font-bold text-lg mb-1">Private Builder</h3>
+                <p className="text-emerald-100/80 text-sm mb-6">Home projects & personal purchases</p>
+                <div className="mt-auto flex gap-2 justify-center">
+                  <Link to="/builder-signin">
+                    <Button variant="outline" size="sm" className="bg-white/10 border-white/30 text-white hover:bg-white/20 px-4">
+                      Sign In
+                    </Button>
+                  </Link>
+                  <Link to="/private-builder-registration">
+                    <Button size="sm" className="bg-white text-emerald-700 hover:bg-white/90 px-4">
+                      Register
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Professional Builder */}
-            <Link to="/professional-builder-registration">
-              <Card className="h-full hover:scale-[1.03] transition-all duration-300 cursor-pointer bg-gradient-to-br from-blue-600 to-blue-700 border-2 border-blue-500/30 hover:border-blue-400 shadow-xl hover:shadow-2xl">
-                <CardContent className="p-8 text-center">
-                  <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <Building2 className="h-8 w-8 text-white" />
-                  </div>
-                  <h3 className="text-white font-bold text-xl mb-2">Pro Builder</h3>
-                  <p className="text-blue-100/80 text-sm mb-4">Contractors & construction companies</p>
-                  <Badge className="bg-white text-blue-700 px-4 py-1">Register →</Badge>
-                </CardContent>
-              </Card>
-            </Link>
+            <Card className="h-full hover:scale-[1.02] transition-all duration-300 bg-gradient-to-br from-blue-500 to-blue-600 border-0 shadow-xl hover:shadow-2xl rounded-2xl overflow-hidden">
+              <CardContent className="p-6 text-center flex flex-col h-full">
+                <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center mx-auto mb-4">
+                  <Building2 className="h-7 w-7 text-white" />
+                </div>
+                <h3 className="text-white font-bold text-lg mb-1">Professional Builder</h3>
+                <p className="text-blue-100/80 text-sm mb-6">Request quotes for bulk orders</p>
+                <div className="mt-auto flex gap-2 justify-center">
+                  <Link to="/builder-signin">
+                    <Button variant="outline" size="sm" className="bg-white/10 border-white/30 text-white hover:bg-white/20 px-4">
+                      Sign In
+                    </Button>
+                  </Link>
+                  <Link to="/professional-builder-registration">
+                    <Button size="sm" className="bg-white text-blue-700 hover:bg-white/90 px-4">
+                      Register
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Supplier */}
-            <Link to="/supplier-registration">
-              <Card className="h-full hover:scale-[1.03] transition-all duration-300 cursor-pointer bg-gradient-to-br from-amber-600 to-orange-600 border-2 border-amber-500/30 hover:border-amber-400 shadow-xl hover:shadow-2xl">
-                <CardContent className="p-8 text-center">
-                  <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <Store className="h-8 w-8 text-white" />
-                  </div>
-                  <h3 className="text-white font-bold text-xl mb-2">Supplier</h3>
-                  <p className="text-amber-100/80 text-sm mb-4">Sell construction materials</p>
-                  <Badge className="bg-white text-amber-700 px-4 py-1">Register →</Badge>
-                </CardContent>
-              </Card>
-            </Link>
+            <Card className="h-full hover:scale-[1.02] transition-all duration-300 bg-gradient-to-br from-orange-500 to-orange-600 border-0 shadow-xl hover:shadow-2xl rounded-2xl overflow-hidden">
+              <CardContent className="p-6 text-center flex flex-col h-full">
+                <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center mx-auto mb-4">
+                  <Store className="h-7 w-7 text-white" />
+                </div>
+                <h3 className="text-white font-bold text-lg mb-1">Supplier</h3>
+                <p className="text-orange-100/80 text-sm mb-6">List & sell your products</p>
+                <div className="mt-auto flex gap-2 justify-center">
+                  <Link to="/supplier-signin">
+                    <Button variant="outline" size="sm" className="bg-white/10 border-white/30 text-white hover:bg-white/20 px-4">
+                      Sign In
+                    </Button>
+                  </Link>
+                  <Link to="/supplier-registration">
+                    <Button size="sm" className="bg-white text-orange-700 hover:bg-white/90 px-4">
+                      Register
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Delivery Provider */}
-            <Link to="/delivery/apply">
-              <Card className="h-full hover:scale-[1.03] transition-all duration-300 cursor-pointer bg-gradient-to-br from-teal-600 to-cyan-600 border-2 border-teal-500/30 hover:border-teal-400 shadow-xl hover:shadow-2xl">
-                <CardContent className="p-8 text-center">
-                  <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <Truck className="h-8 w-8 text-white" />
-                  </div>
-                  <h3 className="text-white font-bold text-xl mb-2">Delivery</h3>
-                  <p className="text-teal-100/80 text-sm mb-4">Transport & logistics services</p>
-                  <Badge className="bg-white text-teal-700 px-4 py-1">Apply →</Badge>
-                </CardContent>
-              </Card>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Sign In Portals Section */}
-      <section className="pt-6 pb-12 bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold mb-2 text-white">Already Registered?</h2>
-            <p className="text-white/70">Sign in to your account to manage your business</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
-            {/* Builder Portal */}
-            <Link to="/builder-signin">
-              <Card className="hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer border-2 border-blue-400/30 bg-white/10 backdrop-blur-sm hover:bg-white/20">
-                <CardContent className="p-5 text-center">
-                  <div className="w-12 h-12 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <Building2 className="h-6 w-6 text-blue-300" />
-                  </div>
-                  <h3 className="text-base font-semibold text-white mb-1">Builder Portal</h3>
-                  <p className="text-xs text-white/60 mb-3">Manage projects & orders</p>
-                  <Badge className="bg-blue-500/20 text-blue-200 border-blue-400/30">Sign In →</Badge>
-                </CardContent>
-              </Card>
-            </Link>
-
-            {/* Supplier Portal */}
-            <Link to="/supplier-signin">
-              <Card className="hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer border-2 border-orange-400/30 bg-white/10 backdrop-blur-sm hover:bg-white/20">
-                <CardContent className="p-5 text-center">
-                  <div className="w-12 h-12 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <Store className="h-6 w-6 text-orange-300" />
-                  </div>
-                  <h3 className="text-base font-semibold text-white mb-1">Supplier Portal</h3>
-                  <p className="text-xs text-white/60 mb-3">Manage inventory & sales</p>
-                  <Badge className="bg-orange-500/20 text-orange-200 border-orange-400/30">Sign In →</Badge>
-                </CardContent>
-              </Card>
-            </Link>
-
-            {/* Delivery Provider Portal */}
-            <Link to="/delivery-signin">
-              <Card className="hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer border-2 border-teal-400/30 bg-white/10 backdrop-blur-sm hover:bg-white/20">
-                <CardContent className="p-5 text-center">
-                  <div className="w-12 h-12 bg-teal-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <Truck className="h-6 w-6 text-teal-300" />
-                  </div>
-                  <h3 className="text-base font-semibold text-white mb-1">Delivery Provider</h3>
-                  <p className="text-xs text-white/60 mb-3">Manage deliveries & routes</p>
-                  <Badge className="bg-teal-500/20 text-teal-200 border-teal-400/30">Sign In →</Badge>
-                </CardContent>
-              </Card>
-            </Link>
+            <Card className="h-full hover:scale-[1.02] transition-all duration-300 bg-gradient-to-br from-purple-500 to-purple-600 border-0 shadow-xl hover:shadow-2xl rounded-2xl overflow-hidden">
+              <CardContent className="p-6 text-center flex flex-col h-full">
+                <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center mx-auto mb-4">
+                  <Truck className="h-7 w-7 text-white" />
+                </div>
+                <h3 className="text-white font-bold text-lg mb-1">Delivery Provider</h3>
+                <p className="text-purple-100/80 text-sm mb-6">Transport & logistics services</p>
+                <div className="mt-auto flex gap-2 justify-center">
+                  <Link to="/delivery-signin">
+                    <Button variant="outline" size="sm" className="bg-white/10 border-white/30 text-white hover:bg-white/20 px-4">
+                      Sign In
+                    </Button>
+                  </Link>
+                  <Link to="/delivery/apply">
+                    <Button size="sm" className="bg-white text-purple-700 hover:bg-white/90 px-4">
+                      Register
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </section>
