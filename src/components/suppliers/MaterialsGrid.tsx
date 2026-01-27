@@ -686,28 +686,25 @@ export const MaterialsGrid = () => {
     };
   }, [filteredMaterials, columns]);
 
-  // ✅ OPTIMIZED LAZY LOAD: Load images for visible items + buffer ahead
+  // ✅ OPTIMIZED LAZY LOAD: Load images for visible items + large buffer ahead
   useEffect(() => {
-    // Load visible items PLUS 20 items ahead for smoother scrolling
-    const bufferSize = 20;
+    // Load visible items PLUS 50 items ahead for smoother scrolling
+    const bufferSize = 50;
     const extendedEnd = Math.min(visibleEnd + bufferSize, filteredMaterials.length);
     const visibleItems = filteredMaterials.slice(visibleStart, extendedEnd);
     const itemsWithoutImages = visibleItems.filter(m => !m.image_url && m.supplier_id === 'admin-catalog');
     
     if (itemsWithoutImages.length > 0) {
       const idsToLoad = itemsWithoutImages.map(m => m.id);
-      // Reduced debounce for faster response
-      const timer = setTimeout(() => {
-        loadMaterialImages(idsToLoad);
-      }, 50); // Reduced from 200ms to 50ms
-      return () => clearTimeout(timer);
+      // Immediate load - no debounce for faster response
+      loadMaterialImages(idsToLoad);
     }
   }, [visibleStart, visibleEnd, filteredMaterials]);
 
   // Track which images are being loaded to prevent duplicate requests
   const loadingImagesRef = useRef<Set<string>>(new Set());
 
-  // ✅ OPTIMIZED: Fetch image URLs for specific material IDs with caching
+  // ✅ ULTRA-OPTIMIZED: Fetch image URLs for specific material IDs with aggressive caching
   const loadMaterialImages = async (ids: string[]) => {
     // Filter out already loading images
     const newIds = ids.filter(id => !loadingImagesRef.current.has(id));
@@ -717,65 +714,60 @@ export const MaterialsGrid = () => {
     newIds.forEach(id => loadingImagesRef.current.add(id));
     
     try {
-      // Load in batches of 30 for better performance
-      const BATCH_SIZE = 30;
-      const batches = [];
-      for (let i = 0; i < newIds.length; i += BATCH_SIZE) {
-        batches.push(newIds.slice(i, i + BATCH_SIZE));
-      }
+      // Load ALL at once for speed (up to 100 items)
+      const BATCH_SIZE = 100;
+      const idsToFetch = newIds.slice(0, BATCH_SIZE);
+      const idsParam = idsToFetch.map(id => `"${id}"`).join(',');
       
-      // Process batches in parallel (max 3 concurrent)
-      const processedBatches = await Promise.all(
-        batches.slice(0, 3).map(async (batchIds) => {
-          const idsParam = batchIds.map(id => `"${id}"`).join(',');
-          const response = await fetch(
-            `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,image_url&id=in.(${idsParam})`,
-            {
-              headers: {
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-                'Content-Type': 'application/json'
-              }
-            }
-          );
-          
-          if (response.ok) {
-            return await response.json();
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,image_url&id=in.(${idsParam})`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json'
           }
-          return [];
-        })
+        }
       );
       
-      // Combine all batch results
-      const allImageData = processedBatches.flat();
-      
-      if (allImageData.length > 0) {
-        // Create a map for O(1) lookup
-        const imageMap = new Map(allImageData.map((d: any) => [d.id, d.image_url]));
+      if (response.ok) {
+        const imageData = await response.json();
         
-        // Update materials with their image URLs
-        setMaterials(prev => prev.map(mat => {
-          const imageUrl = imageMap.get(mat.id);
-          return imageUrl ? { ...mat, image_url: imageUrl } : mat;
-        }));
-        
-        // Also update filtered materials
-        setFilteredMaterials(prev => prev.map(mat => {
-          const imageUrl = imageMap.get(mat.id);
-          return imageUrl ? { ...mat, image_url: imageUrl } : mat;
-        }));
-        
-        console.log(`🖼️ Loaded ${allImageData.length} images`);
+        if (imageData.length > 0) {
+          // Create a map for O(1) lookup
+          const imageMap = new Map<string, string>(imageData.map((d: any) => [d.id, d.image_url as string]));
+          
+          // Preload images in browser cache
+          imageData.forEach((d: any) => {
+            if (d.image_url) {
+              const img = new Image();
+              img.src = d.image_url;
+            }
+          });
+          
+          // Update materials with their image URLs
+          setMaterials(prev => prev.map(mat => {
+            const imageUrl = imageMap.get(mat.id);
+            return imageUrl ? { ...mat, image_url: imageUrl } as Material : mat;
+          }));
+          
+          // Also update filtered materials
+          setFilteredMaterials(prev => prev.map(mat => {
+            const imageUrl = imageMap.get(mat.id);
+            return imageUrl ? { ...mat, image_url: imageUrl } as Material : mat;
+          }));
+          
+          console.log(`🖼️ Loaded ${imageData.length} images`);
+        }
       }
       
-      // Process remaining batches if any
-      if (batches.length > 3) {
-        setTimeout(() => {
-          const remainingIds = batches.slice(3).flat();
-          if (remainingIds.length > 0) {
-            loadMaterialImages(remainingIds);
-          }
-        }, 100);
+      // Process remaining if any
+      if (newIds.length > BATCH_SIZE) {
+        const remainingIds = newIds.slice(BATCH_SIZE);
+        if (remainingIds.length > 0) {
+          // Small delay to not overwhelm
+          setTimeout(() => loadMaterialImages(remainingIds), 50);
+        }
       }
     } catch (err) {
       console.error('Error loading material images:', err);
@@ -837,8 +829,8 @@ export const MaterialsGrid = () => {
         console.log('Supplier prices table not available');
       }
       
-      // STEP 2: Fetch admin-uploaded materials - OPTIMIZED for performance
-      // ✅ PERFORMANCE: First fetch metadata only (no image_url), then lazy load images
+      // STEP 2: Fetch admin-uploaded materials - ULTRA OPTIMIZED for performance
+      // ✅ PERFORMANCE: Fetch first batch WITH images, rest with metadata only
       let adminMaterials: Material[] = [];
       
       try {
@@ -848,36 +840,54 @@ export const MaterialsGrid = () => {
         
         console.log(`📱 Device: ${isMobile ? 'Mobile' : 'Desktop'}`);
         
-        // ✅ FAST: Fetch metadata only (NO image_url which contains huge base64 data)
-        // Increased limit to show ALL admin images
-        const LIMIT = isMobile ? 100 : 500;
-        const response = await fetch(
-          `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants&is_approved=eq.true&order=created_at.desc&limit=${LIMIT}`,
-          {
-            headers: {
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-              'Content-Type': 'application/json',
-              'Prefer': 'count=exact'
-            }
-          }
-        );
+        // ✅ FAST FIRST LOAD: Fetch first 40 items WITH images for instant display
+        const FIRST_BATCH = 40;
+        const TOTAL_LIMIT = isMobile ? 100 : 500;
         
-        if (response.ok) {
-          const allAdminData = await response.json();
-          const countHeader = response.headers.get('content-range');
+        // Parallel fetch: first batch with images + rest without images
+        const [firstBatchResponse, restResponse] = await Promise.all([
+          // First 40 with images for instant display
+          fetch(
+            `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,image_url&is_approved=eq.true&order=created_at.desc&limit=${FIRST_BATCH}`,
+            {
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          ),
+          // Rest without images (metadata only)
+          fetch(
+            `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants&is_approved=eq.true&order=created_at.desc&offset=${FIRST_BATCH}&limit=${TOTAL_LIMIT - FIRST_BATCH}`,
+            {
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'count=exact'
+              }
+            }
+          )
+        ]);
+        
+        if (firstBatchResponse.ok && restResponse.ok) {
+          const firstBatchData = await firstBatchResponse.json();
+          const restData = await restResponse.json();
+          const allAdminData = [...firstBatchData, ...restData];
           
+          const countHeader = restResponse.headers.get('content-range');
           if (countHeader) {
-            const total = parseInt(countHeader.split('/')[1] || '0');
+            const total = parseInt(countHeader.split('/')[1] || '0') + FIRST_BATCH;
             setTotalMaterialsCount(total);
             setHasMoreMaterials(total > allAdminData.length);
             console.log(`📊 Loaded ${allAdminData.length} materials (total: ${total})`);
           }
           
-          console.log(`⚡ Fast load: ${allAdminData.length} materials (metadata only)`);
+          console.log(`⚡ Fast load: ${firstBatchData.length} with images + ${restData.length} metadata only`);
           
-          // Map materials WITHOUT image_url initially
-          const materialsWithoutImages = allAdminData.map((item: any) => {
+          // Map materials - first batch already has images, rest will be loaded lazily
+          const materialsWithImages = allAdminData.map((item: any, index: number) => {
             const supplierPrice = supplierPrices[item.id];
             
             let variants: PriceVariant[] = [];
@@ -918,7 +928,8 @@ export const MaterialsGrid = () => {
               description: description,
               unit: item.unit || 'unit',
               unit_price: supplierPrice?.price || item.suggested_price || 0,
-              image_url: '', // Will be loaded lazily
+              // First batch has images, rest will be loaded lazily
+              image_url: index < FIRST_BATCH ? (item.image_url || '') : '',
               additional_images: [],
               in_stock: supplierPrice?.in_stock ?? true,
               supplier: {
@@ -931,12 +942,15 @@ export const MaterialsGrid = () => {
             } as Material;
           });
           
-          adminMaterials = materialsWithoutImages;
+          adminMaterials = materialsWithImages;
           
-          // ✅ OPTIMIZED: Fetch images for first 40 items immediately (above the fold)
-          const firstBatchIds = allAdminData.slice(0, 40).map((item: any) => item.id);
-          // Load first batch immediately without debounce
-          setTimeout(() => loadMaterialImages(firstBatchIds), 0);
+          // Preload first batch images in browser cache for instant display
+          firstBatchData.forEach((item: any) => {
+            if (item.image_url && !item.image_url.startsWith('data:')) {
+              const img = new Image();
+              img.src = item.image_url;
+            }
+          });
         } else {
           console.warn('Failed to fetch admin materials');
         }
