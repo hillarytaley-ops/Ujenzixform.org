@@ -51,7 +51,7 @@ export const SMSTestPanel: React.FC = () => {
         // Send custom message
         result = await notificationService.sendSMS({
           to: phoneNumber,
-          message: customMessage || 'Test message from MradiPro/UjenziXform!'
+          message: customMessage || 'Test message from UjenziXform/UjenziXform!'
         });
       } else {
         // Send template message with sample data

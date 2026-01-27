@@ -481,7 +481,7 @@ const ProfessionalBuilderDashboardPage = () => {
                   Request Manual Delivery
                 </CardTitle>
                 <CardDescription>
-                  Request delivery for materials sourced outside MradiPro or for site-to-site transfers
+                  Request delivery for materials sourced outside UjenziXform or for site-to-site transfers
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -494,7 +494,7 @@ const ProfessionalBuilderDashboardPage = () => {
                     <div>
                       <h4 className="font-semibold text-teal-800 mb-1">When to Use Manual Delivery Request</h4>
                       <ul className="text-sm text-teal-700 space-y-1">
-                        <li>• Materials purchased from suppliers outside MradiPro</li>
+                        <li>• Materials purchased from suppliers outside UjenziXform</li>
                         <li>• Site-to-site material transfers between your projects</li>
                         <li>• Returning defective materials to suppliers</li>
                         <li>• Moving existing inventory to a new construction site</li>
@@ -748,7 +748,7 @@ const ProfessionalBuilderDashboardPage = () => {
                         {request.status === 'quoted' && request.quote_amount && (
                           <div className="mt-4 p-4 bg-white border-2 border-blue-200 rounded-lg">
                             <div className="flex items-center justify-between mb-3">
-                              <h6 className="font-semibold text-blue-800">📋 Quote from MradiPro</h6>
+                              <h6 className="font-semibold text-blue-800">📋 Quote from UjenziXform</h6>
                               {request.quote_valid_until && (
                                 <span className="text-xs text-gray-500">
                                   Valid until: {new Date(request.quote_valid_until).toLocaleDateString()}

@@ -426,7 +426,7 @@ const PrivateClientDashboard = () => {
                   Request Manual Delivery
                 </CardTitle>
                 <CardDescription>
-                  Request delivery for materials sourced outside MradiPro
+                  Request delivery for materials sourced outside UjenziXform
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -440,7 +440,7 @@ const PrivateClientDashboard = () => {
                       <h4 className="font-semibold text-teal-800 mb-1">When to Use Manual Delivery Request</h4>
                       <ul className="text-sm text-teal-700 space-y-1">
                         <li>• Materials purchased from local hardware stores</li>
-                        <li>• Items bought from suppliers outside MradiPro</li>
+                        <li>• Items bought from suppliers outside UjenziXform</li>
                         <li>• Moving materials between storage and construction site</li>
                         <li>• Returning defective items to suppliers</li>
                       </ul>
@@ -695,7 +695,7 @@ const PrivateClientDashboard = () => {
                         {request.status === 'quoted' && request.quote_amount && (
                           <div className="mt-4 p-4 bg-white border-2 border-blue-200 rounded-lg">
                             <div className="flex items-center justify-between mb-3">
-                              <h6 className="font-semibold text-blue-800">📋 Quote from MradiPro</h6>
+                              <h6 className="font-semibold text-blue-800">📋 Quote from UjenziXform</h6>
                               {request.quote_valid_until && (
                                 <span className="text-xs text-gray-500">
                                   Valid until: {new Date(request.quote_valid_until).toLocaleDateString()}

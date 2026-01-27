@@ -631,7 +631,7 @@ const Delivery = () => {
                       <div>
                         <h4 className="font-semibold text-teal-800 mb-1">Manual Delivery Request</h4>
                         <p className="text-sm text-teal-700">
-                          Use this form to request delivery for materials sourced outside MradiPro, 
+                          Use this form to request delivery for materials sourced outside UjenziXform, 
                           site-to-site transfers, or when you need to move existing inventory.
                         </p>
                       </div>

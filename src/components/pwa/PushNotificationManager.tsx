@@ -183,7 +183,7 @@ export const PushNotificationManager: React.FC = () => {
 
   const sendTestNotification = () => {
     if (permission === 'granted') {
-      new Notification('MradiPro Test', {
+      new Notification('UjenziXform Test', {
         body: 'Notifications are working! 🎉',
         icon: '/icons/icon-192x192.png',
         badge: '/icons/badge-72x72.png',

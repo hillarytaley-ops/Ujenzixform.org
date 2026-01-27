@@ -50,56 +50,56 @@ export const NOTIFICATION_TEMPLATES: Record<string, NotificationTemplate> = {
   ORDER_CONFIRMED: {
     id: 'order_confirmed',
     name: 'Order Confirmed',
-    smsTemplate: 'MradiPro: Your order #{orderNumber} has been confirmed! Total: KES {amount}. Track at: {trackingUrl}',
+    smsTemplate: 'UjenziXform: Your order #{orderNumber} has been confirmed! Total: KES {amount}. Track at: {trackingUrl}',
     whatsappTemplate: '🎉 *Order Confirmed!*\n\nOrder: #{orderNumber}\nTotal: KES {amount}\n\nTrack your order: {trackingUrl}',
     variables: ['orderNumber', 'amount', 'trackingUrl']
   },
   QUOTE_RECEIVED: {
     id: 'quote_received',
     name: 'Quote Received',
-    smsTemplate: 'MradiPro: New quote received from {supplierName}! Amount: KES {amount}. Review at: {reviewUrl}',
+    smsTemplate: 'UjenziXform: New quote received from {supplierName}! Amount: KES {amount}. Review at: {reviewUrl}',
     whatsappTemplate: '📋 *New Quote Received!*\n\nFrom: {supplierName}\nAmount: KES {amount}\n\nReview: {reviewUrl}',
     variables: ['supplierName', 'amount', 'reviewUrl']
   },
   DELIVERY_UPDATE: {
     id: 'delivery_update',
     name: 'Delivery Update',
-    smsTemplate: 'MradiPro: Delivery update for #{trackingNumber} - Status: {status}. {message}',
+    smsTemplate: 'UjenziXform: Delivery update for #{trackingNumber} - Status: {status}. {message}',
     whatsappTemplate: '🚚 *Delivery Update*\n\nTracking: #{trackingNumber}\nStatus: {status}\n\n{message}',
     variables: ['trackingNumber', 'status', 'message']
   },
   DELIVERY_ASSIGNED: {
     id: 'delivery_assigned',
     name: 'Delivery Assigned',
-    smsTemplate: 'MradiPro: Driver {driverName} ({driverPhone}) is on the way! ETA: {eta}',
+    smsTemplate: 'UjenziXform: Driver {driverName} ({driverPhone}) is on the way! ETA: {eta}',
     whatsappTemplate: '🚛 *Driver Assigned!*\n\nDriver: {driverName}\nPhone: {driverPhone}\nETA: {eta}\n\nTrack live: {trackingUrl}',
     variables: ['driverName', 'driverPhone', 'eta', 'trackingUrl']
   },
   QUOTE_REQUEST: {
     id: 'quote_request',
     name: 'Quote Request (for Suppliers)',
-    smsTemplate: 'MradiPro: New quote request from {builderName}! {itemCount} items. Respond at: {responseUrl}',
+    smsTemplate: 'UjenziXform: New quote request from {builderName}! {itemCount} items. Respond at: {responseUrl}',
     whatsappTemplate: '📩 *New Quote Request!*\n\nFrom: {builderName}\nItems: {itemCount}\n\nRespond now: {responseUrl}',
     variables: ['builderName', 'itemCount', 'responseUrl']
   },
   PAYMENT_RECEIVED: {
     id: 'payment_received',
     name: 'Payment Received',
-    smsTemplate: 'MradiPro: Payment of KES {amount} received for order #{orderNumber}. Thank you!',
+    smsTemplate: 'UjenziXform: Payment of KES {amount} received for order #{orderNumber}. Thank you!',
     whatsappTemplate: '✅ *Payment Received!*\n\nAmount: KES {amount}\nOrder: #{orderNumber}\n\nThank you for your business!',
     variables: ['amount', 'orderNumber']
   },
   WELCOME: {
     id: 'welcome',
     name: 'Welcome Message',
-    smsTemplate: 'Welcome to MradiPro, {name}! Your account is ready. Start exploring: {appUrl}',
-    whatsappTemplate: '👋 *Welcome to MradiPro!*\n\nHi {name},\n\nYour account is ready. Explore construction materials from verified suppliers.\n\nGet started: {appUrl}',
+    smsTemplate: 'Welcome to UjenziXform, {name}! Your account is ready. Start exploring: {appUrl}',
+    whatsappTemplate: '👋 *Welcome to UjenziXform!*\n\nHi {name},\n\nYour account is ready. Explore construction materials from verified suppliers.\n\nGet started: {appUrl}',
     variables: ['name', 'appUrl']
   },
   OTP: {
     id: 'otp',
     name: 'OTP Verification',
-    smsTemplate: 'MradiPro: Your verification code is {otp}. Valid for 10 minutes. Do not share.',
+    smsTemplate: 'UjenziXform: Your verification code is {otp}. Valid for 10 minutes. Do not share.',
     whatsappTemplate: '🔐 *Verification Code*\n\nYour code: *{otp}*\n\nValid for 10 minutes.\n⚠️ Never share this code.',
     variables: ['otp']
   }
@@ -114,7 +114,7 @@ class NotificationService {
   constructor() {
     this.apiUsername = import.meta.env.VITE_AFRICASTALKING_USERNAME || '';
     this.apiKey = import.meta.env.VITE_AFRICASTALKING_API_KEY || '';
-    this.senderId = import.meta.env.VITE_AFRICASTALKING_SENDER_ID || 'MradiPro';
+    this.senderId = import.meta.env.VITE_AFRICASTALKING_SENDER_ID || 'UjenziXform';
     this.baseUrl = 'https://api.africastalking.com/version1';
   }
 

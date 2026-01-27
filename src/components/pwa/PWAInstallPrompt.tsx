@@ -97,7 +97,7 @@ export const PWAInstallPrompt: React.FC = () => {
               <Smartphone className="h-8 w-8" />
             </div>
             <div className="flex-1">
-              <h3 className="font-bold text-lg">Install MradiPro</h3>
+              <h3 className="font-bold text-lg">Install UjenziXform</h3>
               <p className="text-sm text-muted-foreground mb-3">
                 Get the full app experience on your device!
               </p>
