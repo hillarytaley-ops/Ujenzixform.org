@@ -235,25 +235,35 @@ const Auth = () => {
           }, 1500);
         }
       } else {
-        // Successful sign in - fetch role and redirect
-        try {
-          const { data: { user: currentUser } } = await supabase.auth.getUser();
-          if (currentUser) {
-            const { data: roleData } = await supabase
-              .from('user_roles')
-              .select('role')
-              .eq('user_id', currentUser.id)
-              .maybeSingle();
-            
-            if (roleData?.role) {
-              localStorage.setItem('user_role', roleData.role);
-              localStorage.setItem('user_role_id', currentUser.id);
-              localStorage.setItem('user_role_verified', Date.now().toString());
-              console.log('🔐 Auth: User role stored:', roleData.role);
-            }
+        // ✅ MOBILE OPTIMIZED: Successful sign in - fast redirect
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        
+        if (currentUser) {
+          // Check localStorage cache first for instant redirect
+          const cachedRole = localStorage.getItem('user_role');
+          const cachedRoleId = localStorage.getItem('user_role_id');
+          
+          if (cachedRole && cachedRoleId === currentUser.id) {
+            console.log('🔐 Auth: Using cached role for fast redirect:', cachedRole);
+            localStorage.setItem('user_role_verified', Date.now().toString());
+            toast({ title: "✅ Welcome back!", description: "Redirecting..." });
+            window.location.href = '/home';
+            return;
           }
-        } catch (e) {
-          console.warn('Could not fetch user role:', e);
+          
+          // Fetch role from database
+          const { data: roleData } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', currentUser.id)
+            .maybeSingle();
+          
+          if (roleData?.role) {
+            localStorage.setItem('user_role', roleData.role);
+            localStorage.setItem('user_role_id', currentUser.id);
+            localStorage.setItem('user_role_verified', Date.now().toString());
+            console.log('🔐 Auth: User role stored:', roleData.role);
+          }
         }
         
         const returnTo = sessionStorage.getItem('returnTo');

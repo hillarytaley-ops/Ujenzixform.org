@@ -840,13 +840,97 @@ export const MaterialsGrid = () => {
         
         console.log(`📱 Device: ${isMobile ? 'Mobile' : 'Desktop'}`);
         
-        // ✅ FAST FIRST LOAD: Fetch first 40 items WITH images for instant display
-        const FIRST_BATCH = 40;
-        const TOTAL_LIMIT = isMobile ? 100 : 500;
+        // ✅ MOBILE OPTIMIZED: Smaller first batch, fewer total items
+        const FIRST_BATCH = isMobile ? 12 : 40; // Mobile: 12 (fits 2 rows), Desktop: 40
+        const TOTAL_LIMIT = isMobile ? 50 : 500; // Mobile: 50 total, Desktop: 500
         
-        // Parallel fetch: first batch with images + rest without images
+        // For mobile: fetch first batch only initially, rest on scroll
+        if (isMobile) {
+          // MOBILE: Single fast fetch with images for immediate display
+          const mobileResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,image_url&is_approved=eq.true&order=created_at.desc&limit=${FIRST_BATCH}`,
+            {
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'count=exact'
+              }
+            }
+          );
+          
+          if (mobileResponse.ok) {
+            const mobileData = await mobileResponse.json();
+            const countHeader = mobileResponse.headers.get('content-range');
+            if (countHeader) {
+              const total = parseInt(countHeader.split('/')[1] || '0');
+              setTotalMaterialsCount(total);
+              setHasMoreMaterials(total > mobileData.length);
+            }
+            console.log(`📱 Mobile fast load: ${mobileData.length} materials with images`);
+            
+            // Process mobile data
+            const mobileMaterials = mobileData.map((item: any) => {
+              const supplierPrice = supplierPrices[item.id];
+              let variants: PriceVariant[] = [];
+              try {
+                if (item.variants && Array.isArray(item.variants)) variants = item.variants;
+                else if (item.variants && typeof item.variants === 'string') variants = JSON.parse(item.variants);
+              } catch (e) { variants = []; }
+              
+              return {
+                id: item.id,
+                supplier_id: 'admin-catalog',
+                name: item.name || 'Unnamed Material',
+                category: item.category || 'Uncategorized',
+                description: supplierPrice?.description || item.description || '',
+                unit: item.unit || 'unit',
+                unit_price: supplierPrice?.price || item.suggested_price || 0,
+                image_url: item.image_url || '',
+                additional_images: [],
+                in_stock: supplierPrice?.in_stock ?? true,
+                supplier: { company_name: supplierPrice ? 'Supplier' : 'Admin Catalog', location: 'Kenya', rating: supplierPrice ? 4.5 : 5.0 },
+                pricing_type: item.pricing_type || 'single',
+                variants: variants
+              } as Material;
+            });
+            
+            adminMaterials = mobileMaterials;
+            
+            // Load more in background after initial render
+            setTimeout(async () => {
+              try {
+                const moreResponse = await fetch(
+                  `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants&is_approved=eq.true&order=created_at.desc&offset=${FIRST_BATCH}&limit=${TOTAL_LIMIT - FIRST_BATCH}`,
+                  { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' } }
+                );
+                if (moreResponse.ok) {
+                  const moreData = await moreResponse.json();
+                  const moreMaterials = moreData.map((item: any) => ({
+                    id: item.id, supplier_id: 'admin-catalog', name: item.name || 'Unnamed Material',
+                    category: item.category || 'Uncategorized', description: item.description || '',
+                    unit: item.unit || 'unit', unit_price: supplierPrices[item.id]?.price || item.suggested_price || 0,
+                    image_url: '', additional_images: [], in_stock: true,
+                    supplier: { company_name: 'Admin Catalog', location: 'Kenya', rating: 5.0 },
+                    pricing_type: item.pricing_type || 'single', variants: []
+                  } as Material));
+                  setMaterials(prev => [...prev, ...moreMaterials]);
+                  setFilteredMaterials(prev => [...prev, ...moreMaterials]);
+                  console.log(`📱 Mobile background load: +${moreData.length} materials`);
+                }
+              } catch (e) { /* silent fail */ }
+            }, 1000); // Load more after 1 second
+            
+            // Skip the desktop parallel fetch
+            setMaterials(mobileMaterials);
+            setFilteredMaterials(mobileMaterials);
+            setLoading(false);
+            return;
+          }
+        }
+        
+        // DESKTOP: Parallel fetch for speed
         const [firstBatchResponse, restResponse] = await Promise.all([
-          // First 40 with images for instant display
           fetch(
             `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,image_url&is_approved=eq.true&order=created_at.desc&limit=${FIRST_BATCH}`,
             {
@@ -857,7 +941,6 @@ export const MaterialsGrid = () => {
               }
             }
           ),
-          // Rest without images (metadata only)
           fetch(
             `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants&is_approved=eq.true&order=created_at.desc&offset=${FIRST_BATCH}&limit=${TOTAL_LIMIT - FIRST_BATCH}`,
             {

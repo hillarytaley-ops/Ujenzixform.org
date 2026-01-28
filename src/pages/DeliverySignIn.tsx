@@ -270,7 +270,21 @@ const DeliverySignIn = () => {
       const userId = authData.user.id;
       const userEmail = authData.user.email?.toLowerCase() || '';
       
-      // Check if user is registered as a delivery provider in the database
+      // ✅ MOBILE OPTIMIZED: Check localStorage first for instant redirect
+      const cachedRole = localStorage.getItem('user_role');
+      const cachedRoleId = localStorage.getItem('user_role_id');
+      
+      // If we have a valid cached delivery/admin role for this user, redirect immediately
+      if (cachedRole && cachedRoleId === userId && (cachedRole === 'delivery' || cachedRole === 'delivery_provider' || cachedRole === 'admin')) {
+        console.log('🔐 Using cached role for fast redirect:', cachedRole);
+        localStorage.setItem('user_role_verified', Date.now().toString());
+        localStorage.setItem('user_email', userEmail);
+        toast({ title: "✅ Welcome!", description: "Redirecting to home..." });
+        window.location.href = '/home';
+        return;
+      }
+      
+      // Fetch role from database (source of truth)
       const { data: roleData } = await supabase
         .from('user_roles')
         .select('role')

@@ -199,8 +199,23 @@ const BuilderSignIn = () => {
       const userId = authData.user.id;
       const userEmail = authData.user.email?.toLowerCase() || '';
       
-      // ALWAYS check the DATABASE for the actual role - this is the source of truth
-      const { data: roleData, error: roleError } = await supabase
+      // ✅ MOBILE OPTIMIZED: Check localStorage first for instant redirect
+      const cachedRole = localStorage.getItem('user_role');
+      const cachedRoleId = localStorage.getItem('user_role_id');
+      const isCachedBuilderRole = ['builder', 'professional_builder', 'private_client'].includes(cachedRole || '');
+      
+      // If we have a valid cached builder role for this user, redirect immediately
+      if (cachedRole && cachedRoleId === userId && isCachedBuilderRole) {
+        console.log('🔐 Using cached role for fast redirect:', cachedRole);
+        localStorage.setItem('user_role_verified', Date.now().toString());
+        localStorage.setItem('user_email', userEmail);
+        toast({ title: "✅ Welcome!", description: "Redirecting to home..." });
+        window.location.href = '/home';
+        return;
+      }
+      
+      // Fetch role from database (source of truth)
+      const { data: roleData } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', userId)
