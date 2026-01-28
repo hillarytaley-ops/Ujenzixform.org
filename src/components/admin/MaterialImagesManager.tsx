@@ -1749,17 +1749,57 @@ export const MaterialImagesManager: React.FC = () => {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="max-h-60">
-                      <SelectItem value="bag">Per Bag</SelectItem>
+                      {/* Weight & Mass */}
                       <SelectItem value="kg">Per Kg</SelectItem>
+                      <SelectItem value="gram">Per Gram</SelectItem>
+                      <SelectItem value="tonne">Per Tonne</SelectItem>
+                      <SelectItem value="ton">Per Ton</SelectItem>
+                      {/* Volume */}
+                      <SelectItem value="liter">Per Liter</SelectItem>
+                      <SelectItem value="ml">Per ML</SelectItem>
+                      <SelectItem value="cubic meter">Per M³</SelectItem>
+                      <SelectItem value="cubic foot">Per Cubic Foot</SelectItem>
+                      {/* Length */}
+                      <SelectItem value="meter">Per Meter</SelectItem>
+                      <SelectItem value="mm">Per MM</SelectItem>
+                      <SelectItem value="cm">Per CM</SelectItem>
+                      <SelectItem value="foot">Per Foot</SelectItem>
+                      <SelectItem value="ft">Per Ft</SelectItem>
+                      <SelectItem value="inch">Per Inch</SelectItem>
+                      {/* Area */}
+                      <SelectItem value="sqm">Per Sqm</SelectItem>
+                      <SelectItem value="sqft">Per Sqft</SelectItem>
+                      {/* Count/Quantity */}
                       <SelectItem value="piece">Per Piece</SelectItem>
                       <SelectItem value="unit">Per Unit</SelectItem>
-                      <SelectItem value="sheet">Per Sheet</SelectItem>
-                      <SelectItem value="meter">Per Meter</SelectItem>
-                      <SelectItem value="ton">Per Ton</SelectItem>
-                      <SelectItem value="liter">Per Liter</SelectItem>
-                      <SelectItem value="roll">Per Roll</SelectItem>
+                      <SelectItem value="pair">Per Pair</SelectItem>
+                      <SelectItem value="dozen">Per Dozen</SelectItem>
+                      <SelectItem value="set">Per Set</SelectItem>
+                      <SelectItem value="bundle">Per Bundle</SelectItem>
+                      {/* Packaging */}
+                      <SelectItem value="bag">Per Bag</SelectItem>
+                      <SelectItem value="packet">Per Packet</SelectItem>
+                      <SelectItem value="carton">Per Carton</SelectItem>
                       <SelectItem value="box">Per Box</SelectItem>
                       <SelectItem value="pallet">Per Pallet</SelectItem>
+                      {/* Sheets & Rolls */}
+                      <SelectItem value="sheet">Per Sheet</SelectItem>
+                      <SelectItem value="roll">Per Roll</SelectItem>
+                      <SelectItem value="coil">Per Coil</SelectItem>
+                      {/* Building Specific */}
+                      <SelectItem value="trip">Per Trip</SelectItem>
+                      <SelectItem value="lorry">Per Lorry</SelectItem>
+                      <SelectItem value="wheelbarrow">Per Wheelbarrow</SelectItem>
+                      {/* Length Bundles */}
+                      <SelectItem value="length">Per Length</SelectItem>
+                      <SelectItem value="bar">Per Bar</SelectItem>
+                      <SelectItem value="rod">Per Rod</SelectItem>
+                      <SelectItem value="pole">Per Pole</SelectItem>
+                      {/* Liquid Containers */}
+                      <SelectItem value="drum">Per Drum</SelectItem>
+                      <SelectItem value="jerrycan">Per Jerrycan</SelectItem>
+                      <SelectItem value="bucket">Per Bucket</SelectItem>
+                      <SelectItem value="tin">Per Tin</SelectItem>
                       {/* Water Tank Sizes */}
                       <SelectItem value="100L">100 Litres</SelectItem>
                       <SelectItem value="200L">200 Litres</SelectItem>
