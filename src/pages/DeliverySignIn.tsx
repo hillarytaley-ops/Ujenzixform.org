@@ -62,7 +62,8 @@ const DeliverySignIn = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
-  const redirectTo = searchParams.get('redirect') || '/home';
+  // Redirect to dashboard after sign-in (not home page)
+  const redirectTo = searchParams.get('redirect') || '/delivery-dashboard';
 
   useEffect(() => {
     checkExistingAuth();
@@ -149,7 +150,7 @@ const DeliverySignIn = () => {
         localStorage.setItem('user_role_id', user.id);
         localStorage.setItem('user_role_verified', Date.now().toString());
         console.log('🔐 Delivery/admin role confirmed, redirecting to dashboard');
-        window.location.href = redirectTo;
+        window.location.href = '/delivery-dashboard';
         return;
       }
       
@@ -279,8 +280,8 @@ const DeliverySignIn = () => {
         console.log('🔐 Using cached role for fast redirect:', cachedRole);
         localStorage.setItem('user_role_verified', Date.now().toString());
         localStorage.setItem('user_email', userEmail);
-        toast({ title: "✅ Welcome!", description: "Redirecting to home..." });
-        window.location.href = '/home';
+        toast({ title: "✅ Welcome!", description: "Redirecting to dashboard..." });
+        window.location.href = '/delivery-dashboard';
         return;
       }
       
@@ -353,11 +354,11 @@ const DeliverySignIn = () => {
       
       toast({
         title: "✅ Welcome Delivery Provider!",
-        description: "Redirecting to home...",
+        description: "Redirecting to dashboard...",
       });
 
-      // Redirect to home
-      window.location.replace('/home');
+      // Redirect to delivery dashboard
+      window.location.replace('/delivery-dashboard');
 
     } catch (error: any) {
       console.error('Sign in exception:', error);
@@ -513,11 +514,11 @@ const DeliverySignIn = () => {
 
           toast({
             title: "✅ Account Created & Signed In!",
-            description: "Welcome! Redirecting to home...",
+            description: "Welcome! Redirecting to dashboard...",
           });
 
           setTimeout(() => {
-            window.location.href = '/home';
+            window.location.href = '/delivery-dashboard';
           }, 500);
           return;
         }
@@ -571,11 +572,11 @@ const DeliverySignIn = () => {
 
       toast({
         title: "✅ Account Created!",
-        description: "Welcome! Redirecting to home...",
+        description: "Welcome! Redirecting to dashboard...",
       });
 
       setTimeout(() => {
-        window.location.href = '/home';
+        window.location.href = '/delivery-dashboard';
       }, 500);
 
     } catch (error: any) {

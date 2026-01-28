@@ -48,7 +48,8 @@ const SupplierSignIn = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
-  const redirectTo = searchParams.get('redirect') || '/home';
+  // Redirect to dashboard after sign-in (not home page)
+  const redirectTo = searchParams.get('redirect') || '/supplier-dashboard';
 
   // Resend verification email
   const resendVerificationEmail = async () => {
@@ -150,9 +151,9 @@ const SupplierSignIn = () => {
         localStorage.setItem('user_role_verified', Date.now().toString());
         toast({
           title: "✅ Welcome Back!",
-          description: "Redirecting to home...",
+          description: "Redirecting to dashboard...",
         });
-        window.location.href = redirectTo;
+        window.location.href = '/supplier-dashboard';
         return;
       }
       
@@ -255,8 +256,8 @@ const SupplierSignIn = () => {
         console.log('🔐 Using cached role for fast redirect:', cachedRole);
         localStorage.setItem('user_role_verified', Date.now().toString());
         localStorage.setItem('user_email', userEmail);
-        toast({ title: "✅ Welcome!", description: "Redirecting to home..." });
-        window.location.href = '/home';
+        toast({ title: "✅ Welcome!", description: "Redirecting to dashboard..." });
+        window.location.href = '/supplier-dashboard';
         return;
       }
       
@@ -312,12 +313,12 @@ const SupplierSignIn = () => {
 
       toast({
         title: "✅ Welcome!",
-        description: "Redirecting to home...",
+        description: "Redirecting to dashboard...",
       });
 
-      // Redirect to dashboard
+      // Redirect to supplier dashboard
       setTimeout(() => {
-        window.location.href = redirectTo;
+        window.location.href = '/supplier-dashboard';
       }, 500);
 
     } catch (error: any) {

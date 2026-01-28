@@ -49,7 +49,8 @@ const BuilderSignIn = () => {
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
   // Get redirect parameter - default to home
-  const redirectTo = searchParams.get('redirect') || '/home';
+  // Redirect to dashboard after sign-in (not home page)
+  const redirectTo = searchParams.get('redirect') || '/builder-dashboard';
 
   useEffect(() => {
     checkExistingAuth();
@@ -209,8 +210,8 @@ const BuilderSignIn = () => {
         console.log('🔐 Using cached role for fast redirect:', cachedRole);
         localStorage.setItem('user_role_verified', Date.now().toString());
         localStorage.setItem('user_email', userEmail);
-        toast({ title: "✅ Welcome!", description: "Redirecting to home..." });
-        window.location.href = '/home';
+        toast({ title: "✅ Welcome!", description: "Redirecting to dashboard..." });
+        window.location.href = '/builder-dashboard';
         return;
       }
       
@@ -306,12 +307,12 @@ const BuilderSignIn = () => {
 
       toast({
         title: "✅ Welcome!",
-        description: "Redirecting to home...",
+        description: "Redirecting to dashboard...",
       });
 
-      // Redirect to appropriate page
+      // Redirect to builder dashboard
       setTimeout(() => {
-        window.location.href = redirectTo;
+        window.location.href = '/builder-dashboard';
       }, 500);
 
     } catch (error: any) {
