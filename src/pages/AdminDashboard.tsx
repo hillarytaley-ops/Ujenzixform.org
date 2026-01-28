@@ -2727,7 +2727,7 @@ const AdminDashboard = () => {
                               ))}
                               {(app.service_areas || []).length > 3 && (
                                 <Badge variant="outline" className="text-xs border-slate-600 text-gray-300">
-                                  +{app.service_areas.length - 3} more
+                                  +{(app.service_areas || []).length - 3} more
                                 </Badge>
                               )}
                             </div>

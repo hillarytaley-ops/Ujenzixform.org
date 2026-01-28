@@ -648,13 +648,18 @@ export const MaterialsGrid = () => {
     fetchSuppliers();
   }, []);
 
+  // Debounced filter for better performance on mobile
   useEffect(() => {
-    try {
-      filterMaterials();
-    } catch (error) {
-      console.error('Error in filterMaterials effect:', error);
-      setFilteredMaterials(materials);
-    }
+    // Use requestAnimationFrame for smoother filtering
+    const rafId = requestAnimationFrame(() => {
+      try {
+        filterMaterials();
+      } catch (error) {
+        console.error('Error in filterMaterials effect:', error);
+        setFilteredMaterials(materials);
+      }
+    });
+    return () => cancelAnimationFrame(rafId);
   }, [materials, searchQuery, selectedCategory, priceRange, stockFilter]);
 
   useEffect(() => {
@@ -1144,40 +1149,51 @@ export const MaterialsGrid = () => {
   };
 
   const filterMaterials = () => {
-    let filtered = [...materials];
-
-    // Search filter
-    if (searchQuery) {
-      filtered = filtered.filter(m => 
-        m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        m.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        m.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        m.supplier?.company_name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+    // Fast path: no filters applied
+    const noFilters = !searchQuery && 
+                      selectedCategory === 'All Categories' && 
+                      priceRange === 'all' && 
+                      stockFilter === 'all';
+    
+    if (noFilters) {
+      setFilteredMaterials(materials);
+      return;
     }
 
-    // Category filter
-    if (selectedCategory !== 'All Categories') {
-      filtered = filtered.filter(m => m.category === selectedCategory);
-    }
+    // Pre-compute lowercase search query once
+    const searchLower = searchQuery?.toLowerCase() || '';
+    
+    // Single pass filter for better performance
+    const filtered = materials.filter(m => {
+      // Search filter (most selective, check first)
+      if (searchLower) {
+        const matchesSearch = m.name.toLowerCase().includes(searchLower) ||
+          m.category.toLowerCase().includes(searchLower) ||
+          m.description?.toLowerCase().includes(searchLower) ||
+          m.supplier?.company_name?.toLowerCase().includes(searchLower);
+        if (!matchesSearch) return false;
+      }
 
-    // Price filter
-    if (priceRange !== 'all') {
-      filtered = filtered.filter(m => {
-        if (priceRange === 'under-1000') return m.unit_price < 1000;
-        if (priceRange === '1000-5000') return m.unit_price >= 1000 && m.unit_price <= 5000;
-        if (priceRange === '5000-10000') return m.unit_price >= 5000 && m.unit_price <= 10000;
-        if (priceRange === 'over-10000') return m.unit_price > 10000;
-        return true;
-      });
-    }
+      // Category filter
+      if (selectedCategory !== 'All Categories' && m.category !== selectedCategory) {
+        return false;
+      }
 
-    // Stock filter
-    if (stockFilter === 'in-stock') {
-      filtered = filtered.filter(m => m.in_stock);
-    } else if (stockFilter === 'out-of-stock') {
-      filtered = filtered.filter(m => !m.in_stock);
-    }
+      // Price filter
+      if (priceRange !== 'all') {
+        const price = m.unit_price;
+        if (priceRange === 'under-1000' && price >= 1000) return false;
+        if (priceRange === '1000-5000' && (price < 1000 || price > 5000)) return false;
+        if (priceRange === '5000-10000' && (price < 5000 || price > 10000)) return false;
+        if (priceRange === 'over-10000' && price <= 10000) return false;
+      }
+
+      // Stock filter
+      if (stockFilter === 'in-stock' && !m.in_stock) return false;
+      if (stockFilter === 'out-of-stock' && m.in_stock) return false;
+
+      return true;
+    });
 
     setFilteredMaterials(filtered);
   };
