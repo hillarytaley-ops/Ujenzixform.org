@@ -5,7 +5,7 @@
 //           periodic sync, share target, file handling
 // ============================================================
 
-const CACHE_VERSION = 'v29';
+const CACHE_VERSION = 'v30';
 const STATIC_CACHE = `UjenziXform-static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `UjenziXform-dynamic-${CACHE_VERSION}`;
 const API_CACHE = `UjenziXform-api-${CACHE_VERSION}`;
@@ -62,10 +62,11 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
   
   event.waitUntil(
-    Promise.all([
-      // Clear ALL old caches first to prevent stale chunk errors
-      caches.keys().then((cacheNames) => {
-        return Promise.all(
+    (async () => {
+      try {
+        // Clear ALL old caches first to prevent stale chunk errors
+        const cacheNames = await caches.keys();
+        await Promise.all(
           cacheNames.map((cacheName) => {
             if (!cacheName.includes(CACHE_VERSION)) {
               console.log(`[SW] Deleting old cache: ${cacheName}`);
@@ -73,34 +74,38 @@ self.addEventListener('install', (event) => {
             }
           })
         );
-      }),
-      // Cache static assets
-      caches.open(STATIC_CACHE).then((cache) => {
+        
+        // Cache static assets (with error handling for each)
+        const staticCache = await caches.open(STATIC_CACHE);
         console.log('[SW] Caching static assets');
-        return cache.addAll(STATIC_ASSETS);
-      }),
-      // Pre-cache offline pages
-      caches.open(OFFLINE_CACHE).then(async (cache) => {
+        for (const asset of STATIC_ASSETS) {
+          try {
+            await staticCache.add(asset);
+          } catch (e) {
+            console.warn(`[SW] Could not cache static asset: ${asset}`, e);
+          }
+        }
+        
+        // Pre-cache offline pages
+        const offlineCache = await caches.open(OFFLINE_CACHE);
         console.log('[SW] Pre-caching offline pages');
         for (const page of OFFLINE_PAGES) {
           try {
             const response = await fetch(page);
             if (response.ok) {
-              await cache.put(page, response);
+              await offlineCache.put(page, response);
             }
           } catch (e) {
             console.log('[SW] Could not cache:', page);
           }
         }
-      })
-    ])
-    .then(() => {
-      console.log('[SW] Installation complete');
-      return self.skipWaiting();
-    })
-    .catch((error) => {
-      console.error('[SW] Installation failed:', error);
-    })
+        
+        console.log('[SW] Installation complete');
+      } catch (error) {
+        console.error('[SW] Installation error:', error);
+        // Don't throw - let the SW install anyway
+      }
+    })()
   );
 });
 
@@ -722,16 +727,31 @@ async function getOfflineData(key) {
 // ============================================================
 self.addEventListener('error', (event) => {
   console.error('[SW] Error:', event.error);
+  
+  // If it's an InvalidStateError, try to recover
+  if (event.error?.name === 'InvalidStateError') {
+    console.log('[SW] InvalidStateError detected - will recover on next load');
+  }
 });
 
 self.addEventListener('unhandledrejection', (event) => {
-  // ✅ FIX: Suppress cache-related errors to reduce console spam
   const reason = event.reason?.message || String(event.reason);
-  if (reason.includes('Cache') || reason.includes('cache') || reason.includes('206')) {
+  
+  // ✅ FIX: Suppress cache-related and InvalidState errors to reduce console spam
+  if (reason.includes('Cache') || 
+      reason.includes('cache') || 
+      reason.includes('206') ||
+      reason.includes('InvalidStateError') ||
+      reason.includes('invalid state')) {
     event.preventDefault(); // Suppress the error
     return;
   }
   console.error('[SW] Unhandled rejection:', event.reason);
+});
+
+// Handle statechange errors gracefully
+self.addEventListener('statechange', (event) => {
+  console.log('[SW] State changed:', self.registration?.active?.state);
 });
 
 console.log('[SW] UjenziXform Service Worker loaded - Version:', CACHE_VERSION);

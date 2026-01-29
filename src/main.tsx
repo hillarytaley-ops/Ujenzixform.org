@@ -112,19 +112,71 @@ root.render(
 
 // Register service worker for offline caching and faster loads
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker
-      .register('/sw.js')
-      .then((registration) => {
-        logger.info('Service Worker registered successfully', { scope: registration.scope });
-        
-        // Check for updates periodically
-        setInterval(() => {
-          registration.update();
-        }, 60 * 60 * 1000); // Check every hour
-      })
-      .catch((error) => {
-        logger.error('Service Worker registration failed', error);
+  window.addEventListener('load', async () => {
+    try {
+      // First, check for any stuck/invalid service workers and clean them up
+      const existingRegistrations = await navigator.serviceWorker.getRegistrations();
+      
+      for (const registration of existingRegistrations) {
+        // If SW is in a bad state, unregister it
+        if (registration.installing === null && 
+            registration.waiting === null && 
+            registration.active === null) {
+          console.log('🧹 Cleaning up invalid SW registration');
+          await registration.unregister();
+        }
+      }
+      
+      // Now register the service worker
+      const registration = await navigator.serviceWorker.register('/sw.js', {
+        updateViaCache: 'none' // Don't use HTTP cache for SW updates
       });
+      
+      logger.info('Service Worker registered successfully', { scope: registration.scope });
+      
+      // Handle updates
+      registration.addEventListener('updatefound', () => {
+        const newWorker = registration.installing;
+        if (newWorker) {
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              // New content is available, notify user or auto-refresh
+              console.log('🔄 New app version available');
+            }
+          });
+        }
+      });
+      
+      // Check for updates periodically (every hour)
+      setInterval(() => {
+        registration.update().catch(() => {
+          // Silently fail - will try again next interval
+        });
+      }, 60 * 60 * 1000);
+      
+    } catch (error: any) {
+      // Handle InvalidStateError specifically
+      if (error.name === 'InvalidStateError' || error.message?.includes('InvalidStateError')) {
+        console.warn('⚠️ Service Worker in invalid state, cleaning up...');
+        
+        // Unregister all service workers
+        try {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(registrations.map(r => r.unregister()));
+          console.log('✅ Service Workers unregistered, will re-register on next load');
+        } catch (e) {
+          console.error('Failed to unregister service workers:', e);
+        }
+      } else {
+        logger.error('Service Worker registration failed', error);
+      }
+    }
+  });
+}
+
+// Also handle SW errors globally
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('error', (event) => {
+    console.warn('Service Worker error:', event);
   });
 }
