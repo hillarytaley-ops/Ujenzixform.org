@@ -310,28 +310,26 @@ export class OrderService {
 
   /**
    * Submit quote response from supplier
+   * Updates the purchase_order with quoted pricing
    */
   static async submitQuoteResponse(
     quoteResponse: QuoteResponse
   ): Promise<{ success: boolean; error?: string }> {
     try {
+      // Update the purchase_order with the quoted items and total
       const { error } = await supabase
-        .from('quote_responses')
-        .insert({
-          order_id: quoteResponse.order_id,
-          supplier_id: quoteResponse.supplier_id,
-          supplier_name: quoteResponse.supplier_name,
-          quoted_items: quoteResponse.quoted_items,
-          total_quoted: quoteResponse.total_quoted,
-          valid_until: quoteResponse.valid_until,
-          notes: quoteResponse.notes,
-          created_at: new Date().toISOString()
-        } as any);
+        .from('purchase_orders')
+        .update({
+          items: quoteResponse.quoted_items,
+          total_amount: quoteResponse.total_quoted,
+          quote_valid_until: quoteResponse.valid_until,
+          supplier_notes: quoteResponse.notes,
+          status: 'quoted',
+          updated_at: new Date().toISOString()
+        } as any)
+        .eq('id', quoteResponse.order_id);
 
       if (error) throw error;
-
-      // Update order status
-      await this.updateOrderStatus(quoteResponse.order_id, 'quoted');
 
       return { success: true };
     } catch (error: any) {
@@ -340,21 +338,23 @@ export class OrderService {
   }
 
   /**
-   * Accept a quote and convert to order
+   * Accept a quote and convert to confirmed order
    */
   static async acceptQuote(
     orderId: string,
-    quoteResponseId: string
+    _quoteResponseId?: string // Kept for backwards compatibility but not used
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      // Update quote response status
-      await supabase
-        .from('quote_responses')
-        .update({ accepted: true } as any)
-        .eq('id', quoteResponseId);
+      // Update purchase_order status to confirmed
+      const { error } = await supabase
+        .from('purchase_orders')
+        .update({ 
+          status: 'confirmed',
+          updated_at: new Date().toISOString()
+        } as any)
+        .eq('id', orderId);
 
-      // Update order status
-      await this.updateOrderStatus(orderId, 'confirmed');
+      if (error) throw error;
 
       return { success: true };
     } catch (error: any) {

@@ -168,11 +168,17 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
 
   const loadOrdersData = async () => {
     try {
-      const { data } = await supabase
-        .from('order_items')
-        .select('*, orders(*)')
+      // Use purchase_orders table which is the main orders table
+      const { data, error } = await supabase
+        .from('purchase_orders')
+        .select('*')
         .eq('supplier_id', supplierId)
         .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.warn('Error loading orders:', error.message);
+        return [];
+      }
       return data || [];
     } catch {
       return [];
@@ -181,10 +187,16 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
 
   const loadProductsData = async () => {
     try {
-      const { data } = await supabase
+      // Load supplier products without the join (relationship may not exist)
+      const { data, error } = await supabase
         .from('supplier_product_prices')
-        .select('*, admin_material_images(*)')
+        .select('*')
         .eq('supplier_id', supplierId);
+      
+      if (error) {
+        console.warn('Error loading products:', error.message);
+        return [];
+      }
       return data || [];
     } catch {
       return [];
@@ -193,10 +205,17 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
 
   const loadQuotesData = async () => {
     try {
-      const { data } = await supabase
-        .from('quote_responses')
+      // Use purchase_orders with status 'quoted' or 'pending' as quote data
+      const { data, error } = await supabase
+        .from('purchase_orders')
         .select('*')
-        .eq('supplier_id', supplierId);
+        .eq('supplier_id', supplierId)
+        .in('status', ['pending', 'quoted']);
+      
+      if (error) {
+        console.warn('Error loading quotes:', error.message);
+        return [];
+      }
       return data || [];
     } catch {
       return [];
@@ -204,17 +223,19 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
   };
 
   const calculateMetrics = (orders: any[], quotes: any[]): SalesMetrics => {
-    const totalRevenue = orders.reduce((sum, o) => sum + (o.total_price || 0), 0);
-    const totalOrders = orders.length;
+    // Filter confirmed/completed orders for revenue calculation
+    const confirmedOrders = orders.filter(o => ['confirmed', 'completed', 'delivered'].includes(o.status));
+    const totalRevenue = confirmedOrders.reduce((sum, o) => sum + (parseFloat(o.total_amount) || 0), 0);
+    const totalOrders = confirmedOrders.length;
     const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
     const totalQuotes = quotes.length;
-    const acceptedQuotes = quotes.filter(q => q.accepted).length;
+    const acceptedQuotes = orders.filter(o => o.status === 'confirmed').length;
     const quoteConversionRate = totalQuotes > 0 ? (acceptedQuotes / totalQuotes) * 100 : 0;
 
-    // Get unique customers
-    const customers = new Set(orders.map(o => o.orders?.builder_id).filter(Boolean));
+    // Get unique customers from purchase_orders
+    const customers = new Set(orders.map(o => o.buyer_id).filter(Boolean));
     const repeatCustomers = orders.filter((o, i, arr) => 
-      arr.findIndex(x => x.orders?.builder_id === o.orders?.builder_id) !== i
+      arr.findIndex(x => x.buyer_id === o.buyer_id) !== i
     );
 
     return {
@@ -234,16 +255,17 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
   };
 
   const generateRevenueChartData = (orders: any[]): RevenueData[] => {
-    // Group by date
+    // Group by date - only confirmed/completed orders for revenue
     const grouped = new Map<string, { revenue: number; orders: number; quotes: number }>();
     
     orders.forEach(order => {
       const date = new Date(order.created_at || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       const existing = grouped.get(date) || { revenue: 0, orders: 0, quotes: 0 };
+      const isConfirmed = ['confirmed', 'completed', 'delivered'].includes(order.status);
       grouped.set(date, {
-        revenue: existing.revenue + (order.total_price || 0),
-        orders: existing.orders + 1,
-        quotes: existing.quotes
+        revenue: existing.revenue + (isConfirmed ? (parseFloat(order.total_amount) || 0) : 0),
+        orders: existing.orders + (isConfirmed ? 1 : 0),
+        quotes: existing.quotes + (['pending', 'quoted'].includes(order.status) ? 1 : 0)
       });
     });
 
@@ -257,9 +279,13 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
   const calculateCategoryDistribution = (orders: any[]): CategoryData[] => {
     const categories = new Map<string, number>();
     
+    // Extract categories from order items
     orders.forEach(order => {
-      const category = order.category || 'Other';
-      categories.set(category, (categories.get(category) || 0) + (order.total_price || 0));
+      const items = order.items || [];
+      items.forEach((item: any) => {
+        const category = item.category || 'Other';
+        categories.set(category, (categories.get(category) || 0) + (parseFloat(item.total_price) || parseFloat(item.price) || 0));
+      });
     });
 
     return Array.from(categories.entries())

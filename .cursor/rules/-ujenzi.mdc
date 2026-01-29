@@ -1,3 +1,7 @@
+---
+alwaysApply: true
+---
+
 -- ============================================================
 -- UjenziXform Database Migration
 -- Inventory Management, Reviews, and Analytics Support
@@ -55,22 +59,13 @@ CREATE INDEX IF NOT EXISTS idx_stock_movements_created ON stock_movements(create
 -- RLS for stock_movements
 ALTER TABLE stock_movements ENABLE ROW LEVEL SECURITY;
 
--- Drop existing policies if they exist, then create new ones
-DO $$
-BEGIN
-    DROP POLICY IF EXISTS "Suppliers can view own stock movements" ON stock_movements;
-    DROP POLICY IF EXISTS "Suppliers can insert own stock movements" ON stock_movements;
-EXCEPTION WHEN undefined_object THEN
-    NULL;
-END $$;
-
-CREATE POLICY "Suppliers can view own stock movements"
+CREATE POLICY IF NOT EXISTS "Suppliers can view own stock movements"
     ON stock_movements FOR SELECT
     USING (supplier_id = auth.uid() OR supplier_id IN (
         SELECT id FROM suppliers WHERE user_id = auth.uid()
     ));
 
-CREATE POLICY "Suppliers can insert own stock movements"
+CREATE POLICY IF NOT EXISTS "Suppliers can insert own stock movements"
     ON stock_movements FOR INSERT
     WITH CHECK (supplier_id = auth.uid() OR supplier_id IN (
         SELECT id FROM suppliers WHERE user_id = auth.uid()
@@ -113,34 +108,23 @@ CREATE INDEX IF NOT EXISTS idx_supplier_reviews_created ON supplier_reviews(crea
 -- RLS for supplier_reviews
 ALTER TABLE supplier_reviews ENABLE ROW LEVEL SECURITY;
 
--- Drop existing policies if they exist, then create new ones
-DO $$
-BEGIN
-    DROP POLICY IF EXISTS "Anyone can view approved reviews" ON supplier_reviews;
-    DROP POLICY IF EXISTS "Authenticated users can create reviews" ON supplier_reviews;
-    DROP POLICY IF EXISTS "Users can update own reviews" ON supplier_reviews;
-    DROP POLICY IF EXISTS "Suppliers can respond to reviews" ON supplier_reviews;
-EXCEPTION WHEN undefined_object THEN
-    NULL;
-END $$;
-
 -- Anyone can view approved reviews
-CREATE POLICY "Anyone can view approved reviews"
+CREATE POLICY IF NOT EXISTS "Anyone can view approved reviews"
     ON supplier_reviews FOR SELECT
     USING (status = 'approved' OR reviewer_id = auth.uid());
 
 -- Authenticated users can create reviews
-CREATE POLICY "Authenticated users can create reviews"
+CREATE POLICY IF NOT EXISTS "Authenticated users can create reviews"
     ON supplier_reviews FOR INSERT
     WITH CHECK (auth.uid() IS NOT NULL AND reviewer_id = auth.uid());
 
 -- Users can update own reviews
-CREATE POLICY "Users can update own reviews"
+CREATE POLICY IF NOT EXISTS "Users can update own reviews"
     ON supplier_reviews FOR UPDATE
     USING (reviewer_id = auth.uid());
 
 -- Suppliers can respond to their reviews
-CREATE POLICY "Suppliers can respond to reviews"
+CREATE POLICY IF NOT EXISTS "Suppliers can respond to reviews"
     ON supplier_reviews FOR UPDATE
     USING (supplier_id = auth.uid() OR supplier_id IN (
         SELECT id FROM suppliers WHERE user_id = auth.uid()
@@ -154,7 +138,7 @@ BEGIN
     SET helpful_count = helpful_count + 1 
     WHERE id = review_id;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============================================================
 -- 3. ANALYTICS SUPPORT
@@ -181,25 +165,15 @@ CREATE INDEX IF NOT EXISTS idx_analytics_events_created ON analytics_events(crea
 -- RLS for analytics_events
 ALTER TABLE analytics_events ENABLE ROW LEVEL SECURITY;
 
--- Drop existing policies if they exist, then create new ones
-DO $$
-BEGIN
-    DROP POLICY IF EXISTS "Users can view own analytics" ON analytics_events;
-    DROP POLICY IF EXISTS "Anyone can insert analytics events" ON analytics_events;
-    DROP POLICY IF EXISTS "Authenticated users can insert analytics events" ON analytics_events;
-EXCEPTION WHEN undefined_object THEN
-    NULL;
-END $$;
-
 -- Users can view own events
-CREATE POLICY "Users can view own analytics"
+CREATE POLICY IF NOT EXISTS "Users can view own analytics"
     ON analytics_events FOR SELECT
     USING (user_id = auth.uid());
 
--- Authenticated users can insert events (for tracking)
-CREATE POLICY "Authenticated users can insert analytics events"
+-- Anyone can insert events (for tracking)
+CREATE POLICY IF NOT EXISTS "Anyone can insert analytics events"
     ON analytics_events FOR INSERT
-    WITH CHECK (auth.uid() IS NOT NULL);
+    WITH CHECK (TRUE);
 
 -- ============================================================
 -- 4. UPDATE TRIGGERS
@@ -212,7 +186,7 @@ BEGIN
     NEW.updated_at = NOW();
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SET search_path = public;
+$$ LANGUAGE plpgsql;
 
 -- Apply to supplier_reviews
 DROP TRIGGER IF EXISTS update_supplier_reviews_updated_at ON supplier_reviews;
@@ -222,36 +196,7 @@ CREATE TRIGGER update_supplier_reviews_updated_at
     EXECUTE FUNCTION update_updated_at();
 
 -- ============================================================
--- 5. FIX EXISTING SECURITY WARNINGS
--- ============================================================
-
--- Fix handle_new_user function search_path (if it exists)
-DO $$
-BEGIN
-    -- Check if handle_new_user exists and update it
-    IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'handle_new_user') THEN
-        -- Get the current function body and recreate with search_path
-        EXECUTE 'ALTER FUNCTION handle_new_user() SET search_path = public';
-    END IF;
-EXCEPTION WHEN OTHERS THEN
-    NULL; -- Ignore errors if function doesn't exist or can't be altered
-END $$;
-
--- Fix notification_logs RLS policy (if table exists)
-DO $$
-BEGIN
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'notification_logs') THEN
-        DROP POLICY IF EXISTS "Allow inserts" ON notification_logs;
-        CREATE POLICY "Authenticated users can insert notification logs"
-            ON notification_logs FOR INSERT
-            WITH CHECK (auth.uid() IS NOT NULL);
-    END IF;
-EXCEPTION WHEN OTHERS THEN
-    NULL; -- Ignore errors
-END $$;
-
--- ============================================================
--- 6. GRANT PERMISSIONS
+-- 5. GRANT PERMISSIONS
 -- ============================================================
 
 GRANT SELECT, INSERT ON stock_movements TO authenticated;
