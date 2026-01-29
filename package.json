@@ -23,7 +23,12 @@
     "security:secrets": "npx trufflehog filesystem . --json --only-verified",
     "security:licenses": "npx license-checker --onlyAllow 'MIT;ISC;BSD-2-Clause;BSD-3-Clause;Apache-2.0;Unlicense;CC0-1.0' --excludePrivatePackages",
     "security:full": "npm run security:test && npm run security:headers && npm run security:secrets && npm run security:licenses",
-    "security:ci": "npm run security:full --silent"
+    "security:ci": "npm run security:full --silent",
+    "mobile:sync": "npx cap sync",
+    "mobile:android": "npm run build && npx cap sync android && npx cap open android",
+    "mobile:ios": "npm run build && npx cap sync ios && npx cap open ios",
+    "mobile:build:android": "npm run build && npx cap sync android",
+    "mobile:build:ios": "npm run build && npx cap sync ios"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.3",

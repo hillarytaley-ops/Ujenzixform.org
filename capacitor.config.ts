@@ -1,13 +1,13 @@
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.mradipro.app',
-  appName: 'MradiPro',
+  appId: 'org.ujenzixform.app',
+  appName: 'UjenziXform',
   webDir: 'dist',
   server: {
     androidScheme: 'https',
     iosScheme: 'https',
-    // For development, uncomment to use live server
+    // For development, use local server
     // url: 'http://localhost:5173',
     // cleartext: true
   },
@@ -15,49 +15,51 @@ const config: CapacitorConfig = {
     SplashScreen: {
       launchShowDuration: 2000,
       launchAutoHide: true,
-      backgroundColor: '#1e40af',
+      backgroundColor: '#1e293b',
       androidSplashResourceName: 'splash',
       androidScaleType: 'CENTER_CROP',
-      showSpinner: false,
-      splashFullScreen: true,
-      splashImmersive: true
+      showSpinner: true,
+      androidSpinnerStyle: 'large',
+      iosSpinnerStyle: 'small',
+      spinnerColor: '#2563eb',
     },
     StatusBar: {
-      style: 'LIGHT',
-      backgroundColor: '#1e40af'
-    },
-    PushNotifications: {
-      presentationOptions: ['badge', 'sound', 'alert']
-    },
-    LocalNotifications: {
-      smallIcon: 'ic_stat_icon',
-      iconColor: '#1e40af'
+      style: 'DARK',
+      backgroundColor: '#1e293b',
     },
     Keyboard: {
       resize: 'body',
-      resizeOnFullScreen: true
+      style: 'DARK',
+      resizeOnFullScreen: true,
     },
-    App: {
-      // Deep linking configuration
-      // URL scheme: mradipro://
+    PushNotifications: {
+      presentationOptions: ['badge', 'sound', 'alert'],
     },
-    CapacitorHttp: {
-      enabled: true
-    }
+    LocalNotifications: {
+      smallIcon: 'ic_stat_icon_config_sample',
+      iconColor: '#2563eb',
+      sound: 'beep.wav',
+    },
+    Geolocation: {
+      // For delivery tracking
+    },
+    Camera: {
+      // For QR scanning and photo uploads
+    },
+    Haptics: {
+      // For feedback on actions
+    },
   },
   android: {
-    allowMixedContent: false,
+    allowMixedContent: true,
     captureInput: true,
     webContentsDebuggingEnabled: false,
-    // Override user agent for API calls
-    // overrideUserAgent: 'MradiPro/1.0'
   },
   ios: {
     contentInset: 'automatic',
     allowsLinkPreview: true,
     scrollEnabled: true,
-    // limitsNavigationsToAppBoundDomains: true
-  }
+  },
 };
 
 export default config;

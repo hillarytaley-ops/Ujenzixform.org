@@ -40,6 +40,10 @@ import {
 import { BuilderProfileEdit } from "@/components/builders/BuilderProfileEdit";
 import { BuilderVideoPortfolio } from "@/components/builders/BuilderVideoPortfolio";
 import { BuilderOrdersTracker } from "@/components/builders/BuilderOrdersTracker";
+import { OrderHistory } from "@/components/orders/OrderHistory";
+import { ReviewPrompt } from "@/components/reviews/ReviewSystem";
+import { UserAnalyticsDashboard } from "@/components/analytics/UserAnalyticsDashboard";
+import { BarChart3, Star } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -407,6 +411,14 @@ const ProfessionalBuilderDashboardPage = () => {
             <TabsTrigger value="support" className="data-[state=active]:bg-gray-500 data-[state=active]:text-white">
               <Headphones className="h-4 w-4 mr-2" />
               Support
+            </TabsTrigger>
+            <TabsTrigger value="order-history" className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white">
+              <FileText className="h-4 w-4 mr-2" />
+              Order History
+            </TabsTrigger>
+            <TabsTrigger value="my-analytics" className="data-[state=active]:bg-pink-500 data-[state=active]:text-white">
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Analytics
             </TabsTrigger>
           </TabsList>
 
@@ -1035,6 +1047,32 @@ const ProfessionalBuilderDashboardPage = () => {
                     </CardContent>
                   </Card>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Order History Tab */}
+          <TabsContent value="order-history">
+            <Card>
+              <CardHeader>
+                <CardTitle>Order History</CardTitle>
+                <CardDescription>View all your orders and download invoices</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {user && <OrderHistory userId={user.id} userRole="professional_builder" />}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Analytics Tab */}
+          <TabsContent value="my-analytics">
+            <Card>
+              <CardHeader>
+                <CardTitle>Spending Analytics</CardTitle>
+                <CardDescription>Track your spending patterns and trends</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {user && <UserAnalyticsDashboard userId={user.id} userRole="professional_builder" />}
               </CardContent>
             </Card>
           </TabsContent>

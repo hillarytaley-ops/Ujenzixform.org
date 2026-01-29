@@ -59,8 +59,12 @@ import { OrderManagement } from "@/components/supplier/OrderManagement";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { SupplierAnalyticsDashboard } from "@/components/suppliers/SupplierAnalyticsDashboard";
 import { SupplierProductManager } from "@/components/suppliers/SupplierProductManager";
-import { MessageSquare, QrCode } from "lucide-react";
+import { MessageSquare, QrCode, Boxes, BarChart3 as BarChartIcon } from "lucide-react";
 import { EnhancedQRCodeManager } from "@/components/qr/EnhancedQRCodeManager";
+import { InventoryManager } from "@/components/supplier/InventoryManager";
+import { OrderHistory } from "@/components/orders/OrderHistory";
+import { ReviewsList, SupplierRatingSummary } from "@/components/reviews/ReviewSystem";
+import { UserAnalyticsDashboard } from "@/components/analytics/UserAnalyticsDashboard";
 
 interface DashboardStats {
   totalProducts: number;
@@ -791,6 +795,22 @@ const SupplierDashboard = () => {
               <Headphones className="h-4 w-4 mr-1" />
               Support
             </TabsTrigger>
+            <TabsTrigger value="inventory" className="data-[state=active]:bg-emerald-500 data-[state=active]:text-white">
+              <Boxes className="h-4 w-4 mr-1" />
+              Inventory
+            </TabsTrigger>
+            <TabsTrigger value="order-history" className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white">
+              <FileText className="h-4 w-4 mr-1" />
+              Order History
+            </TabsTrigger>
+            <TabsTrigger value="reviews" className="data-[state=active]:bg-yellow-500 data-[state=active]:text-white">
+              <Star className="h-4 w-4 mr-1" />
+              Reviews
+            </TabsTrigger>
+            <TabsTrigger value="my-analytics" className="data-[state=active]:bg-pink-500 data-[state=active]:text-white">
+              <BarChartIcon className="h-4 w-4 mr-1" />
+              My Analytics
+            </TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -1266,6 +1286,72 @@ const SupplierDashboard = () => {
                     </CardContent>
                   </Card>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Inventory Management Tab */}
+          <TabsContent value="inventory">
+            <Card className={cardBg}>
+              <CardHeader>
+                <CardTitle className={textColor}>Inventory Management</CardTitle>
+                <CardDescription className={mutedText}>
+                  Track stock levels, set alerts, and manage your inventory
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {user && <InventoryManager supplierId={user.id} />}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Order History Tab */}
+          <TabsContent value="order-history">
+            <Card className={cardBg}>
+              <CardHeader>
+                <CardTitle className={textColor}>Order History</CardTitle>
+                <CardDescription className={mutedText}>
+                  View all orders and download invoices
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {user && <OrderHistory userId={user.id} userRole="supplier" />}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Reviews Tab */}
+          <TabsContent value="reviews">
+            <div className="space-y-6">
+              {/* Rating Summary */}
+              {user && <SupplierRatingSummary supplierId={user.id} />}
+              
+              {/* Reviews List */}
+              <Card className={cardBg}>
+                <CardHeader>
+                  <CardTitle className={textColor}>Customer Reviews</CardTitle>
+                  <CardDescription className={mutedText}>
+                    See what your customers are saying
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {user && <ReviewsList supplierId={user.id} />}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* My Analytics Tab */}
+          <TabsContent value="my-analytics">
+            <Card className={cardBg}>
+              <CardHeader>
+                <CardTitle className={textColor}>Sales Analytics</CardTitle>
+                <CardDescription className={mutedText}>
+                  Track your sales performance and trends
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {user && <UserAnalyticsDashboard userId={user.id} userRole="supplier" />}
               </CardContent>
             </Card>
           </TabsContent>
