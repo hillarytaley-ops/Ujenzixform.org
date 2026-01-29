@@ -133,64 +133,38 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
     try {
       setLoading(true);
       
-      // Get supplier's products with stock info
-      const { data: products, error } = await supabase
+      // Get supplier's products with stock info (without join to avoid 400 errors)
+      const { data: products, error } = await (supabase as any)
         .from('supplier_product_prices')
-        .select(`
-          id,
-          product_id,
-          price,
-          in_stock,
-          stock_quantity,
-          min_stock_level,
-          max_stock_level,
-          last_restocked,
-          admin_material_images!inner(name, category, unit)
-        `)
+        .select('*')
         .eq('supplier_id', supplierId);
       
-      if (error) {
-        // Fallback: try without the join
-        const { data: basicProducts, error: basicError } = await supabase
-          .from('supplier_product_prices')
-          .select('*')
-          .eq('supplier_id', supplierId);
+      if (error) throw error;
+      
+      // Get product IDs to fetch names from admin_material_images
+      const productIds = (products || []).map((p: any) => p.product_id).filter(Boolean);
+      
+      // Fetch product details from admin_material_images
+      let productDetails: Record<string, any> = {};
+      if (productIds.length > 0) {
+        const { data: materials } = await (supabase as any)
+          .from('admin_material_images')
+          .select('id, name, category, unit')
+          .in('id', productIds);
         
-        if (basicError) throw basicError;
-        
-        // Map basic products
-        const inventoryItems: InventoryItem[] = (basicProducts || []).map((p: any) => {
-          const stock = p.stock_quantity || (p.in_stock ? 100 : 0);
-          const minStock = p.min_stock_level || 10;
-          
-          let status: 'in_stock' | 'low_stock' | 'out_of_stock' = 'in_stock';
-          if (stock <= 0) status = 'out_of_stock';
-          else if (stock <= minStock) status = 'low_stock';
-          
-          return {
-            id: p.id,
-            product_id: p.product_id,
-            product_name: p.product_name || `Product ${p.product_id?.slice(0, 8)}`,
-            category: p.category || 'Uncategorized',
-            current_stock: stock,
-            min_stock_level: minStock,
-            max_stock_level: p.max_stock_level || 1000,
-            unit: p.unit || 'piece',
-            unit_price: p.price || 0,
-            last_restocked: p.last_restocked || p.updated_at || new Date().toISOString(),
-            status
-          };
-        });
-        
-        setInventory(inventoryItems);
-        calculateStats(inventoryItems);
-        return;
+        if (materials) {
+          productDetails = materials.reduce((acc: Record<string, any>, m: any) => {
+            acc[m.id] = m;
+            return acc;
+          }, {});
+        }
       }
       
-      // Map products with joined data
+      // Map products with fetched details
       const inventoryItems: InventoryItem[] = (products || []).map((p: any) => {
         const stock = p.stock_quantity || (p.in_stock ? 100 : 0);
         const minStock = p.min_stock_level || 10;
+        const details = productDetails[p.product_id] || {};
         
         let status: 'in_stock' | 'low_stock' | 'out_of_stock' = 'in_stock';
         if (stock <= 0) status = 'out_of_stock';
@@ -199,27 +173,26 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
         return {
           id: p.id,
           product_id: p.product_id,
-          product_name: p.admin_material_images?.name || `Product ${p.product_id?.slice(0, 8)}`,
-          category: p.admin_material_images?.category || 'Uncategorized',
+          product_name: details.name || p.product_name || `Product ${p.product_id?.slice(0, 8)}`,
+          category: details.category || p.category || 'Uncategorized',
           current_stock: stock,
           min_stock_level: minStock,
           max_stock_level: p.max_stock_level || 1000,
-          unit: p.admin_material_images?.unit || 'piece',
+          unit: details.unit || p.unit || 'piece',
           unit_price: p.price || 0,
-          last_restocked: p.last_restocked || new Date().toISOString(),
+          last_restocked: p.last_restocked || p.updated_at || new Date().toISOString(),
           status
         };
       });
       
       setInventory(inventoryItems);
       calculateStats(inventoryItems);
-      
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading inventory:', error);
       toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to load inventory data'
+        title: "Error loading inventory",
+        description: error.message,
+        variant: "destructive"
       });
     } finally {
       setLoading(false);

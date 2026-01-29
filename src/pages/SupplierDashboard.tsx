@@ -119,6 +119,7 @@ const SupplierDashboard = () => {
   
   const [loading, setLoading] = useState(true);
   const [supplierProfile, setSupplierProfile] = useState<any>(null);
+  const [supplierRecordId, setSupplierRecordId] = useState<string | null>(null); // Actual supplier table ID
   const [stats, setStats] = useState<DashboardStats>({
     totalProducts: 0,
     totalOrders: 0,
@@ -222,6 +223,11 @@ const SupplierDashboard = () => {
       
       console.log('🔍 Looking for quotes with supplier_id in:', supplierIds);
       console.log('📦 Final supplier record:', supplierRecord);
+      
+      // Store the supplier record ID for use by child components
+      if (supplierRecord?.id) {
+        setSupplierRecordId(supplierRecord.id);
+      }
 
       // Fetch from purchase_orders where this supplier is the target
       // Check BOTH user.id AND suppliers.id since quotes might use either
@@ -877,17 +883,17 @@ const SupplierDashboard = () => {
 
           {/* Orders Tab */}
           <TabsContent value="orders">
-            <OrderManagement supplierId={user?.id || ''} isDarkMode={isDarkMode} />
+            <OrderManagement supplierId={supplierRecordId || user?.id || ''} isDarkMode={isDarkMode} />
           </TabsContent>
 
           {/* Products Tab */}
           <TabsContent value="products">
-            <ProductManagement supplierId={user?.id || ''} isDarkMode={isDarkMode} />
+            <ProductManagement supplierId={supplierRecordId || user?.id || ''} isDarkMode={isDarkMode} />
           </TabsContent>
 
           {/* Analytics Tab - Enhanced Dashboard */}
           <TabsContent value="analytics">
-            <SupplierAnalyticsDashboard supplierId={user?.id || ''} />
+            <SupplierAnalyticsDashboard supplierId={supplierRecordId || user?.id || ''} />
           </TabsContent>
 
           {/* Quote Requests Tab */}
@@ -1211,7 +1217,7 @@ const SupplierDashboard = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <SupplierProductManager supplierId={user?.id || ''} />
+                <SupplierProductManager supplierId={supplierRecordId || user?.id || ''} />
               </CardContent>
             </Card>
           </TabsContent>
@@ -1300,7 +1306,8 @@ const SupplierDashboard = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {user && <InventoryManager supplierId={user.id} />}
+                {/* Use supplier record ID if available, fallback to user.id */}
+                {user && <InventoryManager supplierId={supplierRecordId || user.id} />}
               </CardContent>
             </Card>
           </TabsContent>
@@ -1324,7 +1331,7 @@ const SupplierDashboard = () => {
           <TabsContent value="reviews">
             <div className="space-y-6">
               {/* Rating Summary */}
-              {user && <SupplierRatingSummary supplierId={user.id} />}
+              {user && <SupplierRatingSummary supplierId={supplierRecordId || user.id} />}
               
               {/* Reviews List */}
               <Card className={cardBg}>
@@ -1335,7 +1342,7 @@ const SupplierDashboard = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {user && <ReviewsList supplierId={user.id} />}
+                  {user && <ReviewsList supplierId={supplierRecordId || user.id} />}
                 </CardContent>
               </Card>
             </div>
