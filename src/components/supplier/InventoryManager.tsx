@@ -428,7 +428,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
             <div className="flex items-center gap-3">
               <BarChart3 className="h-8 w-8 text-purple-400" />
               <div>
-                <p className="text-2xl font-bold text-white">KES {stats.totalValue.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-white">KES {(stats.totalValue || 0).toLocaleString()}</p>
                 <p className="text-xs text-slate-400">Inventory Value</p>
               </div>
             </div>
@@ -522,7 +522,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
                     <td className="py-3 px-4 text-center text-slate-400">{item.min_stock_level}</td>
                     <td className="py-3 px-4 text-center">{getStatusBadge(item.status)}</td>
                     <td className="py-3 px-4 text-right text-white">
-                      KES {(item.current_stock * item.unit_price).toLocaleString()}
+                      KES {((item.current_stock || 0) * (item.unit_price || 0)).toLocaleString()}
                     </td>
                     <td className="py-3 px-4 text-center">
                       <Button

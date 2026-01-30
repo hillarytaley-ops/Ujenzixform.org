@@ -123,7 +123,7 @@ export const SupplierCharts: React.FC<SupplierChartsProps> = ({
                   borderRadius: '8px',
                   color: textColor
                 }}
-                formatter={(value: number) => [`KES ${value.toLocaleString()}`, 'Sales']}
+                formatter={(value: number) => [`KES ${(value || 0).toLocaleString()}`, 'Sales']}
               />
               <Area 
                 type="monotone" 
@@ -203,7 +203,7 @@ export const SupplierCharts: React.FC<SupplierChartsProps> = ({
                   borderRadius: '8px'
                 }}
                 formatter={(value: number, name: string) => [
-                  name === 'sales' ? `${value} units` : `KES ${value.toLocaleString()}`,
+                  name === 'sales' ? `${value || 0} units` : `KES ${(value || 0).toLocaleString()}`,
                   name === 'sales' ? 'Units Sold' : 'Revenue'
                 ]}
               />
@@ -236,7 +236,7 @@ export const SupplierCharts: React.FC<SupplierChartsProps> = ({
                   border: `1px solid ${isDarkMode ? '#475569' : '#e5e7eb'}`,
                   borderRadius: '8px'
                 }}
-                formatter={(value: number) => [`KES ${value.toLocaleString()}`, '']}
+                formatter={(value: number) => [`KES ${(value || 0).toLocaleString()}`, '']}
               />
               <Legend />
               <Line 

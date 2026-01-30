@@ -927,7 +927,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
                         <div className="flex items-center justify-between">
                           <div>
                             <p className="text-lg font-bold text-green-600">
-                              KES {supplierPrice.price.toLocaleString()}
+                              KES {(supplierPrice.price || 0).toLocaleString()}
                             </p>
                             <Badge variant={supplierPrice.in_stock ? 'default' : 'destructive'} className="mt-1">
                               {supplierPrice.in_stock ? 'In Stock' : 'Out of Stock'}
@@ -1017,7 +1017,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
                             <div className="flex-1">
                               <span className="font-medium">{variant.sizeLabel}</span>
                               <span className="text-xs text-gray-500 ml-2">
-                                (Admin: KES {variant.price?.toLocaleString() || 0})
+                                (Admin: KES {(variant.price || 0).toLocaleString()})
                               </span>
                             </div>
                             <div className="flex items-center gap-1">
