@@ -553,12 +553,12 @@ const SupplierDashboard = () => {
     }
   }, [user]);
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number | undefined | null) => {
     return new Intl.NumberFormat('en-KE', {
       style: 'currency',
       currency: 'KES',
       minimumFractionDigits: 0
-    }).format(amount);
+    }).format(amount || 0);
   };
 
   const getStatusColor = (status: string) => {
@@ -854,12 +854,12 @@ const SupplierDashboard = () => {
                           <div className="text-right">
                             <p className={`font-semibold ${textColor}`}>{formatCurrency(order.total_amount)}</p>
                             <p className={`text-xs ${mutedText}`}>
-                              {new Date(order.created_at).toLocaleDateString()}
+                              {order.created_at ? new Date(order.created_at).toLocaleDateString() : 'N/A'}
                             </p>
                           </div>
-                          <Badge className={`${getStatusColor(order.status)} flex items-center gap-1`}>
-                            {getStatusIcon(order.status)}
-                            {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                          <Badge className={`${getStatusColor(order.status || 'pending')} flex items-center gap-1`}>
+                            {getStatusIcon(order.status || 'pending')}
+                            {(order.status || 'pending').charAt(0).toUpperCase() + (order.status || 'pending').slice(1)}
                           </Badge>
                         </div>
                       </div>
@@ -991,9 +991,9 @@ const SupplierDashboard = () => {
                                   {quote.delivery_address}
                                 </div>
                                 
-                                {quote.total_amount && (
+                                {quote.total_amount != null && (
                                   <p className={`text-sm mt-1 ${mutedText}`}>
-                                    <strong>Estimated Total:</strong> KES {quote.total_amount.toLocaleString()}
+                                    <strong>Estimated Total:</strong> KES {Number(quote.total_amount || 0).toLocaleString()}
                                   </p>
                                 )}
                                 
@@ -1013,7 +1013,7 @@ const SupplierDashboard = () => {
                                   </p>
                                 )}
                                 <p className={`text-xs mt-2 ${mutedText}`}>
-                                  Requested: {new Date(quote.created_at).toLocaleString()}
+                                  Requested: {quote.created_at ? new Date(quote.created_at).toLocaleString() : 'N/A'}
                                 </p>
                               </div>
                             </div>
@@ -1031,13 +1031,13 @@ const SupplierDashboard = () => {
                               {quote.status === 'quoted' && <CheckCircle className="h-3 w-3 mr-1" />}
                               {quote.status === 'accepted' && <CheckCircle className="h-3 w-3 mr-1" />}
                               {quote.status === 'rejected' && <XCircle className="h-3 w-3 mr-1" />}
-                              {quote.status.charAt(0).toUpperCase() + quote.status.slice(1)}
+                              {(quote.status || 'pending').charAt(0).toUpperCase() + (quote.status || 'pending').slice(1)}
                             </Badge>
 
-                            {quote.quote_amount && (
+                            {quote.quote_amount != null && (
                               <div className="text-right">
                                 <p className={`text-lg font-bold ${textColor}`}>
-                                  KES {quote.quote_amount.toLocaleString()}
+                                  KES {Number(quote.quote_amount || 0).toLocaleString()}
                                 </p>
                                 {quote.quote_valid_until && (
                                   <p className={`text-xs ${mutedText}`}>
