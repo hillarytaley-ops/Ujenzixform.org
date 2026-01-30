@@ -73,37 +73,60 @@ export const ReviewsManager: React.FC<ReviewsManagerProps> = ({ supplierId, isAd
   const fetchReviews = async () => {
     setIsLoading(true);
     try {
-      let query = supabase
+      // Fetch reviews without join (no FK relationship to suppliers table)
+      let query = (supabase as any)
         .from('supplier_reviews')
-        .select(`
-          *,
-          suppliers:supplier_id (company_name)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (supplierId) {
         query = query.eq('supplier_id', supplierId);
       }
 
-      const { data, error } = await query;
+      const { data: reviewsData, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching reviews:', error);
+        throw error;
+      }
 
-      setReviews(data || []);
-      setFilteredReviews(data || []);
+      // Fetch supplier names separately if we have reviews
+      let reviewsWithSuppliers = reviewsData || [];
+      if (reviewsData && reviewsData.length > 0) {
+        const supplierIds: string[] = [...new Set(reviewsData.map((r: any) => r.supplier_id).filter(Boolean))] as string[];
+        if (supplierIds.length > 0) {
+          const { data: suppliersData } = await supabase
+            .from('suppliers')
+            .select('id, company_name')
+            .in('id', supplierIds);
+          
+          const supplierMap = (suppliersData || []).reduce((acc: any, s: any) => {
+            acc[s.id] = s.company_name;
+            return acc;
+          }, {});
+
+          reviewsWithSuppliers = reviewsData.map((r: any) => ({
+            ...r,
+            suppliers: { company_name: supplierMap[r.supplier_id] || 'Unknown Supplier' }
+          }));
+        }
+      }
+
+      setReviews(reviewsWithSuppliers);
+      setFilteredReviews(reviewsWithSuppliers);
 
       // Calculate stats
-      if (data) {
-        const published = data.filter(r => r.status === 'published').length;
-        const avgRating = data.length > 0 
-          ? data.reduce((sum, r) => sum + r.overall_rating, 0) / data.length 
+      if (reviewsWithSuppliers && reviewsWithSuppliers.length > 0) {
+        const published = reviewsWithSuppliers.filter((r: any) => r.status === 'published' || r.status === 'approved').length;
+        const avgRating = reviewsWithSuppliers.length > 0 
+          ? reviewsWithSuppliers.reduce((sum: number, r: any) => sum + (r.overall_rating || r.rating || 0), 0) / reviewsWithSuppliers.length 
           : 0;
 
         setStats({
-          total: data.length,
+          total: reviewsWithSuppliers.length,
           published,
-          pending: data.filter(r => r.status === 'pending').length,
-          flagged: data.filter(r => r.status === 'flagged').length,
+          pending: reviewsWithSuppliers.filter((r: any) => r.status === 'pending').length,
+          flagged: reviewsWithSuppliers.filter((r: any) => r.status === 'flagged' || r.status === 'rejected').length,
           averageRating: avgRating
         });
       }
@@ -151,7 +174,7 @@ export const ReviewsManager: React.FC<ReviewsManagerProps> = ({ supplierId, isAd
 
   const updateReviewStatus = async (reviewId: string, newStatus: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('supplier_reviews')
         .update({ status: newStatus })
         .eq('id', reviewId);
@@ -176,7 +199,7 @@ export const ReviewsManager: React.FC<ReviewsManagerProps> = ({ supplierId, isAd
 
   const toggleFeatured = async (reviewId: string, currentFeatured: boolean) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('supplier_reviews')
         .update({ is_featured: !currentFeatured })
         .eq('id', reviewId);
@@ -196,7 +219,7 @@ export const ReviewsManager: React.FC<ReviewsManagerProps> = ({ supplierId, isAd
 
   const deleteReview = async (reviewId: string) => {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('supplier_reviews')
         .delete()
         .eq('id', reviewId);
