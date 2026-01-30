@@ -321,7 +321,7 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({ userId, userRole }) 
             <div className="flex items-center gap-3">
               <FileText className="h-8 w-8 text-purple-400" />
               <div>
-                <p className="text-2xl font-bold text-white">KES {stats.totalSpent.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-white">KES {(stats.totalSpent || 0).toLocaleString()}</p>
                 <p className="text-xs text-slate-400">Total Spent</p>
               </div>
             </div>

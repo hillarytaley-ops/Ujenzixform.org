@@ -795,7 +795,7 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
                 </div>
 
                 <div className="text-2xl font-bold text-primary">
-                  KES {product.unit_price.toLocaleString()}
+                  KES {(product.unit_price || 0).toLocaleString()}
                 </div>
 
                 {/* Action Buttons */}

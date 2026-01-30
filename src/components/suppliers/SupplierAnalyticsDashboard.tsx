@@ -382,8 +382,8 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
     ]);
   };
 
-  const formatCurrency = (amount: number) => {
-    return `KES ${amount.toLocaleString()}`;
+  const formatCurrency = (amount: number | undefined | null) => {
+    return `KES ${(amount || 0).toLocaleString()}`;
   };
 
   const getStatusColor = (status: string) => {

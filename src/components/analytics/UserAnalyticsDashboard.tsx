@@ -255,14 +255,14 @@ export const UserAnalyticsDashboard: React.FC<UserAnalyticsDashboardProps> = ({ 
       `${isSupplier ? 'Sales' : 'Spending'} Report - Last ${dateRange} Days`,
       `Generated: ${new Date().toLocaleDateString()}`,
       '',
-      `Total ${isSupplier ? 'Revenue' : 'Spent'}: KES ${analytics.totalRevenue.toLocaleString()}`,
-      `Total Orders: ${analytics.totalOrders}`,
-      `Completed Orders: ${analytics.completedOrders}`,
-      `Pending Orders: ${analytics.pendingOrders}`,
-      `Average Order Value: KES ${analytics.averageOrderValue.toLocaleString()}`,
+      `Total ${isSupplier ? 'Revenue' : 'Spent'}: KES ${(analytics.totalRevenue || 0).toLocaleString()}`,
+      `Total Orders: ${analytics.totalOrders || 0}`,
+      `Completed Orders: ${analytics.completedOrders || 0}`,
+      `Pending Orders: ${analytics.pendingOrders || 0}`,
+      `Average Order Value: KES ${(analytics.averageOrderValue || 0).toLocaleString()}`,
       '',
       'Top Products:',
-      ...analytics.topProducts.map((p, i) => `${i + 1}. ${p.name} - ${p.sales} sold - KES ${p.revenue.toLocaleString()}`)
+      ...(analytics.topProducts || []).map((p, i) => `${i + 1}. ${p.name} - ${p.sales || 0} sold - KES ${(p.revenue || 0).toLocaleString()}`)
     ].join('\n');
     
     const blob = new Blob([report], { type: 'text/plain' });
@@ -341,17 +341,17 @@ export const UserAnalyticsDashboard: React.FC<UserAnalyticsDashboardProps> = ({ 
               <div>
                 <p className="text-sm text-blue-300">{isSupplier ? 'Total Revenue' : 'Total Spent'}</p>
                 <p className="text-2xl font-bold text-white">
-                  KES {analytics.totalRevenue.toLocaleString()}
+                  KES {(analytics.totalRevenue || 0).toLocaleString()}
                 </p>
                 <div className={`flex items-center text-xs mt-1 ${
-                  analytics.revenueChange >= 0 ? 'text-green-400' : 'text-red-400'
+                  (analytics.revenueChange || 0) >= 0 ? 'text-green-400' : 'text-red-400'
                 }`}>
-                  {analytics.revenueChange >= 0 ? (
+                  {(analytics.revenueChange || 0) >= 0 ? (
                     <ArrowUpRight className="h-3 w-3" />
                   ) : (
                     <ArrowDownRight className="h-3 w-3" />
                   )}
-                  {Math.abs(analytics.revenueChange).toFixed(1)}% vs previous period
+                  {Math.abs(analytics.revenueChange || 0).toFixed(1)}% vs previous period
                 </div>
               </div>
               <DollarSign className="h-10 w-10 text-blue-400" />
@@ -380,7 +380,7 @@ export const UserAnalyticsDashboard: React.FC<UserAnalyticsDashboardProps> = ({ 
               <div>
                 <p className="text-sm text-purple-300">Avg Order Value</p>
                 <p className="text-2xl font-bold text-white">
-                  KES {analytics.averageOrderValue.toLocaleString()}
+                  KES {(analytics.averageOrderValue || 0).toLocaleString()}
                 </p>
                 <p className="text-xs text-purple-400 mt-1">
                   Per order
@@ -448,7 +448,7 @@ export const UserAnalyticsDashboard: React.FC<UserAnalyticsDashboardProps> = ({ 
                       <div className="flex justify-between text-sm">
                         <span className="text-slate-400">{data.month}</span>
                         <span className="text-white font-medium">
-                          KES {data.amount.toLocaleString()}
+                          KES {(data.amount || 0).toLocaleString()}
                         </span>
                       </div>
                       <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
@@ -495,7 +495,7 @@ export const UserAnalyticsDashboard: React.FC<UserAnalyticsDashboardProps> = ({ 
                       </div>
                     </div>
                     <p className="text-white font-medium">
-                      KES {product.revenue.toLocaleString()}
+                      KES {(product.revenue || 0).toLocaleString()}
                     </p>
                   </div>
                 ))}
