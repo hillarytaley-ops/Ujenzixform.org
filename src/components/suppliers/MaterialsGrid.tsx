@@ -16,7 +16,7 @@
  * ╚══════════════════════════════════════════════════════════════════════════════════════╝
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,7 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Search, ShoppingCart, Store, Package, Filter, PartyPopper, Plus, Minus, Check, Scale, Camera, ChevronLeft, ChevronRight, X, Eye } from 'lucide-react';
+import { Search, ShoppingCart, Store, Package, Filter, PartyPopper, Plus, Minus, Check, Scale, Camera, ChevronLeft, ChevronRight, X, Eye, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -311,6 +311,10 @@ export const MaterialsGrid = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMoreMaterials, setHasMoreMaterials] = useState(false);
   const [totalMaterialsCount, setTotalMaterialsCount] = useState(0);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(12); // Default 12 items per page (3 rows x 4 cols)
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All Categories');
   const [priceRange, setPriceRange] = useState('all');
@@ -1196,6 +1200,66 @@ export const MaterialsGrid = () => {
     });
 
     setFilteredMaterials(filtered);
+    // Reset to first page when filters change
+    setCurrentPage(1);
+  };
+
+  // Pagination calculations
+  const totalPages = useMemo(() => Math.ceil(filteredMaterials.length / itemsPerPage), [filteredMaterials.length, itemsPerPage]);
+  
+  const paginatedMaterials = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredMaterials.slice(startIndex, endIndex);
+  }, [filteredMaterials, currentPage, itemsPerPage]);
+
+  // Generate page numbers to display
+  const getPageNumbers = () => {
+    const pages: (number | string)[] = [];
+    const maxVisiblePages = 5;
+    
+    if (totalPages <= maxVisiblePages) {
+      // Show all pages if total is small
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      // Always show first page
+      pages.push(1);
+      
+      if (currentPage > 3) {
+        pages.push('...');
+      }
+      
+      // Show pages around current page
+      const start = Math.max(2, currentPage - 1);
+      const end = Math.min(totalPages - 1, currentPage + 1);
+      
+      for (let i = start; i <= end; i++) {
+        if (!pages.includes(i)) {
+          pages.push(i);
+        }
+      }
+      
+      if (currentPage < totalPages - 2) {
+        pages.push('...');
+      }
+      
+      // Always show last page
+      if (!pages.includes(totalPages)) {
+        pages.push(totalPages);
+      }
+    }
+    
+    return pages;
+  };
+
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+      // Scroll to top of grid
+      gridRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   };
 
   const handleRequestQuote = async (material: Material) => {
@@ -1733,7 +1797,7 @@ export const MaterialsGrid = () => {
         </Card>
       ) : (
         <div ref={gridRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredMaterials.map((material) => {
+          {paginatedMaterials.map((material) => {
                 // Get image URL - ONLY use actual image, don't fallback to category images during loading
                 // Category default images will only be used in onError handler when actual image fails
                 const imageUrl = material.image_url || '';
@@ -2083,15 +2147,119 @@ export const MaterialsGrid = () => {
         </div>
       )}
       
-      {/* Load More Button - shown when there are more materials available */}
-      {hasMoreMaterials && !loading && filteredMaterials.length > 0 && (
-        <div className="flex flex-col items-center justify-center mt-8 mb-4">
-          <p className="text-sm text-muted-foreground mb-3">
-            Showing {filteredMaterials.length} of {totalMaterialsCount} materials
+      {/* Pagination Controls */}
+      {filteredMaterials.length > 0 && totalPages > 1 && (
+        <div className="flex flex-col items-center justify-center mt-8 mb-4 space-y-4">
+          {/* Results Summary */}
+          <p className="text-sm text-muted-foreground">
+            Showing {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, filteredMaterials.length)} of {filteredMaterials.length} materials
           </p>
+          
+          {/* Pagination Navigation */}
+          <div className="flex items-center gap-1 sm:gap-2">
+            {/* First Page Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(1)}
+              disabled={currentPage === 1}
+              className="hidden sm:flex h-9 w-9 p-0"
+              title="First page"
+            >
+              <ChevronsLeft className="h-4 w-4" />
+            </Button>
+            
+            {/* Previous Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="h-9 px-3 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+            >
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              <span className="hidden sm:inline">Previous</span>
+            </Button>
+            
+            {/* Page Numbers */}
+            <div className="flex items-center gap-1">
+              {getPageNumbers().map((page, index) => (
+                page === '...' ? (
+                  <span key={`ellipsis-${index}`} className="px-2 text-muted-foreground">...</span>
+                ) : (
+                  <Button
+                    key={page}
+                    variant={currentPage === page ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handlePageChange(page as number)}
+                    className={`h-9 w-9 p-0 font-medium ${
+                      currentPage === page 
+                        ? 'bg-red-600 hover:bg-red-700 text-white' 
+                        : 'hover:bg-red-50 hover:text-red-600 hover:border-red-200'
+                    }`}
+                  >
+                    {page}
+                  </Button>
+                )
+              ))}
+            </div>
+            
+            {/* Next Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="h-9 px-3 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+            >
+              <span className="hidden sm:inline">Next</span>
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+            
+            {/* Last Page Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(totalPages)}
+              disabled={currentPage === totalPages}
+              className="hidden sm:flex h-9 w-9 p-0"
+              title="Last page"
+            >
+              <ChevronsRight className="h-4 w-4" />
+            </Button>
+          </div>
+          
+          {/* Items Per Page Selector */}
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">Show:</span>
+            <Select
+              value={itemsPerPage.toString()}
+              onValueChange={(value) => {
+                setItemsPerPage(Number(value));
+                setCurrentPage(1); // Reset to first page when changing items per page
+              }}
+            >
+              <SelectTrigger className="w-20 h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="12">12</SelectItem>
+                <SelectItem value="24">24</SelectItem>
+                <SelectItem value="48">48</SelectItem>
+                <SelectItem value="96">96</SelectItem>
+              </SelectContent>
+            </Select>
+            <span className="text-muted-foreground">per page</span>
+          </div>
+        </div>
+      )}
+      
+      {/* Load All Materials Button - shown when there are more materials in database */}
+      {hasMoreMaterials && !loading && filteredMaterials.length > 0 && (
+        <div className="flex flex-col items-center justify-center mt-4 mb-4">
           <Button
-            variant="outline"
-            size="lg"
+            variant="ghost"
+            size="sm"
             onClick={async () => {
               setLoadingMore(true);
               try {
@@ -2161,17 +2329,17 @@ export const MaterialsGrid = () => {
               }
             }}
             disabled={loadingMore}
-            className="px-8"
+            className="text-xs text-muted-foreground hover:text-foreground"
           >
             {loadingMore ? (
               <>
                 <span className="animate-spin mr-2">⏳</span>
-                Loading more...
+                Loading...
               </>
             ) : (
               <>
-                <Package className="mr-2 h-4 w-4" />
-                Load All {totalMaterialsCount - filteredMaterials.length} Remaining Materials
+                <Package className="mr-2 h-3 w-3" />
+                Load {totalMaterialsCount - filteredMaterials.length} more from database
               </>
             )}
           </Button>
