@@ -652,19 +652,77 @@ export const MaterialsGrid = () => {
     fetchSuppliers();
   }, []);
 
-  // Debounced filter for better performance on mobile
-  useEffect(() => {
-    // Use requestAnimationFrame for smoother filtering
-    const rafId = requestAnimationFrame(() => {
-      try {
-        filterMaterials();
-      } catch (error) {
-        console.error('Error in filterMaterials effect:', error);
-        setFilteredMaterials(materials);
+  // Filter materials when dependencies change - using useMemo for immediate computation
+  const computedFilteredMaterials = useMemo(() => {
+    // Fast path: no filters applied
+    const noFilters = !searchQuery && 
+                      selectedCategory === 'All Categories' && 
+                      priceRange === 'all' && 
+                      stockFilter === 'all';
+    
+    if (noFilters) {
+      return materials;
+    }
+
+    // Pre-compute lowercase search query once
+    const searchLower = searchQuery?.toLowerCase().trim() || '';
+    
+    // Single pass filter for better performance
+    const filtered = materials.filter(m => {
+      // Search filter (most selective, check first)
+      if (searchLower) {
+        const matchesSearch = m.name.toLowerCase().includes(searchLower) ||
+          m.category.toLowerCase().includes(searchLower) ||
+          m.description?.toLowerCase().includes(searchLower) ||
+          m.supplier?.company_name?.toLowerCase().includes(searchLower);
+        if (!matchesSearch) return false;
       }
+
+      // Category filter
+      if (selectedCategory !== 'All Categories' && m.category !== selectedCategory) {
+        return false;
+      }
+
+      // Price filter
+      if (priceRange !== 'all') {
+        const price = m.unit_price;
+        if (priceRange === 'under-1000' && price >= 1000) return false;
+        if (priceRange === '1000-5000' && (price < 1000 || price > 5000)) return false;
+        if (priceRange === '5000-10000' && (price < 5000 || price > 10000)) return false;
+        if (priceRange === 'over-10000' && price <= 10000) return false;
+      }
+
+      // Stock filter
+      if (stockFilter === 'in-stock' && !m.in_stock) return false;
+      if (stockFilter === 'out-of-stock' && m.in_stock) return false;
+
+      return true;
     });
-    return () => cancelAnimationFrame(rafId);
+
+    console.log(`🔍 Search filter: "${searchQuery}" found ${filtered.length} results`);
+    return filtered;
   }, [materials, searchQuery, selectedCategory, priceRange, stockFilter]);
+  
+  // Pagination calculations - use computedFilteredMaterials for immediate reactivity
+  const totalPages = useMemo(() => Math.ceil(computedFilteredMaterials.length / itemsPerPage), [computedFilteredMaterials.length, itemsPerPage]);
+  
+  // Ensure currentPage is valid when filters change
+  const validCurrentPage = useMemo(() => {
+    const maxPage = Math.max(1, totalPages);
+    return Math.min(currentPage, maxPage);
+  }, [currentPage, totalPages]);
+  
+  const paginatedMaterials = useMemo(() => {
+    const startIndex = (validCurrentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return computedFilteredMaterials.slice(startIndex, endIndex);
+  }, [computedFilteredMaterials, validCurrentPage, itemsPerPage]);
+  
+  // Sync computed filtered materials to state (for components that need the state)
+  useEffect(() => {
+    setFilteredMaterials(computedFilteredMaterials);
+    setCurrentPage(1); // Reset to page 1 when filters change
+  }, [computedFilteredMaterials]);
 
   useEffect(() => {
     const updateColumns = () => {
@@ -680,7 +738,7 @@ export const MaterialsGrid = () => {
       const startRow = Math.max(0, Math.floor((window.scrollY - containerTop) / CARD_HEIGHT) - BUFFER_ROWS);
       const rowsInView = Math.ceil(window.innerHeight / CARD_HEIGHT) + BUFFER_ROWS * 2;
       const startIndex = startRow * columns;
-      const endIndex = Math.min(filteredMaterials.length, startIndex + rowsInView * columns);
+      const endIndex = Math.min(paginatedMaterials.length, startIndex + rowsInView * columns);
       setVisibleStart(startIndex);
       setVisibleEnd(endIndex);
     };
@@ -693,14 +751,14 @@ export const MaterialsGrid = () => {
       window.removeEventListener('resize', onResize);
       window.removeEventListener('scroll', updateVisible);
     };
-  }, [filteredMaterials, columns]);
+  }, [paginatedMaterials, columns]);
 
-  // ✅ OPTIMIZED LAZY LOAD: Load images for visible items + large buffer ahead
+  // ✅ OPTIMIZED LAZY LOAD: Load images for visible items + buffer
   useEffect(() => {
-    // Load visible items PLUS 50 items ahead for smoother scrolling
-    const bufferSize = 50;
-    const extendedEnd = Math.min(visibleEnd + bufferSize, filteredMaterials.length);
-    const visibleItems = filteredMaterials.slice(visibleStart, extendedEnd);
+    // Load visible items PLUS buffer for smoother scrolling
+    const bufferSize = 20;
+    const extendedEnd = Math.min(visibleEnd + bufferSize, paginatedMaterials.length);
+    const visibleItems = paginatedMaterials.slice(visibleStart, extendedEnd);
     const itemsWithoutImages = visibleItems.filter(m => !m.image_url && m.supplier_id === 'admin-catalog');
     
     if (itemsWithoutImages.length > 0) {
@@ -708,7 +766,7 @@ export const MaterialsGrid = () => {
       // Immediate load - no debounce for faster response
       loadMaterialImages(idsToLoad);
     }
-  }, [visibleStart, visibleEnd, filteredMaterials]);
+  }, [visibleStart, visibleEnd, paginatedMaterials]);
 
   // Track which images are being loaded to prevent duplicate requests
   const loadingImagesRef = useRef<Set<string>>(new Set());
@@ -755,13 +813,9 @@ export const MaterialsGrid = () => {
           });
           
           // Update materials with their image URLs
+          // Note: Only update the main materials state - filteredMaterials will be
+          // recomputed automatically via computedFilteredMaterials useMemo
           setMaterials(prev => prev.map(mat => {
-            const imageUrl = imageMap.get(mat.id);
-            return imageUrl ? { ...mat, image_url: imageUrl } as Material : mat;
-          }));
-          
-          // Also update filtered materials
-          setFilteredMaterials(prev => prev.map(mat => {
             const imageUrl = imageMap.get(mat.id);
             return imageUrl ? { ...mat, image_url: imageUrl } as Material : mat;
           }));
@@ -923,16 +977,16 @@ export const MaterialsGrid = () => {
                     supplier: { company_name: 'Admin Catalog', location: 'Kenya', rating: 5.0 },
                     pricing_type: item.pricing_type || 'single', variants: []
                   } as Material));
+                  // Only update materials - filteredMaterials will be recomputed via useMemo
                   setMaterials(prev => [...prev, ...moreMaterials]);
-                  setFilteredMaterials(prev => [...prev, ...moreMaterials]);
                   console.log(`📱 Mobile background load: +${moreData.length} materials`);
                 }
               } catch (e) { /* silent fail */ }
             }, 1000); // Load more after 1 second
             
             // Skip the desktop parallel fetch
+            // Only update materials - filteredMaterials will be recomputed via useMemo
             setMaterials(mobileMaterials);
-            setFilteredMaterials(mobileMaterials);
             setLoading(false);
             return;
           }
@@ -1138,8 +1192,8 @@ export const MaterialsGrid = () => {
         return;
       }
 
+      // Only update materials - filteredMaterials will be recomputed via useMemo
       setMaterials(allMaterials);
-      setFilteredMaterials(allMaterials);
       console.log(`🎉 Successfully loaded ${allMaterials.length} materials to display`);
     } catch (error) {
       console.error('Error loading materials:', error);
@@ -1151,67 +1205,6 @@ export const MaterialsGrid = () => {
       setLoading(false);
     }
   };
-
-  const filterMaterials = () => {
-    // Fast path: no filters applied
-    const noFilters = !searchQuery && 
-                      selectedCategory === 'All Categories' && 
-                      priceRange === 'all' && 
-                      stockFilter === 'all';
-    
-    if (noFilters) {
-      setFilteredMaterials(materials);
-      return;
-    }
-
-    // Pre-compute lowercase search query once
-    const searchLower = searchQuery?.toLowerCase() || '';
-    
-    // Single pass filter for better performance
-    const filtered = materials.filter(m => {
-      // Search filter (most selective, check first)
-      if (searchLower) {
-        const matchesSearch = m.name.toLowerCase().includes(searchLower) ||
-          m.category.toLowerCase().includes(searchLower) ||
-          m.description?.toLowerCase().includes(searchLower) ||
-          m.supplier?.company_name?.toLowerCase().includes(searchLower);
-        if (!matchesSearch) return false;
-      }
-
-      // Category filter
-      if (selectedCategory !== 'All Categories' && m.category !== selectedCategory) {
-        return false;
-      }
-
-      // Price filter
-      if (priceRange !== 'all') {
-        const price = m.unit_price;
-        if (priceRange === 'under-1000' && price >= 1000) return false;
-        if (priceRange === '1000-5000' && (price < 1000 || price > 5000)) return false;
-        if (priceRange === '5000-10000' && (price < 5000 || price > 10000)) return false;
-        if (priceRange === 'over-10000' && price <= 10000) return false;
-      }
-
-      // Stock filter
-      if (stockFilter === 'in-stock' && !m.in_stock) return false;
-      if (stockFilter === 'out-of-stock' && m.in_stock) return false;
-
-      return true;
-    });
-
-    setFilteredMaterials(filtered);
-    // Reset to first page when filters change
-    setCurrentPage(1);
-  };
-
-  // Pagination calculations
-  const totalPages = useMemo(() => Math.ceil(filteredMaterials.length / itemsPerPage), [filteredMaterials.length, itemsPerPage]);
-  
-  const paginatedMaterials = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return filteredMaterials.slice(startIndex, endIndex);
-  }, [filteredMaterials, currentPage, itemsPerPage]);
 
   // Generate page numbers to display
   const getPageNumbers = () => {
@@ -1227,13 +1220,13 @@ export const MaterialsGrid = () => {
       // Always show first page
       pages.push(1);
       
-      if (currentPage > 3) {
+      if (validCurrentPage > 3) {
         pages.push('...');
       }
       
       // Show pages around current page
-      const start = Math.max(2, currentPage - 1);
-      const end = Math.min(totalPages - 1, currentPage + 1);
+      const start = Math.max(2, validCurrentPage - 1);
+      const end = Math.min(totalPages - 1, validCurrentPage + 1);
       
       for (let i = start; i <= end; i++) {
         if (!pages.includes(i)) {
@@ -1241,7 +1234,7 @@ export const MaterialsGrid = () => {
         }
       }
       
-      if (currentPage < totalPages - 2) {
+      if (validCurrentPage < totalPages - 2) {
         pages.push('...');
       }
       
@@ -1571,7 +1564,7 @@ export const MaterialsGrid = () => {
         <div>
           <h2 className="text-3xl font-bold">Construction Materials Marketplace</h2>
           <p className="text-muted-foreground">
-            Browse {filteredMaterials.length} materials from {new Set(materials.map(m => m.supplier_id)).size} suppliers
+            Browse {computedFilteredMaterials.length} materials from {new Set(materials.map(m => m.supplier_id)).size} suppliers
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -1612,109 +1605,112 @@ export const MaterialsGrid = () => {
       {/* Filters - Mobile Optimized */}
       <Card className="overflow-visible">
         <CardContent className="p-4 md:p-6">
-          {/* Search Bar - Full Width on Mobile */}
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none" />
-            <Input
-              type="search"
-              inputMode="search"
-              placeholder="Search materials..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-11 h-12 text-base md:text-sm rounded-xl border-2 focus:border-emerald-500 focus:ring-emerald-500"
-              autoComplete="off"
-              autoCorrect="off"
-              spellCheck="false"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-200 transition-colors"
-                aria-label="Clear search"
-              >
-                <X className="h-4 w-4 text-muted-foreground" />
-              </button>
-            )}
-          </div>
-
-          {/* Filter Chips - Horizontal Scroll on Mobile */}
-          <div className="flex flex-wrap md:grid md:grid-cols-4 gap-2 md:gap-4">
-            {/* Category Filter */}
-            <div className="flex-1 min-w-[140px] md:min-w-0">
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="h-11 md:h-10 text-sm rounded-lg border-2 focus:border-emerald-500">
-                  <SelectValue placeholder="Category" />
-                </SelectTrigger>
-                <SelectContent 
-                  className="max-h-[50vh] z-[100]"
-                  position="popper"
-                  sideOffset={5}
+          {/* Search and Filters Row - All in one row on large screens */}
+          <div className="flex flex-col gap-4">
+            {/* First Row: Search Bar (full width on mobile, controlled width on large screens) */}
+            <div className="relative w-full lg:max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none" />
+              <Input
+                type="search"
+                inputMode="search"
+                placeholder="Search materials..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-11 h-11 text-base md:text-sm rounded-lg border-2 focus:border-emerald-500 focus:ring-emerald-500"
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck="false"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-200 transition-colors"
+                  aria-label="Clear search"
                 >
-                  {PRODUCT_CATEGORIES.map(cat => (
-                    <SelectItem 
-                      key={cat} 
-                      value={cat}
-                      className="py-3 md:py-2 text-base md:text-sm cursor-pointer"
-                    >
-                      {cat}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                  <X className="h-4 w-4 text-muted-foreground" />
+                </button>
+              )}
             </div>
 
-            {/* Price Filter */}
-            <div className="flex-1 min-w-[130px] md:min-w-0">
-              <Select value={priceRange} onValueChange={setPriceRange}>
-                <SelectTrigger className="h-11 md:h-10 text-sm rounded-lg border-2 focus:border-emerald-500">
-                  <SelectValue placeholder="Price" />
-                </SelectTrigger>
-                <SelectContent 
-                  className="z-[100]"
-                  position="popper"
-                  sideOffset={5}
-                >
-                  <SelectItem value="all" className="py-3 md:py-2 text-base md:text-sm cursor-pointer">All Prices</SelectItem>
-                  <SelectItem value="under-1000" className="py-3 md:py-2 text-base md:text-sm cursor-pointer">Under KES 1,000</SelectItem>
-                  <SelectItem value="1000-5000" className="py-3 md:py-2 text-base md:text-sm cursor-pointer">KES 1,000 - 5,000</SelectItem>
-                  <SelectItem value="5000-10000" className="py-3 md:py-2 text-base md:text-sm cursor-pointer">KES 5,000 - 10,000</SelectItem>
-                  <SelectItem value="over-10000" className="py-3 md:py-2 text-base md:text-sm cursor-pointer">Over KES 10,000</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Second Row: All 3 Filter Dropdowns in one row on all screen sizes (scrollable on mobile) */}
+            <div className="flex flex-row gap-2 sm:gap-3 overflow-x-auto pb-1 lg:pb-0">
+              {/* Category Filter */}
+              <div className="flex-shrink-0 w-[140px] sm:w-[160px] lg:w-[180px]">
+                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                  <SelectTrigger className="h-11 md:h-10 text-sm rounded-lg border-2 focus:border-emerald-500">
+                    <SelectValue placeholder="All Categories" />
+                  </SelectTrigger>
+                  <SelectContent 
+                    className="max-h-[50vh] z-[100]"
+                    position="popper"
+                    sideOffset={5}
+                  >
+                    {PRODUCT_CATEGORIES.map(cat => (
+                      <SelectItem 
+                        key={cat} 
+                        value={cat}
+                        className="py-3 md:py-2 text-base md:text-sm cursor-pointer"
+                      >
+                        {cat}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            {/* Stock Filter */}
-            <div className="flex-1 min-w-[120px] md:min-w-0">
-              <Select value={stockFilter} onValueChange={setStockFilter}>
-                <SelectTrigger className="h-11 md:h-10 text-sm rounded-lg border-2 focus:border-emerald-500">
-                  <SelectValue placeholder="Stock" />
-                </SelectTrigger>
-                <SelectContent 
-                  className="z-[100]"
-                  position="popper"
-                  sideOffset={5}
+              {/* Price Filter */}
+              <div className="flex-shrink-0 w-[130px] sm:w-[150px] lg:w-[160px]">
+                <Select value={priceRange} onValueChange={setPriceRange}>
+                  <SelectTrigger className="h-11 md:h-10 text-sm rounded-lg border-2 focus:border-emerald-500">
+                    <SelectValue placeholder="All Prices" />
+                  </SelectTrigger>
+                  <SelectContent 
+                    className="z-[100]"
+                    position="popper"
+                    sideOffset={5}
+                  >
+                    <SelectItem value="all" className="py-3 md:py-2 text-base md:text-sm cursor-pointer">All Prices</SelectItem>
+                    <SelectItem value="under-1000" className="py-3 md:py-2 text-base md:text-sm cursor-pointer">Under KES 1,000</SelectItem>
+                    <SelectItem value="1000-5000" className="py-3 md:py-2 text-base md:text-sm cursor-pointer">KES 1,000 - 5,000</SelectItem>
+                    <SelectItem value="5000-10000" className="py-3 md:py-2 text-base md:text-sm cursor-pointer">KES 5,000 - 10,000</SelectItem>
+                    <SelectItem value="over-10000" className="py-3 md:py-2 text-base md:text-sm cursor-pointer">Over KES 10,000</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Stock Filter */}
+              <div className="flex-shrink-0 w-[120px] sm:w-[130px] lg:w-[140px]">
+                <Select value={stockFilter} onValueChange={setStockFilter}>
+                  <SelectTrigger className="h-11 md:h-10 text-sm rounded-lg border-2 focus:border-emerald-500">
+                    <SelectValue placeholder="All Items" />
+                  </SelectTrigger>
+                  <SelectContent 
+                    className="z-[100]"
+                    position="popper"
+                    sideOffset={5}
+                  >
+                    <SelectItem value="all" className="py-3 md:py-2 text-base md:text-sm cursor-pointer">All Items</SelectItem>
+                    <SelectItem value="in-stock" className="py-3 md:py-2 text-base md:text-sm cursor-pointer">In Stock Only</SelectItem>
+                    <SelectItem value="out-of-stock" className="py-3 md:py-2 text-base md:text-sm cursor-pointer">Out of Stock</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* Book View Button - Mobile Only */}
+              {isMobile && computedFilteredMaterials.length > 0 && (
+                <Button
+                  variant="outline"
+                  className="flex-shrink-0 h-11 min-w-[100px] bg-gradient-to-r from-emerald-600 to-teal-600 text-white border-0 hover:from-emerald-700 hover:to-teal-700 rounded-lg"
+                  onClick={() => {
+                    setBookViewStartIndex(0);
+                    setShowBookView(true);
+                  }}
                 >
-                  <SelectItem value="all" className="py-3 md:py-2 text-base md:text-sm cursor-pointer">All Items</SelectItem>
-                  <SelectItem value="in-stock" className="py-3 md:py-2 text-base md:text-sm cursor-pointer">In Stock Only</SelectItem>
-                  <SelectItem value="out-of-stock" className="py-3 md:py-2 text-base md:text-sm cursor-pointer">Out of Stock</SelectItem>
-                </SelectContent>
-              </Select>
+                  <BookOpen className="h-4 w-4 mr-1" />
+                  Browse
+                </Button>
+              )}
             </div>
-            
-            {/* Book View Button - Mobile Only */}
-            {isMobile && filteredMaterials.length > 0 && (
-              <Button
-                variant="outline"
-                className="h-11 flex-1 min-w-[100px] bg-gradient-to-r from-emerald-600 to-teal-600 text-white border-0 hover:from-emerald-700 hover:to-teal-700 rounded-lg"
-                onClick={() => {
-                  setBookViewStartIndex(0);
-                  setShowBookView(true);
-                }}
-              >
-                <BookOpen className="h-4 w-4 mr-1" />
-                Browse
-              </Button>
-            )}
           </div>
 
           {/* Active Filters & Results Count */}
@@ -1722,7 +1718,7 @@ export const MaterialsGrid = () => {
             {/* Results Count */}
             <div className="flex items-center gap-1.5 text-sm text-muted-foreground bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-full">
               <Filter className="h-3.5 w-3.5" />
-              <span className="font-medium">{filteredMaterials.length}</span>
+              <span className="font-medium">{computedFilteredMaterials.length}</span>
               <span>of {materials.length}</span>
             </div>
             
@@ -1783,7 +1779,7 @@ export const MaterialsGrid = () => {
       </Card>
 
       {/* Materials Grid */}
-      {filteredMaterials.length === 0 ? (
+      {computedFilteredMaterials.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center h-64">
             <Package className="h-16 w-16 text-muted-foreground mb-4" />
@@ -2148,11 +2144,11 @@ export const MaterialsGrid = () => {
       )}
       
       {/* Pagination Controls */}
-      {filteredMaterials.length > 0 && totalPages > 1 && (
+      {computedFilteredMaterials.length > 0 && totalPages > 1 && (
         <div className="flex flex-col items-center justify-center mt-8 mb-4 space-y-4">
           {/* Results Summary */}
           <p className="text-sm text-muted-foreground">
-            Showing {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, filteredMaterials.length)} of {filteredMaterials.length} materials
+            Showing {((validCurrentPage - 1) * itemsPerPage) + 1} - {Math.min(validCurrentPage * itemsPerPage, computedFilteredMaterials.length)} of {computedFilteredMaterials.length} materials
           </p>
           
           {/* Pagination Navigation */}
@@ -2162,7 +2158,7 @@ export const MaterialsGrid = () => {
               variant="outline"
               size="sm"
               onClick={() => handlePageChange(1)}
-              disabled={currentPage === 1}
+              disabled={validCurrentPage === 1}
               className="hidden sm:flex h-9 w-9 p-0"
               title="First page"
             >
@@ -2173,8 +2169,8 @@ export const MaterialsGrid = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
+              onClick={() => handlePageChange(validCurrentPage - 1)}
+              disabled={validCurrentPage === 1}
               className="h-9 px-3 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
             >
               <ChevronLeft className="h-4 w-4 mr-1" />
@@ -2189,11 +2185,11 @@ export const MaterialsGrid = () => {
                 ) : (
                   <Button
                     key={page}
-                    variant={currentPage === page ? "default" : "outline"}
+                    variant={validCurrentPage === page ? "default" : "outline"}
                     size="sm"
                     onClick={() => handlePageChange(page as number)}
                     className={`h-9 w-9 p-0 font-medium ${
-                      currentPage === page 
+                      validCurrentPage === page 
                         ? 'bg-red-600 hover:bg-red-700 text-white' 
                         : 'hover:bg-red-50 hover:text-red-600 hover:border-red-200'
                     }`}
@@ -2208,8 +2204,8 @@ export const MaterialsGrid = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
+              onClick={() => handlePageChange(validCurrentPage + 1)}
+              disabled={validCurrentPage === totalPages}
               className="h-9 px-3 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
             >
               <span className="hidden sm:inline">Next</span>
@@ -2221,7 +2217,7 @@ export const MaterialsGrid = () => {
               variant="outline"
               size="sm"
               onClick={() => handlePageChange(totalPages)}
-              disabled={currentPage === totalPages}
+              disabled={validCurrentPage === totalPages}
               className="hidden sm:flex h-9 w-9 p-0"
               title="Last page"
             >
@@ -2255,7 +2251,7 @@ export const MaterialsGrid = () => {
       )}
       
       {/* Load All Materials Button - shown when there are more materials in database */}
-      {hasMoreMaterials && !loading && filteredMaterials.length > 0 && (
+      {hasMoreMaterials && !loading && computedFilteredMaterials.length > 0 && (
         <div className="flex flex-col items-center justify-center mt-4 mb-4">
           <Button
             variant="ghost"
@@ -2309,8 +2305,8 @@ export const MaterialsGrid = () => {
                     }
                   }));
                   
+                  // Only update materials - filteredMaterials will be recomputed via useMemo
                   setMaterials(prev => [...prev, ...newMaterials]);
-                  setFilteredMaterials(prev => [...prev, ...newMaterials]);
                   setHasMoreMaterials(false);
                   toast({
                     title: '✅ Loaded all materials',
@@ -2339,7 +2335,7 @@ export const MaterialsGrid = () => {
             ) : (
               <>
                 <Package className="mr-2 h-3 w-3" />
-                Load {totalMaterialsCount - filteredMaterials.length} more from database
+                Load {totalMaterialsCount - computedFilteredMaterials.length} more from database
               </>
             )}
           </Button>
