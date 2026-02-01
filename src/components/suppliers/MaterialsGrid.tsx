@@ -669,13 +669,18 @@ export const MaterialsGrid = () => {
     
     // Single pass filter for better performance
     const filtered = materials.filter(m => {
-      // Search filter (most selective, check first)
+      // Search filter - STRICT matching on name and category ONLY
+      // This ensures searching "cement" only returns cement products
       if (searchLower) {
-        const matchesSearch = m.name.toLowerCase().includes(searchLower) ||
-          m.category.toLowerCase().includes(searchLower) ||
-          m.description?.toLowerCase().includes(searchLower) ||
-          m.supplier?.company_name?.toLowerCase().includes(searchLower);
-        if (!matchesSearch) return false;
+        const nameLower = m.name.toLowerCase();
+        const categoryLower = m.category.toLowerCase();
+        
+        // Check if search term matches name or category
+        const matchesName = nameLower.includes(searchLower);
+        const matchesCategory = categoryLower.includes(searchLower);
+        
+        // Only match on name and category for precise results
+        if (!matchesName && !matchesCategory) return false;
       }
 
       // Category filter
@@ -1602,13 +1607,13 @@ export const MaterialsGrid = () => {
         </div>
       </div>
 
-      {/* Filters - Mobile Optimized */}
+      {/* Filters - All in one row on large screens */}
       <Card className="overflow-visible">
         <CardContent className="p-4 md:p-6">
-          {/* Search and Filters Row - All in one row on large screens */}
-          <div className="flex flex-col gap-4">
-            {/* First Row: Search Bar (full width on mobile, controlled width on large screens) */}
-            <div className="relative w-full lg:max-w-md">
+          {/* Search and Filters - ALL IN ONE ROW on large screens */}
+          <div className="flex flex-col lg:flex-row gap-3 lg:gap-4 lg:items-center">
+            {/* Search Bar */}
+            <div className="relative flex-1 min-w-0 lg:max-w-xs">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none" />
               <Input
                 type="search"
@@ -1616,7 +1621,7 @@ export const MaterialsGrid = () => {
                 placeholder="Search materials..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-11 h-11 text-base md:text-sm rounded-lg border-2 focus:border-emerald-500 focus:ring-emerald-500"
+                className="pl-11 h-10 text-sm rounded-lg border-2 focus:border-emerald-500 focus:ring-emerald-500"
                 autoComplete="off"
                 autoCorrect="off"
                 spellCheck="false"
@@ -1632,85 +1637,82 @@ export const MaterialsGrid = () => {
               )}
             </div>
 
-            {/* Second Row: All 3 Filter Dropdowns in one row on all screen sizes (scrollable on mobile) */}
-            <div className="flex flex-row gap-2 sm:gap-3 overflow-x-auto pb-1 lg:pb-0">
-              {/* Category Filter */}
-              <div className="flex-shrink-0 w-[140px] sm:w-[160px] lg:w-[180px]">
-                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                  <SelectTrigger className="h-11 md:h-10 text-sm rounded-lg border-2 focus:border-emerald-500">
-                    <SelectValue placeholder="All Categories" />
-                  </SelectTrigger>
-                  <SelectContent 
-                    className="max-h-[50vh] z-[100]"
-                    position="popper"
-                    sideOffset={5}
-                  >
-                    {PRODUCT_CATEGORIES.map(cat => (
-                      <SelectItem 
-                        key={cat} 
-                        value={cat}
-                        className="py-3 md:py-2 text-base md:text-sm cursor-pointer"
-                      >
-                        {cat}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Price Filter */}
-              <div className="flex-shrink-0 w-[130px] sm:w-[150px] lg:w-[160px]">
-                <Select value={priceRange} onValueChange={setPriceRange}>
-                  <SelectTrigger className="h-11 md:h-10 text-sm rounded-lg border-2 focus:border-emerald-500">
-                    <SelectValue placeholder="All Prices" />
-                  </SelectTrigger>
-                  <SelectContent 
-                    className="z-[100]"
-                    position="popper"
-                    sideOffset={5}
-                  >
-                    <SelectItem value="all" className="py-3 md:py-2 text-base md:text-sm cursor-pointer">All Prices</SelectItem>
-                    <SelectItem value="under-1000" className="py-3 md:py-2 text-base md:text-sm cursor-pointer">Under KES 1,000</SelectItem>
-                    <SelectItem value="1000-5000" className="py-3 md:py-2 text-base md:text-sm cursor-pointer">KES 1,000 - 5,000</SelectItem>
-                    <SelectItem value="5000-10000" className="py-3 md:py-2 text-base md:text-sm cursor-pointer">KES 5,000 - 10,000</SelectItem>
-                    <SelectItem value="over-10000" className="py-3 md:py-2 text-base md:text-sm cursor-pointer">Over KES 10,000</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Stock Filter */}
-              <div className="flex-shrink-0 w-[120px] sm:w-[130px] lg:w-[140px]">
-                <Select value={stockFilter} onValueChange={setStockFilter}>
-                  <SelectTrigger className="h-11 md:h-10 text-sm rounded-lg border-2 focus:border-emerald-500">
-                    <SelectValue placeholder="All Items" />
-                  </SelectTrigger>
-                  <SelectContent 
-                    className="z-[100]"
-                    position="popper"
-                    sideOffset={5}
-                  >
-                    <SelectItem value="all" className="py-3 md:py-2 text-base md:text-sm cursor-pointer">All Items</SelectItem>
-                    <SelectItem value="in-stock" className="py-3 md:py-2 text-base md:text-sm cursor-pointer">In Stock Only</SelectItem>
-                    <SelectItem value="out-of-stock" className="py-3 md:py-2 text-base md:text-sm cursor-pointer">Out of Stock</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              {/* Book View Button - Mobile Only */}
-              {isMobile && computedFilteredMaterials.length > 0 && (
-                <Button
-                  variant="outline"
-                  className="flex-shrink-0 h-11 min-w-[100px] bg-gradient-to-r from-emerald-600 to-teal-600 text-white border-0 hover:from-emerald-700 hover:to-teal-700 rounded-lg"
-                  onClick={() => {
-                    setBookViewStartIndex(0);
-                    setShowBookView(true);
-                  }}
+            {/* Category Filter */}
+            <div className="flex-shrink-0 w-full sm:w-auto">
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger className="h-10 w-full sm:w-[160px] text-sm rounded-lg border-2 focus:border-emerald-500">
+                  <SelectValue placeholder="All Categories" />
+                </SelectTrigger>
+                <SelectContent 
+                  className="max-h-[50vh] z-[100]"
+                  position="popper"
+                  sideOffset={5}
                 >
-                  <BookOpen className="h-4 w-4 mr-1" />
-                  Browse
-                </Button>
-              )}
+                  {PRODUCT_CATEGORIES.map(cat => (
+                    <SelectItem 
+                      key={cat} 
+                      value={cat}
+                      className="py-2 text-sm cursor-pointer"
+                    >
+                      {cat}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+
+            {/* Price Filter */}
+            <div className="flex-shrink-0 w-full sm:w-auto">
+              <Select value={priceRange} onValueChange={setPriceRange}>
+                <SelectTrigger className="h-10 w-full sm:w-[140px] text-sm rounded-lg border-2 focus:border-emerald-500">
+                  <SelectValue placeholder="All Prices" />
+                </SelectTrigger>
+                <SelectContent 
+                  className="z-[100]"
+                  position="popper"
+                  sideOffset={5}
+                >
+                  <SelectItem value="all" className="py-2 text-sm cursor-pointer">All Prices</SelectItem>
+                  <SelectItem value="under-1000" className="py-2 text-sm cursor-pointer">Under KES 1,000</SelectItem>
+                  <SelectItem value="1000-5000" className="py-2 text-sm cursor-pointer">KES 1,000 - 5,000</SelectItem>
+                  <SelectItem value="5000-10000" className="py-2 text-sm cursor-pointer">KES 5,000 - 10,000</SelectItem>
+                  <SelectItem value="over-10000" className="py-2 text-sm cursor-pointer">Over KES 10,000</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Stock Filter */}
+            <div className="flex-shrink-0 w-full sm:w-auto">
+              <Select value={stockFilter} onValueChange={setStockFilter}>
+                <SelectTrigger className="h-10 w-full sm:w-[130px] text-sm rounded-lg border-2 focus:border-emerald-500">
+                  <SelectValue placeholder="All Items" />
+                </SelectTrigger>
+                <SelectContent 
+                  className="z-[100]"
+                  position="popper"
+                  sideOffset={5}
+                >
+                  <SelectItem value="all" className="py-2 text-sm cursor-pointer">All Items</SelectItem>
+                  <SelectItem value="in-stock" className="py-2 text-sm cursor-pointer">In Stock Only</SelectItem>
+                  <SelectItem value="out-of-stock" className="py-2 text-sm cursor-pointer">Out of Stock</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Book View Button - Mobile Only */}
+            {isMobile && computedFilteredMaterials.length > 0 && (
+              <Button
+                variant="outline"
+                className="flex-shrink-0 h-10 w-full sm:w-auto min-w-[100px] bg-gradient-to-r from-emerald-600 to-teal-600 text-white border-0 hover:from-emerald-700 hover:to-teal-700 rounded-lg"
+                onClick={() => {
+                  setBookViewStartIndex(0);
+                  setShowBookView(true);
+                }}
+              >
+                <BookOpen className="h-4 w-4 mr-1" />
+                Browse
+              </Button>
+            )}
           </div>
 
           {/* Active Filters & Results Count */}
