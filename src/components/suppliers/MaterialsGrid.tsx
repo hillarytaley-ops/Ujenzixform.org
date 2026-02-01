@@ -2345,11 +2345,7 @@ export const MaterialsGrid = () => {
       )}
       
       <Dialog open={isMultiQuoteOpen} onOpenChange={setIsMultiQuoteOpen}>
-        <DialogContent className="sm:max-w-[800px]">
-          <DialogHeader>
-            <DialogTitle>Multi-quote Request</DialogTitle>
-            <DialogDescription>Create a purchase order and send quote requests to multiple suppliers.</DialogDescription>
-          </DialogHeader>
+        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto p-0 gap-0">
           {builderId && (
             <QuickPurchaseOrder 
               builderId={builderId} 

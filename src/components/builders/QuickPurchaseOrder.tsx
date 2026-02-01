@@ -322,19 +322,19 @@ export const QuickPurchaseOrder: React.FC<QuickPurchaseOrderProps> = ({ builderI
   };
 
   return (
-    <Card className="w-full max-w-4xl mx-auto">
-      <CardHeader className="bg-gradient-to-r from-orange-50 to-orange-100 border-b">
-        <CardTitle className="flex items-center gap-2 text-2xl">
-          <ShoppingCart className="h-6 w-6 text-orange-600" />
+    <Card className="w-full max-w-4xl mx-auto border-0 shadow-none">
+      <CardHeader className="bg-gradient-to-r from-orange-50 to-orange-100 border-b py-4">
+        <CardTitle className="flex items-center gap-2 text-xl">
+          <ShoppingCart className="h-5 w-5 text-orange-600" />
           Create Purchase Order
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-sm">
           Specify materials needed and we'll connect you with verified suppliers for quotes
         </CardDescription>
       </CardHeader>
 
-      <CardContent className="pt-6">
-        <form onSubmit={handleSubmit} className="space-y-6">
+      <CardContent className="pt-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {/* Project Information */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -372,18 +372,18 @@ export const QuickPurchaseOrder: React.FC<QuickPurchaseOrderProps> = ({ builderI
           </div>
 
           {/* Order Items */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label className="text-lg font-semibold">Materials Required *</Label>
+              <Label className="text-base font-semibold">Materials Required *</Label>
               <Button type="button" onClick={addItem} size="sm" variant="outline">
                 <Plus className="h-4 w-4 mr-1" />
                 Add Item
               </Button>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2">
               {items.map((item, index) => (
-                <Card key={item.id} className="p-4 bg-gray-50">
+                <Card key={item.id} className="p-3 bg-gray-50">
                   <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
                     {/* Category */}
                     <div className="md:col-span-2">
@@ -479,10 +479,10 @@ export const QuickPurchaseOrder: React.FC<QuickPurchaseOrderProps> = ({ builderI
           </div>
 
           {/* Supplier Selection */}
-          <div className="space-y-3">
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-lg font-semibold flex items-center gap-2">
-                <Users className="h-5 w-5" />
+              <Label className="text-base font-semibold flex items-center gap-2">
+                <Users className="h-4 w-4" />
                 Select Suppliers (Optional)
               </Label>
               <Button
@@ -573,41 +573,42 @@ export const QuickPurchaseOrder: React.FC<QuickPurchaseOrderProps> = ({ builderI
           </div>
 
           {/* Additional Notes */}
-          <div className="space-y-2">
-            <Label htmlFor="notes">Additional Requirements (Optional)</Label>
+          <div className="space-y-1">
+            <Label htmlFor="notes" className="text-sm">Additional Requirements (Optional)</Label>
             <Textarea
               id="notes"
               placeholder="Any special requirements, quality standards, or delivery instructions..."
               value={additionalNotes}
               onChange={(e) => setAdditionalNotes(e.target.value)}
-              rows={3}
+              rows={2}
+              className="resize-none"
             />
           </div>
 
           {/* Info Alert */}
-          <Alert className="bg-blue-50 border-blue-200">
+          <Alert className="bg-blue-50 border-blue-200 py-2">
             <Package className="h-4 w-4 text-blue-600" />
-            <AlertDescription className="text-sm text-blue-800">
+            <AlertDescription className="text-xs text-blue-800">
               <strong>How it works:</strong> After submitting, selected suppliers (or all if none selected) will review your order and send competitive quotes. 
               You'll be notified to compare and select the best offer.
             </AlertDescription>
           </Alert>
 
           {/* Submit Buttons */}
-          <div className="flex flex-col sm:flex-row gap-3 pt-4">
+          <div className="flex flex-col sm:flex-row gap-2 pt-2 pb-2">
             <Button 
               type="submit" 
-              className="flex-1 h-12 bg-orange-600 hover:bg-orange-700 text-white font-semibold"
+              className="flex-1 h-10 bg-orange-600 hover:bg-orange-700 text-white font-semibold"
               disabled={submitting}
             >
               {submitting ? (
                 <>
-                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                  Submitting Order...
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Submitting...
                 </>
               ) : (
                 <>
-                  <Send className="h-5 w-5 mr-2" />
+                  <Send className="h-4 w-4 mr-2" />
                   Submit Purchase Order
                 </>
               )}
@@ -618,7 +619,7 @@ export const QuickPurchaseOrder: React.FC<QuickPurchaseOrderProps> = ({ builderI
                 type="button" 
                 variant="outline"
                 onClick={onClose}
-                className="sm:w-32"
+                className="sm:w-28 h-10"
                 disabled={submitting}
               >
                 Cancel
