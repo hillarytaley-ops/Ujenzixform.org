@@ -60,11 +60,28 @@ interface Order {
   items: any[];
 }
 
+interface DeliveryRequest {
+  id: string;
+  tracking_number?: string;
+  status: string;
+  pickup_address: string;
+  delivery_address: string;
+  pickup_date: string;
+  material_type: string;
+  quantity: number;
+  weight_kg?: number;
+  created_at: string;
+  purchase_order_id?: string;
+  provider_name?: string;
+  estimated_delivery?: string;
+}
+
 const PrivateClientDashboard = () => {
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [deliveries, setDeliveries] = useState<DeliveryRequest[]>([]);
   const [stats, setStats] = useState({
     totalOrders: 0,
     pendingOrders: 0,
@@ -187,6 +204,24 @@ const PrivateClientDashboard = () => {
         });
         
         console.log('📦 Private client orders loaded:', totalOrders);
+      }
+
+      // Fetch delivery requests for this user
+      // First get the profile ID to query delivery_requests
+      const profileId = profileByUserId?.id || profile?.id;
+      if (profileId) {
+        const { data: deliveryData, error: deliveryError } = await supabase
+          .from('delivery_requests')
+          .select('*')
+          .eq('builder_id', profileId)
+          .order('created_at', { ascending: false });
+
+        if (deliveryError) {
+          console.error('Error fetching deliveries:', deliveryError);
+        } else {
+          setDeliveries(deliveryData || []);
+          console.log('🚚 Private client deliveries loaded:', deliveryData?.length || 0);
+        }
       }
 
       // Fetch monitoring requests - use user_id (original schema column)
@@ -542,16 +577,106 @@ const PrivateClientDashboard = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Truck className="h-5 w-5 text-green-600" />
-                  Active Deliveries
+                  My Deliveries
                 </CardTitle>
-                <CardDescription>Track your incoming deliveries</CardDescription>
+                <CardDescription>Track your delivery requests - one delivery per order</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-12 text-gray-500">
-                  <Truck className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-                  <p className="text-lg font-medium">No active deliveries</p>
-                  <p className="text-sm">Your deliveries will appear here</p>
-                </div>
+                {deliveries.length === 0 ? (
+                  <div className="text-center py-12 text-gray-500">
+                    <Truck className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+                    <p className="text-lg font-medium">No deliveries yet</p>
+                    <p className="text-sm">Request delivery from your orders to see them here</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {deliveries.map((delivery) => {
+                      // Find the associated order for this delivery
+                      const associatedOrder = orders.find(o => o.id === delivery.purchase_order_id);
+                      const itemCount = associatedOrder?.items?.length || delivery.quantity || 1;
+                      
+                      return (
+                        <div key={delivery.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Truck className="h-4 w-4 text-blue-600" />
+                                <span className="font-semibold text-gray-900">
+                                  {delivery.tracking_number || `Delivery #${delivery.id.slice(0, 8)}`}
+                                </span>
+                                <Badge 
+                                  className={
+                                    delivery.status === 'delivered' ? 'bg-green-100 text-green-800' :
+                                    delivery.status === 'in_transit' || delivery.status === 'accepted' ? 'bg-blue-100 text-blue-800' :
+                                    delivery.status === 'pending' ? 'bg-amber-100 text-amber-800' :
+                                    delivery.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                    'bg-gray-100 text-gray-800'
+                                  }
+                                >
+                                  {delivery.status.charAt(0).toUpperCase() + delivery.status.slice(1).replace('_', ' ')}
+                                </Badge>
+                              </div>
+                              
+                              {/* Material Info */}
+                              <div className="bg-gray-50 rounded-lg p-3 mb-3">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <Package className="h-4 w-4 text-gray-500" />
+                                  <span className="font-medium text-gray-700">
+                                    {delivery.material_type || 'Construction Materials'}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-gray-600">
+                                  {itemCount} item{itemCount > 1 ? 's' : ''} 
+                                  {delivery.weight_kg ? ` • ${delivery.weight_kg}kg` : ''}
+                                </p>
+                                {associatedOrder && (
+                                  <p className="text-xs text-blue-600 mt-1">
+                                    From Order #{associatedOrder.po_number}
+                                  </p>
+                                )}
+                              </div>
+                              
+                              {/* Addresses */}
+                              <div className="space-y-2 text-sm">
+                                <div className="flex items-start gap-2">
+                                  <MapPin className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                                  <div>
+                                    <span className="text-gray-500">Pickup:</span>
+                                    <p className="text-gray-700">{delivery.pickup_address}</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-start gap-2">
+                                  <MapPin className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+                                  <div>
+                                    <span className="text-gray-500">Delivery:</span>
+                                    <p className="text-gray-700">{delivery.delivery_address}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="text-right">
+                              <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
+                                <Calendar className="h-3 w-3" />
+                                {new Date(delivery.created_at).toLocaleDateString()}
+                              </div>
+                              {delivery.pickup_date && (
+                                <p className="text-xs text-gray-500">
+                                  Pickup: {new Date(delivery.pickup_date).toLocaleDateString()}
+                                </p>
+                              )}
+                              {delivery.status === 'pending' && (
+                                <Badge className="mt-2 bg-amber-100 text-amber-800">
+                                  Awaiting Provider
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
