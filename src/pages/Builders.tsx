@@ -830,23 +830,11 @@ const Builders = () => {
         ) : (
           /* Public Directory with Facebook-Style Combined Layout */
           <div className="space-y-6">
-            {/* Login Portal for Builders - Only show to non-logged-in users */}
-            {!userProfile && (
-              <div className="bg-white/95 backdrop-blur-sm rounded-2xl border-2 border-white/50 shadow-2xl p-6 max-w-2xl mx-auto">
-                <LoginPortal 
-                  type="builder"
-                  redirectTo="/professional-builder-dashboard"
-                  title="Builder Dashboard Access"
-                  description="Sign in to access your builder dashboard, manage projects, and track deliveries"
-                />
-              </div>
-            )}
-            
             {/* Show notice to suppliers/delivery providers that this is a builders directory */}
-            {userProfile && userRoleState && userRoleState !== 'builder' && userRoleState !== 'admin' && (
+            {userProfile && userRoleState && userRoleState !== 'professional_builder' && userRoleState !== 'private_client' && userRoleState !== 'admin' && (
               <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-4 text-center max-w-2xl mx-auto">
                 <p className="text-amber-800 font-medium text-sm">
-                  👋 You're viewing the Builders Directory as a <strong className="capitalize">{userRoleState}</strong>.
+                  👋 You're viewing the Builders Directory as a <strong className="capitalize">{userRoleState?.replace('_', ' ')}</strong>.
                 </p>
               </div>
             )}
