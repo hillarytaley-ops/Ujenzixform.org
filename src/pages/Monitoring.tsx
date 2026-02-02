@@ -1017,8 +1017,8 @@ const Monitoring = () => {
           {userRole !== 'supplier' && (
             <div className="bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-cyan-500/20 shadow-2xl shadow-cyan-500/5 p-6">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className={`grid w-full max-w-4xl mx-auto mb-6 bg-slate-800/60 backdrop-blur-md border border-slate-700/50 h-12 ${
-                  isAdmin ? 'grid-cols-6' : isDeliveryProvider ? 'grid-cols-2' : 'grid-cols-2'
+                <TabsList className={`grid mx-auto mb-6 bg-slate-800/60 backdrop-blur-md border border-slate-700/50 h-12 ${
+                  isAdmin ? 'grid-cols-6 w-full max-w-4xl' : isDeliveryProvider ? 'grid-cols-2 w-fit px-2' : 'grid-cols-1 w-fit px-4'
                 }`}>
               {isAdmin && (
                 <TabsTrigger value="overview" className="flex items-center gap-2 text-sm py-2">
@@ -1342,8 +1342,8 @@ const Monitoring = () => {
                 {/* Regular Layout (non-fullscreen) */}
                 <div className={`flex flex-col lg:flex-row gap-4 transition-all duration-300 ${isFullscreen ? 'hidden' : ''}`}>
                   
-                  {/* Main Video Feed - Primary Focus */}
-                  <div className={`flex-1 order-2 lg:order-1 transition-all duration-300 ${isSidebarCollapsed ? 'lg:w-full' : ''}`}>
+                  {/* Main Video Feed - Primary Focus - Now order-1 on all screens */}
+                  <div className={`flex-1 order-1 transition-all duration-300 ${isSidebarCollapsed ? 'lg:w-full' : ''}`}>
                     <Card className="bg-slate-800/60 border-slate-700/50 backdrop-blur-xl overflow-hidden h-full">
                       {/* Video Header with View Controls */}
                       <CardHeader className="p-3 border-b border-slate-700/50">
@@ -1577,8 +1577,8 @@ const Monitoring = () => {
                     </Card>
                   </div>
                   
-                  {/* Camera List - Collapsible Sidebar */}
-                  <div className={`order-1 lg:order-2 transition-all duration-300 ${
+                  {/* Camera List - Collapsible Sidebar - Now order-2 on all screens */}
+                  <div className={`order-2 transition-all duration-300 ${
                     isFullscreen ? 'hidden' : 
                     isSidebarCollapsed ? 'w-12 lg:w-14' : 'w-full lg:w-72 xl:w-80'
                   }`}>
