@@ -24,6 +24,7 @@ import ChatWidget from "@/components/builders/ChatWidget";
 import { EnhancedSearch } from "@/components/builders/EnhancedSearch";
 import { ReviewsSystem } from "@/components/builders/ReviewsSystem";
 import { BuilderFeed } from "@/components/builders/BuilderFeed";
+import { BuilderFacebookLayout } from "@/components/builders/BuilderFacebookLayout";
 // import { NotificationSystem } from "@/components/builders/NotificationSystem";
 import { SimpleAnalyticsDashboard } from "@/components/builders/SimpleAnalyticsDashboard";
 import { PDFExport } from "@/components/builders/PDFExport";
@@ -61,7 +62,6 @@ const Builders = () => {
   const [showMap, setShowMap] = useState(false);
   const [chatBuilder, setChatBuilder] = useState<any>(null);
   const [showChat, setShowChat] = useState(false);
-  const [activeView, setActiveView] = useState<'directory' | 'feed'>('directory');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -813,11 +813,11 @@ const Builders = () => {
             </div>
           )
         ) : (
-          /* Public Directory with Enhanced Search and Feed */
+          /* Public Directory with Facebook-Style Combined Layout */
           <div className="space-y-6">
             {/* Login Portal for Builders - Only show to non-logged-in users */}
             {!userProfile && (
-              <div className="bg-white/95 backdrop-blur-sm rounded-2xl border-2 border-white/50 shadow-2xl p-6">
+              <div className="bg-white/95 backdrop-blur-sm rounded-2xl border-2 border-white/50 shadow-2xl p-6 max-w-2xl mx-auto">
                 <LoginPortal 
                   type="builder"
                   redirectTo="/professional-builder-dashboard"
@@ -829,108 +829,28 @@ const Builders = () => {
             
             {/* Show notice to suppliers/delivery providers that this is a builders directory */}
             {userProfile && userRoleState && userRoleState !== 'builder' && userRoleState !== 'admin' && (
-              <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-6 text-center">
-                <p className="text-amber-800 font-medium">
+              <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-4 text-center max-w-2xl mx-auto">
+                <p className="text-amber-800 font-medium text-sm">
                   👋 You're viewing the Builders Directory as a <strong className="capitalize">{userRoleState}</strong>.
                 </p>
-                <p className="text-amber-700 text-sm mt-1">
-                  Browse and connect with certified builders for your construction projects.
-                </p>
               </div>
             )}
 
-            {/* View Toggle - Facebook Style Navigation */}
-            <div className="bg-white/95 backdrop-blur-sm rounded-2xl border-2 border-white/50 shadow-xl overflow-hidden">
-              <div className="flex items-center border-b">
-                <button
-                  onClick={() => setActiveView('directory')}
-                  className={`flex-1 flex items-center justify-center gap-2 py-4 px-6 font-semibold transition-all duration-200 border-b-4 ${
-                    activeView === 'directory'
-                      ? 'text-blue-600 border-blue-600 bg-blue-50/50'
-                      : 'text-gray-500 border-transparent hover:bg-gray-50 hover:text-gray-700'
-                  }`}
-                >
-                  <Users className="h-5 w-5" />
-                  <span>Builder Directory</span>
-                </button>
-                <button
-                  onClick={() => setActiveView('feed')}
-                  className={`flex-1 flex items-center justify-center gap-2 py-4 px-6 font-semibold transition-all duration-200 border-b-4 ${
-                    activeView === 'feed'
-                      ? 'text-blue-600 border-blue-600 bg-blue-50/50'
-                      : 'text-gray-500 border-transparent hover:bg-gray-50 hover:text-gray-700'
-                  }`}
-                >
-                  <Video className="h-5 w-5" />
-                  <span>Builder Feed</span>
-                  <Badge className="bg-red-500 text-white text-xs px-1.5 py-0.5">New</Badge>
-                </button>
+            {/* Facebook-Style Combined Layout - Sidebar + Feed + Right Panel */}
+            <ErrorBoundary fallback={
+              <div className="p-8 border-2 border-red-200 rounded-xl bg-red-50/90 backdrop-blur-sm shadow-lg max-w-2xl mx-auto">
+                <h3 className="text-red-800 font-bold mb-2 text-xl">Error Loading Content</h3>
+                <p className="text-red-700 text-lg">There was an error loading the builder feed. Please try again.</p>
               </div>
-            </div>
-
-            {/* Directory View */}
-            {activeView === 'directory' && (
-              <div className="space-y-6">
-                <ErrorBoundary fallback={<div></div>}>
-                  <div className="bg-white/95 backdrop-blur-sm rounded-2xl border-2 border-white/50 shadow-2xl p-6">
-                    <EnhancedSearch 
-                      onSearchChange={(filters) => {
-                        // Search filters updated
-                      }}
-                    />
-                  </div>
-                </ErrorBoundary>
-                
-                <ErrorBoundary fallback={
-                  <div className="p-8 border-2 border-red-200 rounded-xl bg-red-50/90 backdrop-blur-sm shadow-lg">
-                    <h3 className="text-red-800 font-bold mb-2 text-xl">Builder Directory Error</h3>
-                    <p className="text-red-700 text-lg">There was an error loading the builder directory. Please check your connection and try again.</p>
-                  </div>
-                }>
-                  <div className="bg-white/95 backdrop-blur-sm rounded-2xl border-2 border-white/50 shadow-2xl p-6">
-                    <BuilderGrid 
-                      onBuilderContact={handleBuilderContact}
-                      onBuilderProfile={handleBuilderProfile}
-                      isAdmin={isAdmin}
-                    />
-                  </div>
-                </ErrorBoundary>
-              </div>
-            )}
-
-            {/* Feed View - Facebook Style */}
-            {activeView === 'feed' && (
-              <div className="space-y-6">
-                {/* Feed Header */}
-                <div className="bg-white/95 backdrop-blur-sm rounded-2xl border-2 border-white/50 shadow-xl p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                        <Video className="h-6 w-6 text-red-500" />
-                        Builder Feed
-                      </h2>
-                      <p className="text-gray-600 mt-1">
-                        Watch project videos, updates, and testimonials from Kenya's top builders
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Builder Feed Component */}
-                <ErrorBoundary fallback={
-                  <div className="p-8 border-2 border-red-200 rounded-xl bg-red-50/90 backdrop-blur-sm shadow-lg">
-                    <h3 className="text-red-800 font-bold mb-2 text-xl">Feed Error</h3>
-                    <p className="text-red-700 text-lg">There was an error loading the feed. Please try again.</p>
-                  </div>
-                }>
-                  <BuilderFeed 
-                    currentUserId={userProfile?.user_id}
-                    currentUserName={userProfile?.full_name || 'Guest'}
-                    currentUserAvatar={userProfile?.avatar_url}
-                  />
-                </ErrorBoundary>
-              </div>
-            )}
+            }>
+              <BuilderFacebookLayout
+                currentUserId={userProfile?.user_id}
+                currentUserName={userProfile?.full_name || 'Guest'}
+                currentUserAvatar={userProfile?.avatar_url}
+                onBuilderContact={handleBuilderContact}
+                onBuilderProfile={handleBuilderProfile}
+              />
+            </ErrorBoundary>
           </div>
         )}
         </div>
