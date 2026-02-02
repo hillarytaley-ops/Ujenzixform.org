@@ -9,7 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertCircle, Settings, Shield, ShoppingCart, Camera, Building2, Package, Truck, FileText, Eye, CheckCircle, Lock, Smartphone, Star, MessageCircle, LogIn } from "lucide-react";
+import { AlertCircle, Settings, Shield, ShoppingCart, Camera, Building2, Package, Truck, FileText, Eye, CheckCircle, Lock, Smartphone, Star, MessageCircle, LogIn, Video, Users } from "lucide-react";
 import AnimatedSection from "@/components/AnimatedSection";
 import { BuilderGrid } from "@/components/builders/BuilderGrid";
 import { ContactBuilderModal } from "@/components/modals/ContactBuilderModal";
@@ -23,6 +23,7 @@ import BuilderMap from "@/components/builders/BuilderMap";
 import ChatWidget from "@/components/builders/ChatWidget";
 import { EnhancedSearch } from "@/components/builders/EnhancedSearch";
 import { ReviewsSystem } from "@/components/builders/ReviewsSystem";
+import { BuilderFeed } from "@/components/builders/BuilderFeed";
 // import { NotificationSystem } from "@/components/builders/NotificationSystem";
 import { SimpleAnalyticsDashboard } from "@/components/builders/SimpleAnalyticsDashboard";
 import { PDFExport } from "@/components/builders/PDFExport";
@@ -60,6 +61,7 @@ const Builders = () => {
   const [showMap, setShowMap] = useState(false);
   const [chatBuilder, setChatBuilder] = useState<any>(null);
   const [showChat, setShowChat] = useState(false);
+  const [activeView, setActiveView] = useState<'directory' | 'feed'>('directory');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -811,8 +813,8 @@ const Builders = () => {
             </div>
           )
         ) : (
-          /* Public Directory with Enhanced Search */
-          <div className="space-y-8">
+          /* Public Directory with Enhanced Search and Feed */
+          <div className="space-y-6">
             {/* Login Portal for Builders - Only show to non-logged-in users */}
             {!userProfile && (
               <div className="bg-white/95 backdrop-blur-sm rounded-2xl border-2 border-white/50 shadow-2xl p-6">
@@ -837,30 +839,98 @@ const Builders = () => {
               </div>
             )}
 
-            <ErrorBoundary fallback={<div></div>}>
-              <div className="bg-white/95 backdrop-blur-sm rounded-2xl border-2 border-white/50 shadow-2xl p-6">
-                <EnhancedSearch 
-                  onSearchChange={(filters) => {
-                    // Search filters updated
-                  }}
-                />
+            {/* View Toggle - Facebook Style Navigation */}
+            <div className="bg-white/95 backdrop-blur-sm rounded-2xl border-2 border-white/50 shadow-xl overflow-hidden">
+              <div className="flex items-center border-b">
+                <button
+                  onClick={() => setActiveView('directory')}
+                  className={`flex-1 flex items-center justify-center gap-2 py-4 px-6 font-semibold transition-all duration-200 border-b-4 ${
+                    activeView === 'directory'
+                      ? 'text-blue-600 border-blue-600 bg-blue-50/50'
+                      : 'text-gray-500 border-transparent hover:bg-gray-50 hover:text-gray-700'
+                  }`}
+                >
+                  <Users className="h-5 w-5" />
+                  <span>Builder Directory</span>
+                </button>
+                <button
+                  onClick={() => setActiveView('feed')}
+                  className={`flex-1 flex items-center justify-center gap-2 py-4 px-6 font-semibold transition-all duration-200 border-b-4 ${
+                    activeView === 'feed'
+                      ? 'text-blue-600 border-blue-600 bg-blue-50/50'
+                      : 'text-gray-500 border-transparent hover:bg-gray-50 hover:text-gray-700'
+                  }`}
+                >
+                  <Video className="h-5 w-5" />
+                  <span>Builder Feed</span>
+                  <Badge className="bg-red-500 text-white text-xs px-1.5 py-0.5">New</Badge>
+                </button>
               </div>
-            </ErrorBoundary>
-            
-            <ErrorBoundary fallback={
-              <div className="p-8 border-2 border-red-200 rounded-xl bg-red-50/90 backdrop-blur-sm shadow-lg">
-                <h3 className="text-red-800 font-bold mb-2 text-xl">Builder Directory Error</h3>
-                <p className="text-red-700 text-lg">There was an error loading the builder directory. Please check your connection and try again.</p>
+            </div>
+
+            {/* Directory View */}
+            {activeView === 'directory' && (
+              <div className="space-y-6">
+                <ErrorBoundary fallback={<div></div>}>
+                  <div className="bg-white/95 backdrop-blur-sm rounded-2xl border-2 border-white/50 shadow-2xl p-6">
+                    <EnhancedSearch 
+                      onSearchChange={(filters) => {
+                        // Search filters updated
+                      }}
+                    />
+                  </div>
+                </ErrorBoundary>
+                
+                <ErrorBoundary fallback={
+                  <div className="p-8 border-2 border-red-200 rounded-xl bg-red-50/90 backdrop-blur-sm shadow-lg">
+                    <h3 className="text-red-800 font-bold mb-2 text-xl">Builder Directory Error</h3>
+                    <p className="text-red-700 text-lg">There was an error loading the builder directory. Please check your connection and try again.</p>
+                  </div>
+                }>
+                  <div className="bg-white/95 backdrop-blur-sm rounded-2xl border-2 border-white/50 shadow-2xl p-6">
+                    <BuilderGrid 
+                      onBuilderContact={handleBuilderContact}
+                      onBuilderProfile={handleBuilderProfile}
+                      isAdmin={isAdmin}
+                    />
+                  </div>
+                </ErrorBoundary>
               </div>
-            }>
-              <div className="bg-white/95 backdrop-blur-sm rounded-2xl border-2 border-white/50 shadow-2xl p-6">
-                <BuilderGrid 
-                  onBuilderContact={handleBuilderContact}
-                  onBuilderProfile={handleBuilderProfile}
-                  isAdmin={isAdmin}
-                />
+            )}
+
+            {/* Feed View - Facebook Style */}
+            {activeView === 'feed' && (
+              <div className="space-y-6">
+                {/* Feed Header */}
+                <div className="bg-white/95 backdrop-blur-sm rounded-2xl border-2 border-white/50 shadow-xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                        <Video className="h-6 w-6 text-red-500" />
+                        Builder Feed
+                      </h2>
+                      <p className="text-gray-600 mt-1">
+                        Watch project videos, updates, and testimonials from Kenya's top builders
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Builder Feed Component */}
+                <ErrorBoundary fallback={
+                  <div className="p-8 border-2 border-red-200 rounded-xl bg-red-50/90 backdrop-blur-sm shadow-lg">
+                    <h3 className="text-red-800 font-bold mb-2 text-xl">Feed Error</h3>
+                    <p className="text-red-700 text-lg">There was an error loading the feed. Please try again.</p>
+                  </div>
+                }>
+                  <BuilderFeed 
+                    currentUserId={userProfile?.user_id}
+                    currentUserName={userProfile?.full_name || 'Guest'}
+                    currentUserAvatar={userProfile?.avatar_url}
+                  />
+                </ErrorBoundary>
               </div>
-            </ErrorBoundary>
+            )}
           </div>
         )}
         </div>

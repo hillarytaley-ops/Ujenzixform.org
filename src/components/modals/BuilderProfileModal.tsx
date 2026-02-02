@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Phone, Mail, MapPin, Building2, Star, Users, Calendar, Award, X } from "lucide-react";
+import { Phone, Mail, MapPin, Building2, Star, Users, Calendar, Award, X, Video, Play, ThumbsUp, MessageCircle } from "lucide-react";
 import { UserProfile } from "@/types/userProfile";
 
 interface BuilderProfileModalProps {
@@ -62,6 +62,39 @@ export const BuilderProfileModal = ({ builder, isOpen, onClose, onContact }: Bui
     "Kenya Association of Building Contractors",
     "ISO 9001:2015 Quality Management",
     "Environmental Impact Assessment Certification"
+  ];
+
+  const mockVideos = [
+    {
+      id: 'v1',
+      title: 'Project Progress Update - Karen Residence',
+      thumbnail: '',
+      duration: '2:34',
+      views: 1234,
+      likes: 89,
+      comments: 23,
+      timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
+    },
+    {
+      id: 'v2',
+      title: 'Foundation Work Timelapse',
+      thumbnail: '',
+      duration: '1:45',
+      views: 856,
+      likes: 67,
+      comments: 15,
+      timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000)
+    },
+    {
+      id: 'v3',
+      title: 'Client Testimonial - Happy Homeowners',
+      thumbnail: '',
+      duration: '3:12',
+      views: 2341,
+      likes: 156,
+      comments: 42,
+      timestamp: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000)
+    }
   ];
 
   return (
@@ -132,10 +165,14 @@ export const BuilderProfileModal = ({ builder, isOpen, onClose, onContact }: Bui
           </div>
 
           <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="videos" className="flex items-center gap-1">
+                <Video className="h-3 w-3" />
+                Videos
+              </TabsTrigger>
               <TabsTrigger value="projects">Projects</TabsTrigger>
-              <TabsTrigger value="certifications">Certifications</TabsTrigger>
+              <TabsTrigger value="certifications">Certs</TabsTrigger>
               <TabsTrigger value="contact">Contact</TabsTrigger>
             </TabsList>
 
@@ -181,6 +218,65 @@ export const BuilderProfileModal = ({ builder, isOpen, onClose, onContact }: Bui
                         <div>• Architectural Design</div>
                       </div>
                     </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="videos" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Video className="h-5 w-5 text-red-500" />
+                    Project Videos
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4">
+                    {mockVideos.map((video) => (
+                      <div 
+                        key={video.id} 
+                        className="flex gap-4 p-3 rounded-lg border hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors group"
+                      >
+                        {/* Video Thumbnail */}
+                        <div className="relative w-40 h-24 bg-gray-200 dark:bg-gray-700 rounded-lg overflow-hidden flex-shrink-0">
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/50 transition-colors">
+                            <div className="w-10 h-10 rounded-full bg-white/90 flex items-center justify-center">
+                              <Play className="h-5 w-5 text-gray-900 ml-0.5" fill="currentColor" />
+                            </div>
+                          </div>
+                          <div className="absolute bottom-1 right-1 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded">
+                            {video.duration}
+                          </div>
+                        </div>
+                        
+                        {/* Video Info */}
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold text-gray-900 dark:text-white line-clamp-2 group-hover:text-blue-600 transition-colors">
+                            {video.title}
+                          </h4>
+                          <p className="text-sm text-gray-500 mt-1">
+                            {video.views.toLocaleString()} views • {Math.floor((Date.now() - video.timestamp.getTime()) / (24 * 60 * 60 * 1000))} days ago
+                          </p>
+                          <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+                            <span className="flex items-center gap-1">
+                              <ThumbsUp className="h-3.5 w-3.5" />
+                              {video.likes}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <MessageCircle className="h-3.5 w-3.5" />
+                              {video.comments}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <div className="mt-4 text-center">
+                    <Button variant="outline" className="w-full">
+                      View All Videos
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
