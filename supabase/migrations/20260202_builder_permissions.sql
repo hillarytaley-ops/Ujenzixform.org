@@ -238,14 +238,14 @@ CREATE POLICY "Users can insert own profile" ON profiles
 DROP POLICY IF EXISTS "Builders can manage own posts" ON builder_posts;
 DROP POLICY IF EXISTS "Anyone can view public posts" ON builder_posts;
 
--- Only builders can create posts
+-- Only builders can create posts (professional_builder or private_client - no generic 'builder' role)
 CREATE POLICY "Only builders can create posts" ON builder_posts
     FOR INSERT WITH CHECK (
         auth.uid() IS NOT NULL AND
         EXISTS (
             SELECT 1 FROM user_roles 
             WHERE user_id = auth.uid() 
-            AND role IN ('professional_builder', 'builder', 'admin')
+            AND role IN ('professional_builder', 'private_client', 'admin')
         )
     );
 
@@ -264,14 +264,14 @@ CREATE POLICY "Anyone can view public posts" ON builder_posts
 DROP POLICY IF EXISTS "Builders can manage own stories" ON builder_stories;
 DROP POLICY IF EXISTS "Anyone can view active stories" ON builder_stories;
 
--- Only builders can create stories
+-- Only builders can create stories (professional_builder or private_client - no generic 'builder' role)
 CREATE POLICY "Only builders can create stories" ON builder_stories
     FOR INSERT WITH CHECK (
         auth.uid() IS NOT NULL AND
         EXISTS (
             SELECT 1 FROM user_roles 
             WHERE user_id = auth.uid() 
-            AND role IN ('professional_builder', 'builder', 'admin')
+            AND role IN ('professional_builder', 'private_client', 'admin')
         )
     );
 
@@ -316,14 +316,14 @@ CREATE POLICY "Users can delete own comments" ON post_comments
 -- 7. HELPER FUNCTIONS
 -- ============================================================
 
--- Function to check if user is a builder
+-- Function to check if user is a builder (professional_builder or private_client - no generic 'builder' role)
 CREATE OR REPLACE FUNCTION is_builder(p_user_id UUID)
 RETURNS BOOLEAN AS $$
 BEGIN
     RETURN EXISTS (
         SELECT 1 FROM user_roles 
         WHERE user_id = p_user_id 
-        AND role IN ('professional_builder', 'builder', 'admin')
+        AND role IN ('professional_builder', 'private_client', 'admin')
     );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

@@ -70,7 +70,8 @@ const Builders = () => {
   const { toast } = useToast();
   
   // Check if current user is a builder (can post)
-  const isBuilder = userRoleState === 'professional_builder' || userRoleState === 'builder' || userRoleState === 'admin';
+  // Valid builder roles: professional_builder, private_client (no generic 'builder' role exists)
+  const isBuilder = userRoleState === 'professional_builder' || userRoleState === 'private_client' || userRoleState === 'admin';
 
   useEffect(() => {
     checkUserProfile();
@@ -179,8 +180,8 @@ const Builders = () => {
     setShowChat(true);
   };
 
-  const canAccessDashboard = userProfile && userRoleState === 'builder';
-  const isProfessionalBuilder = userProfile && userRoleState === 'builder' && 
+  const canAccessDashboard = userProfile && (userRoleState === 'professional_builder' || userRoleState === 'private_client');
+  const isProfessionalBuilder = userProfile && userRoleState === 'professional_builder' && 
     (userProfile.is_professional || userProfile.user_type === 'company');
 
   if (loading) {
@@ -373,7 +374,7 @@ const Builders = () => {
               
               {!loading && (
                 // Only show Dashboard button to builders - not to suppliers or delivery providers
-                userProfile && userRoleState === 'builder' ? (
+                userProfile && (userRoleState === 'professional_builder' || userRoleState === 'private_client') ? (
                   <Link to="/professional-builder-dashboard">
                     <Button 
                       size="lg"

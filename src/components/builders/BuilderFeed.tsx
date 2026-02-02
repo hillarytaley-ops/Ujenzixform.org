@@ -181,7 +181,8 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   onContactBuilder
 }) => {
   // Check if user can post (must be a registered builder)
-  const canPost = isBuilder || currentUserRole === 'professional_builder' || currentUserRole === 'builder' || currentUserRole === 'admin';
+  // Valid builder roles: professional_builder, private_client (no generic 'builder' role exists)
+  const canPost = isBuilder || currentUserRole === 'professional_builder' || currentUserRole === 'private_client' || currentUserRole === 'admin';
   const [posts, setPosts] = useState(DEMO_POSTS);
   const [newPostText, setNewPostText] = useState('');
   const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
