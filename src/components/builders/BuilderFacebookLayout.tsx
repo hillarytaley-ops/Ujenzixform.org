@@ -20,9 +20,12 @@ import {
   Video,
   Calendar,
   Briefcase,
-  X
+  X,
+  ArrowLeft
 } from 'lucide-react';
 import { BuilderFeed } from './BuilderFeed';
+import { BuilderGrid } from './BuilderGrid';
+import { MobileBottomNav, MobileHeader } from './MobileBottomNav';
 import { KENYAN_BUILDERS } from '@/data/kenyanBuilders';
 
 // Demo builders data
@@ -133,6 +136,10 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedBuilder, setExpandedBuilder] = useState<string | null>(null);
   const [showAllBuilders, setShowAllBuilders] = useState(false);
+  
+  // Mobile navigation state
+  const [mobileTab, setMobileTab] = useState<'feed' | 'builders' | 'create' | 'notifications' | 'menu'>('feed');
+  const [showMobileSearch, setShowMobileSearch] = useState(false);
 
   // Combine demo builders with Kenyan builders
   const allBuilders = [...DEMO_BUILDERS, ...KENYAN_BUILDERS.slice(0, 10)];
@@ -165,9 +172,79 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
   };
 
   return (
-    <div className="flex gap-6 max-w-[1400px] mx-auto">
-      {/* Left Sidebar - Builder Profiles (Facebook Style) */}
-      <div className="hidden lg:block w-80 flex-shrink-0">
+    <>
+      {/* Mobile Header */}
+      <div className="lg:hidden">
+        <MobileHeader
+          title="Builders"
+          onSearch={() => setShowMobileSearch(true)}
+          onMessages={() => console.log('Open messages')}
+          messageCount={3}
+        />
+      </div>
+
+      {/* Mobile Search Overlay */}
+      {showMobileSearch && (
+        <div className="fixed inset-0 z-50 bg-white dark:bg-gray-900 lg:hidden">
+          <div className="flex items-center gap-3 p-4 border-b">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-10 w-10 p-0"
+              onClick={() => setShowMobileSearch(false)}
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search builders..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 bg-gray-100 dark:bg-gray-800 border-0 rounded-full"
+                autoFocus
+              />
+            </div>
+          </div>
+          <ScrollArea className="h-[calc(100vh-80px)]">
+            <div className="p-4 space-y-2">
+              {filteredBuilders.map((builder) => (
+                <div
+                  key={builder.id}
+                  className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800 cursor-pointer"
+                  onClick={() => {
+                    onBuilderProfile?.(builder);
+                    setShowMobileSearch(false);
+                  }}
+                >
+                  <Avatar className="h-12 w-12">
+                    <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white font-semibold">
+                      {getInitials(builder.company_name || builder.full_name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-1">
+                      <span className="font-semibold">{builder.company_name || builder.full_name}</span>
+                      {(builder as any).verified && (
+                        <CheckCircle2 className="h-4 w-4 text-blue-500" fill="currentColor" />
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                      {builder.rating?.toFixed(1)} • {builder.location}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        </div>
+      )}
+
+      {/* Main Content */}
+      <div className="flex gap-6 max-w-[1400px] mx-auto pb-20 lg:pb-0">
+        {/* Left Sidebar - Builder Profiles (Facebook Style) - Desktop Only */}
+        <div className="hidden lg:block w-80 flex-shrink-0">
         <div className="sticky top-24 space-y-4">
           {/* Search Builders */}
           <Card className="bg-white dark:bg-gray-900 shadow-md">
@@ -445,7 +522,21 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
           </div>
         </div>
       </div>
-    </div>
+      </div>
+
+      {/* Mobile Bottom Navigation */}
+      <MobileBottomNav
+        activeTab={mobileTab}
+        onTabChange={(tab) => {
+          setMobileTab(tab);
+          if (tab === 'builders') {
+            setShowMobileSearch(true);
+          }
+        }}
+        notificationCount={5}
+        messageCount={3}
+      />
+    </>
   );
 };
 

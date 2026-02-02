@@ -6,6 +6,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Video, 
   Image as ImageIcon, 
@@ -18,7 +20,13 @@ import {
   Upload,
   Globe,
   Lock,
-  ChevronDown
+  ChevronDown,
+  Filter,
+  Star,
+  Bookmark,
+  BookmarkCheck,
+  Radio,
+  Sparkles
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -27,6 +35,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { BuilderVideoPost, BuilderVideoPostProps, VideoComment } from './BuilderVideoPost';
+import { BuilderStories } from './BuilderStories';
 
 interface BuilderFeedProps {
   currentUserId?: string;
@@ -155,6 +164,10 @@ const DEMO_POSTS: Omit<BuilderVideoPostProps, 'onLike' | 'onComment' | 'onShare'
   }
 ];
 
+// Location options for filtering
+const LOCATIONS = ['All Locations', 'Nairobi', 'Mombasa', 'Kisumu', 'Nakuru', 'Eldoret', 'Thika', 'Kiambu'];
+const SPECIALTIES = ['All Specialties', 'Residential', 'Commercial', 'Industrial', 'Renovation', 'Foundation', 'Roofing', 'Electrical', 'Plumbing'];
+
 export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   currentUserId,
   currentUserName = 'Guest',
@@ -167,6 +180,14 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [isCreatingPost, setIsCreatingPost] = useState(false);
   const [privacy, setPrivacy] = useState<'public' | 'friends'>('public');
+  
+  // Filter states
+  const [showFilters, setShowFilters] = useState(false);
+  const [locationFilter, setLocationFilter] = useState('All Locations');
+  const [specialtyFilter, setSpecialtyFilter] = useState('All Specialties');
+  const [sortBy, setSortBy] = useState<'recent' | 'popular' | 'trending'>('recent');
+  const [savedPosts, setSavedPosts] = useState<Set<string>>(new Set());
+  const [feedType, setFeedType] = useState<'all' | 'following' | 'live'>('all');
 
   const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -260,8 +281,43 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
     console.log('Viewing profile:', builderId);
   };
 
+  const handleSavePost = (postId: string) => {
+    setSavedPosts(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(postId)) {
+        newSet.delete(postId);
+      } else {
+        newSet.add(postId);
+      }
+      return newSet;
+    });
+  };
+
+  // Filter posts based on selected filters
+  const filteredPosts = posts.filter(post => {
+    if (locationFilter !== 'All Locations' && post.location && !post.location.toLowerCase().includes(locationFilter.toLowerCase())) {
+      return false;
+    }
+    return true;
+  }).sort((a, b) => {
+    if (sortBy === 'popular') {
+      return b.likes - a.likes;
+    }
+    if (sortBy === 'trending') {
+      return (b.likes + b.comments.length * 2) - (a.likes + a.comments.length * 2);
+    }
+    return b.timestamp.getTime() - a.timestamp.getTime();
+  });
+
   return (
     <div className="w-full max-w-2xl mx-auto space-y-4">
+      {/* Stories Section */}
+      <BuilderStories
+        currentUserName={currentUserName}
+        currentUserAvatar={currentUserAvatar}
+        onCreateStory={() => setIsCreatingPost(true)}
+      />
+
       {/* Create Post Card - Facebook Style */}
       <Card className="bg-white dark:bg-gray-900 shadow-md rounded-lg">
         <CardContent className="p-4">
@@ -391,41 +447,178 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         </CardContent>
       </Card>
 
-      {/* Feed Tabs */}
-      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md p-2">
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" size="sm" className="rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200">
-            All Posts
-          </Button>
-          <Button variant="ghost" size="sm" className="rounded-full text-gray-600">
-            Videos
-          </Button>
-          <Button variant="ghost" size="sm" className="rounded-full text-gray-600">
-            Photos
-          </Button>
-          <Button variant="ghost" size="sm" className="rounded-full text-gray-600">
-            Projects
+      {/* Feed Navigation & Filters */}
+      <Card className="bg-white dark:bg-gray-900 shadow-md rounded-xl overflow-hidden">
+        {/* Feed Type Tabs */}
+        <div className="flex items-center border-b">
+          <button
+            onClick={() => setFeedType('all')}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 font-medium transition-all border-b-2 ${
+              feedType === 'all'
+                ? 'text-blue-600 border-blue-600 bg-blue-50/50'
+                : 'text-gray-500 border-transparent hover:bg-gray-50'
+            }`}
+          >
+            <Sparkles className="h-4 w-4" />
+            For You
+          </button>
+          <button
+            onClick={() => setFeedType('following')}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 font-medium transition-all border-b-2 ${
+              feedType === 'following'
+                ? 'text-blue-600 border-blue-600 bg-blue-50/50'
+                : 'text-gray-500 border-transparent hover:bg-gray-50'
+            }`}
+          >
+            <Users className="h-4 w-4" />
+            Following
+          </button>
+          <button
+            onClick={() => setFeedType('live')}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 font-medium transition-all border-b-2 ${
+              feedType === 'live'
+                ? 'text-red-600 border-red-600 bg-red-50/50'
+                : 'text-gray-500 border-transparent hover:bg-gray-50'
+            }`}
+          >
+            <Radio className="h-4 w-4" />
+            Live
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+            </span>
+          </button>
+        </div>
+
+        {/* Filters Row */}
+        <div className="p-3 flex items-center gap-2 flex-wrap">
+          {/* Sort Dropdown */}
+          <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+            <SelectTrigger className="w-[130px] h-9 rounded-full bg-gray-100 dark:bg-gray-800 border-0">
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="recent">Most Recent</SelectItem>
+              <SelectItem value="popular">Most Popular</SelectItem>
+              <SelectItem value="trending">Trending</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Location Filter */}
+          <Select value={locationFilter} onValueChange={setLocationFilter}>
+            <SelectTrigger className="w-[140px] h-9 rounded-full bg-gray-100 dark:bg-gray-800 border-0">
+              <MapPin className="h-3.5 w-3.5 mr-1 text-gray-500" />
+              <SelectValue placeholder="Location" />
+            </SelectTrigger>
+            <SelectContent>
+              {LOCATIONS.map(loc => (
+                <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Specialty Filter */}
+          <Select value={specialtyFilter} onValueChange={setSpecialtyFilter}>
+            <SelectTrigger className="w-[150px] h-9 rounded-full bg-gray-100 dark:bg-gray-800 border-0">
+              <SelectValue placeholder="Specialty" />
+            </SelectTrigger>
+            <SelectContent>
+              {SPECIALTIES.map(spec => (
+                <SelectItem key={spec} value={spec}>{spec}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Clear Filters */}
+          {(locationFilter !== 'All Locations' || specialtyFilter !== 'All Specialties' || sortBy !== 'recent') && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 px-3 text-gray-500 hover:text-gray-700"
+              onClick={() => {
+                setLocationFilter('All Locations');
+                setSpecialtyFilter('All Specialties');
+                setSortBy('recent');
+              }}
+            >
+              <X className="h-4 w-4 mr-1" />
+              Clear
+            </Button>
+          )}
+
+          {/* Saved Posts Toggle */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className={`h-9 px-3 ml-auto rounded-full ${savedPosts.size > 0 ? 'text-blue-600' : 'text-gray-500'}`}
+          >
+            <Bookmark className="h-4 w-4 mr-1" />
+            Saved ({savedPosts.size})
           </Button>
         </div>
-      </div>
+      </Card>
+
+      {/* Live Indicator */}
+      {feedType === 'live' && (
+        <Card className="bg-gradient-to-r from-red-500 to-pink-500 text-white shadow-lg">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <Radio className="h-8 w-8 animate-pulse" />
+                  <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+                  </span>
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg">Live from Construction Sites</h3>
+                  <p className="text-white/80 text-sm">Watch builders working in real-time across Kenya</p>
+                </div>
+              </div>
+              <Badge className="bg-white/20 text-white border-white/30">
+                3 Live Now
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Posts Feed */}
       <div className="space-y-4">
-        {posts.map((post) => (
-          <BuilderVideoPost
-            key={post.id}
-            {...post}
-            onLike={handleLike}
-            onComment={handleComment}
-            onShare={handleShare}
-            onViewProfile={handleViewProfile}
-          />
+        {filteredPosts.map((post) => (
+          <div key={post.id} className="relative">
+            <BuilderVideoPost
+              {...post}
+              onLike={handleLike}
+              onComment={handleComment}
+              onShare={handleShare}
+              onViewProfile={handleViewProfile}
+            />
+            {/* Save Button Overlay */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`absolute top-16 right-4 h-8 w-8 p-0 rounded-full ${
+                savedPosts.has(post.id) 
+                  ? 'text-blue-600 bg-blue-100 hover:bg-blue-200' 
+                  : 'text-gray-400 bg-white/80 hover:bg-white'
+              }`}
+              onClick={() => handleSavePost(post.id)}
+            >
+              {savedPosts.has(post.id) ? (
+                <BookmarkCheck className="h-4 w-4" />
+              ) : (
+                <Bookmark className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
         ))}
       </div>
 
       {/* Load More */}
       <div className="text-center py-4">
-        <Button variant="outline" className="w-full max-w-xs">
+        <Button variant="outline" className="w-full max-w-xs rounded-full">
           Load More Posts
         </Button>
       </div>
