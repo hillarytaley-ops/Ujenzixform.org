@@ -1339,16 +1339,19 @@ const Monitoring = () => {
                   document.body
                 )}
                 
-                {/* Regular Layout (non-fullscreen) - Video FIRST, then Camera List */}
-                <div className={`flex flex-col lg:flex-row gap-4 transition-all duration-300 ${isFullscreen ? 'hidden' : ''}`}>
+                {/* Regular Layout (non-fullscreen) - Video FIRST at TOP, Camera List SECOND at BOTTOM/RIGHT */}
+                <div className={`flex flex-col gap-4 transition-all duration-300 ${isFullscreen ? 'hidden' : ''}`}>
                   
-                  {/* Main Video Feed - PRIMARY - Must appear FIRST */}
-                  <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'lg:w-full' : ''}`}>
-                    <Card className="bg-slate-800/60 border-slate-700/50 backdrop-blur-xl overflow-hidden h-full">
+                  {/* SECTION 1: Main Video Feed - This is the "Select a Camera" area - ALWAYS FIRST/TOP */}
+                  <div className={`w-full transition-all duration-300`}>
+                    <Card className="bg-slate-800/60 border-slate-700/50 backdrop-blur-xl overflow-hidden">
                       {/* Video Header with View Controls */}
                       <CardHeader className="p-3 border-b border-slate-700/50">
                         <div className="flex items-center justify-between flex-wrap gap-2">
                           <div className="flex items-center gap-3">
+                            <div className="px-2 py-1 bg-cyan-500/20 rounded text-cyan-400 text-xs font-medium">
+                              📺 CAMERA VIEW
+                            </div>
                             {selectedCamera && (
                               <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
                             )}
@@ -1357,7 +1360,7 @@ const Monitoring = () => {
                                 {selectedCamera ? cameras.find(c => c.id === selectedCamera)?.name : 'Select a Camera'}
                               </CardTitle>
                               <CardDescription className="text-xs text-slate-400">
-                                {selectedCamera ? cameras.find(c => c.id === selectedCamera)?.projectSite : 'Choose from the camera list'}
+                                {selectedCamera ? cameras.find(c => c.id === selectedCamera)?.projectSite : 'Choose from the list below'}
                               </CardDescription>
                             </div>
                           </div>
@@ -1577,48 +1580,33 @@ const Monitoring = () => {
                     </Card>
                   </div>
                   
-                  {/* Camera List - Collapsible Sidebar - Appears AFTER video */}
-                  <div className={`transition-all duration-300 ${
-                    isFullscreen ? 'hidden' : 
-                    isSidebarCollapsed ? 'w-12 lg:w-14' : 'w-full lg:w-72 xl:w-80'
+                  {/* SECTION 2: Camera List - ALWAYS SECOND/BOTTOM - User selects camera here */}
+                  <div className={`w-full transition-all duration-300 ${
+                    isFullscreen ? 'hidden' : ''
                   }`}>
-                    <Card className="bg-slate-800/60 border-slate-700/50 backdrop-blur-xl h-full relative">
-                      {/* Collapse Toggle Button */}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="absolute -left-3 top-1/2 -translate-y-1/2 z-10 h-8 w-8 p-0 bg-slate-700 border border-slate-600 rounded-full hover:bg-cyan-500/30 hover:border-cyan-500/50 text-slate-300 hover:text-cyan-400 hidden lg:flex items-center justify-center shadow-lg"
-                        onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                        title={isSidebarCollapsed ? 'Expand Camera List' : 'Collapse Camera List'}
-                      >
-                        {isSidebarCollapsed ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                      </Button>
-                      
-                      <CardHeader className={`border-b border-slate-700/50 transition-all duration-300 ${isSidebarCollapsed ? 'p-2' : 'p-3'}`}>
+                    <Card className="bg-slate-800/60 border-slate-700/50 backdrop-blur-xl relative">
+                      <CardHeader className="p-3 border-b border-slate-700/50">
                         <div className="flex items-center justify-between">
-                          <div className={`flex items-center gap-2 ${isSidebarCollapsed ? 'justify-center w-full' : ''}`}>
+                          <div className="flex items-center gap-2">
+                            <div className="px-2 py-1 bg-purple-500/20 rounded text-purple-400 text-xs font-medium">
+                              📋 CAMERA LIST
+                            </div>
                             <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse flex-shrink-0"></div>
-                            {!isSidebarCollapsed && (
-                              <CardTitle className="text-base text-white truncate">
-                                {monitoringRequest ? `Cameras` : 'Camera Feeds'}
-                              </CardTitle>
-                            )}
+                            <CardTitle className="text-base text-white truncate">
+                              {monitoringRequest ? `Available Cameras` : 'Camera Feeds'}
+                            </CardTitle>
                           </div>
-                          {!isSidebarCollapsed && (
-                            <Badge className="bg-green-500/20 text-green-400 border border-green-500/30 text-xs flex-shrink-0">
-                              {(assignedCameras.length > 0 ? assignedCameras : cameras).filter(c => c.status === 'online' || c.status === 'recording').length} Online
-                            </Badge>
-                          )}
+                          <Badge className="bg-green-500/20 text-green-400 border border-green-500/30 text-xs flex-shrink-0">
+                            {(assignedCameras.length > 0 ? assignedCameras : cameras).filter(c => c.status === 'online' || c.status === 'recording').length} Online
+                          </Badge>
                         </div>
-                        {!isSidebarCollapsed && (
-                          <CardDescription className="text-xs text-slate-400 mt-1">
-                            {monitoringRequest ? `Code: ${monitoringRequest.access_code}` : 'Click to view live feed'}
-                          </CardDescription>
-                        )}
+                        <CardDescription className="text-xs text-slate-400 mt-1">
+                          {monitoringRequest ? `Code: ${monitoringRequest.access_code}` : 'Click a camera to view live feed'}
+                        </CardDescription>
                       </CardHeader>
-                      <CardContent className={`transition-all duration-300 ${isSidebarCollapsed ? 'p-2' : 'p-3'}`}>
-                        {/* Access Code Entry for clients without URL param - Hidden when collapsed */}
-                        {!isSidebarCollapsed && !accessCodeFromUrl && !isAdmin && assignedCameras.length === 0 && (
+                      <CardContent className="p-3">
+                        {/* Access Code Entry for clients without URL param */}
+                        {!accessCodeFromUrl && !isAdmin && assignedCameras.length === 0 && (
                           <div className="mb-3 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
                             <div className="flex items-center gap-2 mb-2">
                               <Key className="h-4 w-4 text-cyan-400" />
@@ -1646,44 +1634,13 @@ const Monitoring = () => {
                           </div>
                         )}
                         
-                        <div className={`space-y-2 overflow-y-auto custom-scrollbar transition-all duration-300 ${
-                          isSidebarCollapsed 
-                            ? 'max-h-[calc(100vh-300px)]' 
-                            : 'max-h-[400px] lg:max-h-[calc(100vh-450px)] pr-1'
-                        }`}>
+                        {/* Camera Grid - Horizontal scrollable on mobile, grid on larger screens */}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                           {(assignedCameras.length > 0 ? assignedCameras : cameras).map((camera) => {
                             const isDrone = camera.id.startsWith('drone-');
                             const isOnline = camera.status === 'online' || camera.status === 'recording';
                             const isSelected = selectedCamera === camera.id;
                             
-                            // Collapsed view - just icons
-                            if (isSidebarCollapsed) {
-                              return (
-                                <div
-                                  key={camera.id}
-                                  className={`p-2 rounded-lg cursor-pointer transition-all duration-300 flex items-center justify-center ${
-                                    isSelected 
-                                      ? 'bg-cyan-500/30 border border-cyan-400/60' 
-                                      : 'bg-slate-700/30 border border-slate-600/30 hover:bg-slate-700/50'
-                                  }`}
-                                  onClick={() => setSelectedCamera(camera.id)}
-                                  title={camera.name}
-                                >
-                                  <div className="relative">
-                                    {isDrone ? (
-                                      <Plane className={`h-5 w-5 ${isSelected ? 'text-purple-400' : 'text-slate-400'}`} />
-                                    ) : (
-                                      <Camera className={`h-5 w-5 ${isSelected ? 'text-cyan-400' : 'text-slate-400'}`} />
-                                    )}
-                                    <span className={`absolute -top-1 -right-1 w-2 h-2 rounded-full ${
-                                      isOnline ? 'bg-green-400 animate-pulse' : 'bg-red-400'
-                                    }`}></span>
-                                  </div>
-                                </div>
-                              );
-                            }
-                            
-                            // Expanded view - full card
                             return (
                               <div
                                 key={camera.id}
