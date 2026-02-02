@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { BuilderCard } from "./BuilderCard";
 import { BuilderFilters as BuilderFiltersType } from "./BuilderFilters";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -8,11 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Database, Users, AlertCircle, Search, MapPin, Filter } from "lucide-react";
+import { Database, Users, AlertCircle, Search, MapPin, Filter, Loader2 } from "lucide-react";
 import { UserProfile } from "@/types/userProfile";
 import { useToast } from "@/hooks/use-toast";
 import { KENYAN_BUILDERS, KENYAN_COUNTIES, CONSTRUCTION_SPECIALTIES } from "@/data/kenyanBuilders";
 import { ReviewModal, ReviewData } from "./ReviewModal";
+import { supabase } from "@/integrations/supabase/client";
 
 // Demo builders data
 const DEMO_BUILDERS = [
@@ -150,10 +151,95 @@ export const BuilderGrid = ({ onBuilderContact, onBuilderProfile, isAdmin = fals
   const [builderSource, setBuilderSource] = useState<BuilderSource>("demo");
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [selectedBuilderForReview, setSelectedBuilderForReview] = useState<any>(null);
+  const [registeredBuilders, setRegisteredBuilders] = useState<any[]>([]);
+  const [loadingBuilders, setLoadingBuilders] = useState(true);
   const { toast } = useToast();
 
-  // Use real Kenyan builders data combined with demo data
-  const allBuilders = [...KENYAN_BUILDERS, ...DEMO_BUILDERS];
+  // Fetch real builders from database on mount
+  useEffect(() => {
+    fetchRegisteredBuilders();
+  }, []);
+
+  const fetchRegisteredBuilders = async () => {
+    setLoadingBuilders(true);
+    try {
+      // Fetch profiles that are professional builders
+      // Join with user_roles to get only professional_builder roles
+      const { data: roleData, error: roleError } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'professional_builder');
+
+      if (roleError) {
+        console.log('Error fetching builder roles:', roleError);
+        setLoadingBuilders(false);
+        return;
+      }
+
+      const builderUserIds = (roleData || []).map(r => r.user_id);
+
+      if (builderUserIds.length === 0) {
+        console.log('No professional builders found');
+        setLoadingBuilders(false);
+        return;
+      }
+
+      // Fetch profiles for these users
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('*')
+        .in('user_id', builderUserIds);
+
+      if (profilesError) {
+        console.error('Error fetching builder profiles:', profilesError);
+        setLoadingBuilders(false);
+        return;
+      }
+
+      // Transform to match expected format
+      const transformedBuilders = (profilesData || []).map(profile => ({
+        id: profile.id,
+        user_id: profile.user_id,
+        full_name: profile.full_name || 'Builder',
+        company_name: profile.company_name,
+        role: 'builder' as const,
+        user_type: profile.company_name ? 'company' as const : 'individual' as const,
+        is_professional: true,
+        phone: profile.phone,
+        email: profile.email,
+        location: profile.location,
+        rating: profile.rating || 4.5,
+        total_projects: profile.total_projects || 0,
+        total_reviews: profile.total_reviews || 0,
+        specialties: profile.specialties || [],
+        description: profile.bio || '',
+        avatar_url: profile.avatar_url,
+        cover_photo_url: profile.cover_photo_url,
+        website: profile.website,
+        years_experience: profile.years_experience,
+        team_size: profile.team_size,
+        price_range: profile.price_range,
+        service_areas: profile.service_areas,
+        certifications: profile.certifications,
+        is_verified: profile.is_verified,
+        created_at: profile.created_at,
+        updated_at: profile.updated_at
+      }));
+
+      setRegisteredBuilders(transformedBuilders);
+      console.log(`Loaded ${transformedBuilders.length} registered builders from database`);
+    } catch (error) {
+      console.error('Error fetching registered builders:', error);
+    } finally {
+      setLoadingBuilders(false);
+    }
+  };
+
+  // Combine registered builders with demo data (registered first)
+  const allBuilders = useMemo(() => {
+    // Put registered builders first, then demo data
+    return [...registeredBuilders, ...KENYAN_BUILDERS, ...DEMO_BUILDERS];
+  }, [registeredBuilders]);
   
   // Filter builders based on current filters
   const getFilteredBuilders = () => {
@@ -297,18 +383,34 @@ export const BuilderGrid = ({ onBuilderContact, onBuilderProfile, isAdmin = fals
 
       {/* Results */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <p className="text-sm text-muted-foreground">
             Showing {builders.length} of {currentTotalCount} professional builders
+            {registeredBuilders.length > 0 && (
+              <span className="text-green-600 ml-1">
+                ({registeredBuilders.length} verified)
+              </span>
+            )}
           </p>
-          {builderSource === "demo" && (
+          <div className="flex items-center gap-2">
+            {registeredBuilders.length > 0 && (
+              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                <Users className="h-3 w-3 mr-1" />
+                {registeredBuilders.length} Registered
+              </Badge>
+            )}
             <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
               Professional Directory
             </Badge>
-          )}
+          </div>
         </div>
 
-        {builders.length === 0 ? (
+        {loadingBuilders ? (
+          <div className="flex flex-col items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600 mb-4" />
+            <p className="text-muted-foreground">Loading builders...</p>
+          </div>
+        ) : builders.length === 0 ? (
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -26,7 +26,8 @@ import {
   Bookmark,
   BookmarkCheck,
   Radio,
-  Sparkles
+  Sparkles,
+  Loader2
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -36,6 +37,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { BuilderVideoPost, BuilderVideoPostProps, VideoComment } from './BuilderVideoPost';
 import { BuilderStories } from './BuilderStories';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface BuilderFeedProps {
   currentUserId?: string;
@@ -180,14 +183,18 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   onUploadVideo,
   onContactBuilder
 }) => {
+  const { toast } = useToast();
+  
   // Check if user can post (must be a registered builder)
   // Only professional builders can post on the Builders page (not private clients)
   const canPost = isBuilder || currentUserRole === 'professional_builder' || currentUserRole === 'admin';
-  const [posts, setPosts] = useState(DEMO_POSTS);
+  const [posts, setPosts] = useState<Omit<BuilderVideoPostProps, 'onLike' | 'onComment' | 'onShare' | 'onViewProfile'>[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(true);
   const [newPostText, setNewPostText] = useState('');
   const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [isCreatingPost, setIsCreatingPost] = useState(false);
+  const [isPosting, setIsPosting] = useState(false);
   const [privacy, setPrivacy] = useState<'public' | 'friends'>('public');
   
   // Filter states
@@ -197,6 +204,116 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   const [sortBy, setSortBy] = useState<'recent' | 'popular' | 'trending'>('recent');
   const [savedPosts, setSavedPosts] = useState<Set<string>>(new Set());
   const [feedType, setFeedType] = useState<'all' | 'following' | 'live'>('all');
+
+  // Fetch posts from database on mount
+  useEffect(() => {
+    fetchPosts();
+  }, []);
+
+  const fetchPosts = async () => {
+    setLoadingPosts(true);
+    try {
+      // Fetch posts from builder_posts table
+      const { data: postsData, error: postsError } = await supabase
+        .from('builder_posts')
+        .select('*')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (postsError) {
+        console.log('builder_posts table may not exist yet, using demo data:', postsError.message);
+        // Fall back to demo posts if table doesn't exist
+        setPosts(DEMO_POSTS);
+        setLoadingPosts(false);
+        return;
+      }
+
+      if (postsData && postsData.length > 0) {
+        // Get unique builder IDs (user_id from auth.users)
+        const builderIds = [...new Set(postsData.map(p => p.builder_id))];
+        
+        // Fetch profiles for these builders
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('*')
+          .in('user_id', builderIds);
+
+        // Create a map for quick lookup
+        const profilesMap = new Map((profilesData || []).map(p => [p.user_id, p]));
+
+        // Fetch comments for each post
+        const postIds = postsData.map(p => p.id);
+        const { data: commentsData } = await supabase
+          .from('post_comments')
+          .select('*')
+          .in('post_id', postIds)
+          .order('created_at', { ascending: false });
+
+        // Get commenter profiles
+        const commenterIds = [...new Set((commentsData || []).map(c => c.user_id))];
+        const { data: commenterProfiles } = await supabase
+          .from('profiles')
+          .select('user_id, full_name, avatar_url')
+          .in('user_id', commenterIds);
+        
+        const commenterMap = new Map((commenterProfiles || []).map(p => [p.user_id, p]));
+
+        // Transform posts to match component format
+        const transformedPosts = postsData.map(post => {
+          const profile = profilesMap.get(post.builder_id);
+          const postComments = (commentsData || [])
+            .filter(c => c.post_id === post.id)
+            .map(c => {
+              const commenter = commenterMap.get(c.user_id);
+              return {
+                id: c.id,
+                userId: c.user_id,
+                userName: commenter?.full_name || 'Anonymous',
+                userAvatar: commenter?.avatar_url,
+                content: c.content,
+                timestamp: new Date(c.created_at),
+                likes: c.likes_count || 0,
+                isLiked: false
+              };
+            });
+
+          return {
+            id: post.id,
+            builderId: post.builder_id,
+            builderName: profile?.full_name || 'Builder',
+            builderCompany: profile?.company_name || '',
+            builderAvatar: profile?.avatar_url || '',
+            builderVerified: profile?.is_verified || false,
+            videoUrl: post.media_url || post.video_url || '',
+            thumbnailUrl: post.thumbnail_url || '',
+            caption: post.caption || '',
+            location: post.location || profile?.location || '',
+            timestamp: new Date(post.created_at),
+            likes: post.likes_count || 0,
+            shares: post.shares_count || 0,
+            isLiked: false,
+            comments: postComments
+          };
+        });
+
+        // Combine real posts with demo posts if we have few real posts
+        if (transformedPosts.length < 3) {
+          setPosts([...transformedPosts, ...DEMO_POSTS]);
+        } else {
+          setPosts(transformedPosts);
+        }
+      } else {
+        // No posts yet, use demo data
+        setPosts(DEMO_POSTS);
+      }
+    } catch (error) {
+      console.error('Error fetching posts:', error);
+      setPosts(DEMO_POSTS);
+    } finally {
+      setLoadingPosts(false);
+    }
+  };
 
   const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -215,34 +332,115 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
     }
   };
 
-  const handlePost = () => {
+  const handlePost = async () => {
     if (!newPostText.trim() && !selectedVideo) return;
-
-    // In a real app, this would upload to the server
-    if (selectedVideo && onUploadVideo) {
-      onUploadVideo(selectedVideo, newPostText);
+    if (!currentUserId) {
+      toast({
+        title: 'Error',
+        description: 'You must be logged in to post',
+        variant: 'destructive'
+      });
+      return;
     }
 
-    // Add to local state for demo
-    const newPost: Omit<BuilderVideoPostProps, 'onLike' | 'onComment' | 'onShare' | 'onViewProfile'> = {
-      id: `post-${Date.now()}`,
-      builderId: currentUserId || 'current-user',
-      builderName: currentUserName,
-      builderAvatar: currentUserAvatar,
-      builderVerified: false,
-      videoUrl: videoPreview || '',
-      caption: newPostText,
-      timestamp: new Date(),
-      likes: 0,
-      shares: 0,
-      isLiked: false,
-      comments: []
-    };
+    setIsPosting(true);
+    try {
+      let videoUrl = '';
+      
+      // Upload video if selected
+      if (selectedVideo) {
+        const fileExt = selectedVideo.name.split('.').pop();
+        const fileName = `${currentUserId}/${Date.now()}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('builder-videos')
+          .upload(fileName, selectedVideo);
+        
+        if (uploadError) {
+          console.error('Video upload error:', uploadError);
+          // Continue without video if upload fails
+        } else {
+          const { data: urlData } = supabase.storage
+            .from('builder-videos')
+            .getPublicUrl(fileName);
+          videoUrl = urlData.publicUrl;
+        }
+      }
 
-    setPosts([newPost, ...posts]);
-    setNewPostText('');
-    handleRemoveVideo();
-    setIsCreatingPost(false);
+      // Get user's profile
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url')
+        .eq('user_id', currentUserId)
+        .single();
+
+      if (!profile) {
+        throw new Error('Profile not found');
+      }
+
+      // Insert post into database (builder_id references auth.users.id, not profiles.id)
+      const { data: newPostData, error: postError } = await supabase
+        .from('builder_posts')
+        .insert({
+          builder_id: currentUserId, // Use auth user ID, not profile ID
+          post_type: videoUrl ? 'video' : 'text',
+          caption: newPostText,
+          media_url: videoUrl || null,
+          location: '', // Could add location picker
+          privacy: privacy,
+          status: 'active',
+          likes_count: 0,
+          shares_count: 0,
+          comments_count: 0
+        })
+        .select()
+        .single();
+
+      if (postError) {
+        console.error('Post creation error:', postError);
+        // Fall back to local state if database fails
+      }
+
+      // Also call onUploadVideo callback if provided
+      if (selectedVideo && onUploadVideo) {
+        onUploadVideo(selectedVideo, newPostText);
+      }
+
+      // Add to local state
+      const newPost: Omit<BuilderVideoPostProps, 'onLike' | 'onComment' | 'onShare' | 'onViewProfile'> = {
+        id: newPostData?.id || `post-${Date.now()}`,
+        builderId: profile.id,
+        builderName: currentUserName,
+        builderAvatar: currentUserAvatar,
+        builderVerified: false,
+        videoUrl: videoUrl || videoPreview || '',
+        caption: newPostText,
+        timestamp: new Date(),
+        likes: 0,
+        shares: 0,
+        isLiked: false,
+        comments: []
+      };
+
+      setPosts([newPost, ...posts]);
+      setNewPostText('');
+      handleRemoveVideo();
+      setIsCreatingPost(false);
+
+      toast({
+        title: 'Posted!',
+        description: 'Your post has been shared successfully'
+      });
+    } catch (error: any) {
+      console.error('Error creating post:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to create post',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsPosting(false);
+    }
   };
 
   const handleLike = (postId: string) => {
@@ -448,9 +646,16 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
                 <Button 
                   className="flex-1 bg-blue-600 hover:bg-blue-700"
                   onClick={handlePost}
-                  disabled={!newPostText.trim() && !selectedVideo}
+                  disabled={isPosting || (!newPostText.trim() && !selectedVideo)}
                 >
-                  Post
+                  {isPosting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Posting...
+                    </>
+                  ) : (
+                    'Post'
+                  )}
                 </Button>
               </div>
             )}
@@ -642,7 +847,24 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
 
       {/* Posts Feed */}
       <div className="space-y-4">
-        {filteredPosts.map((post) => (
+        {loadingPosts ? (
+          <Card className="p-8">
+            <div className="flex flex-col items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-blue-600 mb-4" />
+              <p className="text-muted-foreground">Loading posts...</p>
+            </div>
+          </Card>
+        ) : filteredPosts.length === 0 ? (
+          <Card className="p-8">
+            <div className="flex flex-col items-center justify-center text-center">
+              <Video className="h-12 w-12 text-gray-400 mb-4" />
+              <h3 className="font-semibold text-lg mb-2">No posts yet</h3>
+              <p className="text-muted-foreground">
+                Be the first to share your construction projects!
+              </p>
+            </div>
+          </Card>
+        ) : filteredPosts.map((post) => (
           <div key={post.id} className="relative">
             <BuilderVideoPost
               {...post}
@@ -672,12 +894,14 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         ))}
       </div>
 
-      {/* Load More */}
-      <div className="text-center py-4">
-        <Button variant="outline" className="w-full max-w-xs rounded-full">
-          Load More Posts
-        </Button>
-      </div>
+      {/* Load More - only show if we have posts */}
+      {!loadingPosts && filteredPosts.length > 0 && (
+        <div className="text-center py-4">
+          <Button variant="outline" className="w-full max-w-xs rounded-full">
+            Load More Posts
+          </Button>
+        </div>
+      )}
     </div>
   );
 };
