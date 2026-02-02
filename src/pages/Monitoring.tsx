@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
@@ -99,6 +100,30 @@ const Monitoring = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [cameraViewSize, setCameraViewSize] = useState<'normal' | 'large' | 'fullscreen'>('normal');
+
+  // Handle body scroll lock when fullscreen
+  useEffect(() => {
+    if (isFullscreen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isFullscreen]);
+
+  // Handle ESC key to exit fullscreen
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+        setCameraViewSize('normal');
+      }
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [isFullscreen]);
 
   // Sample monitoring data
   const [cameras] = useState<CameraFeed[]>([
@@ -1160,9 +1185,12 @@ const Monitoring = () => {
                 </div>
 
                 {/* Reorganized Layout - Camera List on Top for Mobile, Side for Desktop */}
-                {/* Fullscreen Overlay */}
-                {isFullscreen && (
-                  <div className="fixed inset-0 z-[100] bg-slate-950 flex flex-col">
+                {/* Fullscreen Overlay - Rendered via Portal to body */}
+                {isFullscreen && createPortal(
+                  <div 
+                    className="fixed inset-0 bg-slate-950 flex flex-col overflow-hidden"
+                    style={{ zIndex: 99999, top: 0, left: 0, right: 0, bottom: 0, position: 'fixed' }}
+                  >
                     {/* Fullscreen Header */}
                     <div className="flex items-center justify-between p-4 border-b border-slate-700/50 bg-slate-900/90 backdrop-blur-xl">
                       <div className="flex items-center gap-3">
@@ -1307,7 +1335,8 @@ const Monitoring = () => {
                         </div>
                       )}
                     </div>
-                  </div>
+                  </div>,
+                  document.body
                 )}
                 
                 {/* Regular Layout (non-fullscreen) */}
