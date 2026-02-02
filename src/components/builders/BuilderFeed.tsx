@@ -456,25 +456,47 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
           </CardContent>
         </Card>
       ) : (
-        /* Visitor Notice - Cannot Post */
+        /* Visitor Notice - Cannot Post - Link to Registration */
         <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900 shadow-md rounded-lg border-blue-200 dark:border-gray-700">
           <CardContent className="p-4">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+              <div className="h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
                 <Users className="h-6 w-6 text-blue-600" />
               </div>
-              <div className="flex-1">
+              <div className="flex-1 text-center sm:text-left">
                 <h3 className="font-semibold text-gray-900 dark:text-white">Want to share your projects?</h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
                   Register as a builder to post videos, share updates, and connect with clients.
                 </p>
               </div>
-              <Button 
-                className="bg-blue-600 hover:bg-blue-700"
-                onClick={() => window.location.href = '/home'}
-              >
-                Register as Builder
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-2">
+                {/* For visitors not logged in - go to registration */}
+                {!currentUserId ? (
+                  <>
+                    <Button 
+                      className="bg-blue-600 hover:bg-blue-700"
+                      onClick={() => window.location.href = '/professional-builder-registration'}
+                    >
+                      Register as Builder
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                      onClick={() => window.location.href = '/professional-builder-signin'}
+                    >
+                      Already Registered? Sign In
+                    </Button>
+                  </>
+                ) : (
+                  /* Logged in but not a builder - upgrade account */
+                  <Button 
+                    className="bg-blue-600 hover:bg-blue-700"
+                    onClick={() => window.location.href = '/professional-builder-registration'}
+                  >
+                    Become a Builder
+                  </Button>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
