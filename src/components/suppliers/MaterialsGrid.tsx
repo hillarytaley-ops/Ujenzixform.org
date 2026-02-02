@@ -908,15 +908,19 @@ export const MaterialsGrid = () => {
         
         console.log(`📱 Device: ${isMobile ? 'Mobile' : 'Desktop'}`);
         
-        // ✅ MOBILE OPTIMIZED: Smaller first batch, fewer total items
-        const FIRST_BATCH = isMobile ? 12 : 40; // Mobile: 12 (fits 2 rows), Desktop: 40
-        const TOTAL_LIMIT = isMobile ? 50 : 500; // Mobile: 50 total, Desktop: 500
+        // ✅ iOS/MOBILE OPTIMIZED: Load ALL materials upfront but in smaller chunks
+        // iOS Safari has issues with background fetches, so we load everything during initial load
+        const isIOS = isIOSSafari();
+        const FIRST_BATCH = isMobile ? 24 : 40; // Mobile: 24 (fits more rows), Desktop: 40
+        const TOTAL_LIMIT = isMobile ? 200 : 500; // Mobile: 200 total (increased for better UX), Desktop: 500
         
-        // For mobile: fetch first batch only initially, rest on scroll
+        console.log(`📱 Device: ${isMobile ? 'Mobile' : 'Desktop'}, iOS: ${isIOS}`);
+        
+        // For iOS/mobile: Load all materials in one request to avoid background fetch issues
         if (isMobile) {
-          // MOBILE: Single fast fetch with images for immediate display
+          // iOS FIX: Single request with ALL data to avoid Safari's aggressive background throttling
           const mobileResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,image_url&is_approved=eq.true&order=created_at.desc&limit=${FIRST_BATCH}`,
+            `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,image_url&is_approved=eq.true&order=created_at.desc&limit=${TOTAL_LIMIT}`,
             {
               headers: {
                 'apikey': SUPABASE_ANON_KEY,
@@ -935,9 +939,9 @@ export const MaterialsGrid = () => {
               setTotalMaterialsCount(total);
               setHasMoreMaterials(total > mobileData.length);
             }
-            console.log(`📱 Mobile fast load: ${mobileData.length} materials with images`);
+            console.log(`📱 Mobile/iOS load: ${mobileData.length} materials (all at once for iOS compatibility)`);
             
-            // Process mobile data
+            // Process all mobile data at once
             const mobileMaterials = mobileData.map((item: any) => {
               const supplierPrice = supplierPrices[item.id];
               let variants: PriceVariant[] = [];
@@ -965,34 +969,10 @@ export const MaterialsGrid = () => {
             
             adminMaterials = mobileMaterials;
             
-            // Load more in background after initial render
-            setTimeout(async () => {
-              try {
-                const moreResponse = await fetch(
-                  `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants&is_approved=eq.true&order=created_at.desc&offset=${FIRST_BATCH}&limit=${TOTAL_LIMIT - FIRST_BATCH}`,
-                  { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' } }
-                );
-                if (moreResponse.ok) {
-                  const moreData = await moreResponse.json();
-                  const moreMaterials = moreData.map((item: any) => ({
-                    id: item.id, supplier_id: 'admin-catalog', name: item.name || 'Unnamed Material',
-                    category: item.category || 'Uncategorized', description: item.description || '',
-                    unit: item.unit || 'unit', unit_price: supplierPrices[item.id]?.price || item.suggested_price || 0,
-                    image_url: '', additional_images: [], in_stock: true,
-                    supplier: { company_name: 'Admin Catalog', location: 'Kenya', rating: 5.0 },
-                    pricing_type: item.pricing_type || 'single', variants: []
-                  } as Material));
-                  // Only update materials - filteredMaterials will be recomputed via useMemo
-                  setMaterials(prev => [...prev, ...moreMaterials]);
-                  console.log(`📱 Mobile background load: +${moreData.length} materials`);
-                }
-              } catch (e) { /* silent fail */ }
-            }, 1000); // Load more after 1 second
-            
-            // Skip the desktop parallel fetch
-            // Only update materials - filteredMaterials will be recomputed via useMemo
+            // Set materials immediately - no background loading for iOS
             setMaterials(mobileMaterials);
             setLoading(false);
+            console.log(`📱 Mobile/iOS: All ${mobileMaterials.length} materials loaded successfully`);
             return;
           }
         }
