@@ -22,7 +22,9 @@ import {
   Image as ImageIcon,
   Globe,
   Clock,
-  CheckCircle2
+  CheckCircle2,
+  Phone,
+  Mail
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -63,6 +65,7 @@ export interface BuilderVideoPostProps {
   onComment?: (postId: string, comment: string) => void;
   onShare?: (postId: string) => void;
   onViewProfile?: (builderId: string) => void;
+  onContactBuilder?: (builderId: string) => void;
 }
 
 export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
@@ -84,7 +87,8 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
   onLike,
   onComment,
   onShare,
-  onViewProfile
+  onViewProfile,
+  onContactBuilder
 }) => {
   const [liked, setLiked] = useState(isLiked);
   const [likeCount, setLikeCount] = useState(likes);
@@ -223,6 +227,14 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={() => onContactBuilder?.(builderId)}>
+                <Phone className="h-4 w-4 mr-2" />
+                Contact Builder
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onViewProfile?.(builderId)}>
+                <Mail className="h-4 w-4 mr-2" />
+                View Profile
+              </DropdownMenuItem>
               <DropdownMenuItem>Save video</DropdownMenuItem>
               <DropdownMenuItem>Report</DropdownMenuItem>
               <DropdownMenuItem>Hide post</DropdownMenuItem>

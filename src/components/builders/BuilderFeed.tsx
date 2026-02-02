@@ -41,7 +41,10 @@ interface BuilderFeedProps {
   currentUserId?: string;
   currentUserName?: string;
   currentUserAvatar?: string;
+  currentUserRole?: string;
+  isBuilder?: boolean; // Whether current user is a registered builder
   onUploadVideo?: (file: File, caption: string) => void;
+  onContactBuilder?: (builderId: string) => void;
 }
 
 // Sample demo posts for builders
@@ -172,8 +175,13 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   currentUserId,
   currentUserName = 'Guest',
   currentUserAvatar,
-  onUploadVideo
+  currentUserRole,
+  isBuilder = false,
+  onUploadVideo,
+  onContactBuilder
 }) => {
+  // Check if user can post (must be a registered builder)
+  const canPost = isBuilder || currentUserRole === 'professional_builder' || currentUserRole === 'builder' || currentUserRole === 'admin';
   const [posts, setPosts] = useState(DEMO_POSTS);
   const [newPostText, setNewPostText] = useState('');
   const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
@@ -318,134 +326,159 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         onCreateStory={() => setIsCreatingPost(true)}
       />
 
-      {/* Create Post Card - Facebook Style */}
-      <Card className="bg-white dark:bg-gray-900 shadow-md rounded-lg">
-        <CardContent className="p-4">
-          <div className="flex items-center gap-3 mb-3">
-            <Avatar className="h-10 w-10">
-              <AvatarImage src={currentUserAvatar} />
-              <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
-                {currentUserName.charAt(0).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <button
-              className="flex-1 text-left px-4 py-2.5 bg-gray-100 dark:bg-gray-800 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-              onClick={() => setIsCreatingPost(true)}
-            >
-              What's on your mind, {currentUserName.split(' ')[0]}?
-            </button>
-          </div>
-
-          {/* Video Preview */}
-          {videoPreview && (
-            <div className="relative mb-3 rounded-lg overflow-hidden bg-black">
-              <video 
-                src={videoPreview} 
-                className="w-full max-h-64 object-contain"
-                controls
-              />
-              <Button
-                variant="secondary"
-                size="sm"
-                className="absolute top-2 right-2 h-8 w-8 p-0 rounded-full bg-black/60 hover:bg-black/80"
-                onClick={handleRemoveVideo}
+      {/* Create Post Card - Facebook Style (Only for Builders) */}
+      {canPost ? (
+        <Card className="bg-white dark:bg-gray-900 shadow-md rounded-lg">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <Avatar className="h-10 w-10">
+                <AvatarImage src={currentUserAvatar} />
+                <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
+                  {currentUserName.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <button
+                className="flex-1 text-left px-4 py-2.5 bg-gray-100 dark:bg-gray-800 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                onClick={() => setIsCreatingPost(true)}
               >
-                <X className="h-4 w-4 text-white" />
-              </Button>
+                What's on your mind, {currentUserName.split(' ')[0]}?
+              </button>
             </div>
-          )}
 
-          {/* Expanded Post Creator */}
-          {isCreatingPost && (
-            <div className="space-y-3">
-              <Textarea
-                placeholder="Share your construction project, progress updates, or tips..."
-                value={newPostText}
-                onChange={(e) => setNewPostText(e.target.value)}
-                className="min-h-[100px] resize-none border-0 focus-visible:ring-0 text-lg"
-              />
-              
-              {/* Privacy Selector */}
-              <div className="flex items-center gap-2">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="gap-2">
-                      {privacy === 'public' ? <Globe className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
-                      {privacy === 'public' ? 'Public' : 'Friends'}
-                      <ChevronDown className="h-3 w-3" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem onClick={() => setPrivacy('public')}>
-                      <Globe className="h-4 w-4 mr-2" />
-                      Public
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setPrivacy('friends')}>
-                      <Lock className="h-4 w-4 mr-2" />
-                      Friends
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+            {/* Video Preview */}
+            {videoPreview && (
+              <div className="relative mb-3 rounded-lg overflow-hidden bg-black">
+                <video 
+                  src={videoPreview} 
+                  className="w-full max-h-64 object-contain"
+                  controls
+                />
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="absolute top-2 right-2 h-8 w-8 p-0 rounded-full bg-black/60 hover:bg-black/80"
+                  onClick={handleRemoveVideo}
+                >
+                  <X className="h-4 w-4 text-white" />
+                </Button>
               </div>
+            )}
+
+            {/* Expanded Post Creator */}
+            {isCreatingPost && (
+              <div className="space-y-3">
+                <Textarea
+                  placeholder="Share your construction project, progress updates, or tips..."
+                  value={newPostText}
+                  onChange={(e) => setNewPostText(e.target.value)}
+                  className="min-h-[100px] resize-none border-0 focus-visible:ring-0 text-lg"
+                />
+                
+                {/* Privacy Selector */}
+                <div className="flex items-center gap-2">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-2">
+                        {privacy === 'public' ? <Globe className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+                        {privacy === 'public' ? 'Public' : 'Friends'}
+                        <ChevronDown className="h-3 w-3" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuItem onClick={() => setPrivacy('public')}>
+                        <Globe className="h-4 w-4 mr-2" />
+                        Public
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setPrivacy('friends')}>
+                        <Lock className="h-4 w-4 mr-2" />
+                        Friends
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+            )}
+
+            <Separator className="my-3" />
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-around">
+              <label className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer transition-colors flex-1 justify-center">
+                <input
+                  type="file"
+                  accept="video/*"
+                  className="hidden"
+                  onChange={handleVideoSelect}
+                />
+                <FileVideo className="h-6 w-6 text-red-500" />
+                <span className="font-medium text-gray-600 dark:text-gray-400">Video</span>
+              </label>
+              
+              <label className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer transition-colors flex-1 justify-center">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                />
+                <ImageIcon className="h-6 w-6 text-green-500" />
+                <span className="font-medium text-gray-600 dark:text-gray-400">Photo</span>
+              </label>
+
+              <button className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex-1 justify-center">
+                <MapPin className="h-6 w-6 text-orange-500" />
+                <span className="font-medium text-gray-600 dark:text-gray-400">Location</span>
+              </button>
             </div>
-          )}
 
-          <Separator className="my-3" />
-
-          {/* Action Buttons */}
-          <div className="flex items-center justify-around">
-            <label className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer transition-colors flex-1 justify-center">
-              <input
-                type="file"
-                accept="video/*"
-                className="hidden"
-                onChange={handleVideoSelect}
-              />
-              <FileVideo className="h-6 w-6 text-red-500" />
-              <span className="font-medium text-gray-600 dark:text-gray-400">Video</span>
-            </label>
-            
-            <label className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer transition-colors flex-1 justify-center">
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-              />
-              <ImageIcon className="h-6 w-6 text-green-500" />
-              <span className="font-medium text-gray-600 dark:text-gray-400">Photo</span>
-            </label>
-
-            <button className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex-1 justify-center">
-              <MapPin className="h-6 w-6 text-orange-500" />
-              <span className="font-medium text-gray-600 dark:text-gray-400">Location</span>
-            </button>
-          </div>
-
-          {/* Post Button */}
-          {isCreatingPost && (
-            <div className="mt-3 flex gap-2">
+            {/* Post Button */}
+            {isCreatingPost && (
+              <div className="mt-3 flex gap-2">
+                <Button 
+                  variant="outline" 
+                  className="flex-1"
+                  onClick={() => {
+                    setIsCreatingPost(false);
+                    handleRemoveVideo();
+                    setNewPostText('');
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  className="flex-1 bg-blue-600 hover:bg-blue-700"
+                  onClick={handlePost}
+                  disabled={!newPostText.trim() && !selectedVideo}
+                >
+                  Post
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        /* Visitor Notice - Cannot Post */
+        <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900 shadow-md rounded-lg border-blue-200 dark:border-gray-700">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-4">
+              <div className="h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                <Users className="h-6 w-6 text-blue-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-900 dark:text-white">Want to share your projects?</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Register as a builder to post videos, share updates, and connect with clients.
+                </p>
+              </div>
               <Button 
-                variant="outline" 
-                className="flex-1"
-                onClick={() => {
-                  setIsCreatingPost(false);
-                  handleRemoveVideo();
-                  setNewPostText('');
-                }}
+                className="bg-blue-600 hover:bg-blue-700"
+                onClick={() => window.location.href = '/home'}
               >
-                Cancel
-              </Button>
-              <Button 
-                className="flex-1 bg-blue-600 hover:bg-blue-700"
-                onClick={handlePost}
-                disabled={!newPostText.trim() && !selectedVideo}
-              >
-                Post
+                Register as Builder
               </Button>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Feed Navigation & Filters */}
       <Card className="bg-white dark:bg-gray-900 shadow-md rounded-xl overflow-hidden">

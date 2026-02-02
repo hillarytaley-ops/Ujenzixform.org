@@ -122,16 +122,22 @@ interface BuilderFacebookLayoutProps {
   currentUserId?: string;
   currentUserName?: string;
   currentUserAvatar?: string;
+  currentUserRole?: string;
+  isBuilder?: boolean;
   onBuilderContact?: (builder: any) => void;
   onBuilderProfile?: (builder: any) => void;
+  onEditProfile?: () => void;
 }
 
 export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
   currentUserId,
   currentUserName = 'Guest',
   currentUserAvatar,
+  currentUserRole,
+  isBuilder = false,
   onBuilderContact,
-  onBuilderProfile
+  onBuilderProfile,
+  onEditProfile
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedBuilder, setExpandedBuilder] = useState<string | null>(null);
@@ -437,6 +443,12 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
           currentUserId={currentUserId}
           currentUserName={currentUserName}
           currentUserAvatar={currentUserAvatar}
+          currentUserRole={currentUserRole}
+          isBuilder={isBuilder}
+          onContactBuilder={(builderId) => {
+            const builder = allBuilders.find(b => b.id === builderId || b.user_id === builderId);
+            if (builder) onBuilderContact?.(builder);
+          }}
         />
       </div>
 

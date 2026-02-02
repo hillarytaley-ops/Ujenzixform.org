@@ -31,6 +31,8 @@ import { PDFExport } from "@/components/builders/PDFExport";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { LanguageToggle } from "@/components/ui/language-toggle";
 import { LoginPortal } from "@/components/LoginPortal";
+import { ContactBuilderDialog } from "@/components/builders/ContactBuilderDialog";
+import { BuilderProfileEdit } from "@/components/builders/BuilderProfileEdit";
 // Builder components temporarily disabled for debugging
 // import ProfessionalBuilderDashboard from "@/components/ProfessionalBuilderDashboard";
 // import PrivateBuilderDirectPurchase from "@/components/PrivateBuilderDirectPurchase";
@@ -62,7 +64,13 @@ const Builders = () => {
   const [showMap, setShowMap] = useState(false);
   const [chatBuilder, setChatBuilder] = useState<any>(null);
   const [showChat, setShowChat] = useState(false);
+  const [showContactDialog, setShowContactDialog] = useState(false);
+  const [showProfileEdit, setShowProfileEdit] = useState(false);
+  const [contactBuilder, setContactBuilder] = useState<any>(null);
   const { toast } = useToast();
+  
+  // Check if current user is a builder (can post)
+  const isBuilder = userRoleState === 'professional_builder' || userRoleState === 'builder' || userRoleState === 'admin';
 
   useEffect(() => {
     checkUserProfile();
@@ -119,6 +127,12 @@ const Builders = () => {
   const handleBuilderContact = (builder: UserProfile & { company_name?: string; phone?: string; email?: string; location?: string }) => {
     setSelectedBuilder(builder);
     setShowContactModal(true);
+  };
+
+  // New contact handler for the Facebook-style contact dialog
+  const handleContactBuilderDialog = (builder: any) => {
+    setContactBuilder(builder);
+    setShowContactDialog(true);
   };
 
   const handleBuilderProfile = (builder: UserProfile & { company_name?: string; phone?: string; email?: string; location?: string }) => {
@@ -847,8 +861,11 @@ const Builders = () => {
                 currentUserId={userProfile?.user_id}
                 currentUserName={userProfile?.full_name || 'Guest'}
                 currentUserAvatar={userProfile?.avatar_url}
-                onBuilderContact={handleBuilderContact}
+                currentUserRole={userRoleState}
+                isBuilder={isBuilder}
+                onBuilderContact={handleContactBuilderDialog}
                 onBuilderProfile={handleBuilderProfile}
+                onEditProfile={() => setShowProfileEdit(true)}
               />
             </ErrorBoundary>
           </div>
@@ -954,6 +971,46 @@ const Builders = () => {
           }}
         />
       )}
+
+      {/* Contact Builder Dialog (Facebook-style) */}
+      {contactBuilder && (
+        <ContactBuilderDialog
+          builder={{
+            id: contactBuilder.id,
+            user_id: contactBuilder.user_id || contactBuilder.id,
+            full_name: contactBuilder.full_name,
+            company_name: contactBuilder.company_name,
+            phone: contactBuilder.phone,
+            email: contactBuilder.email,
+            location: contactBuilder.location,
+            avatar_url: contactBuilder.avatar_url,
+            is_verified: contactBuilder.verified || contactBuilder.is_verified,
+            rating: contactBuilder.rating,
+            allow_calls: contactBuilder.allow_calls,
+            allow_messages: contactBuilder.allow_messages,
+            show_phone: contactBuilder.show_phone,
+            show_email: contactBuilder.show_email
+          }}
+          isOpen={showContactDialog}
+          onClose={() => {
+            setShowContactDialog(false);
+            setContactBuilder(null);
+          }}
+        />
+      )}
+
+      {/* Builder Profile Edit Dialog */}
+      <BuilderProfileEdit
+        isOpen={showProfileEdit}
+        onClose={() => setShowProfileEdit(false)}
+        onSave={() => {
+          checkUserProfile();
+          toast({
+            title: "Profile Updated",
+            description: "Your profile has been updated successfully"
+          });
+        }}
+      />
 
       <Footer />
     </div>
