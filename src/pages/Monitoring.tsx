@@ -1339,11 +1339,11 @@ const Monitoring = () => {
                   document.body
                 )}
                 
-                {/* Regular Layout (non-fullscreen) */}
+                {/* Regular Layout (non-fullscreen) - Video FIRST, then Camera List */}
                 <div className={`flex flex-col lg:flex-row gap-4 transition-all duration-300 ${isFullscreen ? 'hidden' : ''}`}>
                   
-                  {/* Main Video Feed - Primary Focus - Now order-1 on all screens */}
-                  <div className={`flex-1 order-1 transition-all duration-300 ${isSidebarCollapsed ? 'lg:w-full' : ''}`}>
+                  {/* Main Video Feed - PRIMARY - Must appear FIRST */}
+                  <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'lg:w-full' : ''}`}>
                     <Card className="bg-slate-800/60 border-slate-700/50 backdrop-blur-xl overflow-hidden h-full">
                       {/* Video Header with View Controls */}
                       <CardHeader className="p-3 border-b border-slate-700/50">
@@ -1577,8 +1577,8 @@ const Monitoring = () => {
                     </Card>
                   </div>
                   
-                  {/* Camera List - Collapsible Sidebar - Now order-2 on all screens */}
-                  <div className={`order-2 transition-all duration-300 ${
+                  {/* Camera List - Collapsible Sidebar - Appears AFTER video */}
+                  <div className={`transition-all duration-300 ${
                     isFullscreen ? 'hidden' : 
                     isSidebarCollapsed ? 'w-12 lg:w-14' : 'w-full lg:w-72 xl:w-80'
                   }`}>
