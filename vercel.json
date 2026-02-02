@@ -2,6 +2,11 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "env": {
+    "VERCEL_TOOLBAR_ENABLED": "false"
+  },
   "rewrites": [
     {
       "source": "/(.*)",
