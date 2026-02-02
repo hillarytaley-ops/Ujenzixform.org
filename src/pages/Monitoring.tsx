@@ -1160,7 +1160,158 @@ const Monitoring = () => {
                 </div>
 
                 {/* Reorganized Layout - Camera List on Top for Mobile, Side for Desktop */}
-                <div className={`flex flex-col lg:flex-row gap-4 transition-all duration-300 ${isFullscreen ? 'fixed inset-0 z-50 bg-slate-950 p-4' : ''}`}>
+                {/* Fullscreen Overlay */}
+                {isFullscreen && (
+                  <div className="fixed inset-0 z-[100] bg-slate-950 flex flex-col">
+                    {/* Fullscreen Header */}
+                    <div className="flex items-center justify-between p-4 border-b border-slate-700/50 bg-slate-900/90 backdrop-blur-xl">
+                      <div className="flex items-center gap-3">
+                        {selectedCamera && (
+                          <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                        )}
+                        <div>
+                          <h2 className="text-lg font-semibold text-white">
+                            {selectedCamera ? cameras.find(c => c.id === selectedCamera)?.name : 'Select a Camera'}
+                          </h2>
+                          <p className="text-xs text-slate-400">
+                            {selectedCamera ? cameras.find(c => c.id === selectedCamera)?.projectSite : 'Choose from the camera list'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {selectedCamera && (
+                          <>
+                            <Badge className="bg-slate-700/50 text-cyan-400 border border-cyan-500/30">
+                              {cameras.find(c => c.id === selectedCamera)?.quality}
+                            </Badge>
+                            <Badge className={`${
+                              cameras.find(c => c.id === selectedCamera)?.status === 'online' || cameras.find(c => c.id === selectedCamera)?.status === 'recording'
+                                ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                                : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                            }`}>
+                              <span className="w-2 h-2 rounded-full bg-current mr-2 animate-pulse"></span>
+                              {cameras.find(c => c.id === selectedCamera)?.status?.toUpperCase()}
+                            </Badge>
+                          </>
+                        )}
+                        <Button
+                          className="bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/40"
+                          onClick={() => {
+                            setIsFullscreen(false);
+                            setCameraViewSize('normal');
+                          }}
+                        >
+                          <Minimize2 className="h-4 w-4 mr-2" />
+                          Exit Fullscreen
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    {/* Fullscreen Video Area */}
+                    <div className="flex-1 relative bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900">
+                      {/* Grid Overlay */}
+                      <div 
+                        className="absolute inset-0 opacity-10 pointer-events-none"
+                        style={{
+                          backgroundImage: `linear-gradient(rgba(34, 211, 238, 0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(34, 211, 238, 0.2) 1px, transparent 1px)`,
+                          backgroundSize: '40px 40px',
+                        }}
+                      />
+                      
+                      {/* Corner Brackets */}
+                      <div className="absolute top-4 left-4 w-12 h-12 border-l-2 border-t-2 border-cyan-400/60"></div>
+                      <div className="absolute top-4 right-4 w-12 h-12 border-r-2 border-t-2 border-cyan-400/60"></div>
+                      <div className="absolute bottom-20 left-4 w-12 h-12 border-l-2 border-b-2 border-cyan-400/60"></div>
+                      <div className="absolute bottom-20 right-4 w-12 h-12 border-r-2 border-b-2 border-cyan-400/60"></div>
+                      
+                      {/* Center Content */}
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        {selectedCamera ? (
+                          <div className="text-center">
+                            {selectedCamera.startsWith('drone-') ? (
+                              <>
+                                <div className="relative mb-8">
+                                  <Plane className="h-32 w-32 mx-auto text-purple-400" />
+                                  <div className="absolute inset-0 h-32 w-32 mx-auto rounded-full bg-purple-500/30 blur-3xl animate-pulse"></div>
+                                </div>
+                                <p className="text-4xl font-bold bg-gradient-to-r from-purple-300 to-purple-100 bg-clip-text text-transparent mb-3">
+                                  Drone Aerial Feed
+                                </p>
+                                <p className="text-xl font-mono text-purple-300/70">
+                                  {cameras.find(c => c.id === selectedCamera)?.quality} • Live Streaming
+                                </p>
+                              </>
+                            ) : (
+                              <>
+                                <div className="relative mb-8">
+                                  <Camera className="h-32 w-32 mx-auto text-cyan-400" />
+                                  <div className="absolute inset-0 h-32 w-32 mx-auto rounded-full bg-cyan-500/30 blur-3xl animate-pulse"></div>
+                                </div>
+                                <p className="text-4xl font-bold bg-gradient-to-r from-cyan-300 to-cyan-100 bg-clip-text text-transparent mb-3">
+                                  Live Camera Feed
+                                </p>
+                                <p className="text-xl font-mono text-cyan-300/70">
+                                  {cameras.find(c => c.id === selectedCamera)?.quality} • Streaming
+                                </p>
+                              </>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-center">
+                            <Monitor className="h-32 w-32 mx-auto text-slate-600 mb-8" />
+                            <p className="text-3xl font-semibold text-slate-400 mb-3">No Camera Selected</p>
+                            <p className="text-slate-500">Select a camera to view in fullscreen</p>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Fullscreen Bottom Controls */}
+                      {selectedCamera && (
+                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-950 via-slate-950/90 to-transparent p-6">
+                          <div className="flex items-center justify-between max-w-4xl mx-auto">
+                            <div className="flex items-center gap-3">
+                              <Button size="lg" className="h-12 w-12 p-0 bg-cyan-500/20 border border-cyan-500/40 hover:bg-cyan-500/40 text-cyan-300">
+                                <Play className="h-6 w-6" />
+                              </Button>
+                              <Button size="lg" className="h-12 w-12 p-0 bg-slate-800/80 border border-slate-600/50 hover:bg-slate-700/80 text-slate-300">
+                                <Pause className="h-6 w-6" />
+                              </Button>
+                              <Button size="lg" className="h-12 w-12 p-0 bg-slate-800/80 border border-slate-600/50 hover:bg-slate-700/80 text-slate-300">
+                                <RefreshCw className="h-6 w-6" />
+                              </Button>
+                            </div>
+                            
+                            <div className="flex items-center gap-6 text-sm">
+                              <div className="flex items-center gap-2 text-slate-400">
+                                <Wifi className={`h-5 w-5 ${(cameras.find(c => c.id === selectedCamera)?.signalStrength || 0) > 70 ? 'text-green-400' : 'text-amber-400'}`} />
+                                <span>{cameras.find(c => c.id === selectedCamera)?.signalStrength}%</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-slate-400">
+                                <Eye className="h-5 w-5" />
+                                <span>{cameras.find(c => c.id === selectedCamera)?.viewers} viewers</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-slate-400">
+                                <Clock className="h-5 w-5" />
+                                <span>{cameras.find(c => c.id === selectedCamera)?.uptime}</span>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-2">
+                              {isAdmin && (
+                                <Button size="lg" className="h-12 w-12 p-0 bg-slate-800/80 border border-slate-600/50 hover:bg-slate-700/80 text-slate-300">
+                                  <Settings className="h-6 w-6" />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Regular Layout (non-fullscreen) */}
+                <div className={`flex flex-col lg:flex-row gap-4 transition-all duration-300 ${isFullscreen ? 'hidden' : ''}`}>
                   
                   {/* Main Video Feed - Primary Focus */}
                   <div className={`flex-1 order-2 lg:order-1 transition-all duration-300 ${isSidebarCollapsed ? 'lg:w-full' : ''}`}>
@@ -1238,19 +1389,6 @@ const Monitoring = () => {
                               </Button>
                             </div>
                             
-                            {/* Exit Fullscreen Button */}
-                            {isFullscreen && (
-                              <Button
-                                size="sm"
-                                className="bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/40 ml-2"
-                                onClick={() => {
-                                  setIsFullscreen(false);
-                                  setCameraViewSize('normal');
-                                }}
-                              >
-                                Exit Fullscreen
-                              </Button>
-                            )}
                           </div>
                         </div>
                       </CardHeader>
