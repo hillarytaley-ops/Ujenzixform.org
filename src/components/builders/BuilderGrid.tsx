@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { BuilderCard } from "./BuilderCard";
-import { BuilderFilters } from "./BuilderFilters";
+import { BuilderFilters as BuilderFiltersType } from "./BuilderFilters";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { CustomPagination } from "@/components/ui/custom-pagination";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -138,7 +138,7 @@ interface BuilderGridProps {
 }
 
 export const BuilderGrid = ({ onBuilderContact, onBuilderProfile, isAdmin = false }: BuilderGridProps) => {
-  const [filters, setFilters] = useState<BuilderFilters>({
+  const [filters, setFilters] = useState<BuilderFiltersType>({
     search: "",
     location: "All Counties",
     specialties: [],
@@ -230,7 +230,7 @@ export const BuilderGrid = ({ onBuilderContact, onBuilderProfile, isAdmin = fals
     });
   };
 
-  const handleFiltersChange = (newFilters: BuilderFilters) => {
+  const handleFiltersChange = (newFilters: BuilderFiltersType) => {
     setFilters(newFilters);
     setCurrentPage(1); // Reset to first page when filters change
   };
@@ -294,11 +294,6 @@ export const BuilderGrid = ({ onBuilderContact, onBuilderProfile, isAdmin = fals
           </div>
         </div>
       )}
-
-      <BuilderFilters 
-        filters={filters} 
-        onFiltersChange={handleFiltersChange} 
-      />
 
       {/* Results */}
       <div className="space-y-4">
