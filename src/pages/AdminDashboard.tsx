@@ -92,6 +92,7 @@ import { MonitoringRequestsManager } from "@/components/admin/MonitoringRequests
 import { PendingProductsManager } from "@/components/admin/PendingProductsManager";
 import { MaterialImagesManager } from "@/components/admin/MaterialImagesManager";
 import { AdminVideoApproval } from "@/components/admin/AdminVideoApproval";
+import { BuilderModerationTab } from "@/components/admin/BuilderModerationTab";
 import { UserRolesManager } from "@/components/admin/UserRolesManager";
 import { AdminMessaging } from "@/components/admin/AdminMessaging";
 import { LiveChatManager } from "@/components/admin/LiveChatManager";
@@ -2123,9 +2124,9 @@ const AdminDashboard = () => {
               </TabsTrigger>
             )}
             {shouldShowTab('videos') && (
-              <TabsTrigger value="videos" className="data-[state=active]:bg-orange-600">
-                <FileImage className="h-4 w-4 mr-2" />
-                Video Approval
+              <TabsTrigger value="builder-moderation" className="data-[state=active]:bg-indigo-600">
+                <Users className="h-4 w-4 mr-2" />
+                Builder Moderation
               </TabsTrigger>
             )}
             {shouldShowTab('delivery-analytics') && (
@@ -4281,20 +4282,20 @@ const AdminDashboard = () => {
             />
           </TabsContent>
 
-          {/* Video Approval Tab */}
-          <TabsContent value="videos" className="space-y-6">
-            <Card className="bg-gradient-to-r from-orange-900/30 to-red-900/30 border-orange-800/50">
+          {/* Builder Moderation Tab */}
+          <TabsContent value="builder-moderation" className="space-y-6">
+            <Card className="bg-gradient-to-r from-indigo-900/30 to-purple-900/30 border-indigo-800/50">
               <CardHeader>
                 <CardTitle className="text-white flex items-center gap-2">
-                  <FileImage className="h-5 w-5 text-orange-400" />
-                  Builder Video Approval
+                  <Users className="h-5 w-5 text-indigo-400" />
+                  Builder Moderation Center
                 </CardTitle>
                 <CardDescription className="text-gray-400">
-                  Review and approve builder portfolio videos before they are visible to the public
+                  Manage builder profiles, verify professionals, moderate posts, and handle reported content
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-0">
-                <AdminVideoApproval />
+                <BuilderModerationTab />
               </CardContent>
             </Card>
           </TabsContent>
