@@ -70,8 +70,8 @@ const Builders = () => {
   const { toast } = useToast();
   
   // Check if current user is a builder (can post)
-  // Valid builder roles: professional_builder, private_client (no generic 'builder' role exists)
-  const isBuilder = userRoleState === 'professional_builder' || userRoleState === 'private_client' || userRoleState === 'admin';
+  // Only professional builders can post on the Builders page (not private clients)
+  const isBuilder = userRoleState === 'professional_builder' || userRoleState === 'admin';
 
   useEffect(() => {
     checkUserProfile();
