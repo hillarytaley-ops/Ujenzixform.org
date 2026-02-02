@@ -70,8 +70,13 @@ interface BuilderProfile {
 }
 
 interface BuilderProfileEditProps {
-  isOpen: boolean;
-  onClose: () => void;
+  // Dialog mode props
+  isOpen?: boolean;
+  onClose?: () => void;
+  // Embedded mode props (for dashboard)
+  userId?: string;
+  builderCategory?: string;
+  // Common props
   onSave?: () => void;
 }
 
@@ -112,6 +117,8 @@ const PRICE_RANGES = [
 export const BuilderProfileEdit: React.FC<BuilderProfileEditProps> = ({
   isOpen,
   onClose,
+  userId,
+  builderCategory,
   onSave
 }) => {
   const [profile, setProfile] = useState<BuilderProfile | null>(null);
@@ -124,11 +131,18 @@ export const BuilderProfileEdit: React.FC<BuilderProfileEditProps> = ({
   const [newServiceArea, setNewServiceArea] = useState('');
   const { toast } = useToast();
 
+  // Determine if we're in dialog mode or embedded mode
+  const isDialogMode = isOpen !== undefined;
+  const isEmbeddedMode = !isDialogMode;
+
   useEffect(() => {
-    if (isOpen) {
+    // Load profile when dialog opens OR when in embedded mode
+    if (isDialogMode && isOpen) {
+      loadProfile();
+    } else if (isEmbeddedMode) {
       loadProfile();
     }
-  }, [isOpen]);
+  }, [isOpen, isEmbeddedMode]);
 
   const loadProfile = async () => {
     setLoading(true);
@@ -224,7 +238,7 @@ export const BuilderProfileEdit: React.FC<BuilderProfileEditProps> = ({
       });
 
       onSave?.();
-      onClose();
+      if (onClose) onClose();
     } catch (error: any) {
       console.error('Error saving profile:', error);
       toast({
@@ -358,35 +372,29 @@ export const BuilderProfileEdit: React.FC<BuilderProfileEditProps> = ({
       .slice(0, 2);
   };
 
-  if (!isOpen) return null;
+  // For dialog mode, don't render if not open
+  if (isDialogMode && !isOpen) return null;
 
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <User className="h-5 w-5" />
-            Edit Your Profile
-          </DialogTitle>
-          <DialogDescription>
-            Update your builder profile information. Only you can edit this profile.
-          </DialogDescription>
-        </DialogHeader>
-
-        {loading ? (
-          <div className="py-12 text-center">Loading profile...</div>
-        ) : !profile ? (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>Failed to load profile</AlertDescription>
-          </Alert>
-        ) : !isOwner ? (
-          <Alert variant="destructive">
-            <Lock className="h-4 w-4" />
-            <AlertDescription>You don't have permission to edit this profile</AlertDescription>
-          </Alert>
-        ) : (
-          <Tabs defaultValue="basic" className="w-full">
+  // The main form content
+  const formContent = (
+    <>
+      {loading ? (
+        <div className="py-12 text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading profile...</p>
+        </div>
+      ) : !profile ? (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>Failed to load profile. Please try again.</AlertDescription>
+        </Alert>
+      ) : !isOwner ? (
+        <Alert variant="destructive">
+          <Lock className="h-4 w-4" />
+          <AlertDescription>You don't have permission to edit this profile</AlertDescription>
+        </Alert>
+      ) : (
+        <Tabs defaultValue="basic" className="w-full">
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="basic">Basic Info</TabsTrigger>
               <TabsTrigger value="business">Business</TabsTrigger>
@@ -786,22 +794,49 @@ export const BuilderProfileEdit: React.FC<BuilderProfileEditProps> = ({
           </Tabs>
         )}
 
-        <DialogFooter className="mt-6">
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={saving || !isOwner}>
-            {saving ? 'Saving...' : (
-              <>
-                <Save className="h-4 w-4 mr-2" />
-                Save Changes
-              </>
+        {/* Save Button - shown for both modes */}
+        {profile && isOwner && (
+          <div className={`flex ${isDialogMode ? 'justify-end gap-2' : 'justify-start'} mt-6 pt-4 border-t`}>
+            {isDialogMode && onClose && (
+              <Button variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
             )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+            <Button onClick={handleSave} disabled={saving || !isOwner} size={isDialogMode ? 'default' : 'lg'}>
+              {saving ? 'Saving...' : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Changes
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+      </>
+    );
+
+  // Render based on mode
+  if (isDialogMode) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              Edit Your Profile
+            </DialogTitle>
+            <DialogDescription>
+              Update your builder profile information. Only you can edit this profile.
+            </DialogDescription>
+          </DialogHeader>
+          {formContent}
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // Embedded mode - render directly without dialog wrapper
+  return <div className="space-y-6">{formContent}</div>;
 };
 
 export default BuilderProfileEdit;
