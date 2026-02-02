@@ -73,66 +73,69 @@ export const EnhancedSearch: React.FC<EnhancedSearchProps> = ({ onSearchChange, 
 
   return (
     <div className={`space-y-4 ${className}`}>
-      {/* Main Search Bar */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-        <Input
-          placeholder="Search builders, companies, or specialties..."
-          value={filters.search}
-          onChange={(e) => updateFilters({ search: e.target.value })}
-          className="pl-10 pr-4 h-12 text-base"
-        />
-      </div>
-
-      {/* Quick Filters - Enhanced Mobile Responsive */}
-      <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
-        {/* Location Filter */}
-        <div className="flex-1 min-w-[200px]">
-          <Select value={filters.county} onValueChange={(value) => updateFilters({ county: value })}>
-            <SelectTrigger className="h-10">
-              <div className="flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-muted-foreground" />
-                <SelectValue placeholder="All Counties" />
-              </div>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Counties</SelectItem>
-              {KENYAN_COUNTIES.map(county => (
-                <SelectItem key={county} value={county}>{county}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      {/* Search and Quick Filters - All in one row on large screens */}
+      <div className="flex flex-col lg:flex-row gap-3 lg:gap-4 items-stretch">
+        {/* Main Search Bar */}
+        <div className="relative flex-1 lg:max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+          <Input
+            placeholder="Search builders, companies, or specialties..."
+            value={filters.search}
+            onChange={(e) => updateFilters({ search: e.target.value })}
+            className="pl-10 pr-4 h-10 text-base w-full"
+          />
         </div>
 
-        {/* Specialty Filter */}
-        <div className="flex-1 min-w-[200px]">
-          <Select value={filters.specialty} onValueChange={(value) => updateFilters({ specialty: value })}>
-            <SelectTrigger className="h-10">
-              <SelectValue placeholder="All Specialties" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Specialties</SelectItem>
-              {CONSTRUCTION_SPECIALTIES.map(specialty => (
-                <SelectItem key={specialty} value={specialty}>{specialty}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {/* Quick Filters - All in row with search on large screens */}
+        <div className="flex flex-row gap-2 sm:gap-3 overflow-x-auto pb-1 lg:pb-0">
+          {/* Location Filter */}
+          <div className="flex-shrink-0 w-[160px] sm:w-[180px] lg:w-[200px]">
+            <Select value={filters.county} onValueChange={(value) => updateFilters({ county: value })}>
+              <SelectTrigger className="h-10">
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <SelectValue placeholder="All Counties" />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Counties</SelectItem>
+                {KENYAN_COUNTIES.map(county => (
+                  <SelectItem key={county} value={county}>{county}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-        {/* Advanced Filters Toggle */}
-        <Button
-          variant="outline"
-          onClick={() => setShowAdvanced(!showAdvanced)}
-          className="h-10 px-3"
-        >
-          <Filter className="h-4 w-4 mr-2" />
-          Filters
-          {activeFiltersCount > 0 && (
-            <Badge variant="secondary" className="ml-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
-              {activeFiltersCount}
-            </Badge>
-          )}
-        </Button>
+          {/* Specialty Filter */}
+          <div className="flex-shrink-0 w-[160px] sm:w-[180px] lg:w-[200px]">
+            <Select value={filters.specialty} onValueChange={(value) => updateFilters({ specialty: value })}>
+              <SelectTrigger className="h-10">
+                <SelectValue placeholder="All Specialties" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Specialties</SelectItem>
+                {CONSTRUCTION_SPECIALTIES.map(specialty => (
+                  <SelectItem key={specialty} value={specialty}>{specialty}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Advanced Filters Toggle */}
+          <Button
+            variant="outline"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="h-10 px-3 flex-shrink-0"
+          >
+            <Filter className="h-4 w-4 mr-2" />
+            Filters
+            {activeFiltersCount > 0 && (
+              <Badge variant="secondary" className="ml-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
+                {activeFiltersCount}
+              </Badge>
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Advanced Filters Panel */}
