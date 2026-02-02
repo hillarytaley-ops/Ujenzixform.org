@@ -33,7 +33,13 @@ import {
   Plane,
   Truck,
   Key,
-  Lock
+  Lock,
+  ChevronLeft,
+  ChevronRight,
+  Maximize2,
+  Minimize2,
+  PanelLeftClose,
+  PanelLeft
 } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -88,6 +94,11 @@ const Monitoring = () => {
   const [accessCodeInput, setAccessCodeInput] = useState('');
   const [assignedCameras, setAssignedCameras] = useState<any[]>([]);
   const [loadingCameras, setLoadingCameras] = useState(false);
+  
+  // Camera view controls
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [cameraViewSize, setCameraViewSize] = useState<'normal' | 'large' | 'fullscreen'>('normal');
 
   // Sample monitoring data
   const [cameras] = useState<CameraFeed[]>([
@@ -981,43 +992,43 @@ const Monitoring = () => {
           {userRole !== 'supplier' && (
             <div className="bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-cyan-500/20 shadow-2xl shadow-cyan-500/5 p-6">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className={`grid w-full max-w-6xl mx-auto mb-8 bg-slate-800/60 backdrop-blur-md border border-slate-700/50 ${
+                <TabsList className={`grid w-full max-w-4xl mx-auto mb-6 bg-slate-800/60 backdrop-blur-md border border-slate-700/50 h-12 ${
                   isAdmin ? 'grid-cols-6' : isDeliveryProvider ? 'grid-cols-2' : 'grid-cols-2'
                 }`}>
               {isAdmin && (
-                <TabsTrigger value="overview" className="flex items-center gap-2">
+                <TabsTrigger value="overview" className="flex items-center gap-2 text-sm py-2">
                   <Activity className="h-4 w-4" />
-                  Overview
+                  <span className="hidden sm:inline">Overview</span>
                 </TabsTrigger>
               )}
-              <TabsTrigger value="cameras" className="flex items-center gap-2">
+              <TabsTrigger value="cameras" className="flex items-center gap-2 text-sm py-2">
                 <Video className="h-4 w-4" />
-                Live Cameras
+                <span className="hidden sm:inline">Live</span> Cameras
               </TabsTrigger>
               {/* Delivery Routes - for delivery providers and admins */}
               {(isDeliveryProvider || isAdmin) && (
-                <TabsTrigger value="routes" className="flex items-center gap-2">
+                <TabsTrigger value="routes" className="flex items-center gap-2 text-sm py-2">
                   <Truck className="h-4 w-4" />
-                  Delivery Routes
+                  <span className="hidden sm:inline">Delivery</span> Routes
                 </TabsTrigger>
               )}
               {/* Camera Access Requests - for builders */}
               {(isBuilder || isAdmin) && (
-                <TabsTrigger value="access-requests" className="flex items-center gap-2">
+                <TabsTrigger value="access-requests" className="flex items-center gap-2 text-sm py-2">
                   <Camera className="h-4 w-4" />
-                  Camera Access
+                  <span className="hidden sm:inline">Camera</span> Access
                 </TabsTrigger>
               )}
               {isAdmin && (
-                <TabsTrigger value="projects" className="flex items-center gap-2">
+                <TabsTrigger value="projects" className="flex items-center gap-2 text-sm py-2">
                   <Monitor className="h-4 w-4" />
-                  Projects
+                  <span className="hidden sm:inline">Projects</span>
                 </TabsTrigger>
               )}
               {isAdmin && (
-                <TabsTrigger value="system" className="flex items-center gap-2">
+                <TabsTrigger value="system" className="flex items-center gap-2 text-sm py-2">
                   <Server className="h-4 w-4" />
-                  System Health
+                  <span className="hidden sm:inline">System</span>
                 </TabsTrigger>
               )}
             </TabsList>
@@ -1149,23 +1160,23 @@ const Monitoring = () => {
                 </div>
 
                 {/* Reorganized Layout - Camera List on Top for Mobile, Side for Desktop */}
-                <div className="flex flex-col lg:flex-row gap-6">
+                <div className={`flex flex-col lg:flex-row gap-4 transition-all duration-300 ${isFullscreen ? 'fixed inset-0 z-50 bg-slate-950 p-4' : ''}`}>
                   
                   {/* Main Video Feed - Primary Focus */}
-                  <div className="flex-1 order-2 lg:order-1">
+                  <div className={`flex-1 order-2 lg:order-1 transition-all duration-300 ${isSidebarCollapsed ? 'lg:w-full' : ''}`}>
                     <Card className="bg-slate-800/60 border-slate-700/50 backdrop-blur-xl overflow-hidden h-full">
-                      {/* Video Header */}
-                      <CardHeader className="p-4 border-b border-slate-700/50">
-                        <div className="flex items-center justify-between flex-wrap gap-3">
+                      {/* Video Header with View Controls */}
+                      <CardHeader className="p-3 border-b border-slate-700/50">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
                           <div className="flex items-center gap-3">
                             {selectedCamera && (
                               <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
                             )}
                             <div>
-                              <CardTitle className="text-lg md:text-xl text-white">
+                              <CardTitle className="text-base md:text-lg text-white">
                                 {selectedCamera ? cameras.find(c => c.id === selectedCamera)?.name : 'Select a Camera'}
                               </CardTitle>
-                              <CardDescription className="text-sm text-slate-400">
+                              <CardDescription className="text-xs text-slate-400">
                                 {selectedCamera ? cameras.find(c => c.id === selectedCamera)?.projectSite : 'Choose from the camera list'}
                               </CardDescription>
                             </div>
@@ -1173,26 +1184,91 @@ const Monitoring = () => {
                           <div className="flex items-center gap-2">
                             {selectedCamera && (
                               <>
-                                <Badge className="bg-slate-700/50 text-cyan-400 border border-cyan-500/30">
+                                <Badge className="bg-slate-700/50 text-cyan-400 border border-cyan-500/30 text-xs">
                                   {cameras.find(c => c.id === selectedCamera)?.quality}
                                 </Badge>
-                                <Badge className={`${
+                                <Badge className={`text-xs ${
                                   cameras.find(c => c.id === selectedCamera)?.status === 'online' || cameras.find(c => c.id === selectedCamera)?.status === 'recording'
                                     ? 'bg-green-500/20 text-green-400 border border-green-500/30'
                                     : 'bg-red-500/20 text-red-400 border border-red-500/30'
                                 }`}>
-                                  <span className="w-2 h-2 rounded-full bg-current mr-2 animate-pulse"></span>
+                                  <span className="w-2 h-2 rounded-full bg-current mr-1 animate-pulse"></span>
                                   {cameras.find(c => c.id === selectedCamera)?.status?.toUpperCase()}
                                 </Badge>
                               </>
+                            )}
+                            
+                            {/* View Size Controls */}
+                            <div className="flex items-center gap-1 ml-2 border-l border-slate-600 pl-2">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className={`h-8 w-8 p-0 ${cameraViewSize === 'normal' ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-400 hover:text-white'}`}
+                                onClick={() => {
+                                  setCameraViewSize('normal');
+                                  setIsFullscreen(false);
+                                }}
+                                title="Normal View"
+                              >
+                                <Minimize2 className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className={`h-8 w-8 p-0 ${cameraViewSize === 'large' ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-400 hover:text-white'}`}
+                                onClick={() => {
+                                  setCameraViewSize('large');
+                                  setIsFullscreen(false);
+                                }}
+                                title="Large View"
+                              >
+                                <Monitor className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className={`h-8 w-8 p-0 ${isFullscreen ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-400 hover:text-white'}`}
+                                onClick={() => {
+                                  setIsFullscreen(!isFullscreen);
+                                  setCameraViewSize('fullscreen');
+                                }}
+                                title="Fullscreen"
+                              >
+                                <Maximize2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            
+                            {/* Exit Fullscreen Button */}
+                            {isFullscreen && (
+                              <Button
+                                size="sm"
+                                className="bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/40 ml-2"
+                                onClick={() => {
+                                  setIsFullscreen(false);
+                                  setCameraViewSize('normal');
+                                }}
+                              >
+                                Exit Fullscreen
+                              </Button>
                             )}
                           </div>
                         </div>
                       </CardHeader>
                       
-                      {/* Video Display Area - Clean & Large */}
+                      {/* Video Display Area - Resizable */}
                       <CardContent className="p-0">
-                        <div className="relative bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900" style={{ height: 'calc(100vh - 400px)', minHeight: '400px', maxHeight: '700px' }}>
+                        <div 
+                          className="relative bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 transition-all duration-300" 
+                          style={{ 
+                            height: isFullscreen 
+                              ? 'calc(100vh - 120px)' 
+                              : cameraViewSize === 'large' 
+                                ? 'calc(100vh - 300px)' 
+                                : 'calc(100vh - 450px)', 
+                            minHeight: isFullscreen ? '500px' : cameraViewSize === 'large' ? '500px' : '350px', 
+                            maxHeight: isFullscreen ? '100vh' : cameraViewSize === 'large' ? '900px' : '600px' 
+                          }}
+                        >
                           {/* Grid Overlay */}
                           <div 
                             className="absolute inset-0 opacity-10 pointer-events-none"
@@ -1334,64 +1410,117 @@ const Monitoring = () => {
                     </Card>
                   </div>
                   
-                  {/* Camera List - Sidebar */}
-                  <div className="w-full lg:w-80 xl:w-96 order-1 lg:order-2">
-                    <Card className="bg-slate-800/60 border-slate-700/50 backdrop-blur-xl h-full">
-                      <CardHeader className="p-4 border-b border-slate-700/50">
+                  {/* Camera List - Collapsible Sidebar */}
+                  <div className={`order-1 lg:order-2 transition-all duration-300 ${
+                    isFullscreen ? 'hidden' : 
+                    isSidebarCollapsed ? 'w-12 lg:w-14' : 'w-full lg:w-72 xl:w-80'
+                  }`}>
+                    <Card className="bg-slate-800/60 border-slate-700/50 backdrop-blur-xl h-full relative">
+                      {/* Collapse Toggle Button */}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="absolute -left-3 top-1/2 -translate-y-1/2 z-10 h-8 w-8 p-0 bg-slate-700 border border-slate-600 rounded-full hover:bg-cyan-500/30 hover:border-cyan-500/50 text-slate-300 hover:text-cyan-400 hidden lg:flex items-center justify-center shadow-lg"
+                        onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                        title={isSidebarCollapsed ? 'Expand Camera List' : 'Collapse Camera List'}
+                      >
+                        {isSidebarCollapsed ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      </Button>
+                      
+                      <CardHeader className={`border-b border-slate-700/50 transition-all duration-300 ${isSidebarCollapsed ? 'p-2' : 'p-3'}`}>
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></div>
-                            <CardTitle className="text-lg text-white">
-                              {monitoringRequest ? `${monitoringRequest.project_name} - Cameras` : 'Camera Feeds'}
-                            </CardTitle>
+                          <div className={`flex items-center gap-2 ${isSidebarCollapsed ? 'justify-center w-full' : ''}`}>
+                            <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse flex-shrink-0"></div>
+                            {!isSidebarCollapsed && (
+                              <CardTitle className="text-base text-white truncate">
+                                {monitoringRequest ? `Cameras` : 'Camera Feeds'}
+                              </CardTitle>
+                            )}
                           </div>
-                          <Badge className="bg-green-500/20 text-green-400 border border-green-500/30">
-                            {(assignedCameras.length > 0 ? assignedCameras : cameras).filter(c => c.status === 'online' || c.status === 'recording').length} Online
-                          </Badge>
+                          {!isSidebarCollapsed && (
+                            <Badge className="bg-green-500/20 text-green-400 border border-green-500/30 text-xs flex-shrink-0">
+                              {(assignedCameras.length > 0 ? assignedCameras : cameras).filter(c => c.status === 'online' || c.status === 'recording').length} Online
+                            </Badge>
+                          )}
                         </div>
-                        <CardDescription className="text-sm text-slate-400 mt-1">
-                          {monitoringRequest ? `Access Code: ${monitoringRequest.access_code}` : 'Click to view live feed'}
-                        </CardDescription>
+                        {!isSidebarCollapsed && (
+                          <CardDescription className="text-xs text-slate-400 mt-1">
+                            {monitoringRequest ? `Code: ${monitoringRequest.access_code}` : 'Click to view live feed'}
+                          </CardDescription>
+                        )}
                       </CardHeader>
-                      <CardContent className="p-4">
-                        {/* Access Code Entry for clients without URL param */}
-                        {!accessCodeFromUrl && !isAdmin && assignedCameras.length === 0 && (
-                          <div className="mb-4 p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+                      <CardContent className={`transition-all duration-300 ${isSidebarCollapsed ? 'p-2' : 'p-3'}`}>
+                        {/* Access Code Entry for clients without URL param - Hidden when collapsed */}
+                        {!isSidebarCollapsed && !accessCodeFromUrl && !isAdmin && assignedCameras.length === 0 && (
+                          <div className="mb-3 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
                             <div className="flex items-center gap-2 mb-2">
                               <Key className="h-4 w-4 text-cyan-400" />
-                              <span className="text-sm text-white font-medium">Enter Access Code</span>
+                              <span className="text-xs text-white font-medium">Enter Access Code</span>
                             </div>
                             <div className="flex gap-2">
                               <Input
-                                placeholder="Enter your access code..."
+                                placeholder="Access code..."
                                 value={accessCodeInput}
                                 onChange={(e) => setAccessCodeInput(e.target.value.toUpperCase())}
-                                className="bg-slate-900 border-slate-600 text-white font-mono"
+                                className="bg-slate-900 border-slate-600 text-white font-mono text-sm h-9"
                                 maxLength={8}
                               />
                               <Button 
                                 onClick={handleAccessCodeSubmit}
                                 disabled={loadingCameras || !accessCodeInput.trim()}
-                                className="bg-cyan-600 hover:bg-cyan-700"
+                                className="bg-cyan-600 hover:bg-cyan-700 h-9 w-9 p-0"
                               >
                                 {loadingCameras ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
                               </Button>
                             </div>
                             <p className="text-xs text-slate-500 mt-2">
-                              Enter the access code provided by UjenziXform to view your project cameras
+                              Enter the access code provided by UjenziXform
                             </p>
                           </div>
                         )}
                         
-                        <div className="space-y-3 max-h-[500px] lg:max-h-[calc(100vh-500px)] overflow-y-auto pr-2 custom-scrollbar">
+                        <div className={`space-y-2 overflow-y-auto custom-scrollbar transition-all duration-300 ${
+                          isSidebarCollapsed 
+                            ? 'max-h-[calc(100vh-300px)]' 
+                            : 'max-h-[400px] lg:max-h-[calc(100vh-450px)] pr-1'
+                        }`}>
                           {(assignedCameras.length > 0 ? assignedCameras : cameras).map((camera) => {
                             const isDrone = camera.id.startsWith('drone-');
                             const isOnline = camera.status === 'online' || camera.status === 'recording';
                             const isSelected = selectedCamera === camera.id;
+                            
+                            // Collapsed view - just icons
+                            if (isSidebarCollapsed) {
+                              return (
+                                <div
+                                  key={camera.id}
+                                  className={`p-2 rounded-lg cursor-pointer transition-all duration-300 flex items-center justify-center ${
+                                    isSelected 
+                                      ? 'bg-cyan-500/30 border border-cyan-400/60' 
+                                      : 'bg-slate-700/30 border border-slate-600/30 hover:bg-slate-700/50'
+                                  }`}
+                                  onClick={() => setSelectedCamera(camera.id)}
+                                  title={camera.name}
+                                >
+                                  <div className="relative">
+                                    {isDrone ? (
+                                      <Plane className={`h-5 w-5 ${isSelected ? 'text-purple-400' : 'text-slate-400'}`} />
+                                    ) : (
+                                      <Camera className={`h-5 w-5 ${isSelected ? 'text-cyan-400' : 'text-slate-400'}`} />
+                                    )}
+                                    <span className={`absolute -top-1 -right-1 w-2 h-2 rounded-full ${
+                                      isOnline ? 'bg-green-400 animate-pulse' : 'bg-red-400'
+                                    }`}></span>
+                                  </div>
+                                </div>
+                              );
+                            }
+                            
+                            // Expanded view - full card
                             return (
                               <div
                                 key={camera.id}
-                                className={`p-4 rounded-xl cursor-pointer transition-all duration-300 ${
+                                className={`p-3 rounded-xl cursor-pointer transition-all duration-300 ${
                                   isSelected 
                                     ? 'bg-cyan-500/20 border-2 border-cyan-400/60 shadow-lg shadow-cyan-500/20' 
                                     : 'bg-slate-700/30 border border-slate-600/30 hover:bg-slate-700/50 hover:border-slate-500/50'
@@ -1399,40 +1528,40 @@ const Monitoring = () => {
                                 onClick={() => setSelectedCamera(camera.id)}
                               >
                                 {/* Camera Header */}
-                                <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center justify-between mb-2">
                                   <div className="flex items-center gap-2">
-                                    <div className={`p-2 rounded-lg ${isDrone ? 'bg-purple-500/20' : 'bg-cyan-500/20'}`}>
+                                    <div className={`p-1.5 rounded-lg ${isDrone ? 'bg-purple-500/20' : 'bg-cyan-500/20'}`}>
                                       {isDrone ? (
                                         <Plane className="h-4 w-4 text-purple-400" />
                                       ) : (
                                         <Camera className="h-4 w-4 text-cyan-400" />
                                       )}
                                     </div>
-                                    <div>
-                                      <p className="font-medium text-sm text-white">{camera.name}</p>
-                                      <p className="text-xs text-slate-500">{camera.projectSite}</p>
+                                    <div className="min-w-0">
+                                      <p className="font-medium text-xs text-white truncate">{camera.name}</p>
+                                      <p className="text-xs text-slate-500 truncate">{camera.projectSite}</p>
                                     </div>
                                   </div>
                                 </div>
                                 
                                 {/* Status & Quality Row */}
                                 <div className="flex items-center justify-between mb-2">
-                                  <Badge className={`text-xs ${
+                                  <Badge className={`text-xs py-0 px-1.5 ${
                                     isOnline ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 
                                     camera.status === 'offline' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
                                     'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                                   }`}>
-                                    <span className={`inline-block w-2 h-2 rounded-full mr-2 ${isOnline ? 'bg-green-400 animate-pulse' : camera.status === 'offline' ? 'bg-red-400' : 'bg-amber-400'}`}></span>
+                                    <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${isOnline ? 'bg-green-400 animate-pulse' : camera.status === 'offline' ? 'bg-red-400' : 'bg-amber-400'}`}></span>
                                     {camera.status.toUpperCase()}
                                   </Badge>
-                                  <span className={`text-xs font-mono px-2 py-1 rounded ${isDrone ? 'bg-purple-500/20 text-purple-400' : 'bg-cyan-500/20 text-cyan-400'}`}>
+                                  <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${isDrone ? 'bg-purple-500/20 text-purple-400' : 'bg-cyan-500/20 text-cyan-400'}`}>
                                     {camera.quality}
                                   </span>
                                 </div>
                                 
                                 {/* Stats Row */}
                                 <div className="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-700/50">
-                                  <div className="flex items-center gap-3">
+                                  <div className="flex items-center gap-2">
                                     <span className="flex items-center gap-1">
                                       <Eye className="h-3 w-3" />
                                       {camera.viewers}
@@ -1444,7 +1573,7 @@ const Monitoring = () => {
                                   </div>
                                   {camera.isRecording && (
                                     <span className="flex items-center gap-1 text-red-400 font-medium">
-                                      <span className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></span>
+                                      <span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-pulse"></span>
                                       REC
                                     </span>
                                   )}
@@ -1452,9 +1581,9 @@ const Monitoring = () => {
                                 
                                 {/* Battery (for drones) */}
                                 {camera.batteryLevel !== undefined && (
-                                  <div className="flex items-center gap-2 mt-3 pt-2 border-t border-slate-700/50">
-                                    <Battery className={`h-4 w-4 ${camera.batteryLevel > 50 ? 'text-green-400' : camera.batteryLevel > 20 ? 'text-amber-400' : 'text-red-400'}`} />
-                                    <div className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden">
+                                  <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-700/50">
+                                    <Battery className={`h-3 w-3 ${camera.batteryLevel > 50 ? 'text-green-400' : camera.batteryLevel > 20 ? 'text-amber-400' : 'text-red-400'}`} />
+                                    <div className="flex-1 h-1.5 bg-slate-700 rounded-full overflow-hidden">
                                       <div 
                                         className={`h-full rounded-full transition-all ${camera.batteryLevel > 50 ? 'bg-green-400' : camera.batteryLevel > 20 ? 'bg-amber-400' : 'bg-red-400'}`}
                                         style={{ width: `${camera.batteryLevel}%` }}
