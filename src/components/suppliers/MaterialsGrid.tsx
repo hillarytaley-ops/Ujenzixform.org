@@ -912,7 +912,7 @@ export const MaterialsGrid = () => {
         // iOS Safari has issues with background fetches, so we load everything during initial load
         const isIOS = isIOSSafari();
         const FIRST_BATCH = isMobile ? 24 : 40; // Mobile: 24 (fits more rows), Desktop: 40
-        const TOTAL_LIMIT = isMobile ? 200 : 500; // Mobile: 200 total (increased for better UX), Desktop: 500
+        const TOTAL_LIMIT = isMobile ? 600 : 1000; // Mobile: 600 total, Desktop: 1000 - enough to load ALL products
         
         console.log(`📱 Device: ${isMobile ? 'Mobile' : 'Desktop'}, iOS: ${isIOS}`);
         
@@ -2241,9 +2241,9 @@ export const MaterialsGrid = () => {
             onClick={async () => {
               setLoadingMore(true);
               try {
-                // Fetch remaining materials
+                // Fetch remaining materials - use larger batch for faster loading
                 const currentCount = materials.length;
-                const BATCH_SIZE = 25;
+                const BATCH_SIZE = 100; // Increased from 25 for faster loading
                 let moreMaterials: any[] = [];
                 
                 for (let offset = currentCount; offset < totalMaterialsCount; offset += BATCH_SIZE) {
