@@ -5,6 +5,95 @@
 -- ============================================================
 
 -- ============================================================
+-- 0. BUILDER POSTS & STORIES TABLES (CREATE FIRST)
+-- ============================================================
+
+-- Builder Posts Table (Facebook-like posts)
+CREATE TABLE IF NOT EXISTS builder_posts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    builder_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    content TEXT,
+    video_url TEXT,
+    image_urls TEXT[],
+    thumbnail_url TEXT,
+    post_type TEXT DEFAULT 'video' CHECK (post_type IN ('video', 'image', 'text', 'project_update')),
+    project_name TEXT,
+    project_location TEXT,
+    tags TEXT[],
+    likes_count INTEGER DEFAULT 0,
+    comments_count INTEGER DEFAULT 0,
+    shares_count INTEGER DEFAULT 0,
+    views_count INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'active' CHECK (status IN ('active', 'hidden', 'deleted', 'pending_approval')),
+    privacy TEXT DEFAULT 'public' CHECK (privacy IN ('public', 'followers', 'private')),
+    is_pinned BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Builder Stories Table (ephemeral content)
+CREATE TABLE IF NOT EXISTS builder_stories (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    builder_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    media_url TEXT NOT NULL,
+    media_type TEXT DEFAULT 'image' CHECK (media_type IN ('image', 'video')),
+    caption TEXT,
+    views_count INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    expires_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '24 hours'),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Post Comments Table
+CREATE TABLE IF NOT EXISTS post_comments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    post_id UUID NOT NULL REFERENCES builder_posts(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    parent_id UUID REFERENCES post_comments(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    likes_count INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'active' CHECK (status IN ('active', 'hidden', 'deleted')),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Post Likes Table (track who liked what)
+CREATE TABLE IF NOT EXISTS post_likes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    post_id UUID NOT NULL REFERENCES builder_posts(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(post_id, user_id)
+);
+
+-- Story Views Table (track who viewed what)
+CREATE TABLE IF NOT EXISTS story_views (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    story_id UUID NOT NULL REFERENCES builder_stories(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    viewed_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(story_id, user_id)
+);
+
+-- Indexes for posts and stories
+CREATE INDEX IF NOT EXISTS idx_builder_posts_builder ON builder_posts(builder_id);
+CREATE INDEX IF NOT EXISTS idx_builder_posts_status ON builder_posts(status);
+CREATE INDEX IF NOT EXISTS idx_builder_posts_created ON builder_posts(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_builder_stories_builder ON builder_stories(builder_id);
+CREATE INDEX IF NOT EXISTS idx_builder_stories_active ON builder_stories(is_active, expires_at);
+CREATE INDEX IF NOT EXISTS idx_post_comments_post ON post_comments(post_id);
+CREATE INDEX IF NOT EXISTS idx_post_comments_user ON post_comments(user_id);
+CREATE INDEX IF NOT EXISTS idx_post_likes_post ON post_likes(post_id);
+CREATE INDEX IF NOT EXISTS idx_post_likes_user ON post_likes(user_id);
+
+-- Enable RLS on new tables
+ALTER TABLE builder_posts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE builder_stories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE post_comments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE post_likes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE story_views ENABLE ROW LEVEL SECURITY;
+
+-- ============================================================
 -- 1. BUILDER INBOX MESSAGES
 -- ============================================================
 
@@ -440,7 +529,97 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============================================================
--- 8. GRANT PERMISSIONS
+-- 8. POST LIKES & STORY VIEWS POLICIES
+-- ============================================================
+
+-- Post likes policies
+CREATE POLICY "Anyone can view post likes" ON post_likes
+    FOR SELECT USING (TRUE);
+
+CREATE POLICY "Authenticated users can like posts" ON post_likes
+    FOR INSERT WITH CHECK (auth.uid() IS NOT NULL AND user_id = auth.uid());
+
+CREATE POLICY "Users can unlike their own likes" ON post_likes
+    FOR DELETE USING (user_id = auth.uid());
+
+-- Story views policies
+CREATE POLICY "Builders can view who viewed their stories" ON story_views
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM builder_stories 
+            WHERE id = story_views.story_id 
+            AND builder_id = auth.uid()
+        ) OR user_id = auth.uid()
+    );
+
+CREATE POLICY "Authenticated users can record story views" ON story_views
+    FOR INSERT WITH CHECK (auth.uid() IS NOT NULL AND user_id = auth.uid());
+
+-- ============================================================
+-- 9. TRIGGER FUNCTIONS FOR COUNTS
+-- ============================================================
+
+-- Function to update post likes count
+CREATE OR REPLACE FUNCTION update_post_likes_count()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        UPDATE builder_posts SET likes_count = likes_count + 1 WHERE id = NEW.post_id;
+    ELSIF TG_OP = 'DELETE' THEN
+        UPDATE builder_posts SET likes_count = likes_count - 1 WHERE id = OLD.post_id;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to update post comments count
+CREATE OR REPLACE FUNCTION update_post_comments_count()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        UPDATE builder_posts SET comments_count = comments_count + 1 WHERE id = NEW.post_id;
+    ELSIF TG_OP = 'DELETE' THEN
+        UPDATE builder_posts SET comments_count = comments_count - 1 WHERE id = OLD.post_id;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to update story views count
+CREATE OR REPLACE FUNCTION update_story_views_count()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        UPDATE builder_stories SET views_count = views_count + 1 WHERE id = NEW.story_id;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Create triggers
+DROP TRIGGER IF EXISTS trigger_update_post_likes ON post_likes;
+CREATE TRIGGER trigger_update_post_likes
+    AFTER INSERT OR DELETE ON post_likes
+    FOR EACH ROW EXECUTE FUNCTION update_post_likes_count();
+
+DROP TRIGGER IF EXISTS trigger_update_post_comments ON post_comments;
+CREATE TRIGGER trigger_update_post_comments
+    AFTER INSERT OR DELETE ON post_comments
+    FOR EACH ROW EXECUTE FUNCTION update_post_comments_count();
+
+DROP TRIGGER IF EXISTS trigger_update_story_views ON story_views;
+CREATE TRIGGER trigger_update_story_views
+    AFTER INSERT ON story_views
+    FOR EACH ROW EXECUTE FUNCTION update_story_views_count();
+
+-- Auto-update timestamps for posts
+DROP TRIGGER IF EXISTS update_builder_posts_updated_at ON builder_posts;
+CREATE TRIGGER update_builder_posts_updated_at
+    BEFORE UPDATE ON builder_posts
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- ============================================================
+-- 10. GRANT PERMISSIONS
 -- ============================================================
 
 GRANT SELECT, INSERT, UPDATE ON builder_messages TO authenticated;
@@ -449,6 +628,16 @@ GRANT SELECT, INSERT, UPDATE ON builder_inquiries TO authenticated;
 GRANT SELECT, INSERT ON builder_call_logs TO authenticated;
 GRANT SELECT, INSERT ON builder_inquiries TO anon;
 GRANT INSERT ON builder_call_logs TO anon;
+
+-- Posts and stories permissions
+GRANT SELECT ON builder_posts TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON builder_posts TO authenticated;
+GRANT SELECT ON builder_stories TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON builder_stories TO authenticated;
+GRANT SELECT ON post_comments TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON post_comments TO authenticated;
+GRANT SELECT, INSERT, DELETE ON post_likes TO authenticated;
+GRANT SELECT, INSERT ON story_views TO authenticated;
 
 GRANT EXECUTE ON FUNCTION is_builder TO authenticated;
 GRANT EXECUTE ON FUNCTION get_or_create_conversation TO authenticated;
