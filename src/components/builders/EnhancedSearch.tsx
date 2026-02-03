@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { Search, MapPin, Filter, X, Star, DollarSign, Clock } from 'lucide-react';
+import { Search, MapPin, Filter, X, Star, DollarSign, Clock, Users, Sparkles } from 'lucide-react';
 import { KENYAN_COUNTIES, CONSTRUCTION_SPECIALTIES } from '@/data/kenyanBuilders';
 
 interface EnhancedSearchProps {
@@ -73,28 +73,69 @@ export const EnhancedSearch: React.FC<EnhancedSearchProps> = ({ onSearchChange, 
 
   return (
     <div className={`space-y-4 ${className}`}>
-      {/* Search and Quick Filters - All in one row on large screens */}
-      <div className="flex flex-col lg:flex-row gap-3 lg:gap-4 items-stretch">
-        {/* Main Search Bar */}
-        <div className="relative flex-1 lg:max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-          <Input
-            placeholder="Search builders, companies, or specialties..."
-            value={filters.search}
-            onChange={(e) => updateFilters({ search: e.target.value })}
-            className="pl-10 pr-4 h-10 text-base w-full"
-          />
+      {/* Hero Search Section - Prominent and Eye-Catching */}
+      <div className="bg-gradient-to-r from-primary/10 via-blue-500/10 to-cyan-500/10 rounded-2xl p-6 border border-primary/20 shadow-lg">
+        {/* Header with Icon */}
+        <div className="flex items-center justify-center gap-3 mb-4">
+          <div className="p-2 bg-primary/20 rounded-full">
+            <Users className="h-6 w-6 text-primary" />
+          </div>
+          <div className="text-center">
+            <h2 className="text-xl font-bold text-foreground">Find Your Perfect Builder</h2>
+            <p className="text-sm text-muted-foreground">Search from 100+ verified construction professionals in Kenya</p>
+          </div>
+          <div className="p-2 bg-amber-500/20 rounded-full">
+            <Sparkles className="h-5 w-5 text-amber-500" />
+          </div>
         </div>
 
-        {/* Quick Filters - All in row with search on large screens */}
-        <div className="flex flex-row gap-2 sm:gap-3 overflow-x-auto pb-1 lg:pb-0">
+        {/* MAIN SEARCH BAR - Large and Prominent */}
+        <div className="relative max-w-2xl mx-auto mb-4">
+          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+            <Search className="h-6 w-6 text-primary" />
+          </div>
+          <Input
+            placeholder="🔍 Search by name, company, specialty, or location..."
+            value={filters.search}
+            onChange={(e) => updateFilters({ search: e.target.value })}
+            className="pl-12 pr-4 h-14 text-lg w-full rounded-xl border-2 border-primary/30 focus:border-primary shadow-md bg-background/80 backdrop-blur-sm placeholder:text-muted-foreground/70"
+          />
+          {filters.search && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 hover:bg-destructive/10"
+              onClick={() => updateFilters({ search: '' })}
+            >
+              <X className="h-4 w-4 text-muted-foreground" />
+            </Button>
+          )}
+        </div>
+
+        {/* Quick Filter Chips */}
+        <div className="flex flex-wrap justify-center gap-2 mb-4">
+          <span className="text-xs text-muted-foreground mr-2">Popular:</span>
+          {['Residential', 'Commercial', 'Renovation', 'Architecture'].map((term) => (
+            <Badge
+              key={term}
+              variant="outline"
+              className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors px-3 py-1"
+              onClick={() => updateFilters({ search: term })}
+            >
+              {term}
+            </Badge>
+          ))}
+        </div>
+
+        {/* Quick Filters Row */}
+        <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
           {/* Location Filter */}
-          <div className="flex-shrink-0 w-[160px] sm:w-[180px] lg:w-[200px]">
+          <div className="w-full sm:w-[200px]">
             <Select value={filters.county} onValueChange={(value) => updateFilters({ county: value })}>
-              <SelectTrigger className="h-10">
+              <SelectTrigger className="h-11 bg-background/80 border-primary/20">
                 <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  <SelectValue placeholder="All Counties" />
+                  <MapPin className="h-4 w-4 text-primary flex-shrink-0" />
+                  <SelectValue placeholder="📍 All Counties" />
                 </div>
               </SelectTrigger>
               <SelectContent>
@@ -107,10 +148,10 @@ export const EnhancedSearch: React.FC<EnhancedSearchProps> = ({ onSearchChange, 
           </div>
 
           {/* Specialty Filter */}
-          <div className="flex-shrink-0 w-[160px] sm:w-[180px] lg:w-[200px]">
+          <div className="w-full sm:w-[200px]">
             <Select value={filters.specialty} onValueChange={(value) => updateFilters({ specialty: value })}>
-              <SelectTrigger className="h-10">
-                <SelectValue placeholder="All Specialties" />
+              <SelectTrigger className="h-11 bg-background/80 border-primary/20">
+                <SelectValue placeholder="🏗️ All Specialties" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Specialties</SelectItem>
@@ -123,14 +164,14 @@ export const EnhancedSearch: React.FC<EnhancedSearchProps> = ({ onSearchChange, 
 
           {/* Advanced Filters Toggle */}
           <Button
-            variant="outline"
+            variant={showAdvanced ? "default" : "outline"}
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className="h-10 px-3 flex-shrink-0"
+            className="h-11 px-4 w-full sm:w-auto"
           >
             <Filter className="h-4 w-4 mr-2" />
-            Filters
+            More Filters
             {activeFiltersCount > 0 && (
-              <Badge variant="secondary" className="ml-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
+              <Badge variant="secondary" className="ml-2 h-5 min-w-5 rounded-full p-0 flex items-center justify-center text-xs bg-primary text-primary-foreground">
                 {activeFiltersCount}
               </Badge>
             )}
