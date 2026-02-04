@@ -276,15 +276,17 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
   }, [supplierId]);
 
   // Load admin-uploaded products from admin_material_images table
+  // NOTE: Only select needed fields, NOT image_url (too large, causes 500 errors)
   const loadAdminProducts = async () => {
     try {
       setLoading(true);
       
       const { data, error } = await (supabase
         .from('admin_material_images' as any)
-        .select('*')
+        .select('id,name,category,description,unit,suggested_price,pricing_type,variants')
         .eq('is_approved', true)
-        .order('created_at', { ascending: false }));
+        .order('created_at', { ascending: false })
+        .limit(500));
       
       if (error) {
         console.log('Admin products table not available, using demo data');
