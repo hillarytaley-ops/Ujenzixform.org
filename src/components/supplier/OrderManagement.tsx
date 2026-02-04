@@ -100,96 +100,85 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
     try {
       setLoading(true);
       
-      // Mock data for demonstration
-      const mockOrders: Order[] = [
-        {
-          id: '1',
-          order_number: 'ORD-2024-001',
-          customer_name: 'John Kamau',
-          customer_email: 'john.kamau@email.com',
-          customer_phone: '+254 712 345 678',
-          delivery_address: 'Westlands, Nairobi',
-          items: [
-            { name: 'Cement (50kg)', quantity: 100, price: 750 },
-            { name: 'Steel Bars 12mm', quantity: 50, price: 1200 }
-          ],
-          total_amount: 135000,
-          status: 'pending',
-          payment_status: 'paid',
-          notes: 'Deliver before 10am',
-          created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '2',
-          order_number: 'ORD-2024-002',
-          customer_name: 'Mary Wanjiku',
-          customer_email: 'mary.w@email.com',
-          customer_phone: '+254 723 456 789',
-          delivery_address: 'Karen, Nairobi',
-          items: [
-            { name: 'Roofing Sheets', quantity: 30, price: 1500 },
-            { name: 'Timber 2x4', quantity: 100, price: 350 }
-          ],
-          total_amount: 80000,
-          status: 'processing',
-          payment_status: 'paid',
-          created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '3',
-          order_number: 'ORD-2024-003',
-          customer_name: 'Peter Ochieng',
-          customer_email: 'peter.o@email.com',
-          customer_phone: '+254 734 567 890',
-          delivery_address: 'Kilimani, Nairobi',
-          items: [
-            { name: 'River Sand (ton)', quantity: 5, price: 3500 },
-            { name: 'Ballast (ton)', quantity: 5, price: 4000 }
-          ],
-          total_amount: 37500,
-          status: 'shipped',
-          payment_status: 'paid',
-          created_at: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '4',
-          order_number: 'ORD-2024-004',
-          customer_name: 'Grace Muthoni',
-          customer_email: 'grace.m@email.com',
-          customer_phone: '+254 745 678 901',
-          delivery_address: 'Lavington, Nairobi',
-          items: [
-            { name: 'Building Blocks', quantity: 500, price: 45 }
-          ],
-          total_amount: 22500,
-          status: 'delivered',
-          payment_status: 'paid',
-          created_at: new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString(),
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '5',
-          order_number: 'ORD-2024-005',
-          customer_name: 'David Njoroge',
-          customer_email: 'david.n@email.com',
-          customer_phone: '+254 756 789 012',
-          delivery_address: 'South B, Nairobi',
-          items: [
-            { name: 'Cement (50kg)', quantity: 50, price: 750 }
-          ],
-          total_amount: 37500,
-          status: 'pending',
-          payment_status: 'pending',
-          notes: 'Payment on delivery',
-          created_at: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
-          updated_at: new Date().toISOString()
-        }
-      ];
+      // Get current user and their supplier record
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.log('No user authenticated');
+        setOrders([]);
+        return;
+      }
 
-      setOrders(mockOrders);
+      // Get supplier record for the user
+      const { data: supplierData } = await supabase
+        .from('suppliers')
+        .select('id, user_id')
+        .or(`user_id.eq.${user.id},id.eq.${supplierId}`)
+        .single();
+
+      const supplierIds = [user.id, supplierId];
+      if (supplierData?.id) supplierIds.push(supplierData.id);
+      if (supplierData?.user_id) supplierIds.push(supplierData.user_id);
+
+      // Fetch real orders from purchase_orders table
+      const { data: purchaseOrders, error: ordersError } = await supabase
+        .from('purchase_orders')
+        .select('*')
+        .or(supplierIds.map(id => `supplier_id.eq.${id}`).join(','))
+        .order('created_at', { ascending: false });
+
+      if (ordersError) {
+        console.error('Error fetching orders:', ordersError);
+        throw ordersError;
+      }
+
+      console.log('📦 Real orders loaded:', purchaseOrders?.length || 0);
+
+      // Also fetch buyer profiles to get customer names
+      const buyerIds = [...new Set(purchaseOrders?.map(po => po.buyer_id).filter(Boolean) || [])];
+      let buyerProfiles: Record<string, any> = {};
+      
+      if (buyerIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name, phone, email')
+          .in('id', buyerIds);
+        
+        if (profiles) {
+          buyerProfiles = Object.fromEntries(profiles.map(p => [p.id, p]));
+        }
+      }
+
+      // Transform purchase_orders to Order format
+      const realOrders: Order[] = (purchaseOrders || []).map((po, index) => {
+        const buyer = buyerProfiles[po.buyer_id] || {};
+        const items = Array.isArray(po.items) ? po.items : [];
+        
+        return {
+          id: po.id,
+          order_number: po.po_number || `ORD-${String(index + 1).padStart(4, '0')}`,
+          customer_name: buyer.full_name || po.project_name || 'Customer',
+          customer_email: buyer.email || '',
+          customer_phone: buyer.phone || '',
+          delivery_address: po.delivery_address || '',
+          items: items.map((item: any) => ({
+            name: item.material_name || item.name || 'Item',
+            quantity: item.quantity || 1,
+            price: item.unit_price || item.price || 0
+          })),
+          total_amount: po.total_amount || 0,
+          status: (po.status || 'pending') as Order['status'],
+          payment_status: 'paid' as const, // Default to paid for now
+          notes: po.special_instructions || po.delivery_notes || '',
+          created_at: po.created_at,
+          updated_at: po.updated_at || po.created_at
+        };
+      });
+
+      if (realOrders.length === 0) {
+        console.log('No real orders found, showing empty state');
+      }
+
+      setOrders(realOrders);
     } catch (error) {
       console.error('Error loading orders:', error);
       toast({
@@ -197,6 +186,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
         description: 'Failed to load orders',
         variant: 'destructive'
       });
+      setOrders([]);
     } finally {
       setLoading(false);
     }
@@ -205,6 +195,21 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
   const updateOrderStatus = async (orderId: string, newStatus: Order['status']) => {
     setIsUpdating(true);
     try {
+      // Update in database
+      const { error } = await supabase
+        .from('purchase_orders')
+        .update({ 
+          status: newStatus, 
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', orderId);
+
+      if (error) {
+        console.error('Error updating order status:', error);
+        throw error;
+      }
+
+      // Update local state
       setOrders(prev => prev.map(order => 
         order.id === orderId 
           ? { ...order, status: newStatus, updated_at: new Date().toISOString() }
