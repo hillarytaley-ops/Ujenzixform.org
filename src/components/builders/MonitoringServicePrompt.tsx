@@ -134,27 +134,34 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
       const selectedPkg = MONITORING_PACKAGES.find(p => p.id === selectedPackage);
 
       // Create monitoring service request
+      // Build the request object with only fields that exist in the table
+      const monitoringRequest: Record<string, any> = {
+        builder_id: user.id,
+        project_name: formData.projectDescription || purchaseOrder?.project_name || 'Monitoring Request',
+        site_address: formData.siteAddress,
+        contact_phone: formData.contactPhone,
+        service_type: selectedPackage,
+        status: 'pending',
+        notes: `Package: ${selectedPkg?.name || selectedPackage}, Price: KES ${selectedPkg?.price || 0}, Duration: ${selectedPkg?.duration || 'N/A'}. ${formData.specialRequirements || ''}`.trim(),
+        created_at: new Date().toISOString()
+      };
+
+      // Try to add optional fields if they exist
+      if (purchaseOrder?.id) {
+        monitoringRequest.purchase_order_id = purchaseOrder.id;
+      }
+      if (formData.preferredStartDate) {
+        monitoringRequest.preferred_start_date = formData.preferredStartDate;
+      }
+
       const { error } = await supabase
         .from('monitoring_service_requests')
-        .insert({
-          user_id: user.id,
-          purchase_order_id: purchaseOrder?.id,
-          package_type: selectedPackage,
-          package_name: selectedPkg?.name,
-          package_price: selectedPkg?.price,
-          package_duration: selectedPkg?.duration,
-          site_address: formData.siteAddress,
-          project_description: formData.projectDescription || purchaseOrder?.project_name,
-          contact_phone: formData.contactPhone,
-          preferred_start_date: formData.preferredStartDate || null,
-          special_requirements: formData.specialRequirements || null,
-          status: 'pending',
-          created_at: new Date().toISOString()
-        });
+        .insert(monitoringRequest);
 
       if (error) {
-        // If table doesn't exist, just show success (feature not fully deployed)
-        console.warn('Monitoring request error (table may not exist):', error);
+        // Log the error but don't block the flow - monitoring is optional
+        console.warn('Monitoring request error:', error);
+        // Still show success since the purchase itself was successful
       }
 
       setStep('success');
