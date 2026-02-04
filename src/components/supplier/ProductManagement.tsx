@@ -270,13 +270,61 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
   const [uploadingImage, setUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Cache for loaded images
+  const [productImages, setProductImages] = useState<Record<string, string>>({});
+  const [loadingImages, setLoadingImages] = useState<Set<string>>(new Set());
+
   useEffect(() => {
     loadAdminProducts();
     loadSupplierPrices();
   }, [supplierId]);
 
+  // Load images for visible products (called when products are displayed)
+  const loadImagesForProducts = async (productIds: string[]) => {
+    // Filter out already loaded or currently loading images
+    const idsToLoad = productIds.filter(id => !productImages[id] && !loadingImages.has(id));
+    if (idsToLoad.length === 0) return;
+
+    // Mark as loading
+    setLoadingImages(prev => {
+      const next = new Set(prev);
+      idsToLoad.forEach(id => next.add(id));
+      return next;
+    });
+
+    try {
+      // Load images in batches of 20 for speed
+      const BATCH_SIZE = 20;
+      for (let i = 0; i < idsToLoad.length; i += BATCH_SIZE) {
+        const batch = idsToLoad.slice(i, i + BATCH_SIZE);
+        const { data, error } = await (supabase
+          .from('admin_material_images' as any)
+          .select('id,image_url')
+          .in('id', batch));
+
+        if (!error && data) {
+          const imageMap: Record<string, string> = {};
+          data.forEach((item: any) => {
+            if (item.image_url) {
+              imageMap[item.id] = item.image_url;
+            }
+          });
+          setProductImages(prev => ({ ...prev, ...imageMap }));
+        }
+      }
+    } catch (error) {
+      console.error('Error loading product images:', error);
+    } finally {
+      setLoadingImages(prev => {
+        const next = new Set(prev);
+        idsToLoad.forEach(id => next.delete(id));
+        return next;
+      });
+    }
+  };
+
   // Load admin-uploaded products from admin_material_images table
-  // NOTE: Only select needed fields, NOT image_url (too large, causes 500 errors)
+  // NOTE: Only select needed fields, NOT image_url (loaded separately for speed)
   const loadAdminProducts = async () => {
     try {
       setLoading(true);
@@ -300,6 +348,11 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
         ]);
       } else {
         setAdminProducts(data || []);
+        // Load images for first batch of products immediately
+        if (data && data.length > 0) {
+          const firstBatchIds = data.slice(0, 20).map((p: any) => p.id);
+          loadImagesForProducts(firstBatchIds);
+        }
       }
     } catch (error) {
       console.error('Error loading admin products:', error);
@@ -880,27 +933,43 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {adminProducts
-            .filter(p => {
+          {(() => {
+            const filtered = adminProducts.filter(p => {
               const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
               const matchesCategory = categoryFilter === 'all' || p.category === categoryFilter;
               return matchesSearch && matchesCategory;
-            })
-            .map((product) => {
+            });
+            
+            // Load images for visible products (first 30)
+            const visibleIds = filtered.slice(0, 30).map(p => p.id);
+            if (visibleIds.some(id => !productImages[id] && !loadingImages.has(id))) {
+              // Trigger image loading (will be batched)
+              setTimeout(() => loadImagesForProducts(visibleIds), 100);
+            }
+            
+            return filtered.map((product) => {
               const supplierPrice = supplierPrices[product.id];
               const hasSetPrice = supplierPrice !== undefined;
+              // Get image from cache or product
+              const imageUrl = productImages[product.id] || product.image_url;
+              const isImageLoading = loadingImages.has(product.id);
               
               return (
                 <Card key={product.id} className={`${cardBg} hover:shadow-md`}>
                   <CardContent className="p-4">
                     {/* Product Image */}
                     <div className="relative w-full h-32 mb-3 rounded-md overflow-hidden bg-gray-100">
-                      {product.image_url ? (
+                      {imageUrl ? (
                         <img 
-                          src={product.image_url} 
+                          src={imageUrl} 
                           alt={product.name}
                           className="w-full h-full object-contain"
+                          loading="lazy"
                         />
+                      ) : isImageLoading ? (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Loader2 className="h-8 w-8 animate-spin text-orange-400" />
+                        </div>
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
                           <Package className="h-10 w-10 text-gray-400" />
@@ -957,7 +1026,8 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
                   </CardContent>
                 </Card>
               );
-            })}
+            });
+          })()}
         </div>
       )}
 
@@ -979,9 +1049,9 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
             <div className="grid gap-4 py-4">
               {/* Product Preview */}
               <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                {pricingProduct.image_url ? (
+                {(productImages[pricingProduct.id] || pricingProduct.image_url) ? (
                   <img 
-                    src={pricingProduct.image_url} 
+                    src={productImages[pricingProduct.id] || pricingProduct.image_url} 
                     alt={pricingProduct.name}
                     className="w-16 h-16 object-contain rounded"
                   />
