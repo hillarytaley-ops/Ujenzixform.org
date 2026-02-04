@@ -85,6 +85,25 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
     setLoading(true);
     console.log('🔍 Fetching price comparisons for', items.length, 'items');
     
+    // Set a timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      console.warn('⏱️ Price comparison timed out after 10s');
+      setLoading(false);
+      // Show items without comparisons if timeout
+      setComparisons(items.map(item => ({
+        product_id: item.id,
+        product_name: item.name,
+        category: item.category,
+        quantity: item.quantity,
+        current_price: item.unit_price,
+        current_supplier: item.supplier_name || 'Current Supplier',
+        alternatives: [],
+        best_price: item.unit_price,
+        best_supplier: item.supplier_name || 'Current',
+        savings: 0
+      })));
+    }, 10000); // 10 second timeout
+    
     try {
       // 1. Fetch all suppliers
       const { data: suppliersData, error: suppliersError } = await supabase
@@ -153,9 +172,11 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
         };
       });
 
+      clearTimeout(timeoutId);
       console.log('✅ Comparison results:', comparisonResults);
       setComparisons(comparisonResults);
     } catch (error: any) {
+      clearTimeout(timeoutId);
       console.error('❌ Error fetching prices:', error);
       
       // Check if it's an offline/CORS error
