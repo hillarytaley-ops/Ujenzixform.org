@@ -15,7 +15,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { QrCode, Package, Download, DownloadCloud, Maximize2, Truck, Clock, CheckCircle, RefreshCw, User, Mail, Phone, AlertCircle, ShieldCheck, ShieldX, Printer } from 'lucide-react';
+import { QrCode, Package, Download, DownloadCloud, Maximize2, Truck, Clock, CheckCircle, RefreshCw, User, Mail, Phone, AlertCircle, ShieldCheck, ShieldX, Printer, CheckSquare, Square } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import QRCodeLib from 'qrcode';
@@ -64,7 +65,50 @@ export const EnhancedQRCodeManager: React.FC = () => {
   const [selectedItem, setSelectedItem] = useState<MaterialItem | null>(null);
   const [showQRDialog, setShowQRDialog] = useState(false);
   const [viewMode, setViewMode] = useState<'all' | 'by-client'>('by-client');
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [selectionMode, setSelectionMode] = useState(false);
   const { toast } = useToast();
+
+  // Toggle item selection
+  const toggleItemSelection = (itemId: string) => {
+    setSelectedItems(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(itemId)) {
+        newSet.delete(itemId);
+      } else {
+        newSet.add(itemId);
+      }
+      return newSet;
+    });
+  };
+
+  // Select all items for a client
+  const selectAllClientItems = (clientGroup: ClientGroup) => {
+    setSelectedItems(prev => {
+      const newSet = new Set(prev);
+      clientGroup.items.forEach(item => newSet.add(item.id));
+      return newSet;
+    });
+  };
+
+  // Deselect all items for a client
+  const deselectAllClientItems = (clientGroup: ClientGroup) => {
+    setSelectedItems(prev => {
+      const newSet = new Set(prev);
+      clientGroup.items.forEach(item => newSet.delete(item.id));
+      return newSet;
+    });
+  };
+
+  // Check if all client items are selected
+  const areAllClientItemsSelected = (clientGroup: ClientGroup) => {
+    return clientGroup.items.every(item => selectedItems.has(item.id));
+  };
+
+  // Get selected items count for a client
+  const getSelectedCountForClient = (clientGroup: ClientGroup) => {
+    return clientGroup.items.filter(item => selectedItems.has(item.id)).length;
+  };
 
   useEffect(() => {
     checkAuthAndFetch();
@@ -332,26 +376,101 @@ export const EnhancedQRCodeManager: React.FC = () => {
     }
   };
 
-  // Download all QR codes for a specific client
-  const downloadClientQRCodes = async (clientGroup: ClientGroup) => {
+  // Download selected QR codes only
+  const downloadSelectedQRCodes = async () => {
+    const selectedItemsList = items.filter(item => selectedItems.has(item.id));
+    if (selectedItemsList.length === 0) {
+      toast({
+        title: "No items selected",
+        description: "Please select QR codes to download",
+        variant: "destructive",
+      });
+      return;
+    }
+
     toast({
-      title: "Downloading Client QR Codes",
-      description: `Generating ${clientGroup.total_items} QR codes for ${clientGroup.buyer_name}...`,
+      title: "Downloading Selected QR Codes",
+      description: `Generating ${selectedItemsList.length} QR codes...`,
     });
 
-    for (let i = 0; i < clientGroup.items.length; i++) {
-      const item = clientGroup.items[i];
+    for (let i = 0; i < selectedItemsList.length; i++) {
+      const item = selectedItemsList[i];
+      setTimeout(() => {
+        downloadQRCode(item.qr_code, item.material_type, item.item_sequence);
+      }, i * 300);
+    }
+  };
+
+  // Download all QR codes for a specific client
+  const downloadClientQRCodes = async (clientGroup: ClientGroup, selectedOnly: boolean = false) => {
+    const itemsToDownload = selectedOnly 
+      ? clientGroup.items.filter(item => selectedItems.has(item.id))
+      : clientGroup.items;
+
+    if (itemsToDownload.length === 0) {
+      toast({
+        title: "No items to download",
+        description: selectedOnly ? "Please select QR codes to download" : "No items found",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({
+      title: "Downloading Client QR Codes",
+      description: `Generating ${itemsToDownload.length} QR codes for ${clientGroup.buyer_name}...`,
+    });
+
+    for (let i = 0; i < itemsToDownload.length; i++) {
+      const item = itemsToDownload[i];
       setTimeout(() => {
         downloadQRCode(item.qr_code, item.material_type, item.item_sequence);
       }, i * 300); // Stagger downloads
     }
   };
 
+  // Print selected QR codes only
+  const printSelectedQRCodes = async () => {
+    const selectedItemsList = items.filter(item => selectedItems.has(item.id));
+    if (selectedItemsList.length === 0) {
+      toast({
+        title: "No items selected",
+        description: "Please select QR codes to print",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    await printItemsList(selectedItemsList, "Selected QR Codes", `${selectedItemsList.length} selected items`);
+  };
+
   // Print QR codes for a specific client
-  const printClientQRCodes = async (clientGroup: ClientGroup) => {
+  const printClientQRCodes = async (clientGroup: ClientGroup, selectedOnly: boolean = false) => {
+    const itemsToPrint = selectedOnly 
+      ? clientGroup.items.filter(item => selectedItems.has(item.id))
+      : clientGroup.items;
+
+    if (itemsToPrint.length === 0) {
+      toast({
+        title: "No items to print",
+        description: selectedOnly ? "Please select QR codes to print" : "No items found",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    await printItemsList(
+      itemsToPrint, 
+      `QR Codes for ${clientGroup.buyer_name}`,
+      `${clientGroup.buyer_email || ''} ${clientGroup.buyer_phone ? '• ' + clientGroup.buyer_phone : ''}`
+    );
+  };
+
+  // Generic print function for a list of items
+  const printItemsList = async (itemsToPrint: MaterialItem[], title: string, subtitle: string) => {
     toast({
       title: "Preparing Print",
-      description: `Generating ${clientGroup.total_items} QR codes for printing...`,
+      description: `Generating ${itemsToPrint.length} QR codes for printing...`,
     });
 
     // Create a new window for printing
@@ -366,7 +485,7 @@ export const EnhancedQRCodeManager: React.FC = () => {
     }
 
     // Generate QR codes as data URLs
-    const qrPromises = clientGroup.items.map(async (item) => {
+    const qrPromises = itemsToPrint.map(async (item) => {
       const qrDataUrl = await QRCodeLib.toDataURL(item.qr_code, {
         width: 200,
         margin: 2,
@@ -382,7 +501,7 @@ export const EnhancedQRCodeManager: React.FC = () => {
       <!DOCTYPE html>
       <html>
       <head>
-        <title>QR Codes - ${clientGroup.buyer_name}</title>
+        <title>${title}</title>
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body { font-family: Arial, sans-serif; padding: 20px; }
@@ -403,9 +522,9 @@ export const EnhancedQRCodeManager: React.FC = () => {
       </head>
       <body>
         <div class="header">
-          <h1>QR Codes for ${clientGroup.buyer_name}</h1>
-          <p>${clientGroup.buyer_email || ''} ${clientGroup.buyer_phone ? '• ' + clientGroup.buyer_phone : ''}</p>
-          <p>Total Items: ${clientGroup.total_items} | Generated: ${new Date().toLocaleDateString()}</p>
+          <h1>${title}</h1>
+          <p>${subtitle}</p>
+          <p>Total Items: ${itemsToPrint.length} | Generated: ${new Date().toLocaleDateString()}</p>
         </div>
         <div class="qr-grid">
           ${qrResults.map(({ item, qrDataUrl }) => `
@@ -567,7 +686,21 @@ export const EnhancedQRCodeManager: React.FC = () => {
             {items.length} unique QR codes • {clientGroups.length} clients
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap items-center">
+          {/* Selection Mode Toggle */}
+          <Button 
+            variant={selectionMode ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => {
+              setSelectionMode(!selectionMode);
+              if (selectionMode) setSelectedItems(new Set());
+            }}
+            className={selectionMode ? 'bg-orange-500 hover:bg-orange-600' : ''}
+          >
+            {selectionMode ? <CheckSquare className="h-4 w-4 mr-1" /> : <Square className="h-4 w-4 mr-1" />}
+            {selectionMode ? `Selected (${selectedItems.size})` : 'Select'}
+          </Button>
+
           {/* View Mode Toggle */}
           <div className="flex rounded-lg border overflow-hidden">
             <Button 
@@ -589,7 +722,23 @@ export const EnhancedQRCodeManager: React.FC = () => {
               All QR Codes
             </Button>
           </div>
-          {items.length > 0 && (
+
+          {/* Selection Actions */}
+          {selectionMode && selectedItems.size > 0 && (
+            <>
+              <Button onClick={printSelectedQRCodes} size="sm" variant="outline" className="border-green-300 text-green-700 hover:bg-green-50">
+                <Printer className="h-4 w-4 mr-2" />
+                Print Selected ({selectedItems.size})
+              </Button>
+              <Button onClick={downloadSelectedQRCodes} size="sm" className="bg-green-600 hover:bg-green-700">
+                <DownloadCloud className="h-4 w-4 mr-2" />
+                Download Selected ({selectedItems.size})
+              </Button>
+            </>
+          )}
+
+          {/* All Actions */}
+          {items.length > 0 && !selectionMode && (
             <>
               <Button onClick={printAllQRCodes} size="sm" variant="outline" className="border-cyan-300 text-cyan-700 hover:bg-cyan-50">
                 <Printer className="h-4 w-4 mr-2" />
@@ -677,7 +826,33 @@ export const EnhancedQRCodeManager: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {selectionMode && (
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        className="border-orange-300 text-orange-700 hover:bg-orange-50"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (areAllClientItemsSelected(group)) {
+                            deselectAllClientItems(group);
+                          } else {
+                            selectAllClientItems(group);
+                          }
+                        }}
+                      >
+                        {areAllClientItemsSelected(group) ? (
+                          <><CheckSquare className="h-4 w-4 mr-1" /> Deselect All</>
+                        ) : (
+                          <><Square className="h-4 w-4 mr-1" /> Select All ({group.total_items})</>
+                        )}
+                      </Button>
+                    )}
+                    {selectionMode && getSelectedCountForClient(group) > 0 && (
+                      <Badge className="bg-orange-500">
+                        {getSelectedCountForClient(group)} selected
+                      </Badge>
+                    )}
                     <Badge variant="outline" className="bg-yellow-50 text-yellow-700">
                       {group.pending_items} pending
                     </Badge>
@@ -690,30 +865,61 @@ export const EnhancedQRCodeManager: React.FC = () => {
                     <Badge className="bg-cyan-600">
                       {group.total_items} items
                     </Badge>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      className="ml-2 border-green-300 text-green-700 hover:bg-green-50"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        printClientQRCodes(group);
-                      }}
-                    >
-                      <Printer className="h-4 w-4 mr-1" />
-                      Print
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      className="border-cyan-300 text-cyan-700 hover:bg-cyan-50"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        downloadClientQRCodes(group);
-                      }}
-                    >
-                      <DownloadCloud className="h-4 w-4 mr-1" />
-                      Download
-                    </Button>
+                    {selectionMode && getSelectedCountForClient(group) > 0 ? (
+                      <>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          className="ml-2 border-green-300 text-green-700 hover:bg-green-50"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            printClientQRCodes(group, true);
+                          }}
+                        >
+                          <Printer className="h-4 w-4 mr-1" />
+                          Print Selected
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          className="border-cyan-300 text-cyan-700 hover:bg-cyan-50"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            downloadClientQRCodes(group, true);
+                          }}
+                        >
+                          <DownloadCloud className="h-4 w-4 mr-1" />
+                          Download Selected
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          className="ml-2 border-green-300 text-green-700 hover:bg-green-50"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            printClientQRCodes(group);
+                          }}
+                        >
+                          <Printer className="h-4 w-4 mr-1" />
+                          Print All
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          className="border-cyan-300 text-cyan-700 hover:bg-cyan-50"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            downloadClientQRCodes(group);
+                          }}
+                        >
+                          <DownloadCloud className="h-4 w-4 mr-1" />
+                          Download All
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
               </AccordionTrigger>
@@ -731,6 +937,9 @@ export const EnhancedQRCodeManager: React.FC = () => {
                         setShowQRDialog(true);
                       }}
                       showClientInfo={false}
+                      selectionMode={selectionMode}
+                      isSelected={selectedItems.has(item.id)}
+                      onToggleSelect={() => toggleItemSelection(item.id)}
                     />
                   ))}
                 </div>
@@ -753,6 +962,9 @@ export const EnhancedQRCodeManager: React.FC = () => {
                 setShowQRDialog(true);
               }}
               showClientInfo={true}
+              selectionMode={selectionMode}
+              isSelected={selectedItems.has(item.id)}
+              onToggleSelect={() => toggleItemSelection(item.id)}
             />
           ))}
         </div>
@@ -780,7 +992,10 @@ const QRCodeCard: React.FC<{
   downloadQRCode: (qrCode: string, materialType: string, itemSeq: number) => void;
   onViewFullSize: () => void;
   showClientInfo?: boolean;
-}> = ({ item, getStatusColor, getStatusIcon, downloadQRCode, onViewFullSize, showClientInfo = true }) => {
+  selectionMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: () => void;
+}> = ({ item, getStatusColor, getStatusIcon, downloadQRCode, onViewFullSize, showClientInfo = true, selectionMode = false, isSelected = false, onToggleSelect }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
   useEffect(() => {
@@ -798,10 +1013,19 @@ const QRCodeCard: React.FC<{
   }, [item.qr_code]);
 
   return (
-    <Card className="overflow-hidden hover:shadow-lg transition-shadow">
+    <Card className={`overflow-hidden hover:shadow-lg transition-shadow ${isSelected ? 'ring-2 ring-orange-500 bg-orange-50' : ''}`}>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg">{item.material_type}</CardTitle>
+          <div className="flex items-center gap-2">
+            {selectionMode && (
+              <Checkbox 
+                checked={isSelected}
+                onCheckedChange={onToggleSelect}
+                className="h-5 w-5"
+              />
+            )}
+            <CardTitle className="text-lg">{item.material_type}</CardTitle>
+          </div>
           <div className="flex gap-2">
             {/* Scan Status Indicators */}
             {item.dispatch_scanned !== undefined && (
