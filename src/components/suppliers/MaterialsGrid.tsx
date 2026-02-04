@@ -990,7 +990,7 @@ export const MaterialsGrid = () => {
             }
           ),
           fetch(
-            `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants&is_approved=eq.true&order=created_at.desc&offset=${FIRST_BATCH}&limit=${TOTAL_LIMIT - FIRST_BATCH}`,
+            `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,image_url&is_approved=eq.true&order=created_at.desc&offset=${FIRST_BATCH}&limit=${TOTAL_LIMIT - FIRST_BATCH}`,
             {
               headers: {
                 'apikey': SUPABASE_ANON_KEY,
@@ -1059,8 +1059,8 @@ export const MaterialsGrid = () => {
               description: description,
               unit: item.unit || 'unit',
               unit_price: supplierPrice?.price || item.suggested_price || 0,
-              // First batch has images, rest will be loaded lazily
-              image_url: index < FIRST_BATCH ? (item.image_url || '') : '',
+              // Load ALL images - no lazy loading to avoid missing images when browsing
+              image_url: item.image_url || '',
               additional_images: [],
               in_stock: supplierPrice?.in_stock ?? true,
               supplier: {
