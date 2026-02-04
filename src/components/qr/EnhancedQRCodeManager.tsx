@@ -332,6 +332,21 @@ export const EnhancedQRCodeManager: React.FC = () => {
     }
   };
 
+  // Download all QR codes for a specific client
+  const downloadClientQRCodes = async (clientGroup: ClientGroup) => {
+    toast({
+      title: "Downloading Client QR Codes",
+      description: `Generating ${clientGroup.total_items} QR codes for ${clientGroup.buyer_name}...`,
+    });
+
+    for (let i = 0; i < clientGroup.items.length; i++) {
+      const item = clientGroup.items[i];
+      setTimeout(() => {
+        downloadQRCode(item.qr_code, item.material_type, item.item_sequence);
+      }, i * 300); // Stagger downloads
+    }
+  };
+
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       pending: 'bg-yellow-100 text-yellow-800',
@@ -509,6 +524,18 @@ export const EnhancedQRCodeManager: React.FC = () => {
                     <Badge className="bg-cyan-600">
                       {group.total_items} items
                     </Badge>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      className="ml-2 border-cyan-300 text-cyan-700 hover:bg-cyan-50"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        downloadClientQRCodes(group);
+                      }}
+                    >
+                      <DownloadCloud className="h-4 w-4 mr-1" />
+                      Download All ({group.total_items})
+                    </Button>
                   </div>
                 </div>
               </AccordionTrigger>
