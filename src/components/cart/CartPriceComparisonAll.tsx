@@ -75,31 +75,48 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
   useEffect(() => {
     if (isOpen && items.length > 0) {
       fetchAllPrices();
+    } else if (isOpen && items.length === 0) {
+      setLoading(false);
+      setComparisons([]);
     }
-  }, [isOpen, items]);
+  }, [isOpen]);
 
   const fetchAllPrices = async () => {
     setLoading(true);
+    console.log('🔍 Fetching price comparisons for', items.length, 'items');
+    
     try {
       // 1. Fetch all suppliers
-      const { data: suppliersData } = await supabase
+      const { data: suppliersData, error: suppliersError } = await supabase
         .from('suppliers')
-        .select('id, user_id, company_name, rating');
+        .select('id, user_id, company_name, rating')
+        .limit(100);
+
+      if (suppliersError) {
+        console.error('❌ Error fetching suppliers:', suppliersError);
+      }
+      console.log('📦 Suppliers loaded:', suppliersData?.length || 0);
 
       const suppliersMap = new Map<string, any>();
       (suppliersData || []).forEach((s: any) => {
         suppliersMap.set(s.id, s);
-        suppliersMap.set(s.user_id, s);
+        if (s.user_id) suppliersMap.set(s.user_id, s);
       });
 
       // 2. Get all product IDs from cart
       const productIds = items.map(item => item.id);
+      console.log('🛒 Cart product IDs:', productIds);
 
       // 3. Fetch all prices for these products
-      const { data: pricesData } = await supabase
+      const { data: pricesData, error: pricesError } = await supabase
         .from('supplier_product_prices')
-        .select('*')
+        .select('product_id, supplier_id, price, in_stock')
         .in('product_id', productIds);
+
+      if (pricesError) {
+        console.error('❌ Error fetching prices:', pricesError);
+      }
+      console.log('💰 Prices loaded:', pricesData?.length || 0);
 
       // 4. Build comparison data for each cart item
       const comparisonResults: ProductComparison[] = items.map(item => {
@@ -118,8 +135,8 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
         });
 
         // Find best price
-        const allPrices = [item.unit_price, ...alternatives.map(a => a.price)];
-        const bestPrice = Math.min(...allPrices.filter(p => p > 0));
+        const allPrices = [item.unit_price, ...alternatives.map(a => a.price)].filter(p => p > 0);
+        const bestPrice = allPrices.length > 0 ? Math.min(...allPrices) : item.unit_price;
         const bestAlt = alternatives.find(a => a.price === bestPrice);
         
         return {
@@ -132,18 +149,32 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
           alternatives,
           best_price: bestPrice,
           best_supplier: bestAlt?.supplier_name || item.supplier_name || 'Current',
-          savings: (item.unit_price - bestPrice) * item.quantity
+          savings: Math.max(0, (item.unit_price - bestPrice) * item.quantity)
         };
       });
 
+      console.log('✅ Comparison results:', comparisonResults);
       setComparisons(comparisonResults);
     } catch (error) {
-      console.error('Error fetching prices:', error);
+      console.error('❌ Error fetching prices:', error);
       toast({
         title: 'Error',
         description: 'Failed to fetch price comparisons',
         variant: 'destructive'
       });
+      // Still show items even if comparison fails
+      setComparisons(items.map(item => ({
+        product_id: item.id,
+        product_name: item.name,
+        category: item.category,
+        quantity: item.quantity,
+        current_price: item.unit_price,
+        current_supplier: item.supplier_name || 'Current Supplier',
+        alternatives: [],
+        best_price: item.unit_price,
+        best_supplier: item.supplier_name || 'Current',
+        savings: 0
+      })));
     } finally {
       setLoading(false);
     }
