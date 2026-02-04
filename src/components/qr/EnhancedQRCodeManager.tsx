@@ -15,7 +15,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { QrCode, Package, Download, DownloadCloud, Maximize2, Truck, Clock, CheckCircle, RefreshCw, User, Mail, Phone, AlertCircle, ShieldCheck, ShieldX } from 'lucide-react';
+import { QrCode, Package, Download, DownloadCloud, Maximize2, Truck, Clock, CheckCircle, RefreshCw, User, Mail, Phone, AlertCircle, ShieldCheck, ShieldX, Printer } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import QRCodeLib from 'qrcode';
@@ -347,6 +347,166 @@ export const EnhancedQRCodeManager: React.FC = () => {
     }
   };
 
+  // Print QR codes for a specific client
+  const printClientQRCodes = async (clientGroup: ClientGroup) => {
+    toast({
+      title: "Preparing Print",
+      description: `Generating ${clientGroup.total_items} QR codes for printing...`,
+    });
+
+    // Create a new window for printing
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast({
+        title: "Error",
+        description: "Please allow popups to print QR codes",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Generate QR codes as data URLs
+    const qrPromises = clientGroup.items.map(async (item) => {
+      const qrDataUrl = await QRCodeLib.toDataURL(item.qr_code, {
+        width: 200,
+        margin: 2,
+        errorCorrectionLevel: 'H',
+      });
+      return { item, qrDataUrl };
+    });
+
+    const qrResults = await Promise.all(qrPromises);
+
+    // Build print HTML
+    const printHTML = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>QR Codes - ${clientGroup.buyer_name}</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+          .header h1 { font-size: 24px; margin-bottom: 5px; }
+          .header p { color: #666; }
+          .qr-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+          .qr-item { border: 1px solid #ddd; padding: 15px; text-align: center; page-break-inside: avoid; }
+          .qr-item img { width: 150px; height: 150px; }
+          .qr-item h3 { font-size: 12px; margin-top: 10px; word-wrap: break-word; }
+          .qr-item p { font-size: 10px; color: #666; margin-top: 5px; }
+          .qr-code-text { font-family: monospace; font-size: 8px; color: #999; margin-top: 5px; word-break: break-all; }
+          @media print {
+            .qr-grid { grid-template-columns: repeat(3, 1fr); }
+            .qr-item { border: 1px solid #000; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>QR Codes for ${clientGroup.buyer_name}</h1>
+          <p>${clientGroup.buyer_email || ''} ${clientGroup.buyer_phone ? '• ' + clientGroup.buyer_phone : ''}</p>
+          <p>Total Items: ${clientGroup.total_items} | Generated: ${new Date().toLocaleDateString()}</p>
+        </div>
+        <div class="qr-grid">
+          ${qrResults.map(({ item, qrDataUrl }) => `
+            <div class="qr-item">
+              <img src="${qrDataUrl}" alt="QR Code" />
+              <h3>${item.material_type}</h3>
+              <p>Unit ${item.item_sequence} • ${item.unit}</p>
+              <p class="qr-code-text">${item.qr_code}</p>
+            </div>
+          `).join('')}
+        </div>
+        <script>
+          window.onload = function() { window.print(); }
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(printHTML);
+    printWindow.document.close();
+  };
+
+  // Print all QR codes
+  const printAllQRCodes = async () => {
+    toast({
+      title: "Preparing Print",
+      description: `Generating ${items.length} QR codes for printing...`,
+    });
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast({
+        title: "Error",
+        description: "Please allow popups to print QR codes",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Generate QR codes as data URLs
+    const qrPromises = items.map(async (item) => {
+      const qrDataUrl = await QRCodeLib.toDataURL(item.qr_code, {
+        width: 200,
+        margin: 2,
+        errorCorrectionLevel: 'H',
+      });
+      return { item, qrDataUrl };
+    });
+
+    const qrResults = await Promise.all(qrPromises);
+
+    const printHTML = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>All QR Codes - UjenziXform</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+          .header h1 { font-size: 24px; margin-bottom: 5px; }
+          .header p { color: #666; }
+          .qr-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+          .qr-item { border: 1px solid #ddd; padding: 15px; text-align: center; page-break-inside: avoid; }
+          .qr-item img { width: 150px; height: 150px; }
+          .qr-item h3 { font-size: 12px; margin-top: 10px; word-wrap: break-word; }
+          .qr-item p { font-size: 10px; color: #666; margin-top: 5px; }
+          .qr-code-text { font-family: monospace; font-size: 8px; color: #999; margin-top: 5px; word-break: break-all; }
+          @media print {
+            .qr-grid { grid-template-columns: repeat(3, 1fr); }
+            .qr-item { border: 1px solid #000; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>Material QR Codes</h1>
+          <p>UjenziXform - Construction Material Tracking</p>
+          <p>Total Items: ${items.length} | Generated: ${new Date().toLocaleDateString()}</p>
+        </div>
+        <div class="qr-grid">
+          ${qrResults.map(({ item, qrDataUrl }) => `
+            <div class="qr-item">
+              <img src="${qrDataUrl}" alt="QR Code" />
+              <h3>${item.material_type}</h3>
+              <p>Unit ${item.item_sequence} • ${item.unit}</p>
+              <p class="qr-code-text">${item.qr_code}</p>
+            </div>
+          `).join('')}
+        </div>
+        <script>
+          window.onload = function() { window.print(); }
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(printHTML);
+    printWindow.document.close();
+  };
+
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       pending: 'bg-yellow-100 text-yellow-800',
@@ -430,10 +590,16 @@ export const EnhancedQRCodeManager: React.FC = () => {
             </Button>
           </div>
           {items.length > 0 && (
-            <Button onClick={downloadAllQRCodes} size="sm" className="bg-cyan-600 hover:bg-cyan-700">
-              <DownloadCloud className="h-4 w-4 mr-2" />
-              Download All ({items.length})
-            </Button>
+            <>
+              <Button onClick={printAllQRCodes} size="sm" variant="outline" className="border-cyan-300 text-cyan-700 hover:bg-cyan-50">
+                <Printer className="h-4 w-4 mr-2" />
+                Print All ({items.length})
+              </Button>
+              <Button onClick={downloadAllQRCodes} size="sm" className="bg-cyan-600 hover:bg-cyan-700">
+                <DownloadCloud className="h-4 w-4 mr-2" />
+                Download All ({items.length})
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -527,14 +693,26 @@ export const EnhancedQRCodeManager: React.FC = () => {
                     <Button 
                       size="sm" 
                       variant="outline"
-                      className="ml-2 border-cyan-300 text-cyan-700 hover:bg-cyan-50"
+                      className="ml-2 border-green-300 text-green-700 hover:bg-green-50"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        printClientQRCodes(group);
+                      }}
+                    >
+                      <Printer className="h-4 w-4 mr-1" />
+                      Print
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      className="border-cyan-300 text-cyan-700 hover:bg-cyan-50"
                       onClick={(e) => {
                         e.stopPropagation();
                         downloadClientQRCodes(group);
                       }}
                     >
                       <DownloadCloud className="h-4 w-4 mr-1" />
-                      Download All ({group.total_items})
+                      Download
                     </Button>
                   </div>
                 </div>
