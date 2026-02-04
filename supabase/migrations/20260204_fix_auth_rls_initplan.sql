@@ -366,10 +366,11 @@ BEGIN
       FOR SELECT USING (status = ''active'')';
     
     -- Only professional builders and admins can create posts (optimized)
+    -- Note: builder_posts uses builder_id, not user_id
     EXECUTE 'CREATE POLICY "builder_posts_create" ON builder_posts
       FOR INSERT TO authenticated
       WITH CHECK (
-        user_id = (select auth.uid()) AND
+        builder_id = (select auth.uid()) AND
         EXISTS (
           SELECT 1 FROM user_roles 
           WHERE user_id = (select auth.uid()) 
@@ -380,13 +381,13 @@ BEGIN
     -- Users can update their own posts (optimized)
     EXECUTE 'CREATE POLICY "builder_posts_update_own" ON builder_posts
       FOR UPDATE TO authenticated
-      USING (user_id = (select auth.uid()))
-      WITH CHECK (user_id = (select auth.uid()))';
+      USING (builder_id = (select auth.uid()))
+      WITH CHECK (builder_id = (select auth.uid()))';
     
     -- Users can delete their own posts (optimized)
     EXECUTE 'CREATE POLICY "builder_posts_delete_own" ON builder_posts
       FOR DELETE TO authenticated
-      USING (user_id = (select auth.uid()))';
+      USING (builder_id = (select auth.uid()))';
   END IF;
 END $$;
 
