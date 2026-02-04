@@ -133,26 +133,23 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
 
       const selectedPkg = MONITORING_PACKAGES.find(p => p.id === selectedPackage);
 
-      // Create monitoring service request
-      // Build the request object with only fields that exist in the table
-      const monitoringRequest: Record<string, any> = {
-        builder_id: user.id,
+      // Create monitoring service request using actual table columns
+      const monitoringRequest = {
+        user_id: user.id,
         project_name: formData.projectDescription || purchaseOrder?.project_name || 'Monitoring Request',
-        site_address: formData.siteAddress,
+        project_location: formData.siteAddress,
+        project_type: selectedPackage,
+        project_duration: selectedPkg?.duration || null,
+        start_date: formData.preferredStartDate || null,
         contact_phone: formData.contactPhone,
-        service_type: selectedPackage,
+        selected_services: [selectedPackage],
+        special_requirements: formData.specialRequirements || null,
+        estimated_cost: selectedPkg?.price || null,
+        additional_notes: `Package: ${selectedPkg?.name || selectedPackage}`,
         status: 'pending',
-        notes: `Package: ${selectedPkg?.name || selectedPackage}, Price: KES ${selectedPkg?.price || 0}, Duration: ${selectedPkg?.duration || 'N/A'}. ${formData.specialRequirements || ''}`.trim(),
+        urgency: 'normal',
         created_at: new Date().toISOString()
       };
-
-      // Try to add optional fields if they exist
-      if (purchaseOrder?.id) {
-        monitoringRequest.purchase_order_id = purchaseOrder.id;
-      }
-      if (formData.preferredStartDate) {
-        monitoringRequest.preferred_start_date = formData.preferredStartDate;
-      }
 
       const { error } = await supabase
         .from('monitoring_service_requests')
