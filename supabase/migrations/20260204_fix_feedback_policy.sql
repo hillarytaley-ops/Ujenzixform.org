@@ -11,6 +11,7 @@ DROP POLICY IF EXISTS "feedback_public_submit" ON feedback;
 
 -- Create a new policy that validates basic requirements
 -- This still allows public submissions but adds minimal validation
+-- Columns in feedback table: name, email, subject, message
 CREATE POLICY "feedback_public_submit" ON feedback
 FOR INSERT TO anon, authenticated
 WITH CHECK (
@@ -18,8 +19,7 @@ WITH CHECK (
   -- This prevents completely empty submissions while still being public
   (
     COALESCE(message, '') != '' OR 
-    COALESCE(subject, '') != '' OR
-    COALESCE(feedback_text, '') != ''
+    COALESCE(subject, '') != ''
   )
 );
 
