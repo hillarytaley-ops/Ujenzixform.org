@@ -272,63 +272,68 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
 
   // Cache for loaded images
   const [productImages, setProductImages] = useState<Record<string, string>>({});
-  const [loadingImages, setLoadingImages] = useState<Set<string>>(new Set());
+  const [imagesLoading, setImagesLoading] = useState(false);
 
   useEffect(() => {
     loadAdminProducts();
     loadSupplierPrices();
   }, [supplierId]);
 
-  // Load images for visible products (called when products are displayed)
-  const loadImagesForProducts = async (productIds: string[]) => {
-    // Filter out already loaded or currently loading images
-    const idsToLoad = productIds.filter(id => !productImages[id] && !loadingImages.has(id));
-    if (idsToLoad.length === 0) return;
-
-    // Mark as loading
-    setLoadingImages(prev => {
-      const next = new Set(prev);
-      idsToLoad.forEach(id => next.add(id));
-      return next;
-    });
-
+  // Load ALL images in parallel batches for fast loading
+  const loadAllImages = async (productIds: string[]) => {
+    if (productIds.length === 0) return;
+    
+    setImagesLoading(true);
+    console.log(`🖼️ Loading images for ${productIds.length} products...`);
+    
     try {
-      // Load images in batches of 20 for speed
-      const BATCH_SIZE = 20;
-      for (let i = 0; i < idsToLoad.length; i += BATCH_SIZE) {
-        const batch = idsToLoad.slice(i, i + BATCH_SIZE);
-        const { data, error } = await (supabase
-          .from('admin_material_images' as any)
-          .select('id,image_url')
-          .in('id', batch));
-
-        if (!error && data) {
+      // Split into batches of 50 and load in PARALLEL
+      const BATCH_SIZE = 50;
+      const batches: string[][] = [];
+      for (let i = 0; i < productIds.length; i += BATCH_SIZE) {
+        batches.push(productIds.slice(i, i + BATCH_SIZE));
+      }
+      
+      // Load all batches in parallel
+      const results = await Promise.all(
+        batches.map(async (batch) => {
+          const { data, error } = await (supabase
+            .from('admin_material_images' as any)
+            .select('id,image_url')
+            .in('id', batch));
+          
+          if (error) {
+            console.warn('Batch image load error:', error);
+            return {};
+          }
+          
           const imageMap: Record<string, string> = {};
-          data.forEach((item: any) => {
+          (data || []).forEach((item: any) => {
             if (item.image_url) {
               imageMap[item.id] = item.image_url;
             }
           });
-          setProductImages(prev => ({ ...prev, ...imageMap }));
-        }
-      }
+          return imageMap;
+        })
+      );
+      
+      // Merge all results
+      const allImages = results.reduce((acc, batch) => ({ ...acc, ...batch }), {});
+      console.log(`✅ Loaded ${Object.keys(allImages).length} images`);
+      setProductImages(allImages);
     } catch (error) {
-      console.error('Error loading product images:', error);
+      console.error('Error loading images:', error);
     } finally {
-      setLoadingImages(prev => {
-        const next = new Set(prev);
-        idsToLoad.forEach(id => next.delete(id));
-        return next;
-      });
+      setImagesLoading(false);
     }
   };
 
-  // Load admin-uploaded products from admin_material_images table
-  // NOTE: Only select needed fields, NOT image_url (loaded separately for speed)
+  // Load admin-uploaded products - metadata first, then images in parallel
   const loadAdminProducts = async () => {
     try {
       setLoading(true);
       
+      // Load product metadata (fast - no images)
       const { data, error } = await (supabase
         .from('admin_material_images' as any)
         .select('id,name,category,description,unit,suggested_price,pricing_type,variants')
@@ -338,7 +343,6 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
       
       if (error) {
         console.log('Admin products table not available, using demo data');
-        // Fallback to demo data
         setAdminProducts([
           { id: '1', name: 'Bamburi Cement 42.5N (50kg)', category: 'Cement & Concrete', image_url: '', description: 'Premium Portland cement' },
           { id: '2', name: 'Y12 Deformed Steel Bars (6m)', category: 'Steel & Metal', image_url: '', description: 'High-tensile steel reinforcement' },
@@ -346,17 +350,21 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
           { id: '4', name: 'River Sand (per ton)', category: 'Sand & Aggregates', image_url: '', description: 'Clean construction sand' },
           { id: '5', name: 'Machine Cut Blocks 6"', category: 'Bricks & Blocks', image_url: '', description: 'Standard building blocks' },
         ]);
-      } else {
-        setAdminProducts(data || []);
-        // Load images for first batch of products immediately
-        if (data && data.length > 0) {
-          const firstBatchIds = data.slice(0, 20).map((p: any) => p.id);
-          loadImagesForProducts(firstBatchIds);
-        }
+        setLoading(false);
+        return;
+      }
+      
+      // Set products immediately (shows list fast)
+      setAdminProducts(data || []);
+      setLoading(false);
+      
+      // Then load ALL images in parallel (non-blocking)
+      if (data && data.length > 0) {
+        const allIds = data.map((p: any) => p.id);
+        loadAllImages(allIds);
       }
     } catch (error) {
       console.error('Error loading admin products:', error);
-    } finally {
       setLoading(false);
     }
   };
@@ -933,26 +941,17 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {(() => {
-            const filtered = adminProducts.filter(p => {
+          {adminProducts
+            .filter(p => {
               const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
               const matchesCategory = categoryFilter === 'all' || p.category === categoryFilter;
               return matchesSearch && matchesCategory;
-            });
-            
-            // Load images for visible products (first 30)
-            const visibleIds = filtered.slice(0, 30).map(p => p.id);
-            if (visibleIds.some(id => !productImages[id] && !loadingImages.has(id))) {
-              // Trigger image loading (will be batched)
-              setTimeout(() => loadImagesForProducts(visibleIds), 100);
-            }
-            
-            return filtered.map((product) => {
+            })
+            .map((product) => {
               const supplierPrice = supplierPrices[product.id];
               const hasSetPrice = supplierPrice !== undefined;
-              // Get image from cache or product
+              // Get image from cache
               const imageUrl = productImages[product.id] || product.image_url;
-              const isImageLoading = loadingImages.has(product.id);
               
               return (
                 <Card key={product.id} className={`${cardBg} hover:shadow-md`}>
@@ -966,8 +965,8 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
                           className="w-full h-full object-contain"
                           loading="lazy"
                         />
-                      ) : isImageLoading ? (
-                        <div className="w-full h-full flex items-center justify-center">
+                      ) : imagesLoading ? (
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-orange-50 to-orange-100">
                           <Loader2 className="h-8 w-8 animate-spin text-orange-400" />
                         </div>
                       ) : (
@@ -1026,8 +1025,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
                   </CardContent>
                 </Card>
               );
-            });
-          })()}
+            })}
         </div>
       )}
 
