@@ -210,14 +210,35 @@ export const CartSidebar: React.FC = () => {
       let supplierId = items[0]?.supplier_id;
       
       // If supplier_id is not a valid UUID, fetch a real supplier
+      // Prefer the supplier who has set prices for these products
       if (!supplierId || supplierId === 'admin-catalog' || supplierId === 'general') {
-        const { data: suppliers } = await supabase
-          .from('suppliers')
-          .select('id, user_id')
-          .limit(1)
-          .single();
+        // First try to find a supplier who has priced these items
+        const productIds = items.map(item => item.id).filter(Boolean);
+        if (productIds.length > 0) {
+          const { data: priceData } = await supabase
+            .from('supplier_product_prices')
+            .select('supplier_id')
+            .in('product_id', productIds)
+            .limit(1)
+            .maybeSingle();
+          
+          if (priceData?.supplier_id) {
+            supplierId = priceData.supplier_id;
+            console.log('📦 Using supplier from product prices:', supplierId);
+          }
+        }
         
-        supplierId = suppliers?.user_id || suppliers?.id || user.id;
+        // If still no supplier, get the first active supplier
+        if (!supplierId || supplierId === 'admin-catalog' || supplierId === 'general') {
+          const { data: suppliers } = await supabase
+            .from('suppliers')
+            .select('id, user_id')
+            .limit(1)
+            .single();
+          
+          supplierId = suppliers?.id || suppliers?.user_id || user.id;
+          console.log('📦 Using fallback supplier:', supplierId);
+        }
       }
       
       // Create purchase order
