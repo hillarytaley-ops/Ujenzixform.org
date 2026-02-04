@@ -908,23 +908,103 @@ export const MaterialsGrid = () => {
         
         console.log(`📱 Device: ${isMobile ? 'Mobile' : 'Desktop'}`);
         
-        // ✅ iOS/MOBILE OPTIMIZED: Load materials in smaller chunks to avoid 500 errors
-        // iOS Safari has issues with background fetches, so we load everything during initial load
+        // ✅ FAST LOADING: Load metadata first (fast), then images in parallel
         const isIOS = isIOSSafari();
-        const CHUNK_SIZE = 100; // Load 100 at a time to avoid Supabase timeouts
-        const MAX_CHUNKS = isMobile ? 6 : 10; // Mobile: 600 total, Desktop: 1000
+        const FIRST_BATCH_WITH_IMAGES = 48; // First 48 with images for immediate display (4 pages)
+        const METADATA_LIMIT = 600; // Load metadata for 600 items (fast, no images)
         
         console.log(`📱 Device: ${isMobile ? 'Mobile' : 'Desktop'}, iOS: ${isIOS}`);
         
-        // For iOS/mobile: Load materials in chunks to avoid 500 errors
-        if (isMobile) {
-          // iOS FIX: Load in chunks instead of one massive request
-          let allMobileData: any[] = [];
-          let totalCount = 0;
+        // STRATEGY: Load first batch WITH images (fast display), then metadata only, then lazy load remaining images
+        try {
+          // Step 1: Load first batch with images + rest as metadata only (PARALLEL)
+          const [firstBatchResponse, metadataResponse] = await Promise.all([
+            // First 48 items WITH images for immediate display
+            fetch(
+              `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,image_url&is_approved=eq.true&order=created_at.desc&limit=${FIRST_BATCH_WITH_IMAGES}`,
+              {
+                headers: {
+                  'apikey': SUPABASE_ANON_KEY,
+                  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                  'Content-Type': 'application/json'
+                }
+              }
+            ),
+            // Rest of items WITHOUT images (much faster)
+            fetch(
+              `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants&is_approved=eq.true&order=created_at.desc&offset=${FIRST_BATCH_WITH_IMAGES}&limit=${METADATA_LIMIT - FIRST_BATCH_WITH_IMAGES}`,
+              {
+                headers: {
+                  'apikey': SUPABASE_ANON_KEY,
+                  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                  'Content-Type': 'application/json',
+                  'Prefer': 'count=exact'
+                }
+              }
+            )
+          ]);
           
-          // First request to get count
-          const countResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/admin_material_images?select=id&is_approved=eq.true&limit=1`,
+          if (firstBatchResponse.ok && metadataResponse.ok) {
+            const firstBatchData = await firstBatchResponse.json();
+            const metadataData = await metadataResponse.json();
+            
+            // Get total count
+            const countHeader = metadataResponse.headers.get('content-range');
+            if (countHeader) {
+              const total = parseInt(countHeader.split('/')[1] || '0');
+              setTotalMaterialsCount(total);
+              setHasMoreMaterials(total > firstBatchData.length + metadataData.length);
+            }
+            
+            const allData = [...firstBatchData, ...metadataData];
+            console.log(`⚡ Fast load: ${firstBatchData.length} with images + ${metadataData.length} metadata = ${allData.length} total`);
+            
+            // Process all data - first batch has images, rest will load lazily
+            const processedMaterials = allData.map((item: any, index: number) => {
+              const supplierPrice = supplierPrices[item.id];
+              let variants: PriceVariant[] = [];
+              try {
+                if (item.variants && Array.isArray(item.variants)) variants = item.variants;
+                else if (item.variants && typeof item.variants === 'string') variants = JSON.parse(item.variants);
+              } catch (e) { variants = []; }
+              
+              return {
+                id: item.id,
+                supplier_id: 'admin-catalog',
+                name: item.name || 'Unnamed Material',
+                category: item.category || 'Uncategorized',
+                description: supplierPrice?.description || item.description || '',
+                unit: item.unit || 'unit',
+                unit_price: supplierPrice?.price || item.suggested_price || 0,
+                // First batch has images, rest will be loaded on-demand
+                image_url: index < FIRST_BATCH_WITH_IMAGES ? (item.image_url || '') : '',
+                additional_images: [],
+                in_stock: supplierPrice?.in_stock ?? true,
+                supplier: { company_name: supplierPrice ? 'Supplier' : 'Admin Catalog', location: 'Kenya', rating: supplierPrice ? 4.5 : 5.0 },
+                pricing_type: item.pricing_type || 'single',
+                variants: variants
+              } as Material;
+            });
+            
+            adminMaterials = processedMaterials;
+            
+            // Set materials immediately for fast display
+            setMaterials(processedMaterials);
+            setLoading(false);
+            console.log(`✅ ${processedMaterials.length} materials ready (${FIRST_BATCH_WITH_IMAGES} with images, rest lazy-loaded)`);
+          }
+        } catch (loadError) {
+          console.error('❌ Fast load failed:', loadError);
+        }
+        
+        // If we already loaded materials above, skip the fallback
+        if (adminMaterials.length > 0) {
+          // Continue to combine with supplier materials below
+        } else {
+          // FALLBACK: Simple single request (smaller limit)
+          console.log('⚠️ Using fallback loading...');
+          const fallbackResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,image_url&is_approved=eq.true&order=created_at.desc&limit=100`,
             {
               headers: {
                 'apikey': SUPABASE_ANON_KEY,
@@ -935,51 +1015,16 @@ export const MaterialsGrid = () => {
             }
           );
           
-          if (countResponse.ok) {
-            const countHeader = countResponse.headers.get('content-range');
+          if (fallbackResponse.ok) {
+            const fallbackData = await fallbackResponse.json();
+            const countHeader = fallbackResponse.headers.get('content-range');
             if (countHeader) {
-              totalCount = parseInt(countHeader.split('/')[1] || '0');
-              setTotalMaterialsCount(totalCount);
+              const total = parseInt(countHeader.split('/')[1] || '0');
+              setTotalMaterialsCount(total);
+              setHasMoreMaterials(total > fallbackData.length);
             }
-          }
-          
-          // Load in chunks
-          const chunksToLoad = Math.min(MAX_CHUNKS, Math.ceil(totalCount / CHUNK_SIZE));
-          console.log(`📱 Loading ${chunksToLoad} chunks of ${CHUNK_SIZE} materials...`);
-          
-          for (let i = 0; i < chunksToLoad; i++) {
-            const offset = i * CHUNK_SIZE;
-            const chunkResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,image_url&is_approved=eq.true&order=created_at.desc&limit=${CHUNK_SIZE}&offset=${offset}`,
-              {
-                headers: {
-                  'apikey': SUPABASE_ANON_KEY,
-                  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-                  'Content-Type': 'application/json'
-                }
-              }
-            );
             
-            if (chunkResponse.ok) {
-              const chunkData = await chunkResponse.json();
-              allMobileData = [...allMobileData, ...chunkData];
-              console.log(`📱 Chunk ${i + 1}/${chunksToLoad}: Loaded ${chunkData.length} materials`);
-              
-              if (chunkData.length < CHUNK_SIZE) break; // No more data
-            } else {
-              console.warn(`⚠️ Chunk ${i + 1} failed, stopping`);
-              break;
-            }
-          }
-          
-          setHasMoreMaterials(totalCount > allMobileData.length);
-          
-          if (allMobileData.length > 0) {
-            const mobileData = allMobileData;
-            console.log(`📱 Mobile/iOS load: ${mobileData.length} materials (loaded in chunks for reliability)`);
-            
-            // Process all mobile data at once
-            const mobileMaterials = mobileData.map((item: any) => {
+            adminMaterials = fallbackData.map((item: any) => {
               const supplierPrice = supplierPrices[item.id];
               let variants: PriceVariant[] = [];
               try {
@@ -1003,179 +1048,10 @@ export const MaterialsGrid = () => {
                 variants: variants
               } as Material;
             });
-            
-            adminMaterials = mobileMaterials;
-            
-            // Set materials immediately - no background loading for iOS
-            setMaterials(mobileMaterials);
-            setLoading(false);
-            console.log(`📱 Mobile/iOS: All ${mobileMaterials.length} materials loaded successfully`);
-            return;
           }
         }
         
-        // DESKTOP: Load in chunks too (to avoid 500 errors with large datasets)
-        const DESKTOP_CHUNK_SIZE = 100;
-        const DESKTOP_MAX_CHUNKS = 10; // 1000 total max
-        
-        let allDesktopData: any[] = [];
-        let desktopTotalCount = 0;
-        
-        // First request to get count
-        const desktopCountResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/admin_material_images?select=id&is_approved=eq.true&limit=1`,
-          {
-            headers: {
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-              'Content-Type': 'application/json',
-              'Prefer': 'count=exact'
-            }
-          }
-        );
-        
-        if (desktopCountResponse.ok) {
-          const countHeader = desktopCountResponse.headers.get('content-range');
-          if (countHeader) {
-            desktopTotalCount = parseInt(countHeader.split('/')[1] || '0');
-            setTotalMaterialsCount(desktopTotalCount);
-          }
-        }
-        
-        // Load in chunks
-        const desktopChunksToLoad = Math.min(DESKTOP_MAX_CHUNKS, Math.ceil(desktopTotalCount / DESKTOP_CHUNK_SIZE));
-        console.log(`🖥️ Desktop: Loading ${desktopChunksToLoad} chunks of ${DESKTOP_CHUNK_SIZE} materials...`);
-        
-        // Load first 2 chunks in parallel for faster initial display
-        const [firstBatchResponse, secondBatchResponse] = await Promise.all([
-          fetch(
-            `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,image_url&is_approved=eq.true&order=created_at.desc&limit=${DESKTOP_CHUNK_SIZE}&offset=0`,
-            {
-              headers: {
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-                'Content-Type': 'application/json'
-              }
-            }
-          ),
-          fetch(
-            `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,image_url&is_approved=eq.true&order=created_at.desc&limit=${DESKTOP_CHUNK_SIZE}&offset=${DESKTOP_CHUNK_SIZE}`,
-            {
-              headers: {
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-                'Content-Type': 'application/json'
-              }
-            }
-          )
-        ]);
-        
-        if (firstBatchResponse.ok && secondBatchResponse.ok) {
-          const firstBatchData = await firstBatchResponse.json();
-          const secondBatchData = await secondBatchResponse.json();
-          allDesktopData = [...firstBatchData, ...secondBatchData];
-          
-          console.log(`🖥️ First 2 chunks loaded: ${allDesktopData.length} materials`);
-          
-          // Load remaining chunks sequentially (to avoid overwhelming Supabase)
-          for (let i = 2; i < desktopChunksToLoad; i++) {
-            const offset = i * DESKTOP_CHUNK_SIZE;
-            const chunkResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,image_url&is_approved=eq.true&order=created_at.desc&limit=${DESKTOP_CHUNK_SIZE}&offset=${offset}`,
-              {
-                headers: {
-                  'apikey': SUPABASE_ANON_KEY,
-                  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-                  'Content-Type': 'application/json'
-                }
-              }
-            );
-            
-            if (chunkResponse.ok) {
-              const chunkData = await chunkResponse.json();
-              allDesktopData = [...allDesktopData, ...chunkData];
-              console.log(`🖥️ Chunk ${i + 1}/${desktopChunksToLoad}: Loaded ${chunkData.length} materials`);
-              
-              if (chunkData.length < DESKTOP_CHUNK_SIZE) break; // No more data
-            } else {
-              console.warn(`⚠️ Desktop chunk ${i + 1} failed, stopping`);
-              break;
-            }
-          }
-          
-          setHasMoreMaterials(desktopTotalCount > allDesktopData.length);
-          console.log(`📊 Loaded ${allDesktopData.length} materials (total: ${desktopTotalCount})`);
-          
-          const allAdminData = allDesktopData;
-          
-          // Map materials - first batch already has images, rest will be loaded lazily
-          const materialsWithImages = allAdminData.map((item: any, index: number) => {
-            const supplierPrice = supplierPrices[item.id];
-            
-            let variants: PriceVariant[] = [];
-            try {
-              if (item.variants && Array.isArray(item.variants) && item.variants.length > 0) {
-                variants = item.variants;
-              } else if (item.variants && typeof item.variants === 'string') {
-                variants = JSON.parse(item.variants);
-              }
-            } catch (e) {
-              variants = [];
-            }
-            
-            // Apply supplier variant prices if available
-            if (supplierPrice?.variant_prices && supplierPrice.variant_prices.length > 0 && variants.length > 0) {
-              variants = variants.map((variant: PriceVariant) => {
-                const supplierVariantPrice = supplierPrice.variant_prices?.find(
-                  (svp: any) => svp.variant_id === variant.id || svp.sizeLabel === variant.sizeLabel
-                );
-                if (supplierVariantPrice) {
-                  return {
-                    ...variant,
-                    price: supplierVariantPrice.price // Override with supplier price
-                  };
-                }
-                return variant;
-              });
-            }
-            
-            // Use supplier description if available, otherwise use admin description
-            const description = supplierPrice?.description || item.description || '';
-            
-            return {
-              id: item.id,
-              supplier_id: 'admin-catalog',
-              name: item.name || 'Unnamed Material',
-              category: item.category || 'Uncategorized',
-              description: description,
-              unit: item.unit || 'unit',
-              unit_price: supplierPrice?.price || item.suggested_price || 0,
-              // Load ALL images - no lazy loading to avoid missing images when browsing
-              image_url: item.image_url || '',
-              additional_images: [],
-              in_stock: supplierPrice?.in_stock ?? true,
-              supplier: {
-                company_name: supplierPrice ? 'Supplier' : 'Admin Catalog',
-                location: 'Kenya',
-                rating: supplierPrice ? 4.5 : 5.0
-              },
-              pricing_type: item.pricing_type || 'single',
-              variants: variants
-            } as Material;
-          });
-          
-          adminMaterials = materialsWithImages;
-          
-          // Preload first batch images in browser cache for instant display
-          firstBatchData.forEach((item: any) => {
-            if (item.image_url && !item.image_url.startsWith('data:')) {
-              const img = new Image();
-              img.src = item.image_url;
-            }
-          });
-        } else {
-          console.warn('Failed to fetch admin materials');
-        }
+        // adminMaterials is now populated from the fast loading above
       } catch (adminErr: any) {
         console.error('❌ Error fetching admin materials:', adminErr);
       }
