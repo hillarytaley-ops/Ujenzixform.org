@@ -908,19 +908,23 @@ export const MaterialsGrid = () => {
         
         console.log(`📱 Device: ${isMobile ? 'Mobile' : 'Desktop'}`);
         
-        // ✅ iOS/MOBILE OPTIMIZED: Load ALL materials upfront but in smaller chunks
+        // ✅ iOS/MOBILE OPTIMIZED: Load materials in smaller chunks to avoid 500 errors
         // iOS Safari has issues with background fetches, so we load everything during initial load
         const isIOS = isIOSSafari();
-        const FIRST_BATCH = isMobile ? 24 : 40; // Mobile: 24 (fits more rows), Desktop: 40
-        const TOTAL_LIMIT = isMobile ? 600 : 1000; // Mobile: 600 total, Desktop: 1000 - enough to load ALL products
+        const CHUNK_SIZE = 100; // Load 100 at a time to avoid Supabase timeouts
+        const MAX_CHUNKS = isMobile ? 6 : 10; // Mobile: 600 total, Desktop: 1000
         
         console.log(`📱 Device: ${isMobile ? 'Mobile' : 'Desktop'}, iOS: ${isIOS}`);
         
-        // For iOS/mobile: Load all materials in one request to avoid background fetch issues
+        // For iOS/mobile: Load materials in chunks to avoid 500 errors
         if (isMobile) {
-          // iOS FIX: Single request with ALL data to avoid Safari's aggressive background throttling
-          const mobileResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,image_url&is_approved=eq.true&order=created_at.desc&limit=${TOTAL_LIMIT}`,
+          // iOS FIX: Load in chunks instead of one massive request
+          let allMobileData: any[] = [];
+          let totalCount = 0;
+          
+          // First request to get count
+          const countResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/admin_material_images?select=id&is_approved=eq.true&limit=1`,
             {
               headers: {
                 'apikey': SUPABASE_ANON_KEY,
@@ -931,15 +935,48 @@ export const MaterialsGrid = () => {
             }
           );
           
-          if (mobileResponse.ok) {
-            const mobileData = await mobileResponse.json();
-            const countHeader = mobileResponse.headers.get('content-range');
+          if (countResponse.ok) {
+            const countHeader = countResponse.headers.get('content-range');
             if (countHeader) {
-              const total = parseInt(countHeader.split('/')[1] || '0');
-              setTotalMaterialsCount(total);
-              setHasMoreMaterials(total > mobileData.length);
+              totalCount = parseInt(countHeader.split('/')[1] || '0');
+              setTotalMaterialsCount(totalCount);
             }
-            console.log(`📱 Mobile/iOS load: ${mobileData.length} materials (all at once for iOS compatibility)`);
+          }
+          
+          // Load in chunks
+          const chunksToLoad = Math.min(MAX_CHUNKS, Math.ceil(totalCount / CHUNK_SIZE));
+          console.log(`📱 Loading ${chunksToLoad} chunks of ${CHUNK_SIZE} materials...`);
+          
+          for (let i = 0; i < chunksToLoad; i++) {
+            const offset = i * CHUNK_SIZE;
+            const chunkResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,image_url&is_approved=eq.true&order=created_at.desc&limit=${CHUNK_SIZE}&offset=${offset}`,
+              {
+                headers: {
+                  'apikey': SUPABASE_ANON_KEY,
+                  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                  'Content-Type': 'application/json'
+                }
+              }
+            );
+            
+            if (chunkResponse.ok) {
+              const chunkData = await chunkResponse.json();
+              allMobileData = [...allMobileData, ...chunkData];
+              console.log(`📱 Chunk ${i + 1}/${chunksToLoad}: Loaded ${chunkData.length} materials`);
+              
+              if (chunkData.length < CHUNK_SIZE) break; // No more data
+            } else {
+              console.warn(`⚠️ Chunk ${i + 1} failed, stopping`);
+              break;
+            }
+          }
+          
+          setHasMoreMaterials(totalCount > allMobileData.length);
+          
+          if (allMobileData.length > 0) {
+            const mobileData = allMobileData;
+            console.log(`📱 Mobile/iOS load: ${mobileData.length} materials (loaded in chunks for reliability)`);
             
             // Process all mobile data at once
             const mobileMaterials = mobileData.map((item: any) => {
@@ -977,10 +1014,42 @@ export const MaterialsGrid = () => {
           }
         }
         
-        // DESKTOP: Parallel fetch for speed
-        const [firstBatchResponse, restResponse] = await Promise.all([
+        // DESKTOP: Load in chunks too (to avoid 500 errors with large datasets)
+        const DESKTOP_CHUNK_SIZE = 100;
+        const DESKTOP_MAX_CHUNKS = 10; // 1000 total max
+        
+        let allDesktopData: any[] = [];
+        let desktopTotalCount = 0;
+        
+        // First request to get count
+        const desktopCountResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/admin_material_images?select=id&is_approved=eq.true&limit=1`,
+          {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'count=exact'
+            }
+          }
+        );
+        
+        if (desktopCountResponse.ok) {
+          const countHeader = desktopCountResponse.headers.get('content-range');
+          if (countHeader) {
+            desktopTotalCount = parseInt(countHeader.split('/')[1] || '0');
+            setTotalMaterialsCount(desktopTotalCount);
+          }
+        }
+        
+        // Load in chunks
+        const desktopChunksToLoad = Math.min(DESKTOP_MAX_CHUNKS, Math.ceil(desktopTotalCount / DESKTOP_CHUNK_SIZE));
+        console.log(`🖥️ Desktop: Loading ${desktopChunksToLoad} chunks of ${DESKTOP_CHUNK_SIZE} materials...`);
+        
+        // Load first 2 chunks in parallel for faster initial display
+        const [firstBatchResponse, secondBatchResponse] = await Promise.all([
           fetch(
-            `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,image_url&is_approved=eq.true&order=created_at.desc&limit=${FIRST_BATCH}`,
+            `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,image_url&is_approved=eq.true&order=created_at.desc&limit=${DESKTOP_CHUNK_SIZE}&offset=0`,
             {
               headers: {
                 'apikey': SUPABASE_ANON_KEY,
@@ -990,32 +1059,54 @@ export const MaterialsGrid = () => {
             }
           ),
           fetch(
-            `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,image_url&is_approved=eq.true&order=created_at.desc&offset=${FIRST_BATCH}&limit=${TOTAL_LIMIT - FIRST_BATCH}`,
+            `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,image_url&is_approved=eq.true&order=created_at.desc&limit=${DESKTOP_CHUNK_SIZE}&offset=${DESKTOP_CHUNK_SIZE}`,
             {
               headers: {
                 'apikey': SUPABASE_ANON_KEY,
                 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-                'Content-Type': 'application/json',
-                'Prefer': 'count=exact'
+                'Content-Type': 'application/json'
               }
             }
           )
         ]);
         
-        if (firstBatchResponse.ok && restResponse.ok) {
+        if (firstBatchResponse.ok && secondBatchResponse.ok) {
           const firstBatchData = await firstBatchResponse.json();
-          const restData = await restResponse.json();
-          const allAdminData = [...firstBatchData, ...restData];
+          const secondBatchData = await secondBatchResponse.json();
+          allDesktopData = [...firstBatchData, ...secondBatchData];
           
-          const countHeader = restResponse.headers.get('content-range');
-          if (countHeader) {
-            const total = parseInt(countHeader.split('/')[1] || '0') + FIRST_BATCH;
-            setTotalMaterialsCount(total);
-            setHasMoreMaterials(total > allAdminData.length);
-            console.log(`📊 Loaded ${allAdminData.length} materials (total: ${total})`);
+          console.log(`🖥️ First 2 chunks loaded: ${allDesktopData.length} materials`);
+          
+          // Load remaining chunks sequentially (to avoid overwhelming Supabase)
+          for (let i = 2; i < desktopChunksToLoad; i++) {
+            const offset = i * DESKTOP_CHUNK_SIZE;
+            const chunkResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,image_url&is_approved=eq.true&order=created_at.desc&limit=${DESKTOP_CHUNK_SIZE}&offset=${offset}`,
+              {
+                headers: {
+                  'apikey': SUPABASE_ANON_KEY,
+                  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                  'Content-Type': 'application/json'
+                }
+              }
+            );
+            
+            if (chunkResponse.ok) {
+              const chunkData = await chunkResponse.json();
+              allDesktopData = [...allDesktopData, ...chunkData];
+              console.log(`🖥️ Chunk ${i + 1}/${desktopChunksToLoad}: Loaded ${chunkData.length} materials`);
+              
+              if (chunkData.length < DESKTOP_CHUNK_SIZE) break; // No more data
+            } else {
+              console.warn(`⚠️ Desktop chunk ${i + 1} failed, stopping`);
+              break;
+            }
           }
           
-          console.log(`⚡ Fast load: ${firstBatchData.length} with images + ${restData.length} metadata only`);
+          setHasMoreMaterials(desktopTotalCount > allDesktopData.length);
+          console.log(`📊 Loaded ${allDesktopData.length} materials (total: ${desktopTotalCount})`);
+          
+          const allAdminData = allDesktopData;
           
           // Map materials - first batch already has images, rest will be loaded lazily
           const materialsWithImages = allAdminData.map((item: any, index: number) => {
