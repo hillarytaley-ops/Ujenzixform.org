@@ -32,6 +32,8 @@ CREATE OR REPLACE FUNCTION public.is_authenticated()
 RETURNS boolean
 LANGUAGE sql
 STABLE
+SECURITY INVOKER
+SET search_path = public
 AS $$
   SELECT (select auth.uid()) IS NOT NULL;
 $$;
