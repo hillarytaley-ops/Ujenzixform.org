@@ -279,7 +279,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
     loadSupplierPrices();
   }, [supplierId]);
 
-  // Load ALL images in parallel batches for fast loading
+  // Load ALL images in smaller sequential batches to avoid 500 errors
   const loadAllImages = async (productIds: string[]) => {
     if (productIds.length === 0) return;
     
@@ -287,40 +287,35 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
     console.log(`🖼️ Loading images for ${productIds.length} products...`);
     
     try {
-      // Split into batches of 50 and load in PARALLEL
-      const BATCH_SIZE = 50;
-      const batches: string[][] = [];
-      for (let i = 0; i < productIds.length; i += BATCH_SIZE) {
-        batches.push(productIds.slice(i, i + BATCH_SIZE));
-      }
+      // Use smaller batches of 20 to avoid Supabase 500 errors
+      const BATCH_SIZE = 20;
+      const allImages: Record<string, string> = {};
       
-      // Load all batches in parallel
-      const results = await Promise.all(
-        batches.map(async (batch) => {
+      // Process batches sequentially but quickly
+      for (let i = 0; i < productIds.length; i += BATCH_SIZE) {
+        const batch = productIds.slice(i, i + BATCH_SIZE);
+        
+        try {
           const { data, error } = await (supabase
             .from('admin_material_images' as any)
             .select('id,image_url')
             .in('id', batch));
           
-          if (error) {
-            console.warn('Batch image load error:', error);
-            return {};
+          if (!error && data) {
+            data.forEach((item: any) => {
+              if (item.image_url) {
+                allImages[item.id] = item.image_url;
+              }
+            });
+            // Update state progressively so images appear as they load
+            setProductImages(prev => ({ ...prev, ...allImages }));
           }
-          
-          const imageMap: Record<string, string> = {};
-          (data || []).forEach((item: any) => {
-            if (item.image_url) {
-              imageMap[item.id] = item.image_url;
-            }
-          });
-          return imageMap;
-        })
-      );
+        } catch (batchError) {
+          console.warn(`Batch ${i / BATCH_SIZE + 1} failed:`, batchError);
+        }
+      }
       
-      // Merge all results
-      const allImages = results.reduce((acc, batch) => ({ ...acc, ...batch }), {});
       console.log(`✅ Loaded ${Object.keys(allImages).length} images`);
-      setProductImages(allImages);
     } catch (error) {
       console.error('Error loading images:', error);
     } finally {
