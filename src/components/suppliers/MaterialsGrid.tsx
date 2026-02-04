@@ -2452,6 +2452,12 @@ export const MaterialsGrid = () => {
           onClose={() => setShowBookView(false)}
           initialIndex={bookViewStartIndex}
           userRole={userRole || undefined}
+          onImageLoaded={(id, imageUrl) => {
+            // Update materials state with newly loaded image
+            setMaterials(prev => prev.map(m => 
+              m.id === id ? { ...m, image_url: imageUrl } : m
+            ));
+          }}
         />
       )}
     </div>

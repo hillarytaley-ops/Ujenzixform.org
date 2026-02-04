@@ -13,7 +13,7 @@
  * ╚══════════════════════════════════════════════════════════════════════════════════════╝
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -26,10 +26,15 @@ import {
   Plus,
   Minus,
   X,
-  BookOpen
+  BookOpen,
+  Loader2
 } from 'lucide-react';
 import { useCart } from '@/contexts/CartContext';
 import { useToast } from '@/hooks/use-toast';
+
+// Supabase config for fetching images
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 interface Material {
   id: string;
@@ -49,13 +54,15 @@ interface MobileBookViewProps {
   onClose: () => void;
   initialIndex?: number;
   userRole?: string;
+  onImageLoaded?: (id: string, imageUrl: string) => void;
 }
 
 export const MobileBookView: React.FC<MobileBookViewProps> = ({
   materials,
   onClose,
   initialIndex = 0,
-  userRole
+  userRole,
+  onImageLoaded
 }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [touchStart, setTouchStart] = useState<number | null>(null);
@@ -63,9 +70,70 @@ export const MobileBookView: React.FC<MobileBookViewProps> = ({
   const [isAnimating, setIsAnimating] = useState(false);
   const [direction, setDirection] = useState<'left' | 'right' | null>(null);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [loadedImages, setLoadedImages] = useState<Record<string, string>>({});
+  const [loadingImages, setLoadingImages] = useState<Set<string>>(new Set());
   const containerRef = useRef<HTMLDivElement>(null);
   const { addToCart } = useCart();
   const { toast } = useToast();
+
+  // Fetch image for a material if not already loaded
+  const fetchImageForMaterial = useCallback(async (materialId: string) => {
+    if (loadedImages[materialId] || loadingImages.has(materialId)) return;
+    
+    setLoadingImages(prev => new Set(prev).add(materialId));
+    
+    try {
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,image_url&id=eq.${materialId}`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data[0]?.image_url) {
+          setLoadedImages(prev => ({ ...prev, [materialId]: data[0].image_url }));
+          onImageLoaded?.(materialId, data[0].image_url);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch image:', error);
+    } finally {
+      setLoadingImages(prev => {
+        const next = new Set(prev);
+        next.delete(materialId);
+        return next;
+      });
+    }
+  }, [loadedImages, loadingImages, onImageLoaded]);
+
+  // Preload images for current, previous, and next materials
+  useEffect(() => {
+    const indicesToLoad = [currentIndex - 1, currentIndex, currentIndex + 1, currentIndex + 2];
+    
+    indicesToLoad.forEach(idx => {
+      if (idx >= 0 && idx < materials.length) {
+        const material = materials[idx];
+        if (material && !material.image_url && !loadedImages[material.id]) {
+          fetchImageForMaterial(material.id);
+        }
+      }
+    });
+  }, [currentIndex, materials, loadedImages, fetchImageForMaterial]);
+
+  // Get image URL for a material (from props or loaded cache)
+  const getImageUrl = (material: Material): string | undefined => {
+    return material.image_url || loadedImages[material.id];
+  };
+
+  const isLoadingImage = (materialId: string): boolean => {
+    return loadingImages.has(materialId);
+  };
 
   const currentMaterial = materials[currentIndex];
   const minSwipeDistance = 50;
@@ -220,15 +288,20 @@ export const MobileBookView: React.FC<MobileBookViewProps> = ({
           <Card className="h-full bg-white/5 backdrop-blur-xl border-white/10 overflow-hidden">
             {/* Product Image */}
             <div className="h-[45%] relative overflow-hidden bg-gradient-to-b from-slate-800 to-slate-900">
-              {currentMaterial.image_url ? (
+              {getImageUrl(currentMaterial) ? (
                 <img
-                  src={currentMaterial.image_url}
+                  src={getImageUrl(currentMaterial)}
                   alt={currentMaterial.name}
                   className="w-full h-full object-contain p-4"
                   onError={(e) => {
                     e.currentTarget.src = 'https://placehold.co/400x300/1e293b/64748b?text=No+Image';
                   }}
                 />
+              ) : isLoadingImage(currentMaterial.id) ? (
+                <div className="w-full h-full flex flex-col items-center justify-center gap-3">
+                  <Loader2 className="h-12 w-12 text-green-400 animate-spin" />
+                  <span className="text-slate-400 text-sm">Loading image...</span>
+                </div>
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
                   <Package className="h-24 w-24 text-slate-600" />
