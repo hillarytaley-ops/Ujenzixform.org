@@ -12,10 +12,13 @@
 -- 1. FIX PURCHASE_ORDERS RLS POLICIES
 -- =============================================
 
--- Drop existing policies
+-- Drop ALL existing policies
 DROP POLICY IF EXISTS "purchase_orders_builder_access" ON purchase_orders;
 DROP POLICY IF EXISTS "purchase_orders_supplier_access" ON purchase_orders;
+DROP POLICY IF EXISTS "purchase_orders_supplier_view" ON purchase_orders;
+DROP POLICY IF EXISTS "purchase_orders_supplier_update" ON purchase_orders;
 DROP POLICY IF EXISTS "purchase_orders_admin_access" ON purchase_orders;
+DROP POLICY IF EXISTS "purchase_orders_admin_all" ON purchase_orders;
 DROP POLICY IF EXISTS "Builders can view own orders" ON purchase_orders;
 DROP POLICY IF EXISTS "Suppliers can view assigned orders" ON purchase_orders;
 DROP POLICY IF EXISTS "Anyone can view orders" ON purchase_orders;

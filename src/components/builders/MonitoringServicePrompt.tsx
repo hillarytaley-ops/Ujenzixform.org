@@ -135,7 +135,7 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
 
       // Create monitoring service request
       const { error } = await supabase
-        .from('monitoring_requests')
+        .from('monitoring_service_requests')
         .insert({
           user_id: user.id,
           purchase_order_id: purchaseOrder?.id,
