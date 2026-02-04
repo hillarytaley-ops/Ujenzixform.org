@@ -221,31 +221,39 @@ export const CartSidebar: React.FC = () => {
       }
       
       // Create purchase order
+      const orderPayload = {
+        po_number: poNumber,
+        buyer_id: user.id,
+        supplier_id: supplierId,
+        total_amount: getTotalPrice(),
+        delivery_address: 'To be provided',
+        delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 days from now
+        project_name: 'Direct Purchase - ' + new Date().toLocaleDateString(),
+        status: 'confirmed',
+        items: items.map(item => ({
+          material_id: item.id,
+          material_name: item.name,
+          category: item.category,
+          quantity: item.quantity,
+          unit: item.unit,
+          unit_price: item.unit_price
+        }))
+      };
+
+      console.log('🛒 Creating purchase order:', orderPayload);
+
       const { data: orderData, error: orderError } = await supabase
         .from('purchase_orders')
-        .insert({
-          po_number: poNumber,
-          buyer_id: user.id,
-          supplier_id: supplierId,
-          total_amount: getTotalPrice(),
-          delivery_address: 'To be provided',
-          delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 days from now
-          project_name: 'Direct Purchase - ' + new Date().toLocaleDateString(),
-          status: 'confirmed',
-          items: items.map(item => ({
-            material_id: item.id,
-            material_name: item.name,
-            category: item.category,
-            quantity: item.quantity,
-            unit: item.unit,
-            unit_price: item.unit_price
-          })),
-          created_at: new Date().toISOString()
-        })
+        .insert(orderPayload)
         .select()
         .single();
 
-      if (orderError) throw orderError;
+      if (orderError) {
+        console.error('❌ Purchase order creation failed:', orderError);
+        throw orderError;
+      }
+
+      console.log('✅ Purchase order created:', orderData);
 
       // Success! Store order info for delivery/monitoring prompts
       const orderTotal = getTotalPrice();
