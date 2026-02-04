@@ -133,6 +133,13 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
 
       const selectedPkg = MONITORING_PACKAGES.find(p => p.id === selectedPackage);
 
+      // Get user profile for contact name
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name, email')
+        .eq('id', user.id)
+        .single();
+
       // Create monitoring service request using actual table columns
       const monitoringRequest = {
         user_id: user.id,
@@ -141,6 +148,8 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
         project_type: selectedPackage,
         project_duration: selectedPkg?.duration || null,
         start_date: formData.preferredStartDate || null,
+        contact_name: profile?.full_name || user.email?.split('@')[0] || 'Customer',
+        contact_email: profile?.email || user.email || '',
         contact_phone: formData.contactPhone,
         selected_services: [selectedPackage],
         special_requirements: formData.specialRequirements || null,
