@@ -27,6 +27,7 @@ import { ShoppingCart, Trash2, Plus, Minus, Package, X, FileText, CreditCard, Sc
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { CartPriceComparison } from './CartPriceComparison';
+import { CartPriceComparisonAll } from './CartPriceComparisonAll';
 import { MultiSupplierQuoteDialog } from './MultiSupplierQuoteDialog';
 import { DeliveryPromptDialog } from '@/components/builders/DeliveryPromptDialog';
 import { MonitoringServicePrompt } from '@/components/builders/MonitoringServicePrompt';
@@ -45,6 +46,7 @@ export const CartSidebar: React.FC = () => {
   const { toast } = useToast();
   const [comparisonItem, setComparisonItem] = useState<CartItem | null>(null);
   const [showComparison, setShowComparison] = useState(false);
+  const [showCompareAll, setShowCompareAll] = useState(false);
   const [showMultiSupplierQuote, setShowMultiSupplierQuote] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -419,20 +421,6 @@ export const CartSidebar: React.FC = () => {
                         KES {(item.unit_price * item.quantity).toLocaleString()}
                       </span>
                     </div>
-                    
-                          {/* Compare Prices Button */}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full text-purple-600 border-purple-200 hover:bg-purple-50 hover:border-purple-300"
-                            onClick={() => {
-                              setComparisonItem(item);
-                              setShowComparison(true);
-                            }}
-                          >
-                            <Scale className="h-3 w-3 mr-1.5" />
-                            Compare Prices
-                          </Button>
                         </div>
                       ))}
                     </div>
@@ -445,6 +433,16 @@ export const CartSidebar: React.FC = () => {
 
             {/* Cart Summary */}
             <div className="space-y-3 pt-2">
+              {/* Compare All Prices Button */}
+              <Button
+                variant="outline"
+                className="w-full text-purple-600 border-purple-200 hover:bg-purple-50 hover:border-purple-300 h-10"
+                onClick={() => setShowCompareAll(true)}
+              >
+                <Scale className="h-4 w-4 mr-2" />
+                Compare All Prices ({items.length} items)
+              </Button>
+
               <div className="bg-gray-50 rounded-lg p-3 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Items ({getTotalItems()})</span>
@@ -536,6 +534,12 @@ export const CartSidebar: React.FC = () => {
             clearCart();
             setIsCartOpen(false);
           }}
+        />
+
+        {/* Compare All Prices Dialog */}
+        <CartPriceComparisonAll
+          isOpen={showCompareAll}
+          onClose={() => setShowCompareAll(false)}
         />
       </SheetContent>
 
