@@ -155,13 +155,20 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
 
       console.log('✅ Comparison results:', comparisonResults);
       setComparisons(comparisonResults);
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error fetching prices:', error);
+      
+      // Check if it's an offline/CORS error
+      const isOffline = error?.offline || error?.message?.includes('offline') || error?.message?.includes('CORS');
+      
       toast({
-        title: 'Error',
-        description: 'Failed to fetch price comparisons',
-        variant: 'destructive'
+        title: isOffline ? '📡 Connection Issue' : 'Error',
+        description: isOffline 
+          ? 'Unable to fetch prices. Showing your cart items.' 
+          : 'Failed to fetch price comparisons',
+        variant: isOffline ? 'default' : 'destructive'
       });
+      
       // Still show items even if comparison fails
       setComparisons(items.map(item => ({
         product_id: item.id,
