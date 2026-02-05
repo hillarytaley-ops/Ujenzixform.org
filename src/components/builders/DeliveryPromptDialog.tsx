@@ -712,7 +712,7 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
                       <SelectValue placeholder="Any time" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Any time</SelectItem>
+                      <SelectItem value="anytime">Any time</SelectItem>
                       <SelectItem value="morning">Morning (8AM - 12PM)</SelectItem>
                       <SelectItem value="afternoon">Afternoon (12PM - 4PM)</SelectItem>
                       <SelectItem value="evening">Evening (4PM - 6PM)</SelectItem>
