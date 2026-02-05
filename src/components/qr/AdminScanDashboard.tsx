@@ -48,9 +48,12 @@ interface MaterialItemEnhanced {
   status: string;
   buyer_name?: string;
   buyer_email?: string;
+  buyer_phone?: string;
   supplier_id?: string;
   purchase_order_id?: string;
   created_at: string;
+  dispatch_scanned_at?: string;
+  receive_scanned_at?: string;
 }
 
 export const AdminScanDashboard: React.FC = () => {
@@ -152,7 +155,9 @@ export const AdminScanDashboard: React.FC = () => {
           status,
           supplier_id,
           purchase_order_id,
-          created_at
+          created_at,
+          dispatch_scanned_at,
+          receive_scanned_at
         `)
         .order('created_at', { ascending: false })
         .limit(100);
@@ -170,21 +175,23 @@ export const AdminScanDashboard: React.FC = () => {
           .in('id', orderIds);
         
         if (orders) {
-          // Get buyer profiles
+          // Get buyer profiles with phone
           const buyerIds = [...new Set(orders.map(o => o.buyer_id).filter(Boolean))];
           const { data: profiles } = await supabase
             .from('profiles')
-            .select('id, full_name, email')
+            .select('id, full_name, email, phone')
             .in('id', buyerIds);
           
           const profilesMap: Record<string, any> = {};
           profiles?.forEach(p => { profilesMap[p.id] = p; });
           
           orders.forEach(o => {
+            const profile = profilesMap[o.buyer_id];
             ordersMap[o.id] = {
               ...o,
-              buyer_name: profilesMap[o.buyer_id]?.full_name || 'Unknown',
-              buyer_email: profilesMap[o.buyer_id]?.email || ''
+              buyer_name: profile?.full_name || profile?.email?.split('@')[0] || 'Client',
+              buyer_email: profile?.email || '',
+              buyer_phone: profile?.phone || ''
             };
           });
         }
@@ -195,6 +202,7 @@ export const AdminScanDashboard: React.FC = () => {
         ...item,
         buyer_name: ordersMap[item.purchase_order_id]?.buyer_name || 'Unknown Client',
         buyer_email: ordersMap[item.purchase_order_id]?.buyer_email || '',
+        buyer_phone: ordersMap[item.purchase_order_id]?.buyer_phone || '',
         po_number: ordersMap[item.purchase_order_id]?.po_number || ''
       })) || [];
 
@@ -413,24 +421,24 @@ export const AdminScanDashboard: React.FC = () => {
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="bg-slate-50">
-                  <TableHead className="font-semibold">Material</TableHead>
-                  <TableHead className="font-semibold">
+                <TableRow className="bg-slate-100 dark:bg-slate-800">
+                  <TableHead className="font-semibold text-slate-900 dark:text-slate-100">Material</TableHead>
+                  <TableHead className="font-semibold text-slate-900 dark:text-slate-100">
                     <div className="flex items-center gap-1">
                       <User className="h-4 w-4" />
                       Client
                     </div>
                   </TableHead>
-                  <TableHead className="font-semibold">
+                  <TableHead className="font-semibold text-slate-900 dark:text-slate-100">
                     <div className="flex items-center gap-1">
                       <Building2 className="h-4 w-4" />
                       Supplier
                     </div>
                   </TableHead>
-                  <TableHead className="font-semibold">Status</TableHead>
-                  <TableHead className="font-semibold">Dispatched</TableHead>
-                  <TableHead className="font-semibold">Received</TableHead>
-                  <TableHead className="font-semibold">QR Code</TableHead>
+                  <TableHead className="font-semibold text-slate-900 dark:text-slate-100">Status</TableHead>
+                  <TableHead className="font-semibold text-slate-900 dark:text-slate-100">QR Generated</TableHead>
+                  <TableHead className="font-semibold text-slate-900 dark:text-slate-100">Dispatched</TableHead>
+                  <TableHead className="font-semibold text-slate-900 dark:text-slate-100">Received</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -444,92 +452,110 @@ export const AdminScanDashboard: React.FC = () => {
                   filteredItems.map((item) => {
                     const scanInfo = getItemScanInfo(item.qr_code);
                     return (
-                      <TableRow key={item.id} className="hover:bg-slate-50">
+                      <TableRow key={item.id} className="hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors">
                         <TableCell>
                           <div>
-                            <p className="font-medium">{item.material_type}</p>
-                            <p className="text-xs text-muted-foreground">
-                              Created: {new Date(item.created_at).toLocaleDateString()}
-                            </p>
+                            <p className="font-medium text-slate-900 dark:text-slate-100">{item.material_type}</p>
+                            <code className="text-[10px] bg-slate-200 dark:bg-slate-600 px-1.5 py-0.5 rounded font-mono text-slate-600 dark:text-slate-300">
+                              {item.qr_code?.substring(0, 25)}...
+                            </code>
                           </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-cyan-100 flex items-center justify-center">
+                            <div className="w-8 h-8 rounded-full bg-cyan-100 flex items-center justify-center flex-shrink-0">
                               <User className="h-4 w-4 text-cyan-600" />
                             </div>
                             <div>
-                              <p className="font-medium text-sm">{item.buyer_name}</p>
-                              <p className="text-xs text-muted-foreground">{item.buyer_email}</p>
+                              <p className="font-medium text-sm text-slate-900 dark:text-slate-100">{item.buyer_name}</p>
+                              <p className="text-xs text-slate-500 dark:text-slate-400">{item.buyer_email}</p>
+                              {item.buyer_phone && (
+                                <p className="text-xs text-slate-400 dark:text-slate-500">{item.buyer_phone}</p>
+                              )}
                             </div>
                           </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center">
+                            <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
                               <Building2 className="h-4 w-4 text-orange-600" />
                             </div>
-                            <p className="font-medium text-sm">{getSupplierName(item.supplier_id)}</p>
+                            <p className="font-medium text-sm text-slate-900 dark:text-slate-100">{getSupplierName(item.supplier_id)}</p>
                           </div>
                         </TableCell>
                         <TableCell>
                           <Badge
                             className={
-                              item.status === 'pending' ? 'bg-gray-500' :
-                              item.status === 'dispatched' ? 'bg-blue-500' :
-                              item.status === 'in_transit' ? 'bg-yellow-500' :
-                              item.status === 'received' ? 'bg-green-500' :
-                              item.status === 'verified' ? 'bg-emerald-600' :
-                              'bg-gray-400'
+                              item.status === 'pending' ? 'bg-gray-500 text-white' :
+                              item.status === 'dispatched' ? 'bg-blue-500 text-white' :
+                              item.status === 'in_transit' ? 'bg-yellow-500 text-white' :
+                              item.status === 'received' ? 'bg-green-500 text-white' :
+                              item.status === 'verified' ? 'bg-emerald-600 text-white' :
+                              'bg-gray-400 text-white'
                             }
                           >
                             {item.status?.replace('_', ' ').toUpperCase() || 'UNKNOWN'}
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          {scanInfo.dispatchScan ? (
+                          <div className="text-xs">
+                            <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                              <Clock className="h-3 w-3 mr-1" />
+                              Generated
+                            </Badge>
+                            <p className="text-slate-600 dark:text-slate-400 mt-1">
+                              {new Date(item.created_at).toLocaleDateString()}
+                            </p>
+                            <p className="text-slate-500 dark:text-slate-500 text-[10px]">
+                              {new Date(item.created_at).toLocaleTimeString()}
+                            </p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {item.dispatch_scanned_at || scanInfo.dispatchScan ? (
                             <div className="text-xs">
                               <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
                                 <CheckCircle className="h-3 w-3 mr-1" />
                                 Dispatched
                               </Badge>
-                              <p className="text-muted-foreground mt-1">
-                                {new Date(scanInfo.dispatchScan.scanned_at).toLocaleString()}
+                              <p className="text-slate-600 dark:text-slate-400 mt-1">
+                                {new Date(item.dispatch_scanned_at || scanInfo.dispatchScan?.scanned_at || '').toLocaleDateString()}
+                              </p>
+                              <p className="text-slate-500 dark:text-slate-500 text-[10px]">
+                                {new Date(item.dispatch_scanned_at || scanInfo.dispatchScan?.scanned_at || '').toLocaleTimeString()}
                               </p>
                             </div>
                           ) : (
-                            <Badge variant="outline" className="bg-gray-50 text-gray-500">
-                              Not yet
+                            <Badge variant="outline" className="bg-gray-100 text-gray-500 border-gray-200">
+                              Pending
                             </Badge>
                           )}
                         </TableCell>
                         <TableCell>
-                          {scanInfo.receiveScan ? (
+                          {item.receive_scanned_at || scanInfo.receiveScan ? (
                             <div className="text-xs">
                               <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
                                 <CheckCircle className="h-3 w-3 mr-1" />
                                 Received
                               </Badge>
-                              <p className="text-muted-foreground mt-1">
-                                {new Date(scanInfo.receiveScan.scanned_at).toLocaleString()}
+                              <p className="text-slate-600 dark:text-slate-400 mt-1">
+                                {new Date(item.receive_scanned_at || scanInfo.receiveScan?.scanned_at || '').toLocaleDateString()}
                               </p>
-                              {scanInfo.receiveScan.material_condition === 'damaged' && (
-                                <Badge className="bg-red-500 mt-1">
+                              <p className="text-slate-500 dark:text-slate-500 text-[10px]">
+                                {new Date(item.receive_scanned_at || scanInfo.receiveScan?.scanned_at || '').toLocaleTimeString()}
+                              </p>
+                              {scanInfo.receiveScan?.material_condition === 'damaged' && (
+                                <Badge className="bg-red-500 text-white mt-1">
                                   <AlertTriangle className="h-3 w-3 mr-1" />
                                   Damaged
                                 </Badge>
                               )}
                             </div>
                           ) : (
-                            <Badge variant="outline" className="bg-gray-50 text-gray-500">
-                              Not yet
+                            <Badge variant="outline" className="bg-gray-100 text-gray-500 border-gray-200">
+                              Pending
                             </Badge>
                           )}
-                        </TableCell>
-                        <TableCell>
-                          <code className="text-xs bg-slate-100 px-2 py-1 rounded font-mono">
-                            {item.qr_code?.substring(0, 20)}...
-                          </code>
                         </TableCell>
                       </TableRow>
                     );
@@ -553,15 +579,15 @@ export const AdminScanDashboard: React.FC = () => {
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="bg-slate-50">
-                  <TableHead>Material</TableHead>
-                  <TableHead>Client</TableHead>
-                  <TableHead>Supplier</TableHead>
-                  <TableHead>Scan Type</TableHead>
-                  <TableHead>Scanner</TableHead>
-                  <TableHead>Condition</TableHead>
-                  <TableHead>Time</TableHead>
-                  <TableHead>Notes</TableHead>
+                <TableRow className="bg-slate-100 dark:bg-slate-800">
+                  <TableHead className="font-semibold text-slate-900 dark:text-slate-100">Material</TableHead>
+                  <TableHead className="font-semibold text-slate-900 dark:text-slate-100">Client</TableHead>
+                  <TableHead className="font-semibold text-slate-900 dark:text-slate-100">Supplier</TableHead>
+                  <TableHead className="font-semibold text-slate-900 dark:text-slate-100">Scan Type</TableHead>
+                  <TableHead className="font-semibold text-slate-900 dark:text-slate-100">Scanner</TableHead>
+                  <TableHead className="font-semibold text-slate-900 dark:text-slate-100">Condition</TableHead>
+                  <TableHead className="font-semibold text-slate-900 dark:text-slate-100">Date & Time</TableHead>
+                  <TableHead className="font-semibold text-slate-900 dark:text-slate-100">Notes</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -576,54 +602,70 @@ export const AdminScanDashboard: React.FC = () => {
                     // Find matching material item
                     const matchingItem = materialItems.find(m => m.qr_code === scan.qr_code);
                     return (
-                      <TableRow key={scan.id} className="hover:bg-slate-50">
+                      <TableRow key={scan.id} className="hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors">
                         <TableCell>
-                          <p className="font-medium text-sm">
+                          <p className="font-medium text-sm text-slate-900 dark:text-slate-100">
                             {matchingItem?.material_type || 'Unknown Material'}
                           </p>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <User className="h-4 w-4 text-cyan-600" />
-                            <span className="text-sm">{matchingItem?.buyer_name || 'Unknown'}</span>
+                            <div className="w-6 h-6 rounded-full bg-cyan-100 flex items-center justify-center flex-shrink-0">
+                              <User className="h-3 w-3 text-cyan-600" />
+                            </div>
+                            <div>
+                              <span className="text-sm font-medium text-slate-900 dark:text-slate-100">{matchingItem?.buyer_name || 'Unknown'}</span>
+                              {matchingItem?.buyer_email && (
+                                <p className="text-[10px] text-slate-500">{matchingItem.buyer_email}</p>
+                              )}
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <Building2 className="h-4 w-4 text-orange-600" />
-                            <span className="text-sm">{getSupplierName(matchingItem?.supplier_id)}</span>
+                            <div className="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
+                              <Building2 className="h-3 w-3 text-orange-600" />
+                            </div>
+                            <span className="text-sm text-slate-900 dark:text-slate-100">{getSupplierName(matchingItem?.supplier_id)}</span>
                           </div>
                         </TableCell>
                         <TableCell>
                           <Badge
                             className={
                               scan.scan_type === 'dispatch'
-                                ? 'bg-blue-500'
+                                ? 'bg-blue-500 text-white'
                                 : scan.scan_type === 'receiving'
-                                ? 'bg-green-500'
-                                : 'bg-purple-500'
+                                ? 'bg-green-500 text-white'
+                                : 'bg-purple-500 text-white'
                             }
                           >
                             {scan.scan_type}
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline">{scan.scanner_type}</Badge>
+                          <Badge variant="outline" className="text-slate-700 dark:text-slate-300">{scan.scanner_type}</Badge>
                         </TableCell>
                         <TableCell>
                           {scan.material_condition === 'damaged' ? (
-                            <Badge className="bg-red-500">
+                            <Badge className="bg-red-500 text-white">
                               <AlertTriangle className="h-3 w-3 mr-1" />
                               {scan.material_condition}
                             </Badge>
                           ) : (
-                            <span className="text-sm capitalize">{scan.material_condition}</span>
+                            <span className="text-sm capitalize text-green-600 font-medium">{scan.material_condition}</span>
                           )}
                         </TableCell>
-                        <TableCell className="text-sm">
-                          {new Date(scan.scanned_at).toLocaleString()}
+                        <TableCell>
+                          <div className="text-xs">
+                            <p className="text-slate-900 dark:text-slate-100 font-medium">
+                              {new Date(scan.scanned_at).toLocaleDateString()}
+                            </p>
+                            <p className="text-slate-500">
+                              {new Date(scan.scanned_at).toLocaleTimeString()}
+                            </p>
+                          </div>
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground max-w-[150px] truncate">
+                        <TableCell className="text-sm text-slate-600 dark:text-slate-400 max-w-[150px] truncate">
                           {scan.notes || '-'}
                         </TableCell>
                       </TableRow>
