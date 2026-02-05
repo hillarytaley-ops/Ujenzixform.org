@@ -49,6 +49,7 @@ interface MaterialItemEnhanced {
   buyer_name?: string;
   buyer_email?: string;
   buyer_phone?: string;
+  buyer_role?: string;
   supplier_id?: string;
   purchase_order_id?: string;
   created_at: string;
@@ -162,36 +163,91 @@ export const AdminScanDashboard: React.FC = () => {
         .order('created_at', { ascending: false })
         .limit(100);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching material_items:', error);
+        throw error;
+      }
+
+      console.log('📦 Material items loaded:', items?.length);
 
       // Fetch purchase orders to get buyer info
       const orderIds = [...new Set(items?.map(i => i.purchase_order_id).filter(Boolean))];
+      console.log('📋 Order IDs to fetch:', orderIds);
       
       let ordersMap: Record<string, any> = {};
       if (orderIds.length > 0) {
-        const { data: orders } = await supabase
+        const { data: orders, error: ordersError } = await supabase
           .from('purchase_orders')
-          .select('id, po_number, buyer_id')
+          .select('id, po_number, buyer_id, project_name')
           .in('id', orderIds);
         
-        if (orders) {
+        if (ordersError) {
+          console.error('Error fetching purchase_orders:', ordersError);
+        }
+        
+        console.log('📋 Purchase orders loaded:', orders);
+        
+        if (orders && orders.length > 0) {
           // Get buyer profiles with phone
           const buyerIds = [...new Set(orders.map(o => o.buyer_id).filter(Boolean))];
-          const { data: profiles } = await supabase
+          console.log('👥 Buyer IDs to fetch:', buyerIds);
+          
+          // Fetch from profiles table
+          const { data: profiles, error: profilesError } = await supabase
             .from('profiles')
-            .select('id, full_name, email, phone')
+            .select('id, full_name, email, phone, company_name')
             .in('id', buyerIds);
           
+          if (profilesError) {
+            console.error('Error fetching profiles:', profilesError);
+          }
+          
+          console.log('👥 Profiles loaded:', profiles);
+          
           const profilesMap: Record<string, any> = {};
-          profiles?.forEach(p => { profilesMap[p.id] = p; });
+          profiles?.forEach(p => { 
+            profilesMap[p.id] = p; 
+          });
+          
+          // Also try to get user roles to identify builder type
+          const { data: userRoles } = await supabase
+            .from('user_roles')
+            .select('user_id, role')
+            .in('user_id', buyerIds);
+          
+          const rolesMap: Record<string, string> = {};
+          userRoles?.forEach(r => { rolesMap[r.user_id] = r.role; });
+          
+          console.log('🔑 User roles:', userRoles);
           
           orders.forEach(o => {
             const profile = profilesMap[o.buyer_id];
+            const role = rolesMap[o.buyer_id];
+            
+            // Try multiple sources for the name
+            let buyerName = 'Unknown Client';
+            if (profile?.full_name && profile.full_name.trim()) {
+              buyerName = profile.full_name;
+            } else if (profile?.company_name && profile.company_name.trim()) {
+              buyerName = profile.company_name;
+            } else if (profile?.email) {
+              // Use email username as fallback
+              buyerName = profile.email.split('@')[0];
+            }
+            
+            // Add role indicator
+            if (role === 'professional_builder') {
+              buyerName += ' (Pro)';
+            } else if (role === 'private_client') {
+              buyerName += ' (Private)';
+            }
+            
             ordersMap[o.id] = {
               ...o,
-              buyer_name: profile?.full_name || profile?.email?.split('@')[0] || 'Client',
+              buyer_name: buyerName,
               buyer_email: profile?.email || '',
-              buyer_phone: profile?.phone || ''
+              buyer_phone: profile?.phone || '',
+              buyer_role: role || ''
             };
           });
         }
@@ -200,12 +256,14 @@ export const AdminScanDashboard: React.FC = () => {
       // Enhance items with buyer info
       const enhancedItems = items?.map(item => ({
         ...item,
-        buyer_name: ordersMap[item.purchase_order_id]?.buyer_name || 'Unknown Client',
+        buyer_name: ordersMap[item.purchase_order_id]?.buyer_name || 'No Order Link',
         buyer_email: ordersMap[item.purchase_order_id]?.buyer_email || '',
         buyer_phone: ordersMap[item.purchase_order_id]?.buyer_phone || '',
+        buyer_role: ordersMap[item.purchase_order_id]?.buyer_role || '',
         po_number: ordersMap[item.purchase_order_id]?.po_number || ''
       })) || [];
 
+      console.log('✅ Enhanced items:', enhancedItems.slice(0, 3));
       setMaterialItems(enhancedItems);
     } catch (error) {
       console.error('Error fetching material items:', error);
@@ -463,11 +521,26 @@ export const AdminScanDashboard: React.FC = () => {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-cyan-100 flex items-center justify-center flex-shrink-0">
-                              <User className="h-4 w-4 text-cyan-600" />
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                              item.buyer_role === 'professional_builder' ? 'bg-purple-100' : 
+                              item.buyer_role === 'private_client' ? 'bg-cyan-100' : 'bg-gray-100'
+                            }`}>
+                              <User className={`h-4 w-4 ${
+                                item.buyer_role === 'professional_builder' ? 'text-purple-600' : 
+                                item.buyer_role === 'private_client' ? 'text-cyan-600' : 'text-gray-600'
+                              }`} />
                             </div>
                             <div>
                               <p className="font-medium text-sm text-slate-900 dark:text-slate-100">{item.buyer_name}</p>
+                              {item.buyer_role && (
+                                <Badge variant="outline" className={`text-[10px] px-1 py-0 ${
+                                  item.buyer_role === 'professional_builder' 
+                                    ? 'bg-purple-50 text-purple-700 border-purple-200' 
+                                    : 'bg-cyan-50 text-cyan-700 border-cyan-200'
+                                }`}>
+                                  {item.buyer_role === 'professional_builder' ? 'Professional Builder' : 'Private Client'}
+                                </Badge>
+                              )}
                               <p className="text-xs text-slate-500 dark:text-slate-400">{item.buyer_email}</p>
                               {item.buyer_phone && (
                                 <p className="text-xs text-slate-400 dark:text-slate-500">{item.buyer_phone}</p>
