@@ -192,7 +192,10 @@ export const AdminScanDashboard: React.FC = () => {
           const buyerIds = [...new Set(orders.map(o => o.buyer_id).filter(Boolean))];
           console.log('👥 Buyer IDs to fetch:', buyerIds);
           
-          // Fetch from profiles table
+          // Try multiple sources for profile data
+          const profilesMap: Record<string, any> = {};
+          
+          // Method 1: Try profiles table
           const { data: profiles, error: profilesError } = await supabase
             .from('profiles')
             .select('id, full_name, email, phone, company_name')
@@ -201,15 +204,53 @@ export const AdminScanDashboard: React.FC = () => {
           if (profilesError) {
             console.error('Error fetching profiles:', profilesError);
           }
+          console.log('👥 Profiles from profiles table:', profiles);
           
-          console.log('👥 Profiles loaded:', profiles);
-          
-          const profilesMap: Record<string, any> = {};
           profiles?.forEach(p => { 
             profilesMap[p.id] = p; 
           });
           
-          // Also try to get user roles to identify builder type
+          // Method 2: Try builder_profiles table (for professional builders)
+          const { data: builderProfiles } = await supabase
+            .from('builder_profiles')
+            .select('user_id, full_name, email, phone, company_name')
+            .in('user_id', buyerIds);
+          
+          console.log('👥 Builder profiles:', builderProfiles);
+          
+          builderProfiles?.forEach(bp => {
+            if (!profilesMap[bp.user_id] || !profilesMap[bp.user_id].full_name) {
+              profilesMap[bp.user_id] = {
+                id: bp.user_id,
+                full_name: bp.full_name,
+                email: bp.email,
+                phone: bp.phone,
+                company_name: bp.company_name
+              };
+            }
+          });
+          
+          // Method 3: Try suppliers table (in case buyer is also a supplier)
+          const { data: supplierProfiles } = await supabase
+            .from('suppliers')
+            .select('user_id, contact_name, email, phone, company_name')
+            .in('user_id', buyerIds);
+          
+          console.log('👥 Supplier profiles:', supplierProfiles);
+          
+          supplierProfiles?.forEach(sp => {
+            if (!profilesMap[sp.user_id] || !profilesMap[sp.user_id].full_name) {
+              profilesMap[sp.user_id] = {
+                id: sp.user_id,
+                full_name: sp.contact_name,
+                email: sp.email,
+                phone: sp.phone,
+                company_name: sp.company_name
+              };
+            }
+          });
+          
+          // Get user roles to identify builder type
           const { data: userRoles } = await supabase
             .from('user_roles')
             .select('user_id, role')
@@ -219,6 +260,7 @@ export const AdminScanDashboard: React.FC = () => {
           userRoles?.forEach(r => { rolesMap[r.user_id] = r.role; });
           
           console.log('🔑 User roles:', userRoles);
+          console.log('📊 Final profiles map:', profilesMap);
           
           orders.forEach(o => {
             const profile = profilesMap[o.buyer_id];
@@ -226,27 +268,36 @@ export const AdminScanDashboard: React.FC = () => {
             
             // Try multiple sources for the name
             let buyerName = 'Unknown Client';
-            if (profile?.full_name && profile.full_name.trim()) {
-              buyerName = profile.full_name;
-            } else if (profile?.company_name && profile.company_name.trim()) {
-              buyerName = profile.company_name;
-            } else if (profile?.email) {
-              // Use email username as fallback
-              buyerName = profile.email.split('@')[0];
-            }
+            let buyerEmail = '';
+            let buyerPhone = '';
             
-            // Add role indicator
-            if (role === 'professional_builder') {
-              buyerName += ' (Pro)';
-            } else if (role === 'private_client') {
-              buyerName += ' (Private)';
+            if (profile) {
+              if (profile.full_name && profile.full_name.trim()) {
+                buyerName = profile.full_name;
+              } else if (profile.company_name && profile.company_name.trim()) {
+                buyerName = profile.company_name;
+              } else if (profile.email) {
+                // Use email username as fallback
+                buyerName = profile.email.split('@')[0];
+              }
+              buyerEmail = profile.email || '';
+              buyerPhone = profile.phone || '';
+            } else {
+              // If no profile found, try to get name from role
+              if (role === 'professional_builder') {
+                buyerName = `Builder #${o.buyer_id.substring(0, 8)}`;
+              } else if (role === 'private_client') {
+                buyerName = `Client #${o.buyer_id.substring(0, 8)}`;
+              } else {
+                buyerName = `User #${o.buyer_id.substring(0, 8)}`;
+              }
             }
             
             ordersMap[o.id] = {
               ...o,
               buyer_name: buyerName,
-              buyer_email: profile?.email || '',
-              buyer_phone: profile?.phone || '',
+              buyer_email: buyerEmail,
+              buyer_phone: buyerPhone,
               buyer_role: role || ''
             };
           });
