@@ -312,6 +312,7 @@ export const CartSidebar: React.FC = () => {
   };
 
   return (
+    <>
     <Sheet open={isCartOpen} onOpenChange={setIsCartOpen}>
       <SheetContent className="w-full sm:max-w-lg flex flex-col">
         <SheetHeader className="space-y-2 pb-4 border-b">
@@ -571,71 +572,72 @@ export const CartSidebar: React.FC = () => {
           onClose={() => setShowCompareAll(false)}
         />
       </SheetContent>
+    </Sheet>
 
-      {/* Delivery Prompt Dialog (for Private Clients after purchase) */}
-      {lastOrderId && (
-        <DeliveryPromptDialog
-          isOpen={showDeliveryPrompt}
-          onOpenChange={(open) => {
-            setShowDeliveryPrompt(open);
-            if (!open) {
-              // Show monitoring prompt after delivery decision
-              setTimeout(() => {
-                setShowMonitoringPrompt(true);
-              }, 300);
-            }
-          }}
-          purchaseOrder={{
-            id: lastOrderId,
-            po_number: `PO-${lastOrderId.slice(0, 8)}`,
-            supplier_id: '',
-            total_amount: lastOrderTotal,
-            delivery_address: 'To be provided',
-            delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            items: [],
-            project_name: 'Direct Purchase'
-          }}
-          onDeliveryRequested={() => {
-            setShowDeliveryPrompt(false);
-            toast({
-              title: '🚚 Delivery Requested!',
-              description: 'A delivery provider will be assigned to your order soon.',
-            });
-          }}
-          onDeclined={() => {
-            setShowDeliveryPrompt(false);
-          }}
-        />
-      )}
-
-      {/* Monitoring Service Prompt (after delivery decision) */}
-      <MonitoringServicePrompt
-        isOpen={showMonitoringPrompt}
+    {/* Delivery Prompt Dialog (for Private Clients after purchase) - OUTSIDE Sheet so it persists */}
+    {lastOrderId && (
+      <DeliveryPromptDialog
+        isOpen={showDeliveryPrompt}
         onOpenChange={(open) => {
-          setShowMonitoringPrompt(open);
+          setShowDeliveryPrompt(open);
           if (!open) {
-            setLastOrderId(null);
-            setLastOrderTotal(0);
+            // Show monitoring prompt after delivery decision
+            setTimeout(() => {
+              setShowMonitoringPrompt(true);
+            }, 300);
           }
         }}
-        purchaseOrder={lastOrderId ? {
+        purchaseOrder={{
           id: lastOrderId,
           po_number: `PO-${lastOrderId.slice(0, 8)}`,
+          supplier_id: '',
           total_amount: lastOrderTotal,
+          delivery_address: 'To be provided',
+          delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          items: [],
           project_name: 'Direct Purchase'
-        } : undefined}
-        onServiceRequested={() => {
-          setShowMonitoringPrompt(false);
-          setLastOrderId(null);
-          setLastOrderTotal(0);
+        }}
+        onDeliveryRequested={() => {
+          setShowDeliveryPrompt(false);
+          toast({
+            title: '🚚 Delivery Requested!',
+            description: 'A delivery provider will be assigned to your order soon.',
+          });
         }}
         onDeclined={() => {
-          setShowMonitoringPrompt(false);
-          setLastOrderId(null);
-          setLastOrderTotal(0);
+          setShowDeliveryPrompt(false);
         }}
       />
-    </Sheet>
+    )}
+
+    {/* Monitoring Service Prompt (after delivery decision) - OUTSIDE Sheet so it persists */}
+    <MonitoringServicePrompt
+      isOpen={showMonitoringPrompt}
+      onOpenChange={(open) => {
+        setShowMonitoringPrompt(open);
+        if (!open) {
+          setLastOrderId(null);
+          setLastOrderTotal(0);
+        }
+      }}
+      purchaseOrder={lastOrderId ? {
+        id: lastOrderId,
+        po_number: `PO-${lastOrderId.slice(0, 8)}`,
+        total_amount: lastOrderTotal,
+        project_name: 'Direct Purchase'
+      } : undefined}
+      onServiceRequested={() => {
+        setShowMonitoringPrompt(false);
+        setLastOrderId(null);
+        setLastOrderTotal(0);
+      }}
+      onDeclined={() => {
+        setShowMonitoringPrompt(false);
+        setLastOrderId(null);
+        setLastOrderTotal(0);
+      }}
+    />
+    </>
   );
 };
 
