@@ -279,26 +279,40 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
           (deliveryData.deliveryAddress ? ` | ${deliveryData.deliveryAddress}` : '');
       }
 
-      // Create delivery request
+      // Create delivery request - use only core columns that exist
+      const deliveryPayload: Record<string, any> = {
+        builder_id: profile.id,
+        purchase_order_id: purchaseOrder.id,
+        pickup_address: pickupAddress,
+        delivery_address: fullDeliveryAddress,
+        pickup_date: deliveryData.preferredDate,
+        material_type: deliveryData.materialType,
+        quantity: purchaseOrder.items?.length || 1,
+        status: 'pending'
+      };
+
+      // Add optional fields only if they have values
+      if (deliveryData.deliveryCoordinates) {
+        deliveryPayload.delivery_coordinates = deliveryData.deliveryCoordinates;
+      }
+      if (deliveryData.preferredTime && deliveryData.preferredTime !== 'anytime') {
+        deliveryPayload.preferred_time = deliveryData.preferredTime;
+      }
+      if (deliveryData.totalWeight) {
+        deliveryPayload.weight_kg = parseFloat(deliveryData.totalWeight);
+      }
+      if (deliveryData.specialInstructions) {
+        deliveryPayload.special_instructions = deliveryData.specialInstructions;
+      }
+      if (deliveryData.budgetRange) {
+        deliveryPayload.budget_range = deliveryData.budgetRange;
+      }
+
+      console.log('📦 Creating delivery request with payload:', deliveryPayload);
+
       const { data: deliveryRequest, error: deliveryError } = await supabase
         .from('delivery_requests')
-        .insert({
-          builder_id: profile.id,
-          purchase_order_id: purchaseOrder.id,
-          pickup_address: pickupAddress,
-          delivery_address: fullDeliveryAddress,
-          delivery_coordinates: deliveryData.deliveryCoordinates || null,
-          pickup_date: deliveryData.preferredDate,
-          preferred_time: deliveryData.preferredTime || null,
-          material_type: deliveryData.materialType,
-          quantity: purchaseOrder.items?.length || 1,
-          weight_kg: parseFloat(deliveryData.totalWeight) || null,
-          special_instructions: deliveryData.specialInstructions || null,
-          budget_range: deliveryData.budgetRange,
-          status: 'pending',
-          max_rotation_attempts: 5,
-          created_at: new Date().toISOString()
-        })
+        .insert(deliveryPayload)
         .select()
         .single();
 
