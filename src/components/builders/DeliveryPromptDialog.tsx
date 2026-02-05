@@ -32,7 +32,10 @@ import {
   XCircle,
   AlertCircle,
   DollarSign,
-  Eye
+  Eye,
+  Navigation,
+  Copy,
+  MapPinned
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -99,8 +102,10 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
   const [step, setStep] = useState<'prompt' | 'form' | 'success'>('prompt');
   const [submitting, setSubmitting] = useState(false);
   const [showMonitoringPrompt, setShowMonitoringPrompt] = useState(false);
+  const [gettingLocation, setGettingLocation] = useState(false);
   const [deliveryData, setDeliveryData] = useState({
     deliveryAddress: '',
+    deliveryCoordinates: '',
     preferredDate: '',
     preferredTime: '',
     materialType: 'mixed',
@@ -109,6 +114,87 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
     specialInstructions: ''
   });
   const { toast } = useToast();
+
+  // Get current GPS location
+  const getCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      toast({
+        title: 'Location Not Supported',
+        description: 'Your browser does not support GPS location.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setGettingLocation(true);
+    
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        const coords = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+        
+        setDeliveryData(prev => ({
+          ...prev,
+          deliveryCoordinates: coords
+        }));
+        
+        toast({
+          title: '📍 Location Captured!',
+          description: `Coordinates: ${coords}`,
+        });
+        
+        setGettingLocation(false);
+      },
+      (error) => {
+        console.error('Geolocation error:', error);
+        let errorMessage = 'Could not get your location.';
+        
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage = 'Please allow location access in your browser settings.';
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage = 'Location information is unavailable.';
+            break;
+          case error.TIMEOUT:
+            errorMessage = 'Location request timed out. Please try again.';
+            break;
+        }
+        
+        toast({
+          title: 'Location Error',
+          description: errorMessage,
+          variant: 'destructive'
+        });
+        
+        setGettingLocation(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    );
+  };
+
+  // Copy coordinates to clipboard
+  const copyCoordinates = () => {
+    if (deliveryData.deliveryCoordinates) {
+      navigator.clipboard.writeText(deliveryData.deliveryCoordinates);
+      toast({
+        title: 'Copied!',
+        description: 'Coordinates copied to clipboard.',
+      });
+    }
+  };
+
+  // Open coordinates in Google Maps
+  const openInMaps = () => {
+    if (deliveryData.deliveryCoordinates) {
+      const [lat, lng] = deliveryData.deliveryCoordinates.split(',').map(s => s.trim());
+      window.open(`https://www.google.com/maps?q=${lat},${lng}`, '_blank');
+    }
+  };
 
   // Pre-fill form with purchase order data
   useEffect(() => {
@@ -138,11 +224,11 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
   const handleRequestDelivery = async () => {
     if (!purchaseOrder) return;
 
-    // Validate required fields
-    if (!deliveryData.deliveryAddress.trim()) {
+    // Validate required fields - either address or coordinates
+    if (!deliveryData.deliveryAddress.trim() && !deliveryData.deliveryCoordinates.trim()) {
       toast({
-        title: 'Delivery Address Required',
-        description: 'Please enter the delivery address.',
+        title: 'Location Required',
+        description: 'Please provide either GPS coordinates or a delivery address.',
         variant: 'destructive'
       });
       return;
@@ -186,6 +272,13 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
         }
       }
 
+      // Build delivery address with coordinates
+      let fullDeliveryAddress = deliveryData.deliveryAddress;
+      if (deliveryData.deliveryCoordinates) {
+        fullDeliveryAddress = deliveryData.deliveryCoordinates + 
+          (deliveryData.deliveryAddress ? ` | ${deliveryData.deliveryAddress}` : '');
+      }
+
       // Create delivery request
       const { data: deliveryRequest, error: deliveryError } = await supabase
         .from('delivery_requests')
@@ -193,7 +286,8 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
           builder_id: profile.id,
           purchase_order_id: purchaseOrder.id,
           pickup_address: pickupAddress,
-          delivery_address: deliveryData.deliveryAddress,
+          delivery_address: fullDeliveryAddress,
+          delivery_coordinates: deliveryData.deliveryCoordinates || null,
           pickup_date: deliveryData.preferredDate,
           preferred_time: deliveryData.preferredTime || null,
           material_type: deliveryData.materialType,
@@ -479,19 +573,126 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
             </DialogHeader>
 
             <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto">
-              {/* Delivery Address */}
-              <div className="space-y-2">
-                <Label htmlFor="deliveryAddress" className="flex items-center gap-1">
-                  <MapPin className="h-3 w-3" />
-                  Delivery Address *
-                </Label>
-                <Input
-                  id="deliveryAddress"
-                  placeholder="Enter full delivery address"
-                  value={deliveryData.deliveryAddress}
-                  onChange={(e) => setDeliveryData(prev => ({ ...prev, deliveryAddress: e.target.value }))}
-                />
-              </div>
+              {/* Location Section */}
+              <Card className="border-2 border-dashed border-blue-200 bg-blue-50/50">
+                <CardContent className="p-4 space-y-4">
+                  <div className="flex items-center gap-2 text-blue-700 font-medium">
+                    <MapPinned className="h-5 w-5" />
+                    Delivery Location
+                  </div>
+
+                  {/* GPS Location Button - Easy one-tap */}
+                  <div className="space-y-2">
+                    <Label className="text-sm text-gray-600">📍 Quick Location (Recommended)</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={getCurrentLocation}
+                      disabled={gettingLocation}
+                      className="w-full h-14 border-2 border-green-300 bg-green-50 hover:bg-green-100 text-green-700 font-medium"
+                    >
+                      {gettingLocation ? (
+                        <>
+                          <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                          Getting Your Location...
+                        </>
+                      ) : (
+                        <>
+                          <Navigation className="h-5 w-5 mr-2" />
+                          📍 Use My Current Location (GPS)
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-xs text-gray-500 text-center">
+                      Tap to automatically capture your GPS coordinates
+                    </p>
+                  </div>
+
+                  {/* Display captured coordinates */}
+                  {deliveryData.deliveryCoordinates && (
+                    <div className="p-3 bg-green-100 border border-green-300 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs text-green-600 font-medium">GPS Coordinates Captured ✓</p>
+                          <p className="font-mono text-sm text-green-800">{deliveryData.deliveryCoordinates}</p>
+                        </div>
+                        <div className="flex gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={copyCoordinates}
+                            className="h-8 w-8 p-0"
+                            title="Copy coordinates"
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={openInMaps}
+                            className="h-8 w-8 p-0"
+                            title="View in Google Maps"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Manual coordinates input */}
+                  <div className="space-y-2">
+                    <Label htmlFor="deliveryCoordinates" className="text-sm text-gray-600">
+                      Or Enter Coordinates Manually
+                    </Label>
+                    <Input
+                      id="deliveryCoordinates"
+                      placeholder="e.g., -1.286389, 36.817223"
+                      value={deliveryData.deliveryCoordinates}
+                      onChange={(e) => setDeliveryData(prev => ({ ...prev, deliveryCoordinates: e.target.value }))}
+                      className="font-mono text-sm"
+                    />
+                    <p className="text-xs text-gray-400">
+                      Format: latitude, longitude (e.g., -1.286389, 36.817223 for Nairobi)
+                    </p>
+                  </div>
+
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-blue-50 px-2 text-gray-500">or provide address</span>
+                    </div>
+                  </div>
+
+                  {/* Delivery Address - Text */}
+                  <div className="space-y-2">
+                    <Label htmlFor="deliveryAddress" className="flex items-center gap-1 text-sm text-gray-600">
+                      <MapPin className="h-3 w-3" />
+                      Delivery Address (Street/Area)
+                    </Label>
+                    <Input
+                      id="deliveryAddress"
+                      placeholder="e.g., Plot 123, Ngong Road, Nairobi"
+                      value={deliveryData.deliveryAddress}
+                      onChange={(e) => setDeliveryData(prev => ({ ...prev, deliveryAddress: e.target.value }))}
+                    />
+                  </div>
+
+                  {/* Validation message */}
+                  {!deliveryData.deliveryAddress && !deliveryData.deliveryCoordinates && (
+                    <Alert className="bg-amber-50 border-amber-200">
+                      <AlertCircle className="h-4 w-4 text-amber-600" />
+                      <AlertDescription className="text-amber-700 text-xs">
+                        Please provide either GPS coordinates or a delivery address
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </CardContent>
+              </Card>
 
               {/* Date and Time */}
               <div className="grid grid-cols-2 gap-3">
