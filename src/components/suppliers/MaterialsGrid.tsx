@@ -726,8 +726,13 @@ export const MaterialsGrid = () => {
   // Sync computed filtered materials to state (for components that need the state)
   useEffect(() => {
     setFilteredMaterials(computedFilteredMaterials);
-    setCurrentPage(1); // Reset to page 1 when filters change
+    // Don't reset page here - it causes jumping when materials load
   }, [computedFilteredMaterials]);
+  
+  // Reset to page 1 only when FILTER CRITERIA change (not when data changes)
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedCategory, priceRange, stockFilter]);
 
   useEffect(() => {
     const updateColumns = () => {
