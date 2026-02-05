@@ -137,7 +137,7 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
       const { data: profile } = await supabase
         .from('profiles')
         .select('full_name, email')
-        .eq('id', user.id)
+        .eq('user_id', user.id)
         .single();
 
       // Create monitoring service request using actual table columns
