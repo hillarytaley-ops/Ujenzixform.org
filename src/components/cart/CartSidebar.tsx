@@ -55,17 +55,30 @@ export const CartSidebar: React.FC = () => {
   const [lastOrderId, setLastOrderId] = useState<string | null>(null);
   const [lastOrderTotal, setLastOrderTotal] = useState<number>(0);
 
-  // Check user role on mount
+  // Check user role on mount and when cart opens
   useEffect(() => {
     const checkUserRole = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
+        // First check localStorage for cached role (faster)
+        const cachedRole = localStorage.getItem('user_role');
+        if (cachedRole) {
+          console.log('🔐 Cart: Using cached role:', cachedRole);
+          setUserRole(cachedRole);
+        }
+        
+        // Then verify from database
         const { data: roleData } = await supabase
           .from('user_roles')
           .select('role')
           .eq('user_id', user.id)
           .maybeSingle();
-        setUserRole(roleData?.role || null);
+        
+        const dbRole = roleData?.role || null;
+        console.log('🔐 Cart: Database role:', dbRole);
+        setUserRole(dbRole);
+      } else {
+        console.log('🔐 Cart: No user logged in');
       }
     };
     checkUserRole();
@@ -292,11 +305,20 @@ export const CartSidebar: React.FC = () => {
         duration: 4000,
       });
 
-      // Show delivery prompt for private clients
-      if (userRole === 'private_client') {
+      // Debug logging
+      console.log('🚚 Checking delivery prompt - User role:', userRole);
+      console.log('🚚 Last order ID:', orderData.id);
+      console.log('🚚 Should show delivery prompt:', userRole === 'private_client' || userRole === 'professional_builder');
+
+      // Show delivery prompt for private clients AND professional builders
+      if (userRole === 'private_client' || userRole === 'professional_builder') {
+        console.log('🚚 Setting showDeliveryPrompt to true in 500ms...');
         setTimeout(() => {
+          console.log('🚚 NOW setting showDeliveryPrompt = true');
           setShowDeliveryPrompt(true);
         }, 500);
+      } else {
+        console.log('⚠️ User role not eligible for delivery prompt:', userRole);
       }
 
     } catch (error) {
