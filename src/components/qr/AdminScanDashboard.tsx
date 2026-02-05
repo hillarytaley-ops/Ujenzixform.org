@@ -195,11 +195,11 @@ export const AdminScanDashboard: React.FC = () => {
           // Try multiple sources for profile data
           const profilesMap: Record<string, any> = {};
           
-          // Method 1: Try profiles table
+          // Method 1: Try profiles table (user_id is the foreign key, not id)
           const { data: profiles, error: profilesError } = await supabase
             .from('profiles')
-            .select('id, full_name, email, phone, company_name')
-            .in('id', buyerIds);
+            .select('id, user_id, full_name, email, phone, company_name')
+            .in('user_id', buyerIds);
           
           if (profilesError) {
             console.error('Error fetching profiles:', profilesError);
@@ -207,48 +207,29 @@ export const AdminScanDashboard: React.FC = () => {
           console.log('👥 Profiles from profiles table:', profiles);
           
           profiles?.forEach(p => { 
-            profilesMap[p.id] = p; 
+            // Use user_id as the key since that's what buyer_id references
+            profilesMap[p.user_id] = p; 
           });
           
-          // Method 2: Try builder_profiles table (for professional builders)
-          const { data: builderProfiles } = await supabase
-            .from('builder_profiles')
-            .select('user_id, full_name, email, phone, company_name')
-            .in('user_id', buyerIds);
-          
-          console.log('👥 Builder profiles:', builderProfiles);
-          
-          builderProfiles?.forEach(bp => {
-            if (!profilesMap[bp.user_id] || !profilesMap[bp.user_id].full_name) {
-              profilesMap[bp.user_id] = {
-                id: bp.user_id,
-                full_name: bp.full_name,
-                email: bp.email,
-                phone: bp.phone,
-                company_name: bp.company_name
-              };
-            }
-          });
-          
-          // Method 3: Try suppliers table (in case buyer is also a supplier)
-          const { data: supplierProfiles } = await supabase
-            .from('suppliers')
-            .select('user_id, contact_name, email, phone, company_name')
-            .in('user_id', buyerIds);
-          
-          console.log('👥 Supplier profiles:', supplierProfiles);
-          
-          supplierProfiles?.forEach(sp => {
-            if (!profilesMap[sp.user_id] || !profilesMap[sp.user_id].full_name) {
-              profilesMap[sp.user_id] = {
-                id: sp.user_id,
-                full_name: sp.contact_name,
-                email: sp.email,
-                phone: sp.phone,
-                company_name: sp.company_name
-              };
-            }
-          });
+          // If profiles table didn't return results, the RLS might be blocking
+          // Let's also check if we can get info from purchase_orders items array
+          if (!profiles || profiles.length === 0) {
+            console.log('⚠️ No profiles found - checking purchase_orders for buyer info...');
+            
+            // Some purchase orders store buyer info in the items or metadata
+            orders.forEach(o => {
+              if (!profilesMap[o.buyer_id]) {
+                // Check if project_name has useful info
+                profilesMap[o.buyer_id] = {
+                  user_id: o.buyer_id,
+                  full_name: '', // Will be filled from roles
+                  email: '',
+                  phone: '',
+                  company_name: ''
+                };
+              }
+            });
+          }
           
           // Get user roles to identify builder type
           const { data: userRoles } = await supabase
