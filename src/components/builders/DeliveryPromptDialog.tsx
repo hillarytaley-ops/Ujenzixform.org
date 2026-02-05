@@ -527,9 +527,9 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
             </div>
 
             <DialogFooter className="flex flex-col gap-2">
-              {/* Primary action - Accept delivery */}
+              {/* Primary action - Go to form to enter delivery location */}
               <Button 
-                onClick={handleDeliveryConfirmed}
+                onClick={() => setStep('form')}
                 className="w-full bg-green-600 hover:bg-green-700"
               >
                 <Truck className="h-4 w-4 mr-2" />
@@ -545,16 +545,6 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
               >
                 <Package className="h-4 w-4 mr-2" />
                 📦 I'll Pick Up Myself (No QR Code)
-              </Button>
-              
-              {/* Update details */}
-              <Button 
-                variant="ghost" 
-                onClick={() => setStep('form')}
-                className="w-full text-gray-600"
-              >
-                <MapPin className="h-4 w-4 mr-2" />
-                Update Delivery Details
               </Button>
             </DialogFooter>
           </>
