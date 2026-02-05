@@ -261,9 +261,9 @@ const App = () => {
                     {/* Alias for private-client-registration (some links use this path) */}
                     <Route path="/private-builder-registration" element={<SuspenseWrapper><PrivateBuilderRegistration /></SuspenseWrapper>} />
                     <Route path="/analytics" element={
-                      <AuthRequired>
+                      <RoleProtectedRoute allowedRoles={['admin']}>
                         <SuspenseWrapper><Analytics /></SuspenseWrapper>
-                      </AuthRequired>
+                      </RoleProtectedRoute>
                     } />
                     <Route path="/delivery/apply" element={
                       <AuthRequired>
