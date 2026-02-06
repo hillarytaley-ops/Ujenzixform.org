@@ -202,11 +202,18 @@ export const EnhancedQRCodeManager: React.FC = () => {
 
       if (supplierData) {
         console.log('✅ Found supplier:', supplierData.company_name, 'ID:', supplierData.id);
+        
+        // Fetch ALL material items for this supplier - no limit, newest first
         const { data, error } = await supabase
           .from('material_items')
           .select('*')
           .eq('supplier_id', supplierData.id)
-          .order('created_at', { ascending: false });
+          .order('created_at', { ascending: false })
+          .limit(1000); // Ensure we get all recent items
+        
+        console.log('🏷️ Material items query for supplier_id:', supplierData.id);
+        console.log('🏷️ First item created_at:', data?.[0]?.created_at);
+        console.log('🏷️ Last item created_at:', data?.[data?.length - 1]?.created_at);
 
         console.log('🏷️ Material items found:', data?.length || 0, 'Error:', error);
         if (!error) {
