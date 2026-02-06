@@ -235,20 +235,25 @@ const SupplierDashboard = () => {
         .from('purchase_orders')
         .select('*')
         .in('supplier_id', supplierIds)
-        .in('status', ['pending', 'quoted', 'rejected'])
+        .in('status', ['pending', 'quoted', 'rejected', 'confirmed'])
         .order('created_at', { ascending: false });
       
       console.log('📋 Raw purchase_orders query result:', purchaseOrderQuotes?.length || 0, 'quotes, error:', poError);
       
-      // Also log ALL pending quotes in the system for debugging
+      // DEBUG: Log what IDs we're checking vs what's in the database
       const { data: allPendingQuotes } = await supabase
         .from('purchase_orders')
         .select('id, supplier_id, buyer_id, status, po_number, created_at')
-        .eq('status', 'pending')
+        .in('status', ['pending', 'quoted', 'confirmed'])
         .order('created_at', { ascending: false })
-        .limit(10);
+        .limit(20);
       
-      console.log('🔎 DEBUG - All pending quotes in system:', allPendingQuotes);
+      console.log('🔎 DEBUG - All recent quotes in system:', allPendingQuotes);
+      console.log('🔎 DEBUG - Checking if any quote supplier_id matches our IDs:');
+      allPendingQuotes?.forEach(q => {
+        const matches = supplierIds.includes(q.supplier_id);
+        console.log(`   Quote ${q.po_number}: supplier_id=${q.supplier_id}, matches=${matches ? '✓' : '✗'}`);
+      });
         
         if (poError) {
           console.error('Error fetching purchase order quotes:', poError);
