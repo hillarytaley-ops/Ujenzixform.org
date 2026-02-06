@@ -39,6 +39,7 @@ import { PriceComparisonModal } from './PriceComparisonModal';
 import { QuoteCart, QuoteCartButton, QuoteCartItem } from './QuoteCart';
 import { MobileBookView } from './MobileBookView';
 import { FileText, BookOpen } from 'lucide-react';
+import { ProductModal, materialToProduct, Product } from '@/components/products';
 
 // iOS/Safari compatibility check
 const isIOSSafari = () => {
@@ -339,6 +340,9 @@ export const MaterialsGrid = () => {
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryMaterial, setGalleryMaterial] = useState<Material | null>(null);
   const [galleryIndex, setGalleryIndex] = useState(0);
+  
+  // NEW: Product detail modal state (variant-aware UI)
+  const [selectedProductDetail, setSelectedProductDetail] = useState<Product | null>(null);
   
   // Mobile book view state
   const [showBookView, setShowBookView] = useState(false);
@@ -1822,7 +1826,11 @@ export const MaterialsGrid = () => {
                           className="w-full h-full object-contain p-2 bg-white cursor-pointer"
                           loading="lazy"
                           decoding="async"
-                          onClick={() => openGallery(material)}
+                          onClick={() => {
+                            // Open new variant-aware product detail modal
+                            const product = materialToProduct(material);
+                            setSelectedProductDetail(product);
+                          }}
                           onError={(e) => {
                             // Fallback to category default image
                             const fallback = getDefaultCategoryImage(material.category);
@@ -1874,12 +1882,14 @@ export const MaterialsGrid = () => {
                         </div>
                       )}
                       
-                      {/* View Product Button (shows on hover) */}
+                      {/* View Product Button (shows on hover) - Opens variant-aware detail modal */}
                       <div className="absolute inset-0 bg-black/0 group-hover/image:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover/image:opacity-100">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            openGallery(material);
+                            // Open new variant-aware product detail modal
+                            const product = materialToProduct(material);
+                            setSelectedProductDetail(product);
                           }}
                           className="bg-white/90 hover:bg-white text-gray-800 px-3 py-2 rounded-lg shadow-lg flex items-center gap-2 transition-all transform scale-90 group-hover/image:scale-100"
                         >
@@ -2465,6 +2475,13 @@ export const MaterialsGrid = () => {
           }}
         />
       )}
+      
+      {/* NEW: Product Detail Modal - Variant-aware UI */}
+      <ProductModal
+        product={selectedProductDetail}
+        isOpen={!!selectedProductDetail}
+        onClose={() => setSelectedProductDetail(null)}
+      />
     </div>
   );
 };
