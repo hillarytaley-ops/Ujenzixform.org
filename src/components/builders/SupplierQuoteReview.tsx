@@ -161,9 +161,9 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
           project_description: po.project_name,
           special_requirements: null,
           status: po.status === 'confirmed' ? 'accepted' : po.status,
-          quote_amount: po.quote_amount || (po.status === 'quoted' ? po.total_amount : null),
-          quote_valid_until: null,
-          supplier_notes: null,
+          quote_amount: po.quote_amount ?? (po.status === 'quoted' ? po.total_amount : null),
+          quote_valid_until: po.quote_valid_until || null,
+          supplier_notes: po.supplier_notes || null,
           created_at: po.created_at,
           updated_at: po.updated_at || po.created_at,
           supplier: supplier ? {
@@ -183,7 +183,25 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
       });
 
       console.log('📋 Loaded quotes from purchase_orders:', transformedQuotes.length);
-      console.log('📊 Quote statuses:', transformedQuotes.map(q => ({ id: q.id.slice(0,8), status: q.status, quote_amount: q.quote_amount })));
+      console.log('📊 Quote statuses:', transformedQuotes.map(q => ({ 
+        id: q.id.slice(0,8), 
+        status: q.status, 
+        quote_amount: q.quote_amount,
+        total_amount: q.purchase_order?.total_amount 
+      })));
+      
+      // Debug: Show raw purchase order data for quoted items
+      const quotedOrders = purchaseOrders.filter(po => po.status === 'quoted');
+      if (quotedOrders.length > 0) {
+        console.log('💰 RAW quoted purchase_orders data:', quotedOrders.map(po => ({
+          id: po.id.slice(0,8),
+          status: po.status,
+          quote_amount: po.quote_amount,
+          total_amount: po.total_amount,
+          supplier_notes: po.supplier_notes
+        })));
+      }
+      
       setQuotes(transformedQuotes);
     } catch (error) {
       console.error('Error fetching quotes:', error);
