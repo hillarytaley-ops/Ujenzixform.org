@@ -76,6 +76,7 @@ export const MultiSupplierQuoteDialog: React.FC<MultiSupplierQuoteDialogProps> =
 
   const fetchSuppliers = async () => {
     setLoading(true);
+    console.log('🔄 Fetching suppliers for quote dialog...');
     try {
       // Fetch all active suppliers
       const { data: suppliersData, error: suppliersError } = await supabase
@@ -83,6 +84,8 @@ export const MultiSupplierQuoteDialog: React.FC<MultiSupplierQuoteDialogProps> =
         .select('id, user_id, company_name, location, rating')
         .order('rating', { ascending: false });
 
+      console.log('📦 Suppliers fetched:', suppliersData?.length || 0, 'error:', suppliersError);
+      
       if (suppliersError) throw suppliersError;
 
       // Get product counts for each supplier
