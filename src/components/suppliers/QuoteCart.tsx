@@ -148,33 +148,43 @@ export function QuoteCart({
 
         const poNumber = `QR-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
         
-        const { error } = await supabase
+        const orderPayload = {
+          po_number: poNumber,
+          buyer_id: user.id,
+          supplier_id: validSupplierId,
+          total_amount: supplierTotal,
+          delivery_address: deliveryAddress,
+          delivery_date: deliveryDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          status: 'pending',
+          project_name: projectName || 'Quote Request',
+          special_instructions: notes,
+          items: supplierItems.map(item => ({
+            material_id: item.id,
+            material_name: item.name,
+            category: item.category,
+            quantity: item.quantity,
+            unit: item.unit,
+            unit_price: item.unit_price
+          }))
+        };
+        
+        console.log('📤 Submitting quote request:', orderPayload);
+        
+        const { data, error } = await supabase
           .from('purchase_orders')
-          .insert({
-            po_number: poNumber,
-            buyer_id: user.id,
-            supplier_id: validSupplierId,
-            total_amount: supplierTotal,
-            delivery_address: deliveryAddress,
-            delivery_date: deliveryDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            status: 'pending',
-            project_name: projectName || 'Quote Request',
-            special_instructions: notes,
-            items: supplierItems.map(item => ({
-              material_id: item.id,
-              material_name: item.name,
-              category: item.category,
-              quantity: item.quantity,
-              unit: item.unit,
-              unit_price: item.unit_price
-            }))
-          });
+          .insert(orderPayload)
+          .select();
 
-        if (!error) {
+        if (!error && data) {
           successCount++;
-          console.log('✅ Quote request sent to supplier:', validSupplierId);
+          console.log('✅ Quote request created successfully:', data[0]?.id, data[0]?.po_number);
         } else {
-          console.error('Quote request error for supplier:', validSupplierId, error);
+          console.error('❌ Quote request error:', error?.message, error?.details, error?.hint);
+          toast({
+            title: '❌ Quote Request Failed',
+            description: error?.message || 'Failed to submit quote request',
+            variant: 'destructive',
+          });
         }
       }
 
