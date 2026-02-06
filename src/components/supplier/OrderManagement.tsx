@@ -41,7 +41,8 @@ import {
   MapPin,
   Calendar,
   DollarSign,
-  AlertTriangle
+  AlertTriangle,
+  FileText
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -74,13 +75,20 @@ interface OrderManagementProps {
   isDarkMode?: boolean;
 }
 
-const STATUS_CONFIG = {
+const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
   pending: { label: 'Pending', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
   confirmed: { label: 'Confirmed', color: 'bg-blue-100 text-blue-800', icon: CheckCircle },
   processing: { label: 'Processing', color: 'bg-indigo-100 text-indigo-800', icon: Package },
   shipped: { label: 'Shipped', color: 'bg-purple-100 text-purple-800', icon: Truck },
   delivered: { label: 'Delivered', color: 'bg-green-100 text-green-800', icon: CheckCircle },
-  cancelled: { label: 'Cancelled', color: 'bg-red-100 text-red-800', icon: XCircle }
+  cancelled: { label: 'Cancelled', color: 'bg-red-100 text-red-800', icon: XCircle },
+  quoted: { label: 'Quoted', color: 'bg-orange-100 text-orange-800', icon: FileText },
+  rejected: { label: 'Rejected', color: 'bg-red-100 text-red-800', icon: XCircle }
+};
+
+// Safe getter for status config
+const getStatusConfig = (status: string) => {
+  return STATUS_CONFIG[status] || STATUS_CONFIG.pending;
 };
 
 export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, isDarkMode = false }) => {
@@ -242,7 +250,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
 
       toast({
         title: 'Status Updated',
-        description: `Order status changed to ${STATUS_CONFIG[newStatus].label}`
+        description: `Order status changed to ${getStatusConfig(newStatus).label}`
       });
 
       if (selectedOrder?.id === orderId) {
@@ -440,7 +448,8 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
                 </TableHeader>
                 <TableBody>
                   {filteredOrders.map((order) => {
-                    const StatusIcon = STATUS_CONFIG[order.status].icon;
+                    const statusConfig = getStatusConfig(order.status);
+                    const StatusIcon = statusConfig.icon;
                     const nextStatus = getNextStatus(order.status);
                     
                     return (
@@ -457,9 +466,9 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
                         </TableCell>
                         <TableCell className="font-semibold">{formatCurrency(order.total_amount)}</TableCell>
                         <TableCell>
-                          <Badge className={`${STATUS_CONFIG[order.status].color} flex items-center gap-1 w-fit`}>
+                          <Badge className={`${statusConfig.color} flex items-center gap-1 w-fit`}>
                             <StatusIcon className="h-3 w-3" />
-                            {STATUS_CONFIG[order.status].label}
+                            {statusConfig.label}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -508,8 +517,8 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
               <DialogHeader>
                 <DialogTitle className="flex items-center justify-between">
                   <span>Order {selectedOrder.order_number}</span>
-                  <Badge className={STATUS_CONFIG[selectedOrder.status].color}>
-                    {STATUS_CONFIG[selectedOrder.status].label}
+                  <Badge className={getStatusConfig(selectedOrder.status).color}>
+                    {getStatusConfig(selectedOrder.status).label}
                   </Badge>
                 </DialogTitle>
                 <DialogDescription>
