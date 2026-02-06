@@ -208,13 +208,34 @@ export const MaterialImagesManager: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<MaterialImage | SupplierMaterial | null>(null);
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
   
-  // Variant type for multiple sizes/prices
+  // Variant type for multiple sizes/prices/colors
   interface PriceVariant {
     id: string;
     sizeLabel: string;
+    color?: string;
+    colorHex?: string;
     price: number;
     stock: number;
   }
+  
+  // Common color presets for quick selection
+  const COLOR_PRESETS = [
+    { name: 'White', hex: '#FFFFFF' },
+    { name: 'Black', hex: '#000000' },
+    { name: 'Silver', hex: '#C0C0C0' },
+    { name: 'Gray', hex: '#808080' },
+    { name: 'Red', hex: '#EF4444' },
+    { name: 'Blue', hex: '#3B82F6' },
+    { name: 'Green', hex: '#22C55E' },
+    { name: 'Yellow', hex: '#EAB308' },
+    { name: 'Orange', hex: '#F97316' },
+    { name: 'Brown', hex: '#92400E' },
+    { name: 'Beige', hex: '#D4A574' },
+    { name: 'Navy', hex: '#1E3A5F' },
+    { name: 'Maroon', hex: '#800000' },
+    { name: 'Cream', hex: '#FFFDD0' },
+    { name: 'Terracotta', hex: '#E2725B' },
+  ];
 
   // Upload form state
   const [uploadForm, setUploadForm] = useState({
@@ -1569,7 +1590,7 @@ export const MaterialImagesManager: React.FC = () => {
                     onClick={() => setUploadForm(prev => ({ 
                       ...prev, 
                       pricingType: 'variants',
-                      variants: prev.variants.length === 0 ? [{ id: crypto.randomUUID(), sizeLabel: '', price: 0, stock: 0 }] : prev.variants
+                      variants: prev.variants.length === 0 ? [{ id: crypto.randomUUID(), sizeLabel: '', color: '', colorHex: '', price: 0, stock: 0 }] : prev.variants
                     }))}
                   >
                     📊 Multiple Sizes / Variants
@@ -1602,57 +1623,26 @@ export const MaterialImagesManager: React.FC = () => {
                     onClick={() => setUploadForm(prev => ({
                       ...prev,
                       pricingType: 'variants',
-                      variants: [...prev.variants, { id: crypto.randomUUID(), sizeLabel: '', price: 0, stock: 0 }]
+                      variants: [...prev.variants, { id: crypto.randomUUID(), sizeLabel: '', color: '', colorHex: '', price: 0, stock: 0 }]
                     }))}
                   >
-                    + Add Size
+                    + Add Variant
                   </Button>
                 </div>
                 
                 {/* Variants Table */}
                 {uploadForm.variants.length > 0 ? (
-                  <div className="space-y-2">
-                    {/* Header */}
-                    <div className="grid grid-cols-12 gap-2 text-xs text-slate-400 font-medium px-1 border-b border-slate-700 pb-2">
-                      <div className="col-span-6">Size / Label</div>
-                      <div className="col-span-5">Price (KES)</div>
-                      <div className="col-span-1"></div>
-                    </div>
-                    
+                  <div className="space-y-3">
                     {/* Variant Rows */}
                     {uploadForm.variants.map((variant, index) => (
-                      <div key={variant.id} className="grid grid-cols-12 gap-2 items-center">
-                        <div className="col-span-6">
-                          <Input
-                            placeholder="e.g., 1 inch, 2 inch"
-                            value={variant.sizeLabel}
-                            onChange={(e) => {
-                              const newVariants = [...uploadForm.variants];
-                              newVariants[index].sizeLabel = e.target.value;
-                              setUploadForm(prev => ({ ...prev, variants: newVariants }));
-                            }}
-                            className="bg-slate-700 border-slate-600 h-9 text-sm"
-                          />
-                        </div>
-                        <div className="col-span-5">
-                          <Input
-                            type="number"
-                            placeholder="120"
-                            value={variant.price || ''}
-                            onChange={(e) => {
-                              const newVariants = [...uploadForm.variants];
-                              newVariants[index].price = parseFloat(e.target.value) || 0;
-                              setUploadForm(prev => ({ ...prev, variants: newVariants }));
-                            }}
-                            className="bg-slate-700 border-slate-600 h-9 text-sm"
-                          />
-                        </div>
-                        <div className="col-span-1 flex justify-center">
+                      <div key={variant.id} className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-slate-400 font-medium">Variant #{index + 1}</span>
                           <Button
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-500/20"
+                            className="h-6 w-6 text-red-400 hover:text-red-300 hover:bg-red-500/20"
                             onClick={() => {
                               const newVariants = uploadForm.variants.filter(v => v.id !== variant.id);
                               setUploadForm(prev => ({
@@ -1662,8 +1652,101 @@ export const MaterialImagesManager: React.FC = () => {
                               }));
                             }}
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-3 w-3" />
                           </Button>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-2 mb-2">
+                          {/* Size Input */}
+                          <div>
+                            <Label className="text-xs text-slate-500 mb-1 block">Size</Label>
+                            <Input
+                              placeholder="e.g., 1 inch, Large"
+                              value={variant.sizeLabel}
+                              onChange={(e) => {
+                                const newVariants = [...uploadForm.variants];
+                                newVariants[index].sizeLabel = e.target.value;
+                                setUploadForm(prev => ({ ...prev, variants: newVariants }));
+                              }}
+                              className="bg-slate-700 border-slate-600 h-8 text-sm"
+                            />
+                          </div>
+                          
+                          {/* Price Input */}
+                          <div>
+                            <Label className="text-xs text-slate-500 mb-1 block">Price (KES)</Label>
+                            <Input
+                              type="number"
+                              placeholder="120"
+                              value={variant.price || ''}
+                              onChange={(e) => {
+                                const newVariants = [...uploadForm.variants];
+                                newVariants[index].price = parseFloat(e.target.value) || 0;
+                                setUploadForm(prev => ({ ...prev, variants: newVariants }));
+                              }}
+                              className="bg-slate-700 border-slate-600 h-8 text-sm"
+                            />
+                          </div>
+                        </div>
+                        
+                        {/* Color Selection */}
+                        <div>
+                          <Label className="text-xs text-slate-500 mb-1 block">Color (optional)</Label>
+                          <div className="flex items-center gap-2">
+                            {/* Color preview */}
+                            <div 
+                              className="w-8 h-8 rounded border-2 border-slate-600 flex-shrink-0"
+                              style={{ backgroundColor: variant.colorHex || '#374151' }}
+                            />
+                            {/* Color name input */}
+                            <Input
+                              placeholder="e.g., Blue, Red"
+                              value={variant.color || ''}
+                              onChange={(e) => {
+                                const newVariants = [...uploadForm.variants];
+                                newVariants[index].color = e.target.value;
+                                // Auto-match color hex from presets
+                                const preset = COLOR_PRESETS.find(p => p.name.toLowerCase() === e.target.value.toLowerCase());
+                                if (preset) {
+                                  newVariants[index].colorHex = preset.hex;
+                                }
+                                setUploadForm(prev => ({ ...prev, variants: newVariants }));
+                              }}
+                              className="bg-slate-700 border-slate-600 h-8 text-sm flex-1"
+                            />
+                            {/* Color picker */}
+                            <input
+                              type="color"
+                              value={variant.colorHex || '#374151'}
+                              onChange={(e) => {
+                                const newVariants = [...uploadForm.variants];
+                                newVariants[index].colorHex = e.target.value;
+                                setUploadForm(prev => ({ ...prev, variants: newVariants }));
+                              }}
+                              className="w-8 h-8 rounded cursor-pointer border-0"
+                              title="Pick custom color"
+                            />
+                          </div>
+                          {/* Color presets */}
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {COLOR_PRESETS.slice(0, 10).map((preset) => (
+                              <button
+                                key={preset.name}
+                                type="button"
+                                className={`w-5 h-5 rounded-full border-2 transition-all ${
+                                  variant.colorHex === preset.hex ? 'border-white scale-110' : 'border-slate-600 hover:border-slate-400'
+                                }`}
+                                style={{ backgroundColor: preset.hex }}
+                                onClick={() => {
+                                  const newVariants = [...uploadForm.variants];
+                                  newVariants[index].color = preset.name;
+                                  newVariants[index].colorHex = preset.hex;
+                                  setUploadForm(prev => ({ ...prev, variants: newVariants }));
+                                }}
+                                title={preset.name}
+                              />
+                            ))}
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -2062,7 +2145,7 @@ export const MaterialImagesManager: React.FC = () => {
                                 className={`flex-1 ${item.pricingType === 'variants' ? 'bg-purple-500 hover:bg-purple-600' : 'border-slate-500 text-slate-300'}`}
                                 onClick={() => updateBulkItem(item.id, { 
                                   pricingType: 'variants',
-                                  variants: item.variants.length === 0 ? [{ id: crypto.randomUUID(), sizeLabel: '', price: 0, stock: 0 }] : item.variants
+                                  variants: item.variants.length === 0 ? [{ id: crypto.randomUUID(), sizeLabel: '', color: '', colorHex: '', price: 0, stock: 0 }] : item.variants
                                 })}
                                 disabled={item.uploaded || item.uploading}
                               >
@@ -2094,60 +2177,27 @@ export const MaterialImagesManager: React.FC = () => {
                                 variant="outline"
                                 className="border-purple-500 text-purple-400 hover:bg-purple-500/20 h-8 text-xs px-3"
                                 onClick={() => {
-                                  const newVariants = [...item.variants, { id: crypto.randomUUID(), sizeLabel: '', price: 0, stock: 0 }];
+                                  const newVariants = [...item.variants, { id: crypto.randomUUID(), sizeLabel: '', color: '', colorHex: '', price: 0, stock: 0 }];
                                   updateBulkItem(item.id, { pricingType: 'variants', variants: newVariants });
                                 }}
                                 disabled={item.uploaded || item.uploading}
                               >
-                                + Add Size
+                                + Add Variant
                               </Button>
                             </div>
                             
                             {item.variants.length > 0 ? (
-                              <div className="space-y-2">
-                                {/* Header */}
-                                <div className="grid grid-cols-12 gap-2 text-xs text-slate-400 font-medium border-b border-slate-600 pb-2">
-                                  <div className="col-span-6">Size / Label</div>
-                                  <div className="col-span-5">Price (KES)</div>
-                                  <div className="col-span-1"></div>
-                                </div>
-                                
+                              <div className="space-y-3">
                                 {/* Variant Rows */}
                                 {item.variants.map((variant, vIdx) => (
-                                  <div key={variant.id} className="grid grid-cols-12 gap-2 items-center">
-                                    <div className="col-span-6">
-                                      <Input
-                                        placeholder="e.g., 1 inch"
-                                        value={variant.sizeLabel}
-                                        onChange={(e) => {
-                                          const newVariants = [...item.variants];
-                                          newVariants[vIdx].sizeLabel = e.target.value;
-                                          updateBulkItem(item.id, { variants: newVariants });
-                                        }}
-                                        className="bg-slate-600 border-slate-500 h-9 text-sm"
-                                        disabled={item.uploaded || item.uploading}
-                                      />
-                                    </div>
-                                    <div className="col-span-5">
-                                      <Input
-                                        type="number"
-                                        placeholder="120"
-                                        value={variant.price || ''}
-                                        onChange={(e) => {
-                                          const newVariants = [...item.variants];
-                                          newVariants[vIdx].price = parseFloat(e.target.value) || 0;
-                                          updateBulkItem(item.id, { variants: newVariants });
-                                        }}
-                                        className="bg-slate-600 border-slate-500 h-9 text-sm"
-                                        disabled={item.uploaded || item.uploading}
-                                      />
-                                    </div>
-                                    <div className="col-span-1 flex justify-center">
+                                  <div key={variant.id} className="bg-slate-700/50 rounded-lg p-2 border border-slate-600">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <span className="text-xs text-slate-400">Variant #{vIdx + 1}</span>
                                       <Button
                                         type="button"
                                         variant="ghost"
                                         size="icon"
-                                        className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-500/20"
+                                        className="h-5 w-5 text-red-400 hover:text-red-300"
                                         onClick={() => {
                                           const newVariants = item.variants.filter(v => v.id !== variant.id);
                                           updateBulkItem(item.id, { 
@@ -2157,14 +2207,93 @@ export const MaterialImagesManager: React.FC = () => {
                                         }}
                                         disabled={item.uploaded || item.uploading}
                                       >
-                                        <X className="h-4 w-4" />
+                                        <X className="h-3 w-3" />
                                       </Button>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-2 gap-2 mb-2">
+                                      <Input
+                                        placeholder="Size (e.g., 1 inch)"
+                                        value={variant.sizeLabel}
+                                        onChange={(e) => {
+                                          const newVariants = [...item.variants];
+                                          newVariants[vIdx].sizeLabel = e.target.value;
+                                          updateBulkItem(item.id, { variants: newVariants });
+                                        }}
+                                        className="bg-slate-600 border-slate-500 h-8 text-sm"
+                                        disabled={item.uploaded || item.uploading}
+                                      />
+                                      <Input
+                                        type="number"
+                                        placeholder="Price (KES)"
+                                        value={variant.price || ''}
+                                        onChange={(e) => {
+                                          const newVariants = [...item.variants];
+                                          newVariants[vIdx].price = parseFloat(e.target.value) || 0;
+                                          updateBulkItem(item.id, { variants: newVariants });
+                                        }}
+                                        className="bg-slate-600 border-slate-500 h-8 text-sm"
+                                        disabled={item.uploaded || item.uploading}
+                                      />
+                                    </div>
+                                    
+                                    {/* Color Selection */}
+                                    <div className="flex items-center gap-2">
+                                      <div 
+                                        className="w-6 h-6 rounded border border-slate-500 flex-shrink-0"
+                                        style={{ backgroundColor: variant.colorHex || '#374151' }}
+                                      />
+                                      <Input
+                                        placeholder="Color name"
+                                        value={variant.color || ''}
+                                        onChange={(e) => {
+                                          const newVariants = [...item.variants];
+                                          newVariants[vIdx].color = e.target.value;
+                                          const preset = COLOR_PRESETS.find(p => p.name.toLowerCase() === e.target.value.toLowerCase());
+                                          if (preset) newVariants[vIdx].colorHex = preset.hex;
+                                          updateBulkItem(item.id, { variants: newVariants });
+                                        }}
+                                        className="bg-slate-600 border-slate-500 h-7 text-xs flex-1"
+                                        disabled={item.uploaded || item.uploading}
+                                      />
+                                      <input
+                                        type="color"
+                                        value={variant.colorHex || '#374151'}
+                                        onChange={(e) => {
+                                          const newVariants = [...item.variants];
+                                          newVariants[vIdx].colorHex = e.target.value;
+                                          updateBulkItem(item.id, { variants: newVariants });
+                                        }}
+                                        className="w-6 h-6 rounded cursor-pointer border-0"
+                                        disabled={item.uploaded || item.uploading}
+                                      />
+                                    </div>
+                                    {/* Quick color presets */}
+                                    <div className="flex flex-wrap gap-1 mt-1">
+                                      {COLOR_PRESETS.slice(0, 8).map((preset) => (
+                                        <button
+                                          key={preset.name}
+                                          type="button"
+                                          className={`w-4 h-4 rounded-full border transition-all ${
+                                            variant.colorHex === preset.hex ? 'border-white scale-110' : 'border-slate-500'
+                                          }`}
+                                          style={{ backgroundColor: preset.hex }}
+                                          onClick={() => {
+                                            const newVariants = [...item.variants];
+                                            newVariants[vIdx].color = preset.name;
+                                            newVariants[vIdx].colorHex = preset.hex;
+                                            updateBulkItem(item.id, { variants: newVariants });
+                                          }}
+                                          disabled={item.uploaded || item.uploading}
+                                          title={preset.name}
+                                        />
+                                      ))}
                                     </div>
                                   </div>
                                 ))}
                               </div>
                             ) : (
-                              <p className="text-xs text-slate-500 text-center py-3 italic">No sizes added yet. Click "+ Add Size" to add variants.</p>
+                              <p className="text-xs text-slate-500 text-center py-3 italic">No variants added yet. Click "+ Add Variant" to add size/color options.</p>
                             )}
                           </div>
                         </div>
@@ -2430,7 +2559,7 @@ export const MaterialImagesManager: React.FC = () => {
                       onClick={() => setEditForm(prev => ({ 
                         ...prev, 
                         pricingType: 'variants',
-                        variants: prev.variants.length === 0 ? [{ id: crypto.randomUUID(), sizeLabel: '', price: 0, stock: 0 }] : prev.variants
+                        variants: prev.variants.length === 0 ? [{ id: crypto.randomUUID(), sizeLabel: '', color: '', colorHex: '', price: 0, stock: 0 }] : prev.variants
                       }))}
                     >
                       📊 Multiple Sizes / Variants
@@ -2463,57 +2592,26 @@ export const MaterialImagesManager: React.FC = () => {
                       onClick={() => setEditForm(prev => ({
                         ...prev,
                         pricingType: 'variants',
-                        variants: [...prev.variants, { id: crypto.randomUUID(), sizeLabel: '', price: 0, stock: 0 }]
+                        variants: [...prev.variants, { id: crypto.randomUUID(), sizeLabel: '', color: '', colorHex: '', price: 0, stock: 0 }]
                       }))}
                     >
-                      + Add Size
+                      + Add Variant
                     </Button>
                   </div>
                   
                   {/* Variants Table */}
                   {editForm.variants.length > 0 ? (
-                    <div className="space-y-2">
-                      {/* Header */}
-                      <div className="grid grid-cols-12 gap-2 text-xs text-slate-400 font-medium px-1 border-b border-slate-700 pb-2">
-                        <div className="col-span-6">Size / Label</div>
-                        <div className="col-span-5">Price (KES)</div>
-                        <div className="col-span-1"></div>
-                      </div>
-                      
+                    <div className="space-y-3">
                       {/* Variant Rows */}
                       {editForm.variants.map((variant, index) => (
-                        <div key={variant.id} className="grid grid-cols-12 gap-2 items-center">
-                          <div className="col-span-6">
-                            <Input
-                              placeholder="e.g., 1 inch, 2 inch"
-                              value={variant.sizeLabel}
-                              onChange={(e) => {
-                                const newVariants = [...editForm.variants];
-                                newVariants[index].sizeLabel = e.target.value;
-                                setEditForm(prev => ({ ...prev, variants: newVariants }));
-                              }}
-                              className="bg-slate-700 border-slate-600 h-9 text-sm"
-                            />
-                          </div>
-                          <div className="col-span-5">
-                            <Input
-                              type="number"
-                              placeholder="120"
-                              value={variant.price || ''}
-                              onChange={(e) => {
-                                const newVariants = [...editForm.variants];
-                                newVariants[index].price = parseFloat(e.target.value) || 0;
-                                setEditForm(prev => ({ ...prev, variants: newVariants }));
-                              }}
-                              className="bg-slate-700 border-slate-600 h-9 text-sm"
-                            />
-                          </div>
-                          <div className="col-span-1 flex justify-center">
+                        <div key={variant.id} className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs text-slate-400 font-medium">Variant #{index + 1}</span>
                             <Button
                               type="button"
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-500/20"
+                              className="h-6 w-6 text-red-400 hover:text-red-300 hover:bg-red-500/20"
                               onClick={() => {
                                 const newVariants = editForm.variants.filter(v => v.id !== variant.id);
                                 setEditForm(prev => ({
@@ -2523,14 +2621,107 @@ export const MaterialImagesManager: React.FC = () => {
                                 }));
                               }}
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Trash2 className="h-3 w-3" />
                             </Button>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-2 mb-2">
+                            {/* Size Input */}
+                            <div>
+                              <Label className="text-xs text-slate-500 mb-1 block">Size</Label>
+                              <Input
+                                placeholder="e.g., 1 inch, Large"
+                                value={variant.sizeLabel}
+                                onChange={(e) => {
+                                  const newVariants = [...editForm.variants];
+                                  newVariants[index].sizeLabel = e.target.value;
+                                  setEditForm(prev => ({ ...prev, variants: newVariants }));
+                                }}
+                                className="bg-slate-700 border-slate-600 h-8 text-sm"
+                              />
+                            </div>
+                            
+                            {/* Price Input */}
+                            <div>
+                              <Label className="text-xs text-slate-500 mb-1 block">Price (KES)</Label>
+                              <Input
+                                type="number"
+                                placeholder="120"
+                                value={variant.price || ''}
+                                onChange={(e) => {
+                                  const newVariants = [...editForm.variants];
+                                  newVariants[index].price = parseFloat(e.target.value) || 0;
+                                  setEditForm(prev => ({ ...prev, variants: newVariants }));
+                                }}
+                                className="bg-slate-700 border-slate-600 h-8 text-sm"
+                              />
+                            </div>
+                          </div>
+                          
+                          {/* Color Selection */}
+                          <div>
+                            <Label className="text-xs text-slate-500 mb-1 block">Color (optional)</Label>
+                            <div className="flex items-center gap-2">
+                              {/* Color preview */}
+                              <div 
+                                className="w-8 h-8 rounded border-2 border-slate-600 flex-shrink-0"
+                                style={{ backgroundColor: variant.colorHex || '#374151' }}
+                              />
+                              {/* Color name input */}
+                              <Input
+                                placeholder="e.g., Blue, Red"
+                                value={variant.color || ''}
+                                onChange={(e) => {
+                                  const newVariants = [...editForm.variants];
+                                  newVariants[index].color = e.target.value;
+                                  // Auto-match color hex from presets
+                                  const preset = COLOR_PRESETS.find(p => p.name.toLowerCase() === e.target.value.toLowerCase());
+                                  if (preset) {
+                                    newVariants[index].colorHex = preset.hex;
+                                  }
+                                  setEditForm(prev => ({ ...prev, variants: newVariants }));
+                                }}
+                                className="bg-slate-700 border-slate-600 h-8 text-sm flex-1"
+                              />
+                              {/* Color picker */}
+                              <input
+                                type="color"
+                                value={variant.colorHex || '#374151'}
+                                onChange={(e) => {
+                                  const newVariants = [...editForm.variants];
+                                  newVariants[index].colorHex = e.target.value;
+                                  setEditForm(prev => ({ ...prev, variants: newVariants }));
+                                }}
+                                className="w-8 h-8 rounded cursor-pointer border-0"
+                                title="Pick custom color"
+                              />
+                            </div>
+                            {/* Color presets */}
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              {COLOR_PRESETS.slice(0, 10).map((preset) => (
+                                <button
+                                  key={preset.name}
+                                  type="button"
+                                  className={`w-5 h-5 rounded-full border-2 transition-all ${
+                                    variant.colorHex === preset.hex ? 'border-white scale-110' : 'border-slate-600 hover:border-slate-400'
+                                  }`}
+                                  style={{ backgroundColor: preset.hex }}
+                                  onClick={() => {
+                                    const newVariants = [...editForm.variants];
+                                    newVariants[index].color = preset.name;
+                                    newVariants[index].colorHex = preset.hex;
+                                    setEditForm(prev => ({ ...prev, variants: newVariants }));
+                                  }}
+                                  title={preset.name}
+                                />
+                              ))}
+                            </div>
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-xs text-slate-500 text-center py-3 italic">No sizes added yet. Click "+ Add Size" to add product variants.</p>
+                    <p className="text-xs text-slate-500 text-center py-3 italic">No variants added yet. Click "+ Add Variant" to add size/color options.</p>
                   )}
                 </div>
               </div>
