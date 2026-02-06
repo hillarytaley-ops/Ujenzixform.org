@@ -129,7 +129,7 @@ const UnifiedAuth: React.FC = () => {
       case 'professional_builder': return '/professional-builder-dashboard';
       case 'supplier': return '/supplier-dashboard';
       case 'delivery': return '/delivery-dashboard';
-      case 'admin': return '/admin';
+      case 'admin': return '/admin-dashboard';
       default: return '/suppliers';
     }
   };

@@ -293,6 +293,9 @@ const App = () => {
                     <Route path="/supplier-registration" element={<SuspenseWrapper><SupplierRegistration /></SuspenseWrapper>} />
                     <Route path="/supplier-marketplace" element={<SuspenseWrapper><Suppliers /></SuspenseWrapper>} />
                     
+                    {/* Admin Route - Redirect /admin to /admin-dashboard */}
+                    <Route path="/admin" element={<Navigate to="/admin-dashboard" replace />} />
+                    
                     {/* Admin Sub-Routes - Redirect to dashboard with tab param */}
                     <Route path="/admin/pending-registrations" element={<Navigate to="/admin-dashboard?tab=registrations" replace />} />
                     <Route path="/admin/pending-products" element={<Navigate to="/admin-dashboard?tab=pending-products" replace />} />
