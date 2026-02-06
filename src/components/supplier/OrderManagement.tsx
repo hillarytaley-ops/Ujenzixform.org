@@ -119,11 +119,14 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
       if (supplierData?.id) supplierIds.push(supplierData.id);
       if (supplierData?.user_id) supplierIds.push(supplierData.user_id);
 
+      // Log supplier IDs being queried
+      console.log('🔍 Querying orders for supplier IDs:', supplierIds);
+
       // Fetch real orders from purchase_orders table
       const { data: purchaseOrders, error: ordersError } = await supabase
         .from('purchase_orders')
         .select('*')
-        .or(supplierIds.map(id => `supplier_id.eq.${id}`).join(','))
+        .in('supplier_id', supplierIds)
         .order('created_at', { ascending: false });
 
       if (ordersError) {
@@ -132,20 +135,26 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
       }
 
       console.log('📦 Real orders loaded:', purchaseOrders?.length || 0);
+      if (purchaseOrders && purchaseOrders.length > 0) {
+        console.log('📦 First order supplier_id:', purchaseOrders[0].supplier_id);
+      }
 
       // Also fetch buyer profiles to get customer names
       const buyerIds = [...new Set(purchaseOrders?.map(po => po.buyer_id).filter(Boolean) || [])];
       let buyerProfiles: Record<string, any> = {};
       
       if (buyerIds.length > 0) {
+        // buyer_id is auth user ID, so we need to query by user_id not id
         const { data: profiles } = await supabase
           .from('profiles')
-          .select('id, full_name, phone, email')
-          .in('id', buyerIds);
+          .select('id, user_id, full_name, phone, email')
+          .in('user_id', buyerIds);
         
         if (profiles) {
-          buyerProfiles = Object.fromEntries(profiles.map(p => [p.id, p]));
+          // Map by user_id since that's what buyer_id references
+          buyerProfiles = Object.fromEntries(profiles.map(p => [p.user_id, p]));
         }
+        console.log('👥 Buyer profiles loaded:', profiles?.length || 0);
       }
 
       // Transform purchase_orders to Order format

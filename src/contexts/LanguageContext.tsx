@@ -87,6 +87,15 @@ const translations = {
     'stats.completedProjects': 'Completed Projects',
     'stats.countiesServed': 'Counties Served',
     'stats.professionalSupport': 'Professional Support',
+    
+    // Supplier Dashboard
+    'supplier.actions.addProduct': 'Add Product',
+    'supplier.actions.viewOrders': 'View Orders',
+    'supplier.actions.analytics': 'Analytics',
+    'supplier.actions.reports': 'Reports',
+    'supplier.tabs.orders': 'Orders',
+    'supplier.tabs.myProducts': 'My Products',
+    'supplier.tabs.analytics': 'Analytics',
   },
   sw: {
     // Navigation
@@ -155,6 +164,15 @@ const translations = {
     'stats.completedProjects': 'Miradi Iliyokamilika',
     'stats.countiesServed': 'Kaunti Zinazotumikiwa',
     'stats.professionalSupport': 'Msaada wa Kitaaluma',
+    
+    // Supplier Dashboard
+    'supplier.actions.addProduct': 'Ongeza Bidhaa',
+    'supplier.actions.viewOrders': 'Ona Maagizo',
+    'supplier.actions.analytics': 'Uchambuzi',
+    'supplier.actions.reports': 'Ripoti',
+    'supplier.tabs.orders': 'Maagizo',
+    'supplier.tabs.myProducts': 'Bidhaa Zangu',
+    'supplier.tabs.analytics': 'Uchambuzi',
   }
 };
 
