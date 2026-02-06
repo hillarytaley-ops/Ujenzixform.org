@@ -350,12 +350,17 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
         description: 'Nearby delivery providers have been notified. First responder will be assigned.',
       });
 
-      // Call success callback
+      // Call success callback and show monitoring prompt
       if (onDeliveryRequested) {
         setTimeout(() => {
           onDeliveryRequested();
           onOpenChange(false);
           setStep('prompt');
+          
+          // Show monitoring service prompt after delivery is requested
+          setTimeout(() => {
+            setShowMonitoringPrompt(true);
+          }, 500);
         }, 2000);
       }
 
