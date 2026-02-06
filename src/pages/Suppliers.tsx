@@ -24,7 +24,8 @@ import {
   Store,
   Truck,
   Package,
-  Star
+  Star,
+  ChevronRight
 } from "lucide-react";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
@@ -219,8 +220,8 @@ const Suppliers = () => {
                 description="Home projects & personal purchases"
                 gradient="from-emerald-600 to-emerald-700"
                 borderColor="emerald"
-                primaryAction={{ label: "Sign In", path: "/private-client-signin" }}
-                secondaryAction={{ label: "Register", path: "/private-builder-registration" }}
+                explorePath="/unified-auth?role=private_client"
+                features={["Buy materials", "Track deliveries"]}
               />
 
               {/* Professional Builder Portal */}
@@ -230,8 +231,8 @@ const Suppliers = () => {
                 description="Request quotes for bulk orders"
                 gradient="from-blue-600 to-blue-700"
                 borderColor="blue"
-                primaryAction={{ label: "Sign In", path: "/professional-builder-signin" }}
-                secondaryAction={{ label: "Register", path: "/professional-builder-registration" }}
+                explorePath="/unified-auth?role=professional_builder"
+                features={["Bulk quotes", "Manage projects"]}
               />
 
               {/* Supplier Portal */}
@@ -241,8 +242,8 @@ const Suppliers = () => {
                 description="List & sell your products"
                 gradient="from-amber-600 to-amber-700"
                 borderColor="amber"
-                primaryAction={{ label: "Sign In", path: "/supplier-sign-in" }}
-                secondaryAction={{ label: "Register", path: "/supplier-registration" }}
+                explorePath="/unified-auth?role=supplier"
+                features={["List products", "Receive orders"]}
               />
 
               {/* Delivery Provider Portal */}
@@ -252,8 +253,8 @@ const Suppliers = () => {
                 description="Transport & logistics services"
                 gradient="from-purple-600 to-purple-700"
                 borderColor="purple"
-                primaryAction={{ label: "Sign In", path: "/delivery-sign-in" }}
-                secondaryAction={{ label: "Register", path: "/delivery-registration" }}
+                explorePath="/unified-auth?role=delivery"
+                features={["Get jobs", "Earn per delivery"]}
               />
             </div>
           </div>
@@ -305,15 +306,15 @@ const Suppliers = () => {
   );
 };
 
-// Reusable Portal Card Component
+// Reusable Portal Card Component - Single Explore button
 interface PortalCardProps {
   icon: React.ReactNode;
   title: string;
   description: string;
   gradient: string;
   borderColor: string;
-  primaryAction: { label: string; path: string };
-  secondaryAction: { label: string; path: string };
+  explorePath: string;
+  features?: string[];
 }
 
 const PortalCard: React.FC<PortalCardProps> = ({
@@ -322,34 +323,35 @@ const PortalCard: React.FC<PortalCardProps> = ({
   description,
   gradient,
   borderColor,
-  primaryAction,
-  secondaryAction,
+  explorePath,
+  features,
 }) => {
   const navigate = useNavigate();
   
   return (
-    <div className={`group bg-gradient-to-br ${gradient} rounded-xl md:rounded-2xl p-4 md:p-6 border border-${borderColor}-500/30 hover:border-${borderColor}-400 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl`}>
+    <div className={`group bg-gradient-to-br ${gradient} rounded-xl md:rounded-2xl p-4 md:p-6 border border-${borderColor}-500/30 hover:border-${borderColor}-400 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl flex flex-col`}>
       <div className="w-12 h-12 md:w-14 md:h-14 bg-white/20 rounded-xl md:rounded-2xl flex items-center justify-center mb-3 md:mb-4 mx-auto group-hover:scale-110 transition-transform">
         {icon}
       </div>
       <h3 className="text-white font-bold text-lg md:text-xl mb-1 md:mb-2">{title}</h3>
-      <p className="text-white/70 text-xs md:text-sm mb-4 md:mb-5">{description}</p>
-      <div className="flex gap-2">
+      <p className="text-white/70 text-xs md:text-sm mb-3">{description}</p>
+      {features && features.length > 0 && (
+        <ul className="text-white/60 text-xs space-y-1 mb-4">
+          {features.map((feature, idx) => (
+            <li key={idx} className="flex items-center gap-1">
+              <span className="text-white/40">›</span> {feature}
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="mt-auto">
         <Button
           size="sm"
-          variant="secondary"
-          className="flex-1 bg-white hover:bg-gray-100 text-gray-900 border-0 text-xs md:text-sm font-bold shadow-md"
-          onClick={() => navigate(primaryAction.path)}
+          className="w-full bg-white hover:bg-gray-100 text-gray-900 border-0 text-xs md:text-sm font-bold shadow-md"
+          onClick={() => navigate(explorePath)}
         >
-          {primaryAction.label}
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          className="flex-1 bg-gray-900/80 hover:bg-gray-900 text-white border-2 border-white text-xs md:text-sm font-bold shadow-md"
-          onClick={() => navigate(secondaryAction.path)}
-        >
-          {secondaryAction.label}
+          Explore
+          <ChevronRight className="h-4 w-4 ml-1" />
         </Button>
       </div>
     </div>
