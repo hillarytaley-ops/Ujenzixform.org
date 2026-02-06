@@ -122,6 +122,19 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
       // Log supplier IDs being queried
       console.log('🔍 Querying orders for supplier IDs:', supplierIds);
 
+      // Debug: Check all recent orders to see what supplier_ids exist
+      const { data: debugOrders } = await supabase
+        .from('purchase_orders')
+        .select('id, po_number, supplier_id, status, created_at')
+        .order('created_at', { ascending: false })
+        .limit(10);
+      
+      console.log('🔎 DEBUG - Recent orders in system:', debugOrders?.map(o => ({
+        po: o.po_number,
+        supplier_id: o.supplier_id,
+        status: o.status
+      })));
+
       // Fetch real orders from purchase_orders table
       const { data: purchaseOrders, error: ordersError } = await supabase
         .from('purchase_orders')
@@ -137,6 +150,8 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
       console.log('📦 Real orders loaded:', purchaseOrders?.length || 0);
       if (purchaseOrders && purchaseOrders.length > 0) {
         console.log('📦 First order supplier_id:', purchaseOrders[0].supplier_id);
+      } else {
+        console.log('⚠️ No orders found for supplier IDs:', supplierIds);
       }
 
       // Also fetch buyer profiles to get customer names
