@@ -280,8 +280,9 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
       }
 
       // Create delivery request - use only core columns that exist
+      // IMPORTANT: builder_id must be auth.uid() for RLS policy to pass
       const deliveryPayload: Record<string, any> = {
-        builder_id: profile.id,
+        builder_id: user.id, // Use auth user ID, not profile ID - RLS requires builder_id = auth.uid()
         purchase_order_id: purchaseOrder.id,
         pickup_address: pickupAddress,
         delivery_address: fullDeliveryAddress,
