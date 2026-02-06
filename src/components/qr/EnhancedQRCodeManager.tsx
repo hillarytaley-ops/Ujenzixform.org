@@ -57,7 +57,11 @@ interface ClientGroup {
   items: MaterialItem[];
 }
 
-export const EnhancedQRCodeManager: React.FC = () => {
+interface EnhancedQRCodeManagerProps {
+  supplierId?: string; // Optional: pass supplier ID directly to skip lookup
+}
+
+export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ supplierId: propSupplierId }) => {
   const [items, setItems] = useState<MaterialItem[]>([]);
   const [clientGroups, setClientGroups] = useState<ClientGroup[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,6 +71,7 @@ export const EnhancedQRCodeManager: React.FC = () => {
   const [viewMode, setViewMode] = useState<'all' | 'by-client'>('by-client');
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [selectionMode, setSelectionMode] = useState(false);
+  const [resolvedSupplierId, setResolvedSupplierId] = useState<string | null>(propSupplierId || null);
   const { toast } = useToast();
 
   // Toggle item selection
@@ -139,32 +144,51 @@ export const EnhancedQRCodeManager: React.FC = () => {
 
   const fetchMaterialItems = async (role: string | null, userId: string) => {
     console.log('🔍 EnhancedQRCodeManager: Fetching items for role:', role, 'userId (auth.uid):', userId);
+    console.log('🔍 Prop supplierId:', propSupplierId);
     
     if (role === 'supplier') {
-      // Get supplier's record from suppliers table
-      // The chain is: auth.users.id -> profiles.user_id -> profiles.id -> suppliers.user_id
       let supplierData: any = null;
+      let finalSupplierId: string | null = propSupplierId || null;
 
-      // Step 1: Get profile.id for this auth user (suppliers.user_id references profiles.id)
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('id, email')
-        .eq('user_id', userId)
-        .maybeSingle();
-      
-      console.log('📋 Profile lookup by auth.uid:', profileData);
-
-      if (profileData) {
-        // Step 2: Find supplier by profile.id (this is what suppliers.user_id references)
-        const { data: supplierByProfile, error: profileError } = await supabase
+      // If supplierId was passed as prop, use it directly
+      if (propSupplierId) {
+        console.log('✅ Using prop supplierId directly:', propSupplierId);
+        const { data: supplierById } = await supabase
           .from('suppliers')
           .select('id, company_name, user_id, email')
-          .eq('user_id', profileData.id)
+          .eq('id', propSupplierId)
           .maybeSingle();
         
-        console.log('📦 Supplier lookup by profile.id:', supplierByProfile, 'Error:', profileError);
-        if (supplierByProfile) {
-          supplierData = supplierByProfile;
+        if (supplierById) {
+          supplierData = supplierById;
+          finalSupplierId = supplierById.id;
+        }
+      }
+
+      // If no prop, look up via profile chain
+      if (!supplierData) {
+        // Step 1: Get profile.id for this auth user (suppliers.user_id references profiles.id)
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('id, email')
+          .eq('user_id', userId)
+          .maybeSingle();
+        
+        console.log('📋 Profile lookup by auth.uid:', profileData);
+
+        if (profileData) {
+          // Step 2: Find supplier by profile.id (this is what suppliers.user_id references)
+          const { data: supplierByProfile, error: profileError } = await supabase
+            .from('suppliers')
+            .select('id, company_name, user_id, email')
+            .eq('user_id', profileData.id)
+            .maybeSingle();
+          
+          console.log('📦 Supplier lookup by profile.id:', supplierByProfile, 'Error:', profileError);
+          if (supplierByProfile) {
+            supplierData = supplierByProfile;
+            finalSupplierId = supplierByProfile.id;
+          }
         }
       }
 
@@ -179,6 +203,7 @@ export const EnhancedQRCodeManager: React.FC = () => {
         console.log('📦 Supplier lookup by auth.uid directly:', supplierByUserId, 'Error:', userIdError);
         if (supplierByUserId) {
           supplierData = supplierByUserId;
+          finalSupplierId = supplierByUserId.id;
         }
       }
 
@@ -196,8 +221,14 @@ export const EnhancedQRCodeManager: React.FC = () => {
           console.log('📦 Supplier lookup by email:', supplierByEmail);
           if (supplierByEmail) {
             supplierData = supplierByEmail;
+            finalSupplierId = supplierByEmail.id;
           }
         }
+      }
+      
+      // Store the resolved supplier ID
+      if (finalSupplierId) {
+        setResolvedSupplierId(finalSupplierId);
       }
 
       if (supplierData) {

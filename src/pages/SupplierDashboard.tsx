@@ -1229,7 +1229,7 @@ const SupplierDashboard = () => {
                     </ul>
                   </AlertDescription>
                 </Alert>
-                <EnhancedQRCodeManager />
+                <EnhancedQRCodeManager supplierId={supplierRecordId || undefined} />
               </CardContent>
             </Card>
           </TabsContent>
