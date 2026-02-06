@@ -68,7 +68,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
   const [userRole, setUserRole] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<MaterialItem | null>(null);
   const [showQRDialog, setShowQRDialog] = useState(false);
-  const [viewMode, setViewMode] = useState<'all' | 'by-client'>('by-client');
+  const [viewMode, setViewMode] = useState<'all' | 'by-client'>('all'); // Default to 'all' - sorted by date, newest first
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [selectionMode, setSelectionMode] = useState(false);
   const [resolvedSupplierId, setResolvedSupplierId] = useState<string | null>(propSupplierId || null);
@@ -278,9 +278,9 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
     }
   };
 
-  // Group items by client/buyer
+  // Group items by client/buyer - sorted by most recent first
   const groupItemsByClient = (materialItems: MaterialItem[]) => {
-    const groups: Record<string, ClientGroup> = {};
+    const groups: Record<string, ClientGroup & { latestDate: string }> = {};
     
     materialItems.forEach(item => {
       const buyerId = item.buyer_id || 'unknown';
@@ -295,22 +295,39 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
           pending_items: 0,
           dispatched_items: 0,
           received_items: 0,
-          items: []
+          items: [],
+          latestDate: item.created_at || ''
         };
       }
       
       groups[buyerId].total_items++;
       groups[buyerId].items.push(item);
       
+      // Track the most recent item date for this client
+      if (item.created_at && item.created_at > groups[buyerId].latestDate) {
+        groups[buyerId].latestDate = item.created_at;
+      }
+      
       if (item.status === 'pending') groups[buyerId].pending_items++;
       else if (item.status === 'dispatched' || item.status === 'in_transit') groups[buyerId].dispatched_items++;
       else if (item.status === 'received' || item.status === 'verified') groups[buyerId].received_items++;
     });
     
-    // Sort groups by most recent activity
-    const sortedGroups = Object.values(groups).sort((a, b) => b.total_items - a.total_items);
+    // Sort groups by most recent activity (newest first), not by total items
+    const sortedGroups = Object.values(groups).sort((a, b) => {
+      // Sort by latest date descending (newest first)
+      return new Date(b.latestDate).getTime() - new Date(a.latestDate).getTime();
+    });
+    
+    // Also sort items within each group by date (newest first)
+    sortedGroups.forEach(group => {
+      group.items.sort((a, b) => {
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+    });
+    
     setClientGroups(sortedGroups);
-    console.log('📊 Client groups:', sortedGroups.length);
+    console.log('📊 Client groups:', sortedGroups.length, '- sorted by most recent activity');
   };
 
   const downloadQRCode = async (qrCode: string, materialType: string, itemSeq: number) => {
