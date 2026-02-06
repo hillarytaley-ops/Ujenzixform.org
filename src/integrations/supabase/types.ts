@@ -3055,12 +3055,16 @@ export type Database = {
           items: Json
           payment_terms: string | null
           po_number: string
+          project_name: string | null
           qr_code_generated: boolean | null
           qr_code_url: string | null
+          quote_amount: number | null
+          quote_valid_until: string | null
           quotation_request_id: string | null
           special_instructions: string | null
           status: string
           supplier_id: string
+          supplier_notes: string | null
           total_amount: number
           updated_at: string
         }
@@ -3076,12 +3080,16 @@ export type Database = {
           items?: Json
           payment_terms?: string | null
           po_number: string
+          project_name?: string | null
           qr_code_generated?: boolean | null
           qr_code_url?: string | null
+          quote_amount?: number | null
+          quote_valid_until?: string | null
           quotation_request_id?: string | null
           special_instructions?: string | null
           status?: string
           supplier_id: string
+          supplier_notes?: string | null
           total_amount: number
           updated_at?: string
         }
@@ -3097,12 +3105,16 @@ export type Database = {
           items?: Json
           payment_terms?: string | null
           po_number?: string
+          project_name?: string | null
           qr_code_generated?: boolean | null
           qr_code_url?: string | null
+          quote_amount?: number | null
+          quote_valid_until?: string | null
           quotation_request_id?: string | null
           special_instructions?: string | null
           status?: string
           supplier_id?: string
+          supplier_notes?: string | null
           total_amount?: number
           updated_at?: string
         }
