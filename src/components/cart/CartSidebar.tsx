@@ -219,8 +219,9 @@ export const CartSidebar: React.FC = () => {
       // Generate PO number
       const poNumber = `PO-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
       
-      // Get a valid supplier UUID (not 'admin-catalog' or 'general')
+      // Get a valid supplier UUID (must exist in suppliers table)
       let supplierId = items[0]?.supplier_id;
+      let validatedSupplierId: string | null = null;
       
       // If supplier_id is not a valid UUID, fetch a real supplier
       // Prefer the supplier who has set prices for these products
@@ -228,31 +229,51 @@ export const CartSidebar: React.FC = () => {
         // First try to find a supplier who has priced these items
         const productIds = items.map(item => item.id).filter(Boolean);
         if (productIds.length > 0) {
+          // Join with suppliers table to ensure the supplier_id is valid
           const { data: priceData } = await supabase
             .from('supplier_product_prices')
-            .select('supplier_id')
+            .select('supplier_id, suppliers!inner(id, company_name)')
             .in('product_id', productIds)
             .limit(1)
             .maybeSingle();
           
           if (priceData?.supplier_id) {
-            supplierId = priceData.supplier_id;
-            console.log('📦 Using supplier from product prices:', supplierId);
+            validatedSupplierId = priceData.supplier_id;
+            console.log('📦 Using validated supplier from product prices:', validatedSupplierId);
           }
         }
+      } else {
+        // Validate that the provided supplier_id exists in suppliers table
+        const { data: supplierCheck } = await supabase
+          .from('suppliers')
+          .select('id')
+          .eq('id', supplierId)
+          .maybeSingle();
         
-        // If still no supplier, get the first active supplier
-        if (!supplierId || supplierId === 'admin-catalog' || supplierId === 'general') {
-          const { data: suppliers } = await supabase
-            .from('suppliers')
-            .select('id, user_id')
-            .limit(1)
-            .single();
-          
-          supplierId = suppliers?.id || suppliers?.user_id || user.id;
-          console.log('📦 Using fallback supplier:', supplierId);
+        if (supplierCheck?.id) {
+          validatedSupplierId = supplierCheck.id;
+          console.log('📦 Validated existing supplier_id:', validatedSupplierId);
         }
       }
+      
+      // If still no valid supplier, get the first active supplier from suppliers table
+      if (!validatedSupplierId) {
+        const { data: fallbackSupplier } = await supabase
+          .from('suppliers')
+          .select('id, company_name')
+          .limit(1)
+          .single();
+        
+        if (fallbackSupplier?.id) {
+          validatedSupplierId = fallbackSupplier.id;
+          console.log('📦 Using fallback supplier:', validatedSupplierId, fallbackSupplier.company_name);
+        } else {
+          console.error('❌ No valid supplier found in database!');
+          throw new Error('No supplier available to process this order');
+        }
+      }
+      
+      supplierId = validatedSupplierId;
       
       // Create purchase order
       const orderPayload = {

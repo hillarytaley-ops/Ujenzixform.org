@@ -112,15 +112,38 @@ export function QuoteCart({
         const supplierItems = itemsBySupplier[supplierId];
         const supplierTotal = supplierItems.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
         
-        // Get a valid supplier ID (use first available if 'general')
-        let validSupplierId = supplierId;
-        if (supplierId === 'general') {
-          const { data: suppliers } = await supabase
+        // Validate supplier ID exists in suppliers table
+        let validSupplierId: string | null = null;
+        
+        if (supplierId && supplierId !== 'general' && supplierId !== 'admin-catalog') {
+          // Verify this supplier_id actually exists in suppliers table
+          const { data: supplierCheck } = await supabase
             .from('suppliers')
             .select('id')
+            .eq('id', supplierId)
+            .maybeSingle();
+          
+          if (supplierCheck?.id) {
+            validSupplierId = supplierCheck.id;
+            console.log('📦 Validated supplier_id:', validSupplierId);
+          }
+        }
+        
+        // If not valid, get first available supplier
+        if (!validSupplierId) {
+          const { data: fallbackSupplier } = await supabase
+            .from('suppliers')
+            .select('id, company_name')
             .limit(1)
             .single();
-          validSupplierId = suppliers?.id || supplierId;
+          
+          if (fallbackSupplier?.id) {
+            validSupplierId = fallbackSupplier.id;
+            console.log('📦 Using fallback supplier:', validSupplierId, fallbackSupplier.company_name);
+          } else {
+            console.error('❌ No valid supplier found for quote request');
+            continue; // Skip this supplier group
+          }
         }
 
         const poNumber = `QR-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
@@ -149,8 +172,9 @@ export function QuoteCart({
 
         if (!error) {
           successCount++;
+          console.log('✅ Quote request sent to supplier:', validSupplierId);
         } else {
-          console.error('Quote request error for supplier:', supplierId, error);
+          console.error('Quote request error for supplier:', validSupplierId, error);
         }
       }
 
