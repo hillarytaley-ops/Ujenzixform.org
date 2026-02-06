@@ -141,18 +141,24 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
         .single();
 
       // Create monitoring service request using actual table columns
-      // Table: monitoring_service_requests has specific column names
+      // Table uses: user_id, contact_name, contact_email, contact_phone, camera_count
       const monitoringRequest = {
-        requester_id: user.id,
-        requester_name: profile?.full_name || user.email?.split('@')[0] || 'Customer',
-        requester_type: 'private_client', // or could detect from user role
+        user_id: user.id,
         project_name: formData.projectDescription || purchaseOrder?.project_name || 'Monitoring Request',
         project_location: formData.siteAddress,
-        project_description: `Package: ${selectedPkg?.name || selectedPackage}. Phone: ${formData.contactPhone}. ${formData.specialRequirements || ''}`,
-        preferred_start_date: formData.preferredStartDate || null,
-        number_of_cameras: 1,
-        additional_notes: `Estimated cost: KES ${selectedPkg?.price || 0}. Duration: ${selectedPkg?.duration || 'N/A'}`,
-        status: 'pending'
+        project_type: selectedPackage,
+        project_duration: selectedPkg?.duration || null,
+        start_date: formData.preferredStartDate || null,
+        contact_name: profile?.full_name || user.email?.split('@')[0] || 'Customer',
+        contact_email: profile?.email || user.email || '',
+        contact_phone: formData.contactPhone,
+        selected_services: [selectedPackage],
+        camera_count: 1,
+        special_requirements: formData.specialRequirements || null,
+        estimated_cost: selectedPkg?.price || 0,
+        additional_notes: `Package: ${selectedPkg?.name || selectedPackage}. Duration: ${selectedPkg?.duration || 'N/A'}`,
+        status: 'pending',
+        urgency: 'normal'
       };
 
       const { error } = await supabase
