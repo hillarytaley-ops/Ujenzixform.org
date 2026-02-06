@@ -360,11 +360,22 @@ const SupplierDashboard = () => {
         };
         
         if (action === 'approve') {
-          updateData.quote_amount = parseFloat(quoteResponse.quoteAmount);
+          const quoteAmountValue = parseFloat(quoteResponse.quoteAmount);
+          updateData.quote_amount = quoteAmountValue;
+          // Also save supplier notes if provided
+          if (quoteResponse.supplierNotes) {
+            updateData.supplier_notes = quoteResponse.supplierNotes;
+          }
+          if (quoteResponse.validUntil) {
+            updateData.quote_valid_until = quoteResponse.validUntil;
+          }
+          console.log('💰 Quote amount being saved:', quoteAmountValue, 'from input:', quoteResponse.quoteAmount);
         }
 
         const quoteId = selectedQuote.purchase_order_id || selectedQuote.id;
-        console.log('🔄 Attempting to update purchase_order:', quoteId, 'with data:', updateData);
+        console.log('🔄 Attempting to update purchase_order:', quoteId);
+        console.log('📝 Update data:', JSON.stringify(updateData, null, 2));
+        console.log('🔑 Current user.id:', user?.id);
 
         const { data: updateResult, error: poError } = await supabase
           .from('purchase_orders')
@@ -374,6 +385,7 @@ const SupplierDashboard = () => {
         
         if (poError) {
           console.error('❌ Error updating purchase order:', poError);
+          console.error('❌ Error details:', poError.message, poError.details, poError.hint);
           throw poError;
         }
         
@@ -381,10 +393,20 @@ const SupplierDashboard = () => {
         if (!updateResult || updateResult.length === 0) {
           console.error('⚠️ No rows updated! RLS policy may be blocking the update.');
           console.error('Quote ID:', quoteId, 'Supplier user.id:', user?.id);
+          
+          // Try to fetch the order to see what supplier_id it has
+          const { data: orderCheck } = await supabase
+            .from('purchase_orders')
+            .select('id, supplier_id, status')
+            .eq('id', quoteId)
+            .single();
+          console.error('📋 Order details:', orderCheck);
+          
           throw new Error('Failed to update quote - you may not have permission to update this order');
         }
         
         console.log(`✅ Quote ${action === 'approve' ? 'sent' : 'rejected'} - Purchase order updated:`, updateResult);
+        console.log('💰 Saved quote_amount:', updateResult[0]?.quote_amount);
       } else {
         // Legacy: Update quotation_requests table
         const updateData: any = {
