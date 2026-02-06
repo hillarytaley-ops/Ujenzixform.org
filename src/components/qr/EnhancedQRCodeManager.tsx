@@ -138,20 +138,51 @@ export const EnhancedQRCodeManager: React.FC = () => {
   };
 
   const fetchMaterialItems = async (role: string | null, userId: string) => {
-    console.log('🔍 EnhancedQRCodeManager: Fetching items for role:', role, 'userId:', userId);
+    console.log('🔍 EnhancedQRCodeManager: Fetching items for role:', role, 'userId (auth.uid):', userId);
     
     if (role === 'supplier') {
       // Get supplier's record from suppliers table
-      // Try by user_id first (direct auth user ID)
-      let { data: supplierData, error: supplierError } = await supabase
-        .from('suppliers')
-        .select('id, company_name, user_id')
+      // The chain is: auth.users.id -> profiles.user_id -> profiles.id -> suppliers.user_id
+      let supplierData: any = null;
+
+      // Step 1: Get profile.id for this auth user (suppliers.user_id references profiles.id)
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('id, email')
         .eq('user_id', userId)
         .maybeSingle();
+      
+      console.log('📋 Profile lookup by auth.uid:', profileData);
 
-      console.log('📦 Supplier lookup by user_id:', supplierData, 'Error:', supplierError);
+      if (profileData) {
+        // Step 2: Find supplier by profile.id (this is what suppliers.user_id references)
+        const { data: supplierByProfile, error: profileError } = await supabase
+          .from('suppliers')
+          .select('id, company_name, user_id, email')
+          .eq('user_id', profileData.id)
+          .maybeSingle();
+        
+        console.log('📦 Supplier lookup by profile.id:', supplierByProfile, 'Error:', profileError);
+        if (supplierByProfile) {
+          supplierData = supplierByProfile;
+        }
+      }
 
-      // If not found, try looking up by email match
+      // Fallback: Try direct user_id match (in case some suppliers use auth.uid directly)
+      if (!supplierData) {
+        const { data: supplierByUserId, error: userIdError } = await supabase
+          .from('suppliers')
+          .select('id, company_name, user_id, email')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        console.log('📦 Supplier lookup by auth.uid directly:', supplierByUserId, 'Error:', userIdError);
+        if (supplierByUserId) {
+          supplierData = supplierByUserId;
+        }
+      }
+
+      // Fallback: Try by email match
       if (!supplierData) {
         const { data: userData } = await supabase.auth.getUser();
         if (userData?.user?.email) {
@@ -165,30 +196,6 @@ export const EnhancedQRCodeManager: React.FC = () => {
           console.log('📦 Supplier lookup by email:', supplierByEmail);
           if (supplierByEmail) {
             supplierData = supplierByEmail;
-          }
-        }
-      }
-
-      // Also try via profile lookup
-      if (!supplierData) {
-        console.log('🔍 Trying to find supplier via profile...');
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('user_id', userId)
-          .maybeSingle();
-        
-        if (profileData) {
-          console.log('📋 Found profile with id:', profileData.id);
-          const { data: supplierByProfile } = await supabase
-            .from('suppliers')
-            .select('id, company_name, user_id')
-            .eq('user_id', profileData.id)
-            .maybeSingle();
-          
-          console.log('📦 Supplier lookup by profile.id:', supplierByProfile);
-          if (supplierByProfile) {
-            supplierData = supplierByProfile;
           }
         }
       }
