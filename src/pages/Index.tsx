@@ -25,7 +25,8 @@ import {
   Clock,
   TrendingUp,
   Award,
-  Play
+  Play,
+  ChevronRight
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import Navigation from "@/components/Navigation";
@@ -311,16 +312,20 @@ const Index = () => {
                   <ShoppingCart className="h-7 w-7 text-white" />
                 </div>
                 <h3 className="text-white font-bold text-lg mb-1">Private Builder</h3>
-                <p className="text-emerald-100/80 text-sm mb-6">Home projects & personal purchases</p>
-                <div className="mt-auto flex gap-2 justify-center">
-                  <Link to="/builder-signin">
-                    <Button variant="outline" size="sm" className="bg-white/10 border-white/30 text-white hover:bg-white/20 px-4">
-                      Sign In
-                    </Button>
-                  </Link>
-                  <Link to="/private-builder-registration">
-                    <Button size="sm" className="bg-white text-emerald-700 hover:bg-white/90 px-4">
-                      Register
+                <p className="text-emerald-100/80 text-sm mb-4">Buy materials for home projects</p>
+                <ul className="text-left text-emerald-100/70 text-xs space-y-1 mb-4">
+                  <li className="flex items-center gap-2">
+                    <span className="text-emerald-300">›</span> Buy materials for home projects
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-emerald-300">›</span> Track deliveries, Compare prices
+                  </li>
+                </ul>
+                <div className="mt-auto">
+                  <Link to="/unified-auth?role=private_client">
+                    <Button size="sm" className="w-full bg-white text-emerald-700 hover:bg-white/90 font-semibold">
+                      Explore
+                      <ChevronRight className="h-4 w-4 ml-1" />
                     </Button>
                   </Link>
                 </div>
@@ -334,16 +339,20 @@ const Index = () => {
                   <Building2 className="h-7 w-7 text-white" />
                 </div>
                 <h3 className="text-white font-bold text-lg mb-1">Professional Builder</h3>
-                <p className="text-blue-100/80 text-sm mb-6">Request quotes for bulk orders</p>
-                <div className="mt-auto flex gap-2 justify-center">
-                  <Link to="/builder-signin">
-                    <Button variant="outline" size="sm" className="bg-white/10 border-white/30 text-white hover:bg-white/20 px-4">
-                      Sign In
-                    </Button>
-                  </Link>
-                  <Link to="/professional-builder-registration">
-                    <Button size="sm" className="bg-white text-blue-700 hover:bg-white/90 px-4">
-                      Register
+                <p className="text-blue-100/80 text-sm mb-4">Request bulk quotes & manage projects</p>
+                <ul className="text-left text-blue-100/70 text-xs space-y-1 mb-4">
+                  <li className="flex items-center gap-2">
+                    <span className="text-blue-300">›</span> Request bulk quotes
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-blue-300">›</span> Manage projects, Hire suppliers
+                  </li>
+                </ul>
+                <div className="mt-auto">
+                  <Link to="/unified-auth?role=professional_builder">
+                    <Button size="sm" className="w-full bg-white text-blue-700 hover:bg-white/90 font-semibold">
+                      Explore
+                      <ChevronRight className="h-4 w-4 ml-1" />
                     </Button>
                   </Link>
                 </div>
@@ -357,16 +366,20 @@ const Index = () => {
                   <Store className="h-7 w-7 text-white" />
                 </div>
                 <h3 className="text-white font-bold text-lg mb-1">Supplier</h3>
-                <p className="text-orange-100/80 text-sm mb-6">List & sell your products</p>
-                <div className="mt-auto flex gap-2 justify-center">
-                  <Link to="/supplier-signin">
-                    <Button variant="outline" size="sm" className="bg-white/10 border-white/30 text-white hover:bg-white/20 px-4">
-                      Sign In
-                    </Button>
-                  </Link>
-                  <Link to="/supplier-registration">
-                    <Button size="sm" className="bg-white text-orange-700 hover:bg-white/90 px-4">
-                      Register
+                <p className="text-orange-100/80 text-sm mb-4">List products & receive orders</p>
+                <ul className="text-left text-orange-100/70 text-xs space-y-1 mb-4">
+                  <li className="flex items-center gap-2">
+                    <span className="text-orange-300">›</span> List products
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-orange-300">›</span> Receive orders, Manage inventory
+                  </li>
+                </ul>
+                <div className="mt-auto">
+                  <Link to="/unified-auth?role=supplier">
+                    <Button size="sm" className="w-full bg-white text-orange-700 hover:bg-white/90 font-semibold">
+                      Explore
+                      <ChevronRight className="h-4 w-4 ml-1" />
                     </Button>
                   </Link>
                 </div>
@@ -380,16 +393,20 @@ const Index = () => {
                   <Truck className="h-7 w-7 text-white" />
                 </div>
                 <h3 className="text-white font-bold text-lg mb-1">Delivery Provider</h3>
-                <p className="text-purple-100/80 text-sm mb-6">Transport & logistics services</p>
-                <div className="mt-auto flex gap-2 justify-center">
-                  <Link to="/delivery-signin">
-                    <Button variant="outline" size="sm" className="bg-white/10 border-white/30 text-white hover:bg-white/20 px-4">
-                      Sign In
-                    </Button>
-                  </Link>
-                  <Link to="/delivery/apply">
-                    <Button size="sm" className="bg-white text-purple-700 hover:bg-white/90 px-4">
-                      Register
+                <p className="text-purple-100/80 text-sm mb-4">Get transport jobs & earn</p>
+                <ul className="text-left text-purple-100/70 text-xs space-y-1 mb-4">
+                  <li className="flex items-center gap-2">
+                    <span className="text-purple-300">›</span> Get transport jobs
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-purple-300">›</span> Track logistics, Earn per delivery
+                  </li>
+                </ul>
+                <div className="mt-auto">
+                  <Link to="/unified-auth?role=delivery">
+                    <Button size="sm" className="w-full bg-white text-purple-700 hover:bg-white/90 font-semibold">
+                      Explore
+                      <ChevronRight className="h-4 w-4 ml-1" />
                     </Button>
                   </Link>
                 </div>

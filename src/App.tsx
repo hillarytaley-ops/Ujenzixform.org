@@ -56,6 +56,9 @@ const PrivateClientDashboard = React.lazy(() => import("./pages/PrivateClientDas
 const ProfessionalBuilderDashboardPage = React.lazy(() => import("./pages/ProfessionalBuilderDashboard"));
 const PublicBuilderProfile = React.lazy(() => import("./pages/PublicBuilderProfile"));
 
+// Unified Auth page - single auth page for all roles
+const UnifiedAuth = React.lazy(() => import("./pages/UnifiedAuth"));
+
 // Legal pages - lazy loaded
 const PrivacyPolicy = React.lazy(() => import("./pages/PrivacyPolicy"));
 const TermsOfService = React.lazy(() => import("./pages/TermsOfService"));
@@ -218,6 +221,7 @@ const App = () => {
                     {/* Public Routes - Accessible to everyone after single sign in */}
                     <Route path="/" element={<Auth />} />
                     <Route path="/auth" element={<Auth />} />
+                    <Route path="/unified-auth" element={<SuspenseWrapper><UnifiedAuth /></SuspenseWrapper>} />
                     <Route path="/admin-login" element={<SuspenseWrapper><AdminAuth /></SuspenseWrapper>} />
                     <Route path="/reset-password" element={<SuspenseWrapper><ResetPassword /></SuspenseWrapper>} />
                     
