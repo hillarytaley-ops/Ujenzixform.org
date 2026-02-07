@@ -110,12 +110,18 @@ export const SecurityAlert = () => {
 
   const checkRateLimitViolations = async (): Promise<number> => {
     try {
-      const { data } = await supabase
+      // Note: api_rate_limits table may not exist or may have RLS restrictions
+      // This is a non-critical feature, so we silently return 0 if unavailable
+      const { data, error } = await supabase
         .from('api_rate_limits')
         .select('request_count')
         .gte('request_count', 100)
         .gte('window_start', new Date(Date.now() - 60000).toISOString());
 
+      // If table doesn't exist or access denied, just return 0
+      if (error) {
+        return 0;
+      }
       return data?.length || 0;
     } catch (error) {
       return 0;
