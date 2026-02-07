@@ -178,11 +178,14 @@ const PrivateClientDashboard = () => {
         .eq('buyer_id', user.id)
         .order('created_at', { ascending: false });
 
+      console.log('📦 Private client orders loaded:', ordersData?.length || 0, ordersData);
+
       if (ordersError) {
         console.error('Error fetching orders:', ordersError);
       } else {
         const fetchedOrders = ordersData || [];
         setOrders(fetchedOrders);
+        console.log('📦 Orders set to state:', fetchedOrders.length);
         
         // Calculate real stats from orders
         const totalOrders = fetchedOrders.length;
@@ -477,6 +480,7 @@ const PrivateClientDashboard = () => {
                   </div>
                 ) : (
                   <div className="space-y-4">
+                    <p className="text-sm text-gray-500 mb-2">Showing {orders.length} orders</p>
                     {orders.map((order) => (
                       <div key={order.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">

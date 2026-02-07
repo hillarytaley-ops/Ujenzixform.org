@@ -222,58 +222,103 @@ export const CartSidebar: React.FC = () => {
       // Get a valid supplier UUID (must exist in suppliers table)
       let supplierId = items[0]?.supplier_id;
       let validatedSupplierId: string | null = null;
+      let supplierName: string | null = null;
       
-      // If supplier_id is not a valid UUID, fetch a real supplier
-      // Prefer the supplier who has set prices for these products
-      if (!supplierId || supplierId === 'admin-catalog' || supplierId === 'general') {
-        // First try to find a supplier who has priced these items
-        const productIds = items.map(item => item.id).filter(Boolean);
-        if (productIds.length > 0) {
-          // Join with suppliers table to ensure the supplier_id is valid
-          const { data: priceData } = await supabase
-            .from('supplier_product_prices')
-            .select('supplier_id, suppliers!inner(id, company_name)')
-            .in('product_id', productIds)
-            .limit(1)
-            .maybeSingle();
-          
-          if (priceData?.supplier_id) {
-            validatedSupplierId = priceData.supplier_id;
-            console.log('📦 Using validated supplier from product prices:', validatedSupplierId);
-          }
-        }
-      } else {
-        // Validate that the provided supplier_id exists in suppliers table
+      // Collect all product IDs from cart
+      const productIds = items.map(item => item.id).filter(Boolean);
+      console.log('🛒 Cart product IDs:', productIds);
+      
+      // STEP 1: Check if any item already has a valid supplier_id from user selection
+      const itemWithSupplier = items.find(item => 
+        item.supplier_id && 
+        item.supplier_id !== 'admin-catalog' && 
+        item.supplier_id !== 'general' &&
+        item.supplier_id.length === 36 // UUID length check
+      );
+      
+      if (itemWithSupplier?.supplier_id) {
+        // Validate this supplier exists
         const { data: supplierCheck } = await supabase
           .from('suppliers')
-          .select('id')
+          .select('id, company_name')
+          .eq('id', itemWithSupplier.supplier_id)
+          .maybeSingle();
+        
+        if (supplierCheck?.id) {
+          validatedSupplierId = supplierCheck.id;
+          supplierName = supplierCheck.company_name;
+          console.log('📦 Using supplier from cart item:', validatedSupplierId, supplierName);
+        }
+      }
+      
+      // STEP 2: If no supplier from cart, check supplier_product_prices for these products
+      if (!validatedSupplierId && productIds.length > 0) {
+        // Get ALL suppliers who have priced these products, ordered by price
+        const { data: priceData, error: priceError } = await supabase
+          .from('supplier_product_prices')
+          .select('supplier_id, price, suppliers!inner(id, company_name)')
+          .in('product_id', productIds)
+          .order('price', { ascending: true });
+        
+        console.log('💰 Supplier prices found:', priceData?.length || 0, priceError ? `Error: ${priceError.message}` : '');
+        
+        if (priceData && priceData.length > 0) {
+          // Use the supplier with the best (lowest) price
+          validatedSupplierId = priceData[0].supplier_id;
+          supplierName = (priceData[0].suppliers as any)?.company_name;
+          console.log('📦 Using supplier with best price:', validatedSupplierId, supplierName);
+        }
+      }
+      
+      // STEP 3: If supplier_id provided but not validated yet, validate it
+      if (!validatedSupplierId && supplierId && supplierId !== 'admin-catalog' && supplierId !== 'general') {
+        const { data: supplierCheck } = await supabase
+          .from('suppliers')
+          .select('id, company_name')
           .eq('id', supplierId)
           .maybeSingle();
         
         if (supplierCheck?.id) {
           validatedSupplierId = supplierCheck.id;
-          console.log('📦 Validated existing supplier_id:', validatedSupplierId);
+          supplierName = supplierCheck.company_name;
+          console.log('📦 Validated provided supplier_id:', validatedSupplierId, supplierName);
         }
       }
       
-      // If still no valid supplier, get the first active supplier from suppliers table
+      // STEP 4: LAST RESORT - Get a supplier, but warn about it
       if (!validatedSupplierId) {
-        const { data: fallbackSupplier } = await supabase
-          .from('suppliers')
-          .select('id, company_name')
+        // Try to get a supplier who has ANY products priced (active supplier)
+        const { data: activeSupplier } = await supabase
+          .from('supplier_product_prices')
+          .select('supplier_id, suppliers!inner(id, company_name)')
           .limit(1)
-          .single();
+          .maybeSingle();
         
-        if (fallbackSupplier?.id) {
-          validatedSupplierId = fallbackSupplier.id;
-          console.log('📦 Using fallback supplier:', validatedSupplierId, fallbackSupplier.company_name);
+        if (activeSupplier?.supplier_id) {
+          validatedSupplierId = activeSupplier.supplier_id;
+          supplierName = (activeSupplier.suppliers as any)?.company_name;
+          console.log('⚠️ Using active supplier (has products):', validatedSupplierId, supplierName);
         } else {
-          console.error('❌ No valid supplier found in database!');
-          throw new Error('No supplier available to process this order');
+          // Absolute fallback - first supplier in database
+          const { data: fallbackSupplier } = await supabase
+            .from('suppliers')
+            .select('id, company_name')
+            .limit(1)
+            .single();
+          
+          if (fallbackSupplier?.id) {
+            validatedSupplierId = fallbackSupplier.id;
+            supplierName = fallbackSupplier.company_name;
+            console.warn('⚠️ WARNING: Using fallback supplier (no product pricing found):', validatedSupplierId, supplierName);
+          } else {
+            console.error('❌ No valid supplier found in database!');
+            throw new Error('No supplier available to process this order');
+          }
         }
       }
       
       supplierId = validatedSupplierId;
+      console.log('✅ Final supplier for order:', supplierId, supplierName);
       
       // Create purchase order
       const orderPayload = {

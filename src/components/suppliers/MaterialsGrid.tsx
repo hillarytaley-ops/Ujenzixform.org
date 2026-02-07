@@ -979,7 +979,8 @@ export const MaterialsGrid = () => {
               
               return {
                 id: item.id,
-                supplier_id: 'admin-catalog',
+                // Use actual supplier_id from pricing if available, otherwise mark as admin-catalog
+                supplier_id: supplierPrice?.supplier_id || 'admin-catalog',
                 name: item.name || 'Unnamed Material',
                 category: item.category || 'Uncategorized',
                 description: supplierPrice?.description || item.description || '',
@@ -1043,7 +1044,8 @@ export const MaterialsGrid = () => {
               
               return {
                 id: item.id,
-                supplier_id: 'admin-catalog',
+                // Use actual supplier_id from pricing if available, otherwise mark as admin-catalog
+                supplier_id: supplierPrice?.supplier_id || 'admin-catalog',
                 name: item.name || 'Unnamed Material',
                 category: item.category || 'Uncategorized',
                 description: supplierPrice?.description || item.description || '',
