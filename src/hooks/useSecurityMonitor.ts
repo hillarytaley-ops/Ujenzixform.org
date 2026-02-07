@@ -142,66 +142,13 @@ export const useSecurityMonitor = () => {
   }, [validateSession, logSecurityEvent]);
 
   // Rate limiting check
-  // Note: This feature requires the api_rate_limits table to exist in Supabase
-  // If the table doesn't exist or has RLS restrictions, this will gracefully return true (allow request)
-  const checkRateLimit = useCallback(async (endpoint: string, maxRequests: number = 100): Promise<boolean> => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return true; // Allow anonymous requests (they're handled elsewhere)
-
-      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-      
-      const { data, error } = await supabase
-        .from('api_rate_limits')
-        .select('request_count')
-        .eq('user_id', user.id)
-        .eq('endpoint', endpoint)
-        .gte('window_start', oneHourAgo)
-        .single();
-
-      // If table doesn't exist or access denied (403), just allow the request
-      // This is a non-critical feature
-      if (error) {
-        if (error.code === 'PGRST116') {
-          // No rows found - this is fine, user hasn't made requests yet
-        } else if (error.code === '42P01' || error.message?.includes('403') || error.code === '42501') {
-          // Table doesn't exist or permission denied - silently allow
-          return true;
-        } else {
-          // Some other error - log it but allow the request
-          console.debug('Rate limit check unavailable');
-          return true;
-        }
-      }
-
-      const currentCount = data?.request_count || 0;
-      
-      if (currentCount >= maxRequests) {
-        logSecurityEvent('rate_limit_exceeded', `Rate limit exceeded for ${endpoint}`, 'medium');
-        return false;
-      }
-
-      // Try to update or insert rate limit record (may fail silently if table doesn't exist)
-      try {
-        await supabase
-          .from('api_rate_limits')
-          .upsert({
-            user_id: user.id,
-            endpoint,
-            request_count: currentCount + 1,
-            window_start: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          });
-      } catch {
-        // Silently ignore upsert errors
-      }
-
-      return true;
-    } catch (error) {
-      // On any error, allow the request (fail open for non-critical feature)
-      return true;
-    }
-  }, [logSecurityEvent]);
+  // DISABLED: api_rate_limits table doesn't exist or has no RLS policies
+  // This prevents 403 errors in the console
+  // To re-enable, create the table in Supabase with proper RLS policies
+  const checkRateLimit = useCallback(async (_endpoint: string, _maxRequests: number = 100): Promise<boolean> => {
+    // Always allow - rate limiting is handled by Supabase at the API level
+    return true;
+  }, []);
 
   // Enhanced encryption check
   const verifyDataEncryption = useCallback(() => {

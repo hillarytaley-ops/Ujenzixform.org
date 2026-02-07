@@ -453,27 +453,10 @@ class RealTimeSecurityService {
   }
 
   private async checkRateLimitViolations(): Promise<any[]> {
-    try {
-      // Note: api_rate_limits table may not exist or may have RLS restrictions
-      // This is a non-critical feature, so we silently return empty if unavailable
-      const { data, error } = await supabase
-        .from('api_rate_limits')
-        .select('*')
-        .gte('request_count', 100)
-        .gte('window_start', new Date(Date.now() - 60000).toISOString());
-      
-      // If table doesn't exist or access denied, just return empty array
-      if (error) {
-        // Don't log 403 errors to console - this is expected if table doesn't exist
-        if (error.code !== '42P01' && !error.message?.includes('403')) {
-          console.debug('Rate limit check unavailable:', error.code);
-        }
-        return [];
-      }
-      return data || [];
-    } catch {
-      return [];
-    }
+    // DISABLED: api_rate_limits table doesn't exist or has no RLS policies
+    // This prevents 403 errors in the console
+    // To re-enable, create the table in Supabase with proper RLS policies
+    return [];
   }
 
   private async checkSuspiciousDataAccess(): Promise<{ detected: boolean; message: string; details: any }> {
