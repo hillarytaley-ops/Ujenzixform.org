@@ -260,62 +260,62 @@ const Builders = () => {
           </div>
         </div>
         
-        {/* App Screenshot/Phone Mockup - Shows builders using the app */}
-        <div className="absolute bottom-8 right-8 md:right-16 hidden md:block z-10">
+        {/* App Screenshot/Phone Mockup - Shows builders using the app - Positioned higher to avoid overlap */}
+        <div className="absolute top-16 right-4 md:right-12 lg:right-20 hidden lg:block z-10">
           <div className="relative">
-            {/* Phone Frame - Larger and more visible */}
-            <div className="w-56 h-96 bg-gray-900 rounded-3xl p-2 shadow-2xl shadow-blue-500/30 border-4 border-gray-700 transform rotate-6 hover:rotate-0 transition-transform duration-500">
+            {/* Phone Frame - Clear and visible */}
+            <div className="w-52 h-[380px] bg-gray-900 rounded-3xl p-2 shadow-2xl shadow-blue-500/40 border-4 border-gray-700 transform rotate-3 hover:rotate-0 transition-transform duration-500">
               {/* Phone Screen */}
               <div className="w-full h-full bg-gradient-to-b from-blue-600 to-blue-800 rounded-2xl overflow-hidden relative">
                 {/* App Header */}
-                <div className="bg-blue-900 p-4 text-center border-b border-blue-500/30">
+                <div className="bg-blue-900 p-3 text-center border-b border-blue-500/30">
                   <p className="text-white text-sm font-bold tracking-wide">UjenziXform</p>
                   <p className="text-blue-200 text-xs">Builder Dashboard</p>
                 </div>
                 {/* App Content */}
-                <div className="p-4 space-y-3">
-                  <div className="bg-white/90 rounded-xl p-3 shadow-sm">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <Building2 className="h-5 w-5 text-blue-600" />
+                <div className="p-3 space-y-2">
+                  <div className="bg-white rounded-xl p-2.5 shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <Building2 className="h-4 w-4 text-blue-600" />
                       </div>
-                      <span className="text-gray-800 text-sm font-semibold">Active Projects: 5</span>
+                      <span className="text-gray-800 text-xs font-semibold">Active Projects: 5</span>
                     </div>
                   </div>
-                  <div className="bg-white/90 rounded-xl p-3 shadow-sm">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
-                        <Package className="h-5 w-5 text-orange-600" />
+                  <div className="bg-white rounded-xl p-2.5 shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <Package className="h-4 w-4 text-orange-600" />
                       </div>
-                      <span className="text-gray-800 text-sm font-semibold">Materials Ordered</span>
+                      <span className="text-gray-800 text-xs font-semibold">Materials Ordered</span>
                     </div>
                   </div>
-                  <div className="bg-white/90 rounded-xl p-3 shadow-sm">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                        <Truck className="h-5 w-5 text-green-600" />
+                  <div className="bg-white rounded-xl p-2.5 shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <Truck className="h-4 w-4 text-green-600" />
                       </div>
-                      <span className="text-gray-800 text-sm font-semibold">2 Deliveries Today</span>
+                      <span className="text-gray-800 text-xs font-semibold">2 Deliveries Today</span>
                     </div>
                   </div>
-                  <div className="bg-white/90 rounded-xl p-3 shadow-sm">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
-                        <Camera className="h-5 w-5 text-yellow-600" />
+                  <div className="bg-white rounded-xl p-2.5 shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 bg-yellow-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <Camera className="h-4 w-4 text-yellow-600" />
                       </div>
-                      <span className="text-gray-800 text-sm font-semibold">Site Monitoring</span>
+                      <span className="text-gray-800 text-xs font-semibold">Site Monitoring</span>
                     </div>
                   </div>
                 </div>
                 {/* Notification Badge */}
-                <div className="absolute top-3 right-3 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center animate-pulse shadow-lg">
-                  <span className="text-white text-xs font-bold">3</span>
+                <div className="absolute top-2 right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center animate-pulse shadow-lg">
+                  <span className="text-white text-[10px] font-bold">3</span>
                 </div>
               </div>
             </div>
             {/* "Builders Use This" Label */}
-            <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-orange-500 text-white px-5 py-2 rounded-full text-sm font-bold whitespace-nowrap shadow-lg">
-              📱 Builders Use This App!
+            <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-orange-500 text-white px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap shadow-lg">
+              📱 Builders Use This!
             </div>
           </div>
         </div>
@@ -498,61 +498,63 @@ const Builders = () => {
         </section>
       </AnimatedSection>
 
-      {/* Sign-In Section for Professional Builders & Private Builders */}
+      {/* Builder Portal Section - Single Explore Button */}
       <section className="py-12 bg-gradient-to-r from-slate-50 to-blue-50">
         <div className="container mx-auto px-4">
           <div className="text-center mb-8">
             <Badge className="mb-3 bg-blue-100 text-blue-800 font-semibold">Access Your Dashboard</Badge>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Sign In to Your Account</h2>
-            <p className="text-gray-600">Choose your account type to access your personalized dashboard</p>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Choose Your Builder Portal</h2>
+            <p className="text-gray-600">Select your account type to get started</p>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
-            {/* Private Builder Sign In */}
+            {/* Private Builder */}
             <Card className="hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border-2 border-emerald-300 bg-gradient-to-br from-emerald-50 to-white">
               <CardContent className="p-8 text-center">
                 <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                   <ShoppingCart className="h-8 w-8 text-emerald-600" />
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-2">Private Builder</h3>
-                <p className="text-sm text-gray-600 mb-6">Home projects & personal purchases</p>
-                <div className="space-y-3">
-                  <Link to="/private-client-signin" className="block">
-                    <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold h-12">
-                      <LogIn className="h-4 w-4 mr-2" />
-                      Sign In
-                    </Button>
-                  </Link>
-                  <Link to="/private-builder-registration" className="block">
-                    <Button variant="outline" className="w-full border-emerald-400 text-emerald-800 hover:bg-emerald-50 h-10 font-medium">
-                      New? Register Here
-                    </Button>
-                  </Link>
-                </div>
+                <p className="text-sm text-gray-600 mb-4">Home projects & personal purchases</p>
+                <ul className="text-left text-gray-600 text-sm space-y-2 mb-6">
+                  <li className="flex items-center gap-2">
+                    <span className="text-emerald-500">✓</span> Buy materials for home projects
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-emerald-500">✓</span> Track deliveries & compare prices
+                  </li>
+                </ul>
+                <Link to="/unified-auth?role=private_client" className="block">
+                  <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold h-12">
+                    Explore
+                    <Eye className="h-4 w-4 ml-2" />
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
 
-            {/* Professional Builder Sign In */}
+            {/* Professional Builder */}
             <Card className="hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border-2 border-blue-300 bg-gradient-to-br from-blue-50 to-white">
               <CardContent className="p-8 text-center">
                 <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                   <Building2 className="h-8 w-8 text-blue-600" />
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-2">Professional Builder</h3>
-                <p className="text-sm text-gray-600 mb-6">Contractors & construction companies</p>
-                <div className="space-y-3">
-                  <Link to="/professional-builder-signin" className="block">
-                    <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold h-12">
-                      <LogIn className="h-4 w-4 mr-2" />
-                      Sign In
-                    </Button>
-                  </Link>
-                  <Link to="/professional-builder-registration" className="block">
-                    <Button variant="outline" className="w-full border-blue-400 text-blue-800 hover:bg-blue-50 h-10 font-medium">
-                      New? Register Here
-                    </Button>
-                  </Link>
-                </div>
+                <p className="text-sm text-gray-600 mb-4">Contractors & construction companies</p>
+                <ul className="text-left text-gray-600 text-sm space-y-2 mb-6">
+                  <li className="flex items-center gap-2">
+                    <span className="text-blue-500">✓</span> Request bulk quotes & manage projects
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-blue-500">✓</span> Hire suppliers & track logistics
+                  </li>
+                </ul>
+                <Link to="/unified-auth?role=professional_builder" className="block">
+                  <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold h-12">
+                    Explore
+                    <Eye className="h-4 w-4 ml-2" />
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
           </div>
