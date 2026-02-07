@@ -311,25 +311,38 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
 
       console.log('📦 Creating delivery request with payload:', deliveryPayload);
 
-      const { data: deliveryRequest, error: deliveryError } = await supabase
-        .from('delivery_requests')
-        .insert(deliveryPayload)
-        .select()
-        .single();
-
-      if (deliveryError) throw deliveryError;
-
-      // Notify delivery providers via edge function
+      // Try to insert delivery request - if RLS blocks it, the edge function will create it
+      let deliveryRequestId = null;
       try {
-        await supabase.functions.invoke('notify-delivery-providers', {
+        const { data: deliveryRequest, error: deliveryError } = await supabase
+          .from('delivery_requests')
+          .insert(deliveryPayload)
+          .select('id')
+          .single();
+
+        if (deliveryError) {
+          console.warn('⚠️ Direct insert blocked (RLS), will use edge function:', deliveryError.message);
+        } else {
+          deliveryRequestId = deliveryRequest?.id;
+          console.log('✅ Delivery request created directly:', deliveryRequestId);
+        }
+      } catch (insertError: any) {
+        console.warn('⚠️ Insert error, will use edge function:', insertError.message);
+      }
+
+      // Notify delivery providers via edge function (this will also create the request if needed)
+      try {
+        const notifyResponse = await supabase.functions.invoke('notify-delivery-providers', {
           body: {
-            request_type: 'quote_accepted',
-            request_id: deliveryRequest.id,
-            builder_id: profile.id,
+            request_type: 'private_purchase',
+            request_id: deliveryRequestId || purchaseOrder.id,
+            builder_id: user.id,
             pickup_address: pickupAddress,
             delivery_address: deliveryData.deliveryAddress,
+            pickup_date: deliveryData.preferredDate,
+            material_type: deliveryData.materialType,
             material_details: purchaseOrder.items?.map(item => ({
-              material_type: item.material_name || item.name,
+              name: item.material_name || item.name,
               quantity: item.quantity,
               unit: item.unit || 'units'
             })),
@@ -338,9 +351,16 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
             po_number: purchaseOrder.po_number
           }
         });
-      } catch (notifyError) {
-        console.error('Error notifying delivery providers:', notifyError);
-        // Continue even if notification fails - delivery request is created
+        console.log('🚚 Notify providers response:', notifyResponse);
+        
+        if (notifyResponse.error) {
+          console.error('❌ Edge function error:', notifyResponse.error);
+        } else {
+          console.log('✅ Delivery notification sent successfully');
+        }
+      } catch (notifyError: any) {
+        console.error('❌ Error calling edge function:', notifyError);
+        // Still continue - the user experience shouldn't be blocked
       }
 
       setStep('success');

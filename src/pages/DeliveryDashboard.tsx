@@ -251,11 +251,11 @@ const DeliveryDashboard = () => {
 
         setProviderProfile(profile);
 
-        // Fetch real delivery stats - use driver_id (ACTUAL column name in database)
+        // Fetch real delivery stats - use provider_id (ACTUAL column name in database)
         const { data: deliveries, error: deliveriesError } = await supabase
           .from('delivery_requests')
           .select('*')
-          .eq('driver_id', user.id);
+          .eq('provider_id', user.id);
 
         if (!deliveriesError && deliveries) {
           const today = new Date().toDateString();

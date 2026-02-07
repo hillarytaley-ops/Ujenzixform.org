@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,9 +7,10 @@ import { Label } from '@/components/ui/label';
 import { 
   Bell, BellOff, Volume2, VolumeX, Vibrate, 
   Package, Truck, AlertTriangle, CheckCircle, X,
-  Clock, MapPin, DollarSign, Star
+  Clock, MapPin, DollarSign, Star, RefreshCw
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Notification {
   id: string;
@@ -127,59 +128,220 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     audio.play().catch(console.error);
   };
 
-  // Load mock notifications
-  useEffect(() => {
-    const mockNotifications: Notification[] = [
-      {
-        id: '1',
-        type: 'new_delivery',
-        title: 'New Delivery Request',
-        message: 'Cement delivery to Kilimani - 8.5km away',
-        timestamp: new Date(Date.now() - 5 * 60000),
-        read: false,
-        priority: 'high'
-      },
-      {
-        id: '2',
-        type: 'payment',
-        title: 'Payment Received',
-        message: 'KES 8,500 credited for delivery DEL-098',
-        timestamp: new Date(Date.now() - 30 * 60000),
-        read: false,
-        priority: 'medium'
-      },
-      {
-        id: '3',
-        type: 'rating',
-        title: 'New Rating',
-        message: 'You received a 5-star rating from John Kamau',
-        timestamp: new Date(Date.now() - 60 * 60000),
-        read: true,
-        priority: 'low'
-      },
-      {
-        id: '4',
-        type: 'status_update',
-        title: 'Delivery Confirmed',
-        message: 'DEL-097 has been marked as delivered',
-        timestamp: new Date(Date.now() - 2 * 60 * 60000),
-        read: true,
-        priority: 'medium'
-      },
-      {
-        id: '5',
-        type: 'urgent',
-        title: 'Urgent Request',
-        message: 'Emergency steel delivery needed in Westlands',
-        timestamp: new Date(Date.now() - 10 * 60000),
-        read: false,
-        priority: 'high'
-      }
-    ];
+  const [loading, setLoading] = useState(true);
 
-    setNotifications(mockNotifications);
-    setUnreadCount(mockNotifications.filter(n => !n.read).length);
+  // Fetch real delivery requests from database
+  const loadNotifications = useCallback(async () => {
+    try {
+      setLoading(true);
+      console.log('🔔 DeliveryNotifications: Starting to load notifications...');
+      const allNotifications: Notification[] = [];
+
+      // Fetch ALL delivery requests (no status filter for testing)
+      const { data: deliveryRequests, error: reqError } = await supabase
+        .from('delivery_requests')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      console.log('📦 delivery_requests query result:', { data: deliveryRequests, error: reqError });
+
+      if (reqError) {
+        console.error('❌ Error fetching delivery_requests:', reqError.message, reqError.code);
+      } else if (deliveryRequests && deliveryRequests.length > 0) {
+        deliveryRequests.forEach((req: any) => {
+          allNotifications.push({
+            id: req.id,
+            type: 'new_delivery',
+            title: 'New Delivery Request',
+            message: `${req.material_type || 'Materials'} delivery to ${req.delivery_address || 'Unknown location'}`,
+            timestamp: new Date(req.created_at),
+            read: req.status !== 'pending',
+            priority: req.priority_level === 'urgent' ? 'high' : 'medium',
+            actionUrl: `/delivery-dashboard?request=${req.id}`
+          });
+        });
+        console.log(`✅ Loaded ${deliveryRequests.length} delivery_requests`);
+      } else {
+        console.log('⚠️ No delivery_requests found (might be RLS blocking)');
+      }
+
+      // Fetch from deliveries table
+      const { data: deliveries, error: delError } = await supabase
+        .from('deliveries')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      console.log('📦 deliveries query result:', { data: deliveries, error: delError });
+
+      if (delError) {
+        console.error('❌ Error fetching deliveries:', delError.message, delError.code);
+      } else if (deliveries && deliveries.length > 0) {
+        deliveries.forEach((del: any) => {
+          // Avoid duplicates
+          if (!allNotifications.find(n => n.id === del.id)) {
+            allNotifications.push({
+              id: del.id,
+              type: del.status === 'pending' ? 'new_delivery' : 'status_update',
+              title: del.status === 'pending' ? 'New Delivery Request' : `Delivery ${del.status?.replace('_', ' ') || 'update'}`,
+              message: `${del.material_type || 'Materials'} to ${del.delivery_address || 'Unknown'}`,
+              timestamp: new Date(del.created_at),
+              read: del.status !== 'pending',
+              priority: del.urgency === 'urgent' ? 'high' : 'medium',
+              actionUrl: `/delivery-dashboard?delivery=${del.id}`
+            });
+          }
+        });
+        console.log(`✅ Loaded ${deliveries.length} deliveries`);
+      } else {
+        console.log('⚠️ No deliveries found');
+      }
+
+      // Fetch from delivery_notifications table
+      const { data: notifications, error: notifError } = await supabase
+        .from('delivery_notifications')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      console.log('📦 delivery_notifications query result:', { data: notifications, error: notifError });
+
+      if (notifError) {
+        console.error('❌ Error fetching delivery_notifications:', notifError.message, notifError.code);
+      } else if (notifications && notifications.length > 0) {
+        notifications.forEach((notif: any) => {
+          // Avoid duplicates
+          if (!allNotifications.find(n => n.id === notif.id || n.id === notif.request_id)) {
+            const materials = notif.material_details || [];
+            allNotifications.push({
+              id: notif.id,
+              type: 'new_delivery',
+              title: 'New Delivery Request',
+              message: `${materials[0]?.name || notif.material_type || 'Materials'} to ${notif.delivery_address || 'Unknown'}`,
+              timestamp: new Date(notif.created_at),
+              read: notif.status !== 'pending',
+              priority: notif.priority_level === 'urgent' ? 'high' : 'medium',
+              actionUrl: `/delivery-dashboard?notification=${notif.id}`
+            });
+          }
+        });
+        console.log(`✅ Loaded ${notifications.length} delivery_notifications`);
+      } else {
+        console.log('⚠️ No delivery_notifications found');
+      }
+
+      // Sort by timestamp descending
+      allNotifications.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+
+      console.log(`🔔 FINAL: Total notifications loaded: ${allNotifications.length}`, allNotifications);
+      setNotifications(allNotifications);
+      setUnreadCount(allNotifications.filter(n => !n.read).length);
+    } catch (error: any) {
+      console.error('❌ Error loading notifications:', error.message || error);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  // Load notifications on mount and set up real-time subscription
+  useEffect(() => {
+    loadNotifications();
+
+    // Set up real-time subscription for new delivery requests
+    const requestsSubscription = supabase
+      .channel('delivery-requests-notifications')
+      .on('postgres_changes', 
+        { event: 'INSERT', schema: 'public', table: 'delivery_requests' }, 
+        (payload: any) => {
+          console.log('🔔 New delivery request received:', payload.new);
+          const newNotification: Notification = {
+            id: payload.new.id,
+            type: 'new_delivery',
+            title: '🚚 New Delivery Request!',
+            message: `${payload.new.material_type || 'Materials'} to ${payload.new.delivery_address || 'Unknown'}`,
+            timestamp: new Date(payload.new.created_at || Date.now()),
+            read: false,
+            priority: payload.new.priority_level === 'urgent' ? 'high' : 'medium',
+            actionUrl: `/delivery-dashboard?request=${payload.new.id}`
+          };
+          
+          setNotifications(prev => [newNotification, ...prev]);
+          setUnreadCount(prev => prev + 1);
+          
+          // Show toast
+          toast({
+            title: '🚚 New Delivery Request!',
+            description: newNotification.message,
+            duration: 10000,
+          });
+
+          // Play sound and browser notification
+          if (settings.soundEnabled) {
+            playNotificationSound('high');
+          }
+          if (settings.pushEnabled) {
+            sendLocalNotification(newNotification);
+          }
+        }
+      )
+      .on('postgres_changes', 
+        { event: 'INSERT', schema: 'public', table: 'deliveries' }, 
+        (payload: any) => {
+          console.log('🔔 New delivery received:', payload.new);
+          const newNotification: Notification = {
+            id: payload.new.id,
+            type: 'new_delivery',
+            title: '🚚 New Delivery Request!',
+            message: `${payload.new.material_type || 'Materials'} to ${payload.new.delivery_address || 'Unknown'}`,
+            timestamp: new Date(payload.new.created_at || Date.now()),
+            read: false,
+            priority: payload.new.urgency === 'urgent' ? 'high' : 'medium',
+            actionUrl: `/delivery-dashboard?delivery=${payload.new.id}`
+          };
+          
+          setNotifications(prev => [newNotification, ...prev]);
+          setUnreadCount(prev => prev + 1);
+          
+          toast({
+            title: '🚚 New Delivery Request!',
+            description: newNotification.message,
+            duration: 10000,
+          });
+        }
+      )
+      .on('postgres_changes', 
+        { event: 'INSERT', schema: 'public', table: 'delivery_notifications' }, 
+        (payload: any) => {
+          console.log('🔔 New delivery notification received:', payload.new);
+          const materials = payload.new.material_details || [];
+          const newNotification: Notification = {
+            id: payload.new.id,
+            type: 'new_delivery',
+            title: '🚚 New Delivery Request!',
+            message: `${materials[0]?.name || 'Materials'} to ${payload.new.delivery_address || 'Unknown'}`,
+            timestamp: new Date(payload.new.created_at || Date.now()),
+            read: false,
+            priority: payload.new.priority_level === 'urgent' ? 'high' : 'medium',
+            actionUrl: `/delivery-dashboard?notification=${payload.new.id}`
+          };
+          
+          setNotifications(prev => [newNotification, ...prev]);
+          setUnreadCount(prev => prev + 1);
+          
+          toast({
+            title: '🚚 New Delivery Request!',
+            description: newNotification.message,
+            duration: 10000,
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      requestsSubscription.unsubscribe();
+    };
+  }, [loadNotifications, settings.soundEnabled, settings.pushEnabled, toast]);
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
@@ -247,6 +409,15 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             )}
           </CardTitle>
           <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={loadNotifications}
+              disabled={loading}
+            >
+              <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
             {unreadCount > 0 && (
               <Button variant="ghost" size="sm" onClick={markAllAsRead}>
                 <CheckCircle className="h-4 w-4 mr-1" />
@@ -367,10 +538,16 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
 
         {/* Notifications List */}
         <div className="space-y-2 max-h-96 overflow-y-auto">
-          {notifications.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-8">
+              <RefreshCw className="h-12 w-12 text-teal-500 mx-auto mb-3 animate-spin" />
+              <p className="text-gray-500">Loading delivery requests...</p>
+            </div>
+          ) : notifications.length === 0 ? (
             <div className="text-center py-8">
               <BellOff className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500">No notifications yet</p>
+              <p className="text-gray-500">No active delivery requests</p>
+              <p className="text-xs text-gray-400 mt-2">New requests will appear here in real-time</p>
             </div>
           ) : (
             notifications.map((notification) => (

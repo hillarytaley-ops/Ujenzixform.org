@@ -360,11 +360,11 @@ export const useDeliveryProviderData = () => {
         .maybeSingle();
 
       // Fetch active deliveries assigned to THIS provider only
-      // Database uses driver_id instead of provider_id
+      // Database uses provider_id column
       const { data: activeData, error: activeError } = await supabase
         .from('delivery_requests')
         .select('*')
-        .eq('driver_id', user.id)
+        .eq('provider_id', user.id)
         .in('status', ['assigned', 'picked_up', 'in_transit', 'out_for_delivery'])
         .order('created_at', { ascending: false });
 
@@ -375,7 +375,7 @@ export const useDeliveryProviderData = () => {
       const { data: historyData, error: historyError } = await supabase
         .from('delivery_requests')
         .select('*')
-        .eq('driver_id', user.id)
+        .eq('provider_id', user.id)
         .eq('status', 'delivered')
         .order('updated_at', { ascending: false })
         .limit(50);
@@ -383,17 +383,90 @@ export const useDeliveryProviderData = () => {
       if (historyError) throw historyError;
       setDeliveryHistory(historyData || []);
 
-      // Fetch pending requests that this provider can accept
-      // (requests in their service area that haven't been assigned)
+      // Fetch ALL pending requests from multiple tables for testing
+      // All registered providers can see and accept any pending request
+      
+      // From delivery_requests table
       const { data: pendingData } = await supabase
         .from('delivery_requests')
         .select('*')
         .eq('status', 'pending')
-        .is('driver_id', null)
+        .is('provider_id', null)
         .order('created_at', { ascending: false })
-        .limit(20);
+        .limit(50);
 
-      setPendingRequests(pendingData || []);
+      // Also fetch from deliveries table
+      const { data: deliveriesData } = await supabase
+        .from('deliveries')
+        .select('*')
+        .eq('status', 'pending')
+        .is('provider_id', null)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      // Also fetch from delivery_notifications table
+      const { data: notificationsData } = await supabase
+        .from('delivery_notifications')
+        .select('*')
+        .in('status', ['pending', 'notified'])
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      // Combine all pending requests
+      const allPending: any[] = [];
+      
+      // Add from delivery_requests
+      (pendingData || []).forEach((req: any) => {
+        allPending.push({
+          ...req,
+          source: 'delivery_requests'
+        });
+      });
+
+      // Add from deliveries table (avoid duplicates)
+      (deliveriesData || []).forEach((del: any) => {
+        if (!allPending.find(r => r.id === del.id)) {
+          allPending.push({
+            id: del.id,
+            pickup_address: del.pickup_address,
+            delivery_address: del.delivery_address,
+            material_type: del.material_type || 'Construction Materials',
+            quantity: del.quantity,
+            status: del.status,
+            created_at: del.created_at,
+            contact_name: del.contact_name,
+            contact_phone: del.contact_phone,
+            estimated_cost: del.estimated_cost,
+            distance_km: del.distance_km,
+            source: 'deliveries'
+          });
+        }
+      });
+
+      // Add from delivery_notifications (avoid duplicates)
+      (notificationsData || []).forEach((notif: any) => {
+        if (!allPending.find(r => r.id === notif.id || r.id === notif.request_id)) {
+          const materials = notif.material_details || [];
+          allPending.push({
+            id: notif.id,
+            request_id: notif.request_id,
+            pickup_address: notif.pickup_address,
+            delivery_address: notif.delivery_address,
+            material_type: materials[0]?.material_type || materials[0]?.name || 'Construction Materials',
+            quantity: materials.reduce((sum: number, m: any) => sum + (m.quantity || 1), 0),
+            status: notif.status,
+            created_at: notif.created_at,
+            priority_level: notif.priority_level,
+            source: 'delivery_notifications'
+          });
+        }
+      });
+
+      // Sort by created_at descending
+      allPending.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      console.log(`📦 Loaded ${allPending.length} pending delivery requests for provider`);
+      setPendingRequests(allPending);
 
       // Calculate stats from actual data
       const today = new Date();
@@ -436,13 +509,13 @@ export const useDeliveryProviderData = () => {
       const { error } = await supabase
         .from('delivery_requests')
         .update({ 
-          driver_id: user.id,
+          provider_id: user.id,
           status: 'assigned',
-          assigned_at: new Date().toISOString()
+          accepted_at: new Date().toISOString()
         })
         .eq('id', deliveryId)
         .eq('status', 'pending') // Only accept pending requests
-        .is('driver_id', null); // Only accept unassigned requests
+        .is('provider_id', null); // Only accept unassigned requests
 
       if (error) throw error;
 
@@ -473,7 +546,7 @@ export const useDeliveryProviderData = () => {
           updated_at: new Date().toISOString()
         })
         .eq('id', deliveryId)
-        .eq('driver_id', user.id); // CRITICAL: Only update if assigned to this driver
+        .eq('provider_id', user.id); // CRITICAL: Only update if assigned to this provider
 
       if (error) throw error;
 

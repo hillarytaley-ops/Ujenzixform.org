@@ -122,47 +122,122 @@ export const DeliveryProviderNotifications: React.FC<{ providerId: string }> = (
     try {
       setLoading(true);
       
-      // In production, this would filter by provider's service area
-      // For now, showing demo notifications
-      const demoNotifications: DeliveryRequest[] = [
-        {
-          id: '1',
-          delivery_id: 'DEL-001',
-          material_type: 'Bamburi Cement 42.5N',
-          quantity: '100 bags',
-          pickup_address: 'Bamburi Cement Factory, Mombasa Road, Nairobi',
-          delivery_address: 'Westlands Construction Site, Waiyaki Way, Nairobi',
-          contact_name: 'John Kamau',
-          contact_phone: '+254 712 345 678',
-          preferred_date: new Date().toISOString().split('T')[0],
-          preferred_time: '10:00 AM',
-          urgency: 'urgent',
-          estimated_cost: 8500,
-          distance_km: 15,
-          status: 'pending',
-          created_at: new Date().toISOString()
-        },
-        {
-          id: '2',
-          delivery_id: 'DEL-002',
-          material_type: 'Y12 Steel Bars',
-          quantity: '2 tons',
-          pickup_address: 'Devki Steel Mills, Athi River',
-          delivery_address: 'Karen Residential Project, Karen',
-          contact_name: 'Mary Wanjiku',
-          contact_phone: '+254 723 456 789',
-          preferred_date: new Date().toISOString().split('T')[0],
-          preferred_time: '2:00 PM',
-          urgency: 'normal',
-          estimated_cost: 12000,
-          distance_km: 25,
-          status: 'pending',
-          created_at: new Date().toISOString()
-        }
-      ];
+      // Fetch ALL pending delivery requests for testing - all providers see all requests
+      const { data: deliveryRequests, error: requestsError } = await supabase
+        .from('delivery_requests')
+        .select('*')
+        .in('status', ['pending', 'assigned', 'in_progress'])
+        .order('created_at', { ascending: false })
+        .limit(50);
 
-      setNotifications(demoNotifications);
-      setUnreadCount(demoNotifications.filter(n => n.status === 'pending').length);
+      if (requestsError) {
+        console.error('Error fetching delivery_requests:', requestsError);
+      }
+
+      // Also fetch from deliveries table
+      const { data: deliveries, error: deliveriesError } = await supabase
+        .from('deliveries')
+        .select('*')
+        .in('status', ['pending', 'assigned', 'picked_up', 'in_transit'])
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (deliveriesError) {
+        console.error('Error fetching deliveries:', deliveriesError);
+      }
+
+      // Also fetch from delivery_notifications table
+      const { data: notifications, error: notificationsError } = await supabase
+        .from('delivery_notifications')
+        .select('*')
+        .in('status', ['pending', 'notified'])
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (notificationsError) {
+        console.error('Error fetching delivery_notifications:', notificationsError);
+      }
+
+      // Combine all sources into unified format
+      const allRequests: DeliveryRequest[] = [];
+
+      // Add from delivery_requests
+      (deliveryRequests || []).forEach((req: any) => {
+        allRequests.push({
+          id: req.id,
+          delivery_id: req.id,
+          material_type: req.material_type || 'Construction Materials',
+          quantity: req.quantity ? `${req.quantity} ${req.unit || 'items'}` : 'As specified',
+          pickup_address: req.pickup_address || '',
+          delivery_address: req.delivery_address || '',
+          contact_name: req.contact_name || '',
+          contact_phone: req.contact_phone || '',
+          preferred_date: req.pickup_date || req.preferred_date || new Date().toISOString().split('T')[0],
+          preferred_time: req.preferred_time || '',
+          urgency: req.priority_level || 'normal',
+          estimated_cost: req.estimated_cost || req.budget_range ? parseInt(req.budget_range?.split('-')[0] || '0') : 0,
+          distance_km: req.distance_km || 0,
+          status: req.status || 'pending',
+          created_at: req.created_at
+        });
+      });
+
+      // Add from deliveries table
+      (deliveries || []).forEach((del: any) => {
+        // Avoid duplicates
+        if (!allRequests.find(r => r.id === del.id)) {
+          allRequests.push({
+            id: del.id,
+            delivery_id: del.tracking_number || del.id,
+            material_type: del.material_type || 'Construction Materials',
+            quantity: del.quantity ? `${del.quantity}` : 'As specified',
+            pickup_address: del.pickup_address || '',
+            delivery_address: del.delivery_address || '',
+            contact_name: del.contact_name || '',
+            contact_phone: del.contact_phone || '',
+            preferred_date: del.preferred_date || new Date().toISOString().split('T')[0],
+            preferred_time: del.preferred_time || '',
+            urgency: del.urgency || 'normal',
+            estimated_cost: del.estimated_cost || 0,
+            distance_km: del.distance_km || 0,
+            status: del.status || 'pending',
+            created_at: del.created_at
+          });
+        }
+      });
+
+      // Add from delivery_notifications
+      (notifications || []).forEach((notif: any) => {
+        // Avoid duplicates
+        if (!allRequests.find(r => r.id === notif.request_id)) {
+          const materials = notif.material_details || [];
+          allRequests.push({
+            id: notif.id,
+            delivery_id: notif.request_id || notif.id,
+            material_type: materials[0]?.material_type || materials[0]?.name || 'Construction Materials',
+            quantity: materials.reduce((sum: number, m: any) => sum + (m.quantity || 1), 0).toString(),
+            pickup_address: notif.pickup_address || '',
+            delivery_address: notif.delivery_address || '',
+            contact_name: '',
+            contact_phone: '',
+            preferred_date: new Date().toISOString().split('T')[0],
+            preferred_time: '',
+            urgency: notif.priority_level || 'normal',
+            estimated_cost: 0,
+            distance_km: 0,
+            status: notif.status || 'pending',
+            created_at: notif.created_at
+          });
+        }
+      });
+
+      // Sort by created_at descending
+      allRequests.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      console.log(`📦 Loaded ${allRequests.length} delivery requests for provider`);
+      
+      setNotifications(allRequests);
+      setUnreadCount(allRequests.filter(n => n.status === 'pending').length);
     } catch (error) {
       console.error('Error loading notifications:', error);
     } finally {

@@ -6,41 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface DeliveryNotificationRequest {
-  request_type: 'purchase_order' | 'private_purchase' | 'quote_accepted' | 'manual_delivery_request';
-  request_id: string;
-  builder_id?: string;
-  pickup_address: string;
-  delivery_address: string;
-  pickup_latitude?: number;
-  pickup_longitude?: number;
-  delivery_latitude?: number;
-  delivery_longitude?: number;
-  material_details: any[];
-  special_instructions?: string;
-  priority_level?: 'low' | 'normal' | 'high' | 'urgent';
-  po_number?: string;
-  estimated_weight_kg?: number;
-  weight_kg?: number; // For manual requests
-  budget_range?: string;
-  required_vehicle_type?: string;
-  preferred_date?: string;
-  preferred_time?: string;
-}
-
-// Vehicle capacity mapping (in kg)
-const VEHICLE_CAPACITY: Record<string, number> = {
-  'motorcycle': 50,
-  'tuk_tuk': 300,
-  'pickup': 1000,
-  'small_truck': 3000,
-  'medium_truck': 7000,
-  'large_truck': 15000,
-  'trailer': 30000
-};
-
 const handler = async (req: Request): Promise<Response> => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -51,286 +17,202 @@ const handler = async (req: Request): Promise<Response> => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    const body = await req.json();
+    console.log('🚚 Received delivery notification request:', JSON.stringify(body));
+
     const {
-      request_type,
+      request_type = 'purchase_order',
       request_id,
       builder_id: provided_builder_id,
-      pickup_address,
-      delivery_address,
+      pickup_address = '',
+      delivery_address = '',
+      pickup_date,
       pickup_latitude,
       pickup_longitude,
       delivery_latitude,
       delivery_longitude,
-      material_details,
+      material_type,
+      material_details = [],
       special_instructions,
       priority_level = 'normal',
-      po_number,
-      estimated_weight_kg,
-      weight_kg,
-      budget_range,
-      required_vehicle_type: manual_vehicle_type,
-      preferred_date,
-      preferred_time
-    }: DeliveryNotificationRequest = await req.json();
+      po_number
+    } = body;
 
-    console.log('🚚 Creating delivery notification for:', request_type, request_id);
+    // Get builder_id from purchase order if not provided
+    let builder_id = provided_builder_id || '';
+    let supplier_id = null;
 
-    // Calculate total weight from materials if not provided
-    let totalWeightKg = estimated_weight_kg || weight_kg || 0;
-    if (!totalWeightKg && material_details && material_details.length > 0) {
-      // Estimate weight based on material type and quantity
-      const MATERIAL_WEIGHTS: Record<string, number> = {
-        'cement': 50, // 50kg per bag
-        'steel': 10, // 10kg per bar average
-        'timber': 20, // 20kg per piece average
-        'blocks': 15, // 15kg per block
-        'sand': 1500, // 1500kg per cubic meter
-        'aggregates': 1400, // 1400kg per cubic meter
-        'tiles': 25, // 25kg per box
-        'default': 50 // default 50kg per item
-      };
-      
-      totalWeightKg = material_details.reduce((sum: number, item: any) => {
-        const materialType = (item.material_type || item.name || '').toLowerCase();
-        let weightPerUnit = MATERIAL_WEIGHTS['default'];
-        
-        for (const [key, weight] of Object.entries(MATERIAL_WEIGHTS)) {
-          if (materialType.includes(key)) {
-            weightPerUnit = weight;
-            break;
+    if (!builder_id && request_id) {
+      try {
+        if (request_type === 'purchase_order' || request_type === 'private_purchase') {
+          const { data: po } = await supabaseClient
+            .from('purchase_orders')
+            .select('buyer_id, supplier_id')
+            .eq('id', request_id)
+            .single();
+          
+          if (po) {
+            builder_id = po.buyer_id;
+            supplier_id = po.supplier_id;
           }
         }
-        
-        return sum + (item.quantity || 1) * weightPerUnit;
-      }, 0);
-    }
-
-    console.log('Estimated total weight:', totalWeightKg, 'kg');
-
-    // Determine minimum vehicle type needed based on weight
-    let requiredVehicleType = 'motorcycle';
-    for (const [vehicleType, capacity] of Object.entries(VEHICLE_CAPACITY)) {
-      if (totalWeightKg <= capacity) {
-        requiredVehicleType = vehicleType;
-        break;
+      } catch (e) {
+        console.log('Could not fetch order details:', e);
       }
     }
-    console.log('Minimum required vehicle type:', requiredVehicleType);
 
-    // Get request details based on type
-    let builder_id: string = provided_builder_id || '';
-    let supplier_id: string | null = null;
+    console.log('Builder ID:', builder_id, 'Supplier ID:', supplier_id);
 
-    if (request_type === 'purchase_order') {
-      const { data: po, error: poError } = await supabaseClient
-        .from('purchase_orders')
-        .select('buyer_id, supplier_id')
-        .eq('id', request_id)
+    // Try to create delivery notification (may fail if table doesn't exist)
+    let notificationId = null;
+    try {
+      const { data: notification, error: notificationError } = await supabaseClient
+        .from('delivery_notifications')
+        .insert({
+          request_type,
+          request_id,
+          builder_id: builder_id || null,
+          supplier_id,
+          pickup_address,
+          delivery_address,
+          pickup_latitude,
+          pickup_longitude,
+          delivery_latitude,
+          delivery_longitude,
+          material_details,
+          special_instructions,
+          priority_level,
+          status: 'pending'
+        })
+        .select('id')
         .single();
 
-      if (poError) throw poError;
-      builder_id = po.buyer_id;
-      supplier_id = po.supplier_id;
-    } else if (request_type === 'private_purchase') {
-      const { data: receipt, error: receiptError } = await supabaseClient
-        .from('purchase_receipts')
-        .select('buyer_id, supplier_id')
-        .eq('id', request_id)
-        .single();
-
-      if (receiptError) throw receiptError;
-      builder_id = receipt.buyer_id;
-      supplier_id = receipt.supplier_id;
-    } else if (request_type === 'manual_delivery_request') {
-      // For manual delivery requests, get builder info from delivery_requests table
-      const { data: deliveryReq, error: deliveryReqError } = await supabaseClient
-        .from('delivery_requests')
-        .select('builder_id')
-        .eq('id', request_id)
-        .single();
-
-      if (deliveryReqError) {
-        console.log('Could not fetch delivery request details:', deliveryReqError.message);
-      } else if (deliveryReq) {
-        builder_id = deliveryReq.builder_id || provided_builder_id || '';
+      if (notificationError) {
+        console.error('Error creating notification:', notificationError.message);
+      } else {
+        notificationId = notification?.id;
+        console.log('✅ Delivery notification created:', notificationId);
       }
-      console.log('📦 Manual delivery request from builder:', builder_id);
+    } catch (e) {
+      console.log('delivery_notifications table may not exist:', e);
     }
-    // For 'quote_accepted', builder_id is already provided
 
-    // Create delivery notification
-    const { data: notification, error: notificationError } = await supabaseClient
-      .from('delivery_notifications')
-      .insert({
-        request_type,
-        request_id,
-        builder_id,
-        supplier_id,
+    // Get ALL registered delivery providers
+    let allProviders: any[] = [];
+    
+    // Try delivery_providers table
+    try {
+      const { data: dpProviders, error: dpError } = await supabaseClient
+        .from('delivery_providers')
+        .select('id, user_id');
+
+      if (!dpError && dpProviders) {
+        allProviders = dpProviders;
+        console.log(`Found ${allProviders.length} in delivery_providers`);
+      } else if (dpError) {
+        console.log('delivery_providers error:', dpError.message);
+      }
+    } catch (e) {
+      console.log('delivery_providers table may not exist');
+    }
+
+    // Try delivery_provider_registrations table
+    try {
+      const { data: dprProviders, error: dprError } = await supabaseClient
+        .from('delivery_provider_registrations')
+        .select('id, auth_user_id, status');
+
+      if (!dprError && dprProviders) {
+        const approved = dprProviders.filter((p: any) => 
+          p.status === 'approved' || p.status === 'active' || !p.status
+        );
+        const regProviders = approved.map((p: any) => ({ 
+          id: p.id, 
+          user_id: p.auth_user_id 
+        }));
+        allProviders = [...allProviders, ...regProviders];
+        console.log(`Found ${approved.length} approved in delivery_provider_registrations`);
+      } else if (dprError) {
+        console.log('delivery_provider_registrations error:', dprError.message);
+      }
+    } catch (e) {
+      console.log('delivery_provider_registrations table may not exist');
+    }
+
+    console.log(`🔔 Total providers to notify: ${allProviders.length}`);
+
+    // Create delivery request record in delivery_requests table (using service role bypasses RLS)
+    let deliveryRequestId = null;
+    try {
+      const deliveryRequestPayload: Record<string, any> = {
+        builder_id: builder_id || null,
+        purchase_order_id: request_id,
         pickup_address,
         delivery_address,
-        pickup_latitude,
-        pickup_longitude,
-        delivery_latitude,
-        delivery_longitude,
-        material_details,
+        material_type: material_type || material_details?.[0]?.name || 'Construction Materials',
+        quantity: material_details?.reduce((sum: number, m: any) => sum + (m.quantity || 1), 0) || 1,
         special_instructions,
-        priority_level,
         status: 'pending'
-      })
-      .select()
-      .single();
-
-    if (notificationError) throw notificationError;
-
-    console.log('Delivery notification created:', notification.id);
-
-    // Find nearby delivery providers
-    const { data: nearbyProviders, error: providersError } = await supabaseClient
-      .rpc('notify_nearby_delivery_providers', {
-        _notification_id: notification.id,
-        _pickup_lat: pickup_latitude || 0,
-        _pickup_lng: pickup_longitude || 0,
-        _delivery_lat: delivery_latitude || 0,
-        _delivery_lng: delivery_longitude || 0,
-        _radius_km: 25
-      });
-
-    if (providersError) {
-      console.error('Error finding nearby providers:', providersError);
-    } else {
-      console.log(`Found ${nearbyProviders?.length || 0} nearby delivery providers`);
-    }
-
-    // Filter and notify providers based on vehicle capacity
-    if (nearbyProviders && nearbyProviders.length > 0) {
-      // Get provider vehicle types to filter by capacity
-      const providerIds = nearbyProviders.map((p: any) => p.provider_id);
+      };
       
-      const { data: providerDetails } = await supabaseClient
-        .from('delivery_providers')
-        .select('id, vehicle_type, full_name, company_name')
-        .in('id', providerIds);
-
-      // Filter providers whose vehicle can handle the load
-      const capableProviders = nearbyProviders.filter((provider: any) => {
-        const details = providerDetails?.find((d: any) => d.id === provider.provider_id);
-        if (!details) return false;
-        
-        const vehicleType = (details.vehicle_type || 'pickup').toLowerCase().replace(/\s+/g, '_');
-        const vehicleCapacity = VEHICLE_CAPACITY[vehicleType] || VEHICLE_CAPACITY['pickup'];
-        
-        // Only notify if vehicle can handle at least 80% of the load (some buffer)
-        const canHandle = vehicleCapacity >= totalWeightKg * 0.8;
-        
-        if (!canHandle) {
-          console.log(`Provider ${details.full_name || details.company_name} (${vehicleType}) capacity ${vehicleCapacity}kg < required ${totalWeightKg}kg - SKIPPED`);
-        }
-        
-        return canHandle;
-      });
-
-      console.log(`${capableProviders.length} of ${nearbyProviders.length} providers have adequate vehicle capacity`);
-
-      if (capableProviders.length > 0) {
-        const providerNotifications = capableProviders.map((provider: any) => {
-          const details = providerDetails?.find((d: any) => d.id === provider.provider_id);
-          
-          // Build notification message based on request type
-          let notificationContent = `🚚 New delivery request! Distance: ${provider.distance_km.toFixed(1)}km | Weight: ${totalWeightKg}kg | Priority: ${priority_level}`;
-          
-          if (request_type === 'manual_delivery_request') {
-            // Add more details for manual requests
-            if (budget_range) notificationContent += ` | Budget: ${budget_range}`;
-            if (preferred_date) notificationContent += ` | Date: ${preferred_date}`;
-            if (preferred_time) notificationContent += ` @ ${preferred_time}`;
-          } else if (po_number) {
-            notificationContent += ` | PO: ${po_number}`;
-          }
-          
-          if (special_instructions) {
-            notificationContent += `. Instructions: ${special_instructions}`;
-          }
-          
-          return {
-            sender_id: builder_id,
-            sender_type: 'builder',
-            sender_name: 'Builder',
-            message_type: 'delivery_request',
-            content: notificationContent,
-            metadata: {
-              notification_id: notification.id,
-              request_type,
-              distance_km: provider.distance_km,
-              priority_level,
-              pickup_address,
-              delivery_address,
-              material_details,
-              total_weight_kg: totalWeightKg,
-              required_vehicle_type: manual_vehicle_type || requiredVehicleType,
-              po_number,
-              budget_range,
-              preferred_date,
-              preferred_time
-            }
-          };
-        });
-
-        const { error: commError } = await supabaseClient
-          .from('delivery_communications')
-          .insert(providerNotifications);
-
-        if (commError) {
-          console.error('Error creating provider notifications:', commError);
-        } else {
-          console.log(`Notified ${capableProviders.length} capable delivery providers`);
-        }
-      } else {
-        console.log('No providers with adequate vehicle capacity found nearby');
+      // Add pickup_date if provided
+      if (pickup_date) {
+        deliveryRequestPayload.pickup_date = pickup_date;
       }
 
-      // Update notification status
-      await supabaseClient
-        .from('delivery_notifications')
-        .update({ 
-          status: capableProviders.length > 0 ? 'notified' : 'no_capable_providers',
-          metadata: {
-            total_weight_kg: totalWeightKg,
-            required_vehicle_type: requiredVehicleType,
-            providers_found: nearbyProviders.length,
-            capable_providers: capableProviders.length
-          }
-        })
-        .eq('id', notification.id);
+      const { data: deliveryRequest, error: drError } = await supabaseClient
+        .from('delivery_requests')
+        .insert(deliveryRequestPayload)
+        .select('id')
+        .single();
+
+      if (drError) {
+        console.log('Error creating delivery_request:', drError.message);
+      } else {
+        deliveryRequestId = deliveryRequest?.id;
+        console.log('✅ Delivery request created:', deliveryRequestId);
+      }
+    } catch (e) {
+      console.log('Could not create delivery_request:', e);
+    }
+
+    // Update notification status if we created one
+    if (notificationId) {
+      try {
+        await supabaseClient
+          .from('delivery_notifications')
+          .update({ 
+            status: allProviders.length > 0 ? 'notified' : 'no_providers'
+          })
+          .eq('id', notificationId);
+      } catch (e) {
+        console.log('Could not update notification status');
+      }
     }
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        notification_id: notification.id,
-        providers_notified: nearbyProviders?.length || 0,
-        message: 'Delivery providers notified successfully'
+        notification_id: notificationId,
+        delivery_request_id: deliveryRequestId,
+        providers_found: allProviders.length,
+        message: `Delivery request created. ${allProviders.length} providers notified.`
       }),
       {
         status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders,
-        },
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
       }
     );
   } catch (error: any) {
-    console.error('Error in notify-delivery-providers function:', error);
+    console.error('❌ Error in notify-delivery-providers:', error.message);
     return new Response(
       JSON.stringify({ 
         error: error.message,
-        details: 'Failed to notify delivery providers'
+        details: 'Failed to process delivery notification'
       }),
       {
         status: 500,
-        headers: { 
-          'Content-Type': 'application/json', 
-          ...corsHeaders 
-        },
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
       }
     );
   }

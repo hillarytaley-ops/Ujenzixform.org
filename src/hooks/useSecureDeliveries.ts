@@ -198,9 +198,9 @@ export const useSecureDeliveries = () => {
           special_instructions: sanitizedData.special_instructions,
           status: 'pending',
           tracking_number: `UJP${Date.now()}`,
-          // Driver info is NOT set here - will be assigned by admin/system later
+          // Provider info is NOT set here - will be assigned by admin/system later
           // Driver contact fields removed - access via driver_contact_data table
-          driver_id: null
+          provider_id: null
         })
         .select('id, tracking_number, status')
         .single();
