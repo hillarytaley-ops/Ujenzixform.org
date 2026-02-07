@@ -1272,19 +1272,19 @@ const QRCodeCard: React.FC<{
           {/* Item Details */}
           <div className="flex-1 space-y-2">
             <div className="grid grid-cols-2 gap-2">
-              <div className="bg-gray-50 p-2 rounded text-center">
-                <p className="text-gray-500 text-xs">Quantity</p>
-                <p className="font-bold">{item.quantity} {item.unit}</p>
+              <div className="bg-gray-100 p-2 rounded text-center">
+                <p className="text-gray-600 text-xs font-medium">Quantity</p>
+                <p className="font-bold text-gray-900">{item.quantity} {item.unit}</p>
               </div>
-              <div className="bg-gray-50 p-2 rounded text-center">
-                <p className="text-gray-500 text-xs">Category</p>
-                <p className="font-bold text-sm">{item.category}</p>
+              <div className="bg-gray-100 p-2 rounded text-center">
+                <p className="text-gray-600 text-xs font-medium">Category</p>
+                <p className="font-bold text-sm text-gray-900">{item.category}</p>
               </div>
             </div>
             {item.item_total_price && item.item_total_price > 0 && (
-              <div className="bg-green-50 p-2 rounded text-center">
-                <p className="text-green-600 text-xs">Total Value</p>
-                <p className="font-bold text-green-700">KES {item.item_total_price.toLocaleString()}</p>
+              <div className="bg-green-100 p-2 rounded text-center border border-green-200">
+                <p className="text-green-700 text-xs font-medium">Total Value</p>
+                <p className="font-bold text-green-800">KES {item.item_total_price.toLocaleString()}</p>
               </div>
             )}
           </div>

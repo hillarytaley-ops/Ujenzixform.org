@@ -2120,7 +2120,7 @@ const AdminDashboard = () => {
             {shouldShowTab('communications') && (
               <TabsTrigger value="communications" className="data-[state=active]:bg-purple-600">
                 <MessageSquare className="h-4 w-4 mr-2" />
-                Communications
+                LiveChat
               </TabsTrigger>
             )}
             {shouldShowTab('videos') && (
