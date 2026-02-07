@@ -200,303 +200,79 @@ const Builders = () => {
       {/* FloatingSocialSidebar now in App.tsx */}
       <Navigation />
 
-      {/* Hero Section - Builders Using Technology */}
-      <AnimatedSection animation="fadeInUp">
-        <section 
-          className="text-white py-24 relative overflow-hidden min-h-[600px] flex items-center"
-          role="banner"
-          aria-labelledby="builders-hero-heading"
-        >
-        {/* KENYAN Professional Builders at Construction Site (Zoomed Out) */}
+      {/* Hero Section - Ultra Compact */}
+      <section 
+        className="text-white py-8 md:py-10 relative overflow-hidden"
+        role="banner"
+        aria-labelledby="builders-hero-heading"
+      >
+        {/* Background */}
         <div 
-          className="absolute inset-0 bg-no-repeat"
-          style={{
-            backgroundImage: `url('/builders-hero-bg.jpg')`,
-            backgroundSize: '100%',
-            backgroundPosition: 'center center',
-          }}
-          aria-label="Kenyan professional builders with hard hats reviewing blueprints at construction site"
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `url('/builders-hero-bg.jpg')` }}
         />
-        
-        {/* Dark Overlay for Text Readability */}
-        <div className="absolute inset-0 bg-gradient-to-r from-gray-900/90 via-gray-900/70 to-gray-900/80" />
-        
-        {/* Tech Grid Overlay */}
-        <div className="absolute inset-0 opacity-30" style={{
-          backgroundImage: `
-            linear-gradient(90deg, rgba(59, 130, 246, 0.3) 1px, transparent 1px),
-            linear-gradient(rgba(59, 130, 246, 0.3) 1px, transparent 1px)
-          `,
-          backgroundSize: '50px 50px'
-        }} />
-        
-        {/* Glowing Tech Accents */}
-        <div className="absolute top-20 left-20 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-20 right-20 w-72 h-72 bg-orange-500/20 rounded-full blur-3xl animate-pulse delay-500" />
-        
-        {/* Tech Icons Floating - Left Side */}
-        <div className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 flex flex-col gap-4 z-10">
-          <div className="p-3 bg-blue-600/80 rounded-xl backdrop-blur-sm shadow-lg shadow-blue-500/30 animate-bounce" style={{animationDuration: '3s'}}>
-            <Smartphone className="h-8 w-8 md:h-10 md:w-10 text-white" />
-          </div>
-          <div className="p-3 bg-orange-600/80 rounded-xl backdrop-blur-sm shadow-lg shadow-orange-500/30 animate-bounce" style={{animationDuration: '3.5s', animationDelay: '0.5s'}}>
-            <Settings className="h-8 w-8 md:h-10 md:w-10 text-white" />
-          </div>
-          <div className="p-3 bg-green-600/80 rounded-xl backdrop-blur-sm shadow-lg shadow-green-500/30 animate-bounce" style={{animationDuration: '4s', animationDelay: '1s'}}>
-            <CheckCircle className="h-8 w-8 md:h-10 md:w-10 text-white" />
-          </div>
-        </div>
-        
-        {/* Tech Icons Floating - Right Side */}
-        <div className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 flex flex-col gap-4 z-10">
-          <div className="p-3 bg-purple-600/80 rounded-xl backdrop-blur-sm shadow-lg shadow-purple-500/30 animate-bounce" style={{animationDuration: '3.2s'}}>
-            <Building2 className="h-8 w-8 md:h-10 md:w-10 text-white" />
-          </div>
-          <div className="p-3 bg-cyan-600/80 rounded-xl backdrop-blur-sm shadow-lg shadow-cyan-500/30 animate-bounce" style={{animationDuration: '3.7s', animationDelay: '0.3s'}}>
-            <Star className="h-8 w-8 md:h-10 md:w-10 text-white" />
-          </div>
-          <div className="p-3 bg-amber-600/80 rounded-xl backdrop-blur-sm shadow-lg shadow-amber-500/30 animate-bounce" style={{animationDuration: '4.2s', animationDelay: '0.7s'}}>
-            <Shield className="h-8 w-8 md:h-10 md:w-10 text-white" />
-          </div>
-        </div>
-        
-        {/* App Screenshot/Phone Mockup - Only visible on xl screens (1280px+) to avoid overlap */}
-        <div className="absolute top-20 right-8 hidden xl:block z-30">
-          <div className="relative">
-            {/* Phone Frame - Clear and visible with solid backgrounds */}
-            <div className="w-48 h-[340px] 2xl:w-52 2xl:h-[380px] bg-gray-900 rounded-3xl p-2 shadow-2xl shadow-blue-500/40 border-4 border-gray-700 transform rotate-3 hover:rotate-0 transition-transform duration-500">
-              {/* Phone Screen - Solid blue background */}
-              <div className="w-full h-full bg-blue-700 rounded-2xl overflow-hidden relative">
-                {/* App Header */}
-                <div className="bg-blue-900 p-2.5 2xl:p-3 text-center border-b border-blue-500/30">
-                  <p className="text-white text-xs 2xl:text-sm font-bold tracking-wide">UjenziXform</p>
-                  <p className="text-blue-200 text-[10px] 2xl:text-xs">Builder Dashboard</p>
-                </div>
-                {/* App Content - Solid white cards */}
-                <div className="p-2.5 2xl:p-3 space-y-2 bg-blue-700">
-                  <div className="bg-white rounded-xl p-2.5 shadow-md">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <Building2 className="h-3.5 w-3.5 text-blue-600" />
-                      </div>
-                      <span className="text-gray-900 text-xs font-semibold">Active Projects: 5</span>
-                    </div>
-                  </div>
-                  <div className="bg-white rounded-xl p-2.5 shadow-md">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <Package className="h-3.5 w-3.5 text-orange-600" />
-                      </div>
-                      <span className="text-gray-900 text-xs font-semibold">Materials Ordered</span>
-                    </div>
-                  </div>
-                  <div className="bg-white rounded-xl p-2.5 shadow-md">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <Truck className="h-3.5 w-3.5 text-green-600" />
-                      </div>
-                      <span className="text-gray-900 text-xs font-semibold">2 Deliveries Today</span>
-                    </div>
-                  </div>
-                  <div className="bg-white rounded-xl p-2.5 shadow-md">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 bg-yellow-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <Camera className="h-3.5 w-3.5 text-yellow-600" />
-                      </div>
-                      <span className="text-gray-900 text-xs font-semibold">Site Monitoring</span>
-                    </div>
-                  </div>
-                </div>
-                {/* Notification Badge */}
-                <div className="absolute top-2 right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center animate-pulse shadow-lg border-2 border-white">
-                  <span className="text-white text-[9px] font-bold">3</span>
-                </div>
-              </div>
-            </div>
-            {/* "Builders Use This" Label */}
-            <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-orange-500 text-white px-3 py-1 rounded-full text-[10px] 2xl:text-xs font-bold whitespace-nowrap shadow-lg z-40">
-              📱 Builders Use This!
-            </div>
-          </div>
-        </div>
-        
-        {/* Tech Features Banner - Bottom Left */}
-        <div className="absolute bottom-4 left-4 md:left-8 flex flex-col gap-2 z-10">
-          <div className="flex items-center gap-2 bg-blue-600/90 backdrop-blur-md px-4 py-2 rounded-lg border border-blue-400/50 shadow-lg">
-            <Smartphone className="h-5 w-5 text-white" />
-            <span className="text-sm font-bold text-white">Mobile App</span>
-          </div>
-          <div className="flex items-center gap-2 bg-orange-600/90 backdrop-blur-md px-4 py-2 rounded-lg border border-orange-400/50 shadow-lg">
-            <Eye className="h-5 w-5 text-white" />
-            <span className="text-sm font-bold text-white">Site Monitoring</span>
-          </div>
-          <div className="flex items-center gap-2 bg-green-600/90 backdrop-blur-md px-4 py-2 rounded-lg border border-green-400/50 shadow-lg">
-            <Package className="h-5 w-5 text-white" />
-            <span className="text-sm font-bold text-white">Material Tracking</span>
-          </div>
-        </div>
+        <div className="absolute inset-0 bg-gradient-to-r from-gray-900/90 via-gray-900/75 to-gray-900/85" />
         
         <div className="container mx-auto px-4 text-center relative z-10">
-          <div className="max-w-5xl mx-auto">
-            <div className="mb-8 flex justify-center">
-              <Badge className="bg-gradient-to-r from-gray-700 to-blue-600 text-white px-8 py-3 text-xl font-bold border border-white/30 shadow-lg">
-                🇰🇪 Kenya's Premier Construction Professionals
-              </Badge>
-            </div>
-            
-            <h1 id="builders-hero-heading" className="text-6xl md:text-8xl font-bold mb-8 drop-shadow-2xl">
-              <span className="bg-gradient-to-r from-white via-gray-200 to-white bg-clip-text text-transparent">
-                Professional Builders
-              </span>
-              <br />
-              <span className="text-5xl md:text-6xl text-blue-400">
-                Directory
-              </span>
+          <div className="max-w-4xl mx-auto">
+            {/* Title */}
+            <h1 id="builders-hero-heading" className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2">
+              <span className="text-white">Professional Builders</span>
+              {' '}
+              <span className="text-blue-400">Directory</span>
             </h1>
             
-            <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-2xl xl:max-w-4xl mb-12 text-white/90 font-medium drop-shadow-lg leading-relaxed">
-              <strong>Find Your Perfect Builder:</strong> Browse certified builders and contractors, view portfolios and ratings, 
-              compare quotes, check availability, verify certifications, read reviews from past clients, and hire trusted 
-              professionals for residential, commercial, or industrial projects across all 47 counties.
+            <p className="text-sm md:text-base text-white/80 mb-4 max-w-2xl mx-auto">
+              Browse certified builders, compare quotes, and hire trusted professionals across Kenya.
             </p>
             
-            {/* Action Buttons - Always Visible */}
-            <div className="flex flex-wrap gap-4 justify-center mb-12">
+            {/* Action Buttons - Single Row */}
+            <div className="flex flex-wrap gap-2 justify-center mb-4">
               <Button 
-                size="lg"
+                size="sm"
                 onClick={() => setShowDashboard(false)}
-                className="bg-white text-gray-900 hover:bg-gray-100 font-semibold px-8 py-6 text-lg shadow-xl"
+                className="bg-white text-gray-900 hover:bg-gray-100 font-semibold text-xs px-3 py-1.5"
               >
-                <Building2 className="h-5 w-5 mr-2" />
-                Browse Builders
+                <Building2 className="h-3 w-3 mr-1" />
+                Browse
               </Button>
               
               <Link to="/builder-registration">
-                <Button 
-                  size="lg"
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
-                >
-                  <Building2 className="h-5 w-5 mr-2" />
-                  Register as Builder
+                <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-3 py-1.5">
+                  <Building2 className="h-3 w-3 mr-1" />
+                  Register
                 </Button>
               </Link>
               
-              {!loading && (
-                // Only show Dashboard button to builders - not to suppliers or delivery providers
-                userProfile && (userRoleState === 'professional_builder' || userRoleState === 'private_client') ? (
-                  <Link to="/professional-builder-dashboard">
-                    <Button 
-                      size="lg"
-                      className="bg-green-600 hover:bg-green-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
-                    >
-                      <Settings className="h-5 w-5 mr-2" />
-                      My Dashboard
-                    </Button>
-                  </Link>
-                ) : userProfile && userRoleState === 'supplier' ? (
-                  // Supplier is on Builders page - direct them to supplier dashboard
-                  <Link to="/supplier-dashboard">
-                    <Button 
-                      size="lg"
-                      className="bg-amber-600 hover:bg-amber-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
-                    >
-                      <Settings className="h-5 w-5 mr-2" />
-                      Supplier Dashboard
-                    </Button>
-                  </Link>
-                ) : userProfile && userRoleState === 'delivery' ? (
-                  // Delivery provider is on Builders page - direct them to delivery dashboard
-                  <Link to="/delivery-dashboard">
-                    <Button 
-                      size="lg"
-                      className="bg-purple-600 hover:bg-purple-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
-                    >
-                      <Settings className="h-5 w-5 mr-2" />
-                      Delivery Dashboard
-                    </Button>
-                  </Link>
-                ) : !userProfile ? (
-                  // Not logged in - show sign in for builder dashboard
-                  <Link to="/builder-signin?redirect=/professional-builder-dashboard">
-                    <Button 
-                      size="lg"
-                      className="bg-green-600 hover:bg-green-700 text-white font-semibold px-8 py-6 text-lg shadow-xl"
-                    >
-                      <Lock className="h-5 w-5 mr-2" />
-                      Sign In to Dashboard
-                    </Button>
-                  </Link>
-                ) : null
+              {!loading && userProfile && (userRoleState === 'professional_builder' || userRoleState === 'private_client') && (
+                <Link to="/professional-builder-dashboard">
+                  <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white font-semibold text-xs px-3 py-1.5">
+                    <Settings className="h-3 w-3 mr-1" />
+                    Dashboard
+                  </Button>
+                </Link>
+              )}
+              
+              {!loading && !userProfile && (
+                <Link to="/builder-signin">
+                  <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white font-semibold text-xs px-3 py-1.5">
+                    <Lock className="h-3 w-3 mr-1" />
+                    Sign In
+                  </Button>
+                </Link>
               )}
             </div>
 
-            {/* Professional Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
-                <div className="text-4xl font-bold text-blue-400 mb-2">150+</div>
-                <div className="text-white font-medium">Certified Builders</div>
-              </div>
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
-                <div className="text-4xl font-bold text-gray-300 mb-2">500+</div>
-                <div className="text-white font-medium">Completed Projects</div>
-              </div>
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
-                <div className="text-4xl font-bold text-orange-400 mb-2">47</div>
-                <div className="text-white font-medium">Counties Served</div>
-              </div>
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
-                <div className="text-4xl font-bold text-blue-300 mb-2">24/7</div>
-                <div className="text-white font-medium">Support</div>
-              </div>
-            </div>
-            
-            {/* Admin/Builder Controls */}
-            <div className="flex flex-col sm:flex-row justify-center items-center gap-6">
-              <div className="flex items-center gap-4">
-                {isAdmin && (
-                  <Badge className="bg-blue-600/90 text-white border-white/30 px-4 py-2 text-lg font-semibold">
-                    <Shield className="h-5 w-5 mr-2" />
-                    Admin View
-                  </Badge>
-                )}
-                {canAccessDashboard && (
-                  <Button
-                    variant="secondary"
-                    onClick={() => setShowDashboard(!showDashboard)}
-                    className="flex items-center gap-2 bg-white/20 backdrop-blur-sm border-white/30 text-white hover:bg-white/30 px-6 py-3 text-lg font-semibold"
-                  >
-                    <Settings className="h-5 w-5" />
-                    {showDashboard ? 'View Public Directory' : 'Builder Dashboard'}
-                  </Button>
-                )}
-              </div>
-              
-              {/* Theme and Language Controls */}
-              <div className="flex items-center gap-3 bg-white/10 backdrop-blur-sm rounded-full p-2 border border-white/20">
-                <ThemeToggle />
-                <LanguageToggle />
-              </div>
-            </div>
-            
-            {/* Professional Services Highlight */}
-            <div className="mt-12 flex flex-wrap justify-center gap-4 text-white/90">
-              <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full backdrop-blur-sm">
-                <Building2 className="h-5 w-5" />
-                <span className="font-medium">Professional Services</span>
-              </div>
-              <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full backdrop-blur-sm">
-                <Shield className="h-5 w-5" />
-                <span className="font-medium">Verified Builders</span>
-              </div>
-              <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full backdrop-blur-sm">
-                <Star className="h-5 w-5" />
-                <span className="font-medium">Quality Assured</span>
-              </div>
+            {/* Stats - Inline */}
+            <div className="flex flex-wrap justify-center gap-4 text-xs">
+              <span className="text-white/70"><strong className="text-blue-400">150+</strong> Builders</span>
+              <span className="text-white/70"><strong className="text-gray-300">500+</strong> Projects</span>
+              <span className="text-white/70"><strong className="text-orange-400">47</strong> Counties</span>
+              <span className="text-white/70"><strong className="text-blue-300">24/7</strong> Support</span>
             </div>
           </div>
         </div>
-        </section>
-      </AnimatedSection>
+      </section>
 
       {/* Builder Portal Section - Compact */}
       <section className="py-6 bg-gradient-to-r from-slate-50 to-blue-50">
