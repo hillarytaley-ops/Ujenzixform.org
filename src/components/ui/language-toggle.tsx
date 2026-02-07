@@ -10,21 +10,23 @@ export const LanguageToggle: React.FC = () => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon">
-          <Languages className="h-4 w-4" />
-          <span className="sr-only">Toggle language</span>
+        <Button variant="outline" size="sm" className="bg-white/90 hover:bg-white text-gray-700 border-gray-300 gap-2 px-3">
+          <Languages className="h-4 w-4 text-blue-600" />
+          <span className="text-xs font-medium hidden sm:inline">
+            {language === 'en' ? 'EN' : 'SW'}
+          </span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent align="end" className="bg-white border shadow-lg">
         <DropdownMenuItem onClick={() => setLanguage('en')} className="cursor-pointer">
           <span className="mr-2">🇬🇧</span>
           <span>English</span>
-          {language === 'en' && <span className="ml-auto">✓</span>}
+          {language === 'en' && <span className="ml-auto text-green-600">✓</span>}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => setLanguage('sw')} className="cursor-pointer">
           <span className="mr-2">🇰🇪</span>
           <span>Kiswahili</span>
-          {language === 'sw' && <span className="ml-auto">✓</span>}
+          {language === 'sw' && <span className="ml-auto text-green-600">✓</span>}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
