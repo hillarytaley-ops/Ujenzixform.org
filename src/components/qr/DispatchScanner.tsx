@@ -370,16 +370,45 @@ export const DispatchScanner: React.FC = () => {
 
         setScanResults(prev => [scanResult, ...prev.slice(0, 9)]);
         
-        toast.success('Item Dispatched', {
-          description: `${scanData.material_type} - ${scanData.quantity} ${scanData.unit}`
-        });
+        // Show success with invalidation notice if applicable
+        if (scanData.is_invalidated) {
+          toast.success('✅ Item Dispatched & Completed', {
+            description: `${scanData.material_type} - QR code has been invalidated (both dispatch & receive done)`
+          });
+        } else {
+          toast.success('🚚 Item Dispatched', {
+            description: `${scanData.material_type} - ${scanData.quantity} ${scanData.unit}. Awaiting receiving scan.`
+          });
+        }
 
         // Reset form
         setManualQRCode('');
         setNotes('');
       } else {
-        toast.error('Scan Failed', {
-          description: scanData.error || 'Invalid QR code'
+        // Handle specific error codes with appropriate messages
+        const errorCode = scanData.error_code;
+        let errorTitle = 'Scan Failed';
+        let errorIcon = '❌';
+        
+        switch (errorCode) {
+          case 'ALREADY_DISPATCHED':
+            errorTitle = '⚠️ Already Dispatched';
+            errorIcon = '🔄';
+            break;
+          case 'QR_INVALIDATED':
+            errorTitle = '🚫 QR Code Invalidated';
+            errorIcon = '✅';
+            break;
+          case 'QR_NOT_FOUND':
+            errorTitle = '❓ QR Code Not Found';
+            break;
+          default:
+            errorTitle = '❌ Scan Failed';
+        }
+        
+        toast.error(errorTitle, {
+          description: scanData.error || 'Invalid QR code',
+          duration: 5000
         });
       }
     } catch (error) {

@@ -558,7 +558,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
 
     const qrResults = await Promise.all(qrPromises);
 
-    // Build print HTML
+    // Build print HTML with status indicators
     const printHTML = `
       <!DOCTYPE html>
       <html>
@@ -567,36 +567,82 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body { font-family: Arial, sans-serif; padding: 20px; }
-          .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
-          .header h1 { font-size: 24px; margin-bottom: 5px; }
+          .header { 
+            text-align: center; 
+            margin-bottom: 20px; 
+            border-bottom: 3px solid #0891b2; 
+            padding-bottom: 15px; 
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border-radius: 10px;
+            padding: 20px;
+          }
+          .header h1 { font-size: 24px; margin-bottom: 5px; color: #0891b2; }
           .header p { color: #666; }
-          .qr-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-          .qr-item { border: 1px solid #ddd; padding: 15px; text-align: center; page-break-inside: avoid; }
+          .qr-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 20px; }
+          .qr-item { 
+            border: 2px solid #ddd; 
+            padding: 15px; 
+            text-align: center; 
+            page-break-inside: avoid; 
+            border-radius: 8px;
+            background: #fff;
+          }
+          .qr-item.completed { 
+            border-color: #22c55e; 
+            background: #f0fdf4; 
+            opacity: 0.7;
+          }
+          .qr-item.invalidated { 
+            border-color: #ef4444; 
+            background: #fef2f2; 
+            opacity: 0.5;
+          }
           .qr-item img { width: 150px; height: 150px; }
-          .qr-item h3 { font-size: 12px; margin-top: 10px; word-wrap: break-word; }
+          .qr-item h3 { font-size: 12px; margin-top: 10px; word-wrap: break-word; font-weight: bold; }
           .qr-item p { font-size: 10px; color: #666; margin-top: 5px; }
           .qr-code-text { font-family: monospace; font-size: 8px; color: #999; margin-top: 5px; word-break: break-all; }
+          .status-badge { 
+            display: inline-block; 
+            padding: 3px 8px; 
+            border-radius: 4px; 
+            font-size: 9px; 
+            font-weight: bold; 
+            margin-top: 8px; 
+          }
+          .completed-badge { background: #22c55e; color: white; }
+          .pending-badge { background: #eab308; color: white; }
+          .dispatched-badge { background: #3b82f6; color: white; }
           @media print {
             .qr-grid { grid-template-columns: repeat(3, 1fr); }
-            .qr-item { border: 1px solid #000; }
+            .qr-item { border: 2px solid #000; }
           }
         </style>
       </head>
       <body>
         <div class="header">
-          <h1>${title}</h1>
+          <h1>📦 ${title}</h1>
           <p>${subtitle}</p>
           <p>Total Items: ${itemsToPrint.length} | Generated: ${new Date().toLocaleDateString()}</p>
         </div>
         <div class="qr-grid">
-          ${qrResults.map(({ item, qrDataUrl }) => `
-            <div class="qr-item">
-              <img src="${qrDataUrl}" alt="QR Code" />
-              <h3>${item.material_type}</h3>
-              <p>Unit ${item.item_sequence} • ${item.unit}</p>
-              <p class="qr-code-text">${item.qr_code}</p>
-            </div>
-          `).join('')}
+          ${qrResults.map(({ item, qrDataUrl }) => {
+            const isCompleted = item.dispatch_scanned && item.receive_scanned;
+            const isDispatched = item.dispatch_scanned && !item.receive_scanned;
+            return `
+              <div class="qr-item ${isCompleted ? 'completed' : ''}">
+                <img src="${qrDataUrl}" alt="QR Code" />
+                <h3>${item.material_type}</h3>
+                <p>Unit ${item.item_sequence} • ${item.unit}</p>
+                <p class="qr-code-text">${item.qr_code}</p>
+                ${isCompleted 
+                  ? '<p class="status-badge completed-badge">✅ COMPLETED</p>' 
+                  : isDispatched 
+                    ? '<p class="status-badge dispatched-badge">🚚 DISPATCHED</p>'
+                    : '<p class="status-badge pending-badge">⏳ PENDING</p>'
+                }
+              </div>
+            `;
+          }).join('')}
         </div>
         <script>
           window.onload = function() { window.print(); }
@@ -609,11 +655,11 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
     printWindow.document.close();
   };
 
-  // Print all QR codes
+  // Print all QR codes - grouped by client with page breaks
   const printAllQRCodes = async () => {
     toast({
       title: "Preparing Print",
-      description: `Generating ${items.length} QR codes for printing...`,
+      description: `Generating ${items.length} QR codes for printing (grouped by client)...`,
     });
 
     const printWindow = window.open('', '_blank');
@@ -626,7 +672,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
       return;
     }
 
-    // Generate QR codes as data URLs
+    // Generate QR codes as data URLs for all items
     const qrPromises = items.map(async (item) => {
       const qrDataUrl = await QRCodeLib.toDataURL(item.qr_code, {
         width: 200,
@@ -638,6 +684,46 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
 
     const qrResults = await Promise.all(qrPromises);
 
+    // Group results by client
+    const qrByClient: Record<string, { item: MaterialItem; qrDataUrl: string }[]> = {};
+    qrResults.forEach(({ item, qrDataUrl }) => {
+      const clientKey = item.buyer_id || 'unknown';
+      if (!qrByClient[clientKey]) {
+        qrByClient[clientKey] = [];
+      }
+      qrByClient[clientKey].push({ item, qrDataUrl });
+    });
+
+    // Build HTML with page breaks between clients
+    const clientSections = clientGroups.map((group, groupIndex) => {
+      const clientQRs = qrByClient[group.buyer_id] || [];
+      if (clientQRs.length === 0) return '';
+      
+      return `
+        <div class="client-section ${groupIndex > 0 ? 'page-break' : ''}">
+          <div class="client-header">
+            <h2>📦 ${group.buyer_name}</h2>
+            <p class="client-contact">
+              ${group.buyer_email ? '✉️ ' + group.buyer_email : ''} 
+              ${group.buyer_phone ? ' | 📞 ' + group.buyer_phone : ''}
+            </p>
+            <p class="client-stats">${clientQRs.length} items | Generated: ${new Date().toLocaleDateString()}</p>
+          </div>
+          <div class="qr-grid">
+            ${clientQRs.map(({ item, qrDataUrl }) => `
+              <div class="qr-item ${item.dispatch_scanned && item.receive_scanned ? 'completed' : ''}">
+                <img src="${qrDataUrl}" alt="QR Code" />
+                <h3>${item.material_type}</h3>
+                <p>Unit ${item.item_sequence} • ${item.unit}</p>
+                <p class="qr-code-text">${item.qr_code}</p>
+                ${item.dispatch_scanned && item.receive_scanned ? '<p class="status-badge completed-badge">✅ COMPLETED</p>' : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }).join('');
+
     const printHTML = `
       <!DOCTYPE html>
       <html>
@@ -646,37 +732,67 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body { font-family: Arial, sans-serif; padding: 20px; }
-          .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
-          .header h1 { font-size: 24px; margin-bottom: 5px; }
-          .header p { color: #666; }
+          .main-header { text-align: center; margin-bottom: 30px; border-bottom: 3px solid #0891b2; padding-bottom: 15px; }
+          .main-header h1 { font-size: 28px; margin-bottom: 5px; color: #0891b2; }
+          .main-header p { color: #666; }
+          
+          /* Client Section Styling */
+          .client-section { margin-bottom: 40px; padding-top: 20px; }
+          .client-header { 
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); 
+            border: 2px solid #0891b2; 
+            border-radius: 10px; 
+            padding: 15px 20px; 
+            margin-bottom: 20px; 
+          }
+          .client-header h2 { font-size: 20px; color: #0891b2; margin-bottom: 5px; }
+          .client-contact { font-size: 12px; color: #666; }
+          .client-stats { font-size: 11px; color: #888; margin-top: 5px; }
+          
+          /* QR Grid */
           .qr-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-          .qr-item { border: 1px solid #ddd; padding: 15px; text-align: center; page-break-inside: avoid; }
+          .qr-item { 
+            border: 2px solid #ddd; 
+            padding: 15px; 
+            text-align: center; 
+            page-break-inside: avoid; 
+            border-radius: 8px;
+            background: #fff;
+          }
+          .qr-item.completed { 
+            border-color: #22c55e; 
+            background: #f0fdf4; 
+          }
           .qr-item img { width: 150px; height: 150px; }
-          .qr-item h3 { font-size: 12px; margin-top: 10px; word-wrap: break-word; }
+          .qr-item h3 { font-size: 12px; margin-top: 10px; word-wrap: break-word; font-weight: bold; }
           .qr-item p { font-size: 10px; color: #666; margin-top: 5px; }
           .qr-code-text { font-family: monospace; font-size: 8px; color: #999; margin-top: 5px; word-break: break-all; }
+          .status-badge { 
+            display: inline-block; 
+            padding: 3px 8px; 
+            border-radius: 4px; 
+            font-size: 9px; 
+            font-weight: bold; 
+            margin-top: 8px; 
+          }
+          .completed-badge { background: #22c55e; color: white; }
+          
+          /* Print-specific styles */
           @media print {
+            .page-break { page-break-before: always; }
             .qr-grid { grid-template-columns: repeat(3, 1fr); }
-            .qr-item { border: 1px solid #000; }
+            .qr-item { border: 2px solid #000; }
+            .client-section { margin-bottom: 0; }
           }
         </style>
       </head>
       <body>
-        <div class="header">
-          <h1>Material QR Codes</h1>
+        <div class="main-header">
+          <h1>📱 Material QR Codes</h1>
           <p>UjenziXform - Construction Material Tracking</p>
-          <p>Total Items: ${items.length} | Generated: ${new Date().toLocaleDateString()}</p>
+          <p>Total: ${items.length} items across ${clientGroups.length} clients</p>
         </div>
-        <div class="qr-grid">
-          ${qrResults.map(({ item, qrDataUrl }) => `
-            <div class="qr-item">
-              <img src="${qrDataUrl}" alt="QR Code" />
-              <h3>${item.material_type}</h3>
-              <p>Unit ${item.item_sequence} • ${item.unit}</p>
-              <p class="qr-code-text">${item.qr_code}</p>
-            </div>
-          `).join('')}
-        </div>
+        ${clientSections}
         <script>
           window.onload = function() { window.print(); }
         </script>
@@ -862,8 +978,8 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
           </CardContent>
         </Card>
       ) : viewMode === 'by-client' ? (
-        /* Client-Grouped View */
-        <Accordion type="multiple" className="space-y-4" defaultValue={clientGroups.slice(0, 3).map(g => g.buyer_id)}>
+        /* Client-Grouped View - Added extra spacing between clients */
+        <Accordion type="multiple" className="space-y-8" defaultValue={clientGroups.slice(0, 3).map(g => g.buyer_id)}>
           {clientGroups.map((group) => (
             <AccordionItem key={group.buyer_id} value={group.buyer_id} className="border rounded-lg overflow-hidden">
               <AccordionTrigger className="px-4 py-3 bg-gradient-to-r from-slate-50 to-slate-100 hover:from-slate-100 hover:to-slate-150">
