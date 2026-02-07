@@ -54,6 +54,7 @@ interface PriceVariant {
   sizeLabel: string;
   price: number;
   stock: number;
+  imageUrl?: string; // Optional image per variant
 }
 
 interface Material {

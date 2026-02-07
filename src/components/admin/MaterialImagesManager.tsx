@@ -216,6 +216,7 @@ export const MaterialImagesManager: React.FC = () => {
     colorHex?: string;
     price: number;
     stock: number;
+    imageUrl?: string; // Optional image per variant
   }
   
   // Common color presets for quick selection
@@ -1623,7 +1624,7 @@ export const MaterialImagesManager: React.FC = () => {
                     onClick={() => setUploadForm(prev => ({
                       ...prev,
                       pricingType: 'variants',
-                      variants: [...prev.variants, { id: crypto.randomUUID(), sizeLabel: '', color: '', colorHex: '', price: 0, stock: 0 }]
+                      variants: [...prev.variants, { id: crypto.randomUUID(), sizeLabel: '', color: '', colorHex: '', price: 0, stock: 0, imageUrl: '' }]
                     }))}
                   >
                     + Add Variant
@@ -1747,6 +1748,83 @@ export const MaterialImagesManager: React.FC = () => {
                               />
                             ))}
                           </div>
+                        </div>
+                        
+                        {/* Variant Image Upload */}
+                        <div className="mt-3">
+                          <Label className="text-xs text-slate-500 mb-1 block">Variant Image (optional)</Label>
+                          <div className="flex items-center gap-2">
+                            {/* Image preview */}
+                            {variant.imageUrl ? (
+                              <div className="relative w-16 h-16 rounded border-2 border-slate-600 overflow-hidden flex-shrink-0">
+                                <img 
+                                  src={variant.imageUrl} 
+                                  alt={`${variant.sizeLabel} variant`}
+                                  className="w-full h-full object-cover"
+                                />
+                                <button
+                                  type="button"
+                                  className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl"
+                                  onClick={() => {
+                                    const newVariants = [...uploadForm.variants];
+                                    newVariants[index].imageUrl = '';
+                                    setUploadForm(prev => ({ ...prev, variants: newVariants }));
+                                  }}
+                                  title="Remove image"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="w-16 h-16 rounded border-2 border-dashed border-slate-600 flex items-center justify-center text-slate-500 flex-shrink-0">
+                                <ImageIcon className="h-6 w-6" />
+                              </div>
+                            )}
+                            {/* Upload button */}
+                            <label className="flex-1">
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  
+                                  // Validate file
+                                  if (!file.type.startsWith('image/')) {
+                                    toast({
+                                      title: 'Invalid file type',
+                                      description: 'Please select an image file',
+                                      variant: 'destructive',
+                                    });
+                                    return;
+                                  }
+                                  
+                                  if (file.size > 10 * 1024 * 1024) {
+                                    toast({
+                                      title: 'File too large',
+                                      description: 'Please select an image under 10MB',
+                                      variant: 'destructive',
+                                    });
+                                    return;
+                                  }
+                                  
+                                  // Convert to base64
+                                  const reader = new FileReader();
+                                  reader.onload = () => {
+                                    const newVariants = [...uploadForm.variants];
+                                    newVariants[index].imageUrl = reader.result as string;
+                                    setUploadForm(prev => ({ ...prev, variants: newVariants }));
+                                  };
+                                  reader.readAsDataURL(file);
+                                }}
+                              />
+                              <div className="cursor-pointer bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded px-3 py-2 text-xs text-center transition-colors">
+                                {variant.imageUrl ? 'Change Image' : 'Upload Image'}
+                              </div>
+                            </label>
+                          </div>
+                          <p className="text-[10px] text-slate-500 mt-1">Upload a specific image for this size/variant (e.g., 1L, 4L, 20L containers)</p>
                         </div>
                       </div>
                     ))}
@@ -2145,7 +2223,7 @@ export const MaterialImagesManager: React.FC = () => {
                                 className={`flex-1 ${item.pricingType === 'variants' ? 'bg-purple-500 hover:bg-purple-600' : 'border-slate-500 text-slate-300'}`}
                                 onClick={() => updateBulkItem(item.id, { 
                                   pricingType: 'variants',
-                                  variants: item.variants.length === 0 ? [{ id: crypto.randomUUID(), sizeLabel: '', color: '', colorHex: '', price: 0, stock: 0 }] : item.variants
+                                  variants: item.variants.length === 0 ? [{ id: crypto.randomUUID(), sizeLabel: '', color: '', colorHex: '', price: 0, stock: 0, imageUrl: '' }] : item.variants
                                 })}
                                 disabled={item.uploaded || item.uploading}
                               >
@@ -2177,7 +2255,7 @@ export const MaterialImagesManager: React.FC = () => {
                                 variant="outline"
                                 className="border-purple-500 text-purple-400 hover:bg-purple-500/20 h-8 text-xs px-3"
                                 onClick={() => {
-                                  const newVariants = [...item.variants, { id: crypto.randomUUID(), sizeLabel: '', color: '', colorHex: '', price: 0, stock: 0 }];
+                                  const newVariants = [...item.variants, { id: crypto.randomUUID(), sizeLabel: '', color: '', colorHex: '', price: 0, stock: 0, imageUrl: '' }];
                                   updateBulkItem(item.id, { pricingType: 'variants', variants: newVariants });
                                 }}
                                 disabled={item.uploaded || item.uploading}
@@ -2288,6 +2366,68 @@ export const MaterialImagesManager: React.FC = () => {
                                           title={preset.name}
                                         />
                                       ))}
+                                    </div>
+                                    
+                                    {/* Variant Image Upload */}
+                                    <div className="mt-2 flex items-center gap-2">
+                                      {variant.imageUrl ? (
+                                        <div className="relative w-10 h-10 rounded border border-slate-500 overflow-hidden flex-shrink-0">
+                                          <img 
+                                            src={variant.imageUrl} 
+                                            alt={`${variant.sizeLabel} variant`}
+                                            className="w-full h-full object-cover"
+                                          />
+                                          <button
+                                            type="button"
+                                            className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl"
+                                            onClick={() => {
+                                              const newVariants = [...item.variants];
+                                              newVariants[vIdx].imageUrl = '';
+                                              updateBulkItem(item.id, { variants: newVariants });
+                                            }}
+                                            disabled={item.uploaded || item.uploading}
+                                            title="Remove image"
+                                          >
+                                            <X className="h-2 w-2" />
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <div className="w-10 h-10 rounded border border-dashed border-slate-500 flex items-center justify-center text-slate-500 flex-shrink-0">
+                                          <ImageIcon className="h-4 w-4" />
+                                        </div>
+                                      )}
+                                      <label className="flex-1">
+                                        <input
+                                          type="file"
+                                          accept="image/*"
+                                          className="hidden"
+                                          disabled={item.uploaded || item.uploading}
+                                          onChange={async (e) => {
+                                            const file = e.target.files?.[0];
+                                            if (!file) return;
+                                            
+                                            if (!file.type.startsWith('image/') || file.size > 10 * 1024 * 1024) {
+                                              toast({
+                                                title: 'Invalid file',
+                                                description: 'Please select an image under 10MB',
+                                                variant: 'destructive',
+                                              });
+                                              return;
+                                            }
+                                            
+                                            const reader = new FileReader();
+                                            reader.onload = () => {
+                                              const newVariants = [...item.variants];
+                                              newVariants[vIdx].imageUrl = reader.result as string;
+                                              updateBulkItem(item.id, { variants: newVariants });
+                                            };
+                                            reader.readAsDataURL(file);
+                                          }}
+                                        />
+                                        <div className="cursor-pointer bg-slate-600 hover:bg-slate-500 border border-slate-500 rounded px-2 py-1 text-[10px] text-center transition-colors">
+                                          {variant.imageUrl ? 'Change' : 'Add Image'}
+                                        </div>
+                                      </label>
                                     </div>
                                   </div>
                                 ))}
@@ -2559,7 +2699,7 @@ export const MaterialImagesManager: React.FC = () => {
                       onClick={() => setEditForm(prev => ({ 
                         ...prev, 
                         pricingType: 'variants',
-                        variants: prev.variants.length === 0 ? [{ id: crypto.randomUUID(), sizeLabel: '', color: '', colorHex: '', price: 0, stock: 0 }] : prev.variants
+                        variants: prev.variants.length === 0 ? [{ id: crypto.randomUUID(), sizeLabel: '', color: '', colorHex: '', price: 0, stock: 0, imageUrl: '' }] : prev.variants
                       }))}
                     >
                       📊 Multiple Sizes / Variants
@@ -2592,7 +2732,7 @@ export const MaterialImagesManager: React.FC = () => {
                       onClick={() => setEditForm(prev => ({
                         ...prev,
                         pricingType: 'variants',
-                        variants: [...prev.variants, { id: crypto.randomUUID(), sizeLabel: '', color: '', colorHex: '', price: 0, stock: 0 }]
+                        variants: [...prev.variants, { id: crypto.randomUUID(), sizeLabel: '', color: '', colorHex: '', price: 0, stock: 0, imageUrl: '' }]
                       }))}
                     >
                       + Add Variant
@@ -2716,6 +2856,83 @@ export const MaterialImagesManager: React.FC = () => {
                                 />
                               ))}
                             </div>
+                          </div>
+                          
+                          {/* Variant Image Upload */}
+                          <div className="mt-3">
+                            <Label className="text-xs text-slate-500 mb-1 block">Variant Image (optional)</Label>
+                            <div className="flex items-center gap-2">
+                              {/* Image preview */}
+                              {variant.imageUrl ? (
+                                <div className="relative w-16 h-16 rounded border-2 border-slate-600 overflow-hidden flex-shrink-0">
+                                  <img 
+                                    src={variant.imageUrl} 
+                                    alt={`${variant.sizeLabel} variant`}
+                                    className="w-full h-full object-cover"
+                                  />
+                                  <button
+                                    type="button"
+                                    className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl"
+                                    onClick={() => {
+                                      const newVariants = [...editForm.variants];
+                                      newVariants[index].imageUrl = '';
+                                      setEditForm(prev => ({ ...prev, variants: newVariants }));
+                                    }}
+                                    title="Remove image"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="w-16 h-16 rounded border-2 border-dashed border-slate-600 flex items-center justify-center text-slate-500 flex-shrink-0">
+                                  <ImageIcon className="h-6 w-6" />
+                                </div>
+                              )}
+                              {/* Upload button */}
+                              <label className="flex-1">
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+                                    
+                                    // Validate file
+                                    if (!file.type.startsWith('image/')) {
+                                      toast({
+                                        title: 'Invalid file type',
+                                        description: 'Please select an image file',
+                                        variant: 'destructive',
+                                      });
+                                      return;
+                                    }
+                                    
+                                    if (file.size > 10 * 1024 * 1024) {
+                                      toast({
+                                        title: 'File too large',
+                                        description: 'Please select an image under 10MB',
+                                        variant: 'destructive',
+                                      });
+                                      return;
+                                    }
+                                    
+                                    // Convert to base64
+                                    const reader = new FileReader();
+                                    reader.onload = () => {
+                                      const newVariants = [...editForm.variants];
+                                      newVariants[index].imageUrl = reader.result as string;
+                                      setEditForm(prev => ({ ...prev, variants: newVariants }));
+                                    };
+                                    reader.readAsDataURL(file);
+                                  }}
+                                />
+                                <div className="cursor-pointer bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded px-3 py-2 text-xs text-center transition-colors">
+                                  {variant.imageUrl ? 'Change Image' : 'Upload Image'}
+                                </div>
+                              </label>
+                            </div>
+                            <p className="text-[10px] text-slate-500 mt-1">Upload a specific image for this size/variant</p>
                           </div>
                         </div>
                       ))}
