@@ -187,7 +187,7 @@ const Navigation = () => {
         <Link to="/home" className="flex items-center group flex-shrink-0">
           <div className="relative flex-shrink-0" style={{ width: '48px', height: '48px' }}>
             <img 
-              src="/mradipro-logo.png" 
+              src="/ujenzixform-logo.png" 
               alt="UjenziXform" 
               width="48"
               height="48"
@@ -198,11 +198,11 @@ const Navigation = () => {
                 objectFit: 'cover',
                 display: 'block'
               }}
-              className="shadow-lg"
+              className="shadow-lg border-2 border-white"
               onError={(e) => {
                 // Fallback to SVG if PNG fails
                 const target = e.currentTarget;
-                target.src = '/ujenzipro-logo-circular.svg';
+                target.src = '/ujenzixform-logo-circular.svg';
                 target.style.objectFit = 'contain';
               }}
             />

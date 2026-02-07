@@ -247,7 +247,7 @@ export const ClientChatWidget: React.FC<ClientChatWidgetProps> = ({
           <div className="flex items-center gap-3">
             <div className="relative">
               <Avatar className="h-10 w-10 border-2 border-white/30">
-                <AvatarImage src="/logo.png" />
+                <AvatarImage src="/ujenzixform-logo.png" />
                 <AvatarFallback className="bg-white/20 text-white">UP</AvatarFallback>
               </Avatar>
               <div className="absolute bottom-0 right-0 h-3 w-3 bg-green-400 rounded-full border-2 border-white"></div>

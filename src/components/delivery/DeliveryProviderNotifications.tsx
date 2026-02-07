@@ -287,7 +287,7 @@ export const DeliveryProviderNotifications: React.FC<{ providerId: string }> = (
     if ('Notification' in window && Notification.permission === 'granted') {
       new Notification('New Delivery Request - UjenziPro', {
         body: `${request.quantity} ${request.material_type}\nFrom: ${request.pickup_address}\nDistance: ${request.distance_km}km\nPay: KES ${request.estimated_cost.toLocaleString()}`,
-        icon: '/logo.png',
+        icon: '/ujenzixform-logo.png',
         badge: '/badge.png',
         tag: request.delivery_id,
         requireInteraction: true,
