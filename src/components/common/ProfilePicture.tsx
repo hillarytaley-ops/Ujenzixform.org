@@ -24,15 +24,30 @@ export const ProfilePicture: React.FC<ProfilePictureProps> = ({
   className = '',
   defaultImage = 'user',
 }) => {
-  const [imageError, setImageError] = React.useState(false);
+  const [fallbackIndex, setFallbackIndex] = React.useState(0);
+
+  // Logo fallbacks - try multiple formats
+  const logoFallbacks = [
+    '/ujenzixform-logo.png',
+    '/ujenzixform-logo.jpg',
+    '/ujenzixform-logo.jpeg',
+    '/ujenzixform-logo.webp',
+    '/ujenzixform-logo-circular.svg',
+  ];
 
   // Default images
   const defaultImages = {
-    logo: '/ujenzixform-logo.png',
+    logo: logoFallbacks[Math.min(fallbackIndex, logoFallbacks.length - 1)],
     user: '/placeholder.svg',
   };
 
-  const imageSrc = imageError ? defaultImages[defaultImage] : (src || defaultImages[defaultImage]);
+  const handleError = () => {
+    if (defaultImage === 'logo' && fallbackIndex < logoFallbacks.length - 1) {
+      setFallbackIndex(prev => prev + 1);
+    }
+  };
+
+  const imageSrc = src || defaultImages[defaultImage];
 
   return (
     <div className={`relative ${sizeClasses[size]} ${className}`}>
@@ -40,7 +55,7 @@ export const ProfilePicture: React.FC<ProfilePictureProps> = ({
         src={imageSrc}
         alt={alt}
         className="w-full h-full rounded-full object-cover border-2 border-gray-200 shadow-sm"
-        onError={() => setImageError(true)}
+        onError={handleError}
         loading="lazy"
       />
     </div>
@@ -48,24 +63,39 @@ export const ProfilePicture: React.FC<ProfilePictureProps> = ({
 };
 
 // UjenziXform Logo Component (for company branding)
+// Supports multiple image formats: PNG, JPG, JPEG, WEBP, SVG
 export const UjenziXformLogo: React.FC<{
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
   className?: string;
   showText?: boolean;
 }> = ({ size = 'md', className = '', showText = false }) => {
-  const [imgError, setImgError] = React.useState(false);
+  const [currentLogoIndex, setCurrentLogoIndex] = React.useState(0);
   
-  // Try new UjenziXform PNG first, fallback to circular SVG if it fails
-  const logoSrc = imgError ? '/ujenzixform-logo-circular.svg' : '/ujenzixform-logo.png';
+  // Try multiple formats in order of preference
+  const logoFormats = [
+    '/ujenzixform-logo.png',
+    '/ujenzixform-logo.jpg',
+    '/ujenzixform-logo.jpeg',
+    '/ujenzixform-logo.webp',
+    '/ujenzixform-logo.svg',
+    '/ujenzixform-logo-circular.svg', // Final fallback - always works
+  ];
+  
+  const handleImageError = () => {
+    // Try next format if available
+    if (currentLogoIndex < logoFormats.length - 1) {
+      setCurrentLogoIndex(prev => prev + 1);
+    }
+  };
   
   return (
     <div className={`flex items-center gap-2 ${className}`}>
       <div className={`relative ${sizeClasses[size]}`}>
         <img
-          src={logoSrc}
+          src={logoFormats[currentLogoIndex]}
           alt="UjenziXform Logo"
           className="w-full h-full rounded-full object-cover border-2 border-gray-200 shadow-sm"
-          onError={() => setImgError(true)}
+          onError={handleImageError}
         />
       </div>
       {showText && (
