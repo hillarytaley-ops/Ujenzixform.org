@@ -260,61 +260,61 @@ const Builders = () => {
           </div>
         </div>
         
-        {/* App Screenshot/Phone Mockup - Shows builders using the app - Positioned higher to avoid overlap */}
-        <div className="absolute top-16 right-4 md:right-12 lg:right-20 hidden lg:block z-30">
+        {/* App Screenshot/Phone Mockup - Only visible on xl screens (1280px+) to avoid overlap */}
+        <div className="absolute top-20 right-8 hidden xl:block z-30">
           <div className="relative">
             {/* Phone Frame - Clear and visible with solid backgrounds */}
-            <div className="w-52 h-[380px] bg-gray-900 rounded-3xl p-2 shadow-2xl shadow-blue-500/40 border-4 border-gray-700 transform rotate-3 hover:rotate-0 transition-transform duration-500">
+            <div className="w-48 h-[340px] 2xl:w-52 2xl:h-[380px] bg-gray-900 rounded-3xl p-2 shadow-2xl shadow-blue-500/40 border-4 border-gray-700 transform rotate-3 hover:rotate-0 transition-transform duration-500">
               {/* Phone Screen - Solid blue background */}
               <div className="w-full h-full bg-blue-700 rounded-2xl overflow-hidden relative">
                 {/* App Header */}
-                <div className="bg-blue-900 p-3 text-center border-b border-blue-500/30">
-                  <p className="text-white text-sm font-bold tracking-wide">UjenziXform</p>
-                  <p className="text-blue-200 text-xs">Builder Dashboard</p>
+                <div className="bg-blue-900 p-2.5 2xl:p-3 text-center border-b border-blue-500/30">
+                  <p className="text-white text-xs 2xl:text-sm font-bold tracking-wide">UjenziXform</p>
+                  <p className="text-blue-200 text-[10px] 2xl:text-xs">Builder Dashboard</p>
                 </div>
                 {/* App Content - Solid white cards */}
-                <div className="p-3 space-y-2.5 bg-blue-700">
-                  <div className="bg-white rounded-xl p-3 shadow-md">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <Building2 className="h-4 w-4 text-blue-600" />
+                <div className="p-2.5 2xl:p-3 space-y-2 bg-blue-700">
+                  <div className="bg-white rounded-xl p-2.5 shadow-md">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <Building2 className="h-3.5 w-3.5 text-blue-600" />
                       </div>
-                      <span className="text-gray-900 text-sm font-semibold">Active Projects: 5</span>
+                      <span className="text-gray-900 text-xs font-semibold">Active Projects: 5</span>
                     </div>
                   </div>
-                  <div className="bg-white rounded-xl p-3 shadow-md">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <Package className="h-4 w-4 text-orange-600" />
+                  <div className="bg-white rounded-xl p-2.5 shadow-md">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <Package className="h-3.5 w-3.5 text-orange-600" />
                       </div>
-                      <span className="text-gray-900 text-sm font-semibold">Materials Ordered</span>
+                      <span className="text-gray-900 text-xs font-semibold">Materials Ordered</span>
                     </div>
                   </div>
-                  <div className="bg-white rounded-xl p-3 shadow-md">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <Truck className="h-4 w-4 text-green-600" />
+                  <div className="bg-white rounded-xl p-2.5 shadow-md">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <Truck className="h-3.5 w-3.5 text-green-600" />
                       </div>
-                      <span className="text-gray-900 text-sm font-semibold">2 Deliveries Today</span>
+                      <span className="text-gray-900 text-xs font-semibold">2 Deliveries Today</span>
                     </div>
                   </div>
-                  <div className="bg-white rounded-xl p-3 shadow-md">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <Camera className="h-4 w-4 text-yellow-600" />
+                  <div className="bg-white rounded-xl p-2.5 shadow-md">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 bg-yellow-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <Camera className="h-3.5 w-3.5 text-yellow-600" />
                       </div>
-                      <span className="text-gray-900 text-sm font-semibold">Site Monitoring</span>
+                      <span className="text-gray-900 text-xs font-semibold">Site Monitoring</span>
                     </div>
                   </div>
                 </div>
                 {/* Notification Badge */}
-                <div className="absolute top-2 right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center animate-pulse shadow-lg border-2 border-white">
-                  <span className="text-white text-[10px] font-bold">3</span>
+                <div className="absolute top-2 right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center animate-pulse shadow-lg border-2 border-white">
+                  <span className="text-white text-[9px] font-bold">3</span>
                 </div>
               </div>
             </div>
             {/* "Builders Use This" Label */}
-            <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-orange-500 text-white px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap shadow-lg z-40">
+            <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-orange-500 text-white px-3 py-1 rounded-full text-[10px] 2xl:text-xs font-bold whitespace-nowrap shadow-lg z-40">
               📱 Builders Use This!
             </div>
           </div>
@@ -354,7 +354,7 @@ const Builders = () => {
               </span>
             </h1>
             
-            <p className="text-2xl md:text-4xl mb-12 text-white/90 font-medium drop-shadow-lg leading-relaxed">
+            <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-2xl xl:max-w-4xl mb-12 text-white/90 font-medium drop-shadow-lg leading-relaxed">
               <strong>Find Your Perfect Builder:</strong> Browse certified builders and contractors, view portfolios and ratings, 
               compare quotes, check availability, verify certifications, read reviews from past clients, and hire trusted 
               professionals for residential, commercial, or industrial projects across all 47 counties.
