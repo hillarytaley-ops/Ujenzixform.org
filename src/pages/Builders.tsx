@@ -498,61 +498,45 @@ const Builders = () => {
         </section>
       </AnimatedSection>
 
-      {/* Builder Portal Section - Single Explore Button */}
-      <section className="py-12 bg-gradient-to-r from-slate-50 to-blue-50">
+      {/* Builder Portal Section - Compact */}
+      <section className="py-6 bg-gradient-to-r from-slate-50 to-blue-50">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-8">
-            <Badge className="mb-3 bg-blue-100 text-blue-800 font-semibold">Access Your Dashboard</Badge>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Choose Your Builder Portal</h2>
-            <p className="text-gray-600">Select your account type to get started</p>
+          <div className="text-center mb-4">
+            <h2 className="text-lg font-bold text-gray-900">Choose Your Builder Portal</h2>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
             {/* Private Builder */}
-            <Card className="hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border-2 border-emerald-300 bg-gradient-to-br from-emerald-50 to-white">
-              <CardContent className="p-8 text-center">
-                <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <ShoppingCart className="h-8 w-8 text-emerald-600" />
+            <Card className="hover:shadow-lg transition-all duration-300 border border-emerald-200 bg-white">
+              <CardContent className="p-4 flex items-center gap-4">
+                <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <ShoppingCart className="h-6 w-6 text-emerald-600" />
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">Private Builder</h3>
-                <p className="text-sm text-gray-600 mb-4">Home projects & personal purchases</p>
-                <ul className="text-left text-gray-600 text-sm space-y-2 mb-6">
-                  <li className="flex items-center gap-2">
-                    <span className="text-emerald-500">✓</span> Buy materials for home projects
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="text-emerald-500">✓</span> Track deliveries & compare prices
-                  </li>
-                </ul>
-                <Link to="/unified-auth?role=private_client" className="block">
-                  <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold h-12">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-base font-bold text-gray-900">Private Builder</h3>
+                  <p className="text-xs text-gray-500">Home projects & purchases</p>
+                </div>
+                <Link to="/unified-auth?role=private_client">
+                  <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">
                     Explore
-                    <Eye className="h-4 w-4 ml-2" />
                   </Button>
                 </Link>
               </CardContent>
             </Card>
 
             {/* Professional Builder */}
-            <Card className="hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border-2 border-blue-300 bg-gradient-to-br from-blue-50 to-white">
-              <CardContent className="p-8 text-center">
-                <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <Building2 className="h-8 w-8 text-blue-600" />
+            <Card className="hover:shadow-lg transition-all duration-300 border border-blue-200 bg-white">
+              <CardContent className="p-4 flex items-center gap-4">
+                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Building2 className="h-6 w-6 text-blue-600" />
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">Professional Builder</h3>
-                <p className="text-sm text-gray-600 mb-4">Contractors & construction companies</p>
-                <ul className="text-left text-gray-600 text-sm space-y-2 mb-6">
-                  <li className="flex items-center gap-2">
-                    <span className="text-blue-500">✓</span> Request bulk quotes & manage projects
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="text-blue-500">✓</span> Hire suppliers & track logistics
-                  </li>
-                </ul>
-                <Link to="/unified-auth?role=professional_builder" className="block">
-                  <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold h-12">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-base font-bold text-gray-900">Professional Builder</h3>
+                  <p className="text-xs text-gray-500">Contractors & companies</p>
+                </div>
+                <Link to="/unified-auth?role=professional_builder">
+                  <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold">
                     Explore
-                    <Eye className="h-4 w-4 ml-2" />
                   </Button>
                 </Link>
               </CardContent>
