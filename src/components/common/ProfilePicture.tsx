@@ -28,7 +28,7 @@ export const ProfilePicture: React.FC<ProfilePictureProps> = ({
 
   // Default images
   const defaultImages = {
-    logo: '/mradipro-logo.png',
+    logo: '/ujenzixform-logo.png',
     user: '/placeholder.svg',
   };
 
@@ -55,8 +55,8 @@ export const UjenziXformLogo: React.FC<{
 }> = ({ size = 'md', className = '', showText = false }) => {
   const [imgError, setImgError] = React.useState(false);
   
-  // Try PNG first, fallback to SVG if it fails
-  const logoSrc = imgError ? '/mradipro-logo-circular.svg' : '/mradipro-logo.png';
+  // Try new UjenziXform PNG first, fallback to circular SVG if it fails
+  const logoSrc = imgError ? '/ujenzixform-logo-circular.svg' : '/ujenzixform-logo.png';
   
   return (
     <div className={`flex items-center gap-2 ${className}`}>
@@ -70,8 +70,8 @@ export const UjenziXformLogo: React.FC<{
       </div>
       {showText && (
         <div className="flex flex-col">
-          <span className="font-bold text-[#0F2C59] text-lg">MRADIPRO</span>
-          <span className="text-xs text-[#4A9FD8]">Jenga na UjenziXform</span>
+          <span className="font-bold text-[#0F2C59] text-lg">UJENZIXFORM</span>
+          <span className="text-xs text-[#4A9FD8]">Building Kenya's Future</span>
         </div>
       )}
     </div>
