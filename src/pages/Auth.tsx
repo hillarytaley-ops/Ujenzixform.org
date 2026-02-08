@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 
-console.log('🔐 Auth.tsx BUILD v4 - FIXED Feb 8 2026');
+console.log('🔐 Auth.tsx BUILD v5 - FINAL FIX Feb 8 2026');
 
 const Auth = () => {
   const [user, setUser] = useState<User | null>(null);
