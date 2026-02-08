@@ -146,19 +146,36 @@ const UnifiedAuth: React.FC = () => {
       
       if (error) throw error;
       
-      toast({
-        title: 'Welcome back!',
-        description: 'Redirecting to your dashboard...',
-      });
-      
-      // The useEffect will handle redirect
+      if (data.user) {
+        // Fetch user role directly after sign-in
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', data.user.id)
+          .limit(1)
+          .maybeSingle();
+        
+        const fetchedRole = roleData?.role || roleParam;
+        
+        toast({
+          title: 'Welcome back!',
+          description: 'Redirecting to your dashboard...',
+        });
+        
+        // Navigate directly instead of waiting for useEffect
+        const destination = redirectTo || getDashboardForRole(fetchedRole);
+        
+        // Small delay to allow auth state to propagate
+        setTimeout(() => {
+          navigate(destination, { replace: true });
+        }, 100);
+      }
     } catch (error: any) {
       toast({
         title: 'Sign in failed',
         description: error.message || 'Please check your credentials',
         variant: 'destructive'
       });
-    } finally {
       setIsLoading(false);
     }
   };

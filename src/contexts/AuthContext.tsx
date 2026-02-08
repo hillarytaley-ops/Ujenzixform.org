@@ -105,7 +105,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       async (event, currentSession) => {
         if (!mounted) return;
 
-        if (currentSession?.user) {
+        console.log('Auth state changed:', event, currentSession?.user?.email);
+
+        if (event === 'SIGNED_IN' && currentSession?.user) {
+          // User just signed in - fetch role immediately
+          setSession(currentSession);
+          setUser(currentSession.user);
+          setLoading(false);
+          rolesFetched = true;
+          // Fetch role synchronously on sign-in
+          await fetchUserRole(currentSession.user.id);
+        } else if (currentSession?.user) {
           setSession(currentSession);
           setUser(currentSession.user);
           setLoading(false);

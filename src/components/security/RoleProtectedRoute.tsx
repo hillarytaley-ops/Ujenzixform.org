@@ -30,6 +30,24 @@ export const RoleProtectedRoute = ({
   const lastCheckedPath = useRef<string | null>(null);
   const hasCompletedCheck = useRef(false); // Prevent redundant checks
 
+  // ✅ INSTANT CHECK: Check localStorage immediately on mount (before auth loads)
+  useEffect(() => {
+    const localRole = localStorage.getItem('user_role');
+    const roleVerifiedTime = localStorage.getItem('user_role_verified');
+    const TRUST_DURATION = 10 * 60 * 1000; // 10 minutes
+    const roleAge = roleVerifiedTime ? Date.now() - parseInt(roleVerifiedTime) : Infinity;
+    const isRecentlyVerified = roleAge < TRUST_DURATION;
+    
+    // Grant instant access if localStorage has fresh role
+    if (isRecentlyVerified && localRole && (allowedRoles.includes(localRole) || localRole === 'admin')) {
+      console.log('⚡ INSTANT MOUNT ACCESS: Using fresh localStorage role:', localRole);
+      setUserRole(localRole);
+      setAccessGranted(true);
+      setChecking(false);
+      hasCompletedCheck.current = true;
+    }
+  }, []); // Run only once on mount
+  
   useEffect(() => {
     const checkRole = async () => {
       // ✅ PERFORMANCE: Skip if we already completed a successful check for this path
@@ -56,7 +74,7 @@ export const RoleProtectedRoute = ({
       const isRecentlyVerified = roleAge < TRUST_DURATION;
       
       // ✅ INSTANT ACCESS: If localStorage has valid recent role, grant access immediately
-      if (isRecentlyVerified && localRole && allowedRoles.includes(localRole)) {
+      if (isRecentlyVerified && localRole && (allowedRoles.includes(localRole) || localRole === 'admin')) {
         console.log('⚡ INSTANT ACCESS: Using fresh localStorage role:', localRole);
         setUserRole(localRole);
         setAccessGranted(true);
@@ -185,8 +203,8 @@ export const RoleProtectedRoute = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, authLoading, location.pathname]); // Remove allowedRoles to prevent re-runs
 
-  // Loading state
-  if (authLoading || checking) {
+  // Loading state - but skip if we already have access granted
+  if ((authLoading || checking) && !accessGranted) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="text-center">
@@ -195,6 +213,11 @@ export const RoleProtectedRoute = ({
         </div>
       </div>
     );
+  }
+  
+  // If access is already granted (from localStorage), render children immediately
+  if (accessGranted) {
+    return <>{children}</>;
   }
 
   // Not logged in - but check for admin session first
