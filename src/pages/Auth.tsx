@@ -40,76 +40,39 @@ const Auth = () => {
   // Only use lite mode if explicitly requested with lite=1, NOT just because there's a redirect
   const liteMode = liteParam === '1';
 
-  // Handle redirect in a separate effect (ensures navigate works)
+  // Simple redirect when shouldRedirect is set
   useEffect(() => {
     if (shouldRedirect) {
-      console.log('🔐 NAVIGATING NOW to:', shouldRedirect);
-      navigate(shouldRedirect, { replace: true });
+      console.log('🔐 FORCING REDIRECT to:', shouldRedirect);
+      // Force a full page navigation - this WILL work
+      window.location.replace(shouldRedirect);
     }
-  }, [shouldRedirect, navigate]);
+  }, [shouldRedirect]);
 
   useEffect(() => {
-    let isRedirecting = false;
-    
-    const handleRedirect = async (userId: string) => {
-      if (isRedirecting) return;
-      isRedirecting = true;
-      
-      console.log('🔐 Handling redirect for user:', userId);
-      
-      // Fetch and store user role
-      try {
-        const { data: roleData } = await supabase
+    // Check if already logged in on page load
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        console.log('🔐 Already logged in, redirecting...');
+        // Store role and redirect
+        supabase
           .from('user_roles')
           .select('role')
-          .eq('user_id', userId)
-          .maybeSingle();
-        
-        if (roleData?.role) {
-          localStorage.setItem('user_role', roleData.role);
-          localStorage.setItem('user_role_id', userId);
-          localStorage.setItem('user_role_verified', Date.now().toString());
-          console.log('🔐 Role stored:', roleData.role);
-        }
-      } catch (e) {
-        console.error('Role fetch error:', e);
-      }
-      
-      const returnTo = sessionStorage.getItem('returnTo');
-      const target = returnTo || redirectTo || '/home';
-      if (returnTo) sessionStorage.removeItem('returnTo');
-      
-      console.log('🔐 Setting redirect target:', target);
-      setShouldRedirect(target);
-    };
-    
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        console.log('🔐 Auth state change:', event);
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        // Redirect on SIGNED_IN event
-        if (event === 'SIGNED_IN' && session?.user) {
-          handleRedirect(session.user.id);
-        }
-      }
-    );
-
-    // Check for existing session on mount
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      // Redirect if already authenticated - don't show auth page
-      if (session?.user) {
-        console.log('🔐 Already authenticated on mount');
-        handleRedirect(session.user.id);
+          .eq('user_id', session.user.id)
+          .maybeSingle()
+          .then(({ data: roleData }) => {
+            if (roleData?.role) {
+              localStorage.setItem('user_role', roleData.role);
+              localStorage.setItem('user_role_id', session.user.id);
+              localStorage.setItem('user_role_verified', Date.now().toString());
+            }
+            setShouldRedirect(redirectTo || '/home');
+          })
+          .catch(() => {
+            setShouldRedirect(redirectTo || '/home');
+          });
       }
     });
-
-    return () => subscription.unsubscribe();
   }, [redirectTo]);
 
   const signUp = async (email: string, password: string) => {
@@ -262,9 +225,33 @@ const Auth = () => {
         return;
       }
       
-      // ✅ Successful sign in - onAuthStateChange will handle redirect
-      // Just show toast, the SIGNED_IN event will trigger handleRedirect
+      // ✅ Successful sign in - redirect NOW
       toast({ title: "✅ Welcome back!", description: "Redirecting..." });
+      
+      // Get user and store role
+      const { data: { user: signedInUser } } = await supabase.auth.getUser();
+      if (signedInUser) {
+        try {
+          const { data: roleData } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', signedInUser.id)
+            .maybeSingle();
+          
+          if (roleData?.role) {
+            localStorage.setItem('user_role', roleData.role);
+            localStorage.setItem('user_role_id', signedInUser.id);
+            localStorage.setItem('user_role_verified', Date.now().toString());
+          }
+        } catch (e) {
+          console.error('Role fetch error:', e);
+        }
+      }
+      
+      // FORCE redirect with full page reload
+      const target = redirectTo || '/home';
+      console.log('🔐 REDIRECTING NOW to:', target);
+      window.location.replace(target);
       
     } catch (error: any) {
       console.error('Auth error:', error);
