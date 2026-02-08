@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Home, Eye, EyeOff, Loader2, HardHat } from "lucide-react";
 
-console.log('🔐 ProfessionalBuilderSignIn BUILD v3 - STRICT DB check Feb 8 2026');
+console.log('🔐 ProfessionalBuilderSignIn BUILD v4 - REDIRECT to correct dash Feb 8 2026');
 
 const ProfessionalBuilderSignIn = () => {
   const [email, setEmail] = useState("");
@@ -77,22 +77,34 @@ const ProfessionalBuilderSignIn = () => {
 
       if (roleError) throw roleError;
 
-      if (roleData?.role !== 'professional_builder') {
+      const dbRole = roleData?.role;
+      
+      // If user has a different role, redirect them to their correct dashboard
+      if (dbRole && dbRole !== 'professional_builder') {
         toast({
-          title: "Access Denied",
-          description: "This sign-in is for Professional Builders only. Please use the correct portal.",
-          variant: "destructive",
+          title: "Wrong Portal",
+          description: `You are registered as ${dbRole}. Redirecting to your dashboard...`,
         });
-        await supabase.auth.signOut();
+        localStorage.setItem('user_role', dbRole);
+        localStorage.setItem('user_role_id', data.user.id);
+        localStorage.setItem('user_role_verified', Date.now().toString());
+        
+        // Redirect to their actual dashboard
+        if (dbRole === 'private_client') window.location.replace('/private-client-dashboard');
+        else if (dbRole === 'supplier') window.location.replace('/supplier-dashboard');
+        else if (dbRole === 'delivery' || dbRole === 'delivery_provider') window.location.replace('/delivery-dashboard');
+        else if (dbRole === 'admin') window.location.replace('/admin-dashboard');
+        else window.location.replace('/home');
         return;
       }
 
-      // Store role in localStorage
-      localStorage.setItem('user_role', 'professional_builder');
+      // Store role in localStorage (use DB role or default to professional_builder)
+      const roleToStore = dbRole || 'professional_builder';
+      localStorage.setItem('user_role', roleToStore);
       localStorage.setItem('user_role_id', data.user.id);
       localStorage.setItem('user_role_verified', Date.now().toString());
 
-      // Redirect INSTANTLY
+      // Redirect to dashboard
       window.location.replace('/professional-builder-dashboard');
     } catch (error: any) {
       toast({

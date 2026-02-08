@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Home, Eye, EyeOff, Loader2, ShoppingBag } from "lucide-react";
 
-console.log('🔐 PrivateClientSignIn BUILD v3 - STRICT DB check Feb 8 2026');
+console.log('🔐 PrivateClientSignIn BUILD v4 - REDIRECT to correct dash Feb 8 2026');
 
 const PrivateClientSignIn = () => {
   const [email, setEmail] = useState("");
@@ -77,22 +77,34 @@ const PrivateClientSignIn = () => {
 
       if (roleError) throw roleError;
 
-      if (roleData?.role !== 'private_client') {
+      const dbRole = roleData?.role;
+      
+      // If user has a different role, redirect them to their correct dashboard
+      if (dbRole && dbRole !== 'private_client') {
         toast({
-          title: "Access Denied",
-          description: "This sign-in is for Private Builders only. Please use the correct portal.",
-          variant: "destructive",
+          title: "Wrong Portal",
+          description: `You are registered as ${dbRole}. Redirecting to your dashboard...`,
         });
-        await supabase.auth.signOut();
+        localStorage.setItem('user_role', dbRole);
+        localStorage.setItem('user_role_id', data.user.id);
+        localStorage.setItem('user_role_verified', Date.now().toString());
+        
+        // Redirect to their actual dashboard
+        if (dbRole === 'professional_builder') window.location.replace('/professional-builder-dashboard');
+        else if (dbRole === 'supplier') window.location.replace('/supplier-dashboard');
+        else if (dbRole === 'delivery' || dbRole === 'delivery_provider') window.location.replace('/delivery-dashboard');
+        else if (dbRole === 'admin') window.location.replace('/admin-dashboard');
+        else window.location.replace('/home');
         return;
       }
 
-      // Store role in localStorage
-      localStorage.setItem('user_role', 'private_client');
+      // Store role in localStorage (use DB role or default to private_client)
+      const roleToStore = dbRole || 'private_client';
+      localStorage.setItem('user_role', roleToStore);
       localStorage.setItem('user_role_id', data.user.id);
       localStorage.setItem('user_role_verified', Date.now().toString());
 
-      // Redirect INSTANTLY
+      // Redirect to dashboard
       window.location.replace('/private-client-dashboard');
     } catch (error: any) {
       toast({
