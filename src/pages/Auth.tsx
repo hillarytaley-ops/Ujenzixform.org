@@ -40,6 +40,39 @@ const Auth = () => {
   const liteMode = liteParam === '1';
 
   useEffect(() => {
+    let isRedirecting = false;
+    
+    const handleRedirect = async (userId: string) => {
+      if (isRedirecting) return;
+      isRedirecting = true;
+      
+      console.log('🔐 Handling redirect for user:', userId);
+      
+      // Fetch and store user role
+      try {
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', userId)
+          .maybeSingle();
+        
+        if (roleData?.role) {
+          localStorage.setItem('user_role', roleData.role);
+          localStorage.setItem('user_role_id', userId);
+          localStorage.setItem('user_role_verified', Date.now().toString());
+        }
+      } catch (e) {
+        console.error('Role fetch error:', e);
+      }
+      
+      const returnTo = sessionStorage.getItem('returnTo');
+      const target = returnTo || redirectTo || '/home';
+      if (returnTo) sessionStorage.removeItem('returnTo');
+      
+      console.log('🔐 Redirecting to:', target);
+      window.location.href = target;
+    };
+    
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
@@ -47,8 +80,10 @@ const Auth = () => {
         setSession(session);
         setUser(session?.user ?? null);
         
-        // Don't auto-redirect on SIGNED_IN - let handleSubmit handle it
-        // This prevents double-redirect issues
+        // Redirect on SIGNED_IN event
+        if (event === 'SIGNED_IN' && session?.user) {
+          handleRedirect(session.user.id);
+        }
       }
     );
 
@@ -59,30 +94,8 @@ const Auth = () => {
       
       // Redirect if already authenticated - don't show auth page
       if (session?.user) {
-        console.log('🔐 Already authenticated, redirecting...');
-        
-        // Fetch and store user role (non-blocking)
-        supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', session.user.id)
-          .maybeSingle()
-          .then(({ data: roleData }) => {
-            if (roleData?.role) {
-              localStorage.setItem('user_role', roleData.role);
-              localStorage.setItem('user_role_id', session.user.id);
-              localStorage.setItem('user_role_verified', Date.now().toString());
-            }
-          })
-          .catch(() => {});
-        
-        const returnTo = sessionStorage.getItem('returnTo');
-        if (returnTo) {
-          sessionStorage.removeItem('returnTo');
-          navigate(returnTo);
-        } else {
-          navigate("/home");
-        }
+        console.log('🔐 Already authenticated on mount');
+        handleRedirect(session.user.id);
       }
     });
 
