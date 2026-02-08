@@ -1,6 +1,6 @@
 /**
  * ProfessionalBuilderAuth - Auth page ONLY for Professional Builders
- * BUILD v6 - USE onAuthStateChange (Promise doesn't resolve)
+ * BUILD v7 - SECURE: Check DB role before redirect
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -18,7 +18,16 @@ const ROLE = 'professional_builder';
 const DASHBOARD = '/professional-builder-dashboard';
 const TITLE = 'Professional Builder';
 
-console.log('🔐 ProfessionalBuilderAuth BUILD v6 - onAuthStateChange');
+const DASHBOARDS: Record<string, string> = {
+  'private_client': '/private-client-dashboard',
+  'professional_builder': '/professional-builder-dashboard',
+  'supplier': '/supplier-dashboard',
+  'delivery': '/delivery-dashboard',
+  'delivery_provider': '/delivery-dashboard',
+  'admin': '/admin-dashboard',
+};
+
+console.log('🔐 ProfessionalBuilderAuth BUILD v7 - SECURE DB CHECK');
 
 const ProfessionalBuilderAuth: React.FC = () => {
   const { toast } = useToast();
@@ -33,32 +42,59 @@ const ProfessionalBuilderAuth: React.FC = () => {
   const [location, setLocation] = useState('');
   const isSigningIn = useRef(false);
 
-  // Listen for auth state changes
+  // Listen for auth state changes - check DB role before redirect
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('🔐 ProfessionalBuilderAuth: Auth event:', event, session?.user?.email);
       
       if (isSigningIn.current && session?.user && event === 'SIGNED_IN') {
-        console.log('🔐 ProfessionalBuilderAuth: Sign-in detected! Redirecting...');
-        localStorage.setItem('user_role', ROLE);
+        console.log('🔐 ProfessionalBuilderAuth: Sign-in detected, checking DB role...');
+        
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+        
+        const dbRole = roleData?.role;
+        const actualRole = dbRole || ROLE;
+        localStorage.setItem('user_role', actualRole);
         localStorage.setItem('user_role_id', session.user.id);
         localStorage.setItem('user_email', session.user.email || '');
-        window.location.href = DASHBOARD;
+        
+        const correctDashboard = DASHBOARDS[actualRole] || DASHBOARD;
+        
+        if (dbRole && dbRole !== ROLE) {
+          toast({
+            title: 'Redirecting...',
+            description: `You are registered as ${dbRole.replace('_', ' ')}. Redirecting to your dashboard.`,
+          });
+        }
+        
+        window.location.href = correctDashboard;
       }
     });
     
     return () => subscription.unsubscribe();
-  }, []);
+  }, [toast]);
 
-  // Check if already logged in
+  // Check if already logged in on mount
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        localStorage.setItem('user_role', ROLE);
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+        
+        const dbRole = roleData?.role || ROLE;
+        localStorage.setItem('user_role', dbRole);
         localStorage.setItem('user_role_id', session.user.id);
         localStorage.setItem('user_email', session.user.email || '');
-        window.location.href = DASHBOARD;
+        
+        window.location.href = DASHBOARDS[dbRole] || DASHBOARD;
       }
     };
     checkSession();
@@ -68,22 +104,20 @@ const ProfessionalBuilderAuth: React.FC = () => {
     e.preventDefault();
     setIsLoading(true);
     isSigningIn.current = true;
-    console.log('🔐 ProfessionalBuilderAuth: Starting sign-in...');
 
-    supabase.auth.signInWithPassword({ 
-      email: email.trim(), 
-      password 
-    }).then(({ error }) => {
-      if (error) {
+    supabase.auth.signInWithPassword({ email: email.trim(), password })
+      .then(({ error }) => {
+        if (error) {
+          isSigningIn.current = false;
+          setIsLoading(false);
+          toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
+        }
+      })
+      .catch((error) => {
         isSigningIn.current = false;
         setIsLoading(false);
         toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
-      }
-    }).catch((error) => {
-      isSigningIn.current = false;
-      setIsLoading(false);
-      toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
-    });
+      });
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -104,7 +138,7 @@ const ProfessionalBuilderAuth: React.FC = () => {
       if (authData.user) {
         await supabase.from('profiles').upsert({
           id: authData.user.id, user_id: authData.user.id, email: email.trim(),
-          full_name: fullName.trim(), company_name: companyName.trim() || null, 
+          full_name: fullName.trim(), company_name: companyName.trim() || null,
           phone: phone.trim() || null, location: location.trim() || null
         });
         await supabase.from('user_roles').upsert({ user_id: authData.user.id, role: ROLE });
