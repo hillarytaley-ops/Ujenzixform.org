@@ -1,8 +1,8 @@
 /**
- * SupplierAuth - BUILD v12 - CALLBACK BASED
+ * SupplierAuth - BUILD v13 - CHECK SESSION FIRST
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -21,7 +21,7 @@ if (localStorage.getItem('user_role') === ROLE) {
   window.location.replace(DASHBOARD);
 }
 
-console.log('🔐 SupplierAuth BUILD v12');
+console.log('🔐 SupplierAuth BUILD v13');
 
 const SupplierAuth: React.FC = () => {
   const { toast } = useToast();
@@ -36,6 +36,18 @@ const SupplierAuth: React.FC = () => {
   const [location, setLocation] = useState('');
   const redirecting = useRef(false);
 
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user && !redirecting.current) {
+        redirecting.current = true;
+        localStorage.setItem('user_role', ROLE);
+        localStorage.setItem('user_role_id', session.user.id);
+        localStorage.setItem('user_email', session.user.email || '');
+        window.location.href = DASHBOARD;
+      }
+    });
+  }, []);
+
   const doRedirect = (userId: string, userEmail: string) => {
     if (redirecting.current) return;
     redirecting.current = true;
@@ -45,37 +57,34 @@ const SupplierAuth: React.FC = () => {
     window.location.href = DASHBOARD;
   };
 
-  const handleSignIn = (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (redirecting.current) return;
     setIsLoading(true);
 
-    supabase.auth.signInWithPassword({ email: email.trim(), password }).then(result => {
-      if (result.error) {
-        setIsLoading(false);
-        toast({ title: 'Sign in failed', description: result.error.message, variant: 'destructive' });
-        return;
-      }
-      if (result.data?.user) {
-        doRedirect(result.data.user.id, result.data.user.email || '');
-      } else {
-        setIsLoading(false);
-        toast({ title: 'Sign in failed', description: 'No user returned', variant: 'destructive' });
-      }
-    }).catch(err => {
-      setIsLoading(false);
-      toast({ title: 'Sign in failed', description: String(err), variant: 'destructive' });
-    });
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      doRedirect(session.user.id, session.user.email || '');
+      return;
+    }
 
-    setTimeout(() => {
-      if (!redirecting.current) {
-        setIsLoading(false);
-        toast({ title: 'Sign in timeout', description: 'Please try again', variant: 'destructive' });
-      }
-    }, 8000);
+    await supabase.auth.signOut();
+    const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+
+    if (error) {
+      setIsLoading(false);
+      toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
+      return;
+    }
+    if (data?.user) {
+      doRedirect(data.user.id, data.user.email || '');
+    } else {
+      setIsLoading(false);
+      toast({ title: 'Sign in failed', description: 'No user returned', variant: 'destructive' });
+    }
   };
 
-  const handleSignUp = (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     if (!fullName.trim() || !companyName.trim()) {
@@ -83,30 +92,25 @@ const SupplierAuth: React.FC = () => {
       toast({ title: 'Error', description: 'Please enter your full name and company name', variant: 'destructive' });
       return;
     }
-
-    supabase.auth.signUp({
-      email: email.trim(), password,
-      options: { data: { full_name: fullName.trim(), role: ROLE, company_name: companyName.trim() } }
-    }).then(result => {
-      if (result.error) {
-        setIsLoading(false);
-        toast({ title: 'Registration failed', description: result.error.message, variant: 'destructive' });
-        return;
+    try {
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: email.trim(), password,
+        options: { data: { full_name: fullName.trim(), role: ROLE, company_name: companyName.trim() } }
+      });
+      if (authError) throw authError;
+      if (authData.user) {
+        await Promise.all([
+          supabase.from('profiles').upsert({ id: authData.user.id, user_id: authData.user.id, email: email.trim(), full_name: fullName.trim(), company_name: companyName.trim(), phone: phone.trim() || null, location: location.trim() || null }),
+          supabase.from('user_roles').upsert({ user_id: authData.user.id, role: ROLE })
+        ]);
+        toast({ title: 'Account created!', description: 'Please check your email to verify.' });
+        setActiveTab('signin');
       }
-      if (result.data.user) {
-        Promise.all([
-          supabase.from('profiles').upsert({ id: result.data.user.id, user_id: result.data.user.id, email: email.trim(), full_name: fullName.trim(), company_name: companyName.trim(), phone: phone.trim() || null, location: location.trim() || null }),
-          supabase.from('user_roles').upsert({ user_id: result.data.user.id, role: ROLE })
-        ]).finally(() => {
-          setIsLoading(false);
-          toast({ title: 'Account created!', description: 'Please check your email to verify.' });
-          setActiveTab('signin');
-        });
-      }
-    }).catch(err => {
+    } catch (err: any) {
+      toast({ title: 'Registration failed', description: err.message, variant: 'destructive' });
+    } finally {
       setIsLoading(false);
-      toast({ title: 'Registration failed', description: String(err), variant: 'destructive' });
-    });
+    }
   };
 
   return (
