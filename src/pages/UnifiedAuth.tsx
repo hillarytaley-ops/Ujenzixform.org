@@ -163,6 +163,7 @@ const UnifiedAuth: React.FC = () => {
             localStorage.setItem('user_role', dbRole);
             localStorage.setItem('user_role_id', session.user.id);
             localStorage.setItem('user_role_verified', Date.now().toString());
+            localStorage.setItem('user_email', session.user.email || '');
             
             const destination = getDashboardForRole(dbRole);
             console.log('🔐 UnifiedAuth: REDIRECTING to:', destination);
@@ -240,6 +241,7 @@ const UnifiedAuth: React.FC = () => {
         localStorage.setItem('user_role', dbRole);
         localStorage.setItem('user_role_id', data.user.id);
         localStorage.setItem('user_role_verified', Date.now().toString());
+        localStorage.setItem('user_email', data.user.email || '');
         
         // Redirect to their ACTUAL dashboard (not the one they requested)
         const destination = getDashboardForRole(dbRole);

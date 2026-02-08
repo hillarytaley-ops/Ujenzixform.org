@@ -88,6 +88,7 @@ const PrivateClientSignIn = () => {
         localStorage.setItem('user_role', dbRole);
         localStorage.setItem('user_role_id', data.user.id);
         localStorage.setItem('user_role_verified', Date.now().toString());
+        localStorage.setItem('user_email', data.user.email || '');
         
         // Redirect to their actual dashboard
         if (dbRole === 'professional_builder') window.location.replace('/professional-builder-dashboard');
@@ -103,6 +104,7 @@ const PrivateClientSignIn = () => {
       localStorage.setItem('user_role', roleToStore);
       localStorage.setItem('user_role_id', data.user.id);
       localStorage.setItem('user_role_verified', Date.now().toString());
+      localStorage.setItem('user_email', data.user.email || '');
 
       // Redirect to dashboard
       window.location.replace('/private-client-dashboard');
