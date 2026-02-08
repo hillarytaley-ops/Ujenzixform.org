@@ -1,10 +1,9 @@
 /**
- * SupplierAuth - BUILD v13 - CHECK SESSION FIRST
+ * SupplierAuth - BUILD v14 - FETCH API
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Package, Eye, EyeOff, Loader2, ArrowLeft, Mail, Lock, User, Phone, MapPin, ChevronRight, Briefcase } from 'lucide-react';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 
 const ROLE = 'supplier';
 const DASHBOARD = '/supplier-dashboard';
@@ -21,7 +21,7 @@ if (localStorage.getItem('user_role') === ROLE) {
   window.location.replace(DASHBOARD);
 }
 
-console.log('🔐 SupplierAuth BUILD v13');
+console.log('🔐 SupplierAuth BUILD v14');
 
 const SupplierAuth: React.FC = () => {
   const { toast } = useToast();
@@ -36,76 +36,52 @@ const SupplierAuth: React.FC = () => {
   const [location, setLocation] = useState('');
   const redirecting = useRef(false);
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user && !redirecting.current) {
-        redirecting.current = true;
-        localStorage.setItem('user_role', ROLE);
-        localStorage.setItem('user_role_id', session.user.id);
-        localStorage.setItem('user_email', session.user.email || '');
-        window.location.href = DASHBOARD;
-      }
-    });
-  }, []);
-
-  const doRedirect = (userId: string, userEmail: string) => {
-    if (redirecting.current) return;
-    redirecting.current = true;
-    localStorage.setItem('user_role', ROLE);
-    localStorage.setItem('user_role_id', userId);
-    localStorage.setItem('user_email', userEmail);
-    window.location.href = DASHBOARD;
-  };
-
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (redirecting.current) return;
     setIsLoading(true);
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user) {
-      doRedirect(session.user.id, session.user.email || '');
-      return;
-    }
-
-    await supabase.auth.signOut();
-    const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-
-    if (error) {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
+        body: JSON.stringify({ email: email.trim(), password }),
+      });
+      const data = await response.json();
+      if (!response.ok || data.error) {
+        setIsLoading(false);
+        toast({ title: 'Sign in failed', description: data.error_description || data.error || 'Invalid credentials', variant: 'destructive' });
+        return;
+      }
+      if (data.access_token && data.user) {
+        const session = { access_token: data.access_token, refresh_token: data.refresh_token, expires_at: Math.floor(Date.now() / 1000) + data.expires_in, expires_in: data.expires_in, token_type: data.token_type, user: data.user };
+        localStorage.setItem('sb-wuuyjjpgzgeimiptuuws-auth-token', JSON.stringify(session));
+        localStorage.setItem('user_role', ROLE);
+        localStorage.setItem('user_role_id', data.user.id);
+        localStorage.setItem('user_email', data.user.email || '');
+        redirecting.current = true;
+        window.location.href = DASHBOARD;
+      }
+    } catch (err: any) {
       setIsLoading(false);
-      toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
-      return;
-    }
-    if (data?.user) {
-      doRedirect(data.user.id, data.user.email || '');
-    } else {
-      setIsLoading(false);
-      toast({ title: 'Sign in failed', description: 'No user returned', variant: 'destructive' });
+      toast({ title: 'Sign in failed', description: err.message || 'Network error', variant: 'destructive' });
     }
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    if (!fullName.trim() || !companyName.trim()) {
-      setIsLoading(false);
-      toast({ title: 'Error', description: 'Please enter your full name and company name', variant: 'destructive' });
-      return;
-    }
+    if (!fullName.trim() || !companyName.trim()) { setIsLoading(false); toast({ title: 'Error', description: 'Please enter your full name and company name', variant: 'destructive' }); return; }
     try {
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: email.trim(), password,
-        options: { data: { full_name: fullName.trim(), role: ROLE, company_name: companyName.trim() } }
+      const response = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
+        body: JSON.stringify({ email: email.trim(), password, data: { full_name: fullName.trim(), role: ROLE, company_name: companyName.trim() } }),
       });
-      if (authError) throw authError;
-      if (authData.user) {
-        await Promise.all([
-          supabase.from('profiles').upsert({ id: authData.user.id, user_id: authData.user.id, email: email.trim(), full_name: fullName.trim(), company_name: companyName.trim(), phone: phone.trim() || null, location: location.trim() || null }),
-          supabase.from('user_roles').upsert({ user_id: authData.user.id, role: ROLE })
-        ]);
-        toast({ title: 'Account created!', description: 'Please check your email to verify.' });
-        setActiveTab('signin');
-      }
+      const data = await response.json();
+      if (!response.ok || data.error) { setIsLoading(false); toast({ title: 'Registration failed', description: data.error_description || data.error, variant: 'destructive' }); return; }
+      toast({ title: 'Account created!', description: 'Please check your email to verify.' });
+      setActiveTab('signin');
     } catch (err: any) {
       toast({ title: 'Registration failed', description: err.message, variant: 'destructive' });
     } finally {
