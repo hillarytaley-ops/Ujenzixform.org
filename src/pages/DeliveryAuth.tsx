@@ -1,6 +1,6 @@
 /**
  * DeliveryAuth - Auth page ONLY for Delivery Providers
- * BUILD v3 - STRICT: Deny if DB check fails
+ * BUILD v4 - FAST: No DB queries in auth, security in RoleProtectedRoute
  */
 
 import React, { useState, useEffect } from 'react';
@@ -12,13 +12,13 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Truck, Eye, EyeOff, Loader2, ArrowLeft, Mail, Lock, User, Phone, MapPin, ChevronRight } from 'lucide-react';
+import { Truck, Eye, EyeOff, Loader2, ArrowLeft, Mail, Lock, User, Phone, MapPin, ChevronRight, Briefcase } from 'lucide-react';
 
 const ROLE = 'delivery';
 const DASHBOARD = '/delivery-dashboard';
 const TITLE = 'Delivery Provider';
 
-console.log('🔐 DeliveryAuth BUILD v3 - STRICT');
+console.log('🔐 DeliveryAuth BUILD v4 - FAST (no DB wait)');
 
 const DeliveryAuth: React.FC = () => {
   const { toast } = useToast();
@@ -28,85 +28,55 @@ const DeliveryAuth: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [companyName, setCompanyName] = useState('');
   const [phone, setPhone] = useState('');
   const [location, setLocation] = useState('');
 
+  // Check if already logged in on mount
   useEffect(() => {
-    let redirected = false;
-    
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('🔐 DeliveryAuth: Auth event:', event);
-      
-      if (redirected) return;
-      if (!session?.user) return;
-      if (event !== 'SIGNED_IN' && event !== 'INITIAL_SESSION') return;
-      
-      redirected = true;
-      setIsLoading(true);
-      
-      try {
-        const { data: roleData, error } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', session.user.id)
-          .maybeSingle();
-
-        console.log('🔐 DeliveryAuth: DB role:', roleData?.role);
-
-        if (!roleData?.role) {
-          localStorage.setItem('user_role', ROLE);
-          localStorage.setItem('user_role_id', session.user.id);
-          localStorage.setItem('user_email', session.user.email || '');
-          window.location.href = DASHBOARD;
-          return;
-        }
-
-        // Allow both 'delivery' and 'delivery_provider' roles
-        if (roleData.role !== 'delivery' && roleData.role !== 'delivery_provider') {
-          toast({
-            title: 'Access Denied',
-            description: `This portal is for ${TITLE}s only. You are registered as ${roleData.role.replace('_', ' ')}.`,
-            variant: 'destructive'
-          });
-          await supabase.auth.signOut();
-          localStorage.clear();
-          redirected = false;
-          setIsLoading(false);
-          return;
-        }
-
-        localStorage.setItem('user_role', roleData.role);
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        // Already logged in - redirect immediately
+        localStorage.setItem('user_role', ROLE);
         localStorage.setItem('user_role_id', session.user.id);
         localStorage.setItem('user_email', session.user.email || '');
         window.location.href = DASHBOARD;
-        
-      } catch (e) {
-        console.error('🔐 DeliveryAuth: DB error:', e);
-        toast({
-          title: 'Error',
-          description: 'Could not verify your role. Please try again.',
-          variant: 'destructive'
-        });
-        await supabase.auth.signOut();
-        redirected = false;
-        setIsLoading(false);
       }
-    });
-    
-    return () => subscription.unsubscribe();
-  }, [toast]);
+    };
+    checkSession();
+  }, []);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    console.log('🔐 DeliveryAuth: Starting sign-in...');
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      const { data, error } = await supabase.auth.signInWithPassword({ 
+        email: email.trim(), 
+        password 
+      });
+      
+      console.log('🔐 DeliveryAuth: Sign-in result:', { user: data?.user?.email, error: error?.message });
+      
       if (error) {
         setIsLoading(false);
         toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
+        return;
+      }
+
+      if (data?.user) {
+        // Sign-in successful - redirect immediately
+        // Security check happens in RoleProtectedRoute
+        console.log('🔐 DeliveryAuth: Success! Redirecting...');
+        localStorage.setItem('user_role', ROLE);
+        localStorage.setItem('user_role_id', data.user.id);
+        localStorage.setItem('user_email', data.user.email || '');
+        window.location.href = DASHBOARD;
       }
     } catch (error: any) {
+      console.error('🔐 DeliveryAuth: Exception:', error);
       setIsLoading(false);
       toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
     }
@@ -122,7 +92,7 @@ const DeliveryAuth: React.FC = () => {
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: email.trim(),
         password,
-        options: { data: { full_name: fullName.trim(), role: ROLE } }
+        options: { data: { full_name: fullName.trim(), role: ROLE, company_name: companyName.trim() } }
       });
 
       if (authError) throw authError;
@@ -130,7 +100,8 @@ const DeliveryAuth: React.FC = () => {
       if (authData.user) {
         await supabase.from('profiles').upsert({
           id: authData.user.id, user_id: authData.user.id, email: email.trim(),
-          full_name: fullName.trim(), phone: phone.trim() || null, location: location.trim() || null
+          full_name: fullName.trim(), company_name: companyName.trim() || null, 
+          phone: phone.trim() || null, location: location.trim() || null
         });
         await supabase.from('user_roles').upsert({ user_id: authData.user.id, role: ROLE });
 
@@ -163,7 +134,7 @@ const DeliveryAuth: React.FC = () => {
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg">
               <Truck className="h-5 w-5" /><span className="font-semibold">{TITLE}</span>
             </div>
-            <p className="text-white/60 mt-2 text-sm">Get transport jobs & earn</p>
+            <p className="text-white/60 mt-2 text-sm">Deliver materials to construction sites</p>
           </div>
 
           <Card className="border-0 shadow-2xl">
@@ -211,6 +182,13 @@ const DeliveryAuth: React.FC = () => {
                       <div className="relative">
                         <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input type="text" placeholder="John Doe" value={fullName} onChange={(e) => setFullName(e.target.value)} className="pl-10" required />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Company Name</Label>
+                      <div className="relative">
+                        <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input type="text" placeholder="Fast Deliveries Ltd" value={companyName} onChange={(e) => setCompanyName(e.target.value)} className="pl-10" />
                       </div>
                     </div>
                     <div className="space-y-2">

@@ -1,9 +1,8 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useEffect, useState } from 'react';
 
-console.log('🔒 RoleProtectedRoute BUILD v26 - FETCH DB ROLE Feb 8 2026');
+console.log('🔒 RoleProtectedRoute BUILD v27 - FAST (no DB wait)');
 
 interface RoleProtectedRouteProps {
   children: React.ReactNode;
@@ -11,60 +10,27 @@ interface RoleProtectedRouteProps {
 }
 
 export const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRouteProps) => {
-  const { user, loading: authLoading } = useAuth();
+  const { user, userRole: contextRole, loading: authLoading } = useAuth();
   const location = useLocation();
-  const [dbRole, setDbRole] = useState<string | null>(null);
-  const [roleLoading, setRoleLoading] = useState(true);
+  const [ready, setReady] = useState(false);
 
-  // Fetch role from database when user is available
+  // Quick ready check - max 1 second wait
   useEffect(() => {
-    const fetchRole = async () => {
-      if (!user) {
-        setRoleLoading(false);
-        return;
-      }
-
-      try {
-        const { data, error } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        if (!error && data) {
-          console.log('🔐 DB Role fetched:', data.role);
-          setDbRole(data.role);
-          // Update localStorage to match DB
-          localStorage.setItem('user_role', data.role);
-          localStorage.setItem('user_role_id', user.id);
-        }
-      } catch (e) {
-        console.error('🔐 Error fetching role:', e);
-      }
-      
-      setRoleLoading(false);
-    };
-
     if (!authLoading) {
-      fetchRole();
+      setReady(true);
     }
-  }, [user, authLoading]);
-
-  // Safety timeout - stop loading after 3 seconds
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (roleLoading) {
-        console.log('🔐 Role fetch timeout');
-        setRoleLoading(false);
-      }
-    }, 3000);
+    const timeout = setTimeout(() => setReady(true), 1000);
     return () => clearTimeout(timeout);
-  }, [roleLoading]);
+  }, [authLoading]);
 
-  console.log('🔐 Route:', location.pathname, 'User:', user?.id?.slice(0,8), 'DbRole:', dbRole, 'Loading:', authLoading || roleLoading);
+  // Get cached values
+  const cachedRole = localStorage.getItem('user_role');
+  const cachedUserId = localStorage.getItem('user_role_id');
+  
+  console.log('🔐 Route:', location.pathname, 'User:', user?.id?.slice(0,8), 'CachedRole:', cachedRole, 'Ready:', ready);
 
-  // Still loading - show spinner
-  if (authLoading || roleLoading) {
+  // Still loading - show brief spinner (max 1 second)
+  if (!ready) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-4 border-primary border-t-transparent" />
@@ -75,8 +41,7 @@ export const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRout
   // No user = redirect to auth
   if (!user) {
     // Check admin session
-    const isAdmin = localStorage.getItem('admin_authenticated') === 'true' && 
-                    localStorage.getItem('user_role') === 'admin';
+    const isAdmin = localStorage.getItem('admin_authenticated') === 'true' && cachedRole === 'admin';
     if (isAdmin) {
       return <>{children}</>;
     }
@@ -84,8 +49,17 @@ export const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRout
     return <Navigate to="/auth" replace />;
   }
 
-  // Use DB role (source of truth), fallback to localStorage
-  const effectiveRole = dbRole || localStorage.getItem('user_role');
+  // SECURITY: Verify cached role belongs to this user
+  if (cachedUserId && cachedUserId !== user.id) {
+    console.log('🚫 Role mismatch - cached for different user');
+    localStorage.removeItem('user_role');
+    localStorage.removeItem('user_role_id');
+    localStorage.removeItem('user_email');
+    return <Navigate to="/auth" replace />;
+  }
+
+  // Use context role (from AuthContext) or cached role
+  const effectiveRole = contextRole || cachedRole;
   
   console.log('🔐 Effective role:', effectiveRole, 'Allowed:', allowedRoles.join(','));
 

@@ -1,6 +1,6 @@
 /**
  * PrivateClientAuth - Auth page ONLY for Private Clients
- * BUILD v3 - STRICT: Deny if DB check fails
+ * BUILD v4 - FAST: No DB queries in auth, security in RoleProtectedRoute
  */
 
 import React, { useState, useEffect } from 'react';
@@ -18,7 +18,7 @@ const ROLE = 'private_client';
 const DASHBOARD = '/private-client-dashboard';
 const TITLE = 'Private Builder';
 
-console.log('🔐 PrivateClientAuth BUILD v3 - STRICT');
+console.log('🔐 PrivateClientAuth BUILD v4 - FAST (no DB wait)');
 
 const PrivateClientAuth: React.FC = () => {
   const { toast } = useToast();
@@ -31,89 +31,51 @@ const PrivateClientAuth: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [location, setLocation] = useState('');
 
+  // Check if already logged in on mount
   useEffect(() => {
-    let redirected = false;
-    
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('🔐 PrivateClientAuth: Auth event:', event);
-      
-      if (redirected) return;
-      if (!session?.user) return;
-      if (event !== 'SIGNED_IN' && event !== 'INITIAL_SESSION') return;
-      
-      redirected = true;
-      setIsLoading(true);
-      
-      try {
-        // Check if user has correct role - MUST succeed
-        const { data: roleData, error } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', session.user.id)
-          .maybeSingle();
-
-        console.log('🔐 PrivateClientAuth: DB role:', roleData?.role, 'Error:', error);
-
-        // If no role found, this might be a new user - allow them (they'll get role assigned)
-        if (!roleData?.role) {
-          console.log('🔐 PrivateClientAuth: No role found - new user, allowing');
-          localStorage.setItem('user_role', ROLE);
-          localStorage.setItem('user_role_id', session.user.id);
-          localStorage.setItem('user_email', session.user.email || '');
-          window.location.href = DASHBOARD;
-          return;
-        }
-
-        // If role exists but doesn't match - DENY
-        if (roleData.role !== ROLE) {
-          console.log('🔐 PrivateClientAuth: WRONG ROLE - denying');
-          toast({
-            title: 'Access Denied',
-            description: `This portal is for ${TITLE}s only. You are registered as ${roleData.role.replace('_', ' ')}.`,
-            variant: 'destructive'
-          });
-          await supabase.auth.signOut();
-          localStorage.clear();
-          redirected = false;
-          setIsLoading(false);
-          return;
-        }
-
-        // Role matches - allow
-        console.log('🔐 PrivateClientAuth: Role matches - allowing');
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        // Already logged in - redirect immediately
         localStorage.setItem('user_role', ROLE);
         localStorage.setItem('user_role_id', session.user.id);
         localStorage.setItem('user_email', session.user.email || '');
         window.location.href = DASHBOARD;
-        
-      } catch (e) {
-        console.error('🔐 PrivateClientAuth: DB error:', e);
-        toast({
-          title: 'Error',
-          description: 'Could not verify your role. Please try again.',
-          variant: 'destructive'
-        });
-        await supabase.auth.signOut();
-        redirected = false;
-        setIsLoading(false);
       }
-    });
-    
-    return () => subscription.unsubscribe();
-  }, [toast]);
+    };
+    checkSession();
+  }, []);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    console.log('🔐 PrivateClientAuth: Starting sign-in...');
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      const { data, error } = await supabase.auth.signInWithPassword({ 
+        email: email.trim(), 
+        password 
+      });
+      
+      console.log('🔐 PrivateClientAuth: Sign-in result:', { user: data?.user?.email, error: error?.message });
+      
       if (error) {
         setIsLoading(false);
         toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
+        return;
       }
-      // Success handled by onAuthStateChange
+
+      if (data?.user) {
+        // Sign-in successful - redirect immediately
+        // Security check happens in RoleProtectedRoute
+        console.log('🔐 PrivateClientAuth: Success! Redirecting...');
+        localStorage.setItem('user_role', ROLE);
+        localStorage.setItem('user_role_id', data.user.id);
+        localStorage.setItem('user_email', data.user.email || '');
+        window.location.href = DASHBOARD;
+      }
     } catch (error: any) {
+      console.error('🔐 PrivateClientAuth: Exception:', error);
       setIsLoading(false);
       toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
     }
