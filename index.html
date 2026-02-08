@@ -48,6 +48,47 @@
 
   <body>
     <div id="root"></div>
+    
+    <!-- CACHE BUSTER: Forces all users to get fresh code after deployment -->
+    <script>
+      (function() {
+        var CACHE_VERSION = 'v2026-02-08-fix3';
+        var CACHE_KEY = 'ujenzixform_cache_cleared';
+        var lastCleared = localStorage.getItem(CACHE_KEY);
+        
+        if (lastCleared !== CACHE_VERSION) {
+          console.log('🧹 Clearing old caches for version:', CACHE_VERSION);
+          
+          // Clear all caches
+          if ('caches' in window) {
+            caches.keys().then(function(names) {
+              names.forEach(function(name) {
+                caches.delete(name);
+              });
+            });
+          }
+          
+          // Unregister service workers
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+              registrations.forEach(function(registration) {
+                registration.unregister();
+              });
+            });
+          }
+          
+          // Mark as cleared
+          localStorage.setItem(CACHE_KEY, CACHE_VERSION);
+          
+          // If we have old cached JS, force reload
+          if (lastCleared && lastCleared !== CACHE_VERSION) {
+            console.log('🔄 Forcing page reload for fresh code');
+            window.location.reload(true);
+          }
+        }
+      })();
+    </script>
+    
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
