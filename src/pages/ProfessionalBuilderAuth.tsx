@@ -1,8 +1,8 @@
 /**
- * ProfessionalBuilderAuth - BUILD v10 - INSTANT REDIRECT
+ * ProfessionalBuilderAuth - BUILD v11 - TRULY INSTANT
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -17,7 +17,13 @@ const ROLE = 'professional_builder';
 const DASHBOARD = '/professional-builder-dashboard';
 const TITLE = 'Professional Builder';
 
-console.log('🔐 ProfessionalBuilderAuth BUILD v10 - INSTANT');
+const cachedRole = localStorage.getItem('user_role');
+if (cachedRole === ROLE && window.location.pathname.includes('auth')) {
+  console.log('🚀 INSTANT REDIRECT: Already logged in as', ROLE);
+  window.location.replace(DASHBOARD);
+}
+
+console.log('🔐 ProfessionalBuilderAuth BUILD v11');
 
 const ProfessionalBuilderAuth: React.FC = () => {
   const { toast } = useToast();
@@ -32,42 +38,29 @@ const ProfessionalBuilderAuth: React.FC = () => {
   const [location, setLocation] = useState('');
   const hasRedirected = useRef(false);
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user && !hasRedirected.current) {
-        hasRedirected.current = true;
-        localStorage.setItem('user_role', ROLE);
-        localStorage.setItem('user_role_id', session.user.id);
-        localStorage.setItem('user_email', session.user.email || '');
-        window.location.href = DASHBOARD;
-      }
-    });
-  }, []);
-
-  const handleSignIn = (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (hasRedirected.current) return;
     setIsLoading(true);
 
-    supabase.auth.signInWithPassword({ email: email.trim(), password })
-      .then(({ data, error }) => {
-        if (error) {
-          setIsLoading(false);
-          toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
-          return;
-        }
-        if (data?.user) {
-          hasRedirected.current = true;
-          localStorage.setItem('user_role', ROLE);
-          localStorage.setItem('user_role_id', data.user.id);
-          localStorage.setItem('user_email', data.user.email || '');
-          window.location.href = DASHBOARD;
-        }
-      })
-      .catch((err) => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      if (error) {
         setIsLoading(false);
-        toast({ title: 'Sign in failed', description: err.message, variant: 'destructive' });
-      });
+        toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
+        return;
+      }
+      if (data?.user) {
+        hasRedirected.current = true;
+        localStorage.setItem('user_role', ROLE);
+        localStorage.setItem('user_role_id', data.user.id);
+        localStorage.setItem('user_email', data.user.email || '');
+        window.location.replace(DASHBOARD);
+      }
+    } catch (err: any) {
+      setIsLoading(false);
+      toast({ title: 'Sign in failed', description: err.message || 'Unknown error', variant: 'destructive' });
+    }
   };
 
   const handleSignUp = async (e: React.FormEvent) => {

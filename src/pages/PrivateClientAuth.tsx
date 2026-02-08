@@ -1,8 +1,9 @@
 /**
- * PrivateClientAuth - BUILD v10 - INSTANT REDIRECT (No DB wait)
+ * PrivateClientAuth - BUILD v11 - TRULY INSTANT
+ * Check localStorage FIRST, redirect before React even mounts
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -17,7 +18,14 @@ const ROLE = 'private_client';
 const DASHBOARD = '/private-client-dashboard';
 const TITLE = 'Private Builder';
 
-console.log('🔐 PrivateClientAuth BUILD v10 - INSTANT');
+// INSTANT CHECK: If already has this role, redirect NOW before component mounts
+const cachedRole = localStorage.getItem('user_role');
+if (cachedRole === ROLE && window.location.pathname.includes('auth')) {
+  console.log('🚀 INSTANT REDIRECT: Already logged in as', ROLE);
+  window.location.replace(DASHBOARD);
+}
+
+console.log('🔐 PrivateClientAuth BUILD v11 - TRULY INSTANT');
 
 const PrivateClientAuth: React.FC = () => {
   const { toast } = useToast();
@@ -31,49 +39,40 @@ const PrivateClientAuth: React.FC = () => {
   const [location, setLocation] = useState('');
   const hasRedirected = useRef(false);
 
-  // Check if already logged in - redirect immediately
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user && !hasRedirected.current) {
-        hasRedirected.current = true;
-        // Already logged in - just go to dashboard
-        localStorage.setItem('user_role', ROLE);
-        localStorage.setItem('user_role_id', session.user.id);
-        localStorage.setItem('user_email', session.user.email || '');
-        window.location.href = DASHBOARD;
-      }
-    });
-  }, []);
-
-  const handleSignIn = (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (hasRedirected.current) return;
     
     setIsLoading(true);
     console.log('🔐 Signing in:', email);
 
-    supabase.auth.signInWithPassword({ email: email.trim(), password })
-      .then(({ data, error }) => {
-        if (error) {
-          setIsLoading(false);
-          toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
-          return;
-        }
-        
-        if (data?.user) {
-          hasRedirected.current = true;
-          // INSTANT redirect - no DB check, just go!
-          localStorage.setItem('user_role', ROLE);
-          localStorage.setItem('user_role_id', data.user.id);
-          localStorage.setItem('user_email', data.user.email || '');
-          console.log('🔐 Success! Redirecting to', DASHBOARD);
-          window.location.href = DASHBOARD;
-        }
-      })
-      .catch((err) => {
-        setIsLoading(false);
-        toast({ title: 'Sign in failed', description: err.message, variant: 'destructive' });
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ 
+        email: email.trim(), 
+        password 
       });
+      
+      if (error) {
+        console.log('🔐 Error:', error.message);
+        setIsLoading(false);
+        toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
+        return;
+      }
+      
+      if (data?.user) {
+        hasRedirected.current = true;
+        console.log('🔐 Success! Setting localStorage and redirecting...');
+        localStorage.setItem('user_role', ROLE);
+        localStorage.setItem('user_role_id', data.user.id);
+        localStorage.setItem('user_email', data.user.email || '');
+        // Use replace to prevent back button issues
+        window.location.replace(DASHBOARD);
+      }
+    } catch (err: any) {
+      console.error('🔐 Exception:', err);
+      setIsLoading(false);
+      toast({ title: 'Sign in failed', description: err.message || 'Unknown error', variant: 'destructive' });
+    }
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
