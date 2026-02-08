@@ -65,8 +65,29 @@ const DeliverySignIn = () => {
   // Redirect to dashboard after sign-in (not home page)
   const redirectTo = searchParams.get('redirect') || '/delivery-dashboard';
 
+  // Use onAuthStateChange for reliable redirect
   useEffect(() => {
-    checkExistingAuth();
+    let redirected = false;
+    
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('🔐 DeliverySignIn event:', event, session?.user?.email);
+      
+      if (!redirected && session?.user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+        redirected = true;
+        console.log('🔐 DeliverySignIn REDIRECTING to /delivery-dashboard');
+        window.location.href = '/delivery-dashboard';
+      } else if (!session) {
+        setCheckingAuth(false);
+      }
+    });
+    
+    // Safety timeout - stop checking after 3 seconds
+    const timeout = setTimeout(() => setCheckingAuth(false), 3000);
+    
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
 
   /**

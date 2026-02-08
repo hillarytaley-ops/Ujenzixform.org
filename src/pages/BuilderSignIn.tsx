@@ -52,9 +52,30 @@ const BuilderSignIn = () => {
   // Redirect to dashboard after sign-in (not home page)
   const redirectTo = searchParams.get('redirect') || '/builder-dashboard';
 
+  // Use onAuthStateChange for reliable redirect
   useEffect(() => {
-    checkExistingAuth();
-  }, []);
+    let redirected = false;
+    
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('🔐 BuilderSignIn event:', event, session?.user?.email);
+      
+      if (!redirected && session?.user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+        redirected = true;
+        console.log('🔐 BuilderSignIn REDIRECTING to', redirectTo);
+        window.location.href = redirectTo;
+      } else if (!session) {
+        setCheckingAuth(false);
+      }
+    });
+    
+    // Safety timeout - stop checking after 3 seconds
+    const timeout = setTimeout(() => setCheckingAuth(false), 3000);
+    
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
+  }, [redirectTo]);
 
   // Auth check - ALWAYS check database for actual role, not metadata
   const checkExistingAuth = async () => {

@@ -8,7 +8,7 @@
  * - Redirects to role-specific dashboard after auth
  */
 
-console.log('🔐 UnifiedAuth BUILD v3 - Feb 8 2026');
+console.log('🔐 UnifiedAuth BUILD v4 - onAuthStateChange Feb 8 2026');
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
@@ -117,13 +117,23 @@ const UnifiedAuth: React.FC = () => {
   const roleConfig = ROLE_CONFIG[roleParam] || ROLE_CONFIG.private_client;
   const RoleIcon = roleConfig.icon;
   
-  // Redirect if already logged in
+  // Redirect if already logged in - use onAuthStateChange for reliability
   useEffect(() => {
-    if (user && userRole) {
-      const destination = redirectTo || getDashboardForRole(userRole);
-      navigate(destination, { replace: true });
-    }
-  }, [user, userRole, navigate, redirectTo]);
+    let redirected = false;
+    
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('🔐 UnifiedAuth event:', event, session?.user?.email);
+      
+      if (!redirected && session?.user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+        redirected = true;
+        const destination = redirectTo || roleConfig.dashboard;
+        console.log('🔐 UnifiedAuth REDIRECTING to:', destination);
+        window.location.href = destination;
+      }
+    });
+    
+    return () => subscription.unsubscribe();
+  }, [redirectTo, roleConfig.dashboard]);
   
   const getDashboardForRole = (role: string): string => {
     switch (role) {

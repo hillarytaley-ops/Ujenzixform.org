@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Home, Eye, EyeOff, Loader2, HardHat } from "lucide-react";
 
+console.log('🔐 ProfessionalBuilderSignIn BUILD v2 - onAuthStateChange Feb 8 2026');
+
 const ProfessionalBuilderSignIn = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -15,6 +17,23 @@ const ProfessionalBuilderSignIn = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Use onAuthStateChange for reliable redirect
+  useEffect(() => {
+    let redirected = false;
+    
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('🔐 ProfessionalBuilderSignIn event:', event, session?.user?.email);
+      
+      if (!redirected && session?.user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+        redirected = true;
+        console.log('🔐 ProfessionalBuilderSignIn REDIRECTING to /professional-builder-dashboard');
+        window.location.href = '/professional-builder-dashboard';
+      }
+    });
+    
+    return () => subscription.unsubscribe();
+  }, []);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();

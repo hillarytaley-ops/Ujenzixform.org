@@ -14,7 +14,7 @@
  * ╚══════════════════════════════════════════════════════════════════════════════╝
  */
 
-console.log('🔐 SupplierSignIn BUILD v3 - Feb 8 2026');
+console.log('🔐 SupplierSignIn BUILD v4 - onAuthStateChange Feb 8 2026');
 
 import { useState, useEffect } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
@@ -95,94 +95,30 @@ const SupplierSignIn = () => {
     }
   };
 
+  // Use onAuthStateChange for reliable redirect
   useEffect(() => {
-    checkExistingAuth();
-  }, []);
-
-  // Auth check - ALWAYS check database for actual role, not metadata
-  const checkExistingAuth = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
+    let redirected = false;
+    
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('🔐 SupplierSignIn event:', event, session?.user?.email);
       
-      if (!user) {
-        console.log('🔐 No user logged in, showing sign-in form');
-        setCheckingAuth(false);
-        return;
-      }
-
-      console.log('🔐 User already logged in:', user.email);
-      
-      // ALWAYS check the DATABASE for the actual role - this is the source of truth
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      
-      const dbRole = roleData?.role;
-      console.log('🔐 Database role:', dbRole);
-      
-      // Block builders - redirect to builder portal
-      if (dbRole === 'builder') {
-        toast({
-          variant: "destructive",
-          title: "❌ Wrong Portal",
-          description: "You're registered as a Builder. Please use the Builder Sign-In portal.",
-          duration: 5000
-        });
-        setCheckingAuth(false);
-        return;
-      }
-      
-      // Block delivery providers - redirect to delivery portal
-      if (dbRole === 'delivery') {
-        toast({
-          variant: "destructive",
-          title: "❌ Wrong Portal",
-          description: "You're registered as a Delivery Provider. Please use the Delivery Sign-In portal.",
-          duration: 5000
-        });
-        setCheckingAuth(false);
-        return;
-      }
-      
-      // User is supplier OR admin - allow access
-      if (dbRole === 'supplier' || dbRole === 'admin') {
-        localStorage.setItem('user_role', dbRole);
-        localStorage.setItem('user_role_id', user.id);
-        localStorage.setItem('user_role_verified', Date.now().toString());
-        toast({
-          title: "✅ Welcome Back!",
-          description: "Redirecting to dashboard...",
-        });
+      if (!redirected && session?.user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+        redirected = true;
+        console.log('🔐 SupplierSignIn REDIRECTING to /supplier-dashboard');
         window.location.href = '/supplier-dashboard';
-        return;
-      }
-      
-      // User has NO role - they need to register first
-      if (!dbRole) {
-        console.log('🔐 User has no role - must register first');
-        toast({
-          variant: "destructive",
-          title: "❌ Not Registered",
-          description: "You need to register as a Supplier first. Please use the Register link below.",
-          duration: 5000
-        });
-        // Sign them out to prevent auto-login issues
-        await supabase.auth.signOut();
-        localStorage.removeItem('user_role');
-        localStorage.removeItem('user_role_id');
-        localStorage.removeItem('user_role_verified');
+      } else if (!session) {
         setCheckingAuth(false);
-        return;
       }
-      
-      setCheckingAuth(false);
-    } catch (error) {
-      console.error('Auth check error:', error);
-      setCheckingAuth(false);
-    }
-  };
+    });
+    
+    // Safety timeout - stop checking after 3 seconds
+    const timeout = setTimeout(() => setCheckingAuth(false), 3000);
+    
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
+  }, []);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
