@@ -85,7 +85,13 @@ const ProfessionalBuilderDashboardPage = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    checkAuth();
+    // Safety timeout - show UI after 2 seconds max
+    const timeout = setTimeout(() => setLoading(false), 2000);
+    checkAuth().finally(() => {
+      clearTimeout(timeout);
+      setLoading(false);
+    });
+    return () => clearTimeout(timeout);
   }, []);
 
   const checkAuth = async () => {
@@ -93,7 +99,7 @@ const ProfessionalBuilderDashboardPage = () => {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        navigate('/professional-builder-signin');
+        // Don't redirect - RoleProtectedRoute handles this
         return;
       }
 

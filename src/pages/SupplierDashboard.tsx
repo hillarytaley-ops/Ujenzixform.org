@@ -146,6 +146,9 @@ const SupplierDashboard = () => {
     if (user) {
       setLoading(false);
     }
+    // Safety timeout - show UI after 2 seconds max
+    const timeout = setTimeout(() => setLoading(false), 2000);
+    return () => clearTimeout(timeout);
   }, [user]);
 
   // Update local state when isolated data loads (background)
