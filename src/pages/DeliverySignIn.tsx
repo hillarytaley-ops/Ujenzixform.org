@@ -65,30 +65,20 @@ const DeliverySignIn = () => {
   // Redirect to dashboard after sign-in (not home page)
   const redirectTo = searchParams.get('redirect') || '/delivery-dashboard';
 
-  // Redirect ONLY if already logged in when page loads
+  // Check if already logged in on page load
   useEffect(() => {
-    let redirected = false;
-    
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('🔐 DeliverySignIn event:', event, session?.user?.email);
-      
-      // Only redirect on INITIAL_SESSION (already logged in)
-      if (!redirected && session?.user && event === 'INITIAL_SESSION') {
-        redirected = true;
-        console.log('🔐 DeliverySignIn: Already logged in, REDIRECTING to /delivery-dashboard');
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        console.log('🔐 DeliverySignIn: Already logged in, redirecting');
         window.location.href = '/delivery-dashboard';
-      } else if (!session && event !== 'INITIAL_SESSION') {
+      } else {
         setCheckingAuth(false);
       }
     });
     
-    // Safety timeout - stop checking after 3 seconds
+    // Safety timeout
     const timeout = setTimeout(() => setCheckingAuth(false), 3000);
-    
-    return () => {
-      subscription.unsubscribe();
-      clearTimeout(timeout);
-    };
+    return () => clearTimeout(timeout);
   }, []);
 
   /**
