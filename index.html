@@ -1,91 +1,71 @@
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="version" content="3.13.0-strict" />
-    <meta name="build-time" content="2026-02-08-fix21" />
-    <link rel="icon" type="image/svg+xml" href="/mradipro-favicon.svg?v=3.0" />
-    <link rel="manifest" href="/manifest.json?v=3.0" />
+    <meta name="version" content="3.14.0-instant" />
+    <meta name="build-time" content="2026-02-09-v29" />
+    
+    <!-- DISABLE ALL CACHING -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    
+    <link rel="icon" type="image/svg+xml" href="/mradipro-favicon.svg?v=29" />
+    <link rel="manifest" href="/manifest.json?v=29" />
     <meta name="theme-color" content="#2563eb" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="UjenziXform" />
     <title>UjenziXform - Connecting Kenya's Construction Industry</title>
-    <meta name="description" content="Kenya's premier platform connecting builders with verified construction material suppliers across all 47 counties. Find quality materials, competitive quotes, and build lasting business relationships." />
-    <meta name="author" content="UjenziXform" />
+    <meta name="description" content="Kenya's premier platform connecting builders with verified construction material suppliers across all 47 counties." />
     
-    <!-- Performance: Preconnect to external domains for faster loading -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
-    <link rel="preconnect" href="https://images.unsplash.com" crossorigin>
     <link rel="preconnect" href="https://wuuyjjpgzgeimiptuuws.supabase.co" crossorigin>
-    <link rel="dns-prefetch" href="https://wuuyjjpgzgeimiptuuws.supabase.co">
-    <link rel="dns-prefetch" href="https://hebbkx1anhila5yf.public.blob.vercel-storage.com">
-    
-    <!-- Preload critical resources for instant first paint -->
-    <!-- Removed modulepreload to avoid MIME type issues with service worker -->
-    <link rel="prefetch" href="/src/pages/Index.tsx" as="script">
-    
-    <!-- Fonts will load on demand via CSS -->
-    
-    <!-- Security Headers (Note: X-Frame-Options and frame-ancestors only work via HTTP headers, not meta tags) -->
+
     <meta http-equiv="X-Content-Type-Options" content="nosniff" />
-    <meta http-equiv="X-XSS-Protection" content="1; mode=block" />
-    <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
-
     <meta property="og:title" content="UjenziXform - Connecting Kenya's Construction Industry" />
-    <meta property="og:description" content="Kenya's premier platform connecting builders with verified construction material suppliers across all 47 counties. Find quality materials, competitive quotes, and build lasting business relationships." />
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="/mradipro-logo-circular.svg" />
-
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@ujenzixform" />
-    <meta name="twitter:image" content="/mradipro-logo-circular.svg" />
   </head>
 
   <body>
     <div id="root"></div>
     
-    <!-- CACHE BUSTER: Forces all users to get fresh code after deployment -->
+    <!-- AGGRESSIVE CACHE BUSTER v29 -->
     <script>
       (function() {
-        var CACHE_VERSION = 'v2026-02-08-fix23';
-        var CACHE_KEY = 'ujenzixform_cache_cleared';
-        var lastCleared = localStorage.getItem(CACHE_KEY);
+        var BUILD = 'v29-instant';
+        var KEY = 'ujenzi_build';
+        var last = localStorage.getItem(KEY);
         
-        if (lastCleared !== CACHE_VERSION) {
-          console.log('🧹 Clearing old caches for version:', CACHE_VERSION);
-          
-          // Clear all caches
-          if ('caches' in window) {
-            caches.keys().then(function(names) {
-              names.forEach(function(name) {
-                caches.delete(name);
-              });
-            });
-          }
-          
-          // Unregister service workers
-          if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(function(registrations) {
-              registrations.forEach(function(registration) {
-                registration.unregister();
-              });
-            });
-          }
-          
-          // Mark as cleared
-          localStorage.setItem(CACHE_KEY, CACHE_VERSION);
-          
-          // If we have old cached JS, force reload
-          if (lastCleared && lastCleared !== CACHE_VERSION) {
-            console.log('🔄 Forcing page reload for fresh code');
-            window.location.reload(true);
+        // Always unregister service workers
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function(regs) {
+            regs.forEach(function(r) { r.unregister(); });
+          });
+        }
+        
+        // Clear caches
+        if ('caches' in window) {
+          caches.keys().then(function(names) {
+            names.forEach(function(n) { caches.delete(n); });
+          });
+        }
+        
+        // Force reload if build changed
+        if (last !== BUILD) {
+          localStorage.setItem(KEY, BUILD);
+          if (last) {
+            // Add cache-busting parameter and reload
+            var url = new URL(window.location.href);
+            url.searchParams.set('_cb', Date.now());
+            window.location.replace(url.toString());
           }
         }
+        
+        console.log('🚀 UjenziXform BUILD:', BUILD);
       })();
     </script>
     
