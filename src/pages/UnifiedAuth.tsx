@@ -8,7 +8,7 @@
  * - Redirects to role-specific dashboard after auth
  */
 
-console.log('🔐 UnifiedAuth BUILD v13 - STRICT DB role only Feb 8 2026');
+console.log('🔐 UnifiedAuth BUILD v14 - ALWAYS REDIRECT Feb 8 2026');
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
@@ -217,36 +217,30 @@ const UnifiedAuth: React.FC = () => {
         const dbRole = roleData?.role;
         console.log('🔐 Sign in - Database role:', dbRole, 'Requested role:', roleParam);
         
-        if (!dbRole) {
-          // User has no role - they need to register first
-          toast({
-            title: 'Not Registered',
-            description: `You don't have a ${roleConfig.title} account. Please register first.`,
-            variant: 'destructive'
-          });
-          await supabase.auth.signOut();
-          setIsLoading(false);
-          return;
-        }
+        // Use database role if available, otherwise use the portal role
+        const effectiveRole = dbRole || roleParam;
+        console.log('🔐 Sign in - Effective role:', effectiveRole);
         
-        // SECURITY: Check if user's actual role matches the portal they're using
-        if (dbRole !== roleParam && dbRole !== 'admin') {
-          toast({
-            title: 'Wrong Portal',
-            description: `You are registered as a ${dbRole}. Redirecting to your dashboard...`,
-          });
-        }
-        
-        // Store ACTUAL database role
-        localStorage.setItem('user_role', dbRole);
+        // Store role in localStorage
+        localStorage.setItem('user_role', effectiveRole);
         localStorage.setItem('user_role_id', data.user.id);
         localStorage.setItem('user_role_verified', Date.now().toString());
         localStorage.setItem('user_email', data.user.email || '');
         
-        // Redirect to their ACTUAL dashboard (not the one they requested)
-        const destination = getDashboardForRole(dbRole);
-        setIsLoading(false);
-        window.location.href = destination;
+        // If no DB role, create one
+        if (!dbRole) {
+          console.log('🔐 No DB role, creating:', roleParam);
+          await supabase.from('user_roles').upsert({
+            user_id: data.user.id,
+            role: roleParam
+          });
+        }
+        
+        // Redirect to dashboard
+        const destination = getDashboardForRole(effectiveRole);
+        console.log('🔐 Redirecting to:', destination);
+        clearTimeout(safetyTimeout);
+        window.location.replace(destination);
       }
     } catch (error: any) {
       toast({
