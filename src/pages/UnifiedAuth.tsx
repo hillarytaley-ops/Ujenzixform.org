@@ -8,7 +8,7 @@
  * - Redirects to role-specific dashboard after auth
  */
 
-console.log('🔐 UnifiedAuth BUILD v6 - debug getSession Feb 8 2026');
+console.log('🔐 UnifiedAuth BUILD v7 - onAuthStateChange with localStorage Feb 8 2026');
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
@@ -117,22 +117,32 @@ const UnifiedAuth: React.FC = () => {
   const roleConfig = ROLE_CONFIG[roleParam] || ROLE_CONFIG.private_client;
   const RoleIcon = roleConfig.icon;
   
-  // Check if already logged in on page load
+  // Check if already logged in on page load - use onAuthStateChange since getSession hangs
   useEffect(() => {
-    console.log('🔐 UnifiedAuth: Checking session...');
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
-      console.log('🔐 UnifiedAuth: getSession result:', session?.user?.email, 'error:', error);
+    let handled = false;
+    
+    // Listen for auth state - this fires reliably
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (handled) return;
+      
+      console.log('🔐 UnifiedAuth: Auth event:', event, session?.user?.email);
+      
+      // If user is signed in (from any event), redirect to dashboard
       if (session?.user) {
+        handled = true;
+        // Store role first
+        localStorage.setItem('user_role', roleParam);
+        localStorage.setItem('user_role_id', session.user.id);
+        localStorage.setItem('user_role_verified', Date.now().toString());
+        
         const destination = redirectTo || roleConfig.dashboard;
-        console.log('🔐 UnifiedAuth: REDIRECTING to:', destination);
+        console.log('🔐 UnifiedAuth: User signed in, REDIRECTING to:', destination);
         window.location.href = destination;
-      } else {
-        console.log('🔐 UnifiedAuth: No session, showing form');
       }
-    }).catch(err => {
-      console.error('🔐 UnifiedAuth: getSession error:', err);
     });
-  }, []); // Empty deps - run only once on mount
+    
+    return () => subscription.unsubscribe();
+  }, [roleParam, redirectTo, roleConfig.dashboard]);
   
   const getDashboardForRole = (role: string): string => {
     switch (role) {
