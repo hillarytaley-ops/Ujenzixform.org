@@ -1,5 +1,5 @@
 /**
- * SupplierAuth - BUILD v11 - TRULY INSTANT
+ * SupplierAuth - BUILD v12 - CALLBACK BASED
  */
 
 import React, { useState, useRef } from 'react';
@@ -17,13 +17,11 @@ const ROLE = 'supplier';
 const DASHBOARD = '/supplier-dashboard';
 const TITLE = 'Supplier';
 
-const cachedRole = localStorage.getItem('user_role');
-if (cachedRole === ROLE && window.location.pathname.includes('auth')) {
-  console.log('🚀 INSTANT REDIRECT: Already logged in as', ROLE);
+if (localStorage.getItem('user_role') === ROLE) {
   window.location.replace(DASHBOARD);
 }
 
-console.log('🔐 SupplierAuth BUILD v11');
+console.log('🔐 SupplierAuth BUILD v12');
 
 const SupplierAuth: React.FC = () => {
   const { toast } = useToast();
@@ -36,55 +34,79 @@ const SupplierAuth: React.FC = () => {
   const [companyName, setCompanyName] = useState('');
   const [phone, setPhone] = useState('');
   const [location, setLocation] = useState('');
-  const hasRedirected = useRef(false);
+  const redirecting = useRef(false);
 
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (hasRedirected.current) return;
-    setIsLoading(true);
-
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-      if (error) {
-        setIsLoading(false);
-        toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
-        return;
-      }
-      if (data?.user) {
-        hasRedirected.current = true;
-        localStorage.setItem('user_role', ROLE);
-        localStorage.setItem('user_role_id', data.user.id);
-        localStorage.setItem('user_email', data.user.email || '');
-        window.location.replace(DASHBOARD);
-      }
-    } catch (err: any) {
-      setIsLoading(false);
-      toast({ title: 'Sign in failed', description: err.message || 'Unknown error', variant: 'destructive' });
-    }
+  const doRedirect = (userId: string, userEmail: string) => {
+    if (redirecting.current) return;
+    redirecting.current = true;
+    localStorage.setItem('user_role', ROLE);
+    localStorage.setItem('user_role_id', userId);
+    localStorage.setItem('user_email', userEmail);
+    window.location.href = DASHBOARD;
   };
 
-  const handleSignUp = async (e: React.FormEvent) => {
+  const handleSignIn = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (redirecting.current) return;
+    setIsLoading(true);
+
+    supabase.auth.signInWithPassword({ email: email.trim(), password }).then(result => {
+      if (result.error) {
+        setIsLoading(false);
+        toast({ title: 'Sign in failed', description: result.error.message, variant: 'destructive' });
+        return;
+      }
+      if (result.data?.user) {
+        doRedirect(result.data.user.id, result.data.user.email || '');
+      } else {
+        setIsLoading(false);
+        toast({ title: 'Sign in failed', description: 'No user returned', variant: 'destructive' });
+      }
+    }).catch(err => {
+      setIsLoading(false);
+      toast({ title: 'Sign in failed', description: String(err), variant: 'destructive' });
+    });
+
+    setTimeout(() => {
+      if (!redirecting.current) {
+        setIsLoading(false);
+        toast({ title: 'Sign in timeout', description: 'Please try again', variant: 'destructive' });
+      }
+    }, 8000);
+  };
+
+  const handleSignUp = (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    try {
-      if (!fullName.trim()) throw new Error('Please enter your full name');
-      if (!companyName.trim()) throw new Error('Please enter your company name');
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: email.trim(), password,
-        options: { data: { full_name: fullName.trim(), role: ROLE, company_name: companyName.trim() } }
-      });
-      if (authError) throw authError;
-      if (authData.user) {
-        await supabase.from('profiles').upsert({ id: authData.user.id, user_id: authData.user.id, email: email.trim(), full_name: fullName.trim(), company_name: companyName.trim(), phone: phone.trim() || null, location: location.trim() || null });
-        await supabase.from('user_roles').upsert({ user_id: authData.user.id, role: ROLE });
-        toast({ title: 'Account created!', description: 'Please check your email to verify.' });
-        setActiveTab('signin');
-      }
-    } catch (error: any) {
-      toast({ title: 'Registration failed', description: error.message, variant: 'destructive' });
-    } finally {
+    if (!fullName.trim() || !companyName.trim()) {
       setIsLoading(false);
+      toast({ title: 'Error', description: 'Please enter your full name and company name', variant: 'destructive' });
+      return;
     }
+
+    supabase.auth.signUp({
+      email: email.trim(), password,
+      options: { data: { full_name: fullName.trim(), role: ROLE, company_name: companyName.trim() } }
+    }).then(result => {
+      if (result.error) {
+        setIsLoading(false);
+        toast({ title: 'Registration failed', description: result.error.message, variant: 'destructive' });
+        return;
+      }
+      if (result.data.user) {
+        Promise.all([
+          supabase.from('profiles').upsert({ id: result.data.user.id, user_id: result.data.user.id, email: email.trim(), full_name: fullName.trim(), company_name: companyName.trim(), phone: phone.trim() || null, location: location.trim() || null }),
+          supabase.from('user_roles').upsert({ user_id: result.data.user.id, role: ROLE })
+        ]).finally(() => {
+          setIsLoading(false);
+          toast({ title: 'Account created!', description: 'Please check your email to verify.' });
+          setActiveTab('signin');
+        });
+      }
+    }).catch(err => {
+      setIsLoading(false);
+      toast({ title: 'Registration failed', description: String(err), variant: 'destructive' });
+    });
   };
 
   return (

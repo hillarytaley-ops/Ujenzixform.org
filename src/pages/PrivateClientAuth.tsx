@@ -1,6 +1,5 @@
 /**
- * PrivateClientAuth - BUILD v11 - TRULY INSTANT
- * Check localStorage FIRST, redirect before React even mounts
+ * PrivateClientAuth - BUILD v12 - CALLBACK BASED (no await)
  */
 
 import React, { useState, useRef } from 'react';
@@ -18,14 +17,12 @@ const ROLE = 'private_client';
 const DASHBOARD = '/private-client-dashboard';
 const TITLE = 'Private Builder';
 
-// INSTANT CHECK: If already has this role, redirect NOW before component mounts
-const cachedRole = localStorage.getItem('user_role');
-if (cachedRole === ROLE && window.location.pathname.includes('auth')) {
-  console.log('🚀 INSTANT REDIRECT: Already logged in as', ROLE);
+// Instant redirect if already logged in
+if (localStorage.getItem('user_role') === ROLE) {
   window.location.replace(DASHBOARD);
 }
 
-console.log('🔐 PrivateClientAuth BUILD v11 - TRULY INSTANT');
+console.log('🔐 PrivateClientAuth BUILD v12');
 
 const PrivateClientAuth: React.FC = () => {
   const { toast } = useToast();
@@ -37,65 +34,109 @@ const PrivateClientAuth: React.FC = () => {
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [location, setLocation] = useState('');
-  const hasRedirected = useRef(false);
+  const redirecting = useRef(false);
 
-  const handleSignIn = async (e: React.FormEvent) => {
+  const doRedirect = (userId: string, userEmail: string) => {
+    if (redirecting.current) return;
+    redirecting.current = true;
+    console.log('🔐 Redirecting to dashboard...');
+    localStorage.setItem('user_role', ROLE);
+    localStorage.setItem('user_role_id', userId);
+    localStorage.setItem('user_email', userEmail);
+    window.location.href = DASHBOARD;
+  };
+
+  const handleSignIn = (e: React.FormEvent) => {
     e.preventDefault();
-    if (hasRedirected.current) return;
+    if (redirecting.current) return;
     
     setIsLoading(true);
     console.log('🔐 Signing in:', email);
 
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({ 
-        email: email.trim(), 
-        password 
-      });
+    // Don't await - just fire and handle in callback
+    supabase.auth.signInWithPassword({ 
+      email: email.trim(), 
+      password 
+    }).then(result => {
+      console.log('🔐 Sign-in result:', result.error ? result.error.message : 'success');
       
-      if (error) {
-        console.log('🔐 Error:', error.message);
+      if (result.error) {
         setIsLoading(false);
-        toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
+        toast({ title: 'Sign in failed', description: result.error.message, variant: 'destructive' });
         return;
       }
       
-      if (data?.user) {
-        hasRedirected.current = true;
-        console.log('🔐 Success! Setting localStorage and redirecting...');
-        localStorage.setItem('user_role', ROLE);
-        localStorage.setItem('user_role_id', data.user.id);
-        localStorage.setItem('user_email', data.user.email || '');
-        // Use replace to prevent back button issues
-        window.location.replace(DASHBOARD);
+      if (result.data?.user) {
+        doRedirect(result.data.user.id, result.data.user.email || '');
+      } else {
+        setIsLoading(false);
+        toast({ title: 'Sign in failed', description: 'No user returned', variant: 'destructive' });
       }
-    } catch (err: any) {
+    }).catch(err => {
       console.error('🔐 Exception:', err);
       setIsLoading(false);
-      toast({ title: 'Sign in failed', description: err.message || 'Unknown error', variant: 'destructive' });
-    }
+      toast({ title: 'Sign in failed', description: String(err), variant: 'destructive' });
+    });
+
+    // Safety timeout - if nothing happens in 8 seconds, stop loading
+    setTimeout(() => {
+      if (!redirecting.current) {
+        setIsLoading(false);
+        toast({ title: 'Sign in timeout', description: 'Please try again', variant: 'destructive' });
+      }
+    }, 8000);
   };
 
-  const handleSignUp = async (e: React.FormEvent) => {
+  const handleSignUp = (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    try {
-      if (!fullName.trim()) throw new Error('Please enter your full name');
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: email.trim(), password,
-        options: { data: { full_name: fullName.trim(), role: ROLE } }
-      });
-      if (authError) throw authError;
-      if (authData.user) {
-        await supabase.from('profiles').upsert({ id: authData.user.id, user_id: authData.user.id, email: email.trim(), full_name: fullName.trim(), phone: phone.trim() || null, location: location.trim() || null });
-        await supabase.from('user_roles').upsert({ user_id: authData.user.id, role: ROLE });
-        toast({ title: 'Account created!', description: 'Please check your email to verify.' });
-        setActiveTab('signin');
-      }
-    } catch (error: any) {
-      toast({ title: 'Registration failed', description: error.message, variant: 'destructive' });
-    } finally {
+    
+    if (!fullName.trim()) {
       setIsLoading(false);
+      toast({ title: 'Error', description: 'Please enter your full name', variant: 'destructive' });
+      return;
     }
+
+    supabase.auth.signUp({
+      email: email.trim(), 
+      password,
+      options: { data: { full_name: fullName.trim(), role: ROLE } }
+    }).then(result => {
+      if (result.error) {
+        setIsLoading(false);
+        toast({ title: 'Registration failed', description: result.error.message, variant: 'destructive' });
+        return;
+      }
+      
+      if (result.data.user) {
+        // Create profile and role
+        Promise.all([
+          supabase.from('profiles').upsert({ 
+            id: result.data.user.id, 
+            user_id: result.data.user.id, 
+            email: email.trim(), 
+            full_name: fullName.trim(), 
+            phone: phone.trim() || null, 
+            location: location.trim() || null 
+          }),
+          supabase.from('user_roles').upsert({ 
+            user_id: result.data.user.id, 
+            role: ROLE 
+          })
+        ]).then(() => {
+          setIsLoading(false);
+          toast({ title: 'Account created!', description: 'Please check your email to verify.' });
+          setActiveTab('signin');
+        }).catch(() => {
+          setIsLoading(false);
+          toast({ title: 'Account created!', description: 'Please check your email to verify.' });
+          setActiveTab('signin');
+        });
+      }
+    }).catch(err => {
+      setIsLoading(false);
+      toast({ title: 'Registration failed', description: String(err), variant: 'destructive' });
+    });
   };
 
   return (
