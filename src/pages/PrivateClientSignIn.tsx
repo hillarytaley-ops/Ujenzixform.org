@@ -47,21 +47,13 @@ const PrivateClientSignIn = () => {
         return;
       }
 
-      // ✅ SPEED OPTIMIZATION: Store role in localStorage to skip DB check in RoleProtectedRoute
+      // Store role in localStorage
       localStorage.setItem('user_role', 'private_client');
       localStorage.setItem('user_role_id', data.user.id);
       localStorage.setItem('user_role_verified', Date.now().toString());
 
-      toast({
-        title: "Welcome back!",
-        description: "Redirecting to your dashboard...",
-      });
-
-      // ✅ FIX: Small delay to ensure auth state propagates before navigation
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Navigate with replace to prevent back button issues
-      navigate('/private-client-dashboard', { replace: true });
+      // Redirect INSTANTLY
+      window.location.replace('/private-client-dashboard');
     } catch (error: any) {
       toast({
         title: "Sign In Failed",

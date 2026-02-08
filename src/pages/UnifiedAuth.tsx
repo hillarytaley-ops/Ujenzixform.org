@@ -157,18 +157,15 @@ const UnifiedAuth: React.FC = () => {
         
         const fetchedRole = roleData?.role || roleParam;
         
-        toast({
-          title: 'Welcome back!',
-          description: 'Redirecting to your dashboard...',
-        });
+        // Store role in localStorage
+        localStorage.setItem('user_role', fetchedRole);
+        localStorage.setItem('user_role_id', data.user.id);
+        localStorage.setItem('user_role_verified', Date.now().toString());
         
-        // Navigate directly instead of waiting for useEffect
+        // Redirect INSTANTLY
         const destination = redirectTo || getDashboardForRole(fetchedRole);
-        
-        // Small delay to allow auth state to propagate
-        setTimeout(() => {
-          navigate(destination, { replace: true });
-        }, 100);
+        window.location.replace(destination);
+        return;
       }
     } catch (error: any) {
       toast({
@@ -176,6 +173,7 @@ const UnifiedAuth: React.FC = () => {
         description: error.message || 'Please check your credentials',
         variant: 'destructive'
       });
+    } finally {
       setIsLoading(false);
     }
   };
