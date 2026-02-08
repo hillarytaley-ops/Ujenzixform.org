@@ -1,6 +1,6 @@
 /**
  * SupplierAuth - Auth page ONLY for Suppliers
- * BUILD v7 - SECURE: Check DB role before redirect
+ * BUILD v8 - STRICT: DB check is MANDATORY before redirect
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -27,7 +27,7 @@ const DASHBOARDS: Record<string, string> = {
   'admin': '/admin-dashboard',
 };
 
-console.log('🔐 SupplierAuth BUILD v7 - SECURE DB CHECK');
+console.log('🔐 SupplierAuth BUILD v8 - STRICT DB CHECK');
 
 const SupplierAuth: React.FC = () => {
   const { toast } = useToast();
@@ -40,15 +40,16 @@ const SupplierAuth: React.FC = () => {
   const [companyName, setCompanyName] = useState('');
   const [phone, setPhone] = useState('');
   const [location, setLocation] = useState('');
-  const isSigningIn = useRef(false);
+  const hasRedirected = useRef(false);
 
-  // Listen for auth state changes - check DB role before redirect
+  // Check if already logged in on mount
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('🔐 SupplierAuth: Auth event:', event, session?.user?.email);
+    const checkSession = async () => {
+      if (hasRedirected.current) return;
       
-      if (isSigningIn.current && session?.user && event === 'SIGNED_IN') {
-        console.log('🔐 SupplierAuth: Sign-in detected, checking DB role...');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        hasRedirected.current = true;
         
         const { data: roleData } = await supabase
           .from('user_roles')
@@ -57,44 +58,17 @@ const SupplierAuth: React.FC = () => {
           .maybeSingle();
         
         const dbRole = roleData?.role;
-        const actualRole = dbRole || ROLE;
-        localStorage.setItem('user_role', actualRole);
-        localStorage.setItem('user_role_id', session.user.id);
-        localStorage.setItem('user_email', session.user.email || '');
-        
-        const correctDashboard = DASHBOARDS[actualRole] || DASHBOARD;
-        
-        if (dbRole && dbRole !== ROLE) {
-          toast({
-            title: 'Redirecting...',
-            description: `You are registered as ${dbRole.replace('_', ' ')}. Redirecting to your dashboard.`,
-          });
+        if (dbRole) {
+          localStorage.setItem('user_role', dbRole);
+          localStorage.setItem('user_role_id', session.user.id);
+          localStorage.setItem('user_email', session.user.email || '');
+          window.location.href = DASHBOARDS[dbRole] || DASHBOARD;
+        } else {
+          localStorage.setItem('user_role', ROLE);
+          localStorage.setItem('user_role_id', session.user.id);
+          localStorage.setItem('user_email', session.user.email || '');
+          window.location.href = DASHBOARD;
         }
-        
-        window.location.href = correctDashboard;
-      }
-    });
-    
-    return () => subscription.unsubscribe();
-  }, [toast]);
-
-  // Check if already logged in on mount
-  useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        const { data: roleData } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', session.user.id)
-          .maybeSingle();
-        
-        const dbRole = roleData?.role || ROLE;
-        localStorage.setItem('user_role', dbRole);
-        localStorage.setItem('user_role_id', session.user.id);
-        localStorage.setItem('user_email', session.user.email || '');
-        
-        window.location.href = DASHBOARDS[dbRole] || DASHBOARD;
       }
     };
     checkSession();
@@ -102,22 +76,61 @@ const SupplierAuth: React.FC = () => {
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (hasRedirected.current) return;
+    
     setIsLoading(true);
-    isSigningIn.current = true;
+    console.log('🔐 SupplierAuth: Starting sign-in for', email);
 
-    supabase.auth.signInWithPassword({ email: email.trim(), password })
-      .then(({ error }) => {
-        if (error) {
-          isSigningIn.current = false;
-          setIsLoading(false);
-          toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
-        }
-      })
-      .catch((error) => {
-        isSigningIn.current = false;
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ 
+        email: email.trim(), 
+        password 
+      });
+      
+      if (error) {
         setIsLoading(false);
         toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
-      });
+        return;
+      }
+
+      if (!data?.user) {
+        setIsLoading(false);
+        toast({ title: 'Sign in failed', description: 'No user data returned', variant: 'destructive' });
+        return;
+      }
+
+      hasRedirected.current = true;
+
+      // ALWAYS check DB role before redirect
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', data.user.id)
+        .maybeSingle();
+
+      const dbRole = roleData?.role;
+      const actualRole = dbRole || ROLE;
+      
+      localStorage.setItem('user_role', actualRole);
+      localStorage.setItem('user_role_id', data.user.id);
+      localStorage.setItem('user_email', data.user.email || '');
+
+      const correctDashboard = DASHBOARDS[actualRole] || DASHBOARD;
+
+      if (dbRole && dbRole !== ROLE) {
+        toast({
+          title: 'Wrong Portal',
+          description: `You are registered as ${dbRole.replace(/_/g, ' ')}. Redirecting to your dashboard.`,
+        });
+      }
+
+      window.location.href = correctDashboard;
+
+    } catch (err: any) {
+      hasRedirected.current = false;
+      setIsLoading(false);
+      toast({ title: 'Sign in failed', description: err.message, variant: 'destructive' });
+    }
   };
 
   const handleSignUp = async (e: React.FormEvent) => {

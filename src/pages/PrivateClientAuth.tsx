@@ -1,6 +1,6 @@
 /**
  * PrivateClientAuth - Auth page ONLY for Private Clients
- * BUILD v7 - SECURE: Check DB role before redirect
+ * BUILD v8 - STRICT: DB check is MANDATORY before redirect
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -27,7 +27,7 @@ const DASHBOARDS: Record<string, string> = {
   'admin': '/admin-dashboard',
 };
 
-console.log('🔐 PrivateClientAuth BUILD v7 - SECURE DB CHECK');
+console.log('🔐 PrivateClientAuth BUILD v8 - STRICT DB CHECK');
 
 const PrivateClientAuth: React.FC = () => {
   const { toast } = useToast();
@@ -39,72 +39,40 @@ const PrivateClientAuth: React.FC = () => {
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [location, setLocation] = useState('');
-  const isSigningIn = useRef(false);
+  const hasRedirected = useRef(false);
 
-  // Listen for auth state changes - check DB role before redirect
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('🔐 PrivateClientAuth: Auth event:', event, session?.user?.email);
-      
-      if (isSigningIn.current && session?.user && event === 'SIGNED_IN') {
-        console.log('🔐 PrivateClientAuth: Sign-in detected, checking DB role...');
-        
-        // SECURITY: Check actual role from database
-        const { data: roleData } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', session.user.id)
-          .maybeSingle();
-        
-        const dbRole = roleData?.role;
-        console.log('🔐 PrivateClientAuth: DB role is:', dbRole);
-        
-        // Store the ACTUAL role from DB (or portal role for new users)
-        const actualRole = dbRole || ROLE;
-        localStorage.setItem('user_role', actualRole);
-        localStorage.setItem('user_role_id', session.user.id);
-        localStorage.setItem('user_email', session.user.email || '');
-        
-        // Redirect to the CORRECT dashboard based on DB role
-        const correctDashboard = DASHBOARDS[actualRole] || DASHBOARD;
-        
-        if (dbRole && dbRole !== ROLE) {
-          // User is using wrong portal - redirect to their actual dashboard
-          console.log('🔐 PrivateClientAuth: User has different role, redirecting to:', correctDashboard);
-          toast({
-            title: 'Redirecting...',
-            description: `You are registered as ${dbRole.replace('_', ' ')}. Redirecting to your dashboard.`,
-          });
-        }
-        
-        window.location.href = correctDashboard;
-      }
-    });
-    
-    return () => subscription.unsubscribe();
-  }, [toast]);
-
-  // Check if already logged in on mount
+  // Check if already logged in on mount - with DB role check
   useEffect(() => {
     const checkSession = async () => {
+      if (hasRedirected.current) return;
+      
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         console.log('🔐 PrivateClientAuth: Already logged in, checking DB role...');
+        hasRedirected.current = true;
         
-        // Check DB role
-        const { data: roleData } = await supabase
+        // MUST check DB role
+        const { data: roleData, error } = await supabase
           .from('user_roles')
           .select('role')
           .eq('user_id', session.user.id)
           .maybeSingle();
         
-        const dbRole = roleData?.role || ROLE;
-        localStorage.setItem('user_role', dbRole);
-        localStorage.setItem('user_role_id', session.user.id);
-        localStorage.setItem('user_email', session.user.email || '');
+        console.log('🔐 PrivateClientAuth: DB role result:', roleData?.role, 'Error:', error);
         
-        const correctDashboard = DASHBOARDS[dbRole] || DASHBOARD;
-        window.location.href = correctDashboard;
+        const dbRole = roleData?.role;
+        if (dbRole) {
+          localStorage.setItem('user_role', dbRole);
+          localStorage.setItem('user_role_id', session.user.id);
+          localStorage.setItem('user_email', session.user.email || '');
+          window.location.href = DASHBOARDS[dbRole] || DASHBOARD;
+        } else {
+          // No role in DB - this is a new user, use portal role
+          localStorage.setItem('user_role', ROLE);
+          localStorage.setItem('user_role_id', session.user.id);
+          localStorage.setItem('user_email', session.user.email || '');
+          window.location.href = DASHBOARD;
+        }
       }
     };
     checkSession();
@@ -112,24 +80,72 @@ const PrivateClientAuth: React.FC = () => {
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (hasRedirected.current) return;
+    
     setIsLoading(true);
-    isSigningIn.current = true;
-    console.log('🔐 PrivateClientAuth: Starting sign-in...');
+    console.log('🔐 PrivateClientAuth: Starting sign-in for', email);
 
-    supabase.auth.signInWithPassword({ 
-      email: email.trim(), 
-      password 
-    }).then(({ error }) => {
+    try {
+      // Step 1: Sign in
+      const { data, error } = await supabase.auth.signInWithPassword({ 
+        email: email.trim(), 
+        password 
+      });
+      
       if (error) {
-        isSigningIn.current = false;
+        console.log('🔐 PrivateClientAuth: Sign-in error:', error.message);
         setIsLoading(false);
         toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
+        return;
       }
-    }).catch((error) => {
-      isSigningIn.current = false;
+
+      if (!data?.user) {
+        console.log('🔐 PrivateClientAuth: No user returned');
+        setIsLoading(false);
+        toast({ title: 'Sign in failed', description: 'No user data returned', variant: 'destructive' });
+        return;
+      }
+
+      console.log('🔐 PrivateClientAuth: Sign-in successful, checking DB role...');
+      hasRedirected.current = true;
+
+      // Step 2: ALWAYS check DB role before redirect
+      const { data: roleData, error: roleError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', data.user.id)
+        .maybeSingle();
+
+      console.log('🔐 PrivateClientAuth: DB role:', roleData?.role, 'Error:', roleError);
+
+      const dbRole = roleData?.role;
+      const actualRole = dbRole || ROLE; // Only use portal role if NO DB role exists
+      
+      localStorage.setItem('user_role', actualRole);
+      localStorage.setItem('user_role_id', data.user.id);
+      localStorage.setItem('user_email', data.user.email || '');
+
+      const correctDashboard = DASHBOARDS[actualRole] || DASHBOARD;
+
+      // If user has a different role, show message
+      if (dbRole && dbRole !== ROLE) {
+        console.log('🔐 PrivateClientAuth: User has different role:', dbRole, '- redirecting to', correctDashboard);
+        toast({
+          title: 'Wrong Portal',
+          description: `You are registered as ${dbRole.replace(/_/g, ' ')}. Redirecting to your dashboard.`,
+        });
+      } else {
+        console.log('🔐 PrivateClientAuth: Redirecting to', correctDashboard);
+      }
+
+      window.location.href = correctDashboard;
+
+    } catch (err: any) {
+      console.error('🔐 PrivateClientAuth: Exception:', err);
+      hasRedirected.current = false;
       setIsLoading(false);
-      toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
-    });
+      toast({ title: 'Sign in failed', description: err.message, variant: 'destructive' });
+    }
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
