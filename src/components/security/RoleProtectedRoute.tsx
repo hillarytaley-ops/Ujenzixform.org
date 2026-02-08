@@ -1,8 +1,9 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useEffect, useState } from 'react';
 
 // VERSION MARKER
-console.log('🔒 RoleProtectedRoute BUILD v15 - TRUST LOCALSTORAGE Feb 8 2026');
+console.log('🔒 RoleProtectedRoute BUILD v21 - VERIFY DB ROLE Feb 8 2026');
 
 interface RoleProtectedRouteProps {
   children: React.ReactNode;
@@ -11,10 +12,10 @@ interface RoleProtectedRouteProps {
 }
 
 /**
- * RoleProtectedRoute BUILD v15 - TRUST LOCALSTORAGE
+ * RoleProtectedRoute BUILD v21 - VERIFY DB ROLE
  * 
- * If localStorage has valid role data, grant access immediately.
- * Don't wait for AuthContext to load.
+ * SECURITY: Always verify role from database matches localStorage
+ * If mismatch, update localStorage and redirect to correct dashboard
  */
 export const RoleProtectedRoute = ({ 
   children, 
@@ -22,44 +23,89 @@ export const RoleProtectedRoute = ({
 }: RoleProtectedRouteProps) => {
   const { user, loading: authLoading, userRole: contextRole } = useAuth();
   const location = useLocation();
+  const [verifiedRole, setVerifiedRole] = useState<string | null>(null);
+  const [isVerifying, setIsVerifying] = useState(true);
 
-  // Check localStorage FIRST (instant check, no waiting)
-  const cachedRole = localStorage.getItem('user_role');
-  const cachedRoleId = localStorage.getItem('user_role_id');
-  const cachedEmail = localStorage.getItem('user_email');
-  
-  // Admin session check
-  const adminAuth = localStorage.getItem('admin_authenticated') === 'true';
-  const adminTime = parseInt(localStorage.getItem('admin_login_time') || '0');
-  const isValidAdminSession = adminAuth && cachedRole === 'admin' && (Date.now() - adminTime < 24 * 60 * 60 * 1000);
+  // Verify role on mount and when user changes
+  useEffect(() => {
+    const verifyRole = async () => {
+      // If no user from auth context, check if we should wait
+      if (authLoading) {
+        return; // Wait for auth to load
+      }
+      
+      if (!user) {
+        // No user - check admin session
+        const adminAuth = localStorage.getItem('admin_authenticated') === 'true';
+        const adminRole = localStorage.getItem('user_role') === 'admin';
+        const adminTime = parseInt(localStorage.getItem('admin_login_time') || '0');
+        
+        if (adminAuth && adminRole && (Date.now() - adminTime < 24 * 60 * 60 * 1000)) {
+          setVerifiedRole('admin');
+          setIsVerifying(false);
+          return;
+        }
+        
+        setVerifiedRole(null);
+        setIsVerifying(false);
+        return;
+      }
+      
+      // User exists - use contextRole from AuthContext (already fetched from DB)
+      if (contextRole) {
+        console.log('🔐 Using contextRole:', contextRole);
+        
+        // Update localStorage if different
+        const cachedRole = localStorage.getItem('user_role');
+        if (cachedRole !== contextRole) {
+          console.log('🔐 Updating localStorage from', cachedRole, 'to', contextRole);
+          localStorage.setItem('user_role', contextRole);
+          localStorage.setItem('user_role_id', user.id);
+          localStorage.setItem('user_role_verified', Date.now().toString());
+        }
+        
+        setVerifiedRole(contextRole);
+        setIsVerifying(false);
+        return;
+      }
+      
+      // No contextRole yet - check localStorage but verify user ID matches
+      const cachedRole = localStorage.getItem('user_role');
+      const cachedRoleId = localStorage.getItem('user_role_id');
+      
+      if (cachedRole && cachedRoleId === user.id) {
+        console.log('🔐 Using cached role (ID matches):', cachedRole);
+        setVerifiedRole(cachedRole);
+        setIsVerifying(false);
+        return;
+      }
+      
+      // localStorage doesn't match - clear it and wait for contextRole
+      console.log('🔐 localStorage mismatch, clearing...');
+      localStorage.removeItem('user_role');
+      localStorage.removeItem('user_role_id');
+      setVerifiedRole(null);
+      setIsVerifying(false);
+    };
+    
+    verifyRole();
+  }, [user, authLoading, contextRole]);
 
-  // Determine the effective role
-  const effectiveRole = contextRole || cachedRole;
-  const hasValidSession = user || cachedEmail || isValidAdminSession;
+  // Timeout - stop verifying after 3 seconds
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (isVerifying) {
+        console.log('🔐 Verification timeout');
+        setIsVerifying(false);
+      }
+    }, 3000);
+    return () => clearTimeout(timeout);
+  }, [isVerifying]);
 
-  console.log('🔐 RoleProtectedRoute:', location.pathname);
-  console.log('   Auth loading:', authLoading);
-  console.log('   User:', user?.email || cachedEmail || 'NONE');
-  console.log('   Role (context):', contextRole || 'NONE');
-  console.log('   Role (cached):', cachedRole || 'NONE');
-  console.log('   Allowed:', allowedRoles.join(', '));
+  console.log('🔐 RoleProtectedRoute:', location.pathname, 'verifiedRole:', verifiedRole, 'isVerifying:', isVerifying);
 
-  // INSTANT GRANT: If localStorage has matching role, grant immediately
-  if (cachedRole && cachedRoleId) {
-    if (cachedRole === 'admin' || allowedRoles.includes(cachedRole)) {
-      console.log('✅ INSTANT GRANT from localStorage:', cachedRole);
-      return <>{children}</>;
-    }
-  }
-
-  // Admin session - always grant
-  if (isValidAdminSession) {
-    console.log('👑 Admin session - GRANTED');
-    return <>{children}</>;
-  }
-
-  // If auth is still loading but we have no localStorage, show spinner briefly
-  if (authLoading && !cachedRole) {
+  // Still verifying
+  if (isVerifying) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="text-center">
@@ -70,39 +116,42 @@ export const RoleProtectedRoute = ({
     );
   }
 
-  // Check context role (after auth loaded)
-  if (contextRole) {
-    if (contextRole === 'admin' || allowedRoles.includes(contextRole)) {
-      console.log('✅ Context role matches - GRANTED');
-      return <>{children}</>;
-    }
-  }
-
-  // No valid session at all - redirect to auth
-  if (!hasValidSession) {
-    console.log('🚫 No session - redirecting to auth');
+  // No user and no admin session - redirect to auth
+  if (!user && verifiedRole !== 'admin') {
+    console.log('🚫 No user - redirecting to auth');
     return <Navigate to={`/auth?redirect=${encodeURIComponent(location.pathname)}`} replace />;
   }
 
-  // Has session but wrong role - redirect to correct dashboard
-  const roleToUse = effectiveRole;
-  console.log('🔄 Wrong role:', roleToUse, '- redirecting to correct dashboard');
+  // Admin - always grant
+  if (verifiedRole === 'admin') {
+    console.log('👑 Admin - GRANTED');
+    return <>{children}</>;
+  }
+
+  // Check if role matches
+  if (verifiedRole && allowedRoles.includes(verifiedRole)) {
+    console.log('✅ Role matches - GRANTED:', verifiedRole);
+    return <>{children}</>;
+  }
+
+  // Wrong role - redirect to correct dashboard
+  console.log('🚫 Wrong role:', verifiedRole, 'not in', allowedRoles);
   
-  if (roleToUse === 'supplier') {
+  if (verifiedRole === 'supplier') {
     return <Navigate to="/supplier-dashboard" replace />;
   }
-  if (roleToUse === 'professional_builder' || roleToUse === 'builder') {
+  if (verifiedRole === 'professional_builder' || verifiedRole === 'builder') {
     return <Navigate to="/professional-builder-dashboard" replace />;
   }
-  if (roleToUse === 'private_client') {
+  if (verifiedRole === 'private_client') {
     return <Navigate to="/private-client-dashboard" replace />;
   }
-  if (roleToUse === 'delivery_provider' || roleToUse === 'delivery') {
+  if (verifiedRole === 'delivery_provider' || verifiedRole === 'delivery') {
     return <Navigate to="/delivery-dashboard" replace />;
   }
 
-  // Fallback - go to home
-  console.log('🚫 No matching role - redirecting to home');
+  // No role - redirect to home
+  console.log('🚫 No role - redirecting to home');
   return <Navigate to="/home" replace />;
 };
 
