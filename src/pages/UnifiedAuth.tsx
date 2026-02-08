@@ -8,7 +8,7 @@
  * - Redirects to role-specific dashboard after auth
  */
 
-console.log('🔐 UnifiedAuth BUILD v5 - getSession Feb 8 2026');
+console.log('🔐 UnifiedAuth BUILD v6 - debug getSession Feb 8 2026');
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
@@ -119,15 +119,20 @@ const UnifiedAuth: React.FC = () => {
   
   // Check if already logged in on page load
   useEffect(() => {
-    // Check session directly - more reliable than onAuthStateChange
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    console.log('🔐 UnifiedAuth: Checking session...');
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      console.log('🔐 UnifiedAuth: getSession result:', session?.user?.email, 'error:', error);
       if (session?.user) {
-        console.log('🔐 UnifiedAuth: Already logged in, redirecting to dashboard');
         const destination = redirectTo || roleConfig.dashboard;
+        console.log('🔐 UnifiedAuth: REDIRECTING to:', destination);
         window.location.href = destination;
+      } else {
+        console.log('🔐 UnifiedAuth: No session, showing form');
       }
+    }).catch(err => {
+      console.error('🔐 UnifiedAuth: getSession error:', err);
     });
-  }, [redirectTo, roleConfig.dashboard]);
+  }, []); // Empty deps - run only once on mount
   
   const getDashboardForRole = (role: string): string => {
     switch (role) {
