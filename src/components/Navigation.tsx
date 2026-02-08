@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Menu, X, BookOpen } from "lucide-react";
@@ -8,124 +7,28 @@ import { useToast } from "@/hooks/use-toast";
 import { User, Session } from '@supabase/supabase-js';
 import { UserGuideMenu } from "@/components/ui/user-guide-menu";
 import { UjenziXformLogo, UserAvatar } from "@/components/common/ProfilePicture";
+import { useAuth } from "@/contexts/AuthContext";
+
+console.log('🧭 Navigation BUILD v2 - using useAuth Feb 8 2026');
 
 const Navigation = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [userRole, setUserRole] = useState<string | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const [isAuthLoading, setIsAuthLoading] = useState(true);
   const location = useLocation();
   const { toast } = useToast();
-
-
-  useEffect(() => {
-    // ✅ PERFORMANCE: Use cached data immediately for instant display
-    const cachedEmail = localStorage.getItem('user_email');
-    const cachedRole = localStorage.getItem('user_role');
-    const cachedRoleId = localStorage.getItem('user_role_id');
-    
-    // If we have cached data, show user as logged in immediately
-    if (cachedEmail && cachedRole && cachedRoleId) {
-      setUser({ email: cachedEmail, id: cachedRoleId } as any);
-      setUserRole(cachedRole);
-      setIsAuthLoading(false);
-    }
-
-    // Track last fetched user ID to prevent duplicate DB calls
-    let lastFetchedUserId: string | null = null;
-
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        // Cache email for instant display on next page load
-        if (session?.user?.email) {
-          localStorage.setItem('user_email', session.user.email);
-        }
-        
-        // ✅ PERFORMANCE: Only fetch role if user ID changed (skip duplicate events)
-        if (session?.user && session.user.id !== lastFetchedUserId) {
-          lastFetchedUserId = session.user.id;
-          
-          // Use cached role if available
-          const cachedRoleId = localStorage.getItem('user_role_id');
-          const cachedRole = localStorage.getItem('user_role');
-          if (cachedRole && cachedRoleId === session.user.id) {
-            setUserRole(cachedRole);
-            return; // Skip DB call
-          }
-          
-          const { data: roleData } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', session.user.id)
-            .limit(1)
-            .maybeSingle();
-          const role = roleData?.role || null;
-          setUserRole(role);
-          if (role) {
-            localStorage.setItem('user_role', role);
-            localStorage.setItem('user_role_id', session.user.id);
-          }
-        } else if (!session?.user) {
-          setUserRole(null);
-          lastFetchedUserId = null;
-        }
-      }
-    );
-
-    // Check for existing session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      // Cache email for instant display
-      if (session?.user?.email) {
-        localStorage.setItem('user_email', session.user.email);
-      }
-      
-      // ✅ PERFORMANCE: Use cached role if available and matches user
-      if (session?.user) {
-        const cachedRoleId = localStorage.getItem('user_role_id');
-        const cachedRole = localStorage.getItem('user_role');
-        if (cachedRole && cachedRoleId === session.user.id) {
-          setUserRole(cachedRole);
-          lastFetchedUserId = session.user.id;
-          setIsAuthLoading(false);
-          return; // Skip DB call
-        }
-        
-        const { data: roleData } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', session.user.id)
-          .limit(1)
-          .maybeSingle();
-        const role = roleData?.role || null;
-        setUserRole(role);
-        lastFetchedUserId = session.user.id;
-        if (role) {
-          localStorage.setItem('user_role', role);
-          localStorage.setItem('user_role_id', session.user.id);
-        }
-      }
-      setIsAuthLoading(false);
-    }).catch(() => {
-      setIsAuthLoading(false);
-    });
-
-    // Safety timeout - stop loading after 2 seconds max
-    const timeout = setTimeout(() => setIsAuthLoading(false), 2000);
-
-    return () => {
-      subscription.unsubscribe();
-      clearTimeout(timeout);
-    };
-  }, []);
+  
+  // Use AuthContext for user state - single source of truth
+  const { user: authUser, userRole: authRole, loading: authLoading } = useAuth();
+  
+  // Also check localStorage for instant display (before auth loads)
+  const cachedEmail = localStorage.getItem('user_email');
+  const cachedRole = localStorage.getItem('user_role');
+  const cachedRoleId = localStorage.getItem('user_role_id');
+  
+  // Use auth context if available, otherwise fall back to localStorage
+  const user = authUser || (cachedEmail && cachedRoleId ? { email: cachedEmail, id: cachedRoleId } as any : null);
+  const userRole = authRole || cachedRole;
+  const isAuthLoading = authLoading && !cachedEmail;
 
   // Public navigation items (visible to everyone)
   const publicNavItems = [
