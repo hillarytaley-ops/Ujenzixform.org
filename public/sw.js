@@ -5,7 +5,7 @@
 //           periodic sync, share target, file handling
 // ============================================================
 
-const CACHE_VERSION = 'v31';
+const CACHE_VERSION = 'v32';
 const STATIC_CACHE = `UjenziXform-static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `UjenziXform-dynamic-${CACHE_VERSION}`;
 const API_CACHE = `UjenziXform-api-${CACHE_VERSION}`;
@@ -370,8 +370,10 @@ function isImageRequest(request) {
 }
 
 function isStaticAsset(url) {
+  // IMPORTANT: Don't cache JS/CSS files - they should always be fresh
+  // Only cache fonts and explicitly listed static assets
   return (
-    url.pathname.match(/\.(js|css|woff|woff2|ttf|eot)(\?.*)?$/i) ||
+    url.pathname.match(/\.(woff|woff2|ttf|eot)(\?.*)?$/i) ||
     STATIC_ASSETS.includes(url.pathname)
   );
 }

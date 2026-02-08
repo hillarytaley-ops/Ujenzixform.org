@@ -14,6 +14,8 @@
  * ╚══════════════════════════════════════════════════════════════════════════════╝
  */
 
+console.log('🔐 SupplierSignIn BUILD v3 - Feb 8 2026');
+
 import { useState, useEffect } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";

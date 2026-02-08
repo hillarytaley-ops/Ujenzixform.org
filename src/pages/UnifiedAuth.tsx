@@ -8,6 +8,8 @@
  * - Redirects to role-specific dashboard after auth
  */
 
+console.log('🔐 UnifiedAuth BUILD v3 - Feb 8 2026');
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
