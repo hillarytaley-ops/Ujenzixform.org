@@ -310,10 +310,9 @@ const BuilderSignIn = () => {
         description: "Redirecting to dashboard...",
       });
 
-      // Redirect to builder dashboard
-      setTimeout(() => {
-        window.location.href = '/builder-dashboard';
-      }, 500);
+      // Redirect to builder dashboard IMMEDIATELY
+      window.location.replace('/builder-dashboard');
+      return;
 
     } catch (error: any) {
       console.error('Sign in exception:', error);
@@ -322,6 +321,7 @@ const BuilderSignIn = () => {
         title: "Error",
         description: "An unexpected error occurred. Please try again."
       });
+    } finally {
       setLoading(false);
     }
   };

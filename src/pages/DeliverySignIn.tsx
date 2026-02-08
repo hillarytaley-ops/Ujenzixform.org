@@ -517,9 +517,7 @@ const DeliverySignIn = () => {
             description: "Welcome! Redirecting to dashboard...",
           });
 
-          setTimeout(() => {
-            window.location.href = '/delivery-dashboard';
-          }, 500);
+          window.location.replace('/delivery-dashboard');
           return;
         }
       }
@@ -575,9 +573,9 @@ const DeliverySignIn = () => {
         description: "Welcome! Redirecting to dashboard...",
       });
 
-      setTimeout(() => {
-        window.location.href = '/delivery-dashboard';
-      }, 500);
+      // Redirect IMMEDIATELY
+      window.location.replace('/delivery-dashboard');
+      return;
 
     } catch (error: any) {
       console.error('Sign up exception:', error);
@@ -586,6 +584,7 @@ const DeliverySignIn = () => {
         title: "Error",
         description: "An unexpected error occurred."
       });
+    } finally {
       setLoading(false);
     }
   };

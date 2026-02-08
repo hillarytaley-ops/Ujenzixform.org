@@ -316,10 +316,9 @@ const SupplierSignIn = () => {
         description: "Redirecting to dashboard...",
       });
 
-      // Redirect to supplier dashboard
-      setTimeout(() => {
-        window.location.href = '/supplier-dashboard';
-      }, 500);
+      // Redirect to supplier dashboard IMMEDIATELY
+      window.location.replace('/supplier-dashboard');
+      return;
 
     } catch (error: any) {
       console.error('Sign in exception:', error);
@@ -328,6 +327,7 @@ const SupplierSignIn = () => {
         title: "Error",
         description: "An unexpected error occurred. Please try again."
       });
+    } finally {
       setLoading(false);
     }
   };
