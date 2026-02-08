@@ -1,6 +1,6 @@
 /**
  * PrivateClientAuth - Auth page ONLY for Private Clients
- * BUILD v2 - With timeout for DB query
+ * BUILD v3 - STRICT: Deny if DB check fails
  */
 
 import React, { useState, useEffect } from 'react';
@@ -18,7 +18,7 @@ const ROLE = 'private_client';
 const DASHBOARD = '/private-client-dashboard';
 const TITLE = 'Private Builder';
 
-console.log('🔐 PrivateClientAuth BUILD v2');
+console.log('🔐 PrivateClientAuth BUILD v3 - STRICT');
 
 const PrivateClientAuth: React.FC = () => {
   const { toast } = useToast();
@@ -42,52 +42,60 @@ const PrivateClientAuth: React.FC = () => {
       if (event !== 'SIGNED_IN' && event !== 'INITIAL_SESSION') return;
       
       redirected = true;
-      
-      // Set a timeout - if DB query takes too long, proceed anyway
-      const timeoutId = setTimeout(() => {
-        console.log('🔐 PrivateClientAuth: DB timeout - proceeding');
-        localStorage.setItem('user_role', ROLE);
-        localStorage.setItem('user_role_id', session.user.id);
-        localStorage.setItem('user_email', session.user.email || '');
-        window.location.href = DASHBOARD;
-      }, 3000);
+      setIsLoading(true);
       
       try {
-        // Check if user has correct role
+        // Check if user has correct role - MUST succeed
         const { data: roleData, error } = await supabase
           .from('user_roles')
           .select('role')
           .eq('user_id', session.user.id)
           .maybeSingle();
 
-        clearTimeout(timeoutId);
-        
         console.log('🔐 PrivateClientAuth: DB role:', roleData?.role, 'Error:', error);
 
-        if (roleData?.role && roleData.role !== ROLE) {
-          // Wrong role - sign out and show error
+        // If no role found, this might be a new user - allow them (they'll get role assigned)
+        if (!roleData?.role) {
+          console.log('🔐 PrivateClientAuth: No role found - new user, allowing');
+          localStorage.setItem('user_role', ROLE);
+          localStorage.setItem('user_role_id', session.user.id);
+          localStorage.setItem('user_email', session.user.email || '');
+          window.location.href = DASHBOARD;
+          return;
+        }
+
+        // If role exists but doesn't match - DENY
+        if (roleData.role !== ROLE) {
+          console.log('🔐 PrivateClientAuth: WRONG ROLE - denying');
           toast({
             title: 'Access Denied',
             description: `This portal is for ${TITLE}s only. You are registered as ${roleData.role.replace('_', ' ')}.`,
             variant: 'destructive'
           });
           await supabase.auth.signOut();
+          localStorage.clear();
           redirected = false;
+          setIsLoading(false);
           return;
         }
 
-        // Correct role or new user - proceed
+        // Role matches - allow
+        console.log('🔐 PrivateClientAuth: Role matches - allowing');
         localStorage.setItem('user_role', ROLE);
         localStorage.setItem('user_role_id', session.user.id);
         localStorage.setItem('user_email', session.user.email || '');
         window.location.href = DASHBOARD;
+        
       } catch (e) {
-        clearTimeout(timeoutId);
-        console.log('🔐 PrivateClientAuth: DB error, proceeding anyway');
-        localStorage.setItem('user_role', ROLE);
-        localStorage.setItem('user_role_id', session.user.id);
-        localStorage.setItem('user_email', session.user.email || '');
-        window.location.href = DASHBOARD;
+        console.error('🔐 PrivateClientAuth: DB error:', e);
+        toast({
+          title: 'Error',
+          description: 'Could not verify your role. Please try again.',
+          variant: 'destructive'
+        });
+        await supabase.auth.signOut();
+        redirected = false;
+        setIsLoading(false);
       }
     });
     
@@ -97,18 +105,15 @@ const PrivateClientAuth: React.FC = () => {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    const safetyTimeout = setTimeout(() => setIsLoading(false), 5000);
 
     try {
       const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
       if (error) {
-        clearTimeout(safetyTimeout);
         setIsLoading(false);
         toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
       }
       // Success handled by onAuthStateChange
     } catch (error: any) {
-      clearTimeout(safetyTimeout);
       setIsLoading(false);
       toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
     }

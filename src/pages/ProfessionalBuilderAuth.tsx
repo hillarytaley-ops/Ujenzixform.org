@@ -1,6 +1,6 @@
 /**
  * ProfessionalBuilderAuth - Auth page ONLY for Professional Builders
- * BUILD v2 - With timeout for DB query
+ * BUILD v3 - STRICT: Deny if DB check fails
  */
 
 import React, { useState, useEffect } from 'react';
@@ -18,7 +18,7 @@ const ROLE = 'professional_builder';
 const DASHBOARD = '/professional-builder-dashboard';
 const TITLE = 'Professional Builder';
 
-console.log('🔐 ProfessionalBuilderAuth BUILD v2');
+console.log('🔐 ProfessionalBuilderAuth BUILD v3 - STRICT');
 
 const ProfessionalBuilderAuth: React.FC = () => {
   const { toast } = useToast();
@@ -42,14 +42,7 @@ const ProfessionalBuilderAuth: React.FC = () => {
       if (event !== 'SIGNED_IN' && event !== 'INITIAL_SESSION') return;
       
       redirected = true;
-      
-      const timeoutId = setTimeout(() => {
-        console.log('🔐 ProfessionalBuilderAuth: DB timeout - proceeding');
-        localStorage.setItem('user_role', ROLE);
-        localStorage.setItem('user_role_id', session.user.id);
-        localStorage.setItem('user_email', session.user.email || '');
-        window.location.href = DASHBOARD;
-      }, 3000);
+      setIsLoading(true);
       
       try {
         const { data: roleData, error } = await supabase
@@ -58,17 +51,28 @@ const ProfessionalBuilderAuth: React.FC = () => {
           .eq('user_id', session.user.id)
           .maybeSingle();
 
-        clearTimeout(timeoutId);
         console.log('🔐 ProfessionalBuilderAuth: DB role:', roleData?.role);
 
-        if (roleData?.role && roleData.role !== ROLE) {
+        if (!roleData?.role) {
+          console.log('🔐 ProfessionalBuilderAuth: No role found - new user');
+          localStorage.setItem('user_role', ROLE);
+          localStorage.setItem('user_role_id', session.user.id);
+          localStorage.setItem('user_email', session.user.email || '');
+          window.location.href = DASHBOARD;
+          return;
+        }
+
+        if (roleData.role !== ROLE) {
+          console.log('🔐 ProfessionalBuilderAuth: WRONG ROLE - denying');
           toast({
             title: 'Access Denied',
             description: `This portal is for ${TITLE}s only. You are registered as ${roleData.role.replace('_', ' ')}.`,
             variant: 'destructive'
           });
           await supabase.auth.signOut();
+          localStorage.clear();
           redirected = false;
+          setIsLoading(false);
           return;
         }
 
@@ -76,12 +80,17 @@ const ProfessionalBuilderAuth: React.FC = () => {
         localStorage.setItem('user_role_id', session.user.id);
         localStorage.setItem('user_email', session.user.email || '');
         window.location.href = DASHBOARD;
+        
       } catch (e) {
-        clearTimeout(timeoutId);
-        localStorage.setItem('user_role', ROLE);
-        localStorage.setItem('user_role_id', session.user.id);
-        localStorage.setItem('user_email', session.user.email || '');
-        window.location.href = DASHBOARD;
+        console.error('🔐 ProfessionalBuilderAuth: DB error:', e);
+        toast({
+          title: 'Error',
+          description: 'Could not verify your role. Please try again.',
+          variant: 'destructive'
+        });
+        await supabase.auth.signOut();
+        redirected = false;
+        setIsLoading(false);
       }
     });
     
@@ -91,17 +100,14 @@ const ProfessionalBuilderAuth: React.FC = () => {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    const safetyTimeout = setTimeout(() => setIsLoading(false), 5000);
 
     try {
       const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
       if (error) {
-        clearTimeout(safetyTimeout);
         setIsLoading(false);
         toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
       }
     } catch (error: any) {
-      clearTimeout(safetyTimeout);
       setIsLoading(false);
       toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
     }
