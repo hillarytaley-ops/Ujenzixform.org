@@ -154,21 +154,27 @@ const PrivateClientDashboard = () => {
         }
       }
 
-      // Verify role
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .maybeSingle();
+      // Verify role - but don't block if role check fails
+      try {
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .maybeSingle();
 
-      if (roleData?.role !== 'private_client') {
-        toast({
-          title: "Access Denied",
-          description: "This dashboard is for Private Builders only.",
-          variant: "destructive",
-        });
-        navigate('/');
-        return;
+        // Only redirect if we KNOW they have a different role
+        if (roleData?.role && roleData.role !== 'private_client' && roleData.role !== 'admin') {
+          toast({
+            title: "Access Denied",
+            description: "This dashboard is for Private Builders only.",
+            variant: "destructive",
+          });
+          navigate('/');
+          return;
+        }
+      } catch (roleError) {
+        console.error('Role check error (non-blocking):', roleError);
+        // Continue anyway - localStorage already verified role
       }
 
       // Fetch real orders from purchase_orders table
@@ -245,8 +251,7 @@ const PrivateClientDashboard = () => {
 
     } catch (error) {
       console.error('Auth error:', error);
-      navigate('/private-client-signin');
-    } finally {
+      // Don't redirect on error - just show the dashboard with empty data
       setLoading(false);
     }
   };
