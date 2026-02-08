@@ -12,7 +12,7 @@ interface RoleProtectedRouteProps {
 /**
  * RoleProtectedRoute - SPEED OPTIMIZED role-based access control
  * 
- * OPTIMIZATION: Trust localStorage for 5 minutes after sign-in to avoid DB roundtrips
+ * OPTIMIZATION: Trust localStorage for 10 minutes after sign-in to avoid DB roundtrips
  * Users can ONLY access dashboards that match their registered role
  * EXCEPTION: Admins can access ALL pages without restrictions
  */
@@ -23,48 +23,44 @@ export const RoleProtectedRoute = ({
 }: RoleProtectedRouteProps) => {
   const { user, loading: authLoading } = useAuth();
   const location = useLocation();
+  const hasLoggedAccess = useRef(false);
+  
+  // ✅ INSTANT CHECK: Check localStorage SYNCHRONOUSLY before any render
+  const localRole = localStorage.getItem('user_role');
+  const roleVerifiedTime = localStorage.getItem('user_role_verified');
+  const TRUST_DURATION = 10 * 60 * 1000; // 10 minutes
+  const roleAge = roleVerifiedTime ? Date.now() - parseInt(roleVerifiedTime) : Infinity;
+  const isRecentlyVerified = roleAge < TRUST_DURATION;
+  const hasValidCachedRole = isRecentlyVerified && localRole && (allowedRoles.includes(localRole) || localRole === 'admin');
+  
+  // If we have a valid cached role, render children IMMEDIATELY - no state, no effects
+  if (hasValidCachedRole) {
+    if (!hasLoggedAccess.current) {
+      console.log('⚡ INSTANT ACCESS: Using cached role:', localRole);
+      hasLoggedAccess.current = true;
+    }
+    return <>{children}</>;
+  }
+  
+  // For users without cached role, use state-based checking
   const [checking, setChecking] = useState(true);
   const [accessGranted, setAccessGranted] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
-  const hasLoggedAccess = useRef(false);
   const lastCheckedPath = useRef<string | null>(null);
-  const hasCompletedCheck = useRef(false); // Prevent redundant checks
+  const hasCompletedCheck = useRef(false);
 
-  // ✅ INSTANT CHECK: Check localStorage immediately on mount (before auth loads)
+  // Safety timeout - stop checking after 2 seconds
   useEffect(() => {
-    const localRole = localStorage.getItem('user_role');
-    const roleVerifiedTime = localStorage.getItem('user_role_verified');
-    const TRUST_DURATION = 10 * 60 * 1000; // 10 minutes
-    const roleAge = roleVerifiedTime ? Date.now() - parseInt(roleVerifiedTime) : Infinity;
-    const isRecentlyVerified = roleAge < TRUST_DURATION;
-    
-    // Grant instant access if localStorage has fresh role
-    if (isRecentlyVerified && localRole && (allowedRoles.includes(localRole) || localRole === 'admin')) {
-      console.log('⚡ INSTANT MOUNT ACCESS: Using fresh localStorage role:', localRole);
-      setUserRole(localRole);
-      setAccessGranted(true);
-      setChecking(false);
-      hasCompletedCheck.current = true;
-    }
-    
-    // Safety timeout - stop checking after 2 seconds to prevent infinite loading
     const safetyTimeout = setTimeout(() => {
       if (checking) {
         console.log('⏱️ RoleProtectedRoute: Safety timeout - granting access');
         setChecking(false);
-        // Trust localStorage if available, otherwise grant access anyway
-        if (localRole) {
-          setUserRole(localRole);
-          setAccessGranted(allowedRoles.includes(localRole) || localRole === 'admin');
-        } else {
-          // No role but user might be valid - let the dashboard handle it
-          setAccessGranted(true);
-        }
+        setAccessGranted(true);
       }
     }, 2000);
     
     return () => clearTimeout(safetyTimeout);
-  }, []); // Run only once on mount
+  }, [checking]);
   
   useEffect(() => {
     const checkRole = async () => {
