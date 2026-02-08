@@ -8,7 +8,7 @@
  * - Redirects to role-specific dashboard after auth
  */
 
-console.log('🔐 UnifiedAuth BUILD v15 - INSTANT REDIRECT Feb 8 2026');
+console.log('🔐 UnifiedAuth BUILD v16 - NO DB CALLS Feb 8 2026');
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
@@ -117,67 +117,18 @@ const UnifiedAuth: React.FC = () => {
   const roleConfig = ROLE_CONFIG[roleParam] || ROLE_CONFIG.private_client;
   const RoleIcon = roleConfig.icon;
   
-  // Check if already logged in on page load - redirect to their ACTUAL dashboard
+  // Check if already logged in on page load
   useEffect(() => {
-    let handled = false;
+    // Check localStorage for existing session
+    const cachedRole = localStorage.getItem('user_role');
+    const cachedRoleId = localStorage.getItem('user_role_id');
+    const cachedEmail = localStorage.getItem('user_email');
     
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (handled) return;
-      
-      console.log('🔐 UnifiedAuth: Auth event:', event, session?.user?.email);
-      
-      if (session?.user) {
-        handled = true;
-        
-        // Check localStorage ONLY if user ID matches (security check)
-        const cachedRole = localStorage.getItem('user_role');
-        const cachedRoleId = localStorage.getItem('user_role_id');
-        const roleVerified = localStorage.getItem('user_role_verified');
-        const isFresh = roleVerified && (Date.now() - parseInt(roleVerified)) < 10 * 60 * 1000;
-        
-        if (cachedRole && cachedRoleId === session.user.id && isFresh) {
-          console.log('🔐 UnifiedAuth: Using verified cached role:', cachedRole);
-          const destination = getDashboardForRole(cachedRole);
-          window.location.href = destination;
-          return;
-        }
-        
-        // MUST fetch from database - no fallback to URL parameter
-        supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', session.user.id)
-          .maybeSingle()
-          .then(({ data: roleData }) => {
-            if (!roleData?.role) {
-              // No role in database - user is not properly registered
-              console.log('🔐 UnifiedAuth: No role in DB - redirecting to home');
-              window.location.href = '/home';
-              return;
-            }
-            
-            const dbRole = roleData.role;
-            console.log('🔐 UnifiedAuth: Database role:', dbRole);
-            
-            // Store the DATABASE role (not URL parameter)
-            localStorage.setItem('user_role', dbRole);
-            localStorage.setItem('user_role_id', session.user.id);
-            localStorage.setItem('user_role_verified', Date.now().toString());
-            localStorage.setItem('user_email', session.user.email || '');
-            
-            const destination = getDashboardForRole(dbRole);
-            console.log('🔐 UnifiedAuth: REDIRECTING to:', destination);
-            window.location.href = destination;
-          })
-          .catch((err) => {
-            console.error('🔐 UnifiedAuth: DB error:', err);
-            // On error, redirect to home - don't trust URL parameter
-            window.location.href = '/home';
-          });
-      }
-    });
-    
-    return () => subscription.unsubscribe();
+    if (cachedRole && cachedRoleId && cachedEmail) {
+      console.log('🔐 UnifiedAuth: Already logged in, redirecting...');
+      const destination = getDashboardForRole(cachedRole);
+      window.location.href = destination;
+    }
   }, []);
   
   const getDashboardForRole = (role: string): string => {
