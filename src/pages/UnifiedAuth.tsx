@@ -8,7 +8,7 @@
  * - Redirects to role-specific dashboard after auth
  */
 
-console.log('🔐 UnifiedAuth BUILD v19 - SECURE + onAuthStateChange Feb 8 2026');
+console.log('🔐 UnifiedAuth BUILD v20 - 2s DB TIMEOUT Feb 8 2026');
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
@@ -119,7 +119,7 @@ const UnifiedAuth: React.FC = () => {
   
   // Listen for auth state changes - this is how we detect successful sign-in
   useEffect(() => {
-    // Check localStorage first for instant redirect (only if user ID matches)
+    // Check localStorage first for instant redirect
     const cachedRole = localStorage.getItem('user_role');
     const cachedRoleId = localStorage.getItem('user_role_id');
     const cachedEmail = localStorage.getItem('user_email');
@@ -130,42 +130,52 @@ const UnifiedAuth: React.FC = () => {
       return;
     }
     
+    let hasRedirected = false;
+    
+    const redirect = (user: any, role: string) => {
+      if (hasRedirected) return;
+      hasRedirected = true;
+      
+      console.log('🔐 UnifiedAuth: REDIRECTING with role:', role);
+      localStorage.setItem('user_role', role);
+      localStorage.setItem('user_role_id', user.id);
+      localStorage.setItem('user_role_verified', Date.now().toString());
+      localStorage.setItem('user_email', user.email || '');
+      window.location.href = getDashboardForRole(role);
+    };
+    
     // Listen for SIGNED_IN event
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('🔐 UnifiedAuth: Auth event:', event);
       
-      if (event === 'SIGNED_IN' && session?.user) {
-        console.log('🔐 UnifiedAuth: SIGNED_IN detected, checking DB role...');
+      if (event === 'SIGNED_IN' && session?.user && !hasRedirected) {
+        console.log('🔐 UnifiedAuth: SIGNED_IN - fetching role...');
         
-        // SECURITY: Get actual role from database
-        const { data: roleData } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', session.user.id)
-          .maybeSingle();
+        // Set a hard timeout - redirect with portal role after 2s no matter what
+        const timeoutId = setTimeout(() => {
+          console.log('🔐 UnifiedAuth: TIMEOUT - using portal role');
+          redirect(session.user, roleParam);
+        }, 2000);
         
-        const dbRole = roleData?.role;
-        console.log('🔐 UnifiedAuth: DB role:', dbRole, 'Portal role:', roleParam);
-        
-        // Use database role if exists, otherwise use portal role for new users
-        const actualRole = dbRole || roleParam;
-        
-        // Store ACTUAL role in localStorage
-        localStorage.setItem('user_role', actualRole);
-        localStorage.setItem('user_role_id', session.user.id);
-        localStorage.setItem('user_role_verified', Date.now().toString());
-        localStorage.setItem('user_email', session.user.email || '');
-        
-        // Redirect to ACTUAL dashboard (not the portal they tried to use)
-        const destination = getDashboardForRole(actualRole);
-        console.log('🔐 UnifiedAuth: Redirecting to:', destination);
-        
-        // Show toast if they used wrong portal
-        if (dbRole && dbRole !== roleParam) {
-          console.log('🔐 UnifiedAuth: Wrong portal! User is', dbRole, 'not', roleParam);
-        }
-        
-        window.location.href = destination;
+        // Try to fetch DB role
+        fetch(`https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/user_roles?user_id=eq.${session.user.id}&select=role`, {
+          headers: {
+            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzI2MTcyMjIsImV4cCI6MjA0ODE5MzIyMn0.WmMfuhGPYrJnEJBBBFUlq8gCtSJ3Mj_TYkDYLUv0hYk',
+            'Authorization': `Bearer ${session.access_token}`
+          }
+        })
+        .then(res => res.json())
+        .then(data => {
+          clearTimeout(timeoutId);
+          const dbRole = data?.[0]?.role;
+          console.log('🔐 UnifiedAuth: DB returned role:', dbRole);
+          redirect(session.user, dbRole || roleParam);
+        })
+        .catch(err => {
+          clearTimeout(timeoutId);
+          console.log('🔐 UnifiedAuth: DB error:', err);
+          redirect(session.user, roleParam);
+        });
       }
     });
     
