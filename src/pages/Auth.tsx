@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 
-console.log('🔐 Auth.tsx BUILD v5 - FINAL FIX Feb 8 2026');
+console.log('🔐 Auth.tsx BUILD v6 - IMMEDIATE REDIRECT Feb 8 2026');
 
 const Auth = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -53,30 +53,14 @@ const Auth = () => {
   }, [shouldRedirect]);
 
   useEffect(() => {
-    // Check if already logged in on page load
+    // Check if already logged in on page load - redirect IMMEDIATELY
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        console.log('🔐 Already logged in, redirecting...');
-        // Store role and redirect
-        supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', session.user.id)
-          .maybeSingle()
-          .then(({ data: roleData }) => {
-            if (roleData?.role) {
-              localStorage.setItem('user_role', roleData.role);
-              localStorage.setItem('user_role_id', session.user.id);
-              localStorage.setItem('user_role_verified', Date.now().toString());
-            }
-            setShouldRedirect(redirectTo || '/home');
-          })
-          .catch(() => {
-            setShouldRedirect(redirectTo || '/home');
-          });
+        console.log('🔐 Already logged in, redirecting NOW to:', redirectTo || '/home');
+        window.location.href = redirectTo || '/home';
       }
     });
-  }, [redirectTo]);
+  }, []);
 
   const signUp = async (email: string, password: string) => {
     try {
