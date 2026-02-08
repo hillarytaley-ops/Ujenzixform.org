@@ -1,10 +1,9 @@
 /**
  * UnifiedAuth - Single authentication page for all user roles
- * 
- * BUILD v23 - NO DB QUERIES - Let RoleProtectedRoute handle security
+ * BUILD v25 - Same pattern as main Auth.tsx (working)
  */
 
-console.log('🔐 UnifiedAuth BUILD v23 - NO DB AT SIGNIN Feb 8 2026');
+console.log('🔐 UnifiedAuth BUILD v25 - SAME AS MAIN AUTH Feb 8 2026');
 
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
@@ -20,7 +19,6 @@ import {
   ArrowLeft, Mail, Lock, User, Phone, MapPin, ChevronRight
 } from 'lucide-react';
 
-// Role configuration
 const ROLE_CONFIG = {
   private_client: {
     title: 'Private Builder',
@@ -85,63 +83,58 @@ const UnifiedAuth: React.FC = () => {
   
   const roleConfig = ROLE_CONFIG[roleParam] || ROLE_CONFIG.private_client;
   const RoleIcon = roleConfig.icon;
-  
-  // Check if already logged in
+
+  // Listen for auth state changes - SAME PATTERN AS MAIN AUTH
   useEffect(() => {
-    const cachedRole = localStorage.getItem('user_role');
-    const cachedEmail = localStorage.getItem('user_email');
+    let redirected = false;
     
-    if (cachedRole && cachedEmail) {
-      console.log('🔐 Already logged in as', cachedRole);
-      // Go to their dashboard - RoleProtectedRoute will verify
-      window.location.href = getDashboardForRole(cachedRole);
-    }
-  }, []);
-  
-  const getDashboardForRole = (role: string): string => {
-    switch (role) {
-      case 'private_client': return '/private-client-dashboard';
-      case 'professional_builder': return '/professional-builder-dashboard';
-      case 'supplier': return '/supplier-dashboard';
-      case 'delivery': return '/delivery-dashboard';
-      case 'admin': return '/admin-dashboard';
-      default: return '/suppliers';
-    }
-  };
-  
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('🔐 UnifiedAuth: Auth event:', event, session?.user?.email);
+      
+      if (!redirected && session?.user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+        redirected = true;
+        
+        // Store role info
+        localStorage.setItem('user_role', roleParam);
+        localStorage.setItem('user_role_id', session.user.id);
+        localStorage.setItem('user_email', session.user.email || '');
+        
+        console.log('🔐 UnifiedAuth: REDIRECTING to', roleConfig.dashboard);
+        window.location.href = roleConfig.dashboard;
+      }
+    });
+    
+    return () => subscription.unsubscribe();
+  }, [roleParam, roleConfig.dashboard]);
+
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    console.log('🔐 Sign-in for', email);
     
-    // Use a simple callback approach - no await that can hang
-    supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password
-    }).then(({ data, error }) => {
+    // Safety timeout
+    const safetyTimeout = setTimeout(() => setIsLoading(false), 5000);
+    
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password
+      });
+      
       if (error) {
-        console.log('🔐 Error:', error.message);
-        toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
+        clearTimeout(safetyTimeout);
         setIsLoading(false);
+        toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
         return;
       }
       
-      if (data.user) {
-        console.log('🔐 Success! Storing portal role and redirecting...');
-        // Store portal role - RoleProtectedRoute will verify against DB
-        localStorage.setItem('user_role', roleParam);
-        localStorage.setItem('user_role_id', data.user.id);
-        localStorage.setItem('user_email', data.user.email || '');
-        localStorage.setItem('user_role_verified', Date.now().toString());
-        
-        // Redirect immediately - RoleProtectedRoute handles security
-        window.location.href = roleConfig.dashboard;
-      }
-    }).catch((err) => {
-      console.log('🔐 Exception:', err);
-      toast({ title: 'Sign in failed', description: 'An error occurred', variant: 'destructive' });
+      // Success - onAuthStateChange will handle redirect
+      toast({ title: '✅ Welcome back!', description: 'Redirecting...' });
+      
+    } catch (error: any) {
+      clearTimeout(safetyTimeout);
       setIsLoading(false);
-    });
+      toast({ title: 'Sign in failed', description: error.message || 'Please try again', variant: 'destructive' });
+    }
   };
   
   const handleSignUp = async (e: React.FormEvent) => {
@@ -160,7 +153,7 @@ const UnifiedAuth: React.FC = () => {
       if (authError) throw authError;
       
       if (authData.user) {
-        // Create profile
+        // Create profile and assign role
         await supabase.from('profiles').upsert({
           id: authData.user.id,
           user_id: authData.user.id,
@@ -171,10 +164,8 @@ const UnifiedAuth: React.FC = () => {
           company_name: companyName.trim() || null
         });
         
-        // Assign role
         await supabase.from('user_roles').upsert({ user_id: authData.user.id, role: roleParam });
         
-        // For suppliers
         if (roleParam === 'supplier' && companyName) {
           await supabase.from('suppliers').insert({
             user_id: authData.user.id,
