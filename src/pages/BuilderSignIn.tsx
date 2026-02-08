@@ -52,18 +52,19 @@ const BuilderSignIn = () => {
   // Redirect to dashboard after sign-in (not home page)
   const redirectTo = searchParams.get('redirect') || '/builder-dashboard';
 
-  // Use onAuthStateChange for reliable redirect
+  // Redirect ONLY if already logged in when page loads
   useEffect(() => {
     let redirected = false;
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('🔐 BuilderSignIn event:', event, session?.user?.email);
       
-      if (!redirected && session?.user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+      // Only redirect on INITIAL_SESSION (already logged in)
+      if (!redirected && session?.user && event === 'INITIAL_SESSION') {
         redirected = true;
-        console.log('🔐 BuilderSignIn REDIRECTING to', redirectTo);
+        console.log('🔐 BuilderSignIn: Already logged in, REDIRECTING to', redirectTo);
         window.location.href = redirectTo;
-      } else if (!session) {
+      } else if (!session && event !== 'INITIAL_SESSION') {
         setCheckingAuth(false);
       }
     });

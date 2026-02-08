@@ -65,18 +65,19 @@ const DeliverySignIn = () => {
   // Redirect to dashboard after sign-in (not home page)
   const redirectTo = searchParams.get('redirect') || '/delivery-dashboard';
 
-  // Use onAuthStateChange for reliable redirect
+  // Redirect ONLY if already logged in when page loads
   useEffect(() => {
     let redirected = false;
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('🔐 DeliverySignIn event:', event, session?.user?.email);
       
-      if (!redirected && session?.user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+      // Only redirect on INITIAL_SESSION (already logged in)
+      if (!redirected && session?.user && event === 'INITIAL_SESSION') {
         redirected = true;
-        console.log('🔐 DeliverySignIn REDIRECTING to /delivery-dashboard');
+        console.log('🔐 DeliverySignIn: Already logged in, REDIRECTING to /delivery-dashboard');
         window.location.href = '/delivery-dashboard';
-      } else if (!session) {
+      } else if (!session && event !== 'INITIAL_SESSION') {
         setCheckingAuth(false);
       }
     });

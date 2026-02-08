@@ -117,17 +117,19 @@ const UnifiedAuth: React.FC = () => {
   const roleConfig = ROLE_CONFIG[roleParam] || ROLE_CONFIG.private_client;
   const RoleIcon = roleConfig.icon;
   
-  // Redirect if already logged in - use onAuthStateChange for reliability
+  // Redirect ONLY if already logged in when page loads (not on fresh sign-in)
   useEffect(() => {
     let redirected = false;
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('🔐 UnifiedAuth event:', event, session?.user?.email);
       
-      if (!redirected && session?.user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+      // Only redirect on INITIAL_SESSION (already logged in)
+      // Don't redirect on SIGNED_IN - let handleSignIn do that after setting localStorage
+      if (!redirected && session?.user && event === 'INITIAL_SESSION') {
         redirected = true;
         const destination = redirectTo || roleConfig.dashboard;
-        console.log('🔐 UnifiedAuth REDIRECTING to:', destination);
+        console.log('🔐 UnifiedAuth: Already logged in, REDIRECTING to:', destination);
         window.location.href = destination;
       }
     });

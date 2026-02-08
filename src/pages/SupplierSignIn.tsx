@@ -95,18 +95,19 @@ const SupplierSignIn = () => {
     }
   };
 
-  // Use onAuthStateChange for reliable redirect
+  // Redirect ONLY if already logged in when page loads
   useEffect(() => {
     let redirected = false;
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('🔐 SupplierSignIn event:', event, session?.user?.email);
       
-      if (!redirected && session?.user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+      // Only redirect on INITIAL_SESSION (already logged in)
+      if (!redirected && session?.user && event === 'INITIAL_SESSION') {
         redirected = true;
-        console.log('🔐 SupplierSignIn REDIRECTING to /supplier-dashboard');
+        console.log('🔐 SupplierSignIn: Already logged in, REDIRECTING to /supplier-dashboard');
         window.location.href = '/supplier-dashboard';
-      } else if (!session) {
+      } else if (!session && event !== 'INITIAL_SESSION') {
         setCheckingAuth(false);
       }
     });

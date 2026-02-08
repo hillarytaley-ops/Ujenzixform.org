@@ -18,16 +18,17 @@ const ProfessionalBuilderSignIn = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Use onAuthStateChange for reliable redirect
+  // Redirect ONLY if already logged in when page loads
   useEffect(() => {
     let redirected = false;
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('🔐 ProfessionalBuilderSignIn event:', event, session?.user?.email);
       
-      if (!redirected && session?.user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+      // Only redirect on INITIAL_SESSION (already logged in)
+      if (!redirected && session?.user && event === 'INITIAL_SESSION') {
         redirected = true;
-        console.log('🔐 ProfessionalBuilderSignIn REDIRECTING to /professional-builder-dashboard');
+        console.log('🔐 ProfessionalBuilderSignIn: Already logged in, REDIRECTING to /professional-builder-dashboard');
         window.location.href = '/professional-builder-dashboard';
       }
     });
