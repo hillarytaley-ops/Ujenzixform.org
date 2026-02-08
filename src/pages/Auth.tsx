@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 
-console.log('🔐 Auth.tsx BUILD v2 LOADED');
+console.log('🔐 Auth.tsx BUILD v4 - FIXED Feb 8 2026');
 
 const Auth = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -231,44 +231,26 @@ const Auth = () => {
         return;
       }
       
-      // ✅ Successful sign in - redirect NOW
+      // ✅ Successful sign in - redirect IMMEDIATELY
       toast({ title: "✅ Welcome back!", description: "Redirecting..." });
+      clearTimeout(safetyTimeout);
+      setLoading(false);
       
-      // Get user and store role
-      const { data: { user: signedInUser } } = await supabase.auth.getUser();
-      if (signedInUser) {
-        try {
-          const { data: roleData } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', signedInUser.id)
-            .maybeSingle();
-          
-          if (roleData?.role) {
-            localStorage.setItem('user_role', roleData.role);
-            localStorage.setItem('user_role_id', signedInUser.id);
-            localStorage.setItem('user_role_verified', Date.now().toString());
-          }
-        } catch (e) {
-          console.error('Role fetch error:', e);
-        }
-      }
-      
-      // FORCE redirect with full page reload
+      // Redirect NOW - don't wait for anything else
       const target = redirectTo || '/home';
       console.log('🔐 REDIRECTING NOW to:', target);
-      setLoading(false); // Reset button before redirect
-      window.location.href = target; // Use href instead of replace
+      window.location.href = target;
+      return; // Stop execution
       
     } catch (error: any) {
       console.error('Auth error:', error);
+      clearTimeout(safetyTimeout);
+      setLoading(false);
       toast({
         variant: "destructive",
         title: "Error",
         description: error?.message || "An unexpected error occurred."
       });
-    } finally {
-      setLoading(false);
     }
   };
 
