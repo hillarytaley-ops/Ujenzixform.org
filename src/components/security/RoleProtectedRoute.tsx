@@ -1,9 +1,9 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 
 // VERSION MARKER
-console.log('🔒 RoleProtectedRoute BUILD v11 - WORKING SECURITY Feb 8 2026');
+console.log('🔒 RoleProtectedRoute BUILD v12 - FIX CROSS-DASHBOARD Feb 8 2026');
 
 interface RoleProtectedRouteProps {
   children: React.ReactNode;
@@ -12,13 +12,9 @@ interface RoleProtectedRouteProps {
 }
 
 /**
- * RoleProtectedRoute - Working security that doesn't block legitimate users
+ * RoleProtectedRoute BUILD v12
  * 
- * BUILD v11:
- * 1. Trust AuthContext userRole (already fetched from DB)
- * 2. Trust localStorage if user ID matches (set during sign-in)
- * 3. Block visitors (no user)
- * 4. Block wrong roles
+ * FIX: Re-check on EVERY route change (removed ref that was caching result)
  */
 export const RoleProtectedRoute = ({ 
   children, 
@@ -27,13 +23,26 @@ export const RoleProtectedRoute = ({
 }: RoleProtectedRouteProps) => {
   const { user, loading: authLoading, userRole: contextRole } = useAuth();
   const location = useLocation();
+  
+  // Reset state on route change by using pathname as key
+  const [checkKey, setCheckKey] = useState(location.pathname);
   const [status, setStatus] = useState<'checking' | 'granted' | 'denied'>('checking');
   const [finalRole, setFinalRole] = useState<string | null>(null);
-  const verified = useRef(false);
 
+  // Reset when pathname changes
   useEffect(() => {
-    // Don't re-run if already verified
-    if (verified.current) return;
+    if (checkKey !== location.pathname) {
+      console.log('🔄 Route changed, re-checking access');
+      setCheckKey(location.pathname);
+      setStatus('checking');
+      setFinalRole(null);
+    }
+  }, [location.pathname, checkKey]);
+
+  // Main security check
+  useEffect(() => {
+    // Only run when status is 'checking'
+    if (status !== 'checking') return;
     
     // Wait for auth to load
     if (authLoading) return;
@@ -41,8 +50,9 @@ export const RoleProtectedRoute = ({
     console.log('🔐 Checking access for:', location.pathname);
     console.log('   User:', user?.email || 'NONE');
     console.log('   Context role:', contextRole || 'NONE');
+    console.log('   Allowed roles:', allowedRoles.join(', '));
     
-    // ===== SECURITY CHECK 1: Must have user =====
+    // ===== CHECK 1: Must have user =====
     if (!user) {
       // Check admin portal session
       const adminAuth = localStorage.getItem('admin_authenticated') === 'true';
@@ -54,18 +64,15 @@ export const RoleProtectedRoute = ({
         console.log('👑 Admin portal session - GRANTED');
         setFinalRole('admin');
         setStatus('granted');
-        verified.current = true;
         return;
       }
       
-      console.log('🚫 No user - DENIED (redirecting to auth)');
+      console.log('🚫 No user - DENIED');
       setStatus('denied');
-      verified.current = true;
       return;
     }
     
     // ===== GET USER'S ROLE =====
-    // Priority: 1) AuthContext role, 2) localStorage (if user ID matches)
     let role = contextRole;
     
     if (!role) {
@@ -77,66 +84,70 @@ export const RoleProtectedRoute = ({
       }
     }
     
-    setFinalRole(role);
-    
-    // ===== SECURITY CHECK 2: Must have role =====
+    // ===== CHECK 2: Must have role =====
     if (!role) {
-      console.log('⚠️ No role found - waiting for context...');
-      // Don't deny yet - role might still be loading in AuthContext
-      // The timeout will handle this
-      return;
+      console.log('⚠️ No role yet, waiting...');
+      return; // Timeout will handle
     }
     
-    // ===== SECURITY CHECK 3: Admin bypass =====
+    setFinalRole(role);
+    
+    // ===== CHECK 3: Admin bypass =====
     if (role === 'admin') {
       console.log('👑 Admin - GRANTED');
       setStatus('granted');
-      verified.current = true;
       return;
     }
     
-    // ===== SECURITY CHECK 4: Role must match =====
+    // ===== CHECK 4: Role must match =====
     if (allowedRoles.includes(role)) {
-      console.log('✅ Role matches - GRANTED');
+      console.log('✅ Role', role, 'matches - GRANTED');
       setStatus('granted');
-      verified.current = true;
       return;
     }
     
-    // Wrong role
-    console.log('🚫 Role mismatch:', role, 'not in', allowedRoles, '- DENIED');
+    // WRONG ROLE
+    console.log('🚫 DENIED:', role, 'cannot access (needs:', allowedRoles.join(', '), ')');
+    setFinalRole(role);
     setStatus('denied');
-    verified.current = true;
     
-  }, [user, authLoading, contextRole, allowedRoles, location.pathname]);
+  }, [status, user, authLoading, contextRole, allowedRoles, location.pathname]);
 
-  // Timeout - but grant if user exists and has matching cached role
+  // Timeout
   useEffect(() => {
+    if (status !== 'checking') return;
+    
     const t = setTimeout(() => {
       if (status === 'checking') {
-        // Last chance: check localStorage directly
+        // Check localStorage one more time
         if (user) {
           const cached = localStorage.getItem('user_role');
           const cachedId = localStorage.getItem('user_role_id');
           
           if (cached && cachedId === user.id) {
+            setFinalRole(cached);
             if (cached === 'admin' || allowedRoles.includes(cached)) {
-              console.log('⏱️ Timeout but cached role valid - GRANTED');
-              setFinalRole(cached);
+              console.log('⏱️ Timeout - cached role valid - GRANTED');
               setStatus('granted');
+              return;
+            } else {
+              console.log('⏱️ Timeout - wrong role - DENIED');
+              setStatus('denied');
               return;
             }
           }
         }
         
-        console.log('⏱️ Timeout - DENIED');
+        console.log('⏱️ Timeout - no valid role - DENIED');
         setStatus('denied');
       }
     }, 2000);
+    
     return () => clearTimeout(t);
   }, [status, user, allowedRoles]);
 
-  // CHECKING
+  // RENDER
+
   if (status === 'checking') {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
@@ -148,17 +159,16 @@ export const RoleProtectedRoute = ({
     );
   }
   
-  // GRANTED
   if (status === 'granted') {
     return <>{children}</>;
   }
 
-  // DENIED - redirect appropriately
+  // DENIED
   if (!user) {
     return <Navigate to={`/auth?redirect=${encodeURIComponent(location.pathname)}`} replace />;
   }
   
-  // Has user but wrong role - redirect to their dashboard
+  // Redirect to correct dashboard based on role
   if (finalRole === 'supplier') {
     return <Navigate to="/supplier-dashboard" replace />;
   }
@@ -172,7 +182,6 @@ export const RoleProtectedRoute = ({
     return <Navigate to="/delivery-dashboard" replace />;
   }
   
-  // No role at all - go to home
   return <Navigate to="/home" replace />;
 };
 
