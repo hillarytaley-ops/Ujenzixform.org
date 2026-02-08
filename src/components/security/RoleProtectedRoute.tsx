@@ -46,6 +46,21 @@ export const RoleProtectedRoute = ({
       setChecking(false);
       hasCompletedCheck.current = true;
     }
+    
+    // Safety timeout - stop checking after 5 seconds to prevent infinite loading
+    const safetyTimeout = setTimeout(() => {
+      if (checking) {
+        console.log('⏱️ RoleProtectedRoute: Safety timeout - stopping check');
+        setChecking(false);
+        // If we have a local role, trust it
+        if (localRole && (allowedRoles.includes(localRole) || localRole === 'admin')) {
+          setUserRole(localRole);
+          setAccessGranted(true);
+        }
+      }
+    }, 5000);
+    
+    return () => clearTimeout(safetyTimeout);
   }, []); // Run only once on mount
   
   useEffect(() => {
