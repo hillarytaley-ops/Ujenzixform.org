@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 
-console.log('🔐 Auth.tsx BUILD v6 - IMMEDIATE REDIRECT Feb 8 2026');
+console.log('🔐 Auth.tsx BUILD v7 - USE onAuthStateChange Feb 8 2026');
 
 const Auth = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -53,14 +53,22 @@ const Auth = () => {
   }, [shouldRedirect]);
 
   useEffect(() => {
-    // Check if already logged in on page load - redirect IMMEDIATELY
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        console.log('🔐 Already logged in, redirecting NOW to:', redirectTo || '/home');
-        window.location.href = redirectTo || '/home';
+    let redirected = false;
+    
+    // Listen for auth state - this is more reliable than getSession
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('🔐 Auth event:', event, session?.user?.email);
+      
+      if (!redirected && session?.user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+        redirected = true;
+        const target = redirectTo || '/home';
+        console.log('🔐 REDIRECTING NOW to:', target);
+        window.location.href = target;
       }
     });
-  }, []);
+    
+    return () => subscription.unsubscribe();
+  }, [redirectTo]);
 
   const signUp = async (email: string, password: string) => {
     try {
