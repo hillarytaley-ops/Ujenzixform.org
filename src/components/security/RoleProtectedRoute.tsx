@@ -1,9 +1,8 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useEffect, useState } from 'react';
 
 // VERSION MARKER
-console.log('🔒 RoleProtectedRoute BUILD v14 - SIMPLIFIED Feb 8 2026');
+console.log('🔒 RoleProtectedRoute BUILD v15 - TRUST LOCALSTORAGE Feb 8 2026');
 
 interface RoleProtectedRouteProps {
   children: React.ReactNode;
@@ -12,13 +11,10 @@ interface RoleProtectedRouteProps {
 }
 
 /**
- * RoleProtectedRoute BUILD v14 - SIMPLIFIED
+ * RoleProtectedRoute BUILD v15 - TRUST LOCALSTORAGE
  * 
- * Rules:
- * 1. No user = redirect to auth
- * 2. User with matching role (from context OR localStorage) = GRANT
- * 3. User with different role = redirect to their dashboard
- * 4. Admin = always grant
+ * If localStorage has valid role data, grant access immediately.
+ * Don't wait for AuthContext to load.
  */
 export const RoleProtectedRoute = ({ 
   children, 
@@ -26,40 +22,44 @@ export const RoleProtectedRoute = ({
 }: RoleProtectedRouteProps) => {
   const { user, loading: authLoading, userRole: contextRole } = useAuth();
   const location = useLocation();
-  const [checked, setChecked] = useState(false);
 
-  // Get role from multiple sources
-  const getRole = (): string | null => {
-    // 1. Context role (from AuthContext)
-    if (contextRole) return contextRole;
-    
-    // 2. localStorage (if user ID matches)
-    const cached = localStorage.getItem('user_role');
-    const cachedId = localStorage.getItem('user_role_id');
-    if (cached && user && cachedId === user.id) return cached;
-    
-    // 3. Admin session
-    const adminAuth = localStorage.getItem('admin_authenticated') === 'true';
-    const adminRole = localStorage.getItem('user_role') === 'admin';
-    if (adminAuth && adminRole) return 'admin';
-    
-    return null;
-  };
+  // Check localStorage FIRST (instant check, no waiting)
+  const cachedRole = localStorage.getItem('user_role');
+  const cachedRoleId = localStorage.getItem('user_role_id');
+  const cachedEmail = localStorage.getItem('user_email');
+  
+  // Admin session check
+  const adminAuth = localStorage.getItem('admin_authenticated') === 'true';
+  const adminTime = parseInt(localStorage.getItem('admin_login_time') || '0');
+  const isValidAdminSession = adminAuth && cachedRole === 'admin' && (Date.now() - adminTime < 24 * 60 * 60 * 1000);
 
-  const role = getRole();
+  // Determine the effective role
+  const effectiveRole = contextRole || cachedRole;
+  const hasValidSession = user || cachedEmail || isValidAdminSession;
 
-  useEffect(() => {
-    if (!authLoading) {
-      console.log('🔐 RoleProtectedRoute:', location.pathname);
-      console.log('   User:', user?.email || 'NONE');
-      console.log('   Role:', role || 'NONE');
-      console.log('   Allowed:', allowedRoles.join(', '));
-      setChecked(true);
+  console.log('🔐 RoleProtectedRoute:', location.pathname);
+  console.log('   Auth loading:', authLoading);
+  console.log('   User:', user?.email || cachedEmail || 'NONE');
+  console.log('   Role (context):', contextRole || 'NONE');
+  console.log('   Role (cached):', cachedRole || 'NONE');
+  console.log('   Allowed:', allowedRoles.join(', '));
+
+  // INSTANT GRANT: If localStorage has matching role, grant immediately
+  if (cachedRole && cachedRoleId) {
+    if (cachedRole === 'admin' || allowedRoles.includes(cachedRole)) {
+      console.log('✅ INSTANT GRANT from localStorage:', cachedRole);
+      return <>{children}</>;
     }
-  }, [authLoading, user, role, allowedRoles, location.pathname]);
+  }
 
-  // Still loading auth
-  if (authLoading || !checked) {
+  // Admin session - always grant
+  if (isValidAdminSession) {
+    console.log('👑 Admin session - GRANTED');
+    return <>{children}</>;
+  }
+
+  // If auth is still loading but we have no localStorage, show spinner briefly
+  if (authLoading && !cachedRole) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="text-center">
@@ -70,52 +70,39 @@ export const RoleProtectedRoute = ({
     );
   }
 
-  // No user - redirect to auth
-  if (!user) {
-    // Check admin session
-    const adminAuth = localStorage.getItem('admin_authenticated') === 'true';
-    const adminRole = localStorage.getItem('user_role') === 'admin';
-    const adminTime = parseInt(localStorage.getItem('admin_login_time') || '0');
-    const isAdmin = adminAuth && adminRole && (Date.now() - adminTime < 24 * 60 * 60 * 1000);
-    
-    if (isAdmin) {
-      console.log('👑 Admin session - GRANTED');
+  // Check context role (after auth loaded)
+  if (contextRole) {
+    if (contextRole === 'admin' || allowedRoles.includes(contextRole)) {
+      console.log('✅ Context role matches - GRANTED');
       return <>{children}</>;
     }
-    
-    console.log('🚫 No user - redirecting to auth');
+  }
+
+  // No valid session at all - redirect to auth
+  if (!hasValidSession) {
+    console.log('🚫 No session - redirecting to auth');
     return <Navigate to={`/auth?redirect=${encodeURIComponent(location.pathname)}`} replace />;
   }
 
-  // Admin can access everything
-  if (role === 'admin') {
-    console.log('👑 Admin - GRANTED');
-    return <>{children}</>;
-  }
-
-  // Check if role matches
-  if (role && allowedRoles.includes(role)) {
-    console.log('✅ Role matches - GRANTED');
-    return <>{children}</>;
-  }
-
-  // Wrong role - redirect to their dashboard
-  console.log('🔄 Wrong role, redirecting to correct dashboard');
-  if (role === 'supplier') {
+  // Has session but wrong role - redirect to correct dashboard
+  const roleToUse = effectiveRole;
+  console.log('🔄 Wrong role:', roleToUse, '- redirecting to correct dashboard');
+  
+  if (roleToUse === 'supplier') {
     return <Navigate to="/supplier-dashboard" replace />;
   }
-  if (role === 'professional_builder' || role === 'builder') {
+  if (roleToUse === 'professional_builder' || roleToUse === 'builder') {
     return <Navigate to="/professional-builder-dashboard" replace />;
   }
-  if (role === 'private_client') {
+  if (roleToUse === 'private_client') {
     return <Navigate to="/private-client-dashboard" replace />;
   }
-  if (role === 'delivery_provider' || role === 'delivery') {
+  if (roleToUse === 'delivery_provider' || roleToUse === 'delivery') {
     return <Navigate to="/delivery-dashboard" replace />;
   }
 
-  // No role - go to home
-  console.log('🚫 No role - redirecting to home');
+  // Fallback - go to home
+  console.log('🚫 No matching role - redirecting to home');
   return <Navigate to="/home" replace />;
 };
 
