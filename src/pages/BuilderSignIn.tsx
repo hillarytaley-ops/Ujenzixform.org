@@ -150,7 +150,9 @@ const BuilderSignIn = () => {
     }
 
     setLoading(true);
-    console.log('🔐 Attempting sign in for:', email);
+    
+    // Safety timeout - reset loading after 5 seconds no matter what
+    const safetyTimeout = setTimeout(() => setLoading(false), 5000);
 
     try {
       // Sign in with Supabase

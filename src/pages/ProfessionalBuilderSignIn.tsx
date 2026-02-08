@@ -19,6 +19,9 @@ const ProfessionalBuilderSignIn = () => {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    
+    // Safety timeout - reset loading after 5 seconds no matter what
+    const safetyTimeout = setTimeout(() => setLoading(false), 5000);
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({

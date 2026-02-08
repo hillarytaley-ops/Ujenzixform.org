@@ -245,6 +245,9 @@ const AdminAuth = () => {
     }
 
     setLoading(true);
+    
+    // Safety timeout - reset loading after 5 seconds no matter what
+    const safetyTimeout = setTimeout(() => setLoading(false), 5000);
 
     try {
       // Validate work email

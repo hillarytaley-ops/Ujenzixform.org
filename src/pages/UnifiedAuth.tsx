@@ -138,6 +138,9 @@ const UnifiedAuth: React.FC = () => {
     e.preventDefault();
     setIsLoading(true);
     
+    // Safety timeout - reset loading after 5 seconds no matter what
+    const safetyTimeout = setTimeout(() => setIsLoading(false), 5000);
+    
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),

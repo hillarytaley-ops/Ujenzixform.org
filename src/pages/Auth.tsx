@@ -162,6 +162,9 @@ const Auth = () => {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>, isSignUp: boolean) => {
     e.preventDefault();
     setLoading(true);
+    
+    // Safety timeout - reset loading after 5 seconds no matter what
+    const safetyTimeout = setTimeout(() => setLoading(false), 5000);
 
     const formData = new FormData(e.currentTarget);
     const email = formData.get("email") as string;
