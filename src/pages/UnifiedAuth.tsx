@@ -8,7 +8,7 @@
  * - Redirects to role-specific dashboard after auth
  */
 
-console.log('🔐 UnifiedAuth BUILD v16 - NO DB CALLS Feb 8 2026');
+console.log('🔐 UnifiedAuth BUILD v17 - WITH TIMEOUT Feb 8 2026');
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
@@ -145,34 +145,54 @@ const UnifiedAuth: React.FC = () => {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    console.log('🔐 UnifiedAuth: Starting sign-in...');
+    console.log('🔐 UnifiedAuth: Starting sign-in for', email);
+    
+    // Timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      console.log('🔐 UnifiedAuth: Sign-in timeout after 10s');
+      setIsLoading(false);
+      toast({
+        title: 'Sign in timed out',
+        description: 'Please try again',
+        variant: 'destructive'
+      });
+    }, 10000);
     
     try {
+      console.log('🔐 UnifiedAuth: Calling signInWithPassword...');
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password
       });
+      console.log('🔐 UnifiedAuth: signInWithPassword returned', { data: !!data, error: !!error });
       
-      if (error) throw error;
+      clearTimeout(timeoutId);
+      
+      if (error) {
+        console.log('🔐 UnifiedAuth: Sign-in error:', error.message);
+        throw error;
+      }
       
       if (data.user) {
-        console.log('🔐 UnifiedAuth: Sign-in successful, user:', data.user.email);
+        console.log('🔐 UnifiedAuth: SUCCESS! User:', data.user.email);
         
-        // Store in localStorage IMMEDIATELY
+        // Store in localStorage
         localStorage.setItem('user_role', roleParam);
         localStorage.setItem('user_role_id', data.user.id);
         localStorage.setItem('user_role_verified', Date.now().toString());
         localStorage.setItem('user_email', data.user.email || '');
         
-        // Get dashboard URL
+        // Redirect
         const destination = getDashboardForRole(roleParam);
-        console.log('🔐 UnifiedAuth: Redirecting NOW to:', destination);
-        
-        // REDIRECT IMMEDIATELY - don't wait for anything else
+        console.log('🔐 UnifiedAuth: REDIRECTING to:', destination);
         window.location.href = destination;
-        return; // Stop execution
+      } else {
+        console.log('🔐 UnifiedAuth: No user in response');
+        setIsLoading(false);
       }
     } catch (error: any) {
+      clearTimeout(timeoutId);
+      console.log('🔐 UnifiedAuth: Caught error:', error);
       toast({
         title: 'Sign in failed',
         description: error.message || 'Please check your credentials',
