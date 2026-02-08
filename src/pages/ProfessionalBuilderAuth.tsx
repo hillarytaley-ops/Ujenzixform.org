@@ -1,5 +1,5 @@
 /**
- * ProfessionalBuilderAuth - BUILD v14 - FETCH API
+ * ProfessionalBuilderAuth - BUILD v15 - FETCH API + DB ROLE CHECK
  */
 
 import React, { useState, useRef } from 'react';
@@ -17,11 +17,22 @@ const ROLE = 'professional_builder';
 const DASHBOARD = '/professional-builder-dashboard';
 const TITLE = 'Professional Builder';
 
-if (localStorage.getItem('user_role') === ROLE) {
+const ROLE_DASHBOARDS: Record<string, string> = {
+  'private_client': '/private-client-dashboard',
+  'professional_builder': '/professional-builder-dashboard',
+  'supplier': '/supplier-dashboard',
+  'delivery': '/delivery-dashboard',
+  'delivery_provider': '/delivery-dashboard',
+  'admin': '/admin-dashboard',
+};
+
+const cachedRole = localStorage.getItem('user_role');
+const cachedUserId = localStorage.getItem('user_role_id');
+if (cachedRole === ROLE && cachedUserId) {
   window.location.replace(DASHBOARD);
 }
 
-console.log('🔐 ProfessionalBuilderAuth BUILD v14');
+console.log('🔐 ProfessionalBuilderAuth BUILD v15 - SECURE');
 
 const ProfessionalBuilderAuth: React.FC = () => {
   const { toast } = useToast();
@@ -42,24 +53,48 @@ const ProfessionalBuilderAuth: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      const authResponse = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
         body: JSON.stringify({ email: email.trim(), password }),
       });
-      const data = await response.json();
-      if (!response.ok || data.error) {
+      const authData = await authResponse.json();
+      
+      if (!authResponse.ok || authData.error) {
         setIsLoading(false);
-        toast({ title: 'Sign in failed', description: data.error_description || data.error || 'Invalid credentials', variant: 'destructive' });
+        toast({ title: 'Sign in failed', description: authData.error_description || authData.error || 'Invalid credentials', variant: 'destructive' });
         return;
       }
-      if (data.access_token && data.user) {
-        const session = { access_token: data.access_token, refresh_token: data.refresh_token, expires_at: Math.floor(Date.now() / 1000) + data.expires_in, expires_in: data.expires_in, token_type: data.token_type, user: data.user };
-        localStorage.setItem('sb-wuuyjjpgzgeimiptuuws-auth-token', JSON.stringify(session));
+
+      if (!authData.access_token || !authData.user) {
+        setIsLoading(false);
+        toast({ title: 'Sign in failed', description: 'No user returned', variant: 'destructive' });
+        return;
+      }
+
+      // Check DB role
+      const roleResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${authData.user.id}&select=role`,
+        { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${authData.access_token}` } }
+      );
+      const roleData = await roleResponse.json();
+      const dbRole = roleData?.[0]?.role;
+
+      // Store session
+      const session = { access_token: authData.access_token, refresh_token: authData.refresh_token, expires_at: Math.floor(Date.now() / 1000) + authData.expires_in, expires_in: authData.expires_in, token_type: authData.token_type, user: authData.user };
+      localStorage.setItem('sb-wuuyjjpgzgeimiptuuws-auth-token', JSON.stringify(session));
+      localStorage.setItem('user_role_id', authData.user.id);
+      localStorage.setItem('user_email', authData.user.email || '');
+
+      redirecting.current = true;
+      
+      if (dbRole && dbRole !== ROLE) {
+        const correctDashboard = ROLE_DASHBOARDS[dbRole] || '/home';
+        localStorage.setItem('user_role', dbRole);
+        toast({ title: 'Wrong Portal', description: `You are a ${dbRole}. Redirecting to your dashboard.` });
+        window.location.href = correctDashboard;
+      } else {
         localStorage.setItem('user_role', ROLE);
-        localStorage.setItem('user_role_id', data.user.id);
-        localStorage.setItem('user_email', data.user.email || '');
-        redirecting.current = true;
         window.location.href = DASHBOARD;
       }
     } catch (err: any) {
