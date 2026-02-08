@@ -29,6 +29,7 @@ const Auth = () => {
   const [resetEmail, setResetEmail] = useState("");
   const [resetLoading, setResetLoading] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
+  const [shouldRedirect, setShouldRedirect] = useState<string | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -38,6 +39,14 @@ const Auth = () => {
   const liteParam = urlParams.get('lite');
   // Only use lite mode if explicitly requested with lite=1, NOT just because there's a redirect
   const liteMode = liteParam === '1';
+
+  // Handle redirect in a separate effect (ensures navigate works)
+  useEffect(() => {
+    if (shouldRedirect) {
+      console.log('🔐 NAVIGATING NOW to:', shouldRedirect);
+      navigate(shouldRedirect, { replace: true });
+    }
+  }, [shouldRedirect, navigate]);
 
   useEffect(() => {
     let isRedirecting = false;
@@ -70,11 +79,8 @@ const Auth = () => {
       const target = returnTo || redirectTo || '/home';
       if (returnTo) sessionStorage.removeItem('returnTo');
       
-      console.log('🔐 Redirecting to:', target);
-      
-      // Use React Router navigate for SPA navigation (faster, no full reload)
-      // This avoids service worker interception issues
-      navigate(target, { replace: true });
+      console.log('🔐 Setting redirect target:', target);
+      setShouldRedirect(target);
     };
     
     // Set up auth state listener
@@ -104,7 +110,7 @@ const Auth = () => {
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate, redirectTo]);
+  }, [redirectTo]);
 
   const signUp = async (email: string, password: string) => {
     try {
