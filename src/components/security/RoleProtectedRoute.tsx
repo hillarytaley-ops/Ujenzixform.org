@@ -1,7 +1,9 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
-console.log('🔒 RoleProtectedRoute BUILD v24 - SIMPLE Feb 8 2026');
+console.log('🔒 RoleProtectedRoute BUILD v26 - FETCH DB ROLE Feb 8 2026');
 
 interface RoleProtectedRouteProps {
   children: React.ReactNode;
@@ -9,18 +11,60 @@ interface RoleProtectedRouteProps {
 }
 
 export const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRouteProps) => {
-  const { user, loading, userRole } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const location = useLocation();
+  const [dbRole, setDbRole] = useState<string | null>(null);
+  const [roleLoading, setRoleLoading] = useState(true);
 
-  // Get cached data
-  const cachedRole = localStorage.getItem('user_role');
-  const cachedUserId = localStorage.getItem('user_role_id');
+  // Fetch role from database when user is available
+  useEffect(() => {
+    const fetchRole = async () => {
+      if (!user) {
+        setRoleLoading(false);
+        return;
+      }
 
-  console.log('🔐 Route:', location.pathname);
-  console.log('🔐 User:', user?.id || 'none', 'AuthRole:', userRole, 'CachedRole:', cachedRole, 'CachedUserId:', cachedUserId);
+      try {
+        const { data, error } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .maybeSingle();
 
-  // Still loading auth - show spinner briefly
-  if (loading) {
+        if (!error && data) {
+          console.log('🔐 DB Role fetched:', data.role);
+          setDbRole(data.role);
+          // Update localStorage to match DB
+          localStorage.setItem('user_role', data.role);
+          localStorage.setItem('user_role_id', user.id);
+        }
+      } catch (e) {
+        console.error('🔐 Error fetching role:', e);
+      }
+      
+      setRoleLoading(false);
+    };
+
+    if (!authLoading) {
+      fetchRole();
+    }
+  }, [user, authLoading]);
+
+  // Safety timeout - stop loading after 3 seconds
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (roleLoading) {
+        console.log('🔐 Role fetch timeout');
+        setRoleLoading(false);
+      }
+    }, 3000);
+    return () => clearTimeout(timeout);
+  }, [roleLoading]);
+
+  console.log('🔐 Route:', location.pathname, 'User:', user?.id?.slice(0,8), 'DbRole:', dbRole, 'Loading:', authLoading || roleLoading);
+
+  // Still loading - show spinner
+  if (authLoading || roleLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-4 border-primary border-t-transparent" />
@@ -40,18 +84,8 @@ export const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRout
     return <Navigate to="/auth" replace />;
   }
 
-  // SECURITY: If cached user ID doesn't match current user, clear cache
-  if (cachedUserId && cachedUserId !== user.id) {
-    console.log('🚫 SECURITY: User ID mismatch! Clearing stale cache');
-    localStorage.removeItem('user_role');
-    localStorage.removeItem('user_role_id');
-    localStorage.removeItem('user_email');
-    // Redirect to auth to get fresh role
-    return <Navigate to="/auth" replace />;
-  }
-
-  // Use AuthContext role (from DB) if available, otherwise cached role
-  const effectiveRole = userRole || cachedRole;
+  // Use DB role (source of truth), fallback to localStorage
+  const effectiveRole = dbRole || localStorage.getItem('user_role');
   
   console.log('🔐 Effective role:', effectiveRole, 'Allowed:', allowedRoles.join(','));
 
@@ -68,12 +102,12 @@ export const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRout
 
   // Check if role is allowed for this route
   if (allowedRoles.includes(effectiveRole)) {
-    console.log('✅ Access granted');
+    console.log('✅ Access granted for', effectiveRole);
     return <>{children}</>;
   }
 
-  // Wrong role - redirect to correct dashboard
-  console.log('🚫 Wrong role - redirecting to correct dashboard');
+  // WRONG ROLE - redirect to their correct dashboard
+  console.log('🚫 DENIED:', effectiveRole, 'tried to access', location.pathname);
   
   const dashboards: Record<string, string> = {
     'private_client': '/private-client-dashboard',
