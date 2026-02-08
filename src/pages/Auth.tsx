@@ -1,3 +1,4 @@
+// Auth Page - Build v2 - Force cache bust
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,6 +22,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
+
+console.log('🔐 Auth.tsx BUILD v2 LOADED');
 
 const Auth = () => {
   const [user, setUser] = useState<User | null>(null);
