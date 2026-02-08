@@ -155,13 +155,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (mounted) setLoading(false);
     });
 
-    // Safety timeout - ensure loading is false after 3 seconds
+    // Safety timeout - ensure loading is false after 1 second
     const timeoutId = setTimeout(() => {
       if (mounted && loading) {
         console.log('AuthContext: Safety timeout - setting loading false');
         setLoading(false);
       }
-    }, 3000);
+    }, 1000);
 
     return () => {
       mounted = false;
