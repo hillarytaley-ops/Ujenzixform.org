@@ -1,6 +1,6 @@
 /**
  * SupplierAuth - Auth page ONLY for Suppliers
- * BUILD v4 - FAST: No DB queries in auth, security in RoleProtectedRoute
+ * BUILD v5 - WITH TIMEOUT: 5s max for signIn
  */
 
 import React, { useState, useEffect } from 'react';
@@ -18,7 +18,7 @@ const ROLE = 'supplier';
 const DASHBOARD = '/supplier-dashboard';
 const TITLE = 'Supplier';
 
-console.log('🔐 SupplierAuth BUILD v4 - FAST (no DB wait)');
+console.log('🔐 SupplierAuth BUILD v5 - WITH TIMEOUT');
 
 const SupplierAuth: React.FC = () => {
   const { toast } = useToast();
@@ -52,12 +52,19 @@ const SupplierAuth: React.FC = () => {
     setIsLoading(true);
     console.log('🔐 SupplierAuth: Starting sign-in...');
 
+    const timeoutId = setTimeout(() => {
+      console.log('🔐 SupplierAuth: TIMEOUT');
+      setIsLoading(false);
+      toast({ title: 'Sign in timeout', description: 'Please try again.', variant: 'destructive' });
+    }, 5000);
+
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ 
         email: email.trim(), 
         password 
       });
       
+      clearTimeout(timeoutId);
       console.log('🔐 SupplierAuth: Sign-in result:', { user: data?.user?.email, error: error?.message });
       
       if (error) {
@@ -67,15 +74,17 @@ const SupplierAuth: React.FC = () => {
       }
 
       if (data?.user) {
-        // Sign-in successful - redirect immediately
-        // Security check happens in RoleProtectedRoute
-        console.log('🔐 SupplierAuth: Success! Redirecting...');
+        console.log('🔐 SupplierAuth: Success! Redirecting to', DASHBOARD);
         localStorage.setItem('user_role', ROLE);
         localStorage.setItem('user_role_id', data.user.id);
         localStorage.setItem('user_email', data.user.email || '');
         window.location.href = DASHBOARD;
+      } else {
+        setIsLoading(false);
+        toast({ title: 'Sign in failed', description: 'No user data returned', variant: 'destructive' });
       }
     } catch (error: any) {
+      clearTimeout(timeoutId);
       console.error('🔐 SupplierAuth: Exception:', error);
       setIsLoading(false);
       toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });

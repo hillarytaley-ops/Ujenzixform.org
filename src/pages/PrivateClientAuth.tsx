@@ -1,6 +1,6 @@
 /**
  * PrivateClientAuth - Auth page ONLY for Private Clients
- * BUILD v4 - FAST: No DB queries in auth, security in RoleProtectedRoute
+ * BUILD v5 - WITH TIMEOUT: 5s max for signIn
  */
 
 import React, { useState, useEffect } from 'react';
@@ -18,7 +18,7 @@ const ROLE = 'private_client';
 const DASHBOARD = '/private-client-dashboard';
 const TITLE = 'Private Builder';
 
-console.log('🔐 PrivateClientAuth BUILD v4 - FAST (no DB wait)');
+console.log('🔐 PrivateClientAuth BUILD v5 - WITH TIMEOUT');
 
 const PrivateClientAuth: React.FC = () => {
   const { toast } = useToast();
@@ -51,12 +51,21 @@ const PrivateClientAuth: React.FC = () => {
     setIsLoading(true);
     console.log('🔐 PrivateClientAuth: Starting sign-in...');
 
+    // Set up timeout - if sign-in takes more than 5 seconds, something is wrong
+    const timeoutId = setTimeout(() => {
+      console.log('🔐 PrivateClientAuth: TIMEOUT - sign-in took too long');
+      setIsLoading(false);
+      toast({ title: 'Sign in timeout', description: 'Please try again. If the problem persists, refresh the page.', variant: 'destructive' });
+    }, 5000);
+
     try {
+      console.log('🔐 PrivateClientAuth: Calling signInWithPassword...');
       const { data, error } = await supabase.auth.signInWithPassword({ 
         email: email.trim(), 
         password 
       });
       
+      clearTimeout(timeoutId);
       console.log('🔐 PrivateClientAuth: Sign-in result:', { user: data?.user?.email, error: error?.message });
       
       if (error) {
@@ -67,14 +76,17 @@ const PrivateClientAuth: React.FC = () => {
 
       if (data?.user) {
         // Sign-in successful - redirect immediately
-        // Security check happens in RoleProtectedRoute
-        console.log('🔐 PrivateClientAuth: Success! Redirecting...');
+        console.log('🔐 PrivateClientAuth: Success! Redirecting to', DASHBOARD);
         localStorage.setItem('user_role', ROLE);
         localStorage.setItem('user_role_id', data.user.id);
         localStorage.setItem('user_email', data.user.email || '');
         window.location.href = DASHBOARD;
+      } else {
+        setIsLoading(false);
+        toast({ title: 'Sign in failed', description: 'No user data returned', variant: 'destructive' });
       }
     } catch (error: any) {
+      clearTimeout(timeoutId);
       console.error('🔐 PrivateClientAuth: Exception:', error);
       setIsLoading(false);
       toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
