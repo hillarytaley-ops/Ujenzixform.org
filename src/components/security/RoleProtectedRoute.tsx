@@ -3,6 +3,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
+// VERSION MARKER - Check console to verify you have latest code
+console.log('🔒 RoleProtectedRoute BUILD v10 - STRICT SECURITY Feb 8 2026');
+
 interface RoleProtectedRouteProps {
   children: React.ReactNode;
   allowedRoles: string[];
@@ -10,156 +13,130 @@ interface RoleProtectedRouteProps {
 }
 
 /**
- * RoleProtectedRoute - SECURE role-based access control
+ * RoleProtectedRoute - STRICT role-based access control
  * 
- * Security Rules:
- * 1. User MUST be authenticated (no visitor access)
- * 2. User's role MUST match allowedRoles (verified against database)
- * 3. Admins can access ALL pages
- * 4. Use localStorage cache for SPEED but verify against session
+ * BUILD v10 - STRICT SECURITY:
+ * 1. NO access without authenticated user
+ * 2. NO access without matching role
+ * 3. Timeout = DENY (not grant)
  */
 export const RoleProtectedRoute = ({ 
   children, 
   allowedRoles, 
   redirectTo 
 }: RoleProtectedRouteProps) => {
-  const { user, loading: authLoading, userRole: contextRole } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const location = useLocation();
-  const [checking, setChecking] = useState(true);
-  const [accessGranted, setAccessGranted] = useState(false);
+  const [status, setStatus] = useState<'checking' | 'granted' | 'denied'>('checking');
   const [verifiedRole, setVerifiedRole] = useState<string | null>(null);
-  const checkCompleted = useRef(false);
+  const checkDone = useRef(false);
 
   useEffect(() => {
-    const verifyAccess = async () => {
-      // Already completed check
-      if (checkCompleted.current) return;
-      
-      // Wait for auth to finish loading
+    const verify = async () => {
+      if (checkDone.current) return;
       if (authLoading) return;
       
-      // ===== SECURITY CHECK 1: Must have authenticated user =====
+      console.log('🔐 RoleProtectedRoute: Checking', location.pathname, 'user:', user?.email || 'NONE');
+      
+      // ========== CHECK 1: Must have user ==========
       if (!user) {
-        // Check for admin session (admin portal uses different auth)
-        const isAdminAuthenticated = localStorage.getItem('admin_authenticated') === 'true';
-        const localRole = localStorage.getItem('user_role');
-        const adminLoginTime = localStorage.getItem('admin_login_time');
-        const sessionAge = adminLoginTime ? Date.now() - parseInt(adminLoginTime) : Infinity;
+        // Special case: admin portal session
+        const adminAuth = localStorage.getItem('admin_authenticated') === 'true';
+        const adminRole = localStorage.getItem('user_role') === 'admin';
+        const adminTime = parseInt(localStorage.getItem('admin_login_time') || '0');
+        const adminValid = adminAuth && adminRole && (Date.now() - adminTime < 24 * 60 * 60 * 1000);
         
-        if (isAdminAuthenticated && localRole === 'admin' && sessionAge < 24 * 60 * 60 * 1000) {
-          console.log('👑 ADMIN SESSION: Access granted');
+        if (adminValid && allowedRoles.includes('admin')) {
+          console.log('👑 Admin session valid');
           setVerifiedRole('admin');
-          setAccessGranted(true);
-          setChecking(false);
-          checkCompleted.current = true;
+          setStatus('granted');
+          checkDone.current = true;
           return;
         }
         
-        // No user, no admin session = DENY
-        console.log('🚫 NO USER: Access denied');
-        setAccessGranted(false);
-        setChecking(false);
-        checkCompleted.current = true;
+        console.log('🚫 DENIED: No authenticated user');
+        setStatus('denied');
+        checkDone.current = true;
         return;
       }
       
-      // ===== SECURITY CHECK 2: Get user's actual role =====
-      let userRole: string | null = null;
+      // ========== CHECK 2: Get role from DB ==========
+      let role: string | null = null;
       
-      // Try localStorage first (for speed) but ONLY if user ID matches
-      const localRole = localStorage.getItem('user_role');
-      const localRoleId = localStorage.getItem('user_role_id');
-      const roleVerifiedTime = localStorage.getItem('user_role_verified');
-      const TRUST_DURATION = 10 * 60 * 1000; // 10 minutes
-      const roleAge = roleVerifiedTime ? Date.now() - parseInt(roleVerifiedTime) : Infinity;
+      try {
+        const { data, error } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        
+        if (!error && data?.role) {
+          role = data.role;
+          // Cache it
+          localStorage.setItem('user_role', role);
+          localStorage.setItem('user_role_id', user.id);
+          localStorage.setItem('user_role_verified', Date.now().toString());
+          console.log('📡 DB role:', role);
+        }
+      } catch (e) {
+        console.error('DB error:', e);
+      }
       
-      // Use cached role if: recent, user ID matches, and user is authenticated
-      if (roleAge < TRUST_DURATION && localRole && localRoleId === user.id) {
-        userRole = localRole;
-        console.log('⚡ CACHED ROLE:', userRole);
-      } else {
-        // Fetch from database
-        try {
-          const { data: roleData, error } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', user.id)
-            .maybeSingle();
-          
-          if (!error && roleData?.role) {
-            userRole = roleData.role;
-            // Update cache
-            localStorage.setItem('user_role', userRole);
-            localStorage.setItem('user_role_id', user.id);
-            localStorage.setItem('user_role_verified', Date.now().toString());
-            console.log('📡 DB ROLE:', userRole);
-          } else if (localRole && localRoleId === user.id) {
-            // Fallback to localStorage if DB fails
-            userRole = localRole;
-            console.log('⚠️ DB FAILED, using cached:', userRole);
-          }
-        } catch (err) {
-          // Fallback to localStorage
-          if (localRole && localRoleId === user.id) {
-            userRole = localRole;
-            console.log('⚠️ DB ERROR, using cached:', userRole);
-          }
+      // Fallback to cache if DB failed
+      if (!role) {
+        const cached = localStorage.getItem('user_role');
+        const cachedId = localStorage.getItem('user_role_id');
+        if (cached && cachedId === user.id) {
+          role = cached;
+          console.log('⚠️ Using cached role:', role);
         }
       }
       
-      setVerifiedRole(userRole);
+      setVerifiedRole(role);
       
-      // ===== SECURITY CHECK 3: Verify role is allowed =====
-      if (!userRole) {
-        console.log('🚫 NO ROLE: Access denied');
-        setAccessGranted(false);
-        setChecking(false);
-        checkCompleted.current = true;
+      // ========== CHECK 3: Role must match ==========
+      if (!role) {
+        console.log('🚫 DENIED: No role found for user');
+        setStatus('denied');
+        checkDone.current = true;
         return;
       }
       
-      // Admin can access everything
-      if (userRole === 'admin') {
-        console.log('👑 ADMIN: Access granted to', location.pathname);
-        setAccessGranted(true);
-        setChecking(false);
-        checkCompleted.current = true;
+      if (role === 'admin') {
+        console.log('👑 Admin access granted');
+        setStatus('granted');
+        checkDone.current = true;
         return;
       }
       
-      // Check if user's role is in allowed roles
-      if (allowedRoles.includes(userRole)) {
-        console.log('✅ ROLE MATCH:', userRole, '→', location.pathname);
-        setAccessGranted(true);
-        setChecking(false);
-        checkCompleted.current = true;
+      if (allowedRoles.includes(role)) {
+        console.log('✅ GRANTED:', role, 'can access', location.pathname);
+        setStatus('granted');
+        checkDone.current = true;
         return;
       }
       
-      // Role doesn't match - DENY
-      console.log('🚫 ROLE MISMATCH:', userRole, 'not in', allowedRoles);
-      setAccessGranted(false);
-      setChecking(false);
-      checkCompleted.current = true;
+      console.log('🚫 DENIED:', role, 'cannot access', location.pathname, '(allowed:', allowedRoles.join(', '), ')');
+      setStatus('denied');
+      checkDone.current = true;
     };
     
-    verifyAccess();
+    verify();
   }, [user, authLoading, allowedRoles, location.pathname]);
 
-  // Loading state - max 3 seconds then deny (not grant!)
+  // Timeout - DENY after 3 seconds
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (checking) {
-        console.log('⏱️ TIMEOUT: Denying access (security)');
-        setChecking(false);
-        setAccessGranted(false); // DENY on timeout, not grant
+    const t = setTimeout(() => {
+      if (status === 'checking') {
+        console.log('⏱️ TIMEOUT: Denying access');
+        setStatus('denied');
       }
     }, 3000);
-    return () => clearTimeout(timeout);
-  }, [checking]);
+    return () => clearTimeout(t);
+  }, [status]);
 
-  // Show loading spinner while checking
-  if (checking) {
+  // CHECKING - show spinner
+  if (status === 'checking') {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="text-center">
@@ -170,34 +147,30 @@ export const RoleProtectedRoute = ({
     );
   }
   
-  // Access granted - render children
-  if (accessGranted) {
+  // GRANTED - show page
+  if (status === 'granted') {
     return <>{children}</>;
   }
 
-  // Access denied - redirect appropriately
+  // DENIED - redirect
   if (!user) {
-    // Not logged in - go to auth
     return <Navigate to={`/auth?redirect=${encodeURIComponent(location.pathname)}`} replace />;
   }
   
-  // Logged in but wrong role - redirect to their correct dashboard
-  if (verifiedRole) {
-    if (verifiedRole === 'supplier') {
-      return <Navigate to="/supplier-dashboard" replace />;
-    }
-    if (verifiedRole === 'professional_builder' || verifiedRole === 'builder') {
-      return <Navigate to="/professional-builder-dashboard" replace />;
-    }
-    if (verifiedRole === 'private_client') {
-      return <Navigate to="/private-client-dashboard" replace />;
-    }
-    if (verifiedRole === 'delivery_provider' || verifiedRole === 'delivery') {
-      return <Navigate to="/delivery-dashboard" replace />;
-    }
+  // Wrong role - redirect to correct dashboard
+  if (verifiedRole === 'supplier') {
+    return <Navigate to="/supplier-dashboard" replace />;
+  }
+  if (verifiedRole === 'professional_builder' || verifiedRole === 'builder') {
+    return <Navigate to="/professional-builder-dashboard" replace />;
+  }
+  if (verifiedRole === 'private_client') {
+    return <Navigate to="/private-client-dashboard" replace />;
+  }
+  if (verifiedRole === 'delivery_provider' || verifiedRole === 'delivery') {
+    return <Navigate to="/delivery-dashboard" replace />;
   }
   
-  // No role found - go to home
   return <Navigate to="/home" replace />;
 };
 

@@ -174,9 +174,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(null);
       setSession(null);
       setUserRole(null);
-      // Clear localStorage role
+      // Clear ALL localStorage role data
       localStorage.removeItem('user_role');
       localStorage.removeItem('user_role_id');
+      localStorage.removeItem('user_role_verified');
+      localStorage.removeItem('admin_authenticated');
+      localStorage.removeItem('admin_login_time');
       await supabase.auth.signOut();
     } catch (error) {
       console.error('Sign out error:', error);
@@ -185,6 +188,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUserRole(null);
       localStorage.removeItem('user_role');
       localStorage.removeItem('user_role_id');
+      localStorage.removeItem('user_role_verified');
+      localStorage.removeItem('admin_authenticated');
+      localStorage.removeItem('admin_login_time');
     }
   };
 
