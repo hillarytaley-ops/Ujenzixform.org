@@ -1,5 +1,6 @@
 /**
  * PrivateClientAuth - Auth page ONLY for Private Clients
+ * BUILD v2 - With timeout for DB query
  */
 
 import React, { useState, useEffect } from 'react';
@@ -17,6 +18,8 @@ const ROLE = 'private_client';
 const DASHBOARD = '/private-client-dashboard';
 const TITLE = 'Private Builder';
 
+console.log('🔐 PrivateClientAuth BUILD v2');
+
 const PrivateClientAuth: React.FC = () => {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
@@ -29,14 +32,37 @@ const PrivateClientAuth: React.FC = () => {
   const [location, setLocation] = useState('');
 
   useEffect(() => {
+    let redirected = false;
+    
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
+      console.log('🔐 PrivateClientAuth: Auth event:', event);
+      
+      if (redirected) return;
+      if (!session?.user) return;
+      if (event !== 'SIGNED_IN' && event !== 'INITIAL_SESSION') return;
+      
+      redirected = true;
+      
+      // Set a timeout - if DB query takes too long, proceed anyway
+      const timeoutId = setTimeout(() => {
+        console.log('🔐 PrivateClientAuth: DB timeout - proceeding');
+        localStorage.setItem('user_role', ROLE);
+        localStorage.setItem('user_role_id', session.user.id);
+        localStorage.setItem('user_email', session.user.email || '');
+        window.location.href = DASHBOARD;
+      }, 3000);
+      
+      try {
         // Check if user has correct role
-        const { data: roleData } = await supabase
+        const { data: roleData, error } = await supabase
           .from('user_roles')
           .select('role')
           .eq('user_id', session.user.id)
           .maybeSingle();
+
+        clearTimeout(timeoutId);
+        
+        console.log('🔐 PrivateClientAuth: DB role:', roleData?.role, 'Error:', error);
 
         if (roleData?.role && roleData.role !== ROLE) {
           // Wrong role - sign out and show error
@@ -46,6 +72,7 @@ const PrivateClientAuth: React.FC = () => {
             variant: 'destructive'
           });
           await supabase.auth.signOut();
+          redirected = false;
           return;
         }
 
@@ -54,8 +81,16 @@ const PrivateClientAuth: React.FC = () => {
         localStorage.setItem('user_role_id', session.user.id);
         localStorage.setItem('user_email', session.user.email || '');
         window.location.href = DASHBOARD;
+      } catch (e) {
+        clearTimeout(timeoutId);
+        console.log('🔐 PrivateClientAuth: DB error, proceeding anyway');
+        localStorage.setItem('user_role', ROLE);
+        localStorage.setItem('user_role_id', session.user.id);
+        localStorage.setItem('user_email', session.user.email || '');
+        window.location.href = DASHBOARD;
       }
     });
+    
     return () => subscription.unsubscribe();
   }, [toast]);
 
@@ -71,6 +106,7 @@ const PrivateClientAuth: React.FC = () => {
         setIsLoading(false);
         toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
       }
+      // Success handled by onAuthStateChange
     } catch (error: any) {
       clearTimeout(safetyTimeout);
       setIsLoading(false);

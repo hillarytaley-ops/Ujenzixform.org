@@ -1,5 +1,6 @@
 /**
  * DeliveryAuth - Auth page ONLY for Delivery Providers
+ * BUILD v2 - With timeout for DB query
  */
 
 import React, { useState, useEffect } from 'react';
@@ -17,6 +18,8 @@ const ROLE = 'delivery';
 const DASHBOARD = '/delivery-dashboard';
 const TITLE = 'Delivery Provider';
 
+console.log('🔐 DeliveryAuth BUILD v2');
+
 const DeliveryAuth: React.FC = () => {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
@@ -29,13 +32,34 @@ const DeliveryAuth: React.FC = () => {
   const [location, setLocation] = useState('');
 
   useEffect(() => {
+    let redirected = false;
+    
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
-        const { data: roleData } = await supabase
+      console.log('🔐 DeliveryAuth: Auth event:', event);
+      
+      if (redirected) return;
+      if (!session?.user) return;
+      if (event !== 'SIGNED_IN' && event !== 'INITIAL_SESSION') return;
+      
+      redirected = true;
+      
+      const timeoutId = setTimeout(() => {
+        console.log('🔐 DeliveryAuth: DB timeout - proceeding');
+        localStorage.setItem('user_role', ROLE);
+        localStorage.setItem('user_role_id', session.user.id);
+        localStorage.setItem('user_email', session.user.email || '');
+        window.location.href = DASHBOARD;
+      }, 3000);
+      
+      try {
+        const { data: roleData, error } = await supabase
           .from('user_roles')
           .select('role')
           .eq('user_id', session.user.id)
           .maybeSingle();
+
+        clearTimeout(timeoutId);
+        console.log('🔐 DeliveryAuth: DB role:', roleData?.role);
 
         // Allow both 'delivery' and 'delivery_provider' roles
         if (roleData?.role && roleData.role !== 'delivery' && roleData.role !== 'delivery_provider') {
@@ -45,6 +69,7 @@ const DeliveryAuth: React.FC = () => {
             variant: 'destructive'
           });
           await supabase.auth.signOut();
+          redirected = false;
           return;
         }
 
@@ -52,8 +77,15 @@ const DeliveryAuth: React.FC = () => {
         localStorage.setItem('user_role_id', session.user.id);
         localStorage.setItem('user_email', session.user.email || '');
         window.location.href = DASHBOARD;
+      } catch (e) {
+        clearTimeout(timeoutId);
+        localStorage.setItem('user_role', ROLE);
+        localStorage.setItem('user_role_id', session.user.id);
+        localStorage.setItem('user_email', session.user.email || '');
+        window.location.href = DASHBOARD;
       }
     });
+    
     return () => subscription.unsubscribe();
   }, [toast]);
 
