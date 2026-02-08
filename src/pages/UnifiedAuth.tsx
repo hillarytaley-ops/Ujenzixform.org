@@ -8,7 +8,7 @@
  * - Redirects to role-specific dashboard after auth
  */
 
-console.log('🔐 UnifiedAuth BUILD v9 - with timeout fallback Feb 8 2026');
+console.log('🔐 UnifiedAuth BUILD v13 - STRICT DB role only Feb 8 2026');
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
@@ -129,59 +129,55 @@ const UnifiedAuth: React.FC = () => {
       if (session?.user) {
         handled = true;
         
-        // Check localStorage first for instant redirect (trusted for 10 min)
+        // Check localStorage ONLY if user ID matches (security check)
         const cachedRole = localStorage.getItem('user_role');
         const cachedRoleId = localStorage.getItem('user_role_id');
         const roleVerified = localStorage.getItem('user_role_verified');
         const isFresh = roleVerified && (Date.now() - parseInt(roleVerified)) < 10 * 60 * 1000;
         
         if (cachedRole && cachedRoleId === session.user.id && isFresh) {
-          console.log('🔐 UnifiedAuth: Using cached role:', cachedRole);
+          console.log('🔐 UnifiedAuth: Using verified cached role:', cachedRole);
           const destination = getDashboardForRole(cachedRole);
           window.location.href = destination;
           return;
         }
         
-        // No cached role - try to fetch from DB with timeout
-        const fetchTimeout = setTimeout(() => {
-          console.log('🔐 UnifiedAuth: DB fetch timeout, using URL role:', roleParam);
-          localStorage.setItem('user_role', roleParam);
-          localStorage.setItem('user_role_id', session.user.id);
-          localStorage.setItem('user_role_verified', Date.now().toString());
-          window.location.href = roleConfig.dashboard;
-        }, 3000);
-        
+        // MUST fetch from database - no fallback to URL parameter
         supabase
           .from('user_roles')
           .select('role')
           .eq('user_id', session.user.id)
           .maybeSingle()
           .then(({ data: roleData }) => {
-            clearTimeout(fetchTimeout);
-            const actualRole = roleData?.role || roleParam;
-            console.log('🔐 UnifiedAuth: Database role:', actualRole);
+            if (!roleData?.role) {
+              // No role in database - user is not properly registered
+              console.log('🔐 UnifiedAuth: No role in DB - redirecting to home');
+              window.location.href = '/home';
+              return;
+            }
             
-            localStorage.setItem('user_role', actualRole);
+            const dbRole = roleData.role;
+            console.log('🔐 UnifiedAuth: Database role:', dbRole);
+            
+            // Store the DATABASE role (not URL parameter)
+            localStorage.setItem('user_role', dbRole);
             localStorage.setItem('user_role_id', session.user.id);
             localStorage.setItem('user_role_verified', Date.now().toString());
             
-            const destination = getDashboardForRole(actualRole);
+            const destination = getDashboardForRole(dbRole);
             console.log('🔐 UnifiedAuth: REDIRECTING to:', destination);
             window.location.href = destination;
           })
-          .catch(() => {
-            clearTimeout(fetchTimeout);
-            console.log('🔐 UnifiedAuth: DB error, using URL role');
-            localStorage.setItem('user_role', roleParam);
-            localStorage.setItem('user_role_id', session.user.id);
-            localStorage.setItem('user_role_verified', Date.now().toString());
-            window.location.href = roleConfig.dashboard;
+          .catch((err) => {
+            console.error('🔐 UnifiedAuth: DB error:', err);
+            // On error, redirect to home - don't trust URL parameter
+            window.location.href = '/home';
           });
       }
     });
     
     return () => subscription.unsubscribe();
-  }, [roleParam, roleConfig.dashboard]);
+  }, []);
   
   const getDashboardForRole = (role: string): string => {
     switch (role) {

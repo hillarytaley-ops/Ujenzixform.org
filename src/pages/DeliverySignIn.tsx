@@ -65,12 +65,38 @@ const DeliverySignIn = () => {
   // Redirect to dashboard after sign-in (not home page)
   const redirectTo = searchParams.get('redirect') || '/delivery-dashboard';
 
-  // Check if already logged in on page load
+  // Check if already logged in on page load - MUST verify role from DB
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
-        console.log('🔐 DeliverySignIn: Already logged in, redirecting');
-        window.location.href = '/delivery-dashboard';
+        console.log('🔐 DeliverySignIn: Session found, checking DB role...');
+        
+        // MUST check database for actual role
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+        
+        const dbRole = roleData?.role;
+        console.log('🔐 DeliverySignIn: DB role:', dbRole);
+        
+        if (dbRole === 'delivery' || dbRole === 'delivery_provider') {
+          window.location.href = '/delivery-dashboard';
+        } else if (dbRole) {
+          // Wrong role - redirect to their actual dashboard
+          toast({
+            title: 'Wrong Portal',
+            description: `You are registered as ${dbRole}. Redirecting...`,
+          });
+          if (dbRole === 'private_client') window.location.href = '/private-client-dashboard';
+          else if (dbRole === 'professional_builder') window.location.href = '/professional-builder-dashboard';
+          else if (dbRole === 'supplier') window.location.href = '/supplier-dashboard';
+          else if (dbRole === 'admin') window.location.href = '/admin-dashboard';
+          else window.location.href = '/home';
+        } else {
+          setCheckingAuth(false);
+        }
       } else {
         setCheckingAuth(false);
       }

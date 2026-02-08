@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Home, Eye, EyeOff, Loader2, HardHat } from "lucide-react";
 
-console.log('🔐 ProfessionalBuilderSignIn BUILD v2 - onAuthStateChange Feb 8 2026');
+console.log('🔐 ProfessionalBuilderSignIn BUILD v3 - STRICT DB check Feb 8 2026');
 
 const ProfessionalBuilderSignIn = () => {
   const [email, setEmail] = useState("");
@@ -18,15 +18,40 @@ const ProfessionalBuilderSignIn = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Check if already logged in on page load
+  // Check if already logged in on page load - MUST verify role from DB
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
-        console.log('🔐 ProfessionalBuilderSignIn: Already logged in, redirecting');
-        window.location.href = '/professional-builder-dashboard';
+        console.log('🔐 ProfessionalBuilderSignIn: Session found, checking DB role...');
+        
+        // MUST check database for actual role
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+        
+        const dbRole = roleData?.role;
+        console.log('🔐 ProfessionalBuilderSignIn: DB role:', dbRole);
+        
+        if (dbRole === 'professional_builder') {
+          window.location.href = '/professional-builder-dashboard';
+        } else if (dbRole) {
+          // Wrong role - redirect to their actual dashboard
+          toast({
+            title: 'Wrong Portal',
+            description: `You are registered as ${dbRole}. Redirecting...`,
+          });
+          if (dbRole === 'private_client') window.location.href = '/private-client-dashboard';
+          else if (dbRole === 'supplier') window.location.href = '/supplier-dashboard';
+          else if (dbRole === 'delivery' || dbRole === 'delivery_provider') window.location.href = '/delivery-dashboard';
+          else if (dbRole === 'admin') window.location.href = '/admin-dashboard';
+          else window.location.href = '/home';
+        }
+        // If no role, let them stay on page to sign in fresh
       }
     });
-  }, []);
+  }, [toast]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();

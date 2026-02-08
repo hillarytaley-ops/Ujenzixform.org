@@ -14,7 +14,7 @@
  * ╚══════════════════════════════════════════════════════════════════════════════╝
  */
 
-console.log('🔐 SupplierSignIn BUILD v4 - onAuthStateChange Feb 8 2026');
+console.log('🔐 SupplierSignIn BUILD v5 - STRICT DB check Feb 8 2026');
 
 import { useState, useEffect } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
@@ -95,12 +95,38 @@ const SupplierSignIn = () => {
     }
   };
 
-  // Check if already logged in on page load
+  // Check if already logged in on page load - MUST verify role from DB
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
-        console.log('🔐 SupplierSignIn: Already logged in, redirecting');
-        window.location.href = '/supplier-dashboard';
+        console.log('🔐 SupplierSignIn: Session found, checking DB role...');
+        
+        // MUST check database for actual role
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+        
+        const dbRole = roleData?.role;
+        console.log('🔐 SupplierSignIn: DB role:', dbRole);
+        
+        if (dbRole === 'supplier') {
+          window.location.href = '/supplier-dashboard';
+        } else if (dbRole) {
+          // Wrong role - redirect to their actual dashboard
+          toast({
+            title: 'Wrong Portal',
+            description: `You are registered as ${dbRole}. Redirecting...`,
+          });
+          if (dbRole === 'private_client') window.location.href = '/private-client-dashboard';
+          else if (dbRole === 'professional_builder') window.location.href = '/professional-builder-dashboard';
+          else if (dbRole === 'delivery' || dbRole === 'delivery_provider') window.location.href = '/delivery-dashboard';
+          else if (dbRole === 'admin') window.location.href = '/admin-dashboard';
+          else window.location.href = '/home';
+        } else {
+          setCheckingAuth(false);
+        }
       } else {
         setCheckingAuth(false);
       }
@@ -109,7 +135,7 @@ const SupplierSignIn = () => {
     // Safety timeout
     const timeout = setTimeout(() => setCheckingAuth(false), 3000);
     return () => clearTimeout(timeout);
-  }, []);
+  }, [toast]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
