@@ -8,7 +8,7 @@
  * - Redirects to role-specific dashboard after auth
  */
 
-console.log('🔐 UnifiedAuth BUILD v17 - WITH TIMEOUT Feb 8 2026');
+console.log('🔐 UnifiedAuth BUILD v18 - USE onAuthStateChange Feb 8 2026');
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
@@ -117,19 +117,41 @@ const UnifiedAuth: React.FC = () => {
   const roleConfig = ROLE_CONFIG[roleParam] || ROLE_CONFIG.private_client;
   const RoleIcon = roleConfig.icon;
   
-  // Check if already logged in on page load
+  // Listen for auth state changes - this is how we detect successful sign-in
   useEffect(() => {
-    // Check localStorage for existing session
+    // Check localStorage first for instant redirect
     const cachedRole = localStorage.getItem('user_role');
     const cachedRoleId = localStorage.getItem('user_role_id');
     const cachedEmail = localStorage.getItem('user_email');
     
     if (cachedRole && cachedRoleId && cachedEmail) {
       console.log('🔐 UnifiedAuth: Already logged in, redirecting...');
-      const destination = getDashboardForRole(cachedRole);
-      window.location.href = destination;
+      window.location.href = getDashboardForRole(cachedRole);
+      return;
     }
-  }, []);
+    
+    // Listen for SIGNED_IN event
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('🔐 UnifiedAuth: Auth event:', event);
+      
+      if (event === 'SIGNED_IN' && session?.user) {
+        console.log('🔐 UnifiedAuth: SIGNED_IN detected, redirecting...');
+        
+        // Store in localStorage
+        localStorage.setItem('user_role', roleParam);
+        localStorage.setItem('user_role_id', session.user.id);
+        localStorage.setItem('user_role_verified', Date.now().toString());
+        localStorage.setItem('user_email', session.user.email || '');
+        
+        // Redirect
+        const destination = getDashboardForRole(roleParam);
+        console.log('🔐 UnifiedAuth: Redirecting to:', destination);
+        window.location.href = destination;
+      }
+    });
+    
+    return () => subscription.unsubscribe();
+  }, [roleParam]);
   
   const getDashboardForRole = (role: string): string => {
     switch (role) {
@@ -147,51 +169,32 @@ const UnifiedAuth: React.FC = () => {
     setIsLoading(true);
     console.log('🔐 UnifiedAuth: Starting sign-in for', email);
     
-    // Timeout to prevent infinite loading
-    const timeoutId = setTimeout(() => {
-      console.log('🔐 UnifiedAuth: Sign-in timeout after 10s');
-      setIsLoading(false);
-      toast({
-        title: 'Sign in timed out',
-        description: 'Please try again',
-        variant: 'destructive'
-      });
-    }, 10000);
-    
     try {
-      console.log('🔐 UnifiedAuth: Calling signInWithPassword...');
-      const { data, error } = await supabase.auth.signInWithPassword({
+      // Don't await - the onAuthStateChange listener will handle the redirect
+      supabase.auth.signInWithPassword({
         email: email.trim(),
         password
-      });
-      console.log('🔐 UnifiedAuth: signInWithPassword returned', { data: !!data, error: !!error });
-      
-      clearTimeout(timeoutId);
-      
-      if (error) {
-        console.log('🔐 UnifiedAuth: Sign-in error:', error.message);
-        throw error;
-      }
-      
-      if (data.user) {
-        console.log('🔐 UnifiedAuth: SUCCESS! User:', data.user.email);
-        
-        // Store in localStorage
-        localStorage.setItem('user_role', roleParam);
-        localStorage.setItem('user_role_id', data.user.id);
-        localStorage.setItem('user_role_verified', Date.now().toString());
-        localStorage.setItem('user_email', data.user.email || '');
-        
-        // Redirect
-        const destination = getDashboardForRole(roleParam);
-        console.log('🔐 UnifiedAuth: REDIRECTING to:', destination);
-        window.location.href = destination;
-      } else {
-        console.log('🔐 UnifiedAuth: No user in response');
+      }).then(({ error }) => {
+        if (error) {
+          console.log('🔐 UnifiedAuth: Sign-in error:', error.message);
+          toast({
+            title: 'Sign in failed',
+            description: error.message,
+            variant: 'destructive'
+          });
+          setIsLoading(false);
+        }
+        // Success is handled by onAuthStateChange listener
+      }).catch((err) => {
+        console.log('🔐 UnifiedAuth: Sign-in exception:', err);
+        toast({
+          title: 'Sign in failed',
+          description: 'An error occurred',
+          variant: 'destructive'
+        });
         setIsLoading(false);
-      }
+      });
     } catch (error: any) {
-      clearTimeout(timeoutId);
       console.log('🔐 UnifiedAuth: Caught error:', error);
       toast({
         title: 'Sign in failed',
