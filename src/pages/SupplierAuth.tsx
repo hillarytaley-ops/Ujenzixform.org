@@ -1,5 +1,5 @@
 /**
- * SupplierAuth - BUILD v9 - HYBRID
+ * SupplierAuth - BUILD v10 - INSTANT REDIRECT
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -16,16 +16,8 @@ import { Package, Eye, EyeOff, Loader2, ArrowLeft, Mail, Lock, User, Phone, MapP
 const ROLE = 'supplier';
 const DASHBOARD = '/supplier-dashboard';
 const TITLE = 'Supplier';
-const DASHBOARDS: Record<string, string> = {
-  'private_client': '/private-client-dashboard',
-  'professional_builder': '/professional-builder-dashboard',
-  'supplier': '/supplier-dashboard',
-  'delivery': '/delivery-dashboard',
-  'delivery_provider': '/delivery-dashboard',
-  'admin': '/admin-dashboard',
-};
 
-console.log('🔐 SupplierAuth BUILD v9');
+console.log('🔐 SupplierAuth BUILD v10 - INSTANT');
 
 const SupplierAuth: React.FC = () => {
   const { toast } = useToast();
@@ -38,60 +30,44 @@ const SupplierAuth: React.FC = () => {
   const [companyName, setCompanyName] = useState('');
   const [phone, setPhone] = useState('');
   const [location, setLocation] = useState('');
-  const isSigningIn = useRef(false);
   const hasRedirected = useRef(false);
 
-  const checkRoleAndRedirect = async (userId: string, userEmail: string) => {
-    if (hasRedirected.current) return;
-    hasRedirected.current = true;
-    
-    try {
-      const { data: roleData } = await supabase.from('user_roles').select('role').eq('user_id', userId).maybeSingle();
-      const actualRole = roleData?.role || ROLE;
-      localStorage.setItem('user_role', actualRole);
-      localStorage.setItem('user_role_id', userId);
-      localStorage.setItem('user_email', userEmail);
-      window.location.href = DASHBOARDS[actualRole] || DASHBOARD;
-    } catch (e) {
-      localStorage.setItem('user_role', ROLE);
-      localStorage.setItem('user_role_id', userId);
-      localStorage.setItem('user_email', userEmail);
-      window.location.href = DASHBOARD;
-    }
-  };
-
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session?.user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
-        if (isSigningIn.current || event === 'INITIAL_SESSION') {
-          checkRoleAndRedirect(session.user.id, session.user.email || '');
-        }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user && !hasRedirected.current) {
+        hasRedirected.current = true;
+        localStorage.setItem('user_role', ROLE);
+        localStorage.setItem('user_role_id', session.user.id);
+        localStorage.setItem('user_email', session.user.email || '');
+        window.location.href = DASHBOARD;
       }
     });
-    return () => subscription.unsubscribe();
   }, []);
 
   const handleSignIn = (e: React.FormEvent) => {
     e.preventDefault();
     if (hasRedirected.current) return;
     setIsLoading(true);
-    isSigningIn.current = true;
 
-    supabase.auth.signInWithPassword({ email: email.trim(), password }).then(({ data, error }) => {
-      if (error) {
-        isSigningIn.current = false;
-        hasRedirected.current = false;
+    supabase.auth.signInWithPassword({ email: email.trim(), password })
+      .then(({ data, error }) => {
+        if (error) {
+          setIsLoading(false);
+          toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
+          return;
+        }
+        if (data?.user) {
+          hasRedirected.current = true;
+          localStorage.setItem('user_role', ROLE);
+          localStorage.setItem('user_role_id', data.user.id);
+          localStorage.setItem('user_email', data.user.email || '');
+          window.location.href = DASHBOARD;
+        }
+      })
+      .catch((err) => {
         setIsLoading(false);
-        toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
-      } else if (data?.user) {
-        checkRoleAndRedirect(data.user.id, data.user.email || '');
-      }
-    }).catch((err) => {
-      isSigningIn.current = false;
-      hasRedirected.current = false;
-      setIsLoading(false);
-      toast({ title: 'Sign in failed', description: err.message, variant: 'destructive' });
-    });
+        toast({ title: 'Sign in failed', description: err.message, variant: 'destructive' });
+      });
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
