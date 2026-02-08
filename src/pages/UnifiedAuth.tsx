@@ -357,7 +357,7 @@ const UnifiedAuth: React.FC = () => {
       {/* Header */}
       <header className="p-4">
         <div className="container mx-auto flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2 text-white hover:text-white/80 transition-colors">
+          <Link to="/home" className="flex items-center gap-2 text-white hover:text-white/80 transition-colors">
             <ArrowLeft className="h-5 w-5" />
             <span className="font-medium">Back to Home</span>
           </Link>
