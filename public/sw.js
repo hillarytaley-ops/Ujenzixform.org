@@ -5,7 +5,7 @@
 //           periodic sync, share target, file handling
 // ============================================================
 
-const CACHE_VERSION = 'v30';
+const CACHE_VERSION = 'v31';
 const STATIC_CACHE = `UjenziXform-static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `UjenziXform-dynamic-${CACHE_VERSION}`;
 const API_CACHE = `UjenziXform-api-${CACHE_VERSION}`;
@@ -168,6 +168,13 @@ self.addEventListener('fetch', (event) => {
       url.pathname.includes('/src/') ||
       url.pathname.includes('/assets/') && url.pathname.endsWith('.js')) {
     // Let module scripts pass through without service worker interception
+    return;
+  }
+
+  // CRITICAL: Don't intercept navigation requests (HTML pages)
+  // This ensures fresh HTML is always loaded from network
+  if (request.mode === 'navigate' || request.destination === 'document') {
+    // Let navigation requests pass through to network
     return;
   }
 
