@@ -1,14 +1,10 @@
 /**
  * UnifiedAuth - Single authentication page for all user roles
  * 
- * Features:
- * - Detects role from URL parameter (?role=private_client|professional_builder|supplier|delivery)
- * - Shows role-specific branding and messaging
- * - Handles both sign-in and sign-up in one page
- * - Redirects to role-specific dashboard after auth
+ * BUILD v22 - STRICT SECURITY: Never allow wrong role
  */
 
-console.log('🔐 UnifiedAuth BUILD v20 - 2s DB TIMEOUT Feb 8 2026');
+console.log('🔐 UnifiedAuth BUILD v22 - STRICT SECURITY Feb 8 2026');
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
@@ -117,71 +113,6 @@ const UnifiedAuth: React.FC = () => {
   const roleConfig = ROLE_CONFIG[roleParam] || ROLE_CONFIG.private_client;
   const RoleIcon = roleConfig.icon;
   
-  // Listen for auth state changes - this is how we detect successful sign-in
-  useEffect(() => {
-    // Check localStorage first for instant redirect
-    const cachedRole = localStorage.getItem('user_role');
-    const cachedRoleId = localStorage.getItem('user_role_id');
-    const cachedEmail = localStorage.getItem('user_email');
-    
-    if (cachedRole && cachedRoleId && cachedEmail) {
-      console.log('🔐 UnifiedAuth: Already logged in as', cachedRole);
-      window.location.href = getDashboardForRole(cachedRole);
-      return;
-    }
-    
-    let hasRedirected = false;
-    
-    const redirect = (user: any, role: string) => {
-      if (hasRedirected) return;
-      hasRedirected = true;
-      
-      console.log('🔐 UnifiedAuth: REDIRECTING with role:', role);
-      localStorage.setItem('user_role', role);
-      localStorage.setItem('user_role_id', user.id);
-      localStorage.setItem('user_role_verified', Date.now().toString());
-      localStorage.setItem('user_email', user.email || '');
-      window.location.href = getDashboardForRole(role);
-    };
-    
-    // Listen for SIGNED_IN event
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('🔐 UnifiedAuth: Auth event:', event);
-      
-      if (event === 'SIGNED_IN' && session?.user && !hasRedirected) {
-        console.log('🔐 UnifiedAuth: SIGNED_IN - fetching role...');
-        
-        // Set a hard timeout - redirect with portal role after 2s no matter what
-        const timeoutId = setTimeout(() => {
-          console.log('🔐 UnifiedAuth: TIMEOUT - using portal role');
-          redirect(session.user, roleParam);
-        }, 2000);
-        
-        // Try to fetch DB role
-        fetch(`https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/user_roles?user_id=eq.${session.user.id}&select=role`, {
-          headers: {
-            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzI2MTcyMjIsImV4cCI6MjA0ODE5MzIyMn0.WmMfuhGPYrJnEJBBBFUlq8gCtSJ3Mj_TYkDYLUv0hYk',
-            'Authorization': `Bearer ${session.access_token}`
-          }
-        })
-        .then(res => res.json())
-        .then(data => {
-          clearTimeout(timeoutId);
-          const dbRole = data?.[0]?.role;
-          console.log('🔐 UnifiedAuth: DB returned role:', dbRole);
-          redirect(session.user, dbRole || roleParam);
-        })
-        .catch(err => {
-          clearTimeout(timeoutId);
-          console.log('🔐 UnifiedAuth: DB error:', err);
-          redirect(session.user, roleParam);
-        });
-      }
-    });
-    
-    return () => subscription.unsubscribe();
-  }, [roleParam]);
-  
   const getDashboardForRole = (role: string): string => {
     switch (role) {
       case 'private_client': return '/private-client-dashboard';
@@ -193,36 +124,126 @@ const UnifiedAuth: React.FC = () => {
     }
   };
   
+  // Check if already logged in on mount
+  useEffect(() => {
+    const checkExistingSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        console.log('🔐 UnifiedAuth: Already logged in, fetching role...');
+        
+        // Fetch role from DB
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+        
+        const dbRole = roleData?.role;
+        
+        if (dbRole) {
+          console.log('🔐 UnifiedAuth: Existing user has role:', dbRole);
+          localStorage.setItem('user_role', dbRole);
+          localStorage.setItem('user_role_id', session.user.id);
+          localStorage.setItem('user_email', session.user.email || '');
+          window.location.href = getDashboardForRole(dbRole);
+        }
+      }
+    };
+    
+    checkExistingSession();
+  }, []);
+  
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     console.log('🔐 UnifiedAuth: Starting sign-in for', email);
     
     try {
-      // Don't await - the onAuthStateChange listener will handle the redirect
-      supabase.auth.signInWithPassword({
+      // Sign in
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password
-      }).then(({ error }) => {
-        if (error) {
-          console.log('🔐 UnifiedAuth: Sign-in error:', error.message);
-          toast({
-            title: 'Sign in failed',
-            description: error.message,
-            variant: 'destructive'
-          });
-          setIsLoading(false);
-        }
-        // Success is handled by onAuthStateChange listener
-      }).catch((err) => {
-        console.log('🔐 UnifiedAuth: Sign-in exception:', err);
+      });
+      
+      if (error) {
+        console.log('🔐 UnifiedAuth: Sign-in error:', error.message);
         toast({
           title: 'Sign in failed',
-          description: 'An error occurred',
+          description: error.message,
           variant: 'destructive'
         });
         setIsLoading(false);
-      });
+        return;
+      }
+      
+      if (!data.user) {
+        toast({
+          title: 'Sign in failed',
+          description: 'No user returned',
+          variant: 'destructive'
+        });
+        setIsLoading(false);
+        return;
+      }
+      
+      console.log('🔐 UnifiedAuth: Sign-in successful, fetching role...');
+      
+      // ALWAYS fetch role from database - this is the source of truth
+      const { data: roleData, error: roleError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', data.user.id)
+        .maybeSingle();
+      
+      const dbRole = roleData?.role;
+      console.log('🔐 UnifiedAuth: DB role:', dbRole, 'Portal role:', roleParam);
+      
+      // SECURITY: Always use DB role if it exists
+      if (dbRole) {
+        // Store the ACTUAL role in localStorage
+        localStorage.setItem('user_role', dbRole);
+        localStorage.setItem('user_role_id', data.user.id);
+        localStorage.setItem('user_role_verified', Date.now().toString());
+        localStorage.setItem('user_email', data.user.email || '');
+        
+        // If user is at wrong portal, show warning but redirect to correct dashboard
+        if (dbRole !== roleParam) {
+          console.log('🔐 UnifiedAuth: WRONG PORTAL! User is', dbRole, 'not', roleParam);
+          toast({
+            title: 'Redirecting to your dashboard',
+            description: `You are registered as ${dbRole.replace('_', ' ')}`,
+          });
+        }
+        
+        // Redirect to their ACTUAL dashboard
+        window.location.href = getDashboardForRole(dbRole);
+        return;
+      }
+      
+      // No role in DB - this is a new user or role not assigned
+      // Create the role based on the portal they're using
+      console.log('🔐 UnifiedAuth: No DB role, creating role:', roleParam);
+      
+      const { error: createRoleError } = await supabase
+        .from('user_roles')
+        .insert({
+          user_id: data.user.id,
+          role: roleParam
+        });
+      
+      if (createRoleError) {
+        console.error('🔐 UnifiedAuth: Error creating role:', createRoleError);
+      }
+      
+      // Store role and redirect
+      localStorage.setItem('user_role', roleParam);
+      localStorage.setItem('user_role_id', data.user.id);
+      localStorage.setItem('user_role_verified', Date.now().toString());
+      localStorage.setItem('user_email', data.user.email || '');
+      
+      window.location.href = getDashboardForRole(roleParam);
+      
     } catch (error: any) {
       console.log('🔐 UnifiedAuth: Caught error:', error);
       toast({
@@ -587,7 +608,7 @@ const UnifiedAuth: React.FC = () => {
                 return (
                   <Link 
                     key={key}
-                    to={`/auth?role=${key}`}
+                    to={`/unified-auth?role=${key}`}
                     className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium bg-white/10 text-white hover:bg-white/20 transition-colors`}
                   >
                     <Icon className="h-3 w-3" />
