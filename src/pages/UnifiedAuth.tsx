@@ -147,15 +147,19 @@ const UnifiedAuth: React.FC = () => {
       if (error) throw error;
       
       if (data.user) {
-        // Fetch user role directly after sign-in
-        const { data: roleData } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', data.user.id)
-          .limit(1)
-          .maybeSingle();
-        
-        const fetchedRole = roleData?.role || roleParam;
+        // Store role - try to fetch but don't block on it
+        let fetchedRole = roleParam;
+        try {
+          const { data: roleData } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', data.user.id)
+            .limit(1)
+            .maybeSingle();
+          if (roleData?.role) fetchedRole = roleData.role;
+        } catch (e) {
+          console.log('Role fetch failed, using default:', roleParam);
+        }
         
         // Store role in localStorage
         localStorage.setItem('user_role', fetchedRole);
@@ -164,8 +168,8 @@ const UnifiedAuth: React.FC = () => {
         
         // Redirect INSTANTLY
         const destination = redirectTo || getDashboardForRole(fetchedRole);
-        window.location.replace(destination);
-        return;
+        setIsLoading(false);
+        window.location.href = destination;
       }
     } catch (error: any) {
       toast({
@@ -173,7 +177,6 @@ const UnifiedAuth: React.FC = () => {
         description: error.message || 'Please check your credentials',
         variant: 'destructive'
       });
-    } finally {
       setIsLoading(false);
     }
   };

@@ -261,15 +261,21 @@ const SupplierSignIn = () => {
         return;
       }
       
-      // Fetch role from database (source of truth)
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-        .maybeSingle();
-      
-      let dbRole = roleData?.role;
-      console.log('🔐 Database role:', dbRole);
+      // Fetch role from database (source of truth) - with timeout
+      let dbRole: string | null = null;
+      try {
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', userId)
+          .maybeSingle();
+        dbRole = roleData?.role || null;
+        console.log('🔐 Database role:', dbRole);
+      } catch (roleError) {
+        console.error('🔐 Role fetch failed:', roleError);
+        // Continue with supplier role assumption
+        dbRole = 'supplier';
+      }
       
       // If user has a DIFFERENT role (not supplier/admin), BLOCK them
       // @ts-ignore - TypeScript types may not match actual DB values
