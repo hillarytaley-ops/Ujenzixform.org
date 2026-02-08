@@ -1,9 +1,9 @@
 /**
  * PrivateClientAuth - Auth page ONLY for Private Clients
- * BUILD v5 - WITH TIMEOUT: 5s max for signIn
+ * BUILD v6 - USE onAuthStateChange (Promise doesn't resolve)
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,7 @@ const ROLE = 'private_client';
 const DASHBOARD = '/private-client-dashboard';
 const TITLE = 'Private Builder';
 
-console.log('🔐 PrivateClientAuth BUILD v5 - WITH TIMEOUT');
+console.log('🔐 PrivateClientAuth BUILD v6 - onAuthStateChange');
 
 const PrivateClientAuth: React.FC = () => {
   const { toast } = useToast();
@@ -30,13 +30,32 @@ const PrivateClientAuth: React.FC = () => {
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [location, setLocation] = useState('');
+  const isSigningIn = useRef(false);
+
+  // Listen for auth state changes - this is how we detect successful sign-in
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('🔐 PrivateClientAuth: Auth event:', event, session?.user?.email);
+      
+      // Only redirect if we initiated a sign-in and it succeeded
+      if (isSigningIn.current && session?.user && event === 'SIGNED_IN') {
+        console.log('🔐 PrivateClientAuth: Sign-in detected via onAuthStateChange! Redirecting...');
+        localStorage.setItem('user_role', ROLE);
+        localStorage.setItem('user_role_id', session.user.id);
+        localStorage.setItem('user_email', session.user.email || '');
+        window.location.href = DASHBOARD;
+      }
+    });
+    
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Check if already logged in on mount
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        // Already logged in - redirect immediately
+        console.log('🔐 PrivateClientAuth: Already logged in, redirecting...');
         localStorage.setItem('user_role', ROLE);
         localStorage.setItem('user_role_id', session.user.id);
         localStorage.setItem('user_email', session.user.email || '');
@@ -49,48 +68,27 @@ const PrivateClientAuth: React.FC = () => {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    isSigningIn.current = true;
     console.log('🔐 PrivateClientAuth: Starting sign-in...');
 
-    // Set up timeout - if sign-in takes more than 5 seconds, something is wrong
-    const timeoutId = setTimeout(() => {
-      console.log('🔐 PrivateClientAuth: TIMEOUT - sign-in took too long');
-      setIsLoading(false);
-      toast({ title: 'Sign in timeout', description: 'Please try again. If the problem persists, refresh the page.', variant: 'destructive' });
-    }, 5000);
-
-    try {
-      console.log('🔐 PrivateClientAuth: Calling signInWithPassword...');
-      const { data, error } = await supabase.auth.signInWithPassword({ 
-        email: email.trim(), 
-        password 
-      });
-      
-      clearTimeout(timeoutId);
-      console.log('🔐 PrivateClientAuth: Sign-in result:', { user: data?.user?.email, error: error?.message });
-      
+    // Don't await - the onAuthStateChange will handle the redirect
+    supabase.auth.signInWithPassword({ 
+      email: email.trim(), 
+      password 
+    }).then(({ data, error }) => {
       if (error) {
+        console.log('🔐 PrivateClientAuth: Sign-in error:', error.message);
+        isSigningIn.current = false;
         setIsLoading(false);
         toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
-        return;
       }
-
-      if (data?.user) {
-        // Sign-in successful - redirect immediately
-        console.log('🔐 PrivateClientAuth: Success! Redirecting to', DASHBOARD);
-        localStorage.setItem('user_role', ROLE);
-        localStorage.setItem('user_role_id', data.user.id);
-        localStorage.setItem('user_email', data.user.email || '');
-        window.location.href = DASHBOARD;
-      } else {
-        setIsLoading(false);
-        toast({ title: 'Sign in failed', description: 'No user data returned', variant: 'destructive' });
-      }
-    } catch (error: any) {
-      clearTimeout(timeoutId);
+      // Success is handled by onAuthStateChange
+    }).catch((error) => {
       console.error('🔐 PrivateClientAuth: Exception:', error);
+      isSigningIn.current = false;
       setIsLoading(false);
       toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
-    }
+    });
   };
 
   const handleSignUp = async (e: React.FormEvent) => {

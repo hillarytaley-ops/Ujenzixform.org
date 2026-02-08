@@ -1,9 +1,9 @@
 /**
  * DeliveryAuth - Auth page ONLY for Delivery Providers
- * BUILD v5 - WITH TIMEOUT: 5s max for signIn
+ * BUILD v6 - USE onAuthStateChange (Promise doesn't resolve)
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,7 @@ const ROLE = 'delivery';
 const DASHBOARD = '/delivery-dashboard';
 const TITLE = 'Delivery Provider';
 
-console.log('🔐 DeliveryAuth BUILD v5 - WITH TIMEOUT');
+console.log('🔐 DeliveryAuth BUILD v6 - onAuthStateChange');
 
 const DeliveryAuth: React.FC = () => {
   const { toast } = useToast();
@@ -31,13 +31,30 @@ const DeliveryAuth: React.FC = () => {
   const [companyName, setCompanyName] = useState('');
   const [phone, setPhone] = useState('');
   const [location, setLocation] = useState('');
+  const isSigningIn = useRef(false);
 
-  // Check if already logged in on mount
+  // Listen for auth state changes
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('🔐 DeliveryAuth: Auth event:', event, session?.user?.email);
+      
+      if (isSigningIn.current && session?.user && event === 'SIGNED_IN') {
+        console.log('🔐 DeliveryAuth: Sign-in detected! Redirecting...');
+        localStorage.setItem('user_role', ROLE);
+        localStorage.setItem('user_role_id', session.user.id);
+        localStorage.setItem('user_email', session.user.email || '');
+        window.location.href = DASHBOARD;
+      }
+    });
+    
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Check if already logged in
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        // Already logged in - redirect immediately
         localStorage.setItem('user_role', ROLE);
         localStorage.setItem('user_role_id', session.user.id);
         localStorage.setItem('user_email', session.user.email || '');
@@ -50,45 +67,23 @@ const DeliveryAuth: React.FC = () => {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    isSigningIn.current = true;
     console.log('🔐 DeliveryAuth: Starting sign-in...');
 
-    const timeoutId = setTimeout(() => {
-      console.log('🔐 DeliveryAuth: TIMEOUT');
-      setIsLoading(false);
-      toast({ title: 'Sign in timeout', description: 'Please try again.', variant: 'destructive' });
-    }, 5000);
-
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({ 
-        email: email.trim(), 
-        password 
-      });
-      
-      clearTimeout(timeoutId);
-      console.log('🔐 DeliveryAuth: Sign-in result:', { user: data?.user?.email, error: error?.message });
-      
+    supabase.auth.signInWithPassword({ 
+      email: email.trim(), 
+      password 
+    }).then(({ error }) => {
       if (error) {
+        isSigningIn.current = false;
         setIsLoading(false);
         toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
-        return;
       }
-
-      if (data?.user) {
-        console.log('🔐 DeliveryAuth: Success! Redirecting to', DASHBOARD);
-        localStorage.setItem('user_role', ROLE);
-        localStorage.setItem('user_role_id', data.user.id);
-        localStorage.setItem('user_email', data.user.email || '');
-        window.location.href = DASHBOARD;
-      } else {
-        setIsLoading(false);
-        toast({ title: 'Sign in failed', description: 'No user data returned', variant: 'destructive' });
-      }
-    } catch (error: any) {
-      clearTimeout(timeoutId);
-      console.error('🔐 DeliveryAuth: Exception:', error);
+    }).catch((error) => {
+      isSigningIn.current = false;
       setIsLoading(false);
       toast({ title: 'Sign in failed', description: error.message, variant: 'destructive' });
-    }
+    });
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
