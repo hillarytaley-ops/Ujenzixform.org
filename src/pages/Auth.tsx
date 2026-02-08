@@ -60,6 +60,7 @@ const Auth = () => {
           localStorage.setItem('user_role', roleData.role);
           localStorage.setItem('user_role_id', userId);
           localStorage.setItem('user_role_verified', Date.now().toString());
+          console.log('🔐 Role stored:', roleData.role);
         }
       } catch (e) {
         console.error('Role fetch error:', e);
@@ -70,7 +71,10 @@ const Auth = () => {
       if (returnTo) sessionStorage.removeItem('returnTo');
       
       console.log('🔐 Redirecting to:', target);
-      window.location.href = target;
+      
+      // Use React Router navigate for SPA navigation (faster, no full reload)
+      // This avoids service worker interception issues
+      navigate(target, { replace: true });
     };
     
     // Set up auth state listener
@@ -252,36 +256,9 @@ const Auth = () => {
         return;
       }
       
-      // ✅ Successful sign in - fetch role then redirect
+      // ✅ Successful sign in - onAuthStateChange will handle redirect
+      // Just show toast, the SIGNED_IN event will trigger handleRedirect
       toast({ title: "✅ Welcome back!", description: "Redirecting..." });
-      
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      
-      if (currentUser) {
-        // Store role in localStorage for fast access
-        try {
-          const { data: roleData } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', currentUser.id)
-            .maybeSingle();
-          
-          if (roleData?.role) {
-            localStorage.setItem('user_role', roleData.role);
-            localStorage.setItem('user_role_id', currentUser.id);
-            localStorage.setItem('user_role_verified', Date.now().toString());
-          }
-        } catch (e) {
-          console.error('Role fetch error:', e);
-        }
-      }
-      
-      // Redirect - keep loading true during navigation
-      const returnTo = sessionStorage.getItem('returnTo');
-      const target = returnTo || redirectTo || '/home';
-      if (returnTo) sessionStorage.removeItem('returnTo');
-      
-      window.location.href = target;
       
     } catch (error: any) {
       console.error('Auth error:', error);
