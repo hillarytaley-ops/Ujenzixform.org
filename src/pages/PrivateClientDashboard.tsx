@@ -107,7 +107,17 @@ const PrivateClientDashboard = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    checkAuth();
+    // Set loading false after 3 seconds max to prevent infinite loading
+    const timeout = setTimeout(() => {
+      setLoading(false);
+    }, 3000);
+    
+    checkAuth().finally(() => {
+      clearTimeout(timeout);
+      setLoading(false);
+    });
+    
+    return () => clearTimeout(timeout);
   }, []);
 
   const checkAuth = async () => {
@@ -115,7 +125,8 @@ const PrivateClientDashboard = () => {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        navigate('/private-client-signin');
+        // Don't redirect - RoleProtectedRoute handles this
+        setLoading(false);
         return;
       }
 
