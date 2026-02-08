@@ -184,6 +184,7 @@ const Auth = () => {
         : await signIn(email, password);
 
       if (result.error) {
+        setLoading(false); // Reset loading on error
         const error = result.error;
         if (error.message.includes("User already registered")) {
           toast({
@@ -210,20 +211,21 @@ const Auth = () => {
             description: error.message
           });
         }
-      } else if (isSignUp) {
+        return;
+      }
+      
+      if (isSignUp) {
+        setLoading(false); // Reset loading after signup
         if ('needsConfirmation' in result && result.needsConfirmation) {
-          // Email confirmation is required
           toast({
             title: "📧 Check your email",
             description: "We've sent a confirmation link to verify your account. Click the link to complete signup.",
           });
         } else {
-          // Instant signup (no confirmation)
           toast({
             title: "✅ Account created!",
             description: "Welcome to UjenziXform! Taking you to home...",
           });
-          // Auto-redirect to saved location or home page after signup
           setTimeout(() => {
             const returnTo = sessionStorage.getItem('returnTo');
             if (returnTo) {
@@ -234,24 +236,17 @@ const Auth = () => {
             }
           }, 1500);
         }
-      } else {
-        // ✅ MOBILE OPTIMIZED: Successful sign in - fast redirect
-        const { data: { user: currentUser } } = await supabase.auth.getUser();
-        
-        if (currentUser) {
-          // Check localStorage cache first for instant redirect
-          const cachedRole = localStorage.getItem('user_role');
-          const cachedRoleId = localStorage.getItem('user_role_id');
-          
-          if (cachedRole && cachedRoleId === currentUser.id) {
-            console.log('🔐 Auth: Using cached role for fast redirect:', cachedRole);
-            localStorage.setItem('user_role_verified', Date.now().toString());
-            toast({ title: "✅ Welcome back!", description: "Redirecting..." });
-            window.location.href = '/home';
-            return;
-          }
-          
-          // Fetch role from database
+        return;
+      }
+      
+      // ✅ Successful sign in - fetch role then redirect
+      toast({ title: "✅ Welcome back!", description: "Redirecting..." });
+      
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      
+      if (currentUser) {
+        // Store role in localStorage for fast access
+        try {
           const { data: roleData } = await supabase
             .from('user_roles')
             .select('role')
@@ -262,35 +257,27 @@ const Auth = () => {
             localStorage.setItem('user_role', roleData.role);
             localStorage.setItem('user_role_id', currentUser.id);
             localStorage.setItem('user_role_verified', Date.now().toString());
-            console.log('🔐 Auth: User role stored:', roleData.role);
           }
-        }
-        
-        const returnTo = sessionStorage.getItem('returnTo');
-        if (returnTo) {
-          toast({
-            title: "✅ Signed In!",
-            description: "Redirecting...",
-          });
-          sessionStorage.removeItem('returnTo');
-          window.location.href = returnTo;
-        } else {
-          toast({
-            title: "Welcome back!",
-            description: "You've been signed in successfully."
-          });
-          const target = redirectTo || '/home';
-          window.location.href = target;
+        } catch (e) {
+          console.error('Role fetch error:', e);
         }
       }
-    } catch (error) {
+      
+      // Redirect - keep loading true during navigation
+      const returnTo = sessionStorage.getItem('returnTo');
+      const target = returnTo || redirectTo || '/home';
+      if (returnTo) sessionStorage.removeItem('returnTo');
+      
+      window.location.href = target;
+      
+    } catch (error: any) {
+      console.error('Auth error:', error);
+      setLoading(false);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "An unexpected error occurred."
+        description: error?.message || "An unexpected error occurred."
       });
-    } finally {
-      setLoading(false);
     }
   };
 
