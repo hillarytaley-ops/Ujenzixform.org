@@ -130,7 +130,7 @@ const UnifiedAuth: React.FC = () => {
         console.log('🔐 Success! Storing portal role and redirecting...');
         // Store portal role - RoleProtectedRoute will verify against DB
         localStorage.setItem('user_role', roleParam);
-        localStorage.setItem('user_role_id', data.user.id visually);
+        localStorage.setItem('user_role_id', data.user.id);
         localStorage.setItem('user_email', data.user.email || '');
         localStorage.setItem('user_role_verified', Date.now().toString());
         
