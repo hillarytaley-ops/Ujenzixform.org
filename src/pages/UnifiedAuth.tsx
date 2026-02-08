@@ -8,7 +8,7 @@
  * - Redirects to role-specific dashboard after auth
  */
 
-console.log('🔐 UnifiedAuth BUILD v8 - SECURE: Database role only Feb 8 2026');
+console.log('🔐 UnifiedAuth BUILD v9 - with timeout fallback Feb 8 2026');
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
@@ -121,7 +121,7 @@ const UnifiedAuth: React.FC = () => {
   useEffect(() => {
     let handled = false;
     
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (handled) return;
       
       console.log('🔐 UnifiedAuth: Auth event:', event, session?.user?.email);
@@ -129,41 +129,59 @@ const UnifiedAuth: React.FC = () => {
       if (session?.user) {
         handled = true;
         
-        // SECURITY: Fetch ACTUAL role from database - don't trust URL param
-        try {
-          const { data: roleData } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', session.user.id)
-            .maybeSingle();
-          
-          const actualRole = roleData?.role;
-          console.log('🔐 UnifiedAuth: Database role:', actualRole);
-          
-          if (actualRole) {
-            // Store ACTUAL role
+        // Check localStorage first for instant redirect (trusted for 10 min)
+        const cachedRole = localStorage.getItem('user_role');
+        const cachedRoleId = localStorage.getItem('user_role_id');
+        const roleVerified = localStorage.getItem('user_role_verified');
+        const isFresh = roleVerified && (Date.now() - parseInt(roleVerified)) < 10 * 60 * 1000;
+        
+        if (cachedRole && cachedRoleId === session.user.id && isFresh) {
+          console.log('🔐 UnifiedAuth: Using cached role:', cachedRole);
+          const destination = getDashboardForRole(cachedRole);
+          window.location.href = destination;
+          return;
+        }
+        
+        // No cached role - try to fetch from DB with timeout
+        const fetchTimeout = setTimeout(() => {
+          console.log('🔐 UnifiedAuth: DB fetch timeout, using URL role:', roleParam);
+          localStorage.setItem('user_role', roleParam);
+          localStorage.setItem('user_role_id', session.user.id);
+          localStorage.setItem('user_role_verified', Date.now().toString());
+          window.location.href = roleConfig.dashboard;
+        }, 3000);
+        
+        supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .maybeSingle()
+          .then(({ data: roleData }) => {
+            clearTimeout(fetchTimeout);
+            const actualRole = roleData?.role || roleParam;
+            console.log('🔐 UnifiedAuth: Database role:', actualRole);
+            
             localStorage.setItem('user_role', actualRole);
             localStorage.setItem('user_role_id', session.user.id);
             localStorage.setItem('user_role_verified', Date.now().toString());
             
-            // Redirect to their ACTUAL dashboard
             const destination = getDashboardForRole(actualRole);
             console.log('🔐 UnifiedAuth: REDIRECTING to:', destination);
             window.location.href = destination;
-          } else {
-            // No role in DB - this is a new user, don't redirect
-            console.log('🔐 UnifiedAuth: No role in DB, showing form');
-            handled = false; // Allow form to show
-          }
-        } catch (err) {
-          console.error('🔐 UnifiedAuth: Role fetch error:', err);
-          handled = false;
-        }
+          })
+          .catch(() => {
+            clearTimeout(fetchTimeout);
+            console.log('🔐 UnifiedAuth: DB error, using URL role');
+            localStorage.setItem('user_role', roleParam);
+            localStorage.setItem('user_role_id', session.user.id);
+            localStorage.setItem('user_role_verified', Date.now().toString());
+            window.location.href = roleConfig.dashboard;
+          });
       }
     });
     
     return () => subscription.unsubscribe();
-  }, []);
+  }, [roleParam, roleConfig.dashboard]);
   
   const getDashboardForRole = (role: string): string => {
     switch (role) {
