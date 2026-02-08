@@ -251,16 +251,18 @@ const Auth = () => {
       // FORCE redirect with full page reload
       const target = redirectTo || '/home';
       console.log('🔐 REDIRECTING NOW to:', target);
-      window.location.replace(target);
+      setLoading(false); // Reset button before redirect
+      window.location.href = target; // Use href instead of replace
       
     } catch (error: any) {
       console.error('Auth error:', error);
-      setLoading(false);
       toast({
         variant: "destructive",
         title: "Error",
         description: error?.message || "An unexpected error occurred."
       });
+    } finally {
+      setLoading(false);
     }
   };
 
