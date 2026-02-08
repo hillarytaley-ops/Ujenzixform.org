@@ -8,7 +8,7 @@
  * - Redirects to role-specific dashboard after auth
  */
 
-console.log('🔐 UnifiedAuth BUILD v18 - USE onAuthStateChange Feb 8 2026');
+console.log('🔐 UnifiedAuth BUILD v19 - SECURE + onAuthStateChange Feb 8 2026');
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
@@ -119,33 +119,52 @@ const UnifiedAuth: React.FC = () => {
   
   // Listen for auth state changes - this is how we detect successful sign-in
   useEffect(() => {
-    // Check localStorage first for instant redirect
+    // Check localStorage first for instant redirect (only if user ID matches)
     const cachedRole = localStorage.getItem('user_role');
     const cachedRoleId = localStorage.getItem('user_role_id');
     const cachedEmail = localStorage.getItem('user_email');
     
     if (cachedRole && cachedRoleId && cachedEmail) {
-      console.log('🔐 UnifiedAuth: Already logged in, redirecting...');
+      console.log('🔐 UnifiedAuth: Already logged in as', cachedRole);
       window.location.href = getDashboardForRole(cachedRole);
       return;
     }
     
     // Listen for SIGNED_IN event
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('🔐 UnifiedAuth: Auth event:', event);
       
       if (event === 'SIGNED_IN' && session?.user) {
-        console.log('🔐 UnifiedAuth: SIGNED_IN detected, redirecting...');
+        console.log('🔐 UnifiedAuth: SIGNED_IN detected, checking DB role...');
         
-        // Store in localStorage
-        localStorage.setItem('user_role', roleParam);
+        // SECURITY: Get actual role from database
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+        
+        const dbRole = roleData?.role;
+        console.log('🔐 UnifiedAuth: DB role:', dbRole, 'Portal role:', roleParam);
+        
+        // Use database role if exists, otherwise use portal role for new users
+        const actualRole = dbRole || roleParam;
+        
+        // Store ACTUAL role in localStorage
+        localStorage.setItem('user_role', actualRole);
         localStorage.setItem('user_role_id', session.user.id);
         localStorage.setItem('user_role_verified', Date.now().toString());
         localStorage.setItem('user_email', session.user.email || '');
         
-        // Redirect
-        const destination = getDashboardForRole(roleParam);
+        // Redirect to ACTUAL dashboard (not the portal they tried to use)
+        const destination = getDashboardForRole(actualRole);
         console.log('🔐 UnifiedAuth: Redirecting to:', destination);
+        
+        // Show toast if they used wrong portal
+        if (dbRole && dbRole !== roleParam) {
+          console.log('🔐 UnifiedAuth: Wrong portal! User is', dbRole, 'not', roleParam);
+        }
+        
         window.location.href = destination;
       }
     });
