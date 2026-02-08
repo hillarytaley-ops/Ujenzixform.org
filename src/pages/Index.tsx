@@ -322,7 +322,7 @@ const Index = () => {
                   </li>
                 </ul>
                 <div className="mt-auto">
-                  <Link to="/unified-auth?role=private_client">
+                  <Link to="/private-client-auth">
                     <Button size="sm" className="w-full bg-white text-emerald-700 hover:bg-white/90 font-semibold">
                       Explore
                       <ChevronRight className="h-4 w-4 ml-1" />
@@ -349,7 +349,7 @@ const Index = () => {
                   </li>
                 </ul>
                 <div className="mt-auto">
-                  <Link to="/unified-auth?role=professional_builder">
+                  <Link to="/professional-builder-auth">
                     <Button size="sm" className="w-full bg-white text-blue-700 hover:bg-white/90 font-semibold">
                       Explore
                       <ChevronRight className="h-4 w-4 ml-1" />
@@ -376,7 +376,7 @@ const Index = () => {
                   </li>
                 </ul>
                 <div className="mt-auto">
-                  <Link to="/unified-auth?role=supplier">
+                  <Link to="/supplier-auth">
                     <Button size="sm" className="w-full bg-white text-orange-700 hover:bg-white/90 font-semibold">
                       Explore
                       <ChevronRight className="h-4 w-4 ml-1" />
@@ -403,7 +403,7 @@ const Index = () => {
                   </li>
                 </ul>
                 <div className="mt-auto">
-                  <Link to="/unified-auth?role=delivery">
+                  <Link to="/delivery-auth">
                     <Button size="sm" className="w-full bg-white text-purple-700 hover:bg-white/90 font-semibold">
                       Explore
                       <ChevronRight className="h-4 w-4 ml-1" />

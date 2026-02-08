@@ -59,6 +59,12 @@ const PublicBuilderProfile = React.lazy(() => import("./pages/PublicBuilderProfi
 // Unified Auth page - single auth page for all roles
 const UnifiedAuth = React.lazy(() => import("./pages/UnifiedAuth"));
 
+// Role-specific auth pages - each role has its own auth page
+const PrivateClientAuth = React.lazy(() => import("./pages/PrivateClientAuth"));
+const ProfessionalBuilderAuth = React.lazy(() => import("./pages/ProfessionalBuilderAuth"));
+const SupplierAuth = React.lazy(() => import("./pages/SupplierAuth"));
+const DeliveryAuth = React.lazy(() => import("./pages/DeliveryAuth"));
+
 // Legal pages - lazy loaded
 const PrivacyPolicy = React.lazy(() => import("./pages/PrivacyPolicy"));
 const TermsOfService = React.lazy(() => import("./pages/TermsOfService"));
@@ -222,6 +228,12 @@ const App = () => {
                     <Route path="/" element={<Auth />} />
                     <Route path="/auth" element={<Auth />} />
                     <Route path="/unified-auth" element={<SuspenseWrapper><UnifiedAuth /></SuspenseWrapper>} />
+                    
+                    {/* Role-specific auth pages - SECURE: each role has its own auth */}
+                    <Route path="/private-client-auth" element={<SuspenseWrapper><PrivateClientAuth /></SuspenseWrapper>} />
+                    <Route path="/professional-builder-auth" element={<SuspenseWrapper><ProfessionalBuilderAuth /></SuspenseWrapper>} />
+                    <Route path="/supplier-auth" element={<SuspenseWrapper><SupplierAuth /></SuspenseWrapper>} />
+                    <Route path="/delivery-auth" element={<SuspenseWrapper><DeliveryAuth /></SuspenseWrapper>} />
                     <Route path="/admin-login" element={<SuspenseWrapper><AdminAuth /></SuspenseWrapper>} />
                     <Route path="/reset-password" element={<SuspenseWrapper><ResetPassword /></SuspenseWrapper>} />
                     

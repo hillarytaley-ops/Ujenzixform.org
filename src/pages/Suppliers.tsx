@@ -220,7 +220,7 @@ const Suppliers = () => {
                 description="Home projects & personal purchases"
                 gradient="from-emerald-600 to-emerald-700"
                 borderColor="emerald"
-                explorePath="/unified-auth?role=private_client"
+                explorePath="/private-client-auth"
                 features={["Buy materials", "Track deliveries"]}
               />
 
@@ -231,7 +231,7 @@ const Suppliers = () => {
                 description="Request quotes for bulk orders"
                 gradient="from-blue-600 to-blue-700"
                 borderColor="blue"
-                explorePath="/unified-auth?role=professional_builder"
+                explorePath="/professional-builder-auth"
                 features={["Bulk quotes", "Manage projects"]}
               />
 
@@ -242,7 +242,7 @@ const Suppliers = () => {
                 description="List & sell your products"
                 gradient="from-amber-600 to-amber-700"
                 borderColor="amber"
-                explorePath="/unified-auth?role=supplier"
+                explorePath="/supplier-auth"
                 features={["List products", "Receive orders"]}
               />
 
@@ -253,7 +253,7 @@ const Suppliers = () => {
                 description="Transport & logistics services"
                 gradient="from-purple-600 to-purple-700"
                 borderColor="purple"
-                explorePath="/unified-auth?role=delivery"
+                explorePath="/delivery-auth"
                 features={["Get jobs", "Earn per delivery"]}
               />
             </div>

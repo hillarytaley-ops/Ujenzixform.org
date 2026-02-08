@@ -292,7 +292,7 @@ const Builders = () => {
                   <h3 className="text-base font-bold text-gray-900">Private Builder</h3>
                   <p className="text-xs text-gray-500">Home projects & purchases</p>
                 </div>
-                <Link to="/unified-auth?role=private_client">
+                <Link to="/private-client-auth">
                   <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">
                     Explore
                   </Button>
@@ -310,7 +310,7 @@ const Builders = () => {
                   <h3 className="text-base font-bold text-gray-900">Professional Builder</h3>
                   <p className="text-xs text-gray-500">Contractors & companies</p>
                 </div>
-                <Link to="/unified-auth?role=professional_builder">
+                <Link to="/professional-builder-auth">
                   <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold">
                     Explore
                   </Button>
