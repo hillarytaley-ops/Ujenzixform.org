@@ -208,6 +208,15 @@ export const MaterialImagesManager: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<MaterialImage | SupplierMaterial | null>(null);
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
   
+  // Image loading progress tracking
+  const [imageLoadProgress, setImageLoadProgress] = useState({
+    totalProducts: 0,
+    productsWithImages: 0,
+    imagesLoaded: 0,
+    isLoadingImages: false,
+    lastUpdated: new Date()
+  });
+  
   // Variant type for multiple sizes/prices/colors
   interface PriceVariant {
     id: string;
@@ -301,6 +310,14 @@ export const MaterialImagesManager: React.FC = () => {
   // ✅ PERFORMANCE OPTIMIZED: Only fetch metadata first, load images lazily
   const fetchAdminImages = async () => {
     try {
+      // Reset progress
+      setImageLoadProgress(prev => ({
+        ...prev,
+        isLoadingImages: true,
+        imagesLoaded: 0,
+        lastUpdated: new Date()
+      }));
+      
       // ✅ Fetch ALL admin images - no limit to ensure all uploaded images appear
       const { data, error, count } = await (supabase as any)
         .from('admin_material_images')
@@ -315,16 +332,26 @@ export const MaterialImagesManager: React.FC = () => {
           variant: 'destructive'
         });
         setAdminImages([]);
+        setImageLoadProgress(prev => ({ ...prev, isLoadingImages: false, totalProducts: 0 }));
         return;
       }
       
       if (!data || data.length === 0) {
         console.log('📭 No admin images found in database');
         setAdminImages([]);
+        setImageLoadProgress(prev => ({ ...prev, isLoadingImages: false, totalProducts: 0 }));
         return;
       }
       
       console.log(`📊 Loaded ${data.length} material metadata records (total: ${count})`);
+      
+      // Update progress with total count
+      setImageLoadProgress(prev => ({
+        ...prev,
+        totalProducts: data.length,
+        productsWithImages: 0,
+        lastUpdated: new Date()
+      }));
       
       // Map to MaterialImage format - image_url will be loaded on-demand
       const images = data.map((item: any) => ({
@@ -336,11 +363,12 @@ export const MaterialImagesManager: React.FC = () => {
       
       setAdminImages(images);
       
-      // ✅ LAZY LOAD: Fetch image URLs in background for first 30 visible items
-      loadImageUrls(data.slice(0, 30).map((d: any) => d.id));
+      // ✅ LAZY LOAD: Fetch image URLs in background - load ALL images progressively
+      loadImageUrlsWithProgress(data.map((d: any) => d.id));
     } catch (err) {
       console.error('❌ Error fetching admin images:', err);
       setAdminImages([]);
+      setImageLoadProgress(prev => ({ ...prev, isLoadingImages: false }));
     }
   };
   
@@ -364,6 +392,73 @@ export const MaterialImagesManager: React.FC = () => {
     } catch (err) {
       console.error('Error loading image URLs:', err);
     }
+  };
+  
+  // ✅ PROGRESSIVE LOAD: Fetch image URLs in batches with progress tracking
+  const loadImageUrlsWithProgress = async (allIds: string[]) => {
+    if (allIds.length === 0) {
+      setImageLoadProgress(prev => ({ ...prev, isLoadingImages: false }));
+      return;
+    }
+    
+    const BATCH_SIZE = 20; // Load 20 images at a time
+    let loadedCount = 0;
+    let imagesWithData = 0;
+    
+    console.log(`📷 Starting progressive image load for ${allIds.length} products...`);
+    
+    for (let i = 0; i < allIds.length; i += BATCH_SIZE) {
+      const batchIds = allIds.slice(i, i + BATCH_SIZE);
+      
+      try {
+        const { data, error } = await (supabase as any)
+          .from('admin_material_images')
+          .select('id, image_url')
+          .in('id', batchIds);
+        
+        if (!error && data) {
+          // Count how many have actual image data
+          const withImages = data.filter((d: any) => d.image_url && d.image_url.length > 100).length;
+          imagesWithData += withImages;
+          loadedCount += batchIds.length;
+          
+          // Update images with their URLs
+          setAdminImages(prev => prev.map(img => {
+            const found = data.find((d: any) => d.id === img.id);
+            return found ? { ...img, image_url: found.image_url } : img;
+          }));
+          
+          // Update progress
+          setImageLoadProgress({
+            totalProducts: allIds.length,
+            productsWithImages: imagesWithData,
+            imagesLoaded: loadedCount,
+            isLoadingImages: loadedCount < allIds.length,
+            lastUpdated: new Date()
+          });
+          
+          console.log(`📷 Progress: ${loadedCount}/${allIds.length} (${Math.round(loadedCount/allIds.length*100)}%) - ${imagesWithData} with images`);
+        }
+      } catch (err) {
+        console.error('Error loading batch:', err);
+        loadedCount += batchIds.length; // Still count as processed
+      }
+      
+      // Small delay between batches to prevent overwhelming the API
+      if (i + BATCH_SIZE < allIds.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+    
+    // Final update
+    setImageLoadProgress(prev => ({
+      ...prev,
+      isLoadingImages: false,
+      imagesLoaded: allIds.length,
+      lastUpdated: new Date()
+    }));
+    
+    console.log(`✅ Image loading complete: ${imagesWithData}/${allIds.length} products have images`);
   };
 
   // Fetch supplier materials with images
@@ -1236,7 +1331,7 @@ export const MaterialImagesManager: React.FC = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <Card className="bg-slate-800/50 border-slate-700">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -1274,6 +1369,44 @@ export const MaterialImagesManager: React.FC = () => {
               </div>
               <div className="p-3 bg-yellow-500/20 rounded-full">
                 <Star className="h-6 w-6 text-yellow-400" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        {/* Image Loading Progress Card */}
+        <Card className={`border-slate-700 ${imageLoadProgress.isLoadingImages ? 'bg-blue-900/30 border-blue-500/50' : 'bg-slate-800/50'}`}>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-sm text-slate-400">Image Load Progress</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <p className="text-xl font-bold text-white">
+                    {imageLoadProgress.imagesLoaded}/{imageLoadProgress.totalProducts}
+                  </p>
+                  <span className={`text-sm font-medium ${imageLoadProgress.isLoadingImages ? 'text-blue-400' : 'text-green-400'}`}>
+                    ({imageLoadProgress.totalProducts > 0 ? Math.round(imageLoadProgress.imagesLoaded / imageLoadProgress.totalProducts * 100) : 0}%)
+                  </span>
+                </div>
+                {/* Progress Bar */}
+                <div className="mt-2 h-2 bg-slate-700 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full transition-all duration-300 ${imageLoadProgress.isLoadingImages ? 'bg-blue-500' : 'bg-green-500'}`}
+                    style={{ 
+                      width: `${imageLoadProgress.totalProducts > 0 ? (imageLoadProgress.imagesLoaded / imageLoadProgress.totalProducts * 100) : 0}%` 
+                    }}
+                  />
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  {imageLoadProgress.productsWithImages} with images
+                </p>
+              </div>
+              <div className={`p-3 rounded-full ml-3 ${imageLoadProgress.isLoadingImages ? 'bg-blue-500/20' : 'bg-green-500/20'}`}>
+                {imageLoadProgress.isLoadingImages ? (
+                  <Loader2 className="h-6 w-6 text-blue-400 animate-spin" />
+                ) : (
+                  <ImageIcon className="h-6 w-6 text-green-400" />
+                )}
               </div>
             </div>
           </CardContent>
