@@ -15,7 +15,24 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
+
+// Helper for fetch with timeout
+const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs: number = 10000) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error('Request timed out');
+    }
+    throw error;
+  }
+};
 import {
   Eye,
   Shield,
@@ -126,31 +143,44 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
     }
 
     setSubmitting(true);
+    console.log('📹 Starting monitoring service request...');
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
+      // Get user from localStorage (faster than Supabase call)
+      let userId: string | null = null;
+      let userEmail: string | null = null;
+      let accessToken: string | null = null;
+      
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          userId = parsed.user?.id;
+          userEmail = parsed.user?.email;
+          accessToken = parsed.access_token;
+        }
+      } catch (e) {
+        console.warn('Could not parse stored session');
+      }
+      
+      if (!userId || !accessToken) {
+        throw new Error('User not authenticated');
+      }
+
+      console.log('📹 User ID:', userId);
 
       const selectedPkg = MONITORING_PACKAGES.find(p => p.id === selectedPackage);
 
-      // Get user profile for contact name
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('full_name, email')
-        .eq('user_id', user.id)
-        .single();
-
-      // Create monitoring service request using actual table columns
-      // Table uses: user_id, contact_name, contact_email, contact_phone, camera_count
+      // Create monitoring service request
       const monitoringRequest = {
-        user_id: user.id,
+        user_id: userId,
         project_name: formData.projectDescription || purchaseOrder?.project_name || 'Monitoring Request',
         project_location: formData.siteAddress,
         project_type: selectedPackage,
         project_duration: selectedPkg?.duration || null,
         start_date: formData.preferredStartDate || null,
-        contact_name: profile?.full_name || user.email?.split('@')[0] || 'Customer',
-        contact_email: profile?.email || user.email || '',
+        contact_name: userEmail?.split('@')[0] || 'Customer',
+        contact_email: userEmail || '',
         contact_phone: formData.contactPhone,
         selected_services: [selectedPackage],
         camera_count: 1,
@@ -161,14 +191,33 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
         urgency: 'normal'
       };
 
-      const { error } = await supabase
-        .from('monitoring_service_requests')
-        .insert(monitoringRequest);
+      console.log('📹 Creating monitoring request:', monitoringRequest);
 
-      if (error) {
-        // Log the error but don't block the flow - monitoring is optional
-        console.warn('Monitoring request error:', error);
-        // Still show success since the purchase itself was successful
+      // Use native fetch with timeout
+      try {
+        const response = await fetchWithTimeout(
+          `${SUPABASE_URL}/rest/v1/monitoring_service_requests`,
+          {
+            method: 'POST',
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify(monitoringRequest)
+          },
+          10000
+        );
+
+        if (response.ok) {
+          console.log('✅ Monitoring request created successfully');
+        } else {
+          const errorText = await response.text();
+          console.warn('⚠️ Monitoring request failed:', errorText);
+        }
+      } catch (insertError: any) {
+        console.warn('⚠️ Insert error (non-critical):', insertError.message);
       }
 
       setStep('success');
@@ -187,7 +236,7 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
       }
 
     } catch (error: any) {
-      console.error('Error requesting monitoring service:', error);
+      console.error('❌ Error requesting monitoring service:', error);
       toast({
         title: 'Request Submitted',
         description: 'Your monitoring request has been noted. Our team will contact you soon.',
