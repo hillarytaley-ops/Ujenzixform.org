@@ -500,77 +500,100 @@ const SupplierDashboard = () => {
     const fetchDashboardData = async () => {
       if (!user) return;
 
+      // Use native fetch with auth headers to avoid Supabase client timeouts
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      
+      // Get access token from localStorage
+      let accessToken = '';
       try {
-        // Fetch supplier profile - ONLY for current user
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        setSupplierProfile(profile);
-
-        // Fetch orders where this supplier is the vendor
-        // Look up supplier by user_id OR email to handle account mismatches
-        let supplierRecordForOrders = null;
-        const { data: byUserIdOrders } = await supabase
-          .from('suppliers')
-          .select('id, user_id')
-          .eq('user_id', user.id)
-          .maybeSingle();
-        
-        supplierRecordForOrders = byUserIdOrders;
-        
-        // If not found by user_id, try by email
-        if (!supplierRecordForOrders && user.email) {
-          const { data: byEmailOrders } = await supabase
-            .from('suppliers')
-            .select('id, user_id')
-            .eq('email', user.email)
-            .maybeSingle();
-          supplierRecordForOrders = byEmailOrders;
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          accessToken = parsed.access_token || '';
         }
-        
-        // Build list of IDs to check
+      } catch (e) {
+        console.warn('Could not get access token');
+      }
+      
+      const authHeaders: Record<string, string> = { 
+        'apikey': apiKey,
+        'Content-Type': 'application/json'
+      };
+      if (accessToken) {
+        authHeaders['Authorization'] = `Bearer ${accessToken}`;
+      }
+
+      try {
+        // Fetch supplier profile
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000);
+          const profileResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${user.id}&select=*`,
+            { headers: authHeaders, signal: controller.signal, cache: 'no-store' }
+          );
+          clearTimeout(timeoutId);
+          if (profileResponse.ok) {
+            const profiles = await profileResponse.json();
+            if (profiles?.[0]) setSupplierProfile(profiles[0]);
+          }
+        } catch (e) {
+          console.log('Profile fetch timeout');
+        }
+
+        // Use user.id as the supplier ID (this matches how orders are assigned)
         const orderSupplierIds = [user.id];
-        if (supplierRecordForOrders?.id && !orderSupplierIds.includes(supplierRecordForOrders.id)) {
-          orderSupplierIds.push(supplierRecordForOrders.id);
-        }
-        if (supplierRecordForOrders?.user_id && !orderSupplierIds.includes(supplierRecordForOrders.user_id)) {
-          orderSupplierIds.push(supplierRecordForOrders.user_id);
-        }
+        console.log('📊 Dashboard: Fetching stats for supplier IDs:', orderSupplierIds);
 
-        const { data: ordersData } = await supabase
-          .from('purchase_orders')
-          .select('*')
-          .in('supplier_id', orderSupplierIds)
-          .order('created_at', { ascending: false })
-          .limit(10);
+        // Fetch ALL orders for this supplier (not just 10) for accurate stats
+        try {
+          const supplierIdsParam = orderSupplierIds.join(',');
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 8000);
+          
+          const ordersResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=in.(${supplierIdsParam})&order=created_at.desc`,
+            { headers: authHeaders, signal: controller.signal, cache: 'no-store' }
+          );
+          clearTimeout(timeoutId);
 
-        if (ordersData && ordersData.length > 0) {
-          const formattedOrders: RecentOrder[] = ordersData.map((order: any) => ({
-            id: order.id,
-            customer_name: order.builder_name || 'Customer',
-            product_name: order.items?.[0]?.name || order.description || 'Order Items',
-            quantity: order.items?.[0]?.quantity || 1,
-            total_amount: order.total_amount || 0,
-            status: order.status || 'pending',
-            created_at: order.created_at
-          }));
-          setRecentOrders(formattedOrders);
-          
-          // Calculate stats from actual data
-          const pendingCount = ordersData.filter(o => o.status === 'pending').length;
-          const totalRevenue = ordersData.reduce((sum, o) => sum + (o.total_amount || 0), 0);
-          const uniqueCustomers = new Set(ordersData.map(o => o.builder_id)).size;
-          
-          setStats(prev => ({
-            ...prev,
-            totalOrders: ordersData.length,
-            pendingOrders: pendingCount,
-            totalRevenue,
-            totalCustomers: uniqueCustomers
-          }));
+          if (ordersResponse.ok) {
+            const ordersData = await ordersResponse.json();
+            console.log('📊 Dashboard: Orders loaded:', ordersData?.length || 0);
+
+            if (ordersData && ordersData.length > 0) {
+              // Take first 10 for recent orders display
+              const formattedOrders: RecentOrder[] = ordersData.slice(0, 10).map((order: any) => ({
+                id: order.id,
+                customer_name: order.builder_name || 'Customer',
+                product_name: order.items?.[0]?.name || order.description || 'Order Items',
+                quantity: order.items?.[0]?.quantity || 1,
+                total_amount: order.total_amount || 0,
+                status: order.status || 'pending',
+                created_at: order.created_at
+              }));
+              setRecentOrders(formattedOrders);
+              
+              // Calculate stats from ALL orders
+              const pendingCount = ordersData.filter((o: any) => o.status === 'pending').length;
+              const confirmedCount = ordersData.filter((o: any) => o.status === 'confirmed').length;
+              const totalRevenue = ordersData.reduce((sum: number, o: any) => sum + (o.total_amount || 0), 0);
+              const uniqueCustomers = new Set(ordersData.map((o: any) => o.buyer_id)).size;
+              
+              console.log('📊 Dashboard stats: Orders:', ordersData.length, 'Pending:', pendingCount, 'Confirmed:', confirmedCount, 'Revenue:', totalRevenue);
+              
+              setStats(prev => ({
+                ...prev,
+                totalOrders: ordersData.length,
+                pendingOrders: pendingCount,
+                totalRevenue,
+                totalCustomers: uniqueCustomers
+              }));
+            }
+          }
+        } catch (e) {
+          console.log('Orders fetch timeout for stats');
         }
 
       } catch (error) {
