@@ -473,7 +473,17 @@ const AdminDashboard = () => {
   ];
 
   useEffect(() => {
-    checkAdminAccess();
+    // Safety timeout - show UI after 2 seconds max
+    const safetyTimeout = setTimeout(() => {
+      console.log('⏱️ Admin Dashboard safety timeout - forcing loading false');
+      setLoading(false);
+    }, 2000);
+    
+    checkAdminAccess().finally(() => {
+      clearTimeout(safetyTimeout);
+    });
+    
+    return () => clearTimeout(safetyTimeout);
   }, []);
 
   // Set up real-time subscriptions for live updates
@@ -617,8 +627,17 @@ const AdminDashboard = () => {
       setLoading(false);
 
       // Check for Supabase session (optional - RLS is disabled for admin access)
+      // Use timeout to prevent hanging
+      const sessionCheckTimeout = setTimeout(() => {
+        console.log('🔐 Supabase session check timed out (RLS disabled, admin access OK)');
+      }, 3000);
+      
       supabase.auth.getSession().then(({ data: { session } }) => {
+        clearTimeout(sessionCheckTimeout);
         console.log('🔐 Supabase session:', session?.user?.email || 'No session (RLS disabled, admin access OK)');
+      }).catch(() => {
+        clearTimeout(sessionCheckTimeout);
+        console.log('🔐 Supabase session check failed (RLS disabled, admin access OK)');
       });
 
       // Load only essential dashboard stats first (fast)
@@ -639,13 +658,21 @@ const AdminDashboard = () => {
       const client = getAdminClient() || supabase;
       const isAdminClient = !!getAdminClient();
       
+      // Wrap in timeout to prevent hanging
+      const statsTimeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Stats loading timeout')), 8000)
+      );
+      
       // Parallel count queries - very fast, with error handling
-      const results = await Promise.allSettled([
-        client.from('user_roles').select('role', { count: 'exact', head: true }),
-        client.from('supplier_applications').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-        client.from('delivery_providers').select('*', { count: 'exact', head: true }).eq('is_verified', false),
-        client.from('feedback').select('*', { count: 'exact', head: true })
-      ]);
+      const results = await Promise.race([
+        Promise.allSettled([
+          client.from('user_roles').select('role', { count: 'exact', head: true }),
+          client.from('supplier_applications').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+          client.from('delivery_providers').select('*', { count: 'exact', head: true }).eq('is_verified', false),
+          client.from('feedback').select('*', { count: 'exact', head: true })
+        ]),
+        statsTimeout
+      ]) as PromiseSettledResult<any>[];
 
       // Handle each result separately
       const rolesRes = results[0].status === 'fulfilled' ? results[0].value : null;
