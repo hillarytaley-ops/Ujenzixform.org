@@ -526,24 +526,55 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
         updated_at: new Date().toISOString()
       };
       
-      // Use fetch API with upsert (POST with Prefer: resolution=merge-duplicates)
+      // Check if price already exists for this supplier+product
+      const existingPrice = supplierPrices[productId];
+      
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
       
-      const response = await fetch(
-        'https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/supplier_product_prices',
-        {
-          method: 'POST',
-          headers: {
-            'apikey': apiKey,
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'resolution=merge-duplicates,return=representation'
-          },
-          body: JSON.stringify(payload),
-          signal: controller.signal
-        }
-      );
+      let response;
+      
+      if (existingPrice) {
+        // UPDATE existing price using PATCH
+        console.log('📝 Updating existing price...');
+        response = await fetch(
+          `https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/supplier_product_prices?supplier_id=eq.${supplierId}&product_id=eq.${productId}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'apikey': apiKey,
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify({
+              price: price,
+              in_stock: inStock,
+              description: description || null,
+              variant_prices: variantPrices || [],
+              updated_at: new Date().toISOString()
+            }),
+            signal: controller.signal
+          }
+        );
+      } else {
+        // INSERT new price using POST
+        console.log('➕ Creating new price...');
+        response = await fetch(
+          'https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/supplier_product_prices',
+          {
+            method: 'POST',
+            headers: {
+              'apikey': apiKey,
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify(payload),
+            signal: controller.signal
+          }
+        );
+      }
       
       clearTimeout(timeoutId);
       
@@ -552,7 +583,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
         console.error('❌ Database save failed:', response.status, errorText);
         toast({
           title: 'Error Saving Price',
-          description: `Database error: ${response.status}. Please check your permissions.`,
+          description: `Database error: ${response.status}. Please try again.`,
           variant: 'destructive'
         });
         return;
