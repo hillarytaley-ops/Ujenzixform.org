@@ -1755,11 +1755,16 @@ export const MaterialsGrid = () => {
                     return;
                   }
                   
-                  // Both Professional Builders and Private Clients can add to cart
-                  if (userRole !== 'private_client' && userRole !== 'professional_builder' && userRole !== 'admin') {
+                  // Allow cart additions for:
+                  // 1. Private Clients, Professional Builders, Admins (explicit roles)
+                  // 2. Users with null role (role not yet loaded or not assigned - let them shop, check at checkout)
+                  const allowedRoles = ['private_client', 'professional_builder', 'admin', 'builder'];
+                  const canAddToCart = userRole === null || allowedRoles.includes(userRole);
+                  
+                  if (!canAddToCart) {
                     toast({
                       title: '⚠️ Builder Account Required',
-                      description: 'Please register as a Private Client or Professional Builder to purchase materials.',
+                      description: `Your role (${userRole}) cannot purchase materials. Please register as a Private Client or Professional Builder.`,
                       variant: 'destructive',
                     });
                     return;
