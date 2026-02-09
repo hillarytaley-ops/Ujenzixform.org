@@ -329,22 +329,47 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
 
   const handleAcceptQuote = async (quote: QuotationRequest) => {
     setProcessingId(quote.id);
+    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+    const headers = getAuthHeaders();
+    
     try {
-      // Update purchase order to 'confirmed'
-      // Note: delivery_required defaults to true, will be updated if user chooses pickup
-      const { data: poData, error: poError } = await supabase
-        .from('purchase_orders')
-        .update({ 
-          status: 'confirmed',
-          total_amount: quote.quote_amount || quote.purchase_order?.total_amount,
-          delivery_required: true, // Default to delivery, user can change to pickup
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', quote.id)
-        .select()
-        .single();
-
-      if (poError) throw poError;
+      // Update purchase order to 'confirmed' using native fetch
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
+      const updatePayload = { 
+        status: 'confirmed',
+        total_amount: quote.quote_amount || quote.purchase_order?.total_amount,
+        delivery_required: true, // Default to delivery, user can change to pickup
+        updated_at: new Date().toISOString()
+      };
+      
+      console.log('🔄 Accepting quote:', quote.id, 'with payload:', updatePayload);
+      
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${quote.id}`,
+        {
+          method: 'PATCH',
+          headers: {
+            ...headers,
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify(updatePayload),
+          signal: controller.signal,
+          cache: 'no-store'
+        }
+      );
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Accept quote failed:', response.status, errorText);
+        throw new Error(`Failed to accept quote: ${response.status}`);
+      }
+      
+      const poDataArray = await response.json();
+      const poData = poDataArray?.[0];
+      console.log('✅ Quote accepted successfully:', poData);
 
       toast({
         title: '✅ Quote Accepted!',
@@ -401,53 +426,90 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
   const handleDeliveryRequested = async () => {
     if (!acceptedPurchaseOrder) return;
     
+    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+    const headers = getAuthHeaders();
+    const effectiveBuilderId = getEffectiveBuilderId();
+    
     try {
-      // Get supplier info for pickup address
+      // Get supplier info for pickup address using native fetch
       let pickupAddress = acceptedPurchaseOrder.supplier_address || 'Supplier location';
       if (acceptedPurchaseOrder.supplier_id) {
-        const { data: supplierData } = await supabase
-          .from('suppliers')
-          .select('address, location, company_name')
-          .or(`id.eq.${acceptedPurchaseOrder.supplier_id},user_id.eq.${acceptedPurchaseOrder.supplier_id}`)
-          .maybeSingle();
-        
-        if (supplierData) {
-          pickupAddress = supplierData.address || supplierData.location || `${supplierData.company_name} - Pickup Location`;
+        try {
+          const supplierController = new AbortController();
+          const supplierTimeout = setTimeout(() => supplierController.abort(), 5000);
+          
+          const supplierResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/suppliers?or=(id.eq.${acceptedPurchaseOrder.supplier_id},user_id.eq.${acceptedPurchaseOrder.supplier_id})&select=address,location,company_name&limit=1`,
+            { headers, signal: supplierController.signal, cache: 'no-store' }
+          );
+          clearTimeout(supplierTimeout);
+          
+          if (supplierResponse.ok) {
+            const suppliersData = await supplierResponse.json();
+            const supplierData = suppliersData?.[0];
+            if (supplierData) {
+              pickupAddress = supplierData.address || supplierData.location || `${supplierData.company_name} - Pickup Location`;
+            }
+          }
+        } catch (e) {
+          console.log('Supplier fetch timeout, using default pickup address');
         }
       }
 
-      // Create delivery request
-      const { data: deliveryRequest, error: deliveryError } = await supabase
-        .from('delivery_requests')
-        .insert({
-          builder_id: builderId,
-          purchase_order_id: acceptedPurchaseOrder.id,
-          pickup_address: pickupAddress,
-          delivery_address: acceptedPurchaseOrder.delivery_address,
-          pickup_date: acceptedPurchaseOrder.delivery_date,
-          material_type: detectMaterialType(acceptedPurchaseOrder.items?.[0]?.material_name || ''),
-          quantity: acceptedPurchaseOrder.items?.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0) || 1,
-          weight_kg: (acceptedPurchaseOrder.items?.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0) || 1) * 50,
-          special_instructions: acceptedPurchaseOrder.special_instructions || null,
-          budget_range: '10000-20000',
-          status: 'pending',
-          created_at: new Date().toISOString()
-        })
-        .select()
-        .single();
-
-      if (deliveryError) {
-        console.error('Error creating delivery request:', deliveryError);
+      // Create delivery request using native fetch
+      const deliveryController = new AbortController();
+      const deliveryTimeout = setTimeout(() => deliveryController.abort(), 10000);
+      
+      const deliveryPayload = {
+        builder_id: effectiveBuilderId,
+        purchase_order_id: acceptedPurchaseOrder.id,
+        pickup_address: pickupAddress,
+        delivery_address: acceptedPurchaseOrder.delivery_address,
+        pickup_date: acceptedPurchaseOrder.delivery_date,
+        material_type: detectMaterialType(acceptedPurchaseOrder.items?.[0]?.material_name || ''),
+        quantity: acceptedPurchaseOrder.items?.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0) || 1,
+        weight_kg: (acceptedPurchaseOrder.items?.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0) || 1) * 50,
+        special_instructions: acceptedPurchaseOrder.special_instructions || null,
+        budget_range: '10000-20000',
+        status: 'pending',
+        created_at: new Date().toISOString()
+      };
+      
+      console.log('🚚 Creating delivery request:', deliveryPayload);
+      
+      const deliveryResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/delivery_requests`,
+        {
+          method: 'POST',
+          headers: { ...headers, 'Prefer': 'return=representation' },
+          body: JSON.stringify(deliveryPayload),
+          signal: deliveryController.signal
+        }
+      );
+      clearTimeout(deliveryTimeout);
+      
+      let deliveryRequest = null;
+      if (deliveryResponse.ok) {
+        const deliveryData = await deliveryResponse.json();
+        deliveryRequest = deliveryData?.[0];
+        console.log('✅ Delivery request created:', deliveryRequest?.id);
+      } else {
+        console.error('Error creating delivery request:', await deliveryResponse.text());
       }
 
-      // Notify delivery providers
+      // Notify delivery providers (non-blocking)
       if (deliveryRequest) {
         try {
-          await supabase.functions.invoke('notify-delivery-providers', {
-            body: {
+          const notifyController = new AbortController();
+          setTimeout(() => notifyController.abort(), 8000);
+          
+          await fetch(`${SUPABASE_URL}/functions/v1/notify-delivery-providers`, {
+            method: 'POST',
+            headers: { ...headers },
+            body: JSON.stringify({
               request_type: 'quote_accepted',
               request_id: deliveryRequest.id,
-              builder_id: builderId,
+              builder_id: effectiveBuilderId,
               pickup_address: pickupAddress,
               delivery_address: acceptedPurchaseOrder.delivery_address,
               material_details: acceptedPurchaseOrder.items?.map((item: any) => ({
@@ -458,7 +520,8 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
               special_instructions: acceptedPurchaseOrder.special_instructions,
               priority_level: 'normal',
               po_number: acceptedPurchaseOrder.po_number
-            }
+            }),
+            signal: notifyController.signal
           });
           console.log('Delivery providers notified successfully');
         } catch (notifyError) {
@@ -494,19 +557,39 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
   const handleRejectQuote = async () => {
     if (!selectedQuote) return;
     
+    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+    const headers = getAuthHeaders();
+    
     setProcessingId(selectedQuote.id);
     try {
-      // Update purchase order status to 'rejected'
-      // Note: We now store quotes directly in purchase_orders, not quotation_requests
-      const { error } = await supabase
-        .from('purchase_orders')
-        .update({ 
-          status: 'rejected',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', selectedQuote.id);
+      // Update purchase order status to 'rejected' using native fetch
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
+      console.log('🔄 Rejecting quote:', selectedQuote.id);
+      
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${selectedQuote.id}`,
+        {
+          method: 'PATCH',
+          headers: { ...headers, 'Prefer': 'return=minimal' },
+          body: JSON.stringify({ 
+            status: 'rejected',
+            updated_at: new Date().toISOString()
+          }),
+          signal: controller.signal,
+          cache: 'no-store'
+        }
+      );
+      clearTimeout(timeoutId);
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Reject quote failed:', response.status, errorText);
+        throw new Error(`Failed to reject quote: ${response.status}`);
+      }
+      
+      console.log('✅ Quote rejected successfully');
 
       toast({
         title: 'Quote Rejected',
