@@ -181,7 +181,7 @@ const SupplierDashboard = () => {
     }
   }, [user?.id]);
 
-  // Fetch quote requests function - extracted for reuse
+  // Fetch quote requests function - using native fetch API for reliability
   const fetchQuoteRequests = async () => {
     if (!user?.id) {
       console.log('❌ Cannot fetch quotes - no user.id');
@@ -191,28 +191,65 @@ const SupplierDashboard = () => {
     setLoadingQuotes(true);
     console.log('🔄 Fetching quotes for supplier user.id:', user.id, 'email:', user.email);
     
+    // Get auth token from localStorage for faster access
+    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+    
+    let accessToken: string | null = null;
     try {
-      // First, try to find supplier record by user_id
-      let supplierRecord = null;
-      const { data: byUserId, error: userIdError } = await supabase
-        .from('suppliers')
-        .select('id, user_id, company_name, email')
-        .eq('user_id', user.id)
-        .maybeSingle();
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        accessToken = parsed.access_token;
+      }
+    } catch (e) {
+      console.warn('Could not get session from localStorage');
+    }
+    
+    const headers: Record<string, string> = {
+      'apikey': SUPABASE_ANON_KEY,
+      'Content-Type': 'application/json'
+    };
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+    
+    try {
+      // First, try to find supplier record by user_id using fetch with timeout
+      const supplierController = new AbortController();
+      const supplierTimeout = setTimeout(() => supplierController.abort(), 5000);
       
-      supplierRecord = byUserId;
-      console.log('📦 Supplier record by user_id:', byUserId, 'error:', userIdError);
+      let supplierRecord = null;
+      
+      // Try by user_id first
+      const supplierResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${user.id}&select=id,user_id,company_name,email`,
+        { headers, signal: supplierController.signal, cache: 'no-store' }
+      );
+      clearTimeout(supplierTimeout);
+      
+      if (supplierResponse.ok) {
+        const supplierData = await supplierResponse.json();
+        supplierRecord = supplierData?.[0] || null;
+        console.log('📦 Supplier record by user_id:', supplierRecord);
+      }
       
       // If not found by user_id, try by email
       if (!supplierRecord && user.email) {
-        const { data: byEmail, error: emailError } = await supabase
-          .from('suppliers')
-          .select('id, user_id, company_name, email')
-          .eq('email', user.email)
-          .maybeSingle();
+        const emailController = new AbortController();
+        const emailTimeout = setTimeout(() => emailController.abort(), 5000);
         
-        supplierRecord = byEmail;
-        console.log('📦 Supplier record by email:', byEmail, 'error:', emailError);
+        const emailResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/suppliers?email=eq.${encodeURIComponent(user.email)}&select=id,user_id,company_name,email`,
+          { headers, signal: emailController.signal, cache: 'no-store' }
+        );
+        clearTimeout(emailTimeout);
+        
+        if (emailResponse.ok) {
+          const emailData = await emailResponse.json();
+          supplierRecord = emailData?.[0] || null;
+          console.log('📦 Supplier record by email:', supplierRecord);
+        }
       }
       
       // Build list of IDs to check (user.id, suppliers.id, AND suppliers.user_id)
@@ -233,84 +270,86 @@ const SupplierDashboard = () => {
       }
 
       // Fetch from purchase_orders where this supplier is the target
-      // Check BOTH user.id AND suppliers.id since quotes might use either
-      const { data: purchaseOrderQuotes, error: poError } = await supabase
-        .from('purchase_orders')
-        .select('*')
-        .in('supplier_id', supplierIds)
-        .in('status', ['pending', 'quoted', 'rejected', 'confirmed'])
-        .order('created_at', { ascending: false });
+      const quotesController = new AbortController();
+      const quotesTimeout = setTimeout(() => quotesController.abort(), 8000);
       
-      console.log('📋 Raw purchase_orders query result:', purchaseOrderQuotes?.length || 0, 'quotes, error:', poError);
+      const supplierIdsParam = supplierIds.join(',');
+      const quotesResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=in.(${supplierIdsParam})&status=in.(pending,quoted,rejected,confirmed)&order=created_at.desc`,
+        { headers, signal: quotesController.signal, cache: 'no-store' }
+      );
+      clearTimeout(quotesTimeout);
       
-      // DEBUG: Log what IDs we're checking vs what's in the database
-      const { data: allPendingQuotes } = await supabase
-        .from('purchase_orders')
-        .select('id, supplier_id, buyer_id, status, po_number, created_at')
-        .in('status', ['pending', 'quoted', 'confirmed'])
-        .order('created_at', { ascending: false })
-        .limit(20);
-      
-      console.log('🔎 DEBUG - All recent quotes in system:', allPendingQuotes);
-      console.log('🔎 DEBUG - Checking if any quote supplier_id matches our IDs:');
-      allPendingQuotes?.forEach(q => {
-        const matches = supplierIds.includes(q.supplier_id);
-        console.log(`   Quote ${q.po_number}: supplier_id=${q.supplier_id}, matches=${matches ? '✓' : '✗'}`);
-      });
-        
-        if (poError) {
-          console.error('Error fetching purchase order quotes:', poError);
-        }
-
-        // Also fetch from quotation_requests table (legacy)
-        const { data: legacyQuotes, error: qrError } = await supabase
-          .from('quotation_requests')
-          .select('*')
-          .eq('supplier_id', user.id)
-          .order('created_at', { ascending: false });
-        
-        if (qrError) {
-          console.error('Error fetching legacy quote requests:', qrError);
-        }
-
-        // Transform purchase_orders to match quote display format
-        const transformedPOQuotes = (purchaseOrderQuotes || []).map(po => ({
-          id: po.id,
-          material_name: po.items?.[0]?.material_name || po.project_name || 'Quote Request',
-          quantity: po.items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || 1,
-          unit: po.items?.[0]?.unit || 'items',
-          delivery_address: po.delivery_address || 'To be provided',
-          project_description: po.project_name,
-          special_requirements: null,
-          preferred_delivery_date: po.delivery_date,
-          status: po.status,
-          quote_amount: po.quote_amount || po.total_amount,
-          quote_valid_until: null,
-          supplier_notes: null,
-          created_at: po.created_at,
-          buyer_id: po.buyer_id,
-          purchase_order_id: po.id,
-          // Include all items for display
-          items: po.items,
-          po_number: po.po_number,
-          total_amount: po.total_amount
-        }));
-
-        // Combine both sources, with purchase_orders taking priority
-        const allQuotes = [...transformedPOQuotes, ...(legacyQuotes || [])];
-        
-        // Remove duplicates by id
-        const uniqueQuotes = allQuotes.filter((quote, index, self) => 
-          index === self.findIndex(q => q.id === quote.id)
-        );
-
-        console.log('📋 Quote requests loaded:', uniqueQuotes.length, 'from purchase_orders:', transformedPOQuotes.length);
-        setQuoteRequests(uniqueQuotes);
-      } catch (error) {
-        console.error('Error fetching quote requests:', error);
-      } finally {
-        setLoadingQuotes(false);
+      let purchaseOrderQuotes: any[] = [];
+      if (quotesResponse.ok) {
+        purchaseOrderQuotes = await quotesResponse.json();
+        console.log('📋 Raw purchase_orders query result:', purchaseOrderQuotes.length, 'quotes');
+      } else {
+        console.error('Error fetching purchase order quotes:', quotesResponse.status);
       }
+      
+      // DEBUG: Fetch all recent quotes to show what's in the system
+      const debugController = new AbortController();
+      const debugTimeout = setTimeout(() => debugController.abort(), 5000);
+      
+      try {
+        const debugResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/purchase_orders?status=in.(pending,quoted,confirmed)&order=created_at.desc&limit=20&select=id,supplier_id,buyer_id,status,po_number,created_at`,
+          { headers, signal: debugController.signal, cache: 'no-store' }
+        );
+        clearTimeout(debugTimeout);
+        
+        if (debugResponse.ok) {
+          const allPendingQuotes = await debugResponse.json();
+          console.log('🔎 DEBUG - All recent quotes in system:', allPendingQuotes?.length || 0);
+          allPendingQuotes?.forEach((q: any) => {
+            const matches = supplierIds.includes(q.supplier_id);
+            console.log(`   Quote ${q.po_number}: supplier_id=${q.supplier_id}, matches=${matches ? '✓' : '✗'}`);
+          });
+        }
+      } catch (debugErr) {
+        console.log('Debug query skipped due to timeout');
+      }
+
+      // Transform purchase_orders to match quote display format
+      const transformedPOQuotes = (purchaseOrderQuotes || []).map(po => ({
+        id: po.id,
+        material_name: po.items?.[0]?.material_name || po.project_name || 'Quote Request',
+        quantity: po.items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || 1,
+        unit: po.items?.[0]?.unit || 'items',
+        delivery_address: po.delivery_address || 'To be provided',
+        project_description: po.project_name,
+        special_requirements: null,
+        preferred_delivery_date: po.delivery_date,
+        status: po.status,
+        quote_amount: po.quote_amount || po.total_amount,
+        quote_valid_until: null,
+        supplier_notes: null,
+        created_at: po.created_at,
+        buyer_id: po.buyer_id,
+        purchase_order_id: po.id,
+        // Include all items for display
+        items: po.items,
+        po_number: po.po_number,
+        total_amount: po.total_amount
+      }));
+
+      // Remove duplicates by id
+      const uniqueQuotes = transformedPOQuotes.filter((quote, index, self) => 
+        index === self.findIndex(q => q.id === quote.id)
+      );
+
+      console.log('📋 Quote requests loaded:', uniqueQuotes.length, 'from purchase_orders:', transformedPOQuotes.length);
+      setQuoteRequests(uniqueQuotes);
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.error('Quote fetch timed out');
+      } else {
+        console.error('Error fetching quote requests:', error);
+      }
+    } finally {
+      setLoadingQuotes(false);
+    }
   };
 
   // Fetch quote requests on mount and when user changes
