@@ -474,7 +474,10 @@ const SupplierDashboard = () => {
         if (!updateResult || updateResult.length === 0) {
           console.error('⚠️ No rows updated! RLS policy may be blocking the update.');
           console.error('Quote ID:', quoteId, 'Supplier user.id:', user?.id);
-          throw new Error('Failed to update quote - you may not have permission to update this order');
+          
+          // This is likely an RLS policy issue - the supplier needs permission to update
+          // Show a more helpful error message
+          throw new Error('Database permission error. Please contact admin to run the RLS policy fix migration.');
         }
         
         console.log(`✅ Quote ${action === 'approve' ? 'sent' : 'rejected'} - Purchase order updated:`, updateResult);
