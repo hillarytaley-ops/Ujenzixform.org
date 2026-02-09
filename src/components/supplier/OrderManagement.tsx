@@ -105,79 +105,98 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
   }, [supplierId]);
 
   const loadOrders = async () => {
+    // Helper function to add timeout to any promise
+    const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
+      return Promise.race([
+        promise,
+        new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Timeout')), ms))
+      ]);
+    };
+
     try {
       setLoading(true);
       
-      // Get current user and their supplier record
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      // Get current user with timeout
+      let user;
+      try {
+        const { data } = await withTimeout(supabase.auth.getUser(), 5000);
+        user = data?.user;
+      } catch {
+        console.log('Auth timeout, using supplierId directly');
+      }
+      
+      if (!user && !supplierId) {
         console.log('No user authenticated');
         setOrders([]);
         return;
       }
 
-      // Get supplier record for the user
-      const { data: supplierData } = await supabase
-        .from('suppliers')
-        .select('id, user_id')
-        .or(`user_id.eq.${user.id},id.eq.${supplierId}`)
-        .single();
+      const supplierIds = [supplierId];
+      if (user?.id) supplierIds.push(user.id);
 
-      const supplierIds = [user.id, supplierId];
-      if (supplierData?.id) supplierIds.push(supplierData.id);
-      if (supplierData?.user_id) supplierIds.push(supplierData.user_id);
+      // Get supplier record with timeout (skip if it hangs)
+      try {
+        const { data: supplierData } = await withTimeout(
+          supabase
+            .from('suppliers')
+            .select('id, user_id')
+            .or(`user_id.eq.${user?.id || supplierId},id.eq.${supplierId}`)
+            .maybeSingle(),
+          5000
+        );
+        if (supplierData?.id) supplierIds.push(supplierData.id);
+        if (supplierData?.user_id) supplierIds.push(supplierData.user_id);
+      } catch {
+        console.log('Supplier lookup timeout, continuing with available IDs');
+      }
 
       // Log supplier IDs being queried
-      console.log('🔍 Querying orders for supplier IDs:', supplierIds);
+      console.log('🔍 Querying orders for supplier IDs:', [...new Set(supplierIds)]);
 
-      // Debug: Check all recent orders to see what supplier_ids exist
-      const { data: debugOrders } = await supabase
-        .from('purchase_orders')
-        .select('id, po_number, supplier_id, status, created_at')
-        .order('created_at', { ascending: false })
-        .limit(10);
-      
-      console.log('🔎 DEBUG - Recent orders in system:', debugOrders?.map(o => ({
-        po: o.po_number,
-        supplier_id: o.supplier_id,
-        status: o.status
-      })));
+      // Fetch real orders from purchase_orders table with timeout
+      let purchaseOrders: any[] = [];
+      try {
+        const { data, error: ordersError } = await withTimeout(
+          supabase
+            .from('purchase_orders')
+            .select('*')
+            .in('supplier_id', [...new Set(supplierIds)])
+            .order('created_at', { ascending: false }),
+          8000
+        );
 
-      // Fetch real orders from purchase_orders table
-      const { data: purchaseOrders, error: ordersError } = await supabase
-        .from('purchase_orders')
-        .select('*')
-        .in('supplier_id', supplierIds)
-        .order('created_at', { ascending: false });
-
-      if (ordersError) {
-        console.error('Error fetching orders:', ordersError);
-        throw ordersError;
+        if (ordersError) {
+          console.error('Error fetching orders:', ordersError);
+        } else {
+          purchaseOrders = data || [];
+        }
+      } catch {
+        console.log('Orders fetch timeout');
       }
 
-      console.log('📦 Real orders loaded:', purchaseOrders?.length || 0);
-      if (purchaseOrders && purchaseOrders.length > 0) {
-        console.log('📦 First order supplier_id:', purchaseOrders[0].supplier_id);
-      } else {
-        console.log('⚠️ No orders found for supplier IDs:', supplierIds);
-      }
+      console.log('📦 Orders loaded:', purchaseOrders.length);
 
-      // Also fetch buyer profiles to get customer names
-      const buyerIds = [...new Set(purchaseOrders?.map(po => po.buyer_id).filter(Boolean) || [])];
+      // Fetch buyer profiles with timeout (skip if it hangs)
+      const buyerIds = [...new Set(purchaseOrders.map(po => po.buyer_id).filter(Boolean))];
       let buyerProfiles: Record<string, any> = {};
       
       if (buyerIds.length > 0) {
-        // buyer_id is auth user ID, so we need to query by user_id not id
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, user_id, full_name, phone, email')
-          .in('user_id', buyerIds);
-        
-        if (profiles) {
-          // Map by user_id since that's what buyer_id references
-          buyerProfiles = Object.fromEntries(profiles.map(p => [p.user_id, p]));
+        try {
+          const { data: profiles } = await withTimeout(
+            supabase
+              .from('profiles')
+              .select('id, user_id, full_name, phone, email')
+              .in('user_id', buyerIds),
+            5000
+          );
+          
+          if (profiles) {
+            buyerProfiles = Object.fromEntries(profiles.map(p => [p.user_id, p]));
+            console.log('👥 Buyer profiles loaded:', profiles.length);
+          }
+        } catch {
+          console.log('Profiles fetch timeout');
         }
-        console.log('👥 Buyer profiles loaded:', profiles?.length || 0);
       }
 
       // Transform purchase_orders to Order format
