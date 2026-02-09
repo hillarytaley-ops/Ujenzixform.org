@@ -194,7 +194,10 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
       // Fetch orders for THIS supplier
       let purchaseOrders: any[] = [];
       try {
-        const supplierIdsParam = uniqueSupplierIds.map(id => `"${id}"`).join(',');
+        // Supabase REST API in.() filter expects comma-separated values WITHOUT quotes for UUIDs
+        const supplierIdsParam = uniqueSupplierIds.join(',');
+        console.log('🔗 Fetching orders URL:', `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=in.(${supplierIdsParam})&order=created_at.desc`);
+        
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 8000);
         
@@ -202,15 +205,18 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
           `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=in.(${supplierIdsParam})&order=created_at.desc`,
           {
             headers: { 'apikey': apiKey },
-            signal: controller.signal
+            signal: controller.signal,
+            cache: 'no-store'
           }
         );
         clearTimeout(timeoutId);
 
         if (ordersResponse.ok) {
           purchaseOrders = await ordersResponse.json();
+          console.log('✅ Orders fetched successfully:', purchaseOrders.length);
         } else {
-          console.error('Error fetching orders:', ordersResponse.status);
+          const errorText = await ordersResponse.text();
+          console.error('❌ Error fetching orders:', ordersResponse.status, errorText);
         }
       } catch (e: any) {
         console.log('Orders fetch timeout/error:', e.message);
@@ -224,7 +230,8 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
       
       if (buyerIds.length > 0) {
         try {
-          const buyerIdsParam = buyerIds.map(id => `"${id}"`).join(',');
+          // Supabase REST API in.() filter expects comma-separated values WITHOUT quotes for UUIDs
+          const buyerIdsParam = buyerIds.join(',');
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 5000);
           
@@ -232,7 +239,8 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
             `${SUPABASE_URL}/rest/v1/profiles?user_id=in.(${buyerIdsParam})&select=id,user_id,full_name,phone,email`,
             {
               headers: { 'apikey': apiKey },
-              signal: controller.signal
+              signal: controller.signal,
+              cache: 'no-store'
             }
           );
           clearTimeout(timeoutId);
