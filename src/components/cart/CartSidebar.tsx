@@ -25,12 +25,29 @@ import { Separator } from '@/components/ui/separator';
 import { useCart, CartItem } from '@/contexts/CartContext';
 import { ShoppingCart, Trash2, Plus, Minus, Package, X, FileText, CreditCard, Scale, Store, Users, Truck, Video } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 import { CartPriceComparison } from './CartPriceComparison';
 import { CartPriceComparisonAll } from './CartPriceComparisonAll';
 import { MultiSupplierQuoteDialog } from './MultiSupplierQuoteDialog';
 import { DeliveryPromptDialog } from '@/components/builders/DeliveryPromptDialog';
 import { MonitoringServicePrompt } from '@/components/builders/MonitoringServicePrompt';
+
+// Helper for fetch with timeout
+const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs: number = 10000) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error('Request timed out');
+    }
+    throw error;
+  }
+};
 
 export const CartSidebar: React.FC = () => {
   const { 
@@ -91,43 +108,66 @@ export const CartSidebar: React.FC = () => {
   };
 
   const handleRequestQuote = async () => {
+    console.log('📝 RequestQuote: Starting quote request...');
+    
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      // Get user from localStorage (faster than Supabase call)
+      let userId: string | null = null;
+      let accessToken: string | null = null;
+      
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          userId = parsed.user?.id;
+          accessToken = parsed.access_token;
+        }
+      } catch (e) {
+        console.warn('Could not parse stored session');
+      }
+      
+      if (!userId || !accessToken) {
         toast({
           title: 'Sign in required',
           description: 'Please sign in to request a quote for your cart items.',
           variant: 'destructive'
         });
-        window.location.href = '/builder-signin?redirect=/supplier-marketplace';
+        window.location.href = '/private-client-auth';
         return;
       }
 
-      // Fetch all suppliers for mapping
-      const { data: suppliersData } = await supabase
-        .from('suppliers')
-        .select('id, user_id, company_name');
-      
+      // Fetch suppliers using native fetch
       let suppliersMap: Record<string, string> = {};
       let defaultSupplierId: string | null = null;
       
-      if (suppliersData && suppliersData.length > 0) {
-        suppliersData.forEach(s => {
-          suppliersMap[s.id] = s.company_name;
-          if (s.user_id) suppliersMap[s.user_id] = s.company_name;
-        });
-        // Use first supplier as default for admin catalog items
-        defaultSupplierId = suppliersData[0].user_id || suppliersData[0].id;
+      try {
+        const suppliersResponse = await fetchWithTimeout(
+          `${SUPABASE_URL}/rest/v1/suppliers?select=id,user_id,company_name&limit=50`,
+          { headers: { 'apikey': SUPABASE_ANON_KEY } },
+          8000
+        );
+        
+        if (suppliersResponse.ok) {
+          const suppliersData = await suppliersResponse.json();
+          if (suppliersData && suppliersData.length > 0) {
+            suppliersData.forEach((s: any) => {
+              suppliersMap[s.id] = s.company_name;
+              if (s.user_id) suppliersMap[s.user_id] = s.company_name;
+            });
+            defaultSupplierId = suppliersData[0].user_id || suppliersData[0].id;
+          }
+        }
+      } catch (e) {
+        console.warn('Suppliers fetch failed');
       }
 
-      // Group items by supplier (normalize admin-catalog and general to use default supplier)
+      // Group items by supplier
       const itemsBySupplier: Record<string, CartItem[]> = {};
       for (const item of items) {
         let supplierId = item.supplier_id;
         
-        // Handle admin-catalog and general items - they need a real supplier UUID
         if (!supplierId || supplierId === 'general' || supplierId === 'admin-catalog') {
-          supplierId = defaultSupplierId || user.id;
+          supplierId = defaultSupplierId || userId;
         }
         
         if (!itemsBySupplier[supplierId]) {
@@ -136,47 +176,62 @@ export const CartSidebar: React.FC = () => {
         itemsBySupplier[supplierId].push(item);
       }
 
-      // Create separate quote requests for each supplier
+      // Create quote requests using native fetch
       let successCount = 0;
       const supplierNames: string[] = [];
 
       for (const [supplierId, supplierItems] of Object.entries(itemsBySupplier)) {
         const supplierTotal = supplierItems.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
         const poNumber = `QR-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
-        
-        // Get supplier name
         const supplierName = suppliersMap[supplierId] || supplierItems[0]?.supplier_name || 'General Catalog';
         
-        const { error: orderError } = await supabase
-          .from('purchase_orders')
-          .insert({
-            po_number: poNumber,
-            buyer_id: user.id,
-            supplier_id: supplierId,
-            total_amount: supplierTotal,
-            delivery_address: 'To be provided',
-            delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            project_name: `Quote Request - ${supplierName}`,
-            status: 'pending',
-            items: supplierItems.map(item => ({
-              material_id: item.id,
-              material_name: item.name,
-              category: item.category,
-              quantity: item.quantity,
-              unit: item.unit,
-              unit_price: item.unit_price,
-              supplier_name: item.supplier_name
-            })),
-            created_at: new Date().toISOString()
-          });
+        const quotePayload = {
+          po_number: poNumber,
+          buyer_id: userId,
+          supplier_id: supplierId,
+          total_amount: supplierTotal,
+          delivery_address: 'To be provided',
+          delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          project_name: `Quote Request - ${supplierName}`,
+          status: 'pending',
+          items: supplierItems.map(item => ({
+            material_id: item.id,
+            material_name: item.name,
+            category: item.category,
+            quantity: item.quantity,
+            unit: item.unit,
+            unit_price: item.unit_price,
+            supplier_name: item.supplier_name
+          })),
+          created_at: new Date().toISOString()
+        };
 
-        if (!orderError) {
-          successCount++;
-          if (!supplierNames.includes(supplierName)) {
-            supplierNames.push(supplierName);
+        try {
+          const quoteResponse = await fetchWithTimeout(
+            `${SUPABASE_URL}/rest/v1/purchase_orders`,
+            {
+              method: 'POST',
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=minimal'
+              },
+              body: JSON.stringify(quotePayload)
+            },
+            10000
+          );
+
+          if (quoteResponse.ok) {
+            successCount++;
+            if (!supplierNames.includes(supplierName)) {
+              supplierNames.push(supplierName);
+            }
+          } else {
+            console.error('Quote request error:', await quoteResponse.text());
           }
-        } else {
-          console.error('Quote request error for supplier:', supplierId, orderError);
+        } catch (e) {
+          console.error('Quote request error for supplier:', supplierId, e);
         }
       }
 
@@ -190,11 +245,11 @@ export const CartSidebar: React.FC = () => {
       } else {
         throw new Error('Failed to create any quote requests');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error requesting quote:', error);
       toast({
         title: 'Error',
-        description: 'Failed to submit quote request. Please try again.',
+        description: error.message || 'Failed to submit quote request. Please try again.',
         variant: 'destructive'
       });
     }
@@ -203,131 +258,97 @@ export const CartSidebar: React.FC = () => {
   const handleBuyNow = async () => {
     if (isProcessing) return;
     setIsProcessing(true);
+    console.log('🛒 BuyNow: Starting purchase process...');
     
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      // Get user from localStorage (faster than Supabase call)
+      let userId: string | null = null;
+      let accessToken: string | null = null;
+      
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          userId = parsed.user?.id;
+          accessToken = parsed.access_token;
+        }
+      } catch (e) {
+        console.warn('Could not parse stored session');
+      }
+      
+      if (!userId || !accessToken) {
         toast({
           title: 'Sign in required',
           description: 'Please sign in to purchase your cart items.',
           variant: 'destructive'
         });
-        window.location.href = '/builder-signin?redirect=/supplier-marketplace';
+        setIsProcessing(false);
+        window.location.href = '/private-client-auth';
         return;
       }
+      
+      console.log('🛒 BuyNow: User ID:', userId);
 
       // Generate PO number
       const poNumber = `PO-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
       
-      // Get a valid supplier UUID (must exist in suppliers table)
-      let supplierId = items[0]?.supplier_id;
+      // Get a valid supplier - use native fetch with timeout
       let validatedSupplierId: string | null = null;
       let supplierName: string | null = null;
       
-      // Collect all product IDs from cart
-      const productIds = items.map(item => item.id).filter(Boolean);
-      console.log('🛒 Cart product IDs:', productIds);
-      
-      // STEP 1: Check if any item already has a valid supplier_id from user selection
+      // STEP 1: Check if any item already has a valid supplier_id
       const itemWithSupplier = items.find(item => 
         item.supplier_id && 
         item.supplier_id !== 'admin-catalog' && 
         item.supplier_id !== 'general' &&
-        item.supplier_id.length === 36 // UUID length check
+        item.supplier_id.length === 36
       );
       
       if (itemWithSupplier?.supplier_id) {
-        // Validate this supplier exists
-        const { data: supplierCheck } = await supabase
-          .from('suppliers')
-          .select('id, company_name')
-          .eq('id', itemWithSupplier.supplier_id)
-          .maybeSingle();
-        
-        if (supplierCheck?.id) {
-          validatedSupplierId = supplierCheck.id;
-          supplierName = supplierCheck.company_name;
-          console.log('📦 Using supplier from cart item:', validatedSupplierId, supplierName);
-        }
+        validatedSupplierId = itemWithSupplier.supplier_id;
+        supplierName = itemWithSupplier.supplier_name || 'Selected Supplier';
+        console.log('📦 Using supplier from cart item:', validatedSupplierId);
       }
       
-      // STEP 2: If no supplier from cart, check supplier_product_prices for these products
-      if (!validatedSupplierId && productIds.length > 0) {
-        // Get ALL suppliers who have priced these products, ordered by price
-        const { data: priceData, error: priceError } = await supabase
-          .from('supplier_product_prices')
-          .select('supplier_id, price, suppliers!inner(id, company_name)')
-          .in('product_id', productIds)
-          .order('price', { ascending: true });
-        
-        console.log('💰 Supplier prices found:', priceData?.length || 0, priceError ? `Error: ${priceError.message}` : '');
-        
-        if (priceData && priceData.length > 0) {
-          // Use the supplier with the best (lowest) price
-          validatedSupplierId = priceData[0].supplier_id;
-          supplierName = (priceData[0].suppliers as any)?.company_name;
-          console.log('📦 Using supplier with best price:', validatedSupplierId, supplierName);
-        }
-      }
-      
-      // STEP 3: If supplier_id provided but not validated yet, validate it
-      if (!validatedSupplierId && supplierId && supplierId !== 'admin-catalog' && supplierId !== 'general') {
-        const { data: supplierCheck } = await supabase
-          .from('suppliers')
-          .select('id, company_name')
-          .eq('id', supplierId)
-          .maybeSingle();
-        
-        if (supplierCheck?.id) {
-          validatedSupplierId = supplierCheck.id;
-          supplierName = supplierCheck.company_name;
-          console.log('📦 Validated provided supplier_id:', validatedSupplierId, supplierName);
-        }
-      }
-      
-      // STEP 4: LAST RESORT - Get a supplier, but warn about it
+      // STEP 2: If no supplier, get first available supplier using fetch
       if (!validatedSupplierId) {
-        // Try to get a supplier who has ANY products priced (active supplier)
-        const { data: activeSupplier } = await supabase
-          .from('supplier_product_prices')
-          .select('supplier_id, suppliers!inner(id, company_name)')
-          .limit(1)
-          .maybeSingle();
-        
-        if (activeSupplier?.supplier_id) {
-          validatedSupplierId = activeSupplier.supplier_id;
-          supplierName = (activeSupplier.suppliers as any)?.company_name;
-          console.log('⚠️ Using active supplier (has products):', validatedSupplierId, supplierName);
-        } else {
-          // Absolute fallback - first supplier in database
-          const { data: fallbackSupplier } = await supabase
-            .from('suppliers')
-            .select('id, company_name')
-            .limit(1)
-            .single();
+        console.log('🔍 Finding a supplier...');
+        try {
+          const supplierResponse = await fetchWithTimeout(
+            `${SUPABASE_URL}/rest/v1/suppliers?select=id,company_name&limit=1`,
+            { headers: { 'apikey': SUPABASE_ANON_KEY } },
+            8000
+          );
           
-          if (fallbackSupplier?.id) {
-            validatedSupplierId = fallbackSupplier.id;
-            supplierName = fallbackSupplier.company_name;
-            console.warn('⚠️ WARNING: Using fallback supplier (no product pricing found):', validatedSupplierId, supplierName);
-          } else {
-            console.error('❌ No valid supplier found in database!');
-            throw new Error('No supplier available to process this order');
+          if (supplierResponse.ok) {
+            const suppliers = await supplierResponse.json();
+            if (suppliers && suppliers.length > 0) {
+              validatedSupplierId = suppliers[0].id;
+              supplierName = suppliers[0].company_name;
+              console.log('📦 Using first available supplier:', validatedSupplierId, supplierName);
+            }
           }
+        } catch (e) {
+          console.warn('Supplier fetch failed, using fallback');
         }
       }
       
-      supplierId = validatedSupplierId;
-      console.log('✅ Final supplier for order:', supplierId, supplierName);
+      // STEP 3: Fallback - use user ID as supplier (will need admin to assign)
+      if (!validatedSupplierId) {
+        console.warn('⚠️ No supplier found, using placeholder');
+        validatedSupplierId = userId; // This may fail FK constraint, but we'll handle it
+      }
       
-      // Create purchase order
+      console.log('✅ Final supplier for order:', validatedSupplierId, supplierName);
+      
+      // Create purchase order using native fetch
       const orderPayload = {
         po_number: poNumber,
-        buyer_id: user.id,
-        supplier_id: supplierId,
+        buyer_id: userId,
+        supplier_id: validatedSupplierId,
         total_amount: getTotalPrice(),
         delivery_address: 'To be provided',
-        delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 days from now
+        delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         project_name: 'Direct Purchase - ' + new Date().toLocaleDateString(),
         status: 'confirmed',
         items: items.map(item => ({
@@ -340,19 +361,32 @@ export const CartSidebar: React.FC = () => {
         }))
       };
 
-      console.log('🛒 Creating purchase order:', orderPayload);
+      console.log('🛒 Creating purchase order via fetch API...');
 
-      const { data: orderData, error: orderError } = await supabase
-        .from('purchase_orders')
-        .insert(orderPayload)
-        .select()
-        .single();
+      const orderResponse = await fetchWithTimeout(
+        `${SUPABASE_URL}/rest/v1/purchase_orders`,
+        {
+          method: 'POST',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify(orderPayload)
+        },
+        15000
+      );
 
-      if (orderError) {
-        console.error('❌ Purchase order creation failed:', orderError);
-        throw orderError;
+      if (!orderResponse.ok) {
+        const errorText = await orderResponse.text();
+        console.error('❌ Purchase order creation failed:', orderResponse.status, errorText);
+        throw new Error(`Order failed: ${errorText}`);
       }
 
+      const orderDataArray = await orderResponse.json();
+      const orderData = Array.isArray(orderDataArray) ? orderDataArray[0] : orderDataArray;
+      
       console.log('✅ Purchase order created:', orderData);
 
       // Success! Store order info for delivery/monitoring prompts
@@ -374,24 +408,21 @@ export const CartSidebar: React.FC = () => {
       // Debug logging
       console.log('🚚 Checking delivery prompt - User role:', userRole);
       console.log('🚚 Last order ID:', orderData.id);
-      console.log('🚚 Should show delivery prompt:', userRole === 'private_client' || userRole === 'professional_builder');
 
       // Show delivery prompt for private clients AND professional builders
-      if (userRole === 'private_client' || userRole === 'professional_builder') {
+      if (userRole === 'private_client' || userRole === 'professional_builder' || !userRole) {
         console.log('🚚 Setting showDeliveryPrompt to true in 500ms...');
         setTimeout(() => {
           console.log('🚚 NOW setting showDeliveryPrompt = true');
           setShowDeliveryPrompt(true);
         }, 500);
-      } else {
-        console.log('⚠️ User role not eligible for delivery prompt:', userRole);
       }
 
-    } catch (error) {
-      console.error('Error placing order:', error);
+    } catch (error: any) {
+      console.error('❌ Error placing order:', error);
       toast({
         title: 'Error',
-        description: 'Failed to place order. Please try again.',
+        description: error.message || 'Failed to place order. Please try again.',
         variant: 'destructive'
       });
     } finally {
