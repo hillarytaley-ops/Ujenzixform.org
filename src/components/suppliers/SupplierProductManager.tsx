@@ -165,21 +165,33 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      
+      // Use Promise.race with timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Request timed out')), 10000)
+      );
+      
+      const fetchPromise = supabase
         .from('materials')
         .select('*')
         .eq('supplier_id', supplierId)
         .order('created_at', { ascending: false });
 
+      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
+
       if (error) throw error;
       setProducts(data || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching products:', error);
-      toast({
-        title: 'Error loading products',
-        description: 'Failed to fetch your product list',
-        variant: 'destructive'
-      });
+      // Don't show error toast for timeout - just show empty
+      if (error.message !== 'Request timed out') {
+        toast({
+          title: 'Error loading products',
+          description: 'Failed to fetch your product list',
+          variant: 'destructive'
+        });
+      }
+      setProducts([]);
     } finally {
       setLoading(false);
     }
