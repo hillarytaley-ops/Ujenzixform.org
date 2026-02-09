@@ -329,38 +329,59 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
     }
   };
 
-  // Load admin-uploaded products - metadata first, then images in parallel
+  // Load admin-uploaded products using fetch API (bypasses Supabase client hanging)
   const loadAdminProducts = async () => {
     try {
       setLoading(true);
-      console.log('📦 Loading admin products...');
+      console.log('📦 Loading admin products via fetch API...');
       
-      // Use Promise.race with timeout to prevent hanging
-      const fetchPromise = supabase
-        .from('admin_material_images' as any)
-        .select('id,name,category,description,unit,suggested_price,pricing_type,variants')
-        .eq('is_approved', true)
-        .order('created_at', { ascending: false })
-        .limit(500);
+      // Get session for auth
+      const { data: { session } } = await supabase.auth.getSession();
       
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Products fetch timeout')), 8000)
-      );
-
-      let data: any[] = [];
-      let error: any = null;
+      // Use native fetch API with timeout - much more reliable
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
       
       try {
-        const result = await Promise.race([fetchPromise, timeoutPromise]) as any;
-        data = result.data || [];
-        error = result.error;
-      } catch (timeoutErr) {
-        console.log('⏱️ Products fetch timeout - showing demo data');
-        error = timeoutErr;
-      }
-      
-      if (error) {
-        console.log('Admin products table not available, using demo data');
+        const response = await fetch(
+          'https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants&is_approved=eq.true&order=created_at.desc&limit=500',
+          {
+            headers: {
+              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo',
+              'Authorization': session?.access_token ? `Bearer ${session.access_token}` : '',
+            },
+            signal: controller.signal
+          }
+        );
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('✅ Loaded', data.length, 'admin products via fetch');
+        
+        setAdminProducts(data || []);
+        setLoading(false);
+        
+        // Then load images in background
+        if (data && data.length > 0) {
+          const allIds = data.map((p: any) => p.id);
+          loadAllImages(allIds);
+        }
+      } catch (fetchErr: any) {
+        clearTimeout(timeoutId);
+        
+        if (fetchErr.name === 'AbortError') {
+          console.log('⏱️ Products fetch timeout after 15s');
+        } else {
+          console.error('Fetch error:', fetchErr);
+        }
+        
+        // Fallback to demo data
+        console.log('Using demo data as fallback');
         setAdminProducts([
           { id: '1', name: 'Bamburi Cement 42.5N (50kg)', category: 'Cement & Concrete', image_url: '', description: 'Premium Portland cement' },
           { id: '2', name: 'Y12 Deformed Steel Bars (6m)', category: 'Steel & Metal', image_url: '', description: 'High-tensile steel reinforcement' },
@@ -369,18 +390,6 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
           { id: '5', name: 'Machine Cut Blocks 6"', category: 'Bricks & Blocks', image_url: '', description: 'Standard building blocks' },
         ]);
         setLoading(false);
-        return;
-      }
-      
-      console.log('✅ Loaded', data.length, 'admin products');
-      // Set products immediately (shows list fast)
-      setAdminProducts(data || []);
-      setLoading(false);
-      
-      // Then load ALL images in parallel (non-blocking)
-      if (data && data.length > 0) {
-        const allIds = data.map((p: any) => p.id);
-        loadAllImages(allIds);
       }
     } catch (error) {
       console.error('Error loading admin products:', error);
