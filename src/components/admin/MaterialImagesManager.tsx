@@ -1019,7 +1019,7 @@ export const MaterialImagesManager: React.FC = () => {
     setShowEditDialog(true);
   };
 
-  // Save edited image
+  // Save edited image - using fetch API for reliability
   const handleSaveEdit = async () => {
     if (!editingImage) return;
     
@@ -1034,21 +1034,54 @@ export const MaterialImagesManager: React.FC = () => {
 
     setUploading(true);
     try {
-      const { error } = await (supabase as any)
-        .from('admin_material_images')
-        .update({
-          name: editForm.name.trim(),
-          category: editForm.category,
-          description: editForm.description || '',
-          unit: editForm.unit || 'unit',
-          suggested_price: editForm.suggestedPrice || 0,
-          pricing_type: editForm.pricingType || 'single',
-          variants: editForm.variants || [],
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', editingImage.id);
+      console.log('📝 Saving edit for product:', editingImage.id);
       
-      if (error) throw error;
+      // Get session for auth
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('Not authenticated');
+      }
+      
+      const payload = {
+        name: editForm.name.trim(),
+        category: editForm.category,
+        description: editForm.description || '',
+        unit: editForm.unit || 'unit',
+        suggested_price: editForm.suggestedPrice || 0,
+        pricing_type: editForm.pricingType || 'single',
+        variants: editForm.variants || [],
+        updated_at: new Date().toISOString()
+      };
+      
+      // Use fetch API with timeout for reliability
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      
+      const response = await fetch(
+        `https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/admin_material_images?id=eq.${editingImage.id}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo',
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        }
+      );
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Update failed:', response.status, errorText);
+        throw new Error(`Update failed: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('✅ Product updated:', data);
       
       toast({
         title: 'Image updated',
@@ -1062,7 +1095,7 @@ export const MaterialImagesManager: React.FC = () => {
       console.error('Edit error:', err);
       toast({
         title: 'Update failed',
-        description: err.message || 'Failed to update image',
+        description: err.name === 'AbortError' ? 'Request timed out' : (err.message || 'Failed to update image'),
         variant: 'destructive',
       });
     } finally {
