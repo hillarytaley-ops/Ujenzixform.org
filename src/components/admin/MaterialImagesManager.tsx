@@ -481,27 +481,64 @@ export const MaterialImagesManager: React.FC = () => {
     }
   };
 
-  // Save admin image record to database
+  // Save admin image record to database - using fetch API with timeout for reliability
   const saveAdminImage = async (imageUrl: string) => {
-    const { error } = await (supabase as any)
-      .from('admin_material_images')
-      .insert({
-        name: uploadForm.name,
-        category: uploadForm.category,
-        description: uploadForm.description || '',
-        unit: uploadForm.unit || 'unit',
-        suggested_price: uploadForm.suggestedPrice || 0,
-        pricing_type: uploadForm.pricingType || 'single',
-        variants: uploadForm.variants || [],
-        image_url: imageUrl,
-        is_featured: false,
-        is_approved: true
-      });
+    console.log('📤 Saving image to database...');
     
-    if (error) {
-      // If table doesn't exist, log but don't fail
-      console.error('Error saving admin image record:', error);
-      throw error; // Throw so the caller knows it failed
+    // Get session for auth header
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      throw new Error('Not authenticated - please sign in again');
+    }
+
+    const payload = {
+      name: uploadForm.name,
+      category: uploadForm.category,
+      description: uploadForm.description || '',
+      unit: uploadForm.unit || 'unit',
+      suggested_price: uploadForm.suggestedPrice || 0,
+      pricing_type: uploadForm.pricingType || 'single',
+      variants: uploadForm.variants || [],
+      image_url: imageUrl,
+      is_featured: false,
+      is_approved: true
+    };
+
+    // Use fetch API with timeout (30 seconds for large images)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    try {
+      const response = await fetch(
+        'https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/admin_material_images',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo',
+            'Authorization': `Bearer ${session.access_token}`,
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        }
+      );
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Upload error:', response.status, errorText);
+        throw new Error(`Upload failed: ${response.status} - ${errorText}`);
+      }
+
+      console.log('✅ Image saved successfully');
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        throw new Error('Upload timed out - please try again with a smaller image');
+      }
+      throw err;
     }
   };
 
@@ -586,6 +623,42 @@ export const MaterialImagesManager: React.FC = () => {
     });
   };
 
+  // Helper function to save image via fetch API
+  const saveImageViaFetch = async (payload: any, accessToken: string) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    try {
+      const response = await fetch(
+        'https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/admin_material_images',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo',
+            'Authorization': `Bearer ${accessToken}`,
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        }
+      );
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Upload failed: ${response.status}`);
+      }
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        throw new Error('Upload timed out');
+      }
+      throw err;
+    }
+  };
+
   // Upload all bulk items
   const handleBulkUpload = async () => {
     const itemsToUpload = bulkUploadItems.filter(item => !item.uploaded && item.name.trim());
@@ -596,6 +669,13 @@ export const MaterialImagesManager: React.FC = () => {
         description: 'Please add images and fill in the names',
         variant: 'destructive',
       });
+      return;
+    }
+
+    // Get session first
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      toast({ title: 'Not authenticated', description: 'Please sign in again', variant: 'destructive' });
       return;
     }
 
@@ -615,23 +695,19 @@ export const MaterialImagesManager: React.FC = () => {
           reader.readAsDataURL(item.file);
         });
 
-        // Save to database - use individual item's category, unit, pricing type and variants
-        const { error } = await (supabase as any)
-          .from('admin_material_images')
-          .insert({
-            name: item.name.trim(),
-            category: item.category, // Use item's individual category
-            description: item.description || '',
-            unit: item.unit, // Use item's individual unit
-            suggested_price: item.suggestedPrice || 0,
-            pricing_type: item.pricingType || 'single',
-            variants: item.variants || [],
-            image_url: imageDataUrl,
-            is_featured: false,
-            is_approved: true
-          });
-
-        if (error) throw error;
+        // Save to database via fetch API
+        await saveImageViaFetch({
+          name: item.name.trim(),
+          category: item.category,
+          description: item.description || '',
+          unit: item.unit,
+          suggested_price: item.suggestedPrice || 0,
+          pricing_type: item.pricingType || 'single',
+          variants: item.variants || [],
+          image_url: imageDataUrl,
+          is_featured: false,
+          is_approved: true
+        }, session.access_token);
 
         updateBulkItem(item.id, { uploading: false, uploaded: true });
         successCount++;
