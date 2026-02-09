@@ -22,22 +22,29 @@ export const FloatingCartButton: React.FC = () => {
   const { getTotalItems, setIsCartOpen, getTotalPrice } = useCart();
   const totalItems = getTotalItems();
 
-  if (totalItems === 0) return null;
-
+  // Always show the cart button so users know where to find their cart
   return (
     <Button
       onClick={() => setIsCartOpen(true)}
-      className="fixed bottom-6 right-6 z-50 h-14 px-4 bg-green-600 hover:bg-green-700 shadow-lg rounded-full flex items-center gap-2 animate-in slide-in-from-bottom-4"
+      className={`fixed bottom-6 right-6 z-50 h-14 px-4 shadow-lg rounded-full flex items-center gap-2 ${
+        totalItems > 0 
+          ? 'bg-green-600 hover:bg-green-700 animate-in slide-in-from-bottom-4' 
+          : 'bg-gray-600 hover:bg-gray-700'
+      }`}
     >
       <div className="relative">
         <ShoppingCart className="h-5 w-5" />
-        <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center">
-          {totalItems > 99 ? '99+' : totalItems}
-        </span>
+        {totalItems > 0 && (
+          <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center">
+            {totalItems > 99 ? '99+' : totalItems}
+          </span>
+        )}
       </div>
       <div className="flex flex-col items-start text-left">
-        <span className="text-xs font-medium">View Cart</span>
-        <span className="text-[10px] opacity-90">KES {getTotalPrice().toLocaleString()}</span>
+        <span className="text-xs font-medium">{totalItems > 0 ? 'View Cart' : 'Cart'}</span>
+        {totalItems > 0 && (
+          <span className="text-[10px] opacity-90">KES {getTotalPrice().toLocaleString()}</span>
+        )}
       </div>
     </Button>
   );

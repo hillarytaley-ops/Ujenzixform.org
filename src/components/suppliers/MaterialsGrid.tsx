@@ -1781,6 +1781,8 @@ export const MaterialsGrid = () => {
                     }
                   }
                   
+                  console.log('🛒 Adding to cart:', itemName, 'qty:', qtyToAdd, 'price:', unitPrice);
+                  
                   addToCart({
                     id: material.id,
                     name: itemName,
@@ -1791,6 +1793,12 @@ export const MaterialsGrid = () => {
                     supplier_name: material.supplier?.company_name || 'UjenziXform Catalog',
                     supplier_id: material.supplier_id
                   }, qtyToAdd);
+                  
+                  // Show success toast
+                  toast({
+                    title: '✅ Added to Cart',
+                    description: `${itemName} x${qtyToAdd} added to your cart`,
+                  });
                   
                   // Reset quantity counter after adding to cart (back to default of 1)
                   setQuantities(prev => ({ ...prev, [material.id]: 1 }));
