@@ -277,6 +277,12 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
   useEffect(() => {
     loadAdminProducts();
     loadSupplierPrices();
+    // Safety timeout - force loading to false after 10 seconds
+    const safetyTimeout = setTimeout(() => {
+      setLoading(false);
+      console.log('⏱️ Products safety timeout - forcing loading false');
+    }, 10000);
+    return () => clearTimeout(safetyTimeout);
   }, [supplierId]);
 
   // Load ALL images in smaller sequential batches to avoid 500 errors
@@ -327,14 +333,31 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
   const loadAdminProducts = async () => {
     try {
       setLoading(true);
+      console.log('📦 Loading admin products...');
       
-      // Load product metadata (fast - no images)
-      const { data, error } = await (supabase
+      // Use Promise.race with timeout to prevent hanging
+      const fetchPromise = supabase
         .from('admin_material_images' as any)
         .select('id,name,category,description,unit,suggested_price,pricing_type,variants')
         .eq('is_approved', true)
         .order('created_at', { ascending: false })
-        .limit(500));
+        .limit(500);
+      
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Products fetch timeout')), 8000)
+      );
+
+      let data: any[] = [];
+      let error: any = null;
+      
+      try {
+        const result = await Promise.race([fetchPromise, timeoutPromise]) as any;
+        data = result.data || [];
+        error = result.error;
+      } catch (timeoutErr) {
+        console.log('⏱️ Products fetch timeout - showing demo data');
+        error = timeoutErr;
+      }
       
       if (error) {
         console.log('Admin products table not available, using demo data');
@@ -349,6 +372,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
         return;
       }
       
+      console.log('✅ Loaded', data.length, 'admin products');
       // Set products immediately (shows list fast)
       setAdminProducts(data || []);
       setLoading(false);
