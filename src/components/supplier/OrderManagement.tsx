@@ -119,26 +119,48 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
       ]);
     };
 
+    // Helper to get user ID from localStorage as fallback
+    const getUserIdFromStorage = (): string | null => {
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          return parsed.user?.id || null;
+        }
+      } catch (e) {
+        console.warn('Could not get user ID from localStorage');
+      }
+      return null;
+    };
+
     try {
       setLoading(true);
       
       // Get current user with timeout
-      let user;
+      let userId: string | null = null;
       try {
         const { data } = await withTimeout(supabase.auth.getUser(), 5000);
-        user = data?.user;
+        userId = data?.user?.id || null;
+        console.log('✅ Got user from auth:', userId);
       } catch {
-        console.log('Auth timeout, using supplierId directly');
+        console.log('Auth timeout, trying localStorage...');
+        userId = getUserIdFromStorage();
+        console.log('📦 Got user from localStorage:', userId);
       }
       
-      if (!user && !supplierId) {
-        console.log('No user authenticated');
+      // Use supplierId prop, userId, or localStorage fallback
+      const effectiveSupplierId = supplierId && supplierId.trim() !== '' ? supplierId : userId;
+      
+      if (!effectiveSupplierId) {
+        console.log('❌ No user authenticated and no supplierId prop');
         setOrders([]);
         return;
       }
+      
+      console.log('🔑 Effective supplier ID:', effectiveSupplierId);
 
-      const supplierIds = [supplierId];
-      if (user?.id) supplierIds.push(user.id);
+      const supplierIds = [effectiveSupplierId];
+      if (userId && userId !== effectiveSupplierId) supplierIds.push(userId);
 
       // Get supplier record with timeout (skip if it hangs)
       try {
@@ -146,12 +168,13 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
           supabase
             .from('suppliers')
             .select('id, user_id')
-            .or(`user_id.eq.${user?.id || supplierId},id.eq.${supplierId}`)
+            .or(`user_id.eq.${effectiveSupplierId},id.eq.${effectiveSupplierId}`)
             .maybeSingle(),
           5000
         );
         if (supplierData?.id) supplierIds.push(supplierData.id);
         if (supplierData?.user_id) supplierIds.push(supplierData.user_id);
+        console.log('📋 Supplier record found:', supplierData);
       } catch {
         console.log('Supplier lookup timeout, continuing with available IDs');
       }
