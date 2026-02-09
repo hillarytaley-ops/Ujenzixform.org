@@ -318,7 +318,8 @@ export const CartSidebar: React.FC = () => {
       if (!validatedSupplierId && productIds.length > 0) {
         console.log('🔍 Finding supplier who priced these products...');
         try {
-          const productIdsParam = productIds.map(id => `"${id}"`).join(',');
+          // Supabase REST API in.() filter expects comma-separated values WITHOUT quotes for UUIDs
+          const productIdsParam = productIds.join(',');
           const pricesResponse = await fetchWithTimeout(
             `${SUPABASE_URL}/rest/v1/supplier_product_prices?product_id=in.(${productIdsParam})&select=supplier_id&limit=1`,
             { headers: { 'apikey': SUPABASE_ANON_KEY } },

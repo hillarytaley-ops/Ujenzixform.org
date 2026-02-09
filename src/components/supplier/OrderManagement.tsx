@@ -102,11 +102,11 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
 
   useEffect(() => {
     loadOrders();
-    // Safety timeout - force loading to false after 10 seconds
+    // Safety timeout - force loading to false after 20 seconds (increased from 10)
     const safetyTimeout = setTimeout(() => {
       setLoading(false);
-      console.log('⏱️ Orders safety timeout - forcing loading false');
-    }, 10000);
+      console.log('⏱️ Orders safety timeout - forcing loading false after 20s');
+    }, 20000);
     return () => clearTimeout(safetyTimeout);
   }, [supplierId]);
 
@@ -136,14 +136,14 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
     try {
       setLoading(true);
       
-      // Get current user with timeout
+      // Get current user with timeout (reduced to 3s)
       let userId: string | null = null;
       try {
-        const { data } = await withTimeout(supabase.auth.getUser(), 5000);
+        const { data } = await withTimeout(supabase.auth.getUser(), 3000);
         userId = data?.user?.id || null;
         console.log('✅ Got user from auth:', userId);
       } catch {
-        console.log('Auth timeout, trying localStorage...');
+        console.log('Auth timeout (3s), trying localStorage...');
         userId = getUserIdFromStorage();
         console.log('📦 Got user from localStorage:', userId);
       }
@@ -162,7 +162,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
       const supplierIds = [effectiveSupplierId];
       if (userId && userId !== effectiveSupplierId) supplierIds.push(userId);
 
-      // Get supplier record with timeout (skip if it hangs)
+      // Get supplier record with timeout (reduced to 3s, skip if it hangs)
       try {
         const { data: supplierData } = await withTimeout(
           supabase
@@ -170,13 +170,13 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
             .select('id, user_id')
             .or(`user_id.eq.${effectiveSupplierId},id.eq.${effectiveSupplierId}`)
             .maybeSingle(),
-          5000
+          3000
         );
         if (supplierData?.id) supplierIds.push(supplierData.id);
         if (supplierData?.user_id) supplierIds.push(supplierData.user_id);
         console.log('📋 Supplier record found:', supplierData);
       } catch {
-        console.log('Supplier lookup timeout, continuing with available IDs');
+        console.log('Supplier lookup timeout (3s), continuing with available IDs');
       }
 
       // Log supplier IDs being queried
