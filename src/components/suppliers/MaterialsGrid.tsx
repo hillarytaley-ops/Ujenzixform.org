@@ -977,11 +977,21 @@ export const MaterialsGrid = () => {
             // Process all data - first batch has images, rest will load lazily
             const processedMaterials = allData.map((item: any, index: number) => {
               const supplierPrice = supplierPrices[item.id];
-              let variants: PriceVariant[] = [];
+              
+              // Get admin's variants as base
+              let adminVariants: PriceVariant[] = [];
               try {
-                if (item.variants && Array.isArray(item.variants)) variants = item.variants;
-                else if (item.variants && typeof item.variants === 'string') variants = JSON.parse(item.variants);
-              } catch (e) { variants = []; }
+                if (item.variants && Array.isArray(item.variants)) adminVariants = item.variants;
+                else if (item.variants && typeof item.variants === 'string') adminVariants = JSON.parse(item.variants);
+              } catch (e) { adminVariants = []; }
+              
+              // Use SUPPLIER's variant prices if available, otherwise use admin's variants
+              // Supplier variant prices take priority over admin's suggested variant prices
+              let finalVariants: PriceVariant[] = adminVariants;
+              if (supplierPrice?.variant_prices && Array.isArray(supplierPrice.variant_prices) && supplierPrice.variant_prices.length > 0) {
+                finalVariants = supplierPrice.variant_prices;
+                console.log(`💰 Using supplier variant prices for ${item.name}:`, supplierPrice.variant_prices);
+              }
               
               return {
                 id: item.id,
@@ -998,7 +1008,7 @@ export const MaterialsGrid = () => {
                 in_stock: supplierPrice?.in_stock ?? true,
                 supplier: { company_name: supplierPrice ? 'Supplier' : 'Admin Catalog', location: 'Kenya', rating: supplierPrice ? 4.5 : 5.0 },
                 pricing_type: item.pricing_type || 'single',
-                variants: variants
+                variants: finalVariants
               } as Material;
             });
             
