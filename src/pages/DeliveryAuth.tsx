@@ -93,6 +93,18 @@ const DeliveryAuth: React.FC = () => {
         localStorage.setItem('user_role', dbRole);
         toast({ title: 'Wrong Portal', description: `You are a ${dbRole}. Redirecting to your dashboard.` });
         window.location.href = correctDashboard;
+      } else if (!dbRole) {
+        // User has NO role - create one for them
+        console.log('🔐 No role found, creating role for user:', authData.user.id);
+        try {
+          await fetch(`${SUPABASE_URL}/rest/v1/user_roles`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${authData.access_token}`, 'Prefer': 'return=minimal' },
+            body: JSON.stringify({ user_id: authData.user.id, role: ROLE }),
+          });
+        } catch (err) { console.log('🔐 Role creation error:', err); }
+        localStorage.setItem('user_role', ROLE);
+        window.location.href = DASHBOARD;
       } else {
         localStorage.setItem('user_role', ROLE);
         window.location.href = DASHBOARD;
@@ -115,6 +127,19 @@ const DeliveryAuth: React.FC = () => {
       });
       const data = await response.json();
       if (!response.ok || data.error) { setIsLoading(false); toast({ title: 'Registration failed', description: data.error_description || data.error, variant: 'destructive' }); return; }
+      
+      // Insert role into user_roles table
+      if (data.user?.id) {
+        console.log('🔐 Inserting role for new user:', data.user.id, ROLE);
+        try {
+          await fetch(`${SUPABASE_URL}/rest/v1/user_roles`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${data.access_token || SUPABASE_ANON_KEY}`, 'Prefer': 'return=minimal' },
+            body: JSON.stringify({ user_id: data.user.id, role: ROLE }),
+          });
+        } catch (roleErr) { console.log('🔐 Role insert error:', roleErr); }
+      }
+      
       toast({ title: 'Account created!', description: 'Please check your email to verify.' });
       setActiveTab('signin');
     } catch (err: any) {

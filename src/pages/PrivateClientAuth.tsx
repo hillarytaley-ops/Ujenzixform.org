@@ -117,8 +117,28 @@ const PrivateClientAuth: React.FC = () => {
         localStorage.setItem('user_role', dbRole);
         toast({ title: 'Wrong Portal', description: `You are a ${dbRole}. Redirecting to your dashboard.` });
         window.location.href = correctDashboard;
+      } else if (!dbRole) {
+        // User has NO role - create one for them (existing user who never got a role)
+        console.log('🔐 No role found, creating role for user:', authData.user.id);
+        try {
+          await fetch(`${SUPABASE_URL}/rest/v1/user_roles`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${authData.access_token}`,
+              'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify({ user_id: authData.user.id, role: ROLE }),
+          });
+          console.log('🔐 Role created successfully');
+        } catch (err) {
+          console.log('🔐 Role creation error:', err);
+        }
+        localStorage.setItem('user_role', ROLE);
+        window.location.href = DASHBOARD;
       } else {
-        // User has correct role OR no role (new user)
+        // User has correct role
         localStorage.setItem('user_role', ROLE);
         window.location.href = DASHBOARD;
       }
@@ -152,6 +172,33 @@ const PrivateClientAuth: React.FC = () => {
         setIsLoading(false);
         toast({ title: 'Registration failed', description: data.error_description || data.error || 'Failed to create account', variant: 'destructive' });
         return;
+      }
+
+      // If user was created and we have their ID, insert their role into user_roles table
+      if (data.user?.id) {
+        console.log('🔐 Inserting role for new user:', data.user.id, ROLE);
+        
+        // Try to insert role (may fail if user needs email verification first, that's OK)
+        try {
+          const roleResponse = await fetch(`${SUPABASE_URL}/rest/v1/user_roles`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${data.access_token || SUPABASE_ANON_KEY}`,
+              'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify({ user_id: data.user.id, role: ROLE }),
+          });
+          
+          if (roleResponse.ok) {
+            console.log('🔐 Role inserted successfully');
+          } else {
+            console.log('🔐 Role insert response:', roleResponse.status, await roleResponse.text());
+          }
+        } catch (roleErr) {
+          console.log('🔐 Role insert error (may be expected):', roleErr);
+        }
       }
 
       toast({ title: 'Account created!', description: 'Please check your email to verify, then sign in.' });
