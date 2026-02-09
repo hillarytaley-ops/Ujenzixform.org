@@ -870,12 +870,13 @@ export const MaterialsGrid = () => {
       
       try {
         const pricesResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/supplier_product_prices?select=*`,
+          `${SUPABASE_URL}/rest/v1/supplier_product_prices?select=*&_t=${Date.now()}`,
           {
             headers: {
               'apikey': SUPABASE_ANON_KEY,
               'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-              'Content-Type': 'application/json'
+              'Content-Type': 'application/json',
+              'Cache-Control': 'no-cache, no-store, must-revalidate'
             }
           }
         );
@@ -928,27 +929,31 @@ export const MaterialsGrid = () => {
         // STRATEGY: Load first batch WITH images (fast display), then metadata only, then lazy load remaining images
         try {
           // Step 1: Load first batch with images + rest as metadata only (PARALLEL)
+          // Add cache-busting timestamp to prevent browser caching
+          const cacheBuster = `&_t=${Date.now()}`;
           const [firstBatchResponse, metadataResponse] = await Promise.all([
             // First 48 items WITH images for immediate display
             fetch(
-              `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,image_url&is_approved=eq.true&order=created_at.desc&limit=${FIRST_BATCH_WITH_IMAGES}`,
-              {
-                headers: {
-                  'apikey': SUPABASE_ANON_KEY,
-                  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-                  'Content-Type': 'application/json'
-                }
-              }
-            ),
-            // Rest of items WITHOUT images (much faster)
-            fetch(
-              `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants&is_approved=eq.true&order=created_at.desc&offset=${FIRST_BATCH_WITH_IMAGES}&limit=${METADATA_LIMIT - FIRST_BATCH_WITH_IMAGES}`,
+              `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,image_url&is_approved=eq.true&order=created_at.desc&limit=${FIRST_BATCH_WITH_IMAGES}${cacheBuster}`,
               {
                 headers: {
                   'apikey': SUPABASE_ANON_KEY,
                   'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
                   'Content-Type': 'application/json',
-                  'Prefer': 'count=exact'
+                  'Cache-Control': 'no-cache, no-store, must-revalidate'
+                }
+              }
+            ),
+            // Rest of items WITHOUT images (much faster)
+            fetch(
+              `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants&is_approved=eq.true&order=created_at.desc&offset=${FIRST_BATCH_WITH_IMAGES}&limit=${METADATA_LIMIT - FIRST_BATCH_WITH_IMAGES}${cacheBuster}`,
+              {
+                headers: {
+                  'apikey': SUPABASE_ANON_KEY,
+                  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                  'Content-Type': 'application/json',
+                  'Prefer': 'count=exact',
+                  'Cache-Control': 'no-cache, no-store, must-revalidate'
                 }
               }
             )
