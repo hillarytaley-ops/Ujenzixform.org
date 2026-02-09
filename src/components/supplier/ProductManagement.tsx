@@ -453,8 +453,35 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
     }
   };
 
+  // Get effective supplier ID (from prop or from auth user)
+  const getEffectiveSupplierId = (): string => {
+    // First try the prop
+    if (supplierId && supplierId.trim()) {
+      return supplierId;
+    }
+    // Fallback to user from auth context
+    if (user?.id) {
+      return user.id;
+    }
+    // Last resort: try to get from localStorage
+    try {
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        return parsed.user?.id || '';
+      }
+    } catch (e) {}
+    return '';
+  };
+
   // Load supplier's prices for products using fetch API
   const loadSupplierPrices = async () => {
+    const effectiveSupplierId = getEffectiveSupplierId();
+    if (!effectiveSupplierId) {
+      console.log('⚠️ No supplier ID available, skipping price load');
+      return;
+    }
+    
     try {
       const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
       
@@ -467,8 +494,9 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
         }
       } catch (e) {}
       
+      console.log(`📦 Loading prices for supplier: ${effectiveSupplierId}`);
       const response = await fetch(
-        `https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/supplier_product_prices?supplier_id=eq.${supplierId}&select=*`,
+        `https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/supplier_product_prices?supplier_id=eq.${effectiveSupplierId}&select=*`,
         {
           headers: {
             'apikey': apiKey,
@@ -499,10 +527,21 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
   // Set price for an admin-uploaded product (single price or variant prices)
   // Using fetch API to avoid Supabase client hanging
   const handleSetPrice = async (productId: string, price: number, inStock: boolean, description?: string, variantPrices?: any[]) => {
+    const effectiveSupplierId = getEffectiveSupplierId();
+    
+    if (!effectiveSupplierId) {
+      toast({
+        title: 'Error',
+        description: 'Supplier ID not found. Please refresh the page.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
     try {
       setIsSubmitting(true);
       
-      console.log('💾 Saving price for product:', productId, 'price:', price, 'variants:', variantPrices, 'supplier:', supplierId);
+      console.log('💾 Saving price for product:', productId, 'price:', price, 'variants:', variantPrices, 'supplier:', effectiveSupplierId);
       
       const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
       
@@ -517,7 +556,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
       } catch (e) {}
       
       const payload = {
-        supplier_id: supplierId,
+        supplier_id: effectiveSupplierId,
         product_id: productId,
         price: price,
         in_stock: inStock,
@@ -538,7 +577,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
         // UPDATE existing price using PATCH
         console.log('📝 Updating existing price...');
         response = await fetch(
-          `https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/supplier_product_prices?supplier_id=eq.${supplierId}&product_id=eq.${productId}`,
+          `https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/supplier_product_prices?supplier_id=eq.${effectiveSupplierId}&product_id=eq.${productId}`,
           {
             method: 'PATCH',
             headers: {
