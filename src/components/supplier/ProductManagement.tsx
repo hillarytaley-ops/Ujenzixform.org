@@ -453,15 +453,32 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
     }
   };
 
-  // Load supplier's prices for products
+  // Load supplier's prices for products using fetch API
   const loadSupplierPrices = async () => {
     try {
-      const { data, error } = await (supabase
-        .from('supplier_product_prices' as any)
-        .select('*')
-        .eq('supplier_id', supplierId));
+      const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
       
-      if (!error && data) {
+      let accessToken = '';
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          accessToken = parsed.access_token || '';
+        }
+      } catch (e) {}
+      
+      const response = await fetch(
+        `https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/supplier_product_prices?supplier_id=eq.${supplierId}&select=*`,
+        {
+          headers: {
+            'apikey': apiKey,
+            'Authorization': accessToken ? `Bearer ${accessToken}` : '',
+          }
+        }
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
         const priceMap: Record<string, { price: number; in_stock: boolean; description?: string; variant_prices?: any[] }> = {};
         data.forEach((item: any) => {
           priceMap[item.product_id] = { 
@@ -472,6 +489,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
           };
         });
         setSupplierPrices(priceMap);
+        console.log(`✅ Loaded ${data.length} supplier prices`);
       }
     } catch (error) {
       console.log('Supplier prices table not available');
@@ -479,35 +497,68 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
   };
 
   // Set price for an admin-uploaded product (single price or variant prices)
+  // Using fetch API to avoid Supabase client hanging
   const handleSetPrice = async (productId: string, price: number, inStock: boolean, description?: string, variantPrices?: any[]) => {
     try {
       setIsSubmitting(true);
       
       console.log('💾 Saving price for product:', productId, 'price:', price, 'variants:', variantPrices, 'supplier:', supplierId);
       
-      const { data, error } = await (supabase
-        .from('supplier_product_prices' as any)
-        .upsert({
-          supplier_id: supplierId,
-          product_id: productId,
-          price: price,
-          in_stock: inStock,
-          description: description || null,
-          variant_prices: variantPrices || [],
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'supplier_id,product_id' })
-        .select());
+      const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
       
-      if (error) {
-        console.error('❌ Database save failed:', error);
+      // Get access token
+      let accessToken = '';
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          accessToken = parsed.access_token || '';
+        }
+      } catch (e) {}
+      
+      const payload = {
+        supplier_id: supplierId,
+        product_id: productId,
+        price: price,
+        in_stock: inStock,
+        description: description || null,
+        variant_prices: variantPrices || [],
+        updated_at: new Date().toISOString()
+      };
+      
+      // Use fetch API with upsert (POST with Prefer: resolution=merge-duplicates)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+      
+      const response = await fetch(
+        'https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/supplier_product_prices',
+        {
+          method: 'POST',
+          headers: {
+            'apikey': apiKey,
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'resolution=merge-duplicates,return=representation'
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        }
+      );
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Database save failed:', response.status, errorText);
         toast({
           title: 'Error Saving Price',
-          description: `Database error: ${error.message}. Please check your permissions.`,
+          description: `Database error: ${response.status}. Please check your permissions.`,
           variant: 'destructive'
         });
-        return; // Don't update local state if database save failed
+        return;
       }
       
+      const data = await response.json();
       console.log('✅ Price saved successfully:', data);
       
       setSupplierPrices(prev => ({
@@ -522,11 +573,11 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
         title: 'Price Updated',
         description: 'Your prices have been saved successfully'
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error setting price:', error);
       toast({
         title: 'Error',
-        description: 'Failed to save. Please try again.',
+        description: error.name === 'AbortError' ? 'Request timed out. Please try again.' : 'Failed to save. Please try again.',
         variant: 'destructive'
       });
     } finally {
