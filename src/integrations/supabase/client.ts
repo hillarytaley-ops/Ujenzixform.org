@@ -44,5 +44,67 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     autoRefreshToken: true,
     detectSessionInUrl: true,
     flowType: 'pkce'
+  },
+  // Add global fetch options to prevent hanging
+  global: {
+    fetch: (url, options) => {
+      // Add timeout to all fetch requests
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+      
+      return fetch(url, {
+        ...options,
+        signal: controller.signal
+      }).finally(() => clearTimeout(timeoutId));
+    }
+  },
+  // Disable realtime to reduce connections
+  realtime: {
+    params: {
+      eventsPerSecond: 1
+    }
   }
 });
+
+// Helper function for direct fetch API calls (bypasses Supabase client)
+export const supabaseFetch = async (
+  endpoint: string, 
+  options: { method?: string; body?: any; token?: string } = {}
+) => {
+  const { method = 'GET', body, token } = options;
+  
+  const headers: Record<string, string> = {
+    'apikey': SUPABASE_ANON_KEY,
+    'Content-Type': 'application/json',
+  };
+  
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  
+  try {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/${endpoint}`, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    
+    return await response.json();
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error('Request timeout');
+    }
+    throw err;
+  }
+};
