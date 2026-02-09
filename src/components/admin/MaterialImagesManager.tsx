@@ -1294,10 +1294,11 @@ export const MaterialImagesManager: React.FC = () => {
             Upload and manage material images for the suppliers marketplace
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 relative z-10">
           {/* ✅ PERFORMANCE: Load all images button */}
           <Button
             onClick={() => {
+              console.log('🔄 Load All Images button clicked!');
               const unloadedIds = adminImages.filter(img => !img.image_url).map(img => img.id);
               if (unloadedIds.length > 0) {
                 toast({ title: `Loading ${unloadedIds.length} images...` });
@@ -1313,7 +1314,10 @@ export const MaterialImagesManager: React.FC = () => {
             Load All Images ({adminImages.filter(img => !img.image_url).length})
           </Button>
           <Button
-            onClick={() => setShowBulkUploadDialog(true)}
+            onClick={() => {
+              console.log('📦 Bulk Upload button clicked!');
+              setShowBulkUploadDialog(true);
+            }}
             variant="outline"
             className="border-orange-500 text-orange-400 hover:bg-orange-500/20"
           >
@@ -1321,7 +1325,11 @@ export const MaterialImagesManager: React.FC = () => {
             Bulk Upload
           </Button>
           <Button
-            onClick={() => setShowUploadDialog(true)}
+            onClick={() => {
+              console.log('📤 Upload Single button clicked!');
+              alert('Upload dialog opening...'); // Immediate visual feedback
+              setShowUploadDialog(true);
+            }}
             className="bg-orange-500 hover:bg-orange-600"
           >
             <Upload className="h-4 w-4 mr-2" />
