@@ -1338,45 +1338,55 @@ export const MaterialImagesManager: React.FC = () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards - Row 1: Basic Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <Card className="bg-slate-800/50 border-slate-700">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-400">Admin Uploaded</p>
+                <p className="text-sm text-slate-400">Total Products</p>
                 <p className="text-2xl font-bold text-white">{adminImages.length}</p>
               </div>
               <div className="p-3 bg-orange-500/20 rounded-full">
-                <Upload className="h-6 w-6 text-orange-400" />
+                <Package className="h-6 w-6 text-orange-400" />
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-slate-800/50 border-slate-700">
+        
+        {/* Products WITH Images */}
+        <Card className="bg-slate-800/50 border-slate-700 border-l-4 border-l-green-500">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-400">Supplier Images</p>
-                <p className="text-2xl font-bold text-white">{supplierMaterials.length}</p>
-              </div>
-              <div className="p-3 bg-blue-500/20 rounded-full">
-                <Store className="h-6 w-6 text-blue-400" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-slate-800/50 border-slate-700">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-400">Featured</p>
-                <p className="text-2xl font-bold text-white">
-                  {adminImages.filter(i => i.is_featured).length}
+                <p className="text-sm text-slate-400">With Images ✅</p>
+                <p className="text-2xl font-bold text-green-400">{imageLoadProgress.productsWithImages}</p>
+                <p className="text-xs text-green-400/70 mt-1">
+                  {adminImages.length > 0 ? Math.round(imageLoadProgress.productsWithImages / adminImages.length * 100) : 0}% complete
                 </p>
               </div>
-              <div className="p-3 bg-yellow-500/20 rounded-full">
-                <Star className="h-6 w-6 text-yellow-400" />
+              <div className="p-3 bg-green-500/20 rounded-full">
+                <CheckCircle className="h-6 w-6 text-green-400" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        {/* Products WITHOUT Images */}
+        <Card className="bg-slate-800/50 border-slate-700 border-l-4 border-l-red-500">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-400">Missing Images ❌</p>
+                <p className="text-2xl font-bold text-red-400">
+                  {adminImages.length - imageLoadProgress.productsWithImages}
+                </p>
+                <p className="text-xs text-red-400/70 mt-1">
+                  {adminImages.length > 0 ? Math.round((adminImages.length - imageLoadProgress.productsWithImages) / adminImages.length * 100) : 0}% remaining
+                </p>
+              </div>
+              <div className="p-3 bg-red-500/20 rounded-full">
+                <XCircle className="h-6 w-6 text-red-400" />
               </div>
             </div>
           </CardContent>
@@ -1387,7 +1397,7 @@ export const MaterialImagesManager: React.FC = () => {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <p className="text-sm text-slate-400">Image Load Progress</p>
+                <p className="text-sm text-slate-400">Load Progress</p>
                 <div className="flex items-center gap-2 mt-1">
                   <p className="text-xl font-bold text-white">
                     {imageLoadProgress.imagesLoaded}/{imageLoadProgress.totalProducts}
@@ -1405,9 +1415,6 @@ export const MaterialImagesManager: React.FC = () => {
                     }}
                   />
                 </div>
-                <p className="text-xs text-slate-500 mt-1">
-                  {imageLoadProgress.productsWithImages} with images
-                </p>
               </div>
               <div className={`p-3 rounded-full ml-3 ${imageLoadProgress.isLoadingImages ? 'bg-blue-500/20' : 'bg-green-500/20'}`}>
                 {imageLoadProgress.isLoadingImages ? (
@@ -1420,6 +1427,89 @@ export const MaterialImagesManager: React.FC = () => {
           </CardContent>
         </Card>
       </div>
+      
+      {/* Category Breakdown - Shows which categories need more uploads */}
+      <Card className="bg-slate-800/50 border-slate-700">
+        <CardContent className="pt-4 pb-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+              <Filter className="h-4 w-4 text-orange-400" />
+              Category Upload Status
+            </h3>
+            <span className="text-xs text-slate-500">
+              {imageLoadProgress.isLoadingImages ? 'Scanning...' : 'Scan complete'}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+            {(() => {
+              // Calculate category stats
+              const categoryStats: Record<string, { total: number; withImages: number }> = {};
+              
+              adminImages.forEach(img => {
+                const cat = img.category || 'Uncategorized';
+                if (!categoryStats[cat]) {
+                  categoryStats[cat] = { total: 0, withImages: 0 };
+                }
+                categoryStats[cat].total++;
+                // Check if image has actual data (base64 images are > 100 chars)
+                if (img.image_url && img.image_url.length > 100) {
+                  categoryStats[cat].withImages++;
+                }
+              });
+              
+              // Sort by missing images (most missing first)
+              const sortedCategories = Object.entries(categoryStats)
+                .sort((a, b) => (b[1].total - b[1].withImages) - (a[1].total - a[1].withImages));
+              
+              return sortedCategories.map(([category, stats]) => {
+                const percentage = stats.total > 0 ? Math.round(stats.withImages / stats.total * 100) : 0;
+                const missing = stats.total - stats.withImages;
+                
+                // Color coding based on completion
+                let bgColor = 'bg-green-500/20 border-green-500/50';
+                let textColor = 'text-green-400';
+                if (percentage < 50) {
+                  bgColor = 'bg-red-500/20 border-red-500/50';
+                  textColor = 'text-red-400';
+                } else if (percentage < 80) {
+                  bgColor = 'bg-yellow-500/20 border-yellow-500/50';
+                  textColor = 'text-yellow-400';
+                }
+                
+                return (
+                  <div 
+                    key={category}
+                    className={`p-2 rounded-lg border ${bgColor} text-center`}
+                    title={`${category}: ${stats.withImages}/${stats.total} (${percentage}%)`}
+                  >
+                    <p className="text-xs text-slate-300 truncate font-medium">{category}</p>
+                    <p className={`text-lg font-bold ${textColor}`}>{percentage}%</p>
+                    <p className="text-[10px] text-slate-500">
+                      {stats.withImages}/{stats.total}
+                    </p>
+                    {missing > 0 && (
+                      <p className="text-[10px] text-red-400">
+                        -{missing} missing
+                      </p>
+                    )}
+                  </div>
+                );
+              });
+            })()}
+          </div>
+          <div className="mt-3 flex items-center gap-4 text-xs text-slate-500">
+            <span className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded bg-green-500/50"></div> 80%+ complete
+            </span>
+            <span className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded bg-yellow-500/50"></div> 50-79% complete
+            </span>
+            <span className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded bg-red-500/50"></div> &lt;50% complete
+            </span>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
