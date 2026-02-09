@@ -85,39 +85,52 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
     setLoading(true);
     console.log('🔍 Fetching price comparisons for', items.length, 'items');
     
-    // Set a timeout to prevent infinite loading
-    const timeoutId = setTimeout(() => {
-      console.warn('⏱️ Price comparison timed out after 10s');
-      setLoading(false);
-      // Show items without comparisons if timeout
-      setComparisons(items.map(item => ({
-        product_id: item.id,
-        product_name: item.name,
-        category: item.category,
-        quantity: item.quantity,
-        current_price: item.unit_price,
-        current_supplier: item.supplier_name || 'Current Supplier',
-        alternatives: [],
-        best_price: item.unit_price,
-        best_supplier: item.supplier_name || 'Current',
-        savings: 0
-      })));
-    }, 10000); // 10 second timeout
+    // Supabase config
+    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+    const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+    
+    // Create fallback comparisons without supplier alternatives
+    const createFallbackComparisons = () => items.map(item => ({
+      product_id: item.id,
+      product_name: item.name,
+      category: item.category,
+      quantity: item.quantity,
+      current_price: item.unit_price,
+      current_supplier: item.supplier_name || 'Current Supplier',
+      alternatives: [],
+      best_price: item.unit_price,
+      best_supplier: item.supplier_name || 'Current',
+      savings: 0
+    }));
     
     try {
-      // 1. Fetch all suppliers
-      const { data: suppliersData, error: suppliersError } = await supabase
-        .from('suppliers')
-        .select('id, user_id, company_name, rating')
-        .limit(100);
-
-      if (suppliersError) {
-        console.error('❌ Error fetching suppliers:', suppliersError);
+      // Use native fetch with 8-second timeout for suppliers
+      const suppliersController = new AbortController();
+      const suppliersTimeout = setTimeout(() => suppliersController.abort(), 8000);
+      
+      let suppliersData: any[] = [];
+      try {
+        const suppliersResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/suppliers?select=id,user_id,company_name,rating&limit=100`,
+          {
+            headers: { 'apikey': apiKey },
+            signal: suppliersController.signal,
+            cache: 'no-store'
+          }
+        );
+        clearTimeout(suppliersTimeout);
+        
+        if (suppliersResponse.ok) {
+          suppliersData = await suppliersResponse.json();
+          console.log('📦 Suppliers loaded:', suppliersData.length);
+        }
+      } catch (e) {
+        clearTimeout(suppliersTimeout);
+        console.warn('⚠️ Suppliers fetch failed/timed out, continuing without supplier names');
       }
-      console.log('📦 Suppliers loaded:', suppliersData?.length || 0);
 
       const suppliersMap = new Map<string, any>();
-      (suppliersData || []).forEach((s: any) => {
+      suppliersData.forEach((s: any) => {
         suppliersMap.set(s.id, s);
         if (s.user_id) suppliersMap.set(s.user_id, s);
       });
@@ -126,21 +139,40 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
       const productIds = items.map(item => item.id);
       console.log('🛒 Cart product IDs:', productIds);
 
-      // 3. Fetch all prices for these products
-      const { data: pricesData, error: pricesError } = await supabase
-        .from('supplier_product_prices')
-        .select('product_id, supplier_id, price, in_stock')
-        .in('product_id', productIds);
-
-      if (pricesError) {
-        console.error('❌ Error fetching prices:', pricesError);
+      // 3. Fetch all prices for these products with 8-second timeout
+      const pricesController = new AbortController();
+      const pricesTimeout = setTimeout(() => pricesController.abort(), 8000);
+      
+      let pricesData: any[] = [];
+      try {
+        // Build IN query for product IDs
+        const productIdsParam = productIds.map(id => `"${id}"`).join(',');
+        const pricesResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/supplier_product_prices?select=product_id,supplier_id,price,in_stock&product_id=in.(${productIdsParam})`,
+          {
+            headers: { 'apikey': apiKey },
+            signal: pricesController.signal,
+            cache: 'no-store'
+          }
+        );
+        clearTimeout(pricesTimeout);
+        
+        if (pricesResponse.ok) {
+          pricesData = await pricesResponse.json();
+          console.log('💰 Prices loaded:', pricesData.length);
+        }
+      } catch (e) {
+        clearTimeout(pricesTimeout);
+        console.warn('⚠️ Prices fetch failed/timed out, showing cart without comparisons');
+        setComparisons(createFallbackComparisons());
+        setLoading(false);
+        return;
       }
-      console.log('💰 Prices loaded:', pricesData?.length || 0);
 
       // 4. Build comparison data for each cart item
       const comparisonResults: ProductComparison[] = items.map(item => {
         // Find all prices for this product
-        const productPrices = (pricesData || []).filter((p: any) => p.product_id === item.id);
+        const productPrices = pricesData.filter((p: any) => p.product_id === item.id);
         
         // Map to supplier names
         const alternatives: SupplierPrice[] = productPrices.map((p: any) => {
@@ -172,37 +204,18 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
         };
       });
 
-      clearTimeout(timeoutId);
       console.log('✅ Comparison results:', comparisonResults);
       setComparisons(comparisonResults);
     } catch (error: any) {
-      clearTimeout(timeoutId);
       console.error('❌ Error fetching prices:', error);
       
-      // Check if it's an offline/CORS error
-      const isOffline = error?.offline || error?.message?.includes('offline') || error?.message?.includes('CORS');
-      
       toast({
-        title: isOffline ? '📡 Connection Issue' : 'Error',
-        description: isOffline 
-          ? 'Unable to fetch prices. Showing your cart items.' 
-          : 'Failed to fetch price comparisons',
-        variant: isOffline ? 'default' : 'destructive'
+        title: '📡 Connection Issue',
+        description: 'Showing your cart items without price comparisons.',
       });
       
       // Still show items even if comparison fails
-      setComparisons(items.map(item => ({
-        product_id: item.id,
-        product_name: item.name,
-        category: item.category,
-        quantity: item.quantity,
-        current_price: item.unit_price,
-        current_supplier: item.supplier_name || 'Current Supplier',
-        alternatives: [],
-        best_price: item.unit_price,
-        best_supplier: item.supplier_name || 'Current',
-        savings: 0
-      })));
+      setComparisons(createFallbackComparisons());
     } finally {
       setLoading(false);
     }
