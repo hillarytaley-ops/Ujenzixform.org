@@ -384,6 +384,28 @@ const SupplierDashboard = () => {
     if (!selectedQuote) return;
     
     setProcessingQuote(true);
+    
+    // Get auth token from localStorage for faster access
+    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+    
+    let accessToken: string | null = null;
+    try {
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        accessToken = parsed.access_token;
+      }
+    } catch (e) {
+      console.warn('Could not get session from localStorage');
+    }
+    
+    if (!accessToken) {
+      alert('Not authenticated - please sign in again');
+      setProcessingQuote(false);
+      return;
+    }
+    
     try {
       const newStatus = action === 'approve' ? 'quoted' : 'rejected';
       
@@ -395,7 +417,7 @@ const SupplierDashboard = () => {
       const isPurchaseOrderQuote = selectedQuote.purchase_order_id || selectedQuote.po_number;
       
       if (isPurchaseOrderQuote) {
-        // Update purchase_orders table directly
+        // Update purchase_orders table directly using fetch API
         const updateData: any = {
           status: newStatus,
           updated_at: new Date().toISOString()
@@ -419,38 +441,46 @@ const SupplierDashboard = () => {
         console.log('📝 Update data:', JSON.stringify(updateData, null, 2));
         console.log('🔑 Current user.id:', user?.id);
 
-        const { data: updateResult, error: poError } = await supabase
-          .from('purchase_orders')
-          .update(updateData)
-          .eq('id', quoteId)
-          .select();
+        // Use fetch API with timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
         
-        if (poError) {
-          console.error('❌ Error updating purchase order:', poError);
-          console.error('❌ Error details:', poError.message, poError.details, poError.hint);
-          throw poError;
+        const response = await fetch(
+          `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${quoteId}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify(updateData),
+            signal: controller.signal
+          }
+        );
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('❌ Error updating purchase order:', response.status, errorText);
+          throw new Error(`Failed to update quote: ${response.status}`);
         }
+        
+        const updateResult = await response.json();
         
         // Check if any rows were actually updated
         if (!updateResult || updateResult.length === 0) {
           console.error('⚠️ No rows updated! RLS policy may be blocking the update.');
           console.error('Quote ID:', quoteId, 'Supplier user.id:', user?.id);
-          
-          // Try to fetch the order to see what supplier_id it has
-          const { data: orderCheck } = await supabase
-            .from('purchase_orders')
-            .select('id, supplier_id, status')
-            .eq('id', quoteId)
-            .single();
-          console.error('📋 Order details:', orderCheck);
-          
           throw new Error('Failed to update quote - you may not have permission to update this order');
         }
         
         console.log(`✅ Quote ${action === 'approve' ? 'sent' : 'rejected'} - Purchase order updated:`, updateResult);
         console.log('💰 Saved quote_amount:', updateResult[0]?.quote_amount);
       } else {
-        // Legacy: Update quotation_requests table
+        // Legacy: Update quotation_requests table using fetch API
         const updateData: any = {
           status: newStatus,
           updated_at: new Date().toISOString()
@@ -464,58 +494,45 @@ const SupplierDashboard = () => {
           updateData.supplier_notes = quoteResponse.supplierNotes || 'Quote request rejected';
         }
 
-        const { error } = await supabase
-          .from('quotation_requests')
-          .update(updateData)
-          .eq('id', selectedQuote.id);
-
-        if (error) throw error;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        
+        const response = await fetch(
+          `${SUPABASE_URL}/rest/v1/quotation_requests?id=eq.${selectedQuote.id}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify(updateData),
+            signal: controller.signal
+          }
+        );
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to update quote: ${errorText}`);
+        }
       }
 
-      // Refresh quote requests - fetch from both tables
-      // Get supplier record to find their suppliers.id
-      const { data: supplierRecord } = await supabase
-        .from('suppliers')
-        .select('id')
-        .eq('user_id', user?.id)
-        .maybeSingle();
-      
-      const supplierIds = [user?.id];
-      if (supplierRecord?.id) supplierIds.push(supplierRecord.id);
-
-      const { data: purchaseOrderQuotes } = await supabase
-        .from('purchase_orders')
-        .select('*')
-        .in('supplier_id', supplierIds)
-        .in('status', ['pending', 'quoted', 'rejected'])
-        .order('created_at', { ascending: false });
-
-      const transformedPOQuotes = (purchaseOrderQuotes || []).map(po => ({
-        id: po.id,
-        material_name: po.items?.[0]?.material_name || po.project_name || 'Quote Request',
-        quantity: po.items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || 1,
-        unit: po.items?.[0]?.unit || 'items',
-        delivery_address: po.delivery_address || 'To be provided',
-        project_description: po.project_name,
-        status: po.status,
-        quote_amount: po.quote_amount || po.total_amount,
-        created_at: po.created_at,
-        buyer_id: po.buyer_id,
-        purchase_order_id: po.id,
-        items: po.items,
-        po_number: po.po_number,
-        total_amount: po.total_amount
-      }));
-
-      setQuoteRequests(transformedPOQuotes);
+      // Close dialog and reset form
       setQuoteDialogOpen(false);
       setSelectedQuote(null);
       setQuoteResponse({ quoteAmount: '', validUntil: '', supplierNotes: '' });
 
+      // Show success message
       alert(action === 'approve' 
         ? '✅ Quote sent to builder! They will review and accept/reject.' 
         : '❌ Quote request rejected.'
       );
+      
+      // Refresh quote requests using the existing fetchQuoteRequests function
+      fetchQuoteRequests();
 
     } catch (error: any) {
       console.error('Error processing quote:', error);
