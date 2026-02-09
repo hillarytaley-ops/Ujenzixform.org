@@ -186,6 +186,30 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
       // Use native fetch API to avoid Supabase client hanging
       const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
       const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      
+      // Get access token from localStorage for RLS
+      let accessToken = '';
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          accessToken = parsed.access_token || '';
+        }
+      } catch (e) {
+        console.warn('Could not get access token from localStorage');
+      }
+      
+      // Build headers with Authorization for RLS
+      const authHeaders: Record<string, string> = { 
+        'apikey': apiKey,
+        'Content-Type': 'application/json'
+      };
+      if (accessToken) {
+        authHeaders['Authorization'] = `Bearer ${accessToken}`;
+        console.log('🔑 Using auth token for RLS');
+      } else {
+        console.warn('⚠️ No auth token - RLS may block queries');
+      }
 
       // Fetch ALL recent orders first for debugging
       let allOrders: any[] = [];
@@ -196,7 +220,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
         const allOrdersResponse = await fetch(
           `${SUPABASE_URL}/rest/v1/purchase_orders?select=id,po_number,supplier_id,status,created_at&order=created_at.desc&limit=20`,
           {
-            headers: { 'apikey': apiKey },
+            headers: authHeaders,
             signal: controller.signal
           }
         );
@@ -227,7 +251,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
         const ordersResponse = await fetch(
           `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=in.(${supplierIdsParam})&order=created_at.desc`,
           {
-            headers: { 'apikey': apiKey },
+            headers: authHeaders,
             signal: controller.signal,
             cache: 'no-store'
           }
@@ -261,7 +285,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
           const profilesResponse = await fetch(
             `${SUPABASE_URL}/rest/v1/profiles?user_id=in.(${buyerIdsParam})&select=id,user_id,full_name,phone,email`,
             {
-              headers: { 'apikey': apiKey },
+              headers: authHeaders,
               signal: controller.signal,
               cache: 'no-store'
             }
