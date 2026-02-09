@@ -102,6 +102,12 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
 
   useEffect(() => {
     loadOrders();
+    // Safety timeout - force loading to false after 10 seconds
+    const safetyTimeout = setTimeout(() => {
+      setLoading(false);
+      console.log('⏱️ Orders safety timeout - forcing loading false');
+    }, 10000);
+    return () => clearTimeout(safetyTimeout);
   }, [supplierId]);
 
   const loadOrders = async () => {
@@ -239,6 +245,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
       });
       setOrders([]);
     } finally {
+      console.log('✅ Orders loadOrders finally - setting loading false');
       setLoading(false);
     }
   };
