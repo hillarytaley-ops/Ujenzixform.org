@@ -74,27 +74,79 @@ export const PendingQuoteRequests: React.FC<PendingQuoteRequestsProps> = ({ buil
   const [processingId, setProcessingId] = useState<string | null>(null);
   const { toast } = useToast();
 
+  // Helper to get auth token from localStorage
+  const getAuthHeaders = (): Record<string, string> => {
+    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+    const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+    const headers: Record<string, string> = { 'apikey': apiKey, 'Content-Type': 'application/json' };
+    
+    try {
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        if (parsed.access_token) {
+          headers['Authorization'] = `Bearer ${parsed.access_token}`;
+        }
+      }
+    } catch (e) {
+      console.warn('Could not get auth token');
+    }
+    return headers;
+  };
+
   useEffect(() => {
     fetchQuoteRequests();
+    // Safety timeout
+    const safetyTimeout = setTimeout(() => setLoading(false), 15000);
+    return () => clearTimeout(safetyTimeout);
   }, [builderId]);
 
   const fetchQuoteRequests = async () => {
+    if (!builderId) {
+      setLoading(false);
+      return;
+    }
+    
     setLoading(true);
+    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+    const headers = getAuthHeaders();
+    
     try {
-      // Fetch all purchase orders that are quote requests (QR- prefix or pending/quoted status)
-      const { data: ordersData, error: ordersError } = await supabase
-        .from('purchase_orders')
-        .select('*')
-        .eq('buyer_id', builderId)
-        .in('status', ['pending', 'quoted'])
-        .order('created_at', { ascending: false });
+      // Fetch all purchase orders that are quote requests using native fetch
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      
+      const ordersResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${builderId}&status=in.(pending,quoted)&order=created_at.desc`,
+        { headers, signal: controller.signal, cache: 'no-store' }
+      );
+      clearTimeout(timeoutId);
 
-      if (ordersError) throw ordersError;
+      if (!ordersResponse.ok) {
+        throw new Error(`Orders fetch failed: ${ordersResponse.status}`);
+      }
+      
+      const ordersData = await ordersResponse.json();
+      console.log('📋 Quote requests loaded:', ordersData?.length || 0);
 
       // Fetch supplier details
-      const { data: suppliersData } = await supabase
-        .from('suppliers')
-        .select('id, user_id, company_name, rating, location');
+      let suppliersData: any[] = [];
+      try {
+        const suppliersController = new AbortController();
+        const suppliersTimeoutId = setTimeout(() => suppliersController.abort(), 5000);
+        
+        const suppliersResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/suppliers?select=id,user_id,company_name,rating,location`,
+          { headers, signal: suppliersController.signal, cache: 'no-store' }
+        );
+        clearTimeout(suppliersTimeoutId);
+        
+        if (suppliersResponse.ok) {
+          suppliersData = await suppliersResponse.json();
+        }
+      } catch (e) {
+        console.log('Suppliers fetch timeout');
+      }
 
       const suppliersMap = new Map();
       suppliersData?.forEach(s => {

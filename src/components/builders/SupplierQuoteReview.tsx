@@ -87,8 +87,30 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
   const [acceptedPurchaseOrder, setAcceptedPurchaseOrder] = useState<any>(null);
   const { toast } = useToast();
 
+  // Helper to get auth headers
+  const getAuthHeaders = (): Record<string, string> => {
+    const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+    const headers: Record<string, string> = { 'apikey': apiKey, 'Content-Type': 'application/json' };
+    
+    try {
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        if (parsed.access_token) {
+          headers['Authorization'] = `Bearer ${parsed.access_token}`;
+        }
+      }
+    } catch (e) {
+      console.warn('Could not get auth token');
+    }
+    return headers;
+  };
+
   useEffect(() => {
     fetchQuotes();
+    
+    // Safety timeout
+    const safetyTimeout = setTimeout(() => setLoading(false), 15000);
     
     // Set up real-time subscription to purchase_orders changes
     const subscription = supabase
@@ -109,33 +131,63 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
       .subscribe();
     
     return () => {
+      clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
   }, [builderId]);
 
   const fetchQuotes = async () => {
+    if (!builderId) {
+      setLoading(false);
+      return;
+    }
+    
     setLoading(true);
+    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+    const headers = getAuthHeaders();
+    
     try {
-      // Fetch purchase orders that have been quoted by suppliers
-      // These are the supplier responses to our quote requests
-      const { data: purchaseOrders, error: poError } = await supabase
-        .from('purchase_orders')
-        .select('*')
-        .eq('buyer_id', builderId)
-        .in('status', ['pending', 'quoted', 'confirmed', 'rejected'])
-        .order('updated_at', { ascending: false });
+      // Fetch purchase orders using native fetch
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      
+      const ordersResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${builderId}&status=in.(pending,quoted,confirmed,rejected)&order=updated_at.desc`,
+        { headers, signal: controller.signal, cache: 'no-store' }
+      );
+      clearTimeout(timeoutId);
 
-      if (poError) throw poError;
+      if (!ordersResponse.ok) {
+        throw new Error(`Orders fetch failed: ${ordersResponse.status}`);
+      }
+      
+      const purchaseOrders = await ordersResponse.json();
+      console.log('📋 Supplier quotes loaded:', purchaseOrders?.length || 0);
 
       if (!purchaseOrders || purchaseOrders.length === 0) {
         setQuotes([]);
+        setLoading(false);
         return;
       }
 
-      // Fetch all suppliers to map IDs to names
-      const { data: suppliersData } = await supabase
-        .from('suppliers')
-        .select('id, user_id, company_name, address, location, rating');
+      // Fetch all suppliers using native fetch
+      let suppliersData: any[] = [];
+      try {
+        const suppliersController = new AbortController();
+        const suppliersTimeoutId = setTimeout(() => suppliersController.abort(), 5000);
+        
+        const suppliersResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/suppliers?select=id,user_id,company_name,address,location,rating`,
+          { headers, signal: suppliersController.signal, cache: 'no-store' }
+        );
+        clearTimeout(suppliersTimeoutId);
+        
+        if (suppliersResponse.ok) {
+          suppliersData = await suppliersResponse.json();
+        }
+      } catch (e) {
+        console.log('Suppliers fetch timeout');
+      }
 
       // Create maps for both id and user_id lookups
       const suppliersMap = new Map();
