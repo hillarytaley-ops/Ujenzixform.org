@@ -1338,13 +1338,111 @@ export const MaterialImagesManager: React.FC = () => {
         </div>
       </div>
 
-      {/* Stats Cards - Row 1: Basic Stats */}
+      {/* 🎯 UPLOAD TARGET PROGRESS - Main Progress Card */}
+      <Card className="bg-gradient-to-r from-slate-800 to-slate-900 border-slate-700 border-2">
+        <CardContent className="pt-6 pb-6">
+          <div className="flex flex-col lg:flex-row lg:items-center gap-6">
+            {/* Left: Main Stats */}
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-3 bg-orange-500/20 rounded-full">
+                  <Upload className="h-8 w-8 text-orange-400" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white">Product Upload Progress</h3>
+                  <p className="text-sm text-slate-400">Target: 1,000 Products</p>
+                </div>
+              </div>
+              
+              {/* Big Progress Bar */}
+              <div className="relative h-8 bg-slate-700 rounded-full overflow-hidden mb-3">
+                <div 
+                  className="absolute inset-y-0 left-0 bg-gradient-to-r from-orange-500 to-green-500 transition-all duration-500"
+                  style={{ width: `${Math.min(adminImages.length / 1000 * 100, 100)}%` }}
+                />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-white font-bold text-lg drop-shadow-lg">
+                    {adminImages.length} / 1,000 ({(adminImages.length / 1000 * 100).toFixed(1)}%)
+                  </span>
+                </div>
+              </div>
+              
+              {/* Stats Row */}
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div className="bg-green-500/10 rounded-lg p-3 border border-green-500/30">
+                  <p className="text-2xl font-bold text-green-400">{adminImages.length}</p>
+                  <p className="text-xs text-green-400/70">Uploaded ✅</p>
+                  <p className="text-lg font-semibold text-green-300">{(adminImages.length / 1000 * 100).toFixed(1)}%</p>
+                </div>
+                <div className="bg-red-500/10 rounded-lg p-3 border border-red-500/30">
+                  <p className="text-2xl font-bold text-red-400">{Math.max(1000 - adminImages.length, 0)}</p>
+                  <p className="text-xs text-red-400/70">Remaining ❌</p>
+                  <p className="text-lg font-semibold text-red-300">{Math.max((1000 - adminImages.length) / 1000 * 100, 0).toFixed(1)}%</p>
+                </div>
+                <div className="bg-blue-500/10 rounded-lg p-3 border border-blue-500/30">
+                  <p className="text-2xl font-bold text-blue-400">{imageLoadProgress.productsWithImages}</p>
+                  <p className="text-xs text-blue-400/70">With Images 📷</p>
+                  <p className="text-lg font-semibold text-blue-300">
+                    {adminImages.length > 0 ? (imageLoadProgress.productsWithImages / adminImages.length * 100).toFixed(1) : 0}%
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            {/* Right: Visual Indicator */}
+            <div className="lg:w-48 flex flex-col items-center justify-center">
+              <div className="relative w-32 h-32">
+                {/* Circular Progress */}
+                <svg className="w-full h-full transform -rotate-90">
+                  <circle
+                    cx="64"
+                    cy="64"
+                    r="56"
+                    stroke="currentColor"
+                    strokeWidth="12"
+                    fill="none"
+                    className="text-slate-700"
+                  />
+                  <circle
+                    cx="64"
+                    cy="64"
+                    r="56"
+                    stroke="url(#progressGradient)"
+                    strokeWidth="12"
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeDasharray={`${(adminImages.length / 1000) * 352} 352`}
+                    className="transition-all duration-500"
+                  />
+                  <defs>
+                    <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="#f97316" />
+                      <stop offset="100%" stopColor="#22c55e" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-3xl font-bold text-white">{(adminImages.length / 1000 * 100).toFixed(0)}%</span>
+                  <span className="text-xs text-slate-400">Complete</span>
+                </div>
+              </div>
+              {adminImages.length >= 1000 ? (
+                <p className="mt-2 text-green-400 font-semibold text-sm">🎉 Target Reached!</p>
+              ) : (
+                <p className="mt-2 text-slate-400 text-sm">{Math.max(1000 - adminImages.length, 0)} more to go</p>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Stats Cards - Row 2: Detailed Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <Card className="bg-slate-800/50 border-slate-700">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-400">Total Products</p>
+                <p className="text-sm text-slate-400">Total Uploaded</p>
                 <p className="text-2xl font-bold text-white">{adminImages.length}</p>
               </div>
               <div className="p-3 bg-orange-500/20 rounded-full">
@@ -1362,7 +1460,7 @@ export const MaterialImagesManager: React.FC = () => {
                 <p className="text-sm text-slate-400">With Images ✅</p>
                 <p className="text-2xl font-bold text-green-400">{imageLoadProgress.productsWithImages}</p>
                 <p className="text-xs text-green-400/70 mt-1">
-                  {adminImages.length > 0 ? Math.round(imageLoadProgress.productsWithImages / adminImages.length * 100) : 0}% complete
+                  {adminImages.length > 0 ? Math.round(imageLoadProgress.productsWithImages / adminImages.length * 100) : 0}% of uploaded
                 </p>
               </div>
               <div className="p-3 bg-green-500/20 rounded-full">
@@ -1382,7 +1480,7 @@ export const MaterialImagesManager: React.FC = () => {
                   {adminImages.length - imageLoadProgress.productsWithImages}
                 </p>
                 <p className="text-xs text-red-400/70 mt-1">
-                  {adminImages.length > 0 ? Math.round((adminImages.length - imageLoadProgress.productsWithImages) / adminImages.length * 100) : 0}% remaining
+                  {adminImages.length > 0 ? Math.round((adminImages.length - imageLoadProgress.productsWithImages) / adminImages.length * 100) : 0}% need images
                 </p>
               </div>
               <div className="p-3 bg-red-500/20 rounded-full">
