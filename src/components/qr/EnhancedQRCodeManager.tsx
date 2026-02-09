@@ -117,24 +117,80 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
 
   useEffect(() => {
     checkAuthAndFetch();
+    // Safety timeout - force loading to false after 15 seconds
+    const safetyTimeout = setTimeout(() => {
+      setLoading(false);
+      console.log('⏱️ QR Manager safety timeout - forcing loading false');
+    }, 15000);
+    return () => clearTimeout(safetyTimeout);
   }, []);
+
+  // Helper to get user ID from localStorage as fallback
+  const getUserFromStorage = (): { id: string; accessToken: string } | null => {
+    try {
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        if (parsed.user?.id && parsed.access_token) {
+          return { id: parsed.user.id, accessToken: parsed.access_token };
+        }
+      }
+    } catch (e) {
+      console.warn('Could not get user from localStorage');
+    }
+    return null;
+  };
+
+  // Helper function to add timeout to any promise
+  const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Timeout')), ms))
+    ]);
+  };
 
   const checkAuthAndFetch = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      // Try to get user with timeout, fallback to localStorage
+      let userId: string | null = null;
+      
+      try {
+        const { data: { user } } = await withTimeout(supabase.auth.getUser(), 3000);
+        userId = user?.id || null;
+        console.log('✅ QR Manager: Got user from auth:', userId);
+      } catch {
+        console.log('⚠️ QR Manager: Auth timeout, trying localStorage...');
+        const stored = getUserFromStorage();
+        if (stored) {
+          userId = stored.id;
+          console.log('📦 QR Manager: Got user from localStorage:', userId);
+        }
+      }
+      
+      if (!userId) {
+        console.log('❌ QR Manager: No user found');
+        setLoading(false);
+        return;
+      }
 
-      // Get user role
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .maybeSingle();
+      // Get user role with timeout
+      let role: string | null = null;
+      try {
+        const { data: roleData } = await withTimeout(
+          supabase.from('user_roles').select('role').eq('user_id', userId).maybeSingle(),
+          3000
+        );
+        role = roleData?.role || null;
+      } catch {
+        console.log('⚠️ QR Manager: Role lookup timeout, assuming supplier');
+        role = 'supplier'; // Default to supplier for this component
+      }
 
-      setUserRole(roleData?.role || null);
+      setUserRole(role);
+      console.log('🔑 QR Manager: User role:', role);
 
       // Fetch material items based on role
-      await fetchMaterialItems(roleData?.role || null, user.id);
+      await fetchMaterialItems(role, userId);
     } catch (error) {
       console.error('Error:', error);
     } finally {
@@ -153,127 +209,135 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
       // If supplierId was passed as prop, use it directly
       if (propSupplierId) {
         console.log('✅ Using prop supplierId directly:', propSupplierId);
-        const { data: supplierById } = await supabase
-          .from('suppliers')
-          .select('id, company_name, user_id, email')
-          .eq('id', propSupplierId)
-          .maybeSingle();
-        
-        if (supplierById) {
-          supplierData = supplierById;
-          finalSupplierId = supplierById.id;
+        try {
+          const { data: supplierById } = await withTimeout(
+            supabase.from('suppliers').select('id, company_name, user_id, email').eq('id', propSupplierId).maybeSingle(),
+            3000
+          );
+          if (supplierById) {
+            supplierData = supplierById;
+            finalSupplierId = supplierById.id;
+          }
+        } catch {
+          console.log('⚠️ Supplier lookup by prop ID timeout');
         }
       }
 
       // If no prop, look up via profile chain
       if (!supplierData) {
-        // Step 1: Get profile.id for this auth user (suppliers.user_id references profiles.id)
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('id, email')
-          .eq('user_id', userId)
-          .maybeSingle();
-        
-        console.log('📋 Profile lookup by auth.uid:', profileData);
+        try {
+          // Step 1: Get profile.id for this auth user
+          const { data: profileData } = await withTimeout(
+            supabase.from('profiles').select('id, email').eq('user_id', userId).maybeSingle(),
+            3000
+          );
+          console.log('📋 Profile lookup by auth.uid:', profileData);
 
-        if (profileData) {
-          // Step 2: Find supplier by profile.id (this is what suppliers.user_id references)
-          const { data: supplierByProfile, error: profileError } = await supabase
-            .from('suppliers')
-            .select('id, company_name, user_id, email')
-            .eq('user_id', profileData.id)
-            .maybeSingle();
-          
-          console.log('📦 Supplier lookup by profile.id:', supplierByProfile, 'Error:', profileError);
-          if (supplierByProfile) {
-            supplierData = supplierByProfile;
-            finalSupplierId = supplierByProfile.id;
+          if (profileData) {
+            // Step 2: Find supplier by profile.id
+            const { data: supplierByProfile } = await withTimeout(
+              supabase.from('suppliers').select('id, company_name, user_id, email').eq('user_id', profileData.id).maybeSingle(),
+              3000
+            );
+            console.log('📦 Supplier lookup by profile.id:', supplierByProfile);
+            if (supplierByProfile) {
+              supplierData = supplierByProfile;
+              finalSupplierId = supplierByProfile.id;
+            }
           }
+        } catch {
+          console.log('⚠️ Profile/supplier lookup timeout');
         }
       }
 
-      // Fallback: Try direct user_id match (in case some suppliers use auth.uid directly)
+      // Fallback: Try direct user_id match
       if (!supplierData) {
-        const { data: supplierByUserId, error: userIdError } = await supabase
-          .from('suppliers')
-          .select('id, company_name, user_id, email')
-          .eq('user_id', userId)
-          .maybeSingle();
-
-        console.log('📦 Supplier lookup by auth.uid directly:', supplierByUserId, 'Error:', userIdError);
-        if (supplierByUserId) {
-          supplierData = supplierByUserId;
-          finalSupplierId = supplierByUserId.id;
+        try {
+          const { data: supplierByUserId } = await withTimeout(
+            supabase.from('suppliers').select('id, company_name, user_id, email').eq('user_id', userId).maybeSingle(),
+            3000
+          );
+          console.log('📦 Supplier lookup by auth.uid directly:', supplierByUserId);
+          if (supplierByUserId) {
+            supplierData = supplierByUserId;
+            finalSupplierId = supplierByUserId.id;
+          }
+        } catch {
+          console.log('⚠️ Direct user_id lookup timeout');
         }
       }
 
-      // Fallback: Try by email match
-      if (!supplierData) {
-        const { data: userData } = await supabase.auth.getUser();
-        if (userData?.user?.email) {
-          console.log('🔍 Trying to find supplier by email:', userData.user.email);
-          const { data: supplierByEmail } = await supabase
-            .from('suppliers')
-            .select('id, company_name, user_id, email')
-            .eq('email', userData.user.email)
-            .maybeSingle();
-          
-          console.log('📦 Supplier lookup by email:', supplierByEmail);
-          if (supplierByEmail) {
-            supplierData = supplierByEmail;
-            finalSupplierId = supplierByEmail.id;
-          }
-        }
+      // Final fallback: Use userId as supplier ID (common pattern)
+      if (!finalSupplierId) {
+        console.log('📦 Using userId as supplier ID fallback:', userId);
+        finalSupplierId = userId;
       }
       
       // Store the resolved supplier ID
-      if (finalSupplierId) {
-        setResolvedSupplierId(finalSupplierId);
-      }
+      setResolvedSupplierId(finalSupplierId);
 
-      if (supplierData) {
-        console.log('✅ Found supplier:', supplierData.company_name, 'ID:', supplierData.id);
+      console.log('✅ Final supplier ID for QR query:', finalSupplierId);
+      
+      // Fetch material items using native fetch with auth for RLS
+      try {
+        const stored = getUserFromStorage();
+        const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+        const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
         
-        // Fetch ALL material items for this supplier - no limit, newest first
-        const { data, error } = await supabase
-          .from('material_items')
-          .select('*')
-          .eq('supplier_id', supplierData.id)
-          .order('created_at', { ascending: false })
-          .limit(1000); // Ensure we get all recent items
-        
-        console.log('🏷️ Material items query for supplier_id:', supplierData.id);
-        console.log('🏷️ First item created_at:', data?.[0]?.created_at);
-        console.log('🏷️ Last item created_at:', data?.[data?.length - 1]?.created_at);
-
-        console.log('🏷️ Material items found:', data?.length || 0, 'Error:', error);
-        if (!error) {
-          setItems(data || []);
-          // Group items by client
-          groupItemsByClient(data || []);
+        const headers: Record<string, string> = { 'apikey': apiKey };
+        if (stored?.accessToken) {
+          headers['Authorization'] = `Bearer ${stored.accessToken}`;
         }
-      } else {
-        console.log('⚠️ No supplier record found for user.');
-        // Show all items for debugging
-        const { data } = await supabase
-          .from('material_items')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(10);
-        console.log('📋 All material items (first 10) for debugging:', data);
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        
+        const response = await fetch(
+          `${SUPABASE_URL}/rest/v1/material_items?supplier_id=eq.${finalSupplierId}&order=created_at.desc&limit=1000`,
+          { headers, signal: controller.signal, cache: 'no-store' }
+        );
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('🏷️ Material items found:', data?.length || 0);
+          setItems(data || []);
+          groupItemsByClient(data || []);
+        } else {
+          console.log('❌ Material items fetch failed:', response.status);
+        }
+      } catch (e: any) {
+        console.log('⚠️ Material items fetch error:', e.message);
       }
     } else if (role === 'admin') {
-      // Admin sees all items
-      const { data, error } = await supabase
-        .from('material_items')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      console.log('👑 Admin: Material items found:', data?.length || 0);
-      if (!error) {
-        setItems(data || []);
-        // Group items by client
-        groupItemsByClient(data || []);
+      // Admin sees all items - use native fetch
+      try {
+        const stored = getUserFromStorage();
+        const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+        const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+        
+        const headers: Record<string, string> = { 'apikey': apiKey };
+        if (stored?.accessToken) {
+          headers['Authorization'] = `Bearer ${stored.accessToken}`;
+        }
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        
+        const response = await fetch(
+          `${SUPABASE_URL}/rest/v1/material_items?order=created_at.desc`,
+          { headers, signal: controller.signal, cache: 'no-store' }
+        );
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('👑 Admin: Material items found:', data?.length || 0);
+          setItems(data || []);
+          groupItemsByClient(data || []);
+        }
+      } catch (e: any) {
+        console.log('⚠️ Admin material items fetch error:', e.message);
       }
     }
   };
