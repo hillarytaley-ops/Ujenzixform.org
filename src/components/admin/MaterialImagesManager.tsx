@@ -485,9 +485,19 @@ export const MaterialImagesManager: React.FC = () => {
   const saveAdminImage = async (imageUrl: string) => {
     console.log('📤 Saving image to database...');
     
-    // Get session for auth header
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) {
+    // Get session from localStorage (faster than supabase.auth.getSession which can hang)
+    let accessToken: string | null = null;
+    try {
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        accessToken = parsed.access_token;
+      }
+    } catch (e) {
+      console.warn('Could not get session from localStorage');
+    }
+    
+    if (!accessToken) {
       throw new Error('Not authenticated - please sign in again');
     }
 
@@ -672,9 +682,19 @@ export const MaterialImagesManager: React.FC = () => {
       return;
     }
 
-    // Get session first
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) {
+    // Get session from localStorage (faster than supabase.auth.getSession which can hang)
+    let accessToken: string | null = null;
+    try {
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        accessToken = parsed.access_token;
+      }
+    } catch (e) {
+      console.warn('Could not get session from localStorage');
+    }
+    
+    if (!accessToken) {
       toast({ title: 'Not authenticated', description: 'Please sign in again', variant: 'destructive' });
       return;
     }
@@ -707,7 +727,7 @@ export const MaterialImagesManager: React.FC = () => {
           image_url: imageDataUrl,
           is_featured: false,
           is_approved: true
-        }, session.access_token);
+        }, accessToken);
 
         updateBulkItem(item.id, { uploading: false, uploaded: true });
         successCount++;
@@ -1036,10 +1056,20 @@ export const MaterialImagesManager: React.FC = () => {
     try {
       console.log('📝 Saving edit for product:', editingImage.id);
       
-      // Get session for auth
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        throw new Error('Not authenticated');
+      // Get session from localStorage (faster than supabase.auth.getSession which can hang)
+      let accessToken: string | null = null;
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          accessToken = parsed.access_token;
+        }
+      } catch (e) {
+        console.warn('Could not get session from localStorage');
+      }
+      
+      if (!accessToken) {
+        throw new Error('Not authenticated - please sign in again');
       }
       
       const payload = {
@@ -1063,7 +1093,7 @@ export const MaterialImagesManager: React.FC = () => {
           method: 'PATCH',
           headers: {
             'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo',
-            'Authorization': `Bearer ${session.access_token}`,
+            'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
             'Prefer': 'return=representation'
           },
