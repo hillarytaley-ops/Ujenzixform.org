@@ -870,14 +870,15 @@ export const MaterialsGrid = () => {
       
       try {
         const pricesResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/supplier_product_prices?select=*&_t=${Date.now()}`,
+          `${SUPABASE_URL}/rest/v1/supplier_product_prices?select=*`,
           {
             headers: {
               'apikey': SUPABASE_ANON_KEY,
               'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
               'Content-Type': 'application/json',
               'Cache-Control': 'no-cache, no-store, must-revalidate'
-            }
+            },
+            cache: 'no-store' // Prevent browser caching
           }
         );
         
@@ -929,24 +930,23 @@ export const MaterialsGrid = () => {
         // STRATEGY: Load first batch WITH images (fast display), then metadata only, then lazy load remaining images
         try {
           // Step 1: Load first batch with images + rest as metadata only (PARALLEL)
-          // Add cache-busting timestamp to prevent browser caching
-          const cacheBuster = `&_t=${Date.now()}`;
           const [firstBatchResponse, metadataResponse] = await Promise.all([
             // First 48 items WITH images for immediate display
             fetch(
-              `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,image_url&is_approved=eq.true&order=created_at.desc&limit=${FIRST_BATCH_WITH_IMAGES}${cacheBuster}`,
+              `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,image_url&is_approved=eq.true&order=created_at.desc&limit=${FIRST_BATCH_WITH_IMAGES}`,
               {
                 headers: {
                   'apikey': SUPABASE_ANON_KEY,
                   'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
                   'Content-Type': 'application/json',
                   'Cache-Control': 'no-cache, no-store, must-revalidate'
-                }
+                },
+                cache: 'no-store'
               }
             ),
             // Rest of items WITHOUT images (much faster)
             fetch(
-              `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants&is_approved=eq.true&order=created_at.desc&offset=${FIRST_BATCH_WITH_IMAGES}&limit=${METADATA_LIMIT - FIRST_BATCH_WITH_IMAGES}${cacheBuster}`,
+              `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants&is_approved=eq.true&order=created_at.desc&offset=${FIRST_BATCH_WITH_IMAGES}&limit=${METADATA_LIMIT - FIRST_BATCH_WITH_IMAGES}`,
               {
                 headers: {
                   'apikey': SUPABASE_ANON_KEY,
@@ -954,7 +954,8 @@ export const MaterialsGrid = () => {
                   'Content-Type': 'application/json',
                   'Prefer': 'count=exact',
                   'Cache-Control': 'no-cache, no-store, must-revalidate'
-                }
+                },
+                cache: 'no-store'
               }
             )
           ]);
