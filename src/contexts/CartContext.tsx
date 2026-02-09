@@ -55,8 +55,11 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     try {
       const savedCart = localStorage.getItem(CART_STORAGE_KEY);
+      console.log('🛒 Loading cart from localStorage:', savedCart ? 'found' : 'not found');
       if (savedCart) {
-        setItems(JSON.parse(savedCart));
+        const parsed = JSON.parse(savedCart);
+        console.log('🛒 Loaded cart items:', parsed.length);
+        setItems(parsed);
       }
     } catch (error) {
       console.error('Error loading cart from storage:', error);
@@ -66,6 +69,7 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Save cart to localStorage whenever it changes
   useEffect(() => {
     try {
+      console.log('🛒 Saving cart to localStorage:', items.length, 'items');
       localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
     } catch (error) {
       console.error('Error saving cart to storage:', error);
@@ -73,22 +77,34 @@ export const CartProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [items]);
 
   const addToCart = (item: Omit<CartItem, 'quantity'>, quantity: number) => {
-    if (quantity <= 0) return;
+    console.log('🛒 CartContext.addToCart called:', item.name, 'qty:', quantity);
+    
+    if (quantity <= 0) {
+      console.log('🛒 Quantity is 0 or less, not adding');
+      return;
+    }
     
     setItems(prevItems => {
+      console.log('🛒 Previous items:', prevItems.length);
       const existingItem = prevItems.find(i => i.id === item.id);
       
+      let newItems;
       if (existingItem) {
         // Update quantity if item exists
-        return prevItems.map(i => 
+        console.log('🛒 Item exists, updating quantity');
+        newItems = prevItems.map(i => 
           i.id === item.id 
             ? { ...i, quantity: i.quantity + quantity }
             : i
         );
       } else {
         // Add new item
-        return [...prevItems, { ...item, quantity }];
+        console.log('🛒 Adding new item');
+        newItems = [...prevItems, { ...item, quantity }];
       }
+      
+      console.log('🛒 New items count:', newItems.length);
+      return newItems;
     });
   };
 
