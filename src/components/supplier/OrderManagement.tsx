@@ -157,47 +157,89 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
       }
 
       // Log supplier IDs being queried
-      console.log('🔍 Querying orders for supplier IDs:', [...new Set(supplierIds)]);
+      const uniqueSupplierIds = [...new Set(supplierIds)];
+      console.log('🔍 Querying orders for supplier IDs:', uniqueSupplierIds);
 
-      // Fetch real orders from purchase_orders table with timeout
-      let purchaseOrders: any[] = [];
+      // Use native fetch API to avoid Supabase client hanging
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+
+      // Fetch ALL recent orders first for debugging
+      let allOrders: any[] = [];
       try {
-        const { data, error: ordersError } = await withTimeout(
-          supabase
-            .from('purchase_orders')
-            .select('*')
-            .in('supplier_id', [...new Set(supplierIds)])
-            .order('created_at', { ascending: false }),
-          8000
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        
+        const allOrdersResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/purchase_orders?select=id,po_number,supplier_id,status,created_at&order=created_at.desc&limit=20`,
+          {
+            headers: { 'apikey': apiKey },
+            signal: controller.signal
+          }
         );
-
-        if (ordersError) {
-          console.error('Error fetching orders:', ordersError);
-        } else {
-          purchaseOrders = data || [];
+        clearTimeout(timeoutId);
+        
+        if (allOrdersResponse.ok) {
+          allOrders = await allOrdersResponse.json();
+          console.log('📋 ALL recent orders in system:', allOrders.length);
+          allOrders.forEach(o => {
+            const matches = uniqueSupplierIds.includes(o.supplier_id);
+            console.log(`   ${o.po_number}: supplier_id=${o.supplier_id?.substring(0,8)}... ${matches ? '✅ MATCHES' : '❌ no match'}`);
+          });
         }
-      } catch {
-        console.log('Orders fetch timeout');
+      } catch (e) {
+        console.log('All orders debug fetch failed');
       }
 
-      console.log('📦 Orders loaded:', purchaseOrders.length);
+      // Fetch orders for THIS supplier
+      let purchaseOrders: any[] = [];
+      try {
+        const supplierIdsParam = uniqueSupplierIds.map(id => `"${id}"`).join(',');
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        
+        const ordersResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=in.(${supplierIdsParam})&order=created_at.desc`,
+          {
+            headers: { 'apikey': apiKey },
+            signal: controller.signal
+          }
+        );
+        clearTimeout(timeoutId);
 
-      // Fetch buyer profiles with timeout (skip if it hangs)
+        if (ordersResponse.ok) {
+          purchaseOrders = await ordersResponse.json();
+        } else {
+          console.error('Error fetching orders:', ordersResponse.status);
+        }
+      } catch (e: any) {
+        console.log('Orders fetch timeout/error:', e.message);
+      }
+
+      console.log('📦 Orders for this supplier:', purchaseOrders.length);
+
+      // Fetch buyer profiles using native fetch
       const buyerIds = [...new Set(purchaseOrders.map(po => po.buyer_id).filter(Boolean))];
       let buyerProfiles: Record<string, any> = {};
       
       if (buyerIds.length > 0) {
         try {
-          const { data: profiles } = await withTimeout(
-            supabase
-              .from('profiles')
-              .select('id, user_id, full_name, phone, email')
-              .in('user_id', buyerIds),
-            5000
-          );
+          const buyerIdsParam = buyerIds.map(id => `"${id}"`).join(',');
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000);
           
-          if (profiles) {
-            buyerProfiles = Object.fromEntries(profiles.map(p => [p.user_id, p]));
+          const profilesResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/profiles?user_id=in.(${buyerIdsParam})&select=id,user_id,full_name,phone,email`,
+            {
+              headers: { 'apikey': apiKey },
+              signal: controller.signal
+            }
+          );
+          clearTimeout(timeoutId);
+          
+          if (profilesResponse.ok) {
+            const profiles = await profilesResponse.json();
+            buyerProfiles = Object.fromEntries(profiles.map((p: any) => [p.user_id, p]));
             console.log('👥 Buyer profiles loaded:', profiles.length);
           }
         } catch {
