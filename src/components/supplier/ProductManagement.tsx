@@ -336,52 +336,71 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
       console.log('📦 Loading admin products via fetch API...');
       
       // Get session for auth
-      const { data: { session } } = await supabase.auth.getSession();
+      let accessToken = '';
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        accessToken = session?.access_token || '';
+      } catch (e) {
+        console.log('Could not get session, continuing without auth');
+      }
       
       // Use native fetch API with timeout - much more reliable
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 second timeout
       
       try {
-        const response = await fetch(
-          'https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants&is_approved=eq.true&order=created_at.desc&limit=500',
-          {
-            headers: {
-              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo',
-              'Authorization': session?.access_token ? `Bearer ${session.access_token}` : '',
-            },
-            signal: controller.signal
-          }
-        );
+        // Try without is_approved filter first to see all products
+        const url = 'https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,is_approved&order=created_at.desc&limit=500';
+        console.log('📦 Fetching from:', url);
+        
+        const response = await fetch(url, {
+          headers: {
+            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo',
+            'Authorization': accessToken ? `Bearer ${accessToken}` : '',
+          },
+          signal: controller.signal
+        });
         
         clearTimeout(timeoutId);
         
+        console.log('📦 Response status:', response.status);
+        
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
+          const errorText = await response.text();
+          console.error('📦 Response error:', errorText);
+          throw new Error(`HTTP ${response.status}: ${errorText}`);
         }
         
         const data = await response.json();
         console.log('✅ Loaded', data.length, 'admin products via fetch');
+        console.log('📦 First 3 products:', data.slice(0, 3));
         
-        setAdminProducts(data || []);
+        // Filter to only approved products (or show all if none are approved)
+        const approvedProducts = data.filter((p: any) => p.is_approved === true);
+        console.log('📦 Approved products:', approvedProducts.length);
+        
+        // Use approved products if any, otherwise use all products
+        const productsToShow = approvedProducts.length > 0 ? approvedProducts : data;
+        
+        setAdminProducts(productsToShow || []);
         setLoading(false);
         
         // Then load images in background
-        if (data && data.length > 0) {
-          const allIds = data.map((p: any) => p.id);
+        if (productsToShow && productsToShow.length > 0) {
+          const allIds = productsToShow.map((p: any) => p.id);
           loadAllImages(allIds);
         }
       } catch (fetchErr: any) {
         clearTimeout(timeoutId);
         
         if (fetchErr.name === 'AbortError') {
-          console.log('⏱️ Products fetch timeout after 15s');
+          console.log('⏱️ Products fetch timeout after 20s');
         } else {
-          console.error('Fetch error:', fetchErr);
+          console.error('📦 Fetch error:', fetchErr);
         }
         
         // Fallback to demo data
-        console.log('Using demo data as fallback');
+        console.log('📦 Using demo data as fallback');
         setAdminProducts([
           { id: '1', name: 'Bamburi Cement 42.5N (50kg)', category: 'Cement & Concrete', image_url: '', description: 'Premium Portland cement' },
           { id: '2', name: 'Y12 Deformed Steel Bars (6m)', category: 'Steel & Metal', image_url: '', description: 'High-tensile steel reinforcement' },
@@ -392,7 +411,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
         setLoading(false);
       }
     } catch (error) {
-      console.error('Error loading admin products:', error);
+      console.error('📦 Error loading admin products:', error);
       setLoading(false);
     }
   };
