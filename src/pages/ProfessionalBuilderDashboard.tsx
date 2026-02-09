@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
@@ -61,6 +62,8 @@ import { PendingQuoteRequests } from "@/components/builders/PendingQuoteRequests
 import DeliveryRequest from "@/components/DeliveryRequest";
 
 const ProfessionalBuilderDashboardPage = () => {
+  // Use AuthContext for reliable user data
+  const { user: authUser, isAuthenticated } = useAuth();
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -84,6 +87,29 @@ const ProfessionalBuilderDashboardPage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // Helper to get user ID reliably (from AuthContext or localStorage)
+  const getUserId = (): string => {
+    if (authUser?.id) return authUser.id;
+    try {
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        return parsed.user?.id || '';
+      }
+    } catch (e) {
+      console.warn('Could not get user ID from localStorage');
+    }
+    return '';
+  };
+
+  // Set user from AuthContext when available
+  useEffect(() => {
+    if (authUser) {
+      console.log('📋 ProfessionalBuilderDashboard: Got user from AuthContext:', authUser.email);
+      setUser(authUser);
+    }
+  }, [authUser]);
+
   useEffect(() => {
     // Safety timeout - show UI after 2 seconds max
     const timeout = setTimeout(() => setLoading(false), 2000);
@@ -92,18 +118,25 @@ const ProfessionalBuilderDashboardPage = () => {
       setLoading(false);
     });
     return () => clearTimeout(timeout);
-  }, []);
+  }, [authUser]);
 
   const checkAuth = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      // Use authUser from context or localStorage fallback
+      const userId = getUserId();
       
-      if (!user) {
+      if (!userId) {
+        console.log('📋 ProfessionalBuilderDashboard: No user ID available yet');
         // Don't redirect - RoleProtectedRoute handles this
         return;
       }
 
-      setUser(user);
+      console.log('📋 ProfessionalBuilderDashboard: Loading profile for user:', userId);
+      
+      // Set user object if not already set
+      if (!user) {
+        setUser(authUser || { id: userId, email: authUser?.email || 'user' });
+      }
 
       // Get profile - try both 'id' and 'user_id' columns (different schemas use different names)
       let profileData = null;
@@ -113,7 +146,7 @@ const ProfessionalBuilderDashboardPage = () => {
       const { data: profileByUserId, error: errorByUserId } = await supabase
         .from('profiles')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .maybeSingle();
       
       if (!errorByUserId && profileByUserId) {
@@ -123,7 +156,7 @@ const ProfessionalBuilderDashboardPage = () => {
         const { data: profileById, error: errorById } = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', user.id)
+          .eq('id', userId)
           .maybeSingle();
         
         if (!errorById && profileById) {

@@ -204,14 +204,31 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
     };
   }, [builderId]);
 
+  // Helper to get builder ID reliably
+  const getEffectiveBuilderId = (): string => {
+    if (builderId) return builderId;
+    try {
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        return parsed.user?.id || '';
+      }
+    } catch (e) {
+      console.warn('Could not get user ID from localStorage');
+    }
+    return '';
+  };
+
   const fetchQuotes = async () => {
-    if (!builderId) {
-      console.log('❌ SupplierQuoteReview: No builderId provided');
+    const effectiveBuilderId = getEffectiveBuilderId();
+    
+    if (!effectiveBuilderId) {
+      console.log('❌ SupplierQuoteReview: No builderId provided and no fallback available');
       setLoading(false);
       return;
     }
     
-    console.log('🔄 SupplierQuoteReview: Fetching quotes for builder:', builderId);
+    console.log('🔄 SupplierQuoteReview: Fetching quotes for builder:', effectiveBuilderId, '(prop was:', builderId, ')');
     setLoading(true);
     const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
     const headers = getAuthHeaders();
@@ -222,7 +239,7 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
       const timeoutId = setTimeout(() => controller.abort(), 8000);
       
       // Query by buyer_id first
-      const queryUrl = `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${builderId}&status=in.(pending,quoted,confirmed,rejected)&order=updated_at.desc`;
+      const queryUrl = `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${effectiveBuilderId}&status=in.(pending,quoted,confirmed,rejected)&order=updated_at.desc`;
       console.log('🔗 SupplierQuoteReview query URL:', queryUrl);
       
       const ordersResponse = await fetch(queryUrl, { headers, signal: controller.signal, cache: 'no-store' });
@@ -243,7 +260,7 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
         
         try {
           const builderIdResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/purchase_orders?builder_id=eq.${builderId}&status=in.(pending,quoted,confirmed,rejected)&order=updated_at.desc`,
+            `${SUPABASE_URL}/rest/v1/purchase_orders?builder_id=eq.${effectiveBuilderId}&status=in.(pending,quoted,confirmed,rejected)&order=updated_at.desc`,
             { headers, signal: builderIdController.signal, cache: 'no-store' }
           );
           clearTimeout(builderIdTimeout);
