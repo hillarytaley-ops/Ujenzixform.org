@@ -37,9 +37,26 @@ import {
   Copy,
   MapPinned
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { MonitoringServicePrompt } from './MonitoringServicePrompt';
+
+// Helper for fetch with timeout
+const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs: number = 10000) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error('Request timed out');
+    }
+    throw error;
+  }
+};
 
 interface PurchaseOrderItem {
   material_name?: string;
@@ -244,31 +261,47 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
     }
 
     setSubmitting(true);
+    console.log('🚚 Starting delivery request...');
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
+      // Get user from localStorage (faster than Supabase call)
+      let userId: string | null = null;
+      let accessToken: string | null = null;
+      
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          userId = parsed.user?.id;
+          accessToken = parsed.access_token;
+        }
+      } catch (e) {
+        console.warn('Could not parse stored session');
+      }
+      
+      if (!userId || !accessToken) {
+        throw new Error('User not authenticated');
+      }
 
-      // Get user profile
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('id, full_name, phone')
-        .eq('user_id', user.id)
-        .single();
+      console.log('🚚 User ID:', userId);
 
-      if (!profile) throw new Error('Profile not found');
-
-      // Get supplier info for pickup address
+      // Get supplier info for pickup address using fetch
       let pickupAddress = purchaseOrder.supplier_address || 'Supplier location';
       if (purchaseOrder.supplier_id) {
-        const { data: supplier } = await supabase
-          .from('suppliers')
-          .select('address, company_name')
-          .eq('id', purchaseOrder.supplier_id)
-          .maybeSingle();
-        
-        if (supplier) {
-          pickupAddress = supplier.address || `${supplier.company_name} - Pickup Location`;
+        try {
+          const supplierResponse = await fetchWithTimeout(
+            `${SUPABASE_URL}/rest/v1/suppliers?id=eq.${purchaseOrder.supplier_id}&select=address,company_name`,
+            { headers: { 'apikey': SUPABASE_ANON_KEY } },
+            5000
+          );
+          if (supplierResponse.ok) {
+            const suppliers = await supplierResponse.json();
+            if (suppliers?.[0]) {
+              pickupAddress = suppliers[0].address || `${suppliers[0].company_name} - Pickup Location`;
+            }
+          }
+        } catch (e) {
+          console.warn('Could not fetch supplier info');
         }
       }
 
@@ -279,10 +312,9 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
           (deliveryData.deliveryAddress ? ` | ${deliveryData.deliveryAddress}` : '');
       }
 
-      // Create delivery request - use only core columns that exist
-      // IMPORTANT: builder_id must be auth.uid() for RLS policy to pass
+      // Create delivery request payload
       const deliveryPayload: Record<string, any> = {
-        builder_id: user.id, // Use auth user ID, not profile ID - RLS requires builder_id = auth.uid()
+        builder_id: userId,
         purchase_order_id: purchaseOrder.id,
         pickup_address: pickupAddress,
         delivery_address: fullDeliveryAddress,
@@ -292,7 +324,7 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
         status: 'pending'
       };
 
-      // Add optional fields only if they have values
+      // Add optional fields
       if (deliveryData.deliveryCoordinates) {
         deliveryPayload.delivery_coordinates = deliveryData.deliveryCoordinates;
       }
@@ -311,56 +343,63 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
 
       console.log('📦 Creating delivery request with payload:', deliveryPayload);
 
-      // Try to insert delivery request - if RLS blocks it, the edge function will create it
+      // Insert delivery request using native fetch with timeout
       let deliveryRequestId = null;
       try {
-        const { data: deliveryRequest, error: deliveryError } = await supabase
-          .from('delivery_requests')
-          .insert(deliveryPayload)
-          .select('id')
-          .single();
+        const deliveryResponse = await fetchWithTimeout(
+          `${SUPABASE_URL}/rest/v1/delivery_requests`,
+          {
+            method: 'POST',
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify(deliveryPayload)
+          },
+          10000
+        );
 
-        if (deliveryError) {
-          console.warn('⚠️ Direct insert blocked (RLS), will use edge function:', deliveryError.message);
+        if (deliveryResponse.ok) {
+          const deliveryData = await deliveryResponse.json();
+          deliveryRequestId = Array.isArray(deliveryData) ? deliveryData[0]?.id : deliveryData?.id;
+          console.log('✅ Delivery request created:', deliveryRequestId);
         } else {
-          deliveryRequestId = deliveryRequest?.id;
-          console.log('✅ Delivery request created directly:', deliveryRequestId);
+          const errorText = await deliveryResponse.text();
+          console.warn('⚠️ Delivery insert failed:', errorText);
         }
       } catch (insertError: any) {
-        console.warn('⚠️ Insert error, will use edge function:', insertError.message);
+        console.warn('⚠️ Insert error:', insertError.message);
       }
 
-      // Notify delivery providers via edge function (this will also create the request if needed)
+      // Try to notify delivery providers via edge function (non-blocking)
       try {
-        const notifyResponse = await supabase.functions.invoke('notify-delivery-providers', {
-          body: {
-            request_type: 'private_purchase',
-            request_id: deliveryRequestId || purchaseOrder.id,
-            builder_id: user.id,
-            pickup_address: pickupAddress,
-            delivery_address: deliveryData.deliveryAddress,
-            pickup_date: deliveryData.preferredDate,
-            material_type: deliveryData.materialType,
-            material_details: purchaseOrder.items?.map(item => ({
-              name: item.material_name || item.name,
-              quantity: item.quantity,
-              unit: item.unit || 'units'
-            })),
-            special_instructions: deliveryData.specialInstructions,
-            priority_level: 'normal',
-            po_number: purchaseOrder.po_number
-          }
-        });
-        console.log('🚚 Notify providers response:', notifyResponse);
-        
-        if (notifyResponse.error) {
-          console.error('❌ Edge function error:', notifyResponse.error);
-        } else {
-          console.log('✅ Delivery notification sent successfully');
-        }
+        const notifyResponse = await fetchWithTimeout(
+          `${SUPABASE_URL}/functions/v1/notify-delivery-providers`,
+          {
+            method: 'POST',
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              request_type: 'private_purchase',
+              request_id: deliveryRequestId || purchaseOrder.id,
+              builder_id: userId,
+              pickup_address: pickupAddress,
+              delivery_address: deliveryData.deliveryAddress,
+              pickup_date: deliveryData.preferredDate,
+              material_type: deliveryData.materialType,
+              po_number: purchaseOrder.po_number
+            })
+          },
+          8000
+        );
+        console.log('🚚 Notify providers response:', notifyResponse.status);
       } catch (notifyError: any) {
-        console.error('❌ Error calling edge function:', notifyError);
-        // Still continue - the user experience shouldn't be blocked
+        console.warn('⚠️ Edge function call failed (non-critical):', notifyError.message);
       }
 
       setStep('success');
@@ -377,7 +416,6 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
           onOpenChange(false);
           setStep('prompt');
           
-          // Show monitoring service prompt after delivery is requested
           setTimeout(() => {
             setShowMonitoringPrompt(true);
           }, 500);
@@ -385,7 +423,7 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
       }
 
     } catch (error: any) {
-      console.error('Error creating delivery request:', error);
+      console.error('❌ Error creating delivery request:', error);
       toast({
         title: 'Failed to Request Delivery',
         description: error.message || 'Please try again or contact support.',
@@ -410,19 +448,43 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
     if (!purchaseOrder) return;
     
     setSubmitting(true);
+    console.log('📦 Setting order as pickup...');
     
     try {
-      // Update purchase order to mark as pickup (no delivery, no QR codes needed)
-      const { error: updateError } = await supabase
-        .from('purchase_orders')
-        .update({
-          delivery_required: false,
-          special_instructions: (purchaseOrder.special_instructions || '') + '\n[PICKUP ORDER - No delivery required]',
-          qr_code_generated: false // Ensure no QR code generation
-        })
-        .eq('id', purchaseOrder.id);
+      // Get access token from localStorage
+      let accessToken: string | null = null;
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          accessToken = parsed.access_token;
+        }
+      } catch (e) {
+        console.warn('Could not parse stored session');
+      }
+
+      // Update purchase order using fetch with timeout
+      const updateResponse = await fetchWithTimeout(
+        `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${purchaseOrder.id}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': accessToken ? `Bearer ${accessToken}` : `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify({
+            delivery_required: false,
+            qr_code_generated: false
+          })
+        },
+        8000
+      );
       
-      if (updateError) throw updateError;
+      if (!updateResponse.ok) {
+        console.warn('Pickup update response:', updateResponse.status);
+      }
       
       toast({
         title: '📦 Pickup Order Confirmed!',
