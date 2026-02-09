@@ -106,6 +106,74 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
     return headers;
   };
 
+  // Helper function to transform orders to quote format
+  const transformOrders = async (orders: any[], headers: Record<string, string>): Promise<QuotationRequest[]> => {
+    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+    
+    // Fetch suppliers
+    let suppliersData: any[] = [];
+    try {
+      const suppliersController = new AbortController();
+      const suppliersTimeoutId = setTimeout(() => suppliersController.abort(), 5000);
+      
+      const suppliersResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/suppliers?select=id,user_id,company_name,address,location,rating`,
+        { headers, signal: suppliersController.signal, cache: 'no-store' }
+      );
+      clearTimeout(suppliersTimeoutId);
+      
+      if (suppliersResponse.ok) {
+        suppliersData = await suppliersResponse.json();
+      }
+    } catch (e) {
+      console.log('Suppliers fetch timeout in transformOrders');
+    }
+
+    // Create maps for both id and user_id lookups
+    const suppliersMap = new Map();
+    (suppliersData || []).forEach(s => {
+      suppliersMap.set(s.id, s);
+      if (s.user_id) suppliersMap.set(s.user_id, s);
+    });
+
+    return orders.map(po => {
+      const supplier = suppliersMap.get(po.supplier_id);
+      const firstItem = po.items?.[0] || {};
+      
+      return {
+        id: po.id,
+        purchase_order_id: po.id,
+        supplier_id: po.supplier_id,
+        material_name: firstItem.material_name || po.project_name || 'Quote Request',
+        quantity: po.items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || 1,
+        unit: firstItem.unit || 'items',
+        delivery_address: po.delivery_address || 'To be provided',
+        preferred_delivery_date: po.delivery_date,
+        project_description: po.project_name,
+        special_requirements: null,
+        status: po.status === 'confirmed' ? 'accepted' : po.status,
+        quote_amount: po.quote_amount ?? (po.status === 'quoted' ? po.total_amount : null),
+        quote_valid_until: po.quote_valid_until || null,
+        supplier_notes: po.supplier_notes || null,
+        created_at: po.created_at,
+        updated_at: po.updated_at,
+        supplier: supplier ? {
+          company_name: supplier.company_name || 'Unknown Supplier',
+          address: supplier.address || supplier.location || 'Location not provided',
+          rating: supplier.rating || 4.5
+        } : undefined,
+        purchase_order: {
+          po_number: po.po_number,
+          project_name: po.project_name,
+          delivery_address: po.delivery_address,
+          delivery_date: po.delivery_date,
+          items: po.items || [],
+          total_amount: po.total_amount
+        }
+      } as QuotationRequest;
+    });
+  };
+
   useEffect(() => {
     fetchQuotes();
     
@@ -138,10 +206,12 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
 
   const fetchQuotes = async () => {
     if (!builderId) {
+      console.log('❌ SupplierQuoteReview: No builderId provided');
       setLoading(false);
       return;
     }
     
+    console.log('🔄 SupplierQuoteReview: Fetching quotes for builder:', builderId);
     setLoading(true);
     const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
     const headers = getAuthHeaders();
@@ -151,10 +221,11 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 8000);
       
-      const ordersResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${builderId}&status=in.(pending,quoted,confirmed,rejected)&order=updated_at.desc`,
-        { headers, signal: controller.signal, cache: 'no-store' }
-      );
+      // Query by buyer_id first
+      const queryUrl = `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${builderId}&status=in.(pending,quoted,confirmed,rejected)&order=updated_at.desc`;
+      console.log('🔗 SupplierQuoteReview query URL:', queryUrl);
+      
+      const ordersResponse = await fetch(queryUrl, { headers, signal: controller.signal, cache: 'no-store' });
       clearTimeout(timeoutId);
 
       if (!ordersResponse.ok) {
@@ -162,6 +233,39 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
       }
       
       const purchaseOrders = await ordersResponse.json();
+      console.log('📋 SupplierQuoteReview: Orders found by buyer_id:', purchaseOrders?.length || 0);
+      
+      // DEBUG: If no orders found, check what orders exist for this user
+      if (!purchaseOrders || purchaseOrders.length === 0) {
+        // Try fetching by builder_id as well (some orders might use builder_id instead of buyer_id)
+        const builderIdController = new AbortController();
+        const builderIdTimeout = setTimeout(() => builderIdController.abort(), 5000);
+        
+        try {
+          const builderIdResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/purchase_orders?builder_id=eq.${builderId}&status=in.(pending,quoted,confirmed,rejected)&order=updated_at.desc`,
+            { headers, signal: builderIdController.signal, cache: 'no-store' }
+          );
+          clearTimeout(builderIdTimeout);
+          
+          if (builderIdResponse.ok) {
+            const builderIdOrders = await builderIdResponse.json();
+            console.log('📋 SupplierQuoteReview: Orders found by builder_id:', builderIdOrders?.length || 0);
+            
+            if (builderIdOrders && builderIdOrders.length > 0) {
+              // Use builder_id orders
+              console.log('✅ Using builder_id orders instead of buyer_id');
+              const transformedQuotes = await transformOrders(builderIdOrders, headers);
+              setQuotes(transformedQuotes);
+              setLoading(false);
+              return;
+            }
+          }
+        } catch (e) {
+          console.log('builder_id query timeout');
+        }
+      }
+      
       console.log('📋 Supplier quotes loaded:', purchaseOrders?.length || 0);
 
       if (!purchaseOrders || purchaseOrders.length === 0) {
@@ -170,69 +274,8 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
         return;
       }
 
-      // Fetch all suppliers using native fetch
-      let suppliersData: any[] = [];
-      try {
-        const suppliersController = new AbortController();
-        const suppliersTimeoutId = setTimeout(() => suppliersController.abort(), 5000);
-        
-        const suppliersResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/suppliers?select=id,user_id,company_name,address,location,rating`,
-          { headers, signal: suppliersController.signal, cache: 'no-store' }
-        );
-        clearTimeout(suppliersTimeoutId);
-        
-        if (suppliersResponse.ok) {
-          suppliersData = await suppliersResponse.json();
-        }
-      } catch (e) {
-        console.log('Suppliers fetch timeout');
-      }
-
-      // Create maps for both id and user_id lookups
-      const suppliersMap = new Map();
-      (suppliersData || []).forEach(s => {
-        suppliersMap.set(s.id, s);
-        if (s.user_id) suppliersMap.set(s.user_id, s);
-      });
-
-      // Transform purchase orders to quote format
-      const transformedQuotes = purchaseOrders.map(po => {
-        const supplier = suppliersMap.get(po.supplier_id);
-        const firstItem = po.items?.[0] || {};
-        
-        return {
-          id: po.id,
-          purchase_order_id: po.id,
-          supplier_id: po.supplier_id,
-          material_name: firstItem.material_name || po.project_name || 'Quote Request',
-          quantity: po.items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || 1,
-          unit: firstItem.unit || 'items',
-          delivery_address: po.delivery_address || 'To be provided',
-          preferred_delivery_date: po.delivery_date,
-          project_description: po.project_name,
-          special_requirements: null,
-          status: po.status === 'confirmed' ? 'accepted' : po.status,
-          quote_amount: po.quote_amount ?? (po.status === 'quoted' ? po.total_amount : null),
-          quote_valid_until: po.quote_valid_until || null,
-          supplier_notes: po.supplier_notes || null,
-          created_at: po.created_at,
-          updated_at: po.updated_at || po.created_at,
-          supplier: supplier ? {
-            company_name: supplier.company_name,
-            address: supplier.address || supplier.location || '',
-            rating: supplier.rating || 0
-          } : null,
-          purchase_order: {
-            po_number: po.po_number,
-            project_name: po.project_name,
-            delivery_address: po.delivery_address,
-            delivery_date: po.delivery_date,
-            items: po.items,
-            total_amount: po.total_amount
-          }
-        };
-      });
+      // Transform purchase orders to quote format using helper
+      const transformedQuotes = await transformOrders(purchaseOrders, headers);
 
       console.log('📋 Loaded quotes from purchase_orders:', transformedQuotes.length);
       console.log('📊 Quote statuses:', transformedQuotes.map(q => ({ 
