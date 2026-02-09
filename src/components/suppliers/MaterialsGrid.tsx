@@ -40,6 +40,7 @@ import { QuoteCart, QuoteCartButton, QuoteCartItem } from './QuoteCart';
 import { MobileBookView } from './MobileBookView';
 import { FileText, BookOpen } from 'lucide-react';
 import { ProductModal, materialToProduct, Product } from '@/components/products';
+import { useAuth } from '@/contexts/AuthContext';
 
 // iOS/Safari compatibility check
 const isIOSSafari = () => {
@@ -314,6 +315,9 @@ export const MaterialsGrid = () => {
   const [hasMoreMaterials, setHasMoreMaterials] = useState(false);
   const [totalMaterialsCount, setTotalMaterialsCount] = useState(0);
   
+  // Use AuthContext for reliable auth state (instead of making separate Supabase calls)
+  const { user: authUser, userRole: authUserRole, loading: authLoading } = useAuth();
+  
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(12); // Default 12 items per page (3 rows x 4 cols)
@@ -321,8 +325,10 @@ export const MaterialsGrid = () => {
   const [selectedCategory, setSelectedCategory] = useState('All Categories');
   const [priceRange, setPriceRange] = useState('all');
   const [stockFilter, setStockFilter] = useState('all');
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  
+  // Derive auth state from AuthContext (more reliable than separate Supabase calls)
+  const userRole = authUserRole;
+  const isAuthenticated = !!authUser;
   const [showWelcome, setShowWelcome] = useState(false);
   const [isMultiQuoteOpen, setIsMultiQuoteOpen] = useState(false);
   const [builderId, setBuilderId] = useState<string>('');
@@ -571,39 +577,17 @@ export const MaterialsGrid = () => {
     }
   }, [searchParams]);
 
+  // Set builderId from AuthContext user
   useEffect(() => {
-    // Check user role for purchase flow
-    const checkUserRole = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          setIsAuthenticated(true);
-          setBuilderId(user.id); // Set builderId when user is logged in
-          const { data: roleData, error: roleError } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', user.id)
-            .maybeSingle();
-          
-          if (roleError) {
-            console.error('Error fetching user role:', roleError);
-          }
-          
-          const role = roleData?.role || null;
-          setUserRole(role);
-          console.log('MaterialsGrid - User authenticated:', user.email, 'Role:', role, 'BuilderId:', user.id);
-        } else {
-          setIsAuthenticated(false);
-          setUserRole(null);
-          console.log('MaterialsGrid - No user authenticated');
-        }
-      } catch (error) {
-        console.error('Error checking user role:', error);
-      }
-    };
-    
-    checkUserRole();
-    
+    if (authUser?.id) {
+      setBuilderId(authUser.id);
+      console.log('MaterialsGrid - User from AuthContext:', authUser.email, 'Role:', authUserRole, 'BuilderId:', authUser.id);
+    } else {
+      console.log('MaterialsGrid - No user in AuthContext');
+    }
+  }, [authUser, authUserRole]);
+  
+  useEffect(() => {
     // Load materials data
     try {
       loadMaterials();
@@ -613,26 +597,6 @@ export const MaterialsGrid = () => {
       setFilteredMaterials([]);
       setLoading(false);
     }
-    
-    // Also listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        setIsAuthenticated(true);
-        setBuilderId(session.user.id);
-        const { data: roleData } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', session.user.id)
-          .maybeSingle();
-        setUserRole(roleData?.role || null);
-        console.log('MaterialsGrid - Auth state changed:', event, 'Role:', roleData?.role);
-      } else {
-        setIsAuthenticated(false);
-        setUserRole(null);
-      }
-    });
-    
-    return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
