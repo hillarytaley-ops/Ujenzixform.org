@@ -77,43 +77,75 @@ export const MultiSupplierQuoteDialog: React.FC<MultiSupplierQuoteDialogProps> =
   const fetchSuppliers = async () => {
     setLoading(true);
     console.log('🔄 Fetching suppliers for quote dialog...');
+    
+    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+    const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+    
     try {
-      // Fetch all active suppliers
-      const { data: suppliersData, error: suppliersError } = await supabase
-        .from('suppliers')
-        .select('id, user_id, company_name, location, rating')
-        .order('rating', { ascending: false });
-
-      console.log('📦 Suppliers fetched:', suppliersData?.length || 0, 'error:', suppliersError);
+      // Fetch all active suppliers using native fetch
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
       
-      if (suppliersError) throw suppliersError;
+      const suppliersResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/suppliers?select=id,user_id,company_name,location,rating&order=rating.desc.nullslast`,
+        { 
+          headers: { 'apikey': apiKey },
+          signal: controller.signal,
+          cache: 'no-store'
+        }
+      );
+      clearTimeout(timeoutId);
+
+      if (!suppliersResponse.ok) {
+        throw new Error(`Suppliers fetch failed: ${suppliersResponse.status}`);
+      }
+      
+      const suppliersData = await suppliersResponse.json();
+      console.log('📦 Suppliers fetched:', suppliersData?.length || 0);
 
       // Get product counts for each supplier
-      const { data: pricesData } = await supabase
-        .from('supplier_product_prices')
-        .select('supplier_id')
-        .gt('price', 0);
+      let pricesData: any[] = [];
+      try {
+        const pricesController = new AbortController();
+        const pricesTimeoutId = setTimeout(() => pricesController.abort(), 5000);
+        
+        const pricesResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/supplier_product_prices?select=supplier_id&price=gt.0`,
+          { 
+            headers: { 'apikey': apiKey },
+            signal: pricesController.signal,
+            cache: 'no-store'
+          }
+        );
+        clearTimeout(pricesTimeoutId);
+        
+        if (pricesResponse.ok) {
+          pricesData = await pricesResponse.json();
+        }
+      } catch (e) {
+        console.log('Prices fetch timeout');
+      }
 
       const productCounts: Record<string, number> = {};
       pricesData?.forEach(p => {
         productCounts[p.supplier_id] = (productCounts[p.supplier_id] || 0) + 1;
       });
 
-      const suppliersWithCounts = (suppliersData || []).map(s => ({
+      const suppliersWithCounts = (suppliersData || []).map((s: any) => ({
         ...s,
         product_count: productCounts[s.id] || productCounts[s.user_id] || 0,
       }));
 
       // Sort by product count (suppliers with more products first)
-      suppliersWithCounts.sort((a, b) => (b.product_count || 0) - (a.product_count || 0));
+      suppliersWithCounts.sort((a: any, b: any) => (b.product_count || 0) - (a.product_count || 0));
 
       setSuppliers(suppliersWithCounts);
       
       // Pre-select suppliers that have products (top 3 by default)
       const topSuppliers = suppliersWithCounts
-        .filter(s => s.product_count && s.product_count > 0)
+        .filter((s: any) => s.product_count && s.product_count > 0)
         .slice(0, 3)
-        .map(s => s.id);
+        .map((s: any) => s.id);
       setSelectedSuppliers(topSuppliers);
 
     } catch (error) {
@@ -155,62 +187,108 @@ export const MultiSupplierQuoteDialog: React.FC<MultiSupplierQuoteDialogProps> =
     }
 
     setSending(true);
+    
+    // Get user from localStorage (faster than Supabase call)
+    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+    const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+    
+    let userId: string | null = null;
+    let accessToken: string | null = null;
+    
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast({
-          title: 'Sign in required',
-          description: 'Please sign in to request quotes.',
-          variant: 'destructive',
-        });
-        return;
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        userId = parsed.user?.id;
+        accessToken = parsed.access_token;
       }
+    } catch (e) {
+      console.warn('Could not parse stored session');
+    }
+    
+    if (!userId || !accessToken) {
+      toast({
+        title: 'Sign in required',
+        description: 'Please sign in to request quotes.',
+        variant: 'destructive',
+      });
+      setSending(false);
+      return;
+    }
 
-      let successCount = 0;
-      const failedSuppliers: string[] = [];
+    console.log('📤 Sending quotes as user:', userId);
 
-      // Create quote request for each selected supplier
+    let successCount = 0;
+    const failedSuppliers: string[] = [];
+
+    try {
+      // Create quote request for each selected supplier using native fetch
       for (const supplierId of selectedSuppliers) {
         const supplier = suppliers.find(s => s.id === supplierId);
         const supplierName = supplier?.company_name || 'Supplier';
         
-        // IMPORTANT: Use suppliers.id (NOT user_id) for supplier_id
-        // The supplier dashboard queries by suppliers.id, and RLS policies expect this
-        const validSupplierId = supplier?.id || supplierId;
+        // Use supplier.user_id if available (for suppliers who registered), otherwise supplier.id
+        const validSupplierId = supplier?.user_id || supplier?.id || supplierId;
 
         const poNumber = `QR-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
         const totalAmount = cartItems.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
 
-        console.log(`📤 Sending quote to ${supplierName} (supplier.id: ${validSupplierId})`);
+        console.log(`📤 Sending quote to ${supplierName} (supplier_id: ${validSupplierId})`);
 
-        const { error } = await supabase
-          .from('purchase_orders')
-          .insert({
-            po_number: poNumber,
-            buyer_id: user.id,
-            supplier_id: validSupplierId, // Use suppliers.id - this is what the dashboard queries
-            total_amount: totalAmount,
-            delivery_address: 'To be provided',
-            delivery_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 14 days
-            project_name: `Multi-Quote Request - ${new Date().toLocaleDateString()}`,
-            status: 'pending',
-            items: cartItems.map(item => ({
-              material_id: item.id,
-              material_name: item.name,
-              category: item.category,
-              quantity: item.quantity,
-              unit: item.unit,
-              unit_price: item.unit_price, // Reference price (not final)
-              image_url: item.image_url,
-              notes: additionalNotes || undefined,
-            })),
-            created_at: new Date().toISOString(),
+        const quotePayload = {
+          po_number: poNumber,
+          buyer_id: userId,
+          supplier_id: validSupplierId,
+          total_amount: totalAmount,
+          delivery_address: 'To be provided',
+          delivery_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 14 days
+          project_name: `Multi-Quote Request - ${new Date().toLocaleDateString()}`,
+          status: 'pending',
+          items: cartItems.map(item => ({
+            material_id: item.id,
+            material_name: item.name,
+            category: item.category,
+            quantity: item.quantity,
+            unit: item.unit,
+            unit_price: item.unit_price,
+            image_url: item.image_url,
+            notes: additionalNotes || undefined,
+          })),
+          created_at: new Date().toISOString(),
+        };
+
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+          
+          const response = await fetch(`${SUPABASE_URL}/rest/v1/purchase_orders`, {
+            method: 'POST',
+            headers: {
+              'apikey': apiKey,
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify(quotePayload),
+            signal: controller.signal
           });
+          clearTimeout(timeoutId);
 
-        if (!error) {
-          successCount++;
-        } else {
-          console.error(`Failed to send quote to ${supplierName}:`, error);
+          if (response.ok) {
+            const data = await response.json();
+            console.log(`✅ Quote sent to ${supplierName}:`, data?.[0]?.id);
+            successCount++;
+          } else {
+            const errorText = await response.text();
+            console.error(`Failed to send quote to ${supplierName}:`, response.status, errorText);
+            failedSuppliers.push(supplierName);
+          }
+        } catch (fetchError: any) {
+          if (fetchError.name === 'AbortError') {
+            console.error(`Timeout sending quote to ${supplierName}`);
+          } else {
+            console.error(`Error sending quote to ${supplierName}:`, fetchError);
+          }
           failedSuppliers.push(supplierName);
         }
       }
@@ -218,7 +296,7 @@ export const MultiSupplierQuoteDialog: React.FC<MultiSupplierQuoteDialogProps> =
       if (successCount > 0) {
         toast({
           title: '🎉 Quote Requests Sent!',
-          description: `Sent to ${successCount} supplier(s). You'll receive their quotes in your dashboard.`,
+          description: `Sent to ${successCount} supplier(s). Check your dashboard for responses.`,
         });
         onQuotesSent();
         onClose();
@@ -228,6 +306,14 @@ export const MultiSupplierQuoteDialog: React.FC<MultiSupplierQuoteDialogProps> =
         toast({
           title: '⚠️ Some Requests Failed',
           description: `Failed to send to: ${failedSuppliers.join(', ')}`,
+          variant: 'destructive',
+        });
+      }
+
+      if (successCount === 0 && failedSuppliers.length > 0) {
+        toast({
+          title: '❌ All Requests Failed',
+          description: 'Could not send any quote requests. Please try again.',
           variant: 'destructive',
         });
       }
