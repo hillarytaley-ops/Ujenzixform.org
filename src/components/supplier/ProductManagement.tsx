@@ -285,43 +285,71 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
     return () => clearTimeout(safetyTimeout);
   }, [supplierId]);
 
-  // Load ALL images in smaller sequential batches to avoid 500 errors
+  // Load images in smaller sequential batches using fetch API (base64 images are large!)
   const loadAllImages = async (productIds: string[]) => {
     if (productIds.length === 0) return;
     
     setImagesLoading(true);
-    console.log(`🖼️ Loading images for ${productIds.length} products...`);
+    console.log(`🖼️ Loading images for ${productIds.length} products in batches...`);
+    
+    const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+    
+    // Get access token
+    let accessToken = '';
+    try {
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        accessToken = parsed.access_token || '';
+      }
+    } catch (e) {}
     
     try {
-      // Use smaller batches of 20 to avoid Supabase 500 errors
-      const BATCH_SIZE = 20;
-      const allImages: Record<string, string> = {};
+      // Use smaller batches of 10 (base64 images are large - each can be 100KB+)
+      const BATCH_SIZE = 10;
       
-      // Process batches sequentially but quickly
+      // Process batches sequentially
       for (let i = 0; i < productIds.length; i += BATCH_SIZE) {
         const batch = productIds.slice(i, i + BATCH_SIZE);
+        const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+        const totalBatches = Math.ceil(productIds.length / BATCH_SIZE);
         
         try {
-          const { data, error } = await (supabase
-            .from('admin_material_images' as any)
-            .select('id,image_url')
-            .in('id', batch));
+          // Use PostgREST 'in' filter: id=in.(uuid1,uuid2,...)
+          const idsParam = `in.(${batch.join(',')})`;
+          const url = `https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/admin_material_images?select=id,image_url&id=${idsParam}`;
           
-          if (!error && data) {
+          const response = await fetch(url, {
+            headers: {
+              'apikey': apiKey,
+              'Authorization': accessToken ? `Bearer ${accessToken}` : '',
+            }
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            const batchImages: Record<string, string> = {};
+            
             data.forEach((item: any) => {
               if (item.image_url) {
-                allImages[item.id] = item.image_url;
+                batchImages[item.id] = item.image_url;
               }
             });
+            
             // Update state progressively so images appear as they load
-            setProductImages(prev => ({ ...prev, ...allImages }));
+            if (Object.keys(batchImages).length > 0) {
+              setProductImages(prev => ({ ...prev, ...batchImages }));
+              console.log(`🖼️ Batch ${batchNum}/${totalBatches}: Loaded ${Object.keys(batchImages).length} images`);
+            }
+          } else {
+            console.warn(`🖼️ Batch ${batchNum} failed: HTTP ${response.status}`);
           }
         } catch (batchError) {
-          console.warn(`Batch ${i / BATCH_SIZE + 1} failed:`, batchError);
+          console.warn(`🖼️ Batch ${batchNum} error:`, batchError);
         }
       }
       
-      console.log(`✅ Loaded ${Object.keys(allImages).length} images`);
+      console.log(`✅ Finished loading images`);
     } catch (error) {
       console.error('Error loading images:', error);
     } finally {
@@ -365,8 +393,9 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
         console.error('📦 API test failed:', testErr);
       }
       
-      // Now fetch all products INCLUDING image_url
-      const url = 'https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,is_approved,image_url&order=created_at.desc&limit=500';
+      // Fetch products WITHOUT image_url first (base64 images are too large - each can be 100KB-1MB!)
+      // Images will be loaded in batches afterward
+      const url = 'https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,is_approved&order=created_at.desc&limit=500';
       console.log('📦 Fetching products...');
       const fetchStart = Date.now();
       
@@ -402,16 +431,11 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
       setAdminProducts(productsToShow || []);
       setLoading(false);
       
-      // Pre-populate image cache from fetched data (image_url is now included in the query)
+      // Load images in batches (base64 images are large, can't fetch all at once)
       if (productsToShow && productsToShow.length > 0) {
-        const imageCache: Record<string, string> = {};
-        productsToShow.forEach((p: any) => {
-          if (p.image_url) {
-            imageCache[p.id] = p.image_url;
-          }
-        });
-        console.log(`✅ Loaded ${Object.keys(imageCache).length} images directly from product data`);
-        setProductImages(imageCache);
+        const allIds = productsToShow.map((p: any) => p.id);
+        console.log(`📦 Starting to load images for ${allIds.length} products...`);
+        loadAllImages(allIds);
       }
     } catch (error: any) {
       console.error('📦 Error loading admin products:', error.message || error);
