@@ -296,7 +296,11 @@ export const CartSidebar: React.FC = () => {
       let validatedSupplierId: string | null = null;
       let supplierName: string | null = null;
       
-      // STEP 1: Check if any item already has a valid supplier_id
+      // Collect product IDs from cart
+      const productIds = items.map(item => item.id).filter(Boolean);
+      console.log('🛒 Cart product IDs:', productIds);
+      
+      // STEP 1: Check if any item already has a valid supplier_id from user selection
       const itemWithSupplier = items.find(item => 
         item.supplier_id && 
         item.supplier_id !== 'admin-catalog' && 
@@ -310,14 +314,52 @@ export const CartSidebar: React.FC = () => {
         console.log('📦 Using supplier from cart item:', validatedSupplierId);
       }
       
-      // STEP 2: If no supplier, get first available supplier using fetch
+      // STEP 2: If no supplier from cart, find supplier who has PRICED these products
+      if (!validatedSupplierId && productIds.length > 0) {
+        console.log('🔍 Finding supplier who priced these products...');
+        try {
+          const productIdsParam = productIds.map(id => `"${id}"`).join(',');
+          const pricesResponse = await fetchWithTimeout(
+            `${SUPABASE_URL}/rest/v1/supplier_product_prices?product_id=in.(${productIdsParam})&select=supplier_id&limit=1`,
+            { headers: { 'apikey': SUPABASE_ANON_KEY } },
+            5000
+          );
+          
+          if (pricesResponse.ok) {
+            const prices = await pricesResponse.json();
+            if (prices && prices.length > 0) {
+              validatedSupplierId = prices[0].supplier_id;
+              console.log('📦 Using supplier who priced products:', validatedSupplierId);
+              
+              // Get supplier name
+              try {
+                const nameResponse = await fetchWithTimeout(
+                  `${SUPABASE_URL}/rest/v1/suppliers?id=eq.${validatedSupplierId}&select=company_name`,
+                  { headers: { 'apikey': SUPABASE_ANON_KEY } },
+                  3000
+                );
+                if (nameResponse.ok) {
+                  const nameData = await nameResponse.json();
+                  supplierName = nameData?.[0]?.company_name || 'Supplier';
+                }
+              } catch (e) {
+                console.warn('Could not fetch supplier name');
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Product prices lookup failed');
+        }
+      }
+      
+      // STEP 3: If still no supplier, get first available supplier
       if (!validatedSupplierId) {
-        console.log('🔍 Finding a supplier...');
+        console.log('🔍 Finding any available supplier...');
         try {
           const supplierResponse = await fetchWithTimeout(
             `${SUPABASE_URL}/rest/v1/suppliers?select=id,company_name&limit=1`,
             { headers: { 'apikey': SUPABASE_ANON_KEY } },
-            8000
+            5000
           );
           
           if (supplierResponse.ok) {
@@ -329,14 +371,14 @@ export const CartSidebar: React.FC = () => {
             }
           }
         } catch (e) {
-          console.warn('Supplier fetch failed, using fallback');
+          console.warn('Supplier fetch failed');
         }
       }
       
-      // STEP 3: Fallback - use user ID as supplier (will need admin to assign)
+      // STEP 4: Fallback - use user ID (may fail FK, but we'll handle it)
       if (!validatedSupplierId) {
-        console.warn('⚠️ No supplier found, using placeholder');
-        validatedSupplierId = userId; // This may fail FK constraint, but we'll handle it
+        console.warn('⚠️ No supplier found, using user ID as fallback');
+        validatedSupplierId = userId;
       }
       
       console.log('✅ Final supplier for order:', validatedSupplierId, supplierName);
