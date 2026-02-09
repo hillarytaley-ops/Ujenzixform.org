@@ -113,12 +113,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUser(currentSession.user);
           setLoading(false);
           rolesFetched = true;
+          // Save email to localStorage for instant display on refresh
+          if (currentSession.user.email) {
+            localStorage.setItem('user_email', currentSession.user.email);
+          }
           // Fetch role synchronously on sign-in
           await fetchUserRole(currentSession.user.id);
         } else if (currentSession?.user) {
           setSession(currentSession);
           setUser(currentSession.user);
           setLoading(false);
+          // Save email to localStorage for instant display on refresh
+          if (currentSession.user.email) {
+            localStorage.setItem('user_email', currentSession.user.email);
+          }
           // Fetch role in background (only once)
           if (!rolesFetched) {
             rolesFetched = true;
@@ -130,6 +138,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUserRole(null);
           setLoading(false);
           rolesFetched = false;
+          // Clear email from localStorage on sign out
+          localStorage.removeItem('user_email');
         } else if (event === 'INITIAL_SESSION' && !currentSession) {
           // No session on initial load
           setLoading(false);
@@ -144,6 +154,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (initialSession?.user) {
         setSession(initialSession);
         setUser(initialSession.user);
+        // Save email to localStorage for instant display on refresh
+        if (initialSession.user.email) {
+          localStorage.setItem('user_email', initialSession.user.email);
+        }
         if (!rolesFetched) {
           rolesFetched = true;
           fetchUserRole(initialSession.user.id).catch(console.error);
@@ -175,10 +189,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(null);
       setSession(null);
       setUserRole(null);
-      // Clear ALL localStorage role data
+      // Clear ALL localStorage auth data
       localStorage.removeItem('user_role');
       localStorage.removeItem('user_role_id');
       localStorage.removeItem('user_role_verified');
+      localStorage.removeItem('user_email');
       localStorage.removeItem('admin_authenticated');
       localStorage.removeItem('admin_login_time');
       await supabase.auth.signOut();
@@ -190,6 +205,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.removeItem('user_role');
       localStorage.removeItem('user_role_id');
       localStorage.removeItem('user_role_verified');
+      localStorage.removeItem('user_email');
       localStorage.removeItem('admin_authenticated');
       localStorage.removeItem('admin_login_time');
     }
