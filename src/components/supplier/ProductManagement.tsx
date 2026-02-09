@@ -277,11 +277,11 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
   useEffect(() => {
     loadAdminProducts();
     loadSupplierPrices();
-    // Safety timeout - force loading to false after 10 seconds
+    // Safety timeout - force loading to false after 25 seconds (give fetch time to complete)
     const safetyTimeout = setTimeout(() => {
       setLoading(false);
       console.log('⏱️ Products safety timeout - forcing loading false');
-    }, 10000);
+    }, 25000);
     return () => clearTimeout(safetyTimeout);
   }, [supplierId]);
 
@@ -335,83 +335,90 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
       setLoading(true);
       console.log('📦 Loading admin products via fetch API...');
       
-      // Get session for auth
+      // Get access token from localStorage directly (faster than getSession)
       let accessToken = '';
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        accessToken = session?.access_token || '';
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          accessToken = parsed.access_token || '';
+        }
       } catch (e) {
-        console.log('Could not get session, continuing without auth');
+        console.log('Could not get token from localStorage');
       }
       
-      // Use native fetch API with timeout - much more reliable
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 second timeout
+      const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      
+      // First, test if API is responding with a simple count query
+      console.log('📦 Testing API connection...');
+      const testStart = Date.now();
       
       try {
-        // Try without is_approved filter first to see all products
-        const url = 'https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,is_approved&order=created_at.desc&limit=500';
-        console.log('📦 Fetching from:', url);
-        
-        const response = await fetch(url, {
-          headers: {
-            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo',
-            'Authorization': accessToken ? `Bearer ${accessToken}` : '',
-          },
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        console.log('📦 Response status:', response.status);
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('📦 Response error:', errorText);
-          throw new Error(`HTTP ${response.status}: ${errorText}`);
-        }
-        
-        const data = await response.json();
-        console.log('✅ Loaded', data.length, 'admin products via fetch');
-        console.log('📦 First 3 products:', data.slice(0, 3));
-        
-        // Filter to only approved products (or show all if none are approved)
-        const approvedProducts = data.filter((p: any) => p.is_approved === true);
-        console.log('📦 Approved products:', approvedProducts.length);
-        
-        // Use approved products if any, otherwise use all products
-        const productsToShow = approvedProducts.length > 0 ? approvedProducts : data;
-        
-        setAdminProducts(productsToShow || []);
-        setLoading(false);
-        
-        // Then load images in background
-        if (productsToShow && productsToShow.length > 0) {
-          const allIds = productsToShow.map((p: any) => p.id);
-          loadAllImages(allIds);
-        }
-      } catch (fetchErr: any) {
-        clearTimeout(timeoutId);
-        
-        if (fetchErr.name === 'AbortError') {
-          console.log('⏱️ Products fetch timeout after 20s');
-        } else {
-          console.error('📦 Fetch error:', fetchErr);
-        }
-        
-        // Fallback to demo data
-        console.log('📦 Using demo data as fallback');
-        setAdminProducts([
-          { id: '1', name: 'Bamburi Cement 42.5N (50kg)', category: 'Cement & Concrete', image_url: '', description: 'Premium Portland cement' },
-          { id: '2', name: 'Y12 Deformed Steel Bars (6m)', category: 'Steel & Metal', image_url: '', description: 'High-tensile steel reinforcement' },
-          { id: '3', name: 'Mabati Iron Sheets Gauge 28', category: 'Roofing Materials', image_url: '', description: 'Galvanized roofing sheets' },
-          { id: '4', name: 'River Sand (per ton)', category: 'Sand & Aggregates', image_url: '', description: 'Clean construction sand' },
-          { id: '5', name: 'Machine Cut Blocks 6"', category: 'Bricks & Blocks', image_url: '', description: 'Standard building blocks' },
-        ]);
-        setLoading(false);
+        const testResponse = await fetch(
+          'https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/admin_material_images?select=id&limit=1',
+          {
+            headers: { 'apikey': apiKey, 'Authorization': accessToken ? `Bearer ${accessToken}` : '' }
+          }
+        );
+        console.log('📦 API test response:', testResponse.status, 'in', Date.now() - testStart, 'ms');
+      } catch (testErr) {
+        console.error('📦 API test failed:', testErr);
       }
-    } catch (error) {
-      console.error('📦 Error loading admin products:', error);
+      
+      // Now fetch all products
+      const url = 'https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,is_approved&order=created_at.desc&limit=500';
+      console.log('📦 Fetching products...');
+      const fetchStart = Date.now();
+      
+      const response = await fetch(url, {
+        headers: {
+          'apikey': apiKey,
+          'Authorization': accessToken ? `Bearer ${accessToken}` : '',
+        }
+      });
+      
+      console.log('📦 Response status:', response.status, 'in', Date.now() - fetchStart, 'ms');
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('📦 Response error:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+      
+      const data = await response.json();
+      console.log('✅ Loaded', data.length, 'admin products');
+      
+      if (data.length > 0) {
+        console.log('📦 Sample product:', data[0]);
+      }
+      
+      // Filter to only approved products (or show all if none are approved)
+      const approvedProducts = data.filter((p: any) => p.is_approved === true);
+      console.log('📦 Approved:', approvedProducts.length, '/ Total:', data.length);
+      
+      // Use approved products if any, otherwise use all products
+      const productsToShow = approvedProducts.length > 0 ? approvedProducts : data;
+      
+      setAdminProducts(productsToShow || []);
+      setLoading(false);
+      
+      // Then load images in background
+      if (productsToShow && productsToShow.length > 0) {
+        const allIds = productsToShow.map((p: any) => p.id);
+        loadAllImages(allIds);
+      }
+    } catch (error: any) {
+      console.error('📦 Error loading admin products:', error.message || error);
+      
+      // Fallback to demo data
+      console.log('📦 Using demo data as fallback');
+      setAdminProducts([
+        { id: '1', name: 'Bamburi Cement 42.5N (50kg)', category: 'Cement & Concrete', image_url: '', description: 'Premium Portland cement' },
+        { id: '2', name: 'Y12 Deformed Steel Bars (6m)', category: 'Steel & Metal', image_url: '', description: 'High-tensile steel reinforcement' },
+        { id: '3', name: 'Mabati Iron Sheets Gauge 28', category: 'Roofing Materials', image_url: '', description: 'Galvanized roofing sheets' },
+        { id: '4', name: 'River Sand (per ton)', category: 'Sand & Aggregates', image_url: '', description: 'Clean construction sand' },
+        { id: '5', name: 'Machine Cut Blocks 6"', category: 'Bricks & Blocks', image_url: '', description: 'Standard building blocks' },
+      ]);
       setLoading(false);
     }
   };
