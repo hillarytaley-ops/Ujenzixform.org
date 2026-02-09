@@ -88,23 +88,36 @@ const SupplierAuth: React.FC = () => {
 
       redirecting.current = true;
       
-      if (dbRole && dbRole !== ROLE) {
+      // SECURITY: Strict role checking - NO auto-assignment
+      if (!dbRole) {
+        // User has NO role - they must register first!
+        console.log('🔐 SECURITY: No role found - rejecting sign-in');
+        try {
+          await fetch(`${SUPABASE_URL}/auth/v1/logout`, {
+            method: 'POST',
+            headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${authData.access_token}` },
+          });
+        } catch (e) { /* ignore */ }
+        localStorage.removeItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        localStorage.removeItem('user_role');
+        localStorage.removeItem('user_email');
+        setIsLoading(false);
+        redirecting.current = false;
+        toast({ 
+          title: '❌ Account Not Registered', 
+          description: 'You must register as a Supplier first. Please use the Sign Up tab.',
+          variant: 'destructive',
+          duration: 6000
+        });
+        setActiveTab('signup');
+        return;
+      }
+      
+      if (dbRole !== ROLE) {
         const correctDashboard = ROLE_DASHBOARDS[dbRole] || '/home';
         localStorage.setItem('user_role', dbRole);
-        toast({ title: 'Wrong Portal', description: `You are a ${dbRole}. Redirecting to your dashboard.` });
+        toast({ title: 'Wrong Portal', description: `You are registered as ${dbRole}. Redirecting to your dashboard.` });
         window.location.href = correctDashboard;
-      } else if (!dbRole) {
-        // User has NO role - create one for them
-        console.log('🔐 No role found, creating role for user:', authData.user.id);
-        try {
-          await fetch(`${SUPABASE_URL}/rest/v1/user_roles`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${authData.access_token}`, 'Prefer': 'return=minimal' },
-            body: JSON.stringify({ user_id: authData.user.id, role: ROLE }),
-          });
-        } catch (err) { console.log('🔐 Role creation error:', err); }
-        localStorage.setItem('user_role', ROLE);
-        window.location.href = DASHBOARD;
       } else {
         localStorage.setItem('user_role', ROLE);
         window.location.href = DASHBOARD;

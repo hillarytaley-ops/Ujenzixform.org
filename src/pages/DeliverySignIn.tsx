@@ -340,20 +340,9 @@ const DeliverySignIn = () => {
         const metadataRole = authData.user.user_metadata?.role;
         console.log('🔐 Metadata role:', metadataRole);
         
-        if (metadataRole === 'delivery' || metadataRole === 'delivery_provider') {
-          // User registered as delivery but role wasn't saved to DB - fix it now
-          console.log('🔐 Found delivery role in metadata, creating in database...');
-          const { error: insertError } = await supabase
-            .from('user_roles')
-            .insert({ user_id: userId, role: 'delivery' as any });
-          
-          if (insertError) {
-            console.warn('🔐 Could not create delivery role from metadata:', insertError);
-          } else {
-            console.log('🔐 Successfully created delivery role from metadata');
-            dbRole = 'delivery' as any;
-          }
-        }
+        // SECURITY: Do NOT auto-create roles from metadata
+        // Users must register through proper registration pages
+        console.log('🔐 Metadata role (for info only, NOT auto-creating):', metadataRole);
       }
       
       // If user has a DIFFERENT role (not delivery/admin), BLOCK them
@@ -533,28 +522,29 @@ const DeliverySignIn = () => {
             return;
           }
           
-          // Create delivery role only if no role exists
+          // SECURITY: Do NOT auto-create roles for visitors
+          // If no role exists, block them and require registration
           if (!existingRole?.role) {
-            console.log('🔐 Creating delivery role in database for new user');
-            const { error: insertError } = await supabase
-              .from('user_roles')
-              .insert({ user_id: signInData.user.id, role: 'delivery' as any });
-            
-            if (insertError) {
-              console.warn('🔐 Could not create delivery role:', insertError);
-            } else {
-              console.log('🔐 Successfully created delivery role in database');
-            }
+            console.log('🚫 SECURITY: No role found - blocking access, user must register first');
+            toast({
+              variant: "destructive",
+              title: "❌ Not Registered",
+              description: "You are not registered as a Delivery Provider. Please register first using the registration link below.",
+              duration: 5000
+            });
+            await supabase.auth.signOut();
+            setLoading(false);
+            return;
           }
 
-          localStorage.setItem('user_role', 'delivery');
+          localStorage.setItem('user_role', existingRole.role);
           localStorage.setItem('user_role_id', signInData.user.id);
           localStorage.setItem('user_role_verified', Date.now().toString());
-          saveUserSession(signInData.user.id, userEmail, 'delivery');
+          saveUserSession(signInData.user.id, userEmail, existingRole.role);
 
           toast({
-            title: "✅ Account Created & Signed In!",
-            description: "Welcome! Redirecting to dashboard...",
+            title: "✅ Welcome Delivery Provider!",
+            description: "Redirecting to dashboard...",
           });
 
           window.location.replace('/delivery-dashboard');
@@ -585,21 +575,24 @@ const DeliverySignIn = () => {
         return;
       }
       
-      // Create delivery role only if no role exists
+      // SECURITY: Do NOT auto-create roles for visitors
+      // If no role exists, block them and require registration
       if (!existingRole?.role) {
-        console.log('🔐 Creating delivery role in database for new user (session exists)');
-        const { error: insertError } = await supabase
-          .from('user_roles')
-          .insert({ user_id: userId, role: 'delivery' as any });
-        
-        if (insertError) {
-          console.warn('🔐 Could not create delivery role:', insertError);
-        } else {
-          console.log('🔐 Successfully created delivery role in database');
-        }
+        console.log('🚫 SECURITY: No role found (session exists) - blocking access');
+        toast({
+          variant: "destructive",
+          title: "❌ Not Registered",
+          description: "You are not registered as a Delivery Provider. Please register first.",
+          duration: 5000
+        });
+        await supabase.auth.signOut();
+        localStorage.removeItem('user_role');
+        localStorage.removeItem('user_role_id');
+        setLoading(false);
+        return;
       }
 
-      localStorage.setItem('user_role', 'delivery');
+      localStorage.setItem('user_role', existingRole.role);
       localStorage.setItem('user_role_id', userId);
       localStorage.setItem('user_role_verified', Date.now().toString());
       saveUserSession(userId, userEmail, 'delivery');

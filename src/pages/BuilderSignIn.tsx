@@ -239,29 +239,12 @@ const BuilderSignIn = () => {
       let dbRole = roleData?.role;
       console.log('🔐 Database role:', dbRole);
       
-      // If no role in DB, check user metadata (set during registration)
+      // SECURITY: Do NOT auto-create roles from metadata
+      // Users must register through proper registration pages
       if (!dbRole) {
         const metadataRole = authData.user.user_metadata?.role;
-        console.log('🔐 Metadata role:', metadataRole);
-        
-        // Accept builder, professional_builder, or private_client from metadata
-        const builderMetadataRoles = ['builder', 'professional_builder', 'private_client'];
-        if (builderMetadataRoles.includes(metadataRole)) {
-          // User registered as builder but role wasn't saved to DB - fix it now
-          // Default to private_client for new users
-          const roleToCreate = metadataRole === 'builder' ? 'private_client' : metadataRole;
-          console.log('🔐 Found builder role in metadata, creating in database as:', roleToCreate);
-          const { error: insertError } = await supabase
-            .from('user_roles')
-            .insert({ user_id: userId, role: roleToCreate as any });
-          
-          if (insertError) {
-            console.warn('🔐 Could not create builder role from metadata:', insertError);
-          } else {
-            console.log('🔐 Successfully created builder role from metadata');
-            dbRole = roleToCreate;
-          }
-        }
+        console.log('🔐 Metadata role (for info only, NOT auto-creating):', metadataRole);
+        // We no longer auto-create roles - user must register first
       }
 
       // Check if user has a DIFFERENT role (supplier or delivery) in the DATABASE
@@ -463,32 +446,33 @@ const BuilderSignIn = () => {
             return;
           }
           
-          // Create private_client role only if no role exists
+          // SECURITY: Do NOT auto-create roles for visitors
+          // If no role exists, block them and require registration
           if (!existingRole?.role) {
-            console.log('🔐 Creating private_client role in database for new user');
-            const { error: insertError } = await supabase
-              .from('user_roles')
-              .insert({ user_id: signInData.user.id, role: 'private_client' as any });
-            
-            if (insertError) {
-              console.warn('🔐 Could not create private_client role:', insertError);
-            } else {
-              console.log('🔐 Successfully created private_client role in database');
-            }
+            console.log('🚫 SECURITY: No role found - blocking access, user must register first');
+            toast({
+              variant: "destructive",
+              title: "❌ Not Registered",
+              description: "You are not registered as a Builder. Please register first using the registration link below.",
+              duration: 5000
+            });
+            await supabase.auth.signOut();
+            setLoading(false);
+            return;
           }
 
-          const roleToStore = existingRole?.role || 'private_client';
+          const roleToStore = existingRole.role;
           localStorage.setItem('user_role', roleToStore);
           localStorage.setItem('user_role_id', signInData.user.id);
           saveUserSession(signInData.user.id, userEmail, roleToStore);
 
           toast({
-            title: "✅ Account Created & Signed In!",
-            description: "Welcome! Redirecting to home...",
+            title: "✅ Welcome!",
+            description: "Redirecting to dashboard...",
           });
 
           setTimeout(() => {
-            window.location.href = '/home';
+            window.location.href = '/builder-dashboard';
           }, 500);
           return;
         }
@@ -518,21 +502,24 @@ const BuilderSignIn = () => {
         return;
       }
       
-      // Create private_client role only if no role exists
+      // SECURITY: Do NOT auto-create roles for visitors
+      // If no role exists, block them and require registration
       if (!existingRole?.role) {
-        console.log('🔐 Creating private_client role in database for new user (session exists)');
-        const { error: insertError } = await supabase
-          .from('user_roles')
-          .insert({ user_id: userId, role: 'private_client' as any });
-        
-        if (insertError) {
-          console.warn('🔐 Could not create private_client role:', insertError);
-        } else {
-          console.log('🔐 Successfully created private_client role in database');
-        }
+        console.log('🚫 SECURITY: No role found (session exists) - blocking access');
+        toast({
+          variant: "destructive",
+          title: "❌ Not Registered",
+          description: "You are not registered as a Builder. Please register first.",
+          duration: 5000
+        });
+        await supabase.auth.signOut();
+        localStorage.removeItem('user_role');
+        localStorage.removeItem('user_role_id');
+        setLoading(false);
+        return;
       }
 
-      const roleToStore = existingRole?.role || 'private_client';
+      const roleToStore = existingRole.role;
       localStorage.setItem('user_role', roleToStore);
       localStorage.setItem('user_role_id', userId);
       saveUserSession(userId, userEmail, roleToStore);
