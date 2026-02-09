@@ -365,8 +365,8 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
         console.error('📦 API test failed:', testErr);
       }
       
-      // Now fetch all products
-      const url = 'https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,is_approved&order=created_at.desc&limit=500';
+      // Now fetch all products INCLUDING image_url
+      const url = 'https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/admin_material_images?select=id,name,category,description,unit,suggested_price,pricing_type,variants,is_approved,image_url&order=created_at.desc&limit=500';
       console.log('📦 Fetching products...');
       const fetchStart = Date.now();
       
@@ -402,10 +402,16 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
       setAdminProducts(productsToShow || []);
       setLoading(false);
       
-      // Then load images in background
+      // Pre-populate image cache from fetched data (image_url is now included in the query)
       if (productsToShow && productsToShow.length > 0) {
-        const allIds = productsToShow.map((p: any) => p.id);
-        loadAllImages(allIds);
+        const imageCache: Record<string, string> = {};
+        productsToShow.forEach((p: any) => {
+          if (p.image_url) {
+            imageCache[p.id] = p.image_url;
+          }
+        });
+        console.log(`✅ Loaded ${Object.keys(imageCache).length} images directly from product data`);
+        setProductImages(imageCache);
       }
     } catch (error: any) {
       console.error('📦 Error loading admin products:', error.message || error);
