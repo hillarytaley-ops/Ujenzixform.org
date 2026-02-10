@@ -214,21 +214,26 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
         return;
       }
 
-      // Get user role with timeout
-      let role: string | null = null;
-      try {
-        const { data: roleData } = await withTimeout(
-          supabase.from('user_roles').select('role').eq('user_id', userId).maybeSingle(),
-          3000
-        );
-        role = roleData?.role || null;
-      } catch {
-        console.log('⚠️ QR Manager: Role lookup timeout, assuming supplier');
-        role = 'supplier'; // Default to supplier for this component
+      // Get user role - check localStorage first (faster), then database
+      let role: string | null = localStorage.getItem('user_role');
+      console.log('🔑 QR Manager: Role from localStorage:', role);
+      
+      // If no role in localStorage, try database with timeout
+      if (!role) {
+        try {
+          const { data: roleData } = await withTimeout(
+            supabase.from('user_roles').select('role').eq('user_id', userId).maybeSingle(),
+            3000
+          );
+          role = roleData?.role || null;
+          console.log('🔑 QR Manager: Role from database:', role);
+        } catch {
+          console.log('⚠️ QR Manager: Role lookup timeout');
+        }
       }
 
       setUserRole(role);
-      console.log('🔑 QR Manager: User role:', role);
+      console.log('🔑 QR Manager: Final user role:', role);
 
       // Fetch material items based on role
       await fetchMaterialItems(role, userId);
@@ -352,6 +357,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
       }
     } else if (role === 'admin') {
       // Admin sees all items - use native fetch
+      console.log('👑 Admin detected - fetching ALL material items...');
       try {
         const stored = getUserFromStorage();
         const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
@@ -363,10 +369,11 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
         }
         
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout for admin
         
+        // Fetch all material items with limit to prevent overload
         const response = await fetch(
-          `${SUPABASE_URL}/rest/v1/material_items?order=created_at.desc`,
+          `${SUPABASE_URL}/rest/v1/material_items?order=created_at.desc&limit=2000`,
           { headers, signal: controller.signal, cache: 'no-store' }
         );
         clearTimeout(timeoutId);
@@ -374,12 +381,22 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
         if (response.ok) {
           const data = await response.json();
           console.log('👑 Admin: Material items found:', data?.length || 0);
+          if (data && data.length > 0) {
+            console.log('👑 Admin: Sample item:', data[0]?.qr_code, data[0]?.material_type);
+          }
           setItems(data || []);
           groupItemsByClient(data || []);
+        } else {
+          console.log('❌ Admin material items fetch failed:', response.status);
         }
       } catch (e: any) {
         console.log('⚠️ Admin material items fetch error:', e.message);
       }
+    } else {
+      // Unknown role - show empty state
+      console.log('⚠️ Unknown role:', role, '- showing empty state');
+      setItems([]);
+      setClientGroups([]);
     }
   };
 
