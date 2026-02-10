@@ -662,54 +662,78 @@ const AdminDashboard = () => {
     }
   };
   
-  // Fast stats loading - only counts, no full data
+  // Fast stats loading - using native fetch to prevent Supabase client hanging
   const loadDashboardStats = async () => {
+    console.log('📊 Loading dashboard stats...');
+    
+    // Get auth token from localStorage
+    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+    
+    let accessToken: string | null = null;
     try {
-      const client = getAdminClient() || supabase;
-      const isAdminClient = !!getAdminClient();
-      
-      // Wrap in timeout to prevent hanging
-      const statsTimeout = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Stats loading timeout')), 8000)
-      );
-      
-      // Parallel count queries - very fast, with error handling
-      const results = await Promise.race([
-        Promise.allSettled([
-          client.from('user_roles').select('role', { count: 'exact', head: true }),
-          client.from('supplier_applications').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-          client.from('delivery_providers').select('*', { count: 'exact', head: true }).eq('is_verified', false),
-          client.from('feedback').select('*', { count: 'exact', head: true })
-        ]),
-        statsTimeout
-      ]) as PromiseSettledResult<any>[];
-
-      // Handle each result separately
-      const rolesRes = results[0].status === 'fulfilled' ? results[0].value : null;
-      const supplierPendingRes = results[1].status === 'fulfilled' ? results[1].value : null;
-      const deliveryPendingRes = results[2].status === 'fulfilled' ? results[2].value : null;
-      const feedbackRes = results[3].status === 'fulfilled' ? results[3].value : null;
-
-      // Log warnings for failed queries (likely RLS blocks)
-      results.forEach((result, index) => {
-        if (result.status === 'rejected') {
-          const tableNames = ['user_roles', 'supplier_applications', 'delivery_providers', 'feedback'];
-          console.warn(`⚠️ Error loading ${tableNames[index]} (RLS may be blocking):`, result.reason?.message || result.reason);
-          if (!isAdminClient) {
-            console.warn(`⚠️ Admin service key not configured. Some data may not be accessible.`);
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        accessToken = parsed.access_token;
+      }
+    } catch (e) {
+      console.warn('Could not get session from localStorage');
+    }
+    
+    const headers: Record<string, string> = {
+      'apikey': SUPABASE_ANON_KEY,
+      'Content-Type': 'application/json'
+    };
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+    
+    // Use native fetch with individual timeouts for each stat
+    const fetchWithTimeout = async (url: string, timeoutMs: number = 5000) => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const response = await fetch(url, { headers, signal: controller.signal, cache: 'no-store' });
+        clearTimeout(timeoutId);
+        if (response.ok) {
+          const countHeader = response.headers.get('content-range');
+          // Parse count from content-range header (e.g., "0-9/100" -> 100)
+          if (countHeader) {
+            const match = countHeader.match(/\/(\d+)/);
+            return match ? parseInt(match[1], 10) : 0;
           }
+          // Fallback: count array length
+          const data = await response.json();
+          return Array.isArray(data) ? data.length : 0;
         }
-      });
+        return 0;
+      } catch (e) {
+        clearTimeout(timeoutId);
+        return 0;
+      }
+    };
+    
+    try {
+      // Parallel count queries with individual timeouts
+      const [usersCount, pendingSuppliers, pendingDelivery, feedbackCount] = await Promise.all([
+        fetchWithTimeout(`${SUPABASE_URL}/rest/v1/user_roles?select=id&limit=1000`, 5000).then(c => c),
+        fetchWithTimeout(`${SUPABASE_URL}/rest/v1/supplier_applications?status=eq.pending&select=id`, 5000).then(c => c),
+        fetchWithTimeout(`${SUPABASE_URL}/rest/v1/delivery_providers?is_verified=eq.false&select=id`, 5000).then(c => c),
+        fetchWithTimeout(`${SUPABASE_URL}/rest/v1/feedback?select=id&limit=1000`, 5000).then(c => c)
+      ]);
+      
+      console.log('📊 Stats loaded:', { usersCount, pendingSuppliers, pendingDelivery, feedbackCount });
 
       setStats(prev => ({
         ...prev,
-        totalUsers: rolesRes?.count || 0,
-        pendingRegistrations: (supplierPendingRes?.count || 0) + (deliveryPendingRes?.count || 0),
-        totalFeedback: feedbackRes?.count || 0
+        totalUsers: usersCount,
+        pendingRegistrations: pendingSuppliers + pendingDelivery,
+        totalFeedback: feedbackCount
       }));
     } catch (error: any) {
       console.error('Error loading stats:', error);
-      // Set defaults to prevent showing stale data
+      // Set defaults - don't block the dashboard
       setStats(prev => ({
         ...prev,
         totalUsers: 0,
