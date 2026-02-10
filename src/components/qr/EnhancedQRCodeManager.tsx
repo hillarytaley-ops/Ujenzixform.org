@@ -122,7 +122,48 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
       setLoading(false);
       console.log('⏱️ QR Manager safety timeout - forcing loading false');
     }, 15000);
-    return () => clearTimeout(safetyTimeout);
+    
+    // Set up real-time subscription to material_items for auto-refresh
+    // This ensures QR codes appear immediately when a builder accepts a quote
+    const subscription = supabase
+      .channel('qr-codes-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'material_items'
+        },
+        (payload) => {
+          console.log('🔔 New QR code created:', payload.new);
+          // Refresh the list when new QR codes are inserted
+          checkAuthAndFetch();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'material_items'
+        },
+        (payload) => {
+          console.log('🔄 QR code updated:', payload.new);
+          // Update the item in the list
+          setItems(prev => prev.map(item => 
+            item.id === (payload.new as MaterialItem).id ? (payload.new as MaterialItem) : item
+          ));
+        }
+      )
+      .subscribe();
+    
+    console.log('📡 QR Manager: Real-time subscription active');
+    
+    return () => {
+      clearTimeout(safetyTimeout);
+      subscription.unsubscribe();
+      console.log('📡 QR Manager: Real-time subscription closed');
+    };
   }, []);
 
   // Helper to get user ID from localStorage as fallback
@@ -929,6 +970,21 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
           </p>
         </div>
         <div className="flex gap-2 flex-wrap items-center">
+          {/* Refresh Button */}
+          <Button 
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setLoading(true);
+              checkAuthAndFetch();
+              toast({ title: '🔄 Refreshing QR codes...' });
+            }}
+            className="border-cyan-300 text-cyan-700 hover:bg-cyan-50"
+          >
+            <RefreshCw className="h-4 w-4 mr-1" />
+            Refresh
+          </Button>
+          
           {/* Selection Mode Toggle */}
           <Button 
             variant={selectionMode ? 'default' : 'outline'}
