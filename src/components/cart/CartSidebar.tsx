@@ -72,33 +72,45 @@ export const CartSidebar: React.FC = () => {
   const [lastOrderId, setLastOrderId] = useState<string | null>(null);
   const [lastOrderTotal, setLastOrderTotal] = useState<number>(0);
 
-  // Check user role on mount and when cart opens
+  // Check user role on mount and when cart opens - use localStorage FIRST for instant access
   useEffect(() => {
+    // INSTANT: Check localStorage first (this is always available immediately)
+    const cachedRole = localStorage.getItem('user_role');
+    if (cachedRole) {
+      console.log('🔐 Cart: Using cached role (instant):', cachedRole);
+      setUserRole(cachedRole);
+    }
+    
+    // ASYNC: Verify from database in background (but don't wait for it)
     const checkUserRole = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        // First check localStorage for cached role (faster)
-        const cachedRole = localStorage.getItem('user_role');
-        if (cachedRole) {
-          console.log('🔐 Cart: Using cached role:', cachedRole);
-          setUserRole(cachedRole);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: roleData } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', user.id)
+            .maybeSingle();
+          
+          const dbRole = roleData?.role || null;
+          if (dbRole) {
+            console.log('🔐 Cart: Database role verified:', dbRole);
+            setUserRole(dbRole);
+            // Update localStorage if different
+            if (dbRole !== cachedRole) {
+              localStorage.setItem('user_role', dbRole);
+            }
+          }
         }
-        
-        // Then verify from database
-        const { data: roleData } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .maybeSingle();
-        
-        const dbRole = roleData?.role || null;
-        console.log('🔐 Cart: Database role:', dbRole);
-        setUserRole(dbRole);
-      } else {
-        console.log('🔐 Cart: No user logged in');
+      } catch (err) {
+        console.log('🔐 Cart: Role check error, using cached role');
       }
     };
-    checkUserRole();
+    
+    // Only run async check if cart is open (to avoid unnecessary calls)
+    if (isCartOpen) {
+      checkUserRole();
+    }
   }, [isCartOpen]);
 
   const handleQuantityChange = (itemId: string, newQuantity: number) => {
@@ -257,6 +269,19 @@ export const CartSidebar: React.FC = () => {
 
   const handleBuyNow = async () => {
     if (isProcessing) return;
+    
+    // SECURITY: Professional builders cannot buy directly - they must request quotes
+    const currentRole = userRole || localStorage.getItem('user_role');
+    if (currentRole === 'professional_builder') {
+      console.log('🚫 Professional Builder attempted direct purchase - blocked');
+      toast({
+        title: 'Request a Quote Instead',
+        description: 'As a Professional Builder, you need to request quotes from suppliers. Use the "Request Quotes from Multiple Suppliers" button above.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
     setIsProcessing(true);
     console.log('🛒 BuyNow: Starting purchase process...');
     
@@ -652,7 +677,8 @@ export const CartSidebar: React.FC = () => {
               </div>
 
               {/* Action Buttons - Different for Professional Builders */}
-              {userRole === 'professional_builder' ? (
+              {/* Use both state and localStorage to ensure professional builders can't see Buy Now */}
+              {(userRole === 'professional_builder' || localStorage.getItem('user_role') === 'professional_builder') ? (
                 <>
                   {/* Professional Builder: Multi-Supplier Quote Flow */}
                   <Button 
