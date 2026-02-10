@@ -561,7 +561,7 @@ export const MaterialImagesManager: React.FC = () => {
       });
 
       // Reset form and close dialog
-      setUploadForm({ name: '', category: 'Cement', description: '', unit: 'unit', suggestedPrice: 0, imageFile: null, previewUrl: '' });
+      setUploadForm({ name: '', category: 'Cement', description: '', unit: 'unit', suggestedPrice: 0, imageFile: null, previewUrl: '', pricingType: 'single', variants: [] });
       setShowUploadDialog(false);
       fetchAdminImages();
     } catch (err: any) {
@@ -1976,7 +1976,7 @@ export const MaterialImagesManager: React.FC = () => {
                     onClick={() => setUploadForm(prev => ({ 
                       ...prev, 
                       pricingType: 'variants',
-                      variants: prev.variants.length === 0 ? [{ id: crypto.randomUUID(), sizeLabel: '', color: '', colorHex: '', price: 0, stock: 0 }] : prev.variants
+                      variants: (!prev.variants || prev.variants.length === 0) ? [{ id: crypto.randomUUID(), sizeLabel: '', color: '', colorHex: '', price: 0, stock: 0 }] : prev.variants
                     }))}
                   >
                     📊 Multiple Sizes / Variants
@@ -2017,7 +2017,7 @@ export const MaterialImagesManager: React.FC = () => {
                 </div>
                 
                 {/* Variants Table */}
-                {uploadForm.variants.length > 0 ? (
+                {uploadForm.variants && uploadForm.variants.length > 0 ? (
                   <div className="space-y-3">
                     {/* Variant Rows */}
                     {uploadForm.variants.map((variant, index) => (
