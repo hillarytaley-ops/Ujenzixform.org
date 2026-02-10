@@ -361,19 +361,24 @@ const SupplierDashboard = () => {
     // Set up real-time subscription for new quote requests
     // Listen to all purchase_orders changes and filter in callback
     const subscription = supabase
-      .channel('supplier-quotes')
+      .channel('supplier-quotes-realtime')
       .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'purchase_orders' },
+        { event: 'INSERT', schema: 'public', table: 'purchase_orders' },
         (payload: any) => {
-          // Check if this quote is for us (either by user_id or suppliers.id)
-          const newRecord = payload.new;
-          if (newRecord?.supplier_id) {
-            console.log('📬 Quote activity detected, refreshing...');
-            fetchQuoteRequests();
-          }
+          console.log('📬 NEW quote request detected:', payload.new?.po_number, 'supplier_id:', payload.new?.supplier_id);
+          fetchQuoteRequests();
+        }
+      )
+      .on('postgres_changes', 
+        { event: 'UPDATE', schema: 'public', table: 'purchase_orders' },
+        (payload: any) => {
+          console.log('🔄 Quote UPDATE detected:', payload.new?.po_number, 'status:', payload.new?.status);
+          fetchQuoteRequests();
         }
       )
       .subscribe();
+    
+    console.log('📡 Supplier Dashboard: Real-time subscription active for quote requests');
 
     return () => {
       subscription.unsubscribe();

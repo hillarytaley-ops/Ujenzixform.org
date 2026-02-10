@@ -227,13 +227,15 @@ export const MultiSupplierQuoteDialog: React.FC<MultiSupplierQuoteDialogProps> =
         const supplier = suppliers.find(s => s.id === supplierId);
         const supplierName = supplier?.company_name || 'Supplier';
         
-        // Use supplier.user_id if available (for suppliers who registered), otherwise supplier.id
-        const validSupplierId = supplier?.user_id || supplier?.id || supplierId;
+        // Use supplier.id (the suppliers table primary key) - this is what the Supplier Dashboard looks for
+        // The Supplier Dashboard checks: auth.uid(), suppliers.id, AND suppliers.user_id
+        // So using suppliers.id ensures it will be found
+        const validSupplierId = supplier?.id || supplierId;
 
         const poNumber = `QR-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
         const totalAmount = cartItems.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
 
-        console.log(`📤 Sending quote to ${supplierName} (supplier_id: ${validSupplierId})`);
+        console.log(`📤 Sending quote to ${supplierName} (supplier_id: ${validSupplierId}, user_id: ${supplier?.user_id})`);
 
         const quotePayload = {
           po_number: poNumber,
