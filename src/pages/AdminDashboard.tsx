@@ -473,7 +473,17 @@ const AdminDashboard = () => {
   ];
 
   useEffect(() => {
-    // Safety timeout - show UI after 2 seconds max
+    // Check authentication IMMEDIATELY before anything else
+    const isAdminAuthenticated = localStorage.getItem('admin_authenticated') === 'true';
+    const userRole = localStorage.getItem('user_role');
+    
+    if (!isAdminAuthenticated || userRole !== 'admin') {
+      console.log('🚫 Not authenticated - redirecting to admin login');
+      navigate('/admin-login');
+      return;
+    }
+    
+    // Safety timeout - show UI after 2 seconds max (only if authenticated)
     const safetyTimeout = setTimeout(() => {
       console.log('⏱️ Admin Dashboard safety timeout - forcing loading false');
       setLoading(false);
