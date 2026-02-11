@@ -43,6 +43,8 @@ interface MaterialItem {
   dispatch_scanned_at?: string;
   receive_scanned?: boolean;
   receive_scanned_at?: string;
+  is_invalidated?: boolean;  // True when both dispatch and receive scans are complete
+  invalidated_at?: string;   // Timestamp when QR was invalidated
 }
 
 interface ClientGroup {
@@ -54,6 +56,7 @@ interface ClientGroup {
   pending_items: number;
   dispatched_items: number;
   received_items: number;
+  invalid_items: number;  // Items that have been fully scanned (dispatch + receive)
   items: MaterialItem[];
 }
 
@@ -417,6 +420,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
           pending_items: 0,
           dispatched_items: 0,
           received_items: 0,
+          invalid_items: 0,
           items: [],
           latestDate: item.created_at || ''
         };
@@ -430,9 +434,19 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
         groups[buyerId].latestDate = item.created_at;
       }
       
-      if (item.status === 'pending') groups[buyerId].pending_items++;
-      else if (item.status === 'dispatched' || item.status === 'in_transit') groups[buyerId].dispatched_items++;
-      else if (item.status === 'received' || item.status === 'verified') groups[buyerId].received_items++;
+      // Check if item is invalid (both dispatch and receive scanned)
+      const isFullyScanned = item.dispatch_scanned && item.receive_scanned;
+      const isInvalidated = item.is_invalidated || isFullyScanned;
+      
+      if (isInvalidated) {
+        groups[buyerId].invalid_items++;
+      } else if (item.status === 'pending') {
+        groups[buyerId].pending_items++;
+      } else if (item.status === 'dispatched' || item.status === 'in_transit') {
+        groups[buyerId].dispatched_items++;
+      } else if (item.status === 'received' || item.status === 'verified') {
+        groups[buyerId].received_items++;
+      }
     });
     
     // Sort groups by most recent activity (newest first), not by total items
@@ -1177,6 +1191,12 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
                     <Badge variant="outline" className="bg-green-50 text-green-700">
                       {group.received_items} received
                     </Badge>
+                    {group.invalid_items > 0 && (
+                      <Badge variant="outline" className="bg-red-100 text-red-700 border-red-300">
+                        <ShieldX className="h-3 w-3 mr-1" />
+                        {group.invalid_items} invalid
+                      </Badge>
+                    )}
                     <Badge className="bg-cyan-600">
                       {group.total_items} items
                     </Badge>
@@ -1337,11 +1357,38 @@ const QRCodeCard: React.FC<{
   };
   
   const createdDateTime = item.created_at ? formatDateTime(item.created_at) : null;
+  
+  // Check if QR code is INVALID (both dispatch and receive scanned)
+  const isFullyScanned = item.dispatch_scanned && item.receive_scanned;
+  const isInvalidated = item.is_invalidated || isFullyScanned;
 
   return (
-    <Card className={`overflow-hidden hover:shadow-xl transition-all border-2 ${isSelected ? 'ring-2 ring-orange-500 bg-orange-50 border-orange-300' : 'border-slate-200 hover:border-cyan-300'}`}>
+    <Card className={`overflow-hidden transition-all border-2 relative ${
+      isInvalidated 
+        ? 'border-red-400 bg-red-50/50 opacity-75' 
+        : isSelected 
+          ? 'ring-2 ring-orange-500 bg-orange-50 border-orange-300 hover:shadow-xl' 
+          : 'border-slate-200 hover:border-cyan-300 hover:shadow-xl'
+    }`}>
+      {/* INVALID Overlay for fully scanned QR codes */}
+      {isInvalidated && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+          <div className="bg-red-600/90 text-white px-6 py-3 rounded-lg shadow-lg transform -rotate-12 border-4 border-red-800">
+            <div className="flex items-center gap-2">
+              <ShieldX className="h-6 w-6" />
+              <span className="text-xl font-bold tracking-wider">INVALID</span>
+            </div>
+            <p className="text-xs text-center mt-1">QR Code Used</p>
+          </div>
+        </div>
+      )}
+      
       {/* Date/Time Header Banner */}
-      <div className="bg-gradient-to-r from-slate-700 to-slate-800 text-white px-4 py-2 flex items-center justify-between">
+      <div className={`px-4 py-2 flex items-center justify-between ${
+        isInvalidated 
+          ? 'bg-gradient-to-r from-red-700 to-red-800 text-white' 
+          : 'bg-gradient-to-r from-slate-700 to-slate-800 text-white'
+      }`}>
         <div className="flex items-center gap-2">
           <Clock className="h-4 w-4 text-cyan-300" />
           <span className="text-sm font-medium">
@@ -1366,11 +1413,20 @@ const QRCodeCard: React.FC<{
                 className="h-5 w-5"
               />
             )}
-            <CardTitle className="text-lg">{item.material_type}</CardTitle>
+            <CardTitle className={`text-lg ${isInvalidated ? 'text-red-700 line-through' : ''}`}>
+              {item.material_type}
+            </CardTitle>
           </div>
           <div className="flex gap-2 flex-wrap justify-end">
+            {/* INVALID Badge - shown prominently when fully scanned */}
+            {isInvalidated && (
+              <Badge className="bg-red-600 text-white border-red-800 animate-pulse">
+                <ShieldX className="h-3 w-3 mr-1" />
+                INVALID
+              </Badge>
+            )}
             {/* Scan Status Indicators */}
-            {item.dispatch_scanned !== undefined && (
+            {!isInvalidated && item.dispatch_scanned !== undefined && (
               <Badge 
                 variant="outline" 
                 className={item.dispatch_scanned ? 'bg-green-50 text-green-700 border-green-300' : 'bg-gray-50 text-gray-500'}
@@ -1380,7 +1436,7 @@ const QRCodeCard: React.FC<{
                 Dispatch
               </Badge>
             )}
-            {item.receive_scanned !== undefined && (
+            {!isInvalidated && item.receive_scanned !== undefined && (
               <Badge 
                 variant="outline" 
                 className={item.receive_scanned ? 'bg-green-50 text-green-700 border-green-300' : 'bg-gray-50 text-gray-500'}
@@ -1390,10 +1446,12 @@ const QRCodeCard: React.FC<{
                 Receive
               </Badge>
             )}
-            <Badge className={getStatusColor(item.status)}>
-              {getStatusIcon(item.status)}
-              <span className="ml-1">{item.status.replace('_', ' ').toUpperCase()}</span>
-            </Badge>
+            {!isInvalidated && (
+              <Badge className={getStatusColor(item.status)}>
+                {getStatusIcon(item.status)}
+                <span className="ml-1">{item.status.replace('_', ' ').toUpperCase()}</span>
+              </Badge>
+            )}
           </div>
         </div>
         <CardDescription className="flex items-center gap-2">
@@ -1465,19 +1523,38 @@ const QRCodeCard: React.FC<{
           </p>
         </div>
 
-        {/* One-Time Scan Warning */}
-        {(item.dispatch_scanned || item.receive_scanned) && (
+        {/* QR Code Status Message */}
+        {isInvalidated ? (
+          <div className="flex items-center gap-2 text-red-700 bg-red-100 border-2 border-red-300 px-3 py-3 rounded-lg text-sm">
+            <ShieldX className="h-5 w-5 flex-shrink-0" />
+            <div>
+              <p className="font-bold">⛔ QR CODE INVALID - DO NOT USE</p>
+              <p className="text-xs mt-1">
+                This QR code has completed its lifecycle (dispatched & received). 
+                It cannot be scanned again and should be discarded.
+              </p>
+              {item.dispatch_scanned_at && (
+                <p className="text-xs text-red-600 mt-1">
+                  Dispatched: {new Date(item.dispatch_scanned_at).toLocaleString()}
+                </p>
+              )}
+              {item.receive_scanned_at && (
+                <p className="text-xs text-red-600">
+                  Received: {new Date(item.receive_scanned_at).toLocaleString()}
+                </p>
+              )}
+            </div>
+          </div>
+        ) : (item.dispatch_scanned || item.receive_scanned) ? (
           <div className="flex items-center gap-2 text-amber-600 bg-amber-50 px-3 py-2 rounded-lg text-sm">
             <AlertCircle className="h-4 w-4 flex-shrink-0" />
             <span>
-              {item.dispatch_scanned && item.receive_scanned 
-                ? 'This QR code has been fully scanned (dispatch + receive)'
-                : item.dispatch_scanned 
-                  ? 'Dispatch scan completed. Awaiting receive scan.'
-                  : 'Receive scan completed.'}
+              {item.dispatch_scanned 
+                ? '✓ Dispatch scan completed. Awaiting receive scan.'
+                : '✓ Receive scan completed.'}
             </span>
           </div>
-        )}
+        ) : null}
 
         {/* Action Buttons */}
         <div className="flex gap-2">
