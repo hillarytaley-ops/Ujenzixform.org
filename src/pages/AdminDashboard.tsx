@@ -476,12 +476,38 @@ const AdminDashboard = () => {
     // Check authentication IMMEDIATELY before anything else
     const isAdminAuthenticated = localStorage.getItem('admin_authenticated') === 'true';
     const userRole = localStorage.getItem('user_role');
+    const supabaseToken = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
     
-    if (!isAdminAuthenticated || userRole !== 'admin') {
+    console.log('🔐 Admin Dashboard: Initial auth check', { isAdminAuthenticated, userRole, hasToken: !!supabaseToken });
+    
+    // If not authenticated OR no Supabase token, redirect immediately
+    if (!isAdminAuthenticated || userRole !== 'admin' || !supabaseToken) {
       console.log('🚫 Not authenticated - redirecting to admin login');
-      navigate('/admin-login');
+      // Set loading false to prevent showing loading screen
+      setLoading(false);
+      // Use replace to prevent back button issues
+      window.location.replace('/admin-login');
       return;
     }
+    
+    // Listen for auth state changes (e.g., sign out)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('🔐 Admin Dashboard: Auth state changed:', event);
+      if (event === 'SIGNED_OUT') {
+        console.log('🚪 User signed out - redirecting to admin login');
+        // Clear all admin-related localStorage
+        localStorage.removeItem('admin_authenticated');
+        localStorage.removeItem('admin_email');
+        localStorage.removeItem('admin_login_time');
+        localStorage.removeItem('user_role');
+        localStorage.removeItem('user_id');
+        localStorage.removeItem('staff_role');
+        localStorage.removeItem('staff_name');
+        localStorage.removeItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        // Redirect immediately
+        window.location.replace('/admin-login');
+      }
+    });
     
     // Safety timeout - show UI after 2 seconds max (only if authenticated)
     const safetyTimeout = setTimeout(() => {
@@ -493,7 +519,10 @@ const AdminDashboard = () => {
       clearTimeout(safetyTimeout);
     });
     
-    return () => clearTimeout(safetyTimeout);
+    return () => {
+      clearTimeout(safetyTimeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Set up real-time subscriptions for live updates
@@ -1801,30 +1830,33 @@ const AdminDashboard = () => {
   };
 
   const handleSignOut = async () => {
-    // Redirect IMMEDIATELY to prevent UI flash
-    window.location.href = '/admin-login';
+    // CRITICAL: Redirect IMMEDIATELY - don't show loading screen
+    console.log('🚪 Admin Sign Out: Starting sign out process...');
     
-    // Then do cleanup in background (page is already redirecting)
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user?.email) {
-        await (supabase as any).from('activity_logs').insert({
-          user_id: user.id,
-          user_email: user.email,
-          action: 'admin_logout',
-          category: 'auth',
-          details: `Admin ${user.email} logged out`,
-          metadata: {},
-          created_at: new Date().toISOString()
-        }).catch(() => {});
-      }
-    } catch (err) {
-      // Ignore errors - we're already redirecting
-    }
+    // Clear admin-specific auth flags FIRST (synchronous)
+    localStorage.removeItem('admin_authenticated');
+    localStorage.removeItem('admin_email');
+    localStorage.removeItem('admin_login_time');
+    localStorage.removeItem('user_role');
+    localStorage.removeItem('user_id');
+    localStorage.removeItem('staff_role');
+    localStorage.removeItem('staff_name');
     
-    localStorage.clear();
+    // Clear the Supabase auth token
+    localStorage.removeItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+    
+    // Clear session storage
     sessionStorage.clear();
-    await supabase.auth.signOut();
+    
+    console.log('🚪 Admin Sign Out: Auth cleared, redirecting immediately...');
+    
+    // IMMEDIATELY redirect - don't wait for Supabase signOut which can hang
+    // Use replace() to prevent back button returning to dashboard
+    window.location.replace('/admin-login');
+    
+    // Sign out from Supabase in background (non-blocking)
+    // This will complete after redirect starts
+    supabase.auth.signOut().catch(() => {});
   };
 
   const filteredRegistrations = registrations.filter(reg => {
@@ -1890,6 +1922,19 @@ const AdminDashboard = () => {
   }, [permissionsLoading, accessibleTabs, activeTab, isAdminStaff, isSuperAdminStaff]);
 
   if (loading || permissionsLoading) {
+    // CRITICAL: Check if user is actually authenticated before showing loading screen
+    // If not authenticated, redirect immediately instead of showing loading spinner
+    const isAuth = localStorage.getItem('admin_authenticated') === 'true';
+    const role = localStorage.getItem('user_role');
+    const token = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+    
+    if (!isAuth || role !== 'admin' || !token) {
+      // Not authenticated - redirect immediately, don't show loading screen
+      console.log('🚫 Loading screen: Not authenticated, redirecting...');
+      window.location.replace('/admin-login');
+      return null; // Return nothing while redirect happens
+    }
+    
     return (
       <ThemeProvider>
         <div className="min-h-screen bg-slate-950 dark:bg-slate-950 flex items-center justify-center">
