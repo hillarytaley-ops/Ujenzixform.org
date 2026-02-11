@@ -38,6 +38,7 @@ export interface StaffRole {
 // All available dashboard tabs
 export const ALL_ADMIN_TABS = [
   'overview',
+  'orders',
   'monitoring',
   'gps',
   'pages',
@@ -234,6 +235,12 @@ export const TAB_METADATA: Record<AdminTab, { name: string; icon: string; descri
     icon: 'LayoutDashboard',
     description: 'Dashboard statistics and summary',
     category: 'General'
+  },
+  'orders': {
+    name: 'Orders Management',
+    icon: 'ShoppingCart',
+    description: 'View and manage all platform orders',
+    category: 'Operations'
   },
   'monitoring': {
     name: 'Site Monitoring',

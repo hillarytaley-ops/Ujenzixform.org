@@ -91,6 +91,7 @@ import { DeliveryAnalytics } from "@/components/admin/DeliveryAnalytics";
 import { MonitoringRequestsManager } from "@/components/admin/MonitoringRequestsManager";
 import { PendingProductsManager } from "@/components/admin/PendingProductsManager";
 import { MaterialImagesManager } from "@/components/admin/MaterialImagesManager";
+import { AdminOrdersManager } from "@/components/admin/AdminOrdersManager";
 import { AdminVideoApproval } from "@/components/admin/AdminVideoApproval";
 import { BuilderModerationTab } from "@/components/admin/BuilderModerationTab";
 import { UserRolesManager } from "@/components/admin/UserRolesManager";
@@ -2109,6 +2110,12 @@ const AdminDashboard = () => {
                 Overview
               </TabsTrigger>
             )}
+            {shouldShowTab('orders') && (
+              <TabsTrigger value="orders" className="data-[state=active]:bg-orange-600">
+                <ShoppingCart className="h-4 w-4 mr-2" />
+                Orders
+              </TabsTrigger>
+            )}
             {shouldShowTab('monitoring') && (
               <TabsTrigger value="monitoring" className="data-[state=active]:bg-red-600">
                 <Eye className="h-4 w-4 mr-2" />
@@ -2294,6 +2301,11 @@ const AdminDashboard = () => {
               onTabChange={setActiveTab}
               onNavigate={navigate}
             />
+          </TabsContent>
+
+          {/* Orders Management Tab */}
+          <TabsContent value="orders" className="space-y-6">
+            <AdminOrdersManager />
           </TabsContent>
 
           {/* Camera Monitoring Tab - Using New Modular Component */}
