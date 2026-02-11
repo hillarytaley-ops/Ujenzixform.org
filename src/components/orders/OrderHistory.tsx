@@ -93,22 +93,47 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({ userId, userRole }) 
   const loadOrders = async () => {
     try {
       setLoading(true);
+      console.log('📋 OrderHistory: Loading orders for', userRole, userId);
       
-      // Determine query based on user role
-      let query = supabase
-        .from('purchase_orders')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // Use native fetch with timeout for faster loading
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
       
-      if (userRole === 'supplier') {
-        query = query.eq('supplier_id', userId);
-      } else {
-        query = query.eq('buyer_id', userId);
+      // Get access token from localStorage
+      const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      let accessToken = '';
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          accessToken = parsed.access_token || '';
+        } catch (e) {}
       }
       
-      const { data, error } = await query;
+      const headers: Record<string, string> = { 'apikey': apiKey };
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+      }
       
-      if (error) throw error;
+      // Build filter based on user role
+      const filterParam = userRole === 'supplier' 
+        ? `supplier_id=eq.${userId}` 
+        : `buyer_id=eq.${userId}`;
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+      
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/purchase_orders?${filterParam}&order=created_at.desc`,
+        { headers, signal: controller.signal, cache: 'no-store' }
+      );
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('📋 OrderHistory: Orders loaded:', data?.length || 0);
       
       // Parse items JSON and format orders
       const formattedOrders: Order[] = (data || []).map((order: any) => {
@@ -126,38 +151,55 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({ userId, userRole }) 
         };
       });
       
-      // Load supplier names for buyer view
+      // Load supplier names for buyer view (with timeout)
       if (userRole !== 'supplier' && formattedOrders.length > 0) {
         const supplierIds = [...new Set(formattedOrders.map(o => o.supplier_id).filter(Boolean))];
         if (supplierIds.length > 0) {
-          const { data: suppliers } = await supabase
-            .from('suppliers')
-            .select('id, user_id, company_name')
-            .or(`id.in.(${supplierIds.join(',')}),user_id.in.(${supplierIds.join(',')})`);
-          
-          if (suppliers) {
-            const supplierMap = new Map();
-            suppliers.forEach((s: any) => {
-              supplierMap.set(s.id, s.company_name);
-              supplierMap.set(s.user_id, s.company_name);
-            });
+          try {
+            const supplierController = new AbortController();
+            const supplierTimeoutId = setTimeout(() => supplierController.abort(), 5000);
             
-            formattedOrders.forEach(order => {
-              order.supplier_name = supplierMap.get(order.supplier_id) || 'Supplier';
-            });
+            // Build OR filter for suppliers
+            const orFilter = supplierIds.map(id => `id.eq.${id},user_id.eq.${id}`).join(',');
+            
+            const suppliersResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/suppliers?select=id,user_id,company_name&or=(${orFilter})`,
+              { headers, signal: supplierController.signal, cache: 'no-store' }
+            );
+            clearTimeout(supplierTimeoutId);
+            
+            if (suppliersResponse.ok) {
+              const suppliers = await suppliersResponse.json();
+              if (suppliers && suppliers.length > 0) {
+                const supplierMap = new Map();
+                suppliers.forEach((s: any) => {
+                  supplierMap.set(s.id, s.company_name);
+                  supplierMap.set(s.user_id, s.company_name);
+                });
+                
+                formattedOrders.forEach(order => {
+                  order.supplier_name = supplierMap.get(order.supplier_id) || 'Supplier';
+                });
+              }
+            }
+          } catch (e) {
+            console.log('📋 OrderHistory: Supplier lookup timeout, using defaults');
           }
         }
       }
       
       setOrders(formattedOrders);
+      console.log('✅ OrderHistory: Loaded', formattedOrders.length, 'orders');
       
-    } catch (error) {
-      console.error('Error loading orders:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to load order history'
-      });
+    } catch (error: any) {
+      console.error('❌ OrderHistory Error:', error?.message || error);
+      if (error?.name !== 'AbortError') {
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to load order history'
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -165,28 +207,72 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({ userId, userRole }) 
 
   const loadOrderDetails = async (order: Order) => {
     setSelectedOrder(order);
-    
-    // Load supplier info
-    if (order.supplier_id) {
-      const { data: supplier } = await supabase
-        .from('suppliers')
-        .select('*')
-        .or(`id.eq.${order.supplier_id},user_id.eq.${order.supplier_id}`)
-        .maybeSingle();
-      setSupplierInfo(supplier);
-    }
-    
-    // Load buyer info
-    if (order.buyer_id) {
-      const { data: buyer } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', order.buyer_id)
-        .maybeSingle();
-      setBuyerInfo(buyer);
-    }
-    
     setShowOrderDetails(true);
+    
+    // Use native fetch with timeout for faster loading
+    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+    const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+    
+    // Get access token from localStorage
+    const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+    let accessToken = '';
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        accessToken = parsed.access_token || '';
+      } catch (e) {}
+    }
+    
+    const headers: Record<string, string> = { 'apikey': apiKey };
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+    
+    // Load supplier info (non-blocking)
+    if (order.supplier_id) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        
+        const response = await fetch(
+          `${SUPABASE_URL}/rest/v1/suppliers?or=(id.eq.${order.supplier_id},user_id.eq.${order.supplier_id})&limit=1`,
+          { headers, signal: controller.signal, cache: 'no-store' }
+        );
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.length > 0) {
+            setSupplierInfo(data[0]);
+          }
+        }
+      } catch (e) {
+        console.log('Supplier info lookup timeout');
+      }
+    }
+    
+    // Load buyer info (non-blocking)
+    if (order.buyer_id) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        
+        const response = await fetch(
+          `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${order.buyer_id}&limit=1`,
+          { headers, signal: controller.signal, cache: 'no-store' }
+        );
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.length > 0) {
+            setBuyerInfo(data[0]);
+          }
+        }
+      } catch (e) {
+        console.log('Buyer info lookup timeout');
+      }
+    }
   };
 
   const getStatusBadge = (status: string) => {

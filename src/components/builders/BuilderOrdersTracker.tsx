@@ -245,42 +245,98 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       
       console.log('🔍 BuilderOrdersTracker: Fetching orders for builder:', builderId);
       
-      // Fetch purchase orders for this builder
-      const { data: ordersData, error: ordersError } = await supabase
-        .from('purchase_orders')
-        .select('*')
-        .eq('buyer_id', builderId)
-        .order('created_at', { ascending: false });
-
-      console.log('📦 Orders fetched:', ordersData?.length || 0, 'orders', ordersError ? `Error: ${ordersError.message}` : '');
-
-      if (ordersError) throw ordersError;
-
-      // Fetch material items for each order
-      const ordersWithItems = await Promise.all(
-        (ordersData || []).map(async (order) => {
-          const { data: itemsData } = await supabase
-            .from('material_items')
-            .select('*')
-            .eq('purchase_order_id', order.id)
-            .order('item_sequence', { ascending: true });
-
-          return {
-            ...order,
-            material_items: itemsData || []
-          };
-        })
+      // Use native fetch with timeout for faster loading
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      
+      // Get access token from localStorage
+      const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      let accessToken = '';
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          accessToken = parsed.access_token || '';
+        } catch (e) {}
+      }
+      
+      const headers: Record<string, string> = { 'apikey': apiKey };
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+      }
+      
+      // Fetch purchase orders for this builder with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+      
+      const ordersResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${builderId}&order=created_at.desc`,
+        { headers, signal: controller.signal, cache: 'no-store' }
       );
+      clearTimeout(timeoutId);
+      
+      if (!ordersResponse.ok) {
+        throw new Error(`HTTP ${ordersResponse.status}`);
+      }
+      
+      const ordersData = await ordersResponse.json();
+      console.log('📦 Orders fetched:', ordersData?.length || 0, 'orders');
 
-      console.log('📦 Orders with items:', ordersWithItems);
-      setOrders(ordersWithItems);
-    } catch (error) {
-      console.error('❌ Error fetching orders:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load orders',
-        variant: 'destructive'
+      if (!ordersData || ordersData.length === 0) {
+        setOrders([]);
+        setLoading(false);
+        return;
+      }
+
+      // Fetch all material items for all orders in one batch request
+      const orderIds = ordersData.map((o: any) => o.id);
+      const orderIdsParam = orderIds.join(',');
+      
+      let allMaterialItems: MaterialItem[] = [];
+      try {
+        const itemsController = new AbortController();
+        const itemsTimeoutId = setTimeout(() => itemsController.abort(), 5000);
+        
+        const itemsResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/material_items?purchase_order_id=in.(${orderIdsParam})&order=item_sequence.asc`,
+          { headers, signal: itemsController.signal, cache: 'no-store' }
+        );
+        clearTimeout(itemsTimeoutId);
+        
+        if (itemsResponse.ok) {
+          allMaterialItems = await itemsResponse.json();
+          console.log('📦 Material items fetched:', allMaterialItems.length);
+        }
+      } catch (e) {
+        console.log('⚠️ Material items fetch timeout, continuing without items');
+      }
+
+      // Group material items by order
+      const itemsByOrder = new Map<string, MaterialItem[]>();
+      allMaterialItems.forEach(item => {
+        const orderId = (item as any).purchase_order_id;
+        if (!itemsByOrder.has(orderId)) {
+          itemsByOrder.set(orderId, []);
+        }
+        itemsByOrder.get(orderId)!.push(item);
       });
+
+      // Combine orders with their items
+      const ordersWithItems = ordersData.map((order: any) => ({
+        ...order,
+        material_items: itemsByOrder.get(order.id) || []
+      }));
+
+      console.log('📦 Orders with items:', ordersWithItems.length);
+      setOrders(ordersWithItems);
+    } catch (error: any) {
+      console.error('❌ Error fetching orders:', error?.message || error);
+      if (error?.name !== 'AbortError') {
+        toast({
+          title: 'Error',
+          description: 'Failed to load orders',
+          variant: 'destructive'
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -288,16 +344,42 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
 
   const fetchScanEvents = async () => {
     try {
-      const { data, error } = await supabase
-        .from('qr_scan_events')
-        .select('*')
-        .order('scanned_at', { ascending: false })
-        .limit(50);
-
-      if (error) throw error;
-      setScanEvents(data || []);
-    } catch (error) {
-      console.error('Error fetching scan events:', error);
+      // Use native fetch with timeout for faster loading
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      
+      // Get access token from localStorage
+      const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      let accessToken = '';
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          accessToken = parsed.access_token || '';
+        } catch (e) {}
+      }
+      
+      const headers: Record<string, string> = { 'apikey': apiKey };
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+      }
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/qr_scan_events?order=scanned_at.desc&limit=50`,
+        { headers, signal: controller.signal, cache: 'no-store' }
+      );
+      clearTimeout(timeoutId);
+      
+      if (response.ok) {
+        const data = await response.json();
+        setScanEvents(data || []);
+      }
+    } catch (error: any) {
+      if (error?.name !== 'AbortError') {
+        console.error('Error fetching scan events:', error);
+      }
     }
   };
 
