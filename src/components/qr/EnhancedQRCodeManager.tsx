@@ -1238,8 +1238,8 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
                   </div>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="px-4 py-4 bg-white">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <AccordionContent className="px-4 py-6 bg-gradient-to-b from-slate-50 to-white">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {group.items.map((item) => (
                     <QRCodeCard 
                       key={item.id}
@@ -1327,9 +1327,36 @@ const QRCodeCard: React.FC<{
     }
   }, [item.qr_code]);
 
+  // Format date and time for display
+  const formatDateTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return {
+      date: date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+      time: date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+    };
+  };
+  
+  const createdDateTime = item.created_at ? formatDateTime(item.created_at) : null;
+
   return (
-    <Card className={`overflow-hidden hover:shadow-lg transition-shadow ${isSelected ? 'ring-2 ring-orange-500 bg-orange-50' : ''}`}>
-      <CardHeader className="pb-2">
+    <Card className={`overflow-hidden hover:shadow-xl transition-all border-2 ${isSelected ? 'ring-2 ring-orange-500 bg-orange-50 border-orange-300' : 'border-slate-200 hover:border-cyan-300'}`}>
+      {/* Date/Time Header Banner */}
+      <div className="bg-gradient-to-r from-slate-700 to-slate-800 text-white px-4 py-2 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Clock className="h-4 w-4 text-cyan-300" />
+          <span className="text-sm font-medium">
+            {createdDateTime ? `${createdDateTime.date} at ${createdDateTime.time}` : 'Date not available'}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Package className="h-4 w-4 text-cyan-300" />
+          <span className="text-sm font-mono bg-slate-600 px-2 py-0.5 rounded">
+            Order #{item.purchase_order_id?.slice(0, 8) || 'N/A'}
+          </span>
+        </div>
+      </div>
+      
+      <CardHeader className="pb-2 pt-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             {selectionMode && (
@@ -1341,7 +1368,7 @@ const QRCodeCard: React.FC<{
             )}
             <CardTitle className="text-lg">{item.material_type}</CardTitle>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap justify-end">
             {/* Scan Status Indicators */}
             {item.dispatch_scanned !== undefined && (
               <Badge 
@@ -1369,7 +1396,11 @@ const QRCodeCard: React.FC<{
             </Badge>
           </div>
         </div>
-        <CardDescription>Item #{item.item_sequence} • {item.category}</CardDescription>
+        <CardDescription className="flex items-center gap-2">
+          <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-medium">Item #{item.item_sequence}</span>
+          <span>•</span>
+          <span>{item.category}</span>
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         {/* Client Info (when showing all QR codes) */}
