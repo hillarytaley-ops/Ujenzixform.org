@@ -75,18 +75,44 @@ export const AdminScanDashboard: React.FC = () => {
 
   const checkAuthAndFetch = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      // Use localStorage for instant role check (faster than Supabase)
+      const storedRole = localStorage.getItem('user_role');
+      
+      if (storedRole === 'admin') {
+        setUserRole('admin');
+        // Load data in parallel immediately
+        await Promise.all([
+          fetchStatistics(),
+          fetchRecentScans(),
+          fetchMaterialItems(),
+          fetchSuppliers()
+        ]);
+        setLoading(false);
+        return;
+      }
+      
+      // Fallback to Supabase if not in localStorage (with timeout)
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Auth timeout')), 5000)
+      );
+      
+      const authPromise = (async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return null;
 
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .maybeSingle();
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        
+        return roleData?.role || null;
+      })();
+      
+      const role = await Promise.race([authPromise, timeoutPromise]) as string | null;
+      setUserRole(role);
 
-      setUserRole(roleData?.role || null);
-
-      if (roleData?.role === 'admin') {
+      if (role === 'admin') {
         await Promise.all([
           fetchStatistics(),
           fetchRecentScans(),
@@ -96,19 +122,52 @@ export const AdminScanDashboard: React.FC = () => {
       }
     } catch (error) {
       console.error('Error:', error);
+      // If timeout, check localStorage again
+      const storedRole = localStorage.getItem('user_role');
+      if (storedRole === 'admin') {
+        setUserRole('admin');
+        // Try to load data anyway
+        Promise.all([
+          fetchStatistics(),
+          fetchRecentScans(),
+          fetchMaterialItems(),
+          fetchSuppliers()
+        ]).catch(console.error);
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  // Helper for fetch with timeout
+  const fetchWithTimeout = async (url: string, options: RequestInit, timeout: number = 8000) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    try {
+      const response = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(timeoutId);
+      return response;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw error;
+    }
+  };
+
   const fetchSuppliers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('suppliers')
-        .select('id, company_name, user_id');
+      // Use native fetch for faster loading
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
       
-      if (!error && data) {
-        setSuppliers(data);
+      const response = await fetchWithTimeout(
+        `${SUPABASE_URL}/rest/v1/suppliers?select=id,company_name,user_id`,
+        { headers: { 'apikey': SUPABASE_ANON_KEY } },
+        5000
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        setSuppliers(data || []);
       }
     } catch (error) {
       console.error('Error fetching suppliers:', error);
