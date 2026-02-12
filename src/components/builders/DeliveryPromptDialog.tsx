@@ -40,6 +40,7 @@ import {
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { MonitoringServicePrompt } from './MonitoringServicePrompt';
+import { deliveryProviderNotificationService } from '@/services/DeliveryProviderNotificationService';
 
 // Helper for fetch with timeout
 const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs: number = 10000) => {
@@ -373,33 +374,30 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
         console.warn('⚠️ Insert error:', insertError.message);
       }
 
-      // Try to notify delivery providers via edge function (non-blocking)
+      // Notify ALL registered delivery providers (first-come-first-served)
+      console.log('🔔 Notifying all delivery providers...');
       try {
-        const notifyResponse = await fetchWithTimeout(
-          `${SUPABASE_URL}/functions/v1/notify-delivery-providers`,
-          {
-            method: 'POST',
-            headers: {
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${accessToken}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              request_type: 'private_purchase',
-              request_id: deliveryRequestId || purchaseOrder.id,
-              builder_id: userId,
-              pickup_address: pickupAddress,
-              delivery_address: deliveryData.deliveryAddress,
-              pickup_date: deliveryData.preferredDate,
-              material_type: deliveryData.materialType,
-              po_number: purchaseOrder.po_number
-            })
-          },
-          8000
-        );
-        console.log('🚚 Notify providers response:', notifyResponse.status);
+        const notificationResult = await deliveryProviderNotificationService.notifyAllProviders({
+          id: deliveryRequestId || purchaseOrder.id,
+          po_number: purchaseOrder.po_number,
+          pickup_address: pickupAddress,
+          delivery_address: fullDeliveryAddress,
+          pickup_date: deliveryData.preferredDate,
+          material_type: deliveryData.materialType,
+          quantity: purchaseOrder.items?.length || 1,
+          weight_kg: deliveryData.totalWeight ? parseFloat(deliveryData.totalWeight) : undefined,
+          budget_range: deliveryData.budgetRange,
+          special_instructions: deliveryData.specialInstructions
+        });
+        
+        console.log(`✅ Delivery providers notified: ${notificationResult.notified}/${notificationResult.totalProviders}`);
+        
+        // Log analytics event
+        if (deliveryRequestId) {
+          await deliveryProviderNotificationService.logNotificationEvent(deliveryRequestId, notificationResult);
+        }
       } catch (notifyError: any) {
-        console.warn('⚠️ Edge function call failed (non-critical):', notifyError.message);
+        console.warn('⚠️ Provider notification error (non-critical):', notifyError.message);
       }
 
       setStep('success');

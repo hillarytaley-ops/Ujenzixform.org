@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { UserRole } from "@/types/userProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { MapPin, Package, Truck, Calendar, Shield, AlertTriangle } from "lucide-react";
+import { deliveryProviderNotificationService } from "@/services/DeliveryProviderNotificationService";
 
 const DeliveryRequest = () => {
   const [loading, setLoading] = useState(false);
@@ -145,34 +146,27 @@ const DeliveryRequest = () => {
 
       if (error) throw error;
 
-      // ✅ AUTO-NOTIFY: Alert nearby delivery providers immediately
+      // ✅ AUTO-NOTIFY: Alert ALL registered delivery providers immediately
       if (deliveryRequest) {
         try {
-          console.log('🚚 Notifying delivery providers for request:', deliveryRequest.id);
+          console.log('🚚 Notifying ALL delivery providers for request:', deliveryRequest.id);
           
-          await supabase.functions.invoke('notify-delivery-providers', {
-            body: {
-              request_type: 'manual_delivery_request',
-              request_id: deliveryRequest.id,
-              builder_id: profile.id,
-              pickup_address: formData.pickupAddress.trim(),
-              delivery_address: formData.deliveryAddress.trim(),
-              material_details: [{
-                material_type: formData.materialType,
-                quantity: parseInt(formData.quantity) || 1,
-                unit: 'units'
-              }],
-              weight_kg: parseFloat(formData.weight) || null,
-              special_instructions: formData.specialInstructions.trim() || null,
-              budget_range: formData.budgetRange || null,
-              required_vehicle_type: formData.requiredVehicleType || null,
-              preferred_date: formData.preferredDate,
-              preferred_time: formData.preferredTime || null,
-              priority_level: 'normal'
-            }
+          const notificationResult = await deliveryProviderNotificationService.notifyAllProviders({
+            id: deliveryRequest.id,
+            pickup_address: formData.pickupAddress.trim(),
+            delivery_address: formData.deliveryAddress.trim(),
+            pickup_date: formData.preferredDate,
+            material_type: formData.materialType,
+            quantity: parseInt(formData.quantity) || 1,
+            weight_kg: parseFloat(formData.weight) || undefined,
+            budget_range: formData.budgetRange || undefined,
+            special_instructions: formData.specialInstructions.trim() || undefined
           });
           
-          console.log('✅ Delivery providers notified successfully');
+          console.log(`✅ Delivery providers notified: ${notificationResult.notified}/${notificationResult.totalProviders}`);
+          
+          // Log analytics event
+          await deliveryProviderNotificationService.logNotificationEvent(deliveryRequest.id, notificationResult);
         } catch (notifyError) {
           console.error('⚠️ Error notifying delivery providers:', notifyError);
           // Continue even if notification fails - delivery request is created
