@@ -338,7 +338,7 @@ export const MaterialsGridSafe = () => {
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Price:</span>
                     <span className="text-lg font-bold text-blue-600">
-                      KES {material.unit_price.toLocaleString()}
+                      KES {material.unit_price.toLocaleString()}/{material.unit || 'unit'}
                     </span>
                   </div>
                   <div className="flex justify-between">

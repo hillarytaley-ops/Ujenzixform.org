@@ -965,7 +965,7 @@ export const MaterialsGrid = () => {
                 name: item.name || 'Unnamed Material',
                 category: item.category || 'Uncategorized',
                 description: supplierPrice?.description || item.description || '',
-                unit: item.unit || 'unit',
+                unit: (item.unit && item.unit.trim()) ? item.unit : 'unit',
                 unit_price: supplierPrice?.price || item.suggested_price || 0,
                 // First batch has images, rest will be loaded on-demand
                 image_url: index < FIRST_BATCH_WITH_IMAGES ? (item.image_url || '') : '',
@@ -1030,7 +1030,7 @@ export const MaterialsGrid = () => {
                 name: item.name || 'Unnamed Material',
                 category: item.category || 'Uncategorized',
                 description: supplierPrice?.description || item.description || '',
-                unit: item.unit || 'unit',
+                unit: (item.unit && item.unit.trim()) ? item.unit : 'unit',
                 unit_price: supplierPrice?.price || item.suggested_price || 0,
                 image_url: item.image_url || '',
                 additional_images: [],
@@ -1949,7 +1949,7 @@ export const MaterialsGrid = () => {
                           >
                             {material.variants.map((variant) => (
                               <option key={variant.id} value={variant.id}>
-                                {variant.sizeLabel} - KES {variant.price.toLocaleString()}
+                                {variant.sizeLabel} - KES {variant.price.toLocaleString()}/{material.unit}
                               </option>
                             ))}
                           </select>
@@ -2253,7 +2253,7 @@ export const MaterialsGrid = () => {
                     name: item.name || 'Unnamed Material',
                     category: item.category || 'Uncategorized',
                     description: item.description || '',
-                    unit: item.unit || 'unit',
+                    unit: (item.unit && item.unit.trim()) ? item.unit : 'unit',
                     unit_price: item.suggested_price || 0,
                     image_url: item.image_url,
                     additional_images: [],

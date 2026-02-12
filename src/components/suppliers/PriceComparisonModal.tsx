@@ -225,7 +225,7 @@ export const PriceComparisonModal: React.FC<PriceComparisonModalProps> = ({
                           <Badge variant="outline" className="text-red-500 border-red-300 text-[10px]">HIGH</Badge>
                         )}
                         <span className={`font-bold ${isCheapest ? 'text-green-600 text-lg' : 'text-gray-800'}`}>
-                          KES {material.unit_price.toLocaleString()}
+                          KES {material.unit_price.toLocaleString()}/{material.unit || 'unit'}
                         </span>
                       </div>
                     </td>

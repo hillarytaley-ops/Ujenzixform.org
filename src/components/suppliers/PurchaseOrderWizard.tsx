@@ -340,10 +340,7 @@ export const PurchaseOrderWizard: React.FC<PurchaseOrderWizardProps> = ({ userId
                   <CardContent className="space-y-3">
                     <div className="flex items-baseline justify-between">
                       <div className="text-2xl font-bold text-blue-600">
-                        KES {material.unit_price.toLocaleString()}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        per {material.unit}
+                        KES {material.unit_price.toLocaleString()}<span className="text-sm font-normal text-gray-600">/{material.unit || 'unit'}</span>
                       </div>
                     </div>
 
