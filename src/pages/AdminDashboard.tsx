@@ -518,12 +518,21 @@ const AdminDashboard = () => {
       }
     });
     
-    // Safety timeout - show UI after 2 seconds max (only if authenticated)
+    // FAST: If localStorage auth is valid, show UI immediately
+    // Don't wait for checkAdminAccess() - it can run in background
+    if (isAdminAuthenticated && userRole === 'admin' && supabaseToken) {
+      console.log('✅ Admin Dashboard: Valid localStorage auth - showing UI immediately');
+      setAdminEmail(localStorage.getItem('admin_email') || '');
+      setLoading(false);
+    }
+    
+    // Safety timeout - show UI after 1 second max (only if authenticated)
     const safetyTimeout = setTimeout(() => {
       console.log('⏱️ Admin Dashboard safety timeout - forcing loading false');
       setLoading(false);
-    }, 2000);
+    }, 1000);
     
+    // Run checkAdminAccess in background - it will update state if needed
     checkAdminAccess().finally(() => {
       clearTimeout(safetyTimeout);
     });
@@ -1947,30 +1956,20 @@ const AdminDashboard = () => {
     }
   }, [permissionsLoading, accessibleTabs, activeTab, isAdminStaff, isSuperAdminStaff]);
 
-  if (loading || permissionsLoading) {
-    // CRITICAL: Check if user is actually authenticated before showing loading screen
-    // If not authenticated, redirect immediately instead of showing loading spinner
-    const isAuth = localStorage.getItem('admin_authenticated') === 'true';
-    const role = localStorage.getItem('user_role');
-    const token = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-    
-    if (!isAuth || role !== 'admin' || !token) {
-      // Not authenticated - redirect immediately, don't show loading screen
-      console.log('🚫 Loading screen: Not authenticated, redirecting...');
-      window.location.replace('/admin-login');
-      return null; // Return nothing while redirect happens
-    }
-    
-    return (
-      <ThemeProvider>
-        <div className="min-h-screen bg-slate-950 dark:bg-slate-950 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
-            <p className="text-gray-400">Loading Admin Dashboard...</p>
-          </div>
-        </div>
-      </ThemeProvider>
-    );
+  // FAST PATH: If we have valid localStorage auth, skip the loading screen entirely
+  // This prevents the dashboard from hanging on slow Supabase auth
+  const isAuthFromStorage = localStorage.getItem('admin_authenticated') === 'true';
+  const roleFromStorage = localStorage.getItem('user_role');
+  const tokenFromStorage = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+  const hasValidAuth = isAuthFromStorage && roleFromStorage === 'admin' && tokenFromStorage;
+  
+  // Only show loading screen if we DON'T have valid localStorage auth
+  // If we have localStorage auth, show the dashboard immediately
+  if ((loading || permissionsLoading) && !hasValidAuth) {
+    // Not authenticated - redirect immediately, don't show loading screen
+    console.log('🚫 Loading screen: Not authenticated, redirecting...');
+    window.location.replace('/admin-login');
+    return null; // Return nothing while redirect happens
   }
 
   return (

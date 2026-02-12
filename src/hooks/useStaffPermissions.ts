@@ -161,8 +161,29 @@ export function useStaffPermissions(): StaffPermissionsReturn {
           const roleDetails = getStaffRole(storedRole) || STAFF_ROLES.admin;
           const isFullAdmin = ['admin', 'super_admin', 'administrator'].includes(storedRole);
           
-          // Try to get additional info from database if user has Supabase session
-          const { data: { user } } = await supabase.auth.getUser();
+          // FAST PATH: Set state immediately with localStorage data
+          // Don't wait for Supabase - this prevents the loading screen from hanging
+          setState({
+            loading: false,
+            staffId: null,
+            staffEmail: adminEmail,
+            staffName: storedName,
+            staffRole: storedRole,
+            roleDetails: roleDetails,
+            isAdmin: isFullAdmin,
+            isSuperAdmin: storedRole === 'super_admin',
+            accessibleTabs: roleDetails.allowedTabs as AdminTab[],
+            error: null
+          });
+          
+          // Try to get additional info from database in background (with timeout)
+          // This is optional - localStorage data is sufficient for access
+          const userPromise = supabase.auth.getUser();
+          const timeoutPromise = new Promise<{ data: { user: null } }>((resolve) => 
+            setTimeout(() => resolve({ data: { user: null } }), 3000)
+          );
+          
+          const { data: { user } } = await Promise.race([userPromise, timeoutPromise]);
           
           if (user) {
             // Check admin_staff table for specific role (to get latest info)
