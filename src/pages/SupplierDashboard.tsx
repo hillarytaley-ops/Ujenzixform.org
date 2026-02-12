@@ -627,16 +627,61 @@ const SupplierDashboard = () => {
             console.log('📊 Dashboard: Orders loaded:', ordersData?.length || 0);
 
             if (ordersData && ordersData.length > 0) {
+              // Fetch buyer profiles to get actual names
+              const buyerIds = [...new Set(ordersData.map((o: any) => o.buyer_id).filter(Boolean))];
+              let buyerProfiles: Record<string, string> = {};
+              
+              if (buyerIds.length > 0) {
+                try {
+                  const profilesController = new AbortController();
+                  const profilesTimeout = setTimeout(() => profilesController.abort(), 5000);
+                  
+                  const profilesResponse = await fetch(
+                    `${SUPABASE_URL}/rest/v1/profiles?user_id=in.(${buyerIds.join(',')})&select=user_id,full_name,company_name`,
+                    { headers: authHeaders, signal: profilesController.signal, cache: 'no-store' }
+                  );
+                  clearTimeout(profilesTimeout);
+                  
+                  if (profilesResponse.ok) {
+                    const profiles = await profilesResponse.json();
+                    profiles.forEach((p: any) => {
+                      buyerProfiles[p.user_id] = p.full_name || p.company_name || 'Customer';
+                    });
+                  }
+                } catch (e) {
+                  console.log('Buyer profiles fetch timeout');
+                }
+              }
+              
               // Take first 10 for recent orders display
-              const formattedOrders: RecentOrder[] = ordersData.slice(0, 10).map((order: any) => ({
-                id: order.id,
-                customer_name: order.builder_name || 'Customer',
-                product_name: order.items?.[0]?.name || order.description || 'Order Items',
-                quantity: order.items?.[0]?.quantity || 1,
-                total_amount: order.total_amount || 0,
-                status: order.status || 'pending',
-                created_at: order.created_at
-              }));
+              const formattedOrders: RecentOrder[] = ordersData.slice(0, 10).map((order: any) => {
+                // Get product names from items array
+                const items = order.items || [];
+                let productName = 'Order Items';
+                let totalQty = 0;
+                
+                if (items.length > 0) {
+                  // Get first item name, or summarize if multiple
+                  const itemNames = items.map((item: any) => item.name || item.material_name || 'Item').filter(Boolean);
+                  totalQty = items.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0);
+                  
+                  if (itemNames.length === 1) {
+                    productName = itemNames[0];
+                  } else if (itemNames.length > 1) {
+                    productName = `${itemNames[0]} +${itemNames.length - 1} more`;
+                  }
+                }
+                
+                return {
+                  id: order.id,
+                  customer_name: buyerProfiles[order.buyer_id] || order.builder_name || order.project_name || 'Customer',
+                  product_name: productName,
+                  quantity: totalQty || order.items?.length || 1,
+                  total_amount: order.total_amount || 0,
+                  status: order.status || 'pending',
+                  created_at: order.created_at
+                };
+              });
               setRecentOrders(formattedOrders);
               
               // Calculate stats from ALL orders

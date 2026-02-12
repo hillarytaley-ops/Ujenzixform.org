@@ -115,6 +115,13 @@ const translations = {
     'supplier.tabs.orderHistory': 'Order History',
     'supplier.tabs.reviews': 'Reviews',
     'supplier.tabs.myAnalytics': 'My Analytics',
+    
+    // Supplier Orders Section
+    'supplier.orders.title': 'Recent Orders',
+    'supplier.orders.description': 'Latest orders from your customers',
+    'supplier.orders.viewAll': 'View All Orders',
+    'supplier.orders.noOrders': 'No orders yet',
+    'supplier.orders.ordersAppear': 'New orders will appear here when customers place them',
   },
   sw: {
     // Navigation
@@ -211,6 +218,13 @@ const translations = {
     'supplier.tabs.orderHistory': 'Historia ya Maagizo',
     'supplier.tabs.reviews': 'Mapitio',
     'supplier.tabs.myAnalytics': 'Uchambuzi Wangu',
+    
+    // Supplier Orders Section
+    'supplier.orders.title': 'Maagizo ya Hivi Karibuni',
+    'supplier.orders.description': 'Maagizo ya hivi karibuni kutoka kwa wateja wako',
+    'supplier.orders.viewAll': 'Ona Maagizo Yote',
+    'supplier.orders.noOrders': 'Hakuna maagizo bado',
+    'supplier.orders.ordersAppear': 'Maagizo mapya yataonekana hapa wateja wanapoyaweka',
   }
 };
 
