@@ -185,6 +185,19 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
 }) => {
   const { toast } = useToast();
   
+  // FAST PATH: Check localStorage for role if not passed via props
+  // This ensures we detect professional builders even if the prop wasn't set correctly
+  const storedRole = typeof window !== 'undefined' ? localStorage.getItem('user_role') : null;
+  const storedUserId = typeof window !== 'undefined' ? localStorage.getItem('user_id') : null;
+  
+  // User is a builder if: prop says so, OR localStorage role is professional_builder/admin
+  const effectiveIsBuilder = isBuilder || 
+    storedRole === 'professional_builder' || 
+    storedRole === 'admin';
+  
+  // Use stored user ID if currentUserId not provided
+  const effectiveUserId = currentUserId || storedUserId;
+  
   // Check if user can post (must be a registered builder)
   // Only professional builders can post on the Builders page (not private clients)
   const canPost = isBuilder || currentUserRole === 'professional_builder' || currentUserRole === 'admin';
@@ -661,6 +674,31 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
             )}
           </CardContent>
         </Card>
+      ) : effectiveIsBuilder ? (
+        /* User IS a builder but component didn't get the prop - show posting UI */
+        <Card className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-gray-800 dark:to-gray-900 shadow-md rounded-lg border-green-200 dark:border-gray-700">
+          <CardContent className="p-4">
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+              <div className="h-12 w-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center flex-shrink-0">
+                <Video className="h-6 w-6 text-green-600" />
+              </div>
+              <div className="flex-1 text-center sm:text-left">
+                <h3 className="font-semibold text-gray-900 dark:text-white">Welcome, Professional Builder!</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  You can post videos and share your projects. Go to your dashboard to upload content.
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button 
+                  className="bg-green-600 hover:bg-green-700"
+                  onClick={() => window.location.href = '/professional-builder-dashboard'}
+                >
+                  Go to Dashboard
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       ) : (
         /* Visitor Notice - Cannot Post - Link to Registration */
         <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900 shadow-md rounded-lg border-blue-200 dark:border-gray-700">
@@ -677,7 +715,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
               </div>
               <div className="flex flex-col sm:flex-row gap-2">
                 {/* For visitors not logged in - go to registration */}
-                {!currentUserId ? (
+                {!effectiveUserId ? (
                   <>
                     <Button 
                       className="bg-blue-600 hover:bg-blue-700"

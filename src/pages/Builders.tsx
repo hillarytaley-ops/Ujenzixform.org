@@ -78,14 +78,36 @@ const Builders = () => {
   }, []);
 
   useEffect(() => {
+    // FAST PATH: Check localStorage first for instant role detection
+    const storedRole = localStorage.getItem('user_role');
+    if (storedRole) {
+      console.log('🔐 Builders: Using localStorage role:', storedRole);
+      setUserRoleState(storedRole);
+    }
+    
+    // Then verify from database (in background)
     if (userProfile) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
       supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', userProfile.user_id)
         .limit(1)
         .maybeSingle()
-        .then(({ data }) => setUserRoleState(data?.role || null));
+        .then(({ data }) => {
+          clearTimeout(timeoutId);
+          if (data?.role) {
+            console.log('🔐 Builders: DB role confirmed:', data.role);
+            setUserRoleState(data.role);
+            localStorage.setItem('user_role', data.role);
+          }
+        })
+        .catch((err) => {
+          clearTimeout(timeoutId);
+          console.log('🔐 Builders: Role check failed, using localStorage');
+        });
     }
   }, [userProfile]);
 
