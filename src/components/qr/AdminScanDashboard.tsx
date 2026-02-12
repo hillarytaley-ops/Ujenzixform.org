@@ -57,11 +57,28 @@ interface MaterialItemEnhanced {
   receive_scanned_at?: string;
 }
 
+// Default empty stats to show UI immediately
+const defaultStats: ScanStatistics = {
+  total_items: 0,
+  pending_items: 0,
+  dispatched_items: 0,
+  received_items: 0,
+  verified_items: 0,
+  damaged_items: 0,
+  total_scans: 0,
+  dispatch_scans: 0,
+  receiving_scans: 0,
+  verification_scans: 0,
+  avg_dispatch_to_receive_hours: 0
+};
+
 export const AdminScanDashboard: React.FC = () => {
-  const [stats, setStats] = useState<ScanStatistics | null>(null);
+  // Initialize with default values so UI shows immediately
+  const [stats, setStats] = useState<ScanStatistics>(defaultStats);
   const [recentScans, setRecentScans] = useState<ScanEvent[]>([]);
   const [materialItems, setMaterialItems] = useState<MaterialItemEnhanced[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Start with false - show UI immediately
+  const [dataLoading, setDataLoading] = useState(true); // Track background data loading
   const [userRole, setUserRole] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -70,30 +87,40 @@ export const AdminScanDashboard: React.FC = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    checkAuthAndFetch();
+    // FAST PATH: Check localStorage immediately for role
+    const storedRole = localStorage.getItem('user_role');
+    if (storedRole === 'admin') {
+      setUserRole('admin');
+      // Load data in background - don't block UI
+      loadDataInBackground();
+    } else {
+      // No admin role in localStorage - try Supabase with short timeout
+      checkAuthAndFetch();
+    }
   }, []);
+
+  const loadDataInBackground = async () => {
+    setDataLoading(true);
+    try {
+      // Load all data in parallel with individual timeouts
+      await Promise.allSettled([
+        fetchStatisticsWithTimeout(),
+        fetchRecentScansWithTimeout(),
+        fetchMaterialItemsWithTimeout(),
+        fetchSuppliersWithTimeout()
+      ]);
+    } catch (error) {
+      console.error('Background data load error:', error);
+    } finally {
+      setDataLoading(false);
+    }
+  };
 
   const checkAuthAndFetch = async () => {
     try {
-      // Use localStorage for instant role check (faster than Supabase)
-      const storedRole = localStorage.getItem('user_role');
-      
-      if (storedRole === 'admin') {
-        setUserRole('admin');
-        // Load data in parallel immediately
-        await Promise.all([
-          fetchStatistics(),
-          fetchRecentScans(),
-          fetchMaterialItems(),
-          fetchSuppliers()
-        ]);
-        setLoading(false);
-        return;
-      }
-      
-      // Fallback to Supabase if not in localStorage (with timeout)
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Auth timeout')), 5000)
+      // Quick timeout for auth check
+      const timeoutPromise = new Promise<null>((resolve) => 
+        setTimeout(() => resolve(null), 3000)
       );
       
       const authPromise = (async () => {
@@ -109,33 +136,72 @@ export const AdminScanDashboard: React.FC = () => {
         return roleData?.role || null;
       })();
       
-      const role = await Promise.race([authPromise, timeoutPromise]) as string | null;
-      setUserRole(role);
-
+      const role = await Promise.race([authPromise, timeoutPromise]);
+      
       if (role === 'admin') {
-        await Promise.all([
-          fetchStatistics(),
-          fetchRecentScans(),
-          fetchMaterialItems(),
-          fetchSuppliers()
-        ]);
+        setUserRole('admin');
+        loadDataInBackground();
+      } else {
+        // Check localStorage as final fallback
+        const storedRole = localStorage.getItem('user_role');
+        if (storedRole === 'admin') {
+          setUserRole('admin');
+          loadDataInBackground();
+        }
       }
     } catch (error) {
-      console.error('Error:', error);
-      // If timeout, check localStorage again
+      console.error('Auth error:', error);
+      // Final fallback to localStorage
       const storedRole = localStorage.getItem('user_role');
       if (storedRole === 'admin') {
         setUserRole('admin');
-        // Try to load data anyway
-        Promise.all([
-          fetchStatistics(),
-          fetchRecentScans(),
-          fetchMaterialItems(),
-          fetchSuppliers()
-        ]).catch(console.error);
+        loadDataInBackground();
       }
+    }
+  };
+
+  // Wrapper functions with individual timeouts
+  const fetchStatisticsWithTimeout = async () => {
+    const timeout = setTimeout(() => {
+      console.log('⏱️ Statistics fetch timeout');
+    }, 5000);
+    try {
+      await fetchStatistics();
     } finally {
-      setLoading(false);
+      clearTimeout(timeout);
+    }
+  };
+
+  const fetchRecentScansWithTimeout = async () => {
+    const timeout = setTimeout(() => {
+      console.log('⏱️ Recent scans fetch timeout');
+    }, 5000);
+    try {
+      await fetchRecentScans();
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
+
+  const fetchMaterialItemsWithTimeout = async () => {
+    const timeout = setTimeout(() => {
+      console.log('⏱️ Material items fetch timeout');
+    }, 5000);
+    try {
+      await fetchMaterialItems();
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
+
+  const fetchSuppliersWithTimeout = async () => {
+    const timeout = setTimeout(() => {
+      console.log('⏱️ Suppliers fetch timeout');
+    }, 5000);
+    try {
+      await fetchSuppliers();
+    } finally {
+      clearTimeout(timeout);
     }
   };
 
@@ -412,11 +478,10 @@ export const AdminScanDashboard: React.FC = () => {
     });
   };
 
-  if (loading) {
-    return <SectionLoader message="Loading scan dashboard..." className="p-6 h-48" />;
-  }
-
-  if (userRole !== 'admin') {
+  // Don't block UI with loading - show content immediately
+  // Only check role - if not admin from localStorage, show access denied
+  const storedRole = localStorage.getItem('user_role');
+  if (userRole !== 'admin' && storedRole !== 'admin') {
     return (
       <Card>
         <CardHeader>
@@ -433,6 +498,14 @@ export const AdminScanDashboard: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Data loading indicator - subtle, doesn't block UI */}
+      {dataLoading && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <RefreshCw className="h-4 w-4 animate-spin" />
+          Loading scan data...
+        </div>
+      )}
+      
       {/* Statistics Overview */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
