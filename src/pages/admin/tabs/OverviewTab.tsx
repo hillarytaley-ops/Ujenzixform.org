@@ -14,6 +14,9 @@ import {
   MessageSquare,
   BarChart3,
   Layers,
+  ShoppingCart,
+  Truck,
+  Package,
 } from 'lucide-react';
 import { DashboardStats, RegistrationRecord, AppPage } from '../types';
 import { StatsCard, StatsGrid } from '../components/StatsCard';
@@ -139,8 +142,20 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
           </CardHeader>
           <CardContent className="space-y-3">
             <QuickActionButton
+              icon={ShoppingCart}
+              label={`Orders ${stats.pendingOrders > 0 ? `(${stats.pendingOrders} pending)` : `(${stats.totalOrders})`}`}
+              color="orange"
+              onClick={() => onTabChange('orders')}
+            />
+            <QuickActionButton
+              icon={Truck}
+              label={`Delivery Requests ${stats.pendingDeliveryRequests > 0 ? `(${stats.pendingDeliveryRequests} pending)` : ''}`}
+              color="green"
+              onClick={() => onTabChange('delivery-requests')}
+            />
+            <QuickActionButton
               icon={Users}
-              label={`Pending (${stats.pendingRegistrations})`}
+              label={`Pending Registrations (${stats.pendingRegistrations})`}
               color="blue"
               onClick={() => onTabChange('registrations')}
             />
@@ -241,7 +256,7 @@ const SystemHealthItem: React.FC<SystemHealthItemProps> = ({ icon: Icon, title, 
 interface QuickActionButtonProps {
   icon: React.ElementType;
   label: string;
-  color: 'blue' | 'purple' | 'green' | 'orange' | 'red';
+  color: 'blue' | 'purple' | 'green' | 'orange' | 'red' | 'cyan' | 'yellow' | 'teal';
   onClick: () => void;
 }
 
@@ -257,6 +272,9 @@ const QuickActionButton: React.FC<QuickActionButtonProps> = ({
     green: 'bg-green-600/20 hover:bg-green-600/30 text-green-400 border-green-600/30',
     orange: 'bg-orange-600/20 hover:bg-orange-600/30 text-orange-400 border-orange-600/30',
     red: 'bg-red-600/20 hover:bg-red-600/30 text-red-400 border-red-600/30',
+    cyan: 'bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-400 border-cyan-600/30',
+    yellow: 'bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-400 border-yellow-600/30',
+    teal: 'bg-teal-600/20 hover:bg-teal-600/30 text-teal-400 border-teal-600/30',
   };
 
   return (

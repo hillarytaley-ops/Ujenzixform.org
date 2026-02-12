@@ -133,6 +133,7 @@ import { StaffManagement } from "@/components/admin/StaffManagement";
 import { ActivityLogViewer } from "@/components/admin/ActivityLogViewer";
 import { ThemeToggle, ThemeProvider } from "@/components/admin/dashboard/ThemeToggle";
 import { MobileNav } from "@/components/admin/dashboard/MobileNav";
+import { GroupedTabNav } from "@/components/admin/dashboard/GroupedTabNav";
 import { useStaffPermissions } from "@/hooks/useStaffPermissions";
 import { PermissionGate } from "@/components/admin/PermissionGate";
 import { AdminTab } from "@/config/staffPermissions";
@@ -358,7 +359,14 @@ const AdminDashboard = () => {
     activeToday: 0,
     totalFeedback: 0,
     positiveFeedback: 0,
-    negativeFeedback: 0
+    negativeFeedback: 0,
+    // Order stats
+    totalOrders: 0,
+    pendingOrders: 0,
+    confirmedOrders: 0,
+    // Delivery request stats
+    totalDeliveryRequests: 0,
+    pendingDeliveryRequests: 0
   });
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [registrations, setRegistrations] = useState<RegistrationRecord[]>([]);
@@ -746,20 +754,32 @@ const AdminDashboard = () => {
     
     try {
       // Parallel count queries with individual timeouts
-      const [usersCount, pendingSuppliers, pendingDelivery, feedbackCount] = await Promise.all([
+      const [usersCount, pendingSuppliers, pendingDelivery, feedbackCount, totalOrders, pendingOrders, confirmedOrders, totalDeliveryRequests, pendingDeliveryRequests] = await Promise.all([
         fetchWithTimeout(`${SUPABASE_URL}/rest/v1/user_roles?select=id&limit=1000`, 5000).then(c => c),
         fetchWithTimeout(`${SUPABASE_URL}/rest/v1/supplier_applications?status=eq.pending&select=id`, 5000).then(c => c),
         fetchWithTimeout(`${SUPABASE_URL}/rest/v1/delivery_providers?is_verified=eq.false&select=id`, 5000).then(c => c),
-        fetchWithTimeout(`${SUPABASE_URL}/rest/v1/feedback?select=id&limit=1000`, 5000).then(c => c)
+        fetchWithTimeout(`${SUPABASE_URL}/rest/v1/feedback?select=id&limit=1000`, 5000).then(c => c),
+        // Order stats
+        fetchWithTimeout(`${SUPABASE_URL}/rest/v1/purchase_orders?select=id&limit=1000`, 5000).then(c => c),
+        fetchWithTimeout(`${SUPABASE_URL}/rest/v1/purchase_orders?status=eq.pending&select=id`, 5000).then(c => c),
+        fetchWithTimeout(`${SUPABASE_URL}/rest/v1/purchase_orders?status=eq.confirmed&select=id`, 5000).then(c => c),
+        // Delivery request stats
+        fetchWithTimeout(`${SUPABASE_URL}/rest/v1/delivery_requests?select=id&limit=1000`, 5000).then(c => c),
+        fetchWithTimeout(`${SUPABASE_URL}/rest/v1/delivery_requests?status=eq.pending&select=id`, 5000).then(c => c)
       ]);
       
-      console.log('📊 Stats loaded:', { usersCount, pendingSuppliers, pendingDelivery, feedbackCount });
+      console.log('📊 Stats loaded:', { usersCount, pendingSuppliers, pendingDelivery, feedbackCount, totalOrders, pendingOrders, confirmedOrders, totalDeliveryRequests, pendingDeliveryRequests });
 
       setStats(prev => ({
         ...prev,
         totalUsers: usersCount,
         pendingRegistrations: pendingSuppliers + pendingDelivery,
-        totalFeedback: feedbackCount
+        totalFeedback: feedbackCount,
+        totalOrders,
+        pendingOrders,
+        confirmedOrders,
+        totalDeliveryRequests,
+        pendingDeliveryRequests
       }));
     } catch (error: any) {
       console.error('Error loading stats:', error);
@@ -768,7 +788,12 @@ const AdminDashboard = () => {
         ...prev,
         totalUsers: 0,
         pendingRegistrations: 0,
-        totalFeedback: 0
+        totalFeedback: 0,
+        totalOrders: 0,
+        pendingOrders: 0,
+        confirmedOrders: 0,
+        totalDeliveryRequests: 0,
+        pendingDeliveryRequests: 0
       }));
     }
   };
@@ -2103,7 +2128,23 @@ const AdminDashboard = () => {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="bg-slate-900/50 border border-slate-800 p-1 flex-wrap h-auto gap-1 justify-start overflow-x-auto max-w-full">
+          {/* Grouped Tab Navigation - Cleaner dropdown-based navigation */}
+          <GroupedTabNav
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            shouldShowTab={shouldShowTab}
+            stats={{
+              pendingOrders: stats.pendingOrders,
+              totalOrders: stats.totalOrders,
+              pendingDeliveryRequests: stats.pendingDeliveryRequests,
+            }}
+            deliveryAppsCount={deliveryApplications.length}
+            deliveryRequestsCount={builderDeliveryRequests.length}
+            financialDocsCount={financialDocuments.length}
+          />
+          
+          {/* Legacy Tab List - Hidden but kept for direct access */}
+          <TabsList className="bg-slate-900/50 border border-slate-800 p-1 flex-wrap h-auto gap-1 justify-start overflow-x-auto max-w-full hidden">
             {shouldShowTab('overview') && (
               <TabsTrigger value="overview" className="data-[state=active]:bg-blue-600">
                 <BarChart3 className="h-4 w-4 mr-2" />
@@ -2113,7 +2154,7 @@ const AdminDashboard = () => {
             {shouldShowTab('orders') && (
               <TabsTrigger value="orders" className="data-[state=active]:bg-orange-600">
                 <ShoppingCart className="h-4 w-4 mr-2" />
-                Orders
+                Orders {stats.pendingOrders > 0 && <Badge className="ml-1 bg-yellow-600 text-xs">{stats.pendingOrders}</Badge>}
               </TabsTrigger>
             )}
             {shouldShowTab('monitoring') && (

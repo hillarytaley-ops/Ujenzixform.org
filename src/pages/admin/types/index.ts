@@ -11,6 +11,13 @@ export interface DashboardStats {
   totalFeedback: number;
   positiveFeedback: number;
   negativeFeedback: number;
+  // Order stats
+  totalOrders: number;
+  pendingOrders: number;
+  confirmedOrders: number;
+  // Delivery request stats
+  totalDeliveryRequests: number;
+  pendingDeliveryRequests: number;
 }
 
 // Feedback Record
