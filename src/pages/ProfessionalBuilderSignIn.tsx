@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Home, Eye, EyeOff, Loader2, HardHat } from "lucide-react";
 
-console.log('🔐 ProfessionalBuilderSignIn BUILD v4 - REDIRECT to correct dash Feb 8 2026');
+console.log('🔐 ProfessionalBuilderSignIn BUILD v5 - FIX SIGN IN BUTTON Feb 13 2026');
 
 const ProfessionalBuilderSignIn = () => {
   const [email, setEmail] = useState("");
@@ -18,66 +18,133 @@ const ProfessionalBuilderSignIn = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Check if already logged in on page load - MUST verify role from DB
+  // Check if already logged in on page load - with timeout to prevent hanging
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        console.log('🔐 ProfessionalBuilderSignIn: Session found, checking DB role...');
+    const checkSession = async () => {
+      try {
+        // Use timeout to prevent hanging
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Session check timeout')), 5000)
+        );
         
-        // MUST check database for actual role
-        const { data: roleData } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', session.user.id)
-          .maybeSingle();
+        const sessionPromise = supabase.auth.getSession();
+        const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]) as any;
         
-        const dbRole = roleData?.role;
-        console.log('🔐 ProfessionalBuilderSignIn: DB role:', dbRole);
-        
-        if (dbRole === 'professional_builder') {
-          window.location.href = '/professional-builder-dashboard';
-        } else if (dbRole) {
-          // Wrong role - redirect to their actual dashboard
-          toast({
-            title: 'Wrong Portal',
-            description: `You are registered as ${dbRole}. Redirecting...`,
-          });
-          if (dbRole === 'private_client') window.location.href = '/private-client-dashboard';
-          else if (dbRole === 'supplier') window.location.href = '/supplier-dashboard';
-          else if (dbRole === 'delivery' || dbRole === 'delivery_provider') window.location.href = '/delivery-dashboard';
-          else if (dbRole === 'admin') window.location.href = '/admin-dashboard';
-          else window.location.href = '/home';
+        if (session?.user) {
+          console.log('🔐 ProfessionalBuilderSignIn: Session found, checking DB role...');
+          
+          // MUST check database for actual role - with timeout
+          const rolePromise = supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', session.user.id)
+            .maybeSingle();
+          
+          const roleTimeout = new Promise((resolve) => 
+            setTimeout(() => resolve({ data: null }), 3000)
+          );
+          
+          const { data: roleData } = await Promise.race([rolePromise, roleTimeout]) as any;
+          
+          const dbRole = roleData?.role;
+          console.log('🔐 ProfessionalBuilderSignIn: DB role:', dbRole);
+          
+          if (dbRole === 'professional_builder') {
+            window.location.href = '/professional-builder-dashboard';
+          } else if (dbRole) {
+            // Wrong role - redirect to their actual dashboard
+            toast({
+              title: 'Wrong Portal',
+              description: `You are registered as ${dbRole}. Redirecting...`,
+            });
+            if (dbRole === 'private_client') window.location.href = '/private-client-dashboard';
+            else if (dbRole === 'supplier') window.location.href = '/supplier-dashboard';
+            else if (dbRole === 'delivery' || dbRole === 'delivery_provider') window.location.href = '/delivery-dashboard';
+            else if (dbRole === 'admin') window.location.href = '/admin-dashboard';
+            else window.location.href = '/home';
+          }
+          // If no role, let them stay on page to sign in fresh
         }
-        // If no role, let them stay on page to sign in fresh
+      } catch (error) {
+        console.log('🔐 Session check error or timeout:', error);
+        // Continue - let user sign in
       }
-    });
+    };
+    
+    checkSession();
   }, [toast]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    console.log('🔐 Sign in button clicked! Email:', email);
+    
+    if (!email || !password) {
+      toast({
+        title: "Missing Information",
+        description: "Please enter both email and password.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setLoading(true);
     
-    // Safety timeout - reset loading after 5 seconds no matter what
-    const safetyTimeout = setTimeout(() => setLoading(false), 5000);
+    // Safety timeout - reset loading after 8 seconds and show error
+    const safetyTimeout = setTimeout(() => {
+      console.log('🔐 Sign in timeout - resetting');
+      setLoading(false);
+      toast({
+        title: "Sign In Timeout",
+        description: "The sign in is taking too long. Please try again.",
+        variant: "destructive",
+      });
+    }, 8000);
 
     try {
+      console.log('🔐 Calling supabase.auth.signInWithPassword...');
+      
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.trim().toLowerCase(),
         password,
       });
 
-      if (error) throw error;
+      console.log('🔐 Sign in response:', { data: !!data, error: error?.message });
 
-      // Check if user has professional_builder role
-      const { data: roleData, error: roleError } = await supabase
+      if (error) {
+        clearTimeout(safetyTimeout);
+        throw error;
+      }
+
+      if (!data?.user) {
+        clearTimeout(safetyTimeout);
+        throw new Error('No user returned from sign in');
+      }
+
+      console.log('🔐 Sign in successful, checking role...');
+
+      // Check if user has professional_builder role - with timeout
+      const rolePromise = supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', data.user.id)
         .maybeSingle();
+      
+      const roleTimeout = new Promise((resolve) => 
+        setTimeout(() => resolve({ data: null, error: null }), 3000)
+      );
+      
+      const { data: roleData, error: roleError } = await Promise.race([rolePromise, roleTimeout]) as any;
 
-      if (roleError) throw roleError;
+      clearTimeout(safetyTimeout);
+
+      if (roleError) {
+        console.warn('🔐 Role check error:', roleError);
+        // Continue anyway - use default role
+      }
 
       const dbRole = roleData?.role;
+      console.log('🔐 DB role:', dbRole);
       
       // If user has a different role, redirect them to their correct dashboard
       if (dbRole && dbRole !== 'professional_builder') {
@@ -86,7 +153,7 @@ const ProfessionalBuilderSignIn = () => {
           description: `You are registered as ${dbRole}. Redirecting to your dashboard...`,
         });
         localStorage.setItem('user_role', dbRole);
-        localStorage.setItem('user_role_id', data.user.id);
+        localStorage.setItem('user_id', data.user.id);
         localStorage.setItem('user_role_verified', Date.now().toString());
         localStorage.setItem('user_email', data.user.email || '');
         
@@ -102,19 +169,37 @@ const ProfessionalBuilderSignIn = () => {
       // Store role in localStorage (use DB role or default to professional_builder)
       const roleToStore = dbRole || 'professional_builder';
       localStorage.setItem('user_role', roleToStore);
-      localStorage.setItem('user_role_id', data.user.id);
+      localStorage.setItem('user_id', data.user.id);
       localStorage.setItem('user_role_verified', Date.now().toString());
       localStorage.setItem('user_email', data.user.email || '');
+
+      console.log('🔐 Redirecting to professional-builder-dashboard...');
+      
+      toast({
+        title: "Sign In Successful",
+        description: "Redirecting to your dashboard...",
+      });
 
       // Redirect to dashboard
       window.location.replace('/professional-builder-dashboard');
     } catch (error: any) {
+      clearTimeout(safetyTimeout);
+      console.error('🔐 Sign in error:', error);
+      
+      let errorMessage = "Invalid email or password";
+      if (error.message?.includes('Invalid login credentials')) {
+        errorMessage = "The email or password you entered is incorrect.";
+      } else if (error.message?.includes('Email not confirmed')) {
+        errorMessage = "Please check your email and click the verification link first.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Sign In Failed",
-        description: error.message || "Invalid email or password",
+        description: errorMessage,
         variant: "destructive",
       });
-    } finally {
       setLoading(false);
     }
   };
