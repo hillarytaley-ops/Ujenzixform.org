@@ -147,6 +147,7 @@ export function BuilderVideoPortfolio({ builderId, isOwner = false }: BuilderVid
       const filePath = `${builderId}/${timestamp}.${fileExt}`;
 
       console.log('📹 Uploading to path:', filePath);
+      console.log('📹 File size:', (uploadForm.file.size / 1024 / 1024).toFixed(2), 'MB');
 
       // Get auth token from localStorage
       let accessToken = '';
@@ -155,41 +156,83 @@ export function BuilderVideoPortfolio({ builderId, isOwner = false }: BuilderVid
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
           accessToken = parsed.access_token || '';
+          console.log('📹 Got access token from localStorage');
         }
       } catch (e) {
-        console.warn('Could not get access token from localStorage');
+        console.warn('📹 Could not get access token from localStorage');
       }
 
-      // Use native fetch for upload (more reliable than Supabase client)
       const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
       const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
 
-      const uploadResponse = await fetch(
-        `${SUPABASE_URL}/storage/v1/object/builder-videos/${filePath}`,
-        {
-          method: 'POST',
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
-            'Content-Type': uploadForm.file.type,
-            'x-upsert': 'false'
-          },
-          body: uploadForm.file
+      // Try using Supabase client first (it handles the upload better for large files)
+      console.log('📹 Attempting upload via Supabase client...');
+      
+      // Create an AbortController for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        console.log('📹 Upload taking too long, aborting...');
+        controller.abort();
+      }, 60000); // 60 second timeout
+      
+      try {
+        // Use Supabase client but with a wrapper that can timeout
+        const uploadPromise = supabase.storage
+          .from('builder-videos')
+          .upload(filePath, uploadForm.file, {
+            cacheControl: '3600',
+            upsert: true // Allow overwrite to avoid conflicts
+          });
+        
+        // Race between upload and timeout
+        const result = await Promise.race([
+          uploadPromise,
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Upload timeout after 60 seconds')), 60000)
+          )
+        ]) as any;
+        
+        clearTimeout(timeoutId);
+        
+        if (result.error) {
+          console.error('📹 Supabase upload error:', result.error);
+          throw result.error;
         }
-      );
+        
+        console.log('📹 Upload successful via Supabase client!');
+      } catch (supabaseError: any) {
+        clearTimeout(timeoutId);
+        console.log('📹 Supabase client failed, trying native fetch...', supabaseError.message);
+        
+        // Fallback to native fetch
+        const uploadResponse = await fetch(
+          `${SUPABASE_URL}/storage/v1/object/builder-videos/${filePath}`,
+          {
+            method: 'POST',
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+              'Content-Type': uploadForm.file.type,
+              'x-upsert': 'true'
+            },
+            body: uploadForm.file
+          }
+        );
 
-      console.log('📹 Upload response status:', uploadResponse.status);
+        console.log('📹 Native fetch response status:', uploadResponse.status);
 
-      if (!uploadResponse.ok) {
-        const errorText = await uploadResponse.text();
-        console.error('📹 Upload error:', errorText);
-        throw new Error(`Upload failed: ${errorText}`);
+        if (!uploadResponse.ok) {
+          const errorText = await uploadResponse.text();
+          console.error('📹 Native fetch upload error:', errorText);
+          throw new Error(`Upload failed: ${errorText}`);
+        }
+        
+        console.log('📹 Upload successful via native fetch!');
       }
-
-      console.log('📹 Video uploaded successfully, getting public URL...');
 
       // Get public URL
       const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/builder-videos/${filePath}`;
+      console.log('📹 Video uploaded successfully!');
 
       console.log('📹 Public URL:', publicUrl);
 
