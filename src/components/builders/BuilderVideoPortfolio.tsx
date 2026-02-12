@@ -127,49 +127,117 @@ export function BuilderVideoPortfolio({ builderId, isOwner = false }: BuilderVid
     }
 
     setUploading(true);
+    console.log('📹 Starting video upload...');
+    
+    // Safety timeout - 2 minutes for large files
+    const uploadTimeout = setTimeout(() => {
+      console.log('📹 Upload timeout reached');
+      setUploading(false);
+      toast({
+        title: "Upload Timeout",
+        description: "The upload is taking too long. Please try with a smaller file or check your connection.",
+        variant: "destructive"
+      });
+    }, 120000);
+    
     try {
-      // Upload video to storage
+      // Upload video to storage using native fetch for better reliability
       const fileExt = uploadForm.file.name.split('.').pop();
       const timestamp = Date.now();
       const filePath = `${builderId}/${timestamp}.${fileExt}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from('builder-videos')
-        .upload(filePath, uploadForm.file);
+      console.log('📹 Uploading to path:', filePath);
 
-      if (uploadError) throw uploadError;
+      // Get auth token from localStorage
+      let accessToken = '';
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          accessToken = parsed.access_token || '';
+        }
+      } catch (e) {
+        console.warn('Could not get access token from localStorage');
+      }
+
+      // Use native fetch for upload (more reliable than Supabase client)
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+
+      const uploadResponse = await fetch(
+        `${SUPABASE_URL}/storage/v1/object/builder-videos/${filePath}`,
+        {
+          method: 'POST',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+            'Content-Type': uploadForm.file.type,
+            'x-upsert': 'false'
+          },
+          body: uploadForm.file
+        }
+      );
+
+      console.log('📹 Upload response status:', uploadResponse.status);
+
+      if (!uploadResponse.ok) {
+        const errorText = await uploadResponse.text();
+        console.error('📹 Upload error:', errorText);
+        throw new Error(`Upload failed: ${errorText}`);
+      }
+
+      console.log('📹 Video uploaded successfully, getting public URL...');
 
       // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('builder-videos')
-        .getPublicUrl(filePath);
+      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/builder-videos/${filePath}`;
 
-      // Create database record
-      const { error: dbError } = await supabase
-        .from('builder_videos')
-        .insert({
-          builder_id: builderId,
-          title: uploadForm.title,
-          description: uploadForm.description,
-          video_url: urlData.publicUrl,
-          status: 'pending'
-        });
+      console.log('📹 Public URL:', publicUrl);
 
-      if (dbError) throw dbError;
+      // Create database record using native fetch
+      const dbResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/builder_videos`,
+        {
+          method: 'POST',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify({
+            builder_id: builderId,
+            title: uploadForm.title,
+            description: uploadForm.description,
+            video_url: publicUrl,
+            status: 'pending'
+          })
+        }
+      );
+
+      console.log('📹 DB insert response status:', dbResponse.status);
+
+      if (!dbResponse.ok) {
+        const dbErrorText = await dbResponse.text();
+        console.error('📹 DB error:', dbErrorText);
+        throw new Error(`Database error: ${dbErrorText}`);
+      }
+
+      clearTimeout(uploadTimeout);
 
       toast({
-        title: "Video Uploaded",
+        title: "Video Uploaded! 🎉",
         description: "Your video has been submitted for approval",
       });
 
       setShowUploadDialog(false);
       setUploadForm({ title: '', description: '', file: null });
       fetchVideos();
-    } catch (error) {
-      console.error('Error uploading video:', error);
+    } catch (error: any) {
+      clearTimeout(uploadTimeout);
+      console.error('📹 Error uploading video:', error);
       toast({
         title: "Upload Failed",
-        description: "Failed to upload video. Please try again.",
+        description: error.message || "Failed to upload video. Please try again.",
         variant: "destructive"
       });
     } finally {
