@@ -398,30 +398,74 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
     try {
       let videoUrl = '';
       
-      // Upload video if selected
+      // Upload video if selected - using fast XMLHttpRequest
       if (selectedVideo) {
-        console.log('📤 Uploading video...');
         const fileExt = selectedVideo.name.split('.').pop();
         const fileName = `${postUserId}/${Date.now()}.${fileExt}`;
+        const fileSizeMB = (selectedVideo.size / 1024 / 1024).toFixed(2);
         
-        const { error: uploadError } = await supabase.storage
-          .from('builder-videos')
-          .upload(fileName, selectedVideo);
+        console.log('📤 Uploading video:', fileName, `(${fileSizeMB}MB)`);
         
-        if (uploadError) {
+        // Get auth token for upload
+        let accessToken = '';
+        try {
+          const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          if (storedSession) {
+            const parsed = JSON.parse(storedSession);
+            accessToken = parsed.access_token || '';
+          }
+        } catch (e) {
+          console.warn('📤 Could not get access token');
+        }
+        
+        const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+        
+        try {
+          // Fast upload using XMLHttpRequest with progress
+          await new Promise<void>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            const uploadUrl = `${SUPABASE_URL}/storage/v1/object/builder-videos/${fileName}`;
+            
+            xhr.upload.onprogress = (event) => {
+              if (event.lengthComputable) {
+                const percent = Math.round((event.loaded / event.total) * 100);
+                console.log(`📤 Upload progress: ${percent}%`);
+              }
+            };
+            
+            xhr.onload = () => {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                console.log('📤 Upload complete!');
+                resolve();
+              } else {
+                reject(new Error(`Upload failed: ${xhr.status}`));
+              }
+            };
+            
+            xhr.onerror = () => reject(new Error('Network error'));
+            xhr.ontimeout = () => reject(new Error('Upload timeout'));
+            
+            xhr.open('POST', uploadUrl, true);
+            xhr.timeout = 300000; // 5 min timeout
+            xhr.setRequestHeader('Authorization', `Bearer ${accessToken || SUPABASE_ANON_KEY}`);
+            xhr.setRequestHeader('apikey', SUPABASE_ANON_KEY);
+            xhr.setRequestHeader('Content-Type', selectedVideo.type);
+            xhr.setRequestHeader('x-upsert', 'true');
+            xhr.send(selectedVideo);
+          });
+          
+          videoUrl = `${SUPABASE_URL}/storage/v1/object/public/builder-videos/${fileName}`;
+          console.log('📤 Video URL:', videoUrl);
+          
+        } catch (uploadError: any) {
           console.error('📤 Video upload error:', uploadError);
           toast({
             title: 'Video Upload Failed',
-            description: uploadError.message || 'Could not upload video. Posting without video.',
+            description: uploadError.message || 'Could not upload video.',
             variant: 'destructive'
           });
-          // Continue without video if upload fails
-        } else {
-          const { data: urlData } = supabase.storage
-            .from('builder-videos')
-            .getPublicUrl(fileName);
-          videoUrl = urlData.publicUrl;
-          console.log('📤 Video uploaded:', videoUrl);
+          // Continue without video
         }
       }
 
