@@ -469,44 +469,107 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         }
       }
 
-      // Get user's profile (optional - don't fail if not found)
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('id, full_name, avatar_url')
-        .eq('user_id', postUserId)
-        .single();
+      console.log('📤 Upload done, now saving to database...');
 
-      console.log('📤 Profile found:', profile ? 'yes' : 'no');
+      // Get user's profile using fetch (bypass Supabase client)
+      let profile: { id?: string; full_name?: string; avatar_url?: string } | null = null;
+      try {
+        console.log('📤 Fetching profile...');
+        const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+        
+        let accessToken = '';
+        try {
+          const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          if (storedSession) {
+            const parsed = JSON.parse(storedSession);
+            accessToken = parsed.access_token || '';
+          }
+        } catch (e) {}
+        
+        const profileRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${postUserId}&select=id,full_name,avatar_url&limit=1`,
+          {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+            }
+          }
+        );
+        const profileData = await profileRes.json();
+        profile = profileData?.[0] || null;
+        console.log('📤 Profile found:', profile ? 'yes' : 'no');
+      } catch (e) {
+        console.log('📤 Profile fetch error (continuing):', e);
+      }
 
-      // Insert post into database (builder_id references auth.users.id, not profiles.id)
+      // Insert post into database using fetch (bypass Supabase client)
       console.log('📤 Inserting post into database...');
-      const { data: newPostData, error: postError } = await supabase
-        .from('builder_posts')
-        .insert({
-          builder_id: postUserId, // Use auth user ID, not profile ID
+      let newPostData: any = null;
+      
+      try {
+        const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+        
+        let accessToken = '';
+        try {
+          const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          if (storedSession) {
+            const parsed = JSON.parse(storedSession);
+            accessToken = parsed.access_token || '';
+          }
+        } catch (e) {}
+        
+        const postPayload = {
+          builder_id: postUserId,
           post_type: videoUrl ? 'video' : 'text',
-          content: newPostText, // Database column is 'content', not 'caption'
-          video_url: videoUrl || null, // Database column is 'video_url', not 'media_url'
-          project_location: '', // Could add location picker
+          content: newPostText,
+          video_url: videoUrl || null,
+          project_location: '',
           privacy: privacy,
           status: 'active',
           likes_count: 0,
           shares_count: 0,
           comments_count: 0
-        })
-        .select()
-        .single();
-
-      if (postError) {
-        console.error('📤 Post creation error:', postError);
+        };
+        
+        console.log('📤 Post payload:', postPayload);
+        
+        const postRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/builder_posts`,
+          {
+            method: 'POST',
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify(postPayload)
+          }
+        );
+        
+        const postResult = await postRes.json();
+        console.log('📤 Post insert response:', postRes.status, postResult);
+        
+        if (postRes.ok && postResult?.[0]) {
+          newPostData = postResult[0];
+          console.log('📤 Post created successfully:', newPostData?.id);
+        } else {
+          console.error('📤 Post creation error:', postResult);
+          toast({
+            title: 'Database Error',
+            description: postResult?.message || 'Could not save post to database',
+            variant: 'destructive'
+          });
+        }
+      } catch (postError: any) {
+        console.error('📤 Post insert fetch error:', postError);
         toast({
           title: 'Database Error',
-          description: postError.message || 'Could not save post to database',
+          description: postError.message || 'Could not save post',
           variant: 'destructive'
         });
-        // Still add to local state for immediate feedback
-      } else {
-        console.log('📤 Post created successfully:', newPostData?.id);
       }
 
       // Also call onUploadVideo callback if provided
