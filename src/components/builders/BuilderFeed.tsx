@@ -347,14 +347,31 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
 
   const handlePost = async () => {
     if (!newPostText.trim() && !selectedVideo) return;
-    if (!currentUserId) {
-      toast({
-        title: 'Error',
-        description: 'You must be logged in to post',
-        variant: 'destructive'
-      });
+    
+    // Use effectiveUserId which includes localStorage fallback
+    const userId = effectiveUserId || currentUserId;
+    
+    if (!userId) {
+      // Try to get user from Supabase auth as last resort
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: 'Error',
+          description: 'You must be logged in to post',
+          variant: 'destructive'
+        });
+        return;
+      }
+      // Use the auth user id
+      await handlePostWithUserId(user.id);
       return;
     }
+    
+    await handlePostWithUserId(userId);
+  };
+  
+  const handlePostWithUserId = async (postUserId: string) => {
+    if (!newPostText.trim() && !selectedVideo) return;
 
     setIsPosting(true);
     try {
@@ -363,7 +380,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
       // Upload video if selected
       if (selectedVideo) {
         const fileExt = selectedVideo.name.split('.').pop();
-        const fileName = `${currentUserId}/${Date.now()}.${fileExt}`;
+        const fileName = `${postUserId}/${Date.now()}.${fileExt}`;
         
         const { error: uploadError } = await supabase.storage
           .from('builder-videos')
@@ -384,7 +401,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
       const { data: profile } = await supabase
         .from('profiles')
         .select('id, full_name, avatar_url')
-        .eq('user_id', currentUserId)
+        .eq('user_id', postUserId)
         .single();
 
       if (!profile) {
@@ -395,7 +412,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
       const { data: newPostData, error: postError } = await supabase
         .from('builder_posts')
         .insert({
-          builder_id: currentUserId, // Use auth user ID, not profile ID
+          builder_id: postUserId, // Use auth user ID, not profile ID
           post_type: videoUrl ? 'video' : 'text',
           caption: newPostText,
           media_url: videoUrl || null,

@@ -123,6 +123,9 @@ const Builders = () => {
         return;
       }
 
+      // Store user_id in localStorage for components that need it
+      localStorage.setItem('user_id', user.id);
+
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('*, user_id')
