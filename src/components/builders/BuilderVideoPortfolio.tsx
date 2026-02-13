@@ -34,7 +34,7 @@ interface BuilderVideo {
   description: string;
   video_url: string;
   thumbnail_url?: string;
-  is_published: boolean;
+  is_published?: boolean;
   created_at: string;
   views?: number;
 }
@@ -170,8 +170,8 @@ export function BuilderVideoPortfolio({ builderId, isOwner = false }: BuilderVid
       const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
       const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
 
-      // Try test-uploads bucket first, fallback to builder-videos
-      const bucketName = 'test-uploads'; // Using test bucket to debug RLS issues
+      // Use builder-videos bucket (RLS fixed with allow_all_storage_operations policy)
+      const bucketName = 'builder-videos';
       
       // Use XMLHttpRequest for better large file handling and progress
       console.log('📹 Starting upload via XMLHttpRequest to bucket:', bucketName);
@@ -243,8 +243,8 @@ export function BuilderVideoPortfolio({ builderId, isOwner = false }: BuilderVid
             builder_id: builderId,
             title: uploadForm.title,
             description: uploadForm.description || '',
-            video_url: publicUrl,
-            is_published: false // Set to false for admin review, or true to publish immediately
+            video_url: publicUrl
+            // Note: is_published column doesn't exist, videos are published by default
           })
         }
       );
@@ -305,12 +305,12 @@ export function BuilderVideoPortfolio({ builderId, isOwner = false }: BuilderVid
     }
   };
 
-  const getStatusBadge = (isPublished: boolean) => {
-    if (isPublished) {
-      return <Badge className="bg-green-500"><CheckCircle className="w-3 h-3 mr-1" /> Published</Badge>;
-    } else {
+  const getStatusBadge = (isPublished?: boolean) => {
+    // Default to published if is_published column doesn't exist
+    if (isPublished === false) {
       return <Badge className="bg-yellow-500"><Clock className="w-3 h-3 mr-1" /> Pending Review</Badge>;
     }
+    return <Badge className="bg-green-500"><CheckCircle className="w-3 h-3 mr-1" /> Published</Badge>;
   };
 
   return (
