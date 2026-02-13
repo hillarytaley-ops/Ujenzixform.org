@@ -346,27 +346,38 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   };
 
   const handlePost = async () => {
-    if (!newPostText.trim() && !selectedVideo) return;
+    console.log('📤 handlePost() called');
+    console.log('📤 effectiveUserId:', effectiveUserId);
+    console.log('📤 currentUserId:', currentUserId);
+    console.log('📤 storedUserId:', storedUserId);
+    
+    if (!newPostText.trim() && !selectedVideo) {
+      console.log('📤 No content, returning early');
+      return;
+    }
     
     // Use effectiveUserId which includes localStorage fallback
-    const userId = effectiveUserId || currentUserId;
+    let userId = effectiveUserId || currentUserId;
+    console.log('📤 Using userId:', userId);
     
     if (!userId) {
+      console.log('📤 No userId found, checking Supabase auth...');
       // Try to get user from Supabase auth as last resort
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error } = await supabase.auth.getUser();
+      console.log('📤 Supabase auth result:', user?.id, error?.message);
+      
       if (!user) {
         toast({
           title: 'Error',
-          description: 'You must be logged in to post',
+          description: 'You must be logged in to post. Please sign in again.',
           variant: 'destructive'
         });
         return;
       }
-      // Use the auth user id
-      await handlePostWithUserId(user.id);
-      return;
+      userId = user.id;
     }
     
+    console.log('📤 Calling handlePostWithUserId with:', userId);
     await handlePostWithUserId(userId);
   };
   
@@ -692,10 +703,33 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
                   Cancel
                 </Button>
                 <Button 
+                  type="button"
                   className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
-                  onClick={async () => {
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     console.log('📤 Post button clicked!');
-                    await handlePost();
+                    console.log('📤 newPostText:', newPostText);
+                    console.log('📤 selectedVideo:', selectedVideo?.name);
+                    console.log('📤 isPosting:', isPosting);
+                    
+                    if (isPosting) {
+                      console.log('📤 Already posting, ignoring click');
+                      return;
+                    }
+                    
+                    if (!newPostText.trim() && !selectedVideo) {
+                      console.log('📤 No content to post');
+                      toast({
+                        title: 'Nothing to post',
+                        description: 'Please add some text or select a video',
+                        variant: 'destructive'
+                      });
+                      return;
+                    }
+                    
+                    // Call handlePost
+                    handlePost();
                   }}
                   disabled={isPosting || (!newPostText.trim() && !selectedVideo)}
                 >
