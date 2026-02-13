@@ -147,7 +147,8 @@ export function BuilderVideoPortfolio({ builderId, isOwner = false }: BuilderVid
       const filePath = `${builderId}/${timestamp}.${fileExt}`;
 
       console.log('📹 Uploading to path:', filePath);
-      console.log('📹 File size:', (uploadForm.file.size / 1024 / 1024).toFixed(2), 'MB');
+      const fileSizeMB = (uploadForm.file.size / 1024 / 1024).toFixed(2);
+      console.log('📹 File size:', fileSizeMB, 'MB');
 
       // Get auth token from localStorage
       let accessToken = '';
@@ -162,73 +163,60 @@ export function BuilderVideoPortfolio({ builderId, isOwner = false }: BuilderVid
         console.warn('📹 Could not get access token from localStorage');
       }
 
+      if (!accessToken) {
+        throw new Error('Not authenticated. Please sign in again.');
+      }
+
       const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
       const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
 
-      // Try using Supabase client first (it handles the upload better for large files)
-      console.log('📹 Attempting upload via Supabase client...');
+      // Use XMLHttpRequest for better large file handling and progress
+      console.log('📹 Starting upload via XMLHttpRequest...');
       
-      // Create an AbortController for timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => {
-        console.log('📹 Upload taking too long, aborting...');
-        controller.abort();
-      }, 60000); // 60 second timeout
+      const uploadUrl = `${SUPABASE_URL}/storage/v1/object/builder-videos/${filePath}`;
       
-      try {
-        // Use Supabase client but with a wrapper that can timeout
-        const uploadPromise = supabase.storage
-          .from('builder-videos')
-          .upload(filePath, uploadForm.file, {
-            cacheControl: '3600',
-            upsert: true // Allow overwrite to avoid conflicts
-          });
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
         
-        // Race between upload and timeout
-        const result = await Promise.race([
-          uploadPromise,
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Upload timeout after 60 seconds')), 60000)
-          )
-        ]) as any;
+        // Set timeout for large files (5 minutes)
+        xhr.timeout = 300000;
         
-        clearTimeout(timeoutId);
-        
-        if (result.error) {
-          console.error('📹 Supabase upload error:', result.error);
-          throw result.error;
-        }
-        
-        console.log('📹 Upload successful via Supabase client!');
-      } catch (supabaseError: any) {
-        clearTimeout(timeoutId);
-        console.log('📹 Supabase client failed, trying native fetch...', supabaseError.message);
-        
-        // Fallback to native fetch
-        const uploadResponse = await fetch(
-          `${SUPABASE_URL}/storage/v1/object/builder-videos/${filePath}`,
-          {
-            method: 'POST',
-            headers: {
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
-              'Content-Type': uploadForm.file.type,
-              'x-upsert': 'true'
-            },
-            body: uploadForm.file
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            const percentComplete = Math.round((event.loaded / event.total) * 100);
+            console.log(`📹 Upload progress: ${percentComplete}% (${(event.loaded / 1024 / 1024).toFixed(2)}MB / ${fileSizeMB}MB)`);
           }
-        );
-
-        console.log('📹 Native fetch response status:', uploadResponse.status);
-
-        if (!uploadResponse.ok) {
-          const errorText = await uploadResponse.text();
-          console.error('📹 Native fetch upload error:', errorText);
-          throw new Error(`Upload failed: ${errorText}`);
-        }
+        };
         
-        console.log('📹 Upload successful via native fetch!');
-      }
+        xhr.onload = () => {
+          console.log('📹 XHR response status:', xhr.status);
+          if (xhr.status >= 200 && xhr.status < 300) {
+            console.log('📹 Upload successful via XMLHttpRequest!');
+            resolve();
+          } else {
+            console.error('📹 XHR upload error:', xhr.responseText);
+            reject(new Error(`Upload failed (${xhr.status}): ${xhr.responseText}`));
+          }
+        };
+        
+        xhr.onerror = () => {
+          console.error('📹 XHR network error');
+          reject(new Error('Network error during upload. Please check your connection.'));
+        };
+        
+        xhr.ontimeout = () => {
+          console.error('📹 XHR timeout');
+          reject(new Error('Upload timed out. The file may be too large or your connection is slow.'));
+        };
+        
+        xhr.open('POST', uploadUrl, true);
+        xhr.setRequestHeader('apikey', SUPABASE_ANON_KEY);
+        xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
+        xhr.setRequestHeader('Content-Type', uploadForm.file.type);
+        xhr.setRequestHeader('x-upsert', 'true');
+        
+        xhr.send(uploadForm.file);
+      });
 
       // Get public URL
       const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/builder-videos/${filePath}`;
