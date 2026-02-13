@@ -60,19 +60,38 @@ export function BuilderVideoPortfolio({ builderId, isOwner = false }: BuilderVid
   const fetchVideos = async () => {
     setLoading(true);
     console.log('📹 Fetching videos for builder:', builderId, 'isOwner:', isOwner);
+    
+    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+    
     try {
-      let query = supabase
-        .from('builder_videos')
-        .select('*')
-        .eq('builder_id', builderId)
-        .order('created_at', { ascending: false });
-
-      // If not owner, only show approved videos
+      // Build query params
+      let queryParams = `builder_id=eq.${builderId}&order=created_at.desc`;
       if (!isOwner) {
-        query = query.eq('status', 'approved');
+        queryParams += '&status=eq.approved';
       }
-
-      const { data, error } = await query;
+      
+      // Use native fetch with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/builder_videos?${queryParams}`,
+        {
+          method: 'GET',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          signal: controller.signal
+        }
+      );
+      
+      clearTimeout(timeoutId);
+      
+      const data = await response.json();
+      const error = response.ok ? null : data;
       console.log('📹 Videos fetched:', data?.length || 0, 'Error:', error);
 
       if (error) throw error;
