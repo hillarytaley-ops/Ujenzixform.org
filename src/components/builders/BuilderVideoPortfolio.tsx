@@ -328,10 +328,11 @@ export function BuilderVideoPortfolio({ builderId, isOwner = false }: BuilderVid
   };
 
   const getPublishedBadge = (isPublished?: boolean) => {
-    if (isPublished) {
-      return <Badge className="bg-green-500"><CheckCircle className="w-3 h-3 mr-1" /> Published</Badge>;
+    // Treat null/undefined as published (database default is true)
+    if (isPublished === false) {
+      return <Badge className="bg-yellow-500"><Clock className="w-3 h-3 mr-1" /> Draft</Badge>;
     }
-    return <Badge className="bg-yellow-500"><Clock className="w-3 h-3 mr-1" /> Draft</Badge>;
+    return <Badge className="bg-green-500"><CheckCircle className="w-3 h-3 mr-1" /> Published</Badge>;
   };
 
   return (
@@ -448,6 +449,20 @@ export function BuilderVideoPortfolio({ builderId, isOwner = false }: BuilderVid
                     alt={video.title}
                     className="w-full h-full object-cover"
                   />
+                ) : video.video_url ? (
+                  /* Show video preview with first frame as poster */
+                  <video 
+                    src={video.video_url}
+                    className="w-full h-full object-cover"
+                    preload="metadata"
+                    muted
+                    playsInline
+                    onLoadedMetadata={(e) => {
+                      // Seek to 1 second to get a better frame
+                      const videoEl = e.target as HTMLVideoElement;
+                      videoEl.currentTime = 1;
+                    }}
+                  />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
                     <Video className="w-12 h-12 text-gray-600" />
@@ -466,7 +481,7 @@ export function BuilderVideoPortfolio({ builderId, isOwner = false }: BuilderVid
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-gray-500 text-xs">
                     <Eye className="w-3 h-3" />
-                    <span>{video.views || 0} views</span>
+                    <span>{video.views_count || 0} views</span>
                   </div>
                   {isOwner && (
                     <Button 
