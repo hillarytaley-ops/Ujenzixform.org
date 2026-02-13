@@ -572,6 +572,8 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         });
       }
 
+      console.log('📤 Post saved! Now updating UI...');
+
       // Also call onUploadVideo callback if provided
       if (selectedVideo && onUploadVideo) {
         onUploadVideo(selectedVideo, newPostText);
@@ -593,15 +595,21 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         comments: []
       };
 
+      console.log('📤 Adding post to feed:', newPost.id);
       setPosts([newPost, ...posts]);
+      
+      console.log('📤 Clearing form...');
       setNewPostText('');
       handleRemoveVideo();
       setIsCreatingPost(false);
 
+      console.log('📤 Showing success toast...');
       toast({
         title: '🎉 Posted!',
         description: 'Your post has been shared successfully'
       });
+      
+      console.log('📤 ✅ All done!');
     } catch (error: any) {
       console.error('📤 Error creating post:', error);
       toast({
