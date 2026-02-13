@@ -82,7 +82,8 @@ import {
   QrCode,
   Scan,
   ShoppingBag,
-  ClipboardList
+  ClipboardList,
+  Video
 } from "lucide-react";
 import { AdminScanDashboard } from "@/components/qr/AdminScanDashboard";
 import { EnhancedQRCodeManager } from "@/components/qr/EnhancedQRCodeManager";
@@ -2186,6 +2187,12 @@ const AdminDashboard = () => {
                 Pending Products
               </TabsTrigger>
             )}
+            {shouldShowTab('videos') && (
+              <TabsTrigger value="videos" className="data-[state=active]:bg-orange-600">
+                <Video className="h-4 w-4 mr-2" />
+                Video Approvals
+              </TabsTrigger>
+            )}
             {shouldShowTab('material-images') && (
               <TabsTrigger value="material-images" className="data-[state=active]:bg-purple-600">
                 <FileImage className="h-4 w-4 mr-2" />
@@ -2681,6 +2688,11 @@ const AdminDashboard = () => {
           {/* Pending Products Tab - Admin Product Approval */}
           <TabsContent value="pending-products" className="space-y-6">
             <PendingProductsManager />
+          </TabsContent>
+
+          {/* Video Approvals Tab - Admin approves builder videos */}
+          <TabsContent value="videos" className="space-y-6">
+            <AdminVideoApproval />
           </TabsContent>
 
           {/* Material Images Tab - Admin uploads and approves supplier images */}

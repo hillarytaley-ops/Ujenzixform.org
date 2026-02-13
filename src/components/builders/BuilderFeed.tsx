@@ -583,7 +583,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
           video_url: videoUrl || null,
           project_location: '',
           privacy: privacy,
-          status: 'active',
+          status: 'pending', // Requires admin approval before showing publicly
           likes_count: 0,
           shares_count: 0,
           comments_count: 0
@@ -661,8 +661,8 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
 
       console.log('📤 Showing success toast...');
       toast({
-        title: '🎉 Posted!',
-        description: 'Your post has been shared successfully'
+        title: '🎉 Video Submitted!',
+        description: 'Your video is pending admin approval before it appears publicly.'
       });
       
       console.log('📤 ✅ All done!');

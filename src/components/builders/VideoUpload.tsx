@@ -126,7 +126,7 @@ export const VideoUpload = ({ builderId, onUploadComplete }: VideoUploadProps) =
           project_location: formData.project_location || null,
           project_duration: formData.project_duration || null,
           project_cost_range: formData.project_cost_range || null,
-          is_published: true,
+          is_published: false, // Requires admin approval
         });
 
       if (dbError) throw dbError;
@@ -135,7 +135,7 @@ export const VideoUpload = ({ builderId, onUploadComplete }: VideoUploadProps) =
 
       toast({
         title: 'Video uploaded successfully!',
-        description: 'Your project showcase is now live',
+        description: 'Your video is pending admin approval before it goes live.',
       });
 
       // Reset form
