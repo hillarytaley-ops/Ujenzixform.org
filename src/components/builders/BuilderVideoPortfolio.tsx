@@ -34,7 +34,7 @@ interface BuilderVideo {
   description: string;
   video_url: string;
   thumbnail_url?: string;
-  status: 'pending' | 'approved' | 'rejected';
+  is_published: boolean;
   created_at: string;
   views?: number;
 }
@@ -237,6 +237,7 @@ export function BuilderVideoPortfolio({ builderId, isOwner = false }: BuilderVid
       console.log('📹 Public URL:', publicUrl);
 
       // Create database record using native fetch
+      console.log('📹 Creating database record...');
       const dbResponse = await fetch(
         `${SUPABASE_URL}/rest/v1/builder_videos`,
         {
@@ -250,9 +251,9 @@ export function BuilderVideoPortfolio({ builderId, isOwner = false }: BuilderVid
           body: JSON.stringify({
             builder_id: builderId,
             title: uploadForm.title,
-            description: uploadForm.description,
+            description: uploadForm.description || '',
             video_url: publicUrl,
-            status: 'pending'
+            is_published: false // Set to false for admin review, or true to publish immediately
           })
         }
       );
@@ -313,16 +314,11 @@ export function BuilderVideoPortfolio({ builderId, isOwner = false }: BuilderVid
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return <Badge className="bg-yellow-500"><Clock className="w-3 h-3 mr-1" /> Pending Review</Badge>;
-      case 'approved':
-        return <Badge className="bg-green-500"><CheckCircle className="w-3 h-3 mr-1" /> Approved</Badge>;
-      case 'rejected':
-        return <Badge className="bg-red-500"><XCircle className="w-3 h-3 mr-1" /> Rejected</Badge>;
-      default:
-        return <Badge>{status}</Badge>;
+  const getStatusBadge = (isPublished: boolean) => {
+    if (isPublished) {
+      return <Badge className="bg-green-500"><CheckCircle className="w-3 h-3 mr-1" /> Published</Badge>;
+    } else {
+      return <Badge className="bg-yellow-500"><Clock className="w-3 h-3 mr-1" /> Pending Review</Badge>;
     }
   };
 
@@ -452,7 +448,7 @@ export function BuilderVideoPortfolio({ builderId, isOwner = false }: BuilderVid
               <CardContent className="p-4">
                 <div className="flex items-start justify-between mb-2">
                   <h3 className="text-white font-medium line-clamp-1">{video.title}</h3>
-                  {isOwner && getStatusBadge(video.status)}
+                  {isOwner && getStatusBadge(video.is_published)}
                 </div>
                 <p className="text-gray-400 text-sm line-clamp-2 mb-3">{video.description}</p>
                 <div className="flex items-center justify-between">
