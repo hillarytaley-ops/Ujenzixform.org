@@ -374,37 +374,36 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
         console.warn('⚠️ Insert error:', insertError.message);
       }
 
-      // Notify ALL registered delivery providers (first-come-first-served)
-      console.log('🔔 Notifying all delivery providers...');
-      try {
-        const notificationResult = await deliveryProviderNotificationService.notifyAllProviders({
-          id: deliveryRequestId || purchaseOrder.id,
-          po_number: purchaseOrder.po_number,
-          pickup_address: pickupAddress,
-          delivery_address: fullDeliveryAddress,
-          pickup_date: deliveryData.preferredDate,
-          material_type: deliveryData.materialType,
-          quantity: purchaseOrder.items?.length || 1,
-          weight_kg: deliveryData.totalWeight ? parseFloat(deliveryData.totalWeight) : undefined,
-          budget_range: deliveryData.budgetRange,
-          special_instructions: deliveryData.specialInstructions
-        });
-        
-        console.log(`✅ Delivery providers notified: ${notificationResult.notified}/${notificationResult.totalProviders}`);
-        
-        // Log analytics event
-        if (deliveryRequestId) {
-          await deliveryProviderNotificationService.logNotificationEvent(deliveryRequestId, notificationResult);
-        }
-      } catch (notifyError: any) {
-        console.warn('⚠️ Provider notification error (non-critical):', notifyError.message);
-      }
-
+      // Show success immediately - don't wait for notifications
       setStep('success');
+      setSubmitting(false);
       
       toast({
         title: '🚚 Delivery Request Sent!',
-        description: 'Nearby delivery providers have been notified. First responder will be assigned.',
+        description: 'Nearby delivery providers are being notified. First responder will be assigned.',
+      });
+
+      // Notify ALL registered delivery providers in background (don't block UI)
+      console.log('🔔 Notifying delivery providers in background...');
+      deliveryProviderNotificationService.notifyAllProviders({
+        id: deliveryRequestId || purchaseOrder.id,
+        po_number: purchaseOrder.po_number,
+        pickup_address: pickupAddress,
+        delivery_address: fullDeliveryAddress,
+        pickup_date: deliveryData.preferredDate,
+        material_type: deliveryData.materialType,
+        quantity: purchaseOrder.items?.length || 1,
+        weight_kg: deliveryData.totalWeight ? parseFloat(deliveryData.totalWeight) : undefined,
+        budget_range: deliveryData.budgetRange,
+        special_instructions: deliveryData.specialInstructions
+      }).then(notificationResult => {
+        console.log(`✅ Delivery providers notified: ${notificationResult.notified}/${notificationResult.totalProviders}`);
+        // Log analytics event in background
+        if (deliveryRequestId) {
+          deliveryProviderNotificationService.logNotificationEvent(deliveryRequestId, notificationResult);
+        }
+      }).catch(notifyError => {
+        console.warn('⚠️ Provider notification error (non-critical):', notifyError.message);
       });
 
       // Call success callback and show monitoring prompt
