@@ -59,6 +59,7 @@ export function BuilderVideoPortfolio({ builderId, isOwner = false }: BuilderVid
 
   const fetchVideos = async () => {
     setLoading(true);
+    console.log('📹 Fetching videos for builder:', builderId, 'isOwner:', isOwner);
     try {
       let query = supabase
         .from('builder_videos')
@@ -72,6 +73,7 @@ export function BuilderVideoPortfolio({ builderId, isOwner = false }: BuilderVid
       }
 
       const { data, error } = await query;
+      console.log('📹 Videos fetched:', data?.length || 0, 'Error:', error);
 
       if (error) throw error;
       setVideos(data || []);
