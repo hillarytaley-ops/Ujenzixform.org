@@ -371,7 +371,12 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   };
   
   const handlePostWithUserId = async (postUserId: string) => {
-    if (!newPostText.trim() && !selectedVideo) return;
+    console.log('📤 handlePostWithUserId called with:', postUserId);
+    
+    if (!newPostText.trim() && !selectedVideo) {
+      console.log('📤 No content to post');
+      return;
+    }
 
     setIsPosting(true);
     try {
@@ -379,6 +384,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
       
       // Upload video if selected
       if (selectedVideo) {
+        console.log('📤 Uploading video...');
         const fileExt = selectedVideo.name.split('.').pop();
         const fileName = `${postUserId}/${Date.now()}.${fileExt}`;
         
@@ -387,28 +393,33 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
           .upload(fileName, selectedVideo);
         
         if (uploadError) {
-          console.error('Video upload error:', uploadError);
+          console.error('📤 Video upload error:', uploadError);
+          toast({
+            title: 'Video Upload Failed',
+            description: uploadError.message || 'Could not upload video. Posting without video.',
+            variant: 'destructive'
+          });
           // Continue without video if upload fails
         } else {
           const { data: urlData } = supabase.storage
             .from('builder-videos')
             .getPublicUrl(fileName);
           videoUrl = urlData.publicUrl;
+          console.log('📤 Video uploaded:', videoUrl);
         }
       }
 
-      // Get user's profile
+      // Get user's profile (optional - don't fail if not found)
       const { data: profile } = await supabase
         .from('profiles')
         .select('id, full_name, avatar_url')
         .eq('user_id', postUserId)
         .single();
 
-      if (!profile) {
-        throw new Error('Profile not found');
-      }
+      console.log('📤 Profile found:', profile ? 'yes' : 'no');
 
       // Insert post into database (builder_id references auth.users.id, not profiles.id)
+      console.log('📤 Inserting post into database...');
       const { data: newPostData, error: postError } = await supabase
         .from('builder_posts')
         .insert({
@@ -427,8 +438,15 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         .single();
 
       if (postError) {
-        console.error('Post creation error:', postError);
-        // Fall back to local state if database fails
+        console.error('📤 Post creation error:', postError);
+        toast({
+          title: 'Database Error',
+          description: postError.message || 'Could not save post to database',
+          variant: 'destructive'
+        });
+        // Still add to local state for immediate feedback
+      } else {
+        console.log('📤 Post created successfully:', newPostData?.id);
       }
 
       // Also call onUploadVideo callback if provided
@@ -436,12 +454,12 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         onUploadVideo(selectedVideo, newPostText);
       }
 
-      // Add to local state
+      // Add to local state for immediate display
       const newPost: Omit<BuilderVideoPostProps, 'onLike' | 'onComment' | 'onShare' | 'onViewProfile'> = {
         id: newPostData?.id || `post-${Date.now()}`,
-        builderId: profile.id,
-        builderName: currentUserName,
-        builderAvatar: currentUserAvatar,
+        builderId: postUserId,
+        builderName: profile?.full_name || currentUserName,
+        builderAvatar: profile?.avatar_url || currentUserAvatar,
         builderVerified: false,
         videoUrl: videoUrl || videoPreview || '',
         caption: newPostText,
@@ -458,14 +476,14 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
       setIsCreatingPost(false);
 
       toast({
-        title: 'Posted!',
+        title: '🎉 Posted!',
         description: 'Your post has been shared successfully'
       });
     } catch (error: any) {
-      console.error('Error creating post:', error);
+      console.error('📤 Error creating post:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to create post',
+        description: error.message || 'Failed to create post. Please try again.',
         variant: 'destructive'
       });
     } finally {
@@ -659,8 +677,8 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
               </button>
             </div>
 
-            {/* Post Button */}
-            {isCreatingPost && (
+            {/* Post Button - Always show when there's content or video */}
+            {(isCreatingPost || newPostText.trim() || selectedVideo) && (
               <div className="mt-3 flex gap-2">
                 <Button 
                   variant="outline" 
@@ -674,8 +692,11 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
                   Cancel
                 </Button>
                 <Button 
-                  className="flex-1 bg-blue-600 hover:bg-blue-700"
-                  onClick={handlePost}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+                  onClick={async () => {
+                    console.log('📤 Post button clicked!');
+                    await handlePost();
+                  }}
                   disabled={isPosting || (!newPostText.trim() && !selectedVideo)}
                 >
                   {isPosting ? (
