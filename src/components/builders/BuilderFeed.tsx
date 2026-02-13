@@ -353,22 +353,30 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
       return;
     }
     
-    // ALWAYS get user from Supabase auth - this is the most reliable way
-    console.log('📤 Getting user from Supabase auth...');
-    const { data: { user }, error } = await supabase.auth.getUser();
+    // Get user from session (faster and more reliable than getUser)
+    console.log('📤 Getting session...');
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    console.log('📤 Session result:', session?.user?.id, sessionError?.message);
     
-    if (error) {
-      console.error('📤 Auth error:', error);
-      toast({
-        title: 'Authentication Error',
-        description: 'Please sign in again to post.',
-        variant: 'destructive'
-      });
-      return;
+    let userId = session?.user?.id;
+    
+    // If no session, try localStorage token
+    if (!userId) {
+      console.log('📤 No session, checking localStorage...');
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          userId = parsed.user?.id;
+          console.log('📤 Found userId in localStorage:', userId);
+        }
+      } catch (e) {
+        console.log('📤 Could not parse localStorage session');
+      }
     }
     
-    if (!user) {
-      console.log('📤 No user found');
+    if (!userId) {
+      console.log('📤 No user found anywhere');
       toast({
         title: 'Not Signed In',
         description: 'Please sign in to post.',
@@ -377,13 +385,13 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
       return;
     }
     
-    console.log('📤 User authenticated:', user.id, user.email);
+    console.log('📤 User ID found:', userId);
     
     // Store user_id in localStorage for future use
-    localStorage.setItem('user_id', user.id);
+    localStorage.setItem('user_id', userId);
     
-    console.log('📤 Calling handlePostWithUserId with:', user.id);
-    await handlePostWithUserId(user.id);
+    console.log('📤 Calling handlePostWithUserId with:', userId);
+    await handlePostWithUserId(userId);
   };
   
   const handlePostWithUserId = async (postUserId: string) => {
