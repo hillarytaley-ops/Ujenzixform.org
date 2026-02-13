@@ -56,7 +56,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .maybeSingle();
       
       if (error) console.error('AuthContext: Role fetch error:', error);
-      setUserRole(roleData?.role || null);
+      const role = roleData?.role || null;
+      setUserRole(role);
+      
+      // Sync to localStorage for components that need instant access
+      if (role) {
+        localStorage.setItem('user_role', role);
+        localStorage.setItem('user_role_id', userId);
+        console.log('AuthContext: Role synced to localStorage:', role);
+      }
     } catch (error) {
       console.error('AuthContext: Error fetching user role:', error);
       setUserRole(null);
@@ -113,12 +121,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUser(currentSession.user);
           setLoading(false);
           rolesFetched = true;
-          // Save email to localStorage for instant display on refresh
+          // Save email and user_id to localStorage for instant display on refresh
           if (currentSession.user.email) {
             localStorage.setItem('user_email', currentSession.user.email);
           }
+          localStorage.setItem('user_id', currentSession.user.id);
+          
           // Fetch role synchronously on sign-in
           await fetchUserRole(currentSession.user.id);
+          
+          // Also fetch user profile name for display
+          try {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('full_name')
+              .eq('user_id', currentSession.user.id)
+              .single();
+            if (profile?.full_name) {
+              localStorage.setItem('user_name', profile.full_name);
+            }
+          } catch (e) {
+            // Profile fetch is optional, don't fail
+          }
         } else if (currentSession?.user) {
           setSession(currentSession);
           setUser(currentSession.user);
