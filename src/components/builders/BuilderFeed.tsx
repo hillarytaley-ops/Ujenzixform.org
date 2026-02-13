@@ -298,10 +298,10 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
             builderCompany: profile?.company_name || '',
             builderAvatar: profile?.avatar_url || '',
             builderVerified: profile?.is_verified || false,
-            videoUrl: post.media_url || post.video_url || '',
+            videoUrl: post.video_url || '', // Database column is 'video_url'
             thumbnailUrl: post.thumbnail_url || '',
-            caption: post.caption || '',
-            location: post.location || profile?.location || '',
+            caption: post.content || '', // Database column is 'content'
+            location: post.project_location || profile?.location || '',
             timestamp: new Date(post.created_at),
             likes: post.likes_count || 0,
             shares: post.shares_count || 0,
@@ -414,9 +414,9 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         .insert({
           builder_id: postUserId, // Use auth user ID, not profile ID
           post_type: videoUrl ? 'video' : 'text',
-          caption: newPostText,
-          media_url: videoUrl || null,
-          location: '', // Could add location picker
+          content: newPostText, // Database column is 'content', not 'caption'
+          video_url: videoUrl || null, // Database column is 'video_url', not 'media_url'
+          project_location: '', // Could add location picker
           privacy: privacy,
           status: 'active',
           likes_count: 0,
