@@ -353,44 +353,36 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
       return;
     }
     
-    // Get user from session (faster and more reliable than getUser)
-    console.log('📤 Getting session...');
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    console.log('📤 Session result:', session?.user?.id, sessionError?.message);
+    // Get user ID directly from localStorage (bypasses Supabase client issues)
+    let userId: string | null = null;
     
-    let userId = session?.user?.id;
-    
-    // If no session, try localStorage token
-    if (!userId) {
-      console.log('📤 No session, checking localStorage...');
-      try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        if (storedSession) {
-          const parsed = JSON.parse(storedSession);
-          userId = parsed.user?.id;
-          console.log('📤 Found userId in localStorage:', userId);
-        }
-      } catch (e) {
-        console.log('📤 Could not parse localStorage session');
+    console.log('📤 Checking localStorage for auth token...');
+    try {
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      console.log('📤 Found stored session:', !!storedSession);
+      
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        userId = parsed.user?.id;
+        console.log('📤 Parsed user ID:', userId);
+        console.log('📤 User email:', parsed.user?.email);
       }
+    } catch (e) {
+      console.error('📤 Error parsing localStorage:', e);
     }
     
     if (!userId) {
-      console.log('📤 No user found anywhere');
+      console.log('📤 No user found in localStorage');
       toast({
         title: 'Not Signed In',
-        description: 'Please sign in to post.',
+        description: 'Please sign in to post. Try refreshing the page.',
         variant: 'destructive'
       });
       return;
     }
     
     console.log('📤 User ID found:', userId);
-    
-    // Store user_id in localStorage for future use
-    localStorage.setItem('user_id', userId);
-    
-    console.log('📤 Calling handlePostWithUserId with:', userId);
+    console.log('📤 Calling handlePostWithUserId...');
     await handlePostWithUserId(userId);
   };
   
