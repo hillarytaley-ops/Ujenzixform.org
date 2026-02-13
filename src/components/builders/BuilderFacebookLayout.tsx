@@ -25,7 +25,9 @@ import {
 } from 'lucide-react';
 import { BuilderFeed } from './BuilderFeed';
 import { BuilderGrid } from './BuilderGrid';
+import { BuilderVideoGallery } from './BuilderVideoGallery';
 import { MobileBottomNav, MobileHeader } from './MobileBottomNav';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { KENYAN_BUILDERS } from '@/data/kenyanBuilders';
 
 // Demo builders data
@@ -437,19 +439,56 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
         </div>
       </div>
 
-      {/* Main Content - Feed */}
+      {/* Main Content - Feed & Portfolio */}
       <div className="flex-1 min-w-0">
-        <BuilderFeed
-          currentUserId={currentUserId}
-          currentUserName={currentUserName}
-          currentUserAvatar={currentUserAvatar}
-          currentUserRole={currentUserRole}
-          isBuilder={isBuilder}
-          onContactBuilder={(builderId) => {
-            const builder = allBuilders.find(b => b.id === builderId || b.user_id === builderId);
-            if (builder) onBuilderContact?.(builder);
-          }}
-        />
+        <Tabs defaultValue="feed" className="w-full">
+          <TabsList className="w-full bg-white dark:bg-gray-900 shadow-sm mb-4 p-1 rounded-xl">
+            <TabsTrigger 
+              value="feed" 
+              className="flex-1 data-[state=active]:bg-orange-500 data-[state=active]:text-white rounded-lg"
+            >
+              <MessageCircle className="h-4 w-4 mr-2" />
+              Social Feed
+            </TabsTrigger>
+            <TabsTrigger 
+              value="portfolio" 
+              className="flex-1 data-[state=active]:bg-purple-500 data-[state=active]:text-white rounded-lg"
+            >
+              <Video className="h-4 w-4 mr-2" />
+              Project Showcase
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="feed" className="mt-0">
+            <BuilderFeed
+              currentUserId={currentUserId}
+              currentUserName={currentUserName}
+              currentUserAvatar={currentUserAvatar}
+              currentUserRole={currentUserRole}
+              isBuilder={isBuilder}
+              onContactBuilder={(builderId) => {
+                const builder = allBuilders.find(b => b.id === builderId || b.user_id === builderId);
+                if (builder) onBuilderContact?.(builder);
+              }}
+            />
+          </TabsContent>
+          
+          <TabsContent value="portfolio" className="mt-0">
+            <Card className="bg-white dark:bg-gray-900 shadow-md">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+                  🎬 Builder Project Showcase
+                </CardTitle>
+                <p className="text-sm text-gray-500">
+                  Watch professional builders showcase their completed construction projects across Kenya
+                </p>
+              </CardHeader>
+              <CardContent>
+                <BuilderVideoGallery />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Right Sidebar - Suggestions (Facebook Style) */}
