@@ -34,7 +34,7 @@ interface BuilderVideo {
   description: string;
   video_url: string;
   thumbnail_url?: string;
-  is_published?: boolean;
+  status?: 'pending' | 'approved' | 'rejected';
   created_at: string;
   views?: number;
 }
@@ -243,8 +243,8 @@ export function BuilderVideoPortfolio({ builderId, isOwner = false }: BuilderVid
             builder_id: builderId,
             title: uploadForm.title,
             description: uploadForm.description || '',
-            video_url: publicUrl
-            // Note: is_published column doesn't exist, videos are published by default
+            video_url: publicUrl,
+            status: 'pending' // Videos need admin approval before being published
           })
         }
       );
@@ -305,12 +305,17 @@ export function BuilderVideoPortfolio({ builderId, isOwner = false }: BuilderVid
     }
   };
 
-  const getStatusBadge = (isPublished?: boolean) => {
-    // Default to published if is_published column doesn't exist
-    if (isPublished === false) {
-      return <Badge className="bg-yellow-500"><Clock className="w-3 h-3 mr-1" /> Pending Review</Badge>;
+  const getStatusBadge = (status?: string) => {
+    switch (status) {
+      case 'pending':
+        return <Badge className="bg-yellow-500"><Clock className="w-3 h-3 mr-1" /> Pending Review</Badge>;
+      case 'approved':
+        return <Badge className="bg-green-500"><CheckCircle className="w-3 h-3 mr-1" /> Approved</Badge>;
+      case 'rejected':
+        return <Badge className="bg-red-500"><XCircle className="w-3 h-3 mr-1" /> Rejected</Badge>;
+      default:
+        return <Badge className="bg-yellow-500"><Clock className="w-3 h-3 mr-1" /> Pending</Badge>;
     }
-    return <Badge className="bg-green-500"><CheckCircle className="w-3 h-3 mr-1" /> Published</Badge>;
   };
 
   return (
@@ -439,7 +444,7 @@ export function BuilderVideoPortfolio({ builderId, isOwner = false }: BuilderVid
               <CardContent className="p-4">
                 <div className="flex items-start justify-between mb-2">
                   <h3 className="text-white font-medium line-clamp-1">{video.title}</h3>
-                  {isOwner && getStatusBadge(video.is_published)}
+                  {isOwner && getStatusBadge(video.status)}
                 </div>
                 <p className="text-gray-400 text-sm line-clamp-2 mb-3">{video.description}</p>
                 <div className="flex items-center justify-between">
