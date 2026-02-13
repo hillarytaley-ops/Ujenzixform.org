@@ -189,6 +189,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   // This ensures we detect professional builders even if the prop wasn't set correctly
   const storedRole = typeof window !== 'undefined' ? localStorage.getItem('user_role') : null;
   const storedUserId = typeof window !== 'undefined' ? localStorage.getItem('user_id') : null;
+  const storedUserName = typeof window !== 'undefined' ? localStorage.getItem('user_name') : null;
   
   // User is a builder if: prop says so, OR localStorage role is professional_builder/admin
   const effectiveIsBuilder = isBuilder || 
@@ -198,9 +199,19 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   // Use stored user ID if currentUserId not provided
   const effectiveUserId = currentUserId || storedUserId;
   
+  // Get effective role from props or localStorage
+  const effectiveRole = currentUserRole || storedRole;
+  
+  // Get effective user name from props or localStorage
+  const effectiveUserName = currentUserName !== 'Guest' ? currentUserName : (storedUserName || 'Guest');
+  
   // Check if user can post (must be a registered builder)
   // Only professional builders can post on the Builders page (not private clients)
-  const canPost = isBuilder || currentUserRole === 'professional_builder' || currentUserRole === 'admin';
+  const canPost = isBuilder || 
+    effectiveRole === 'professional_builder' || 
+    effectiveRole === 'admin' ||
+    storedRole === 'professional_builder' || 
+    storedRole === 'admin';
   const [posts, setPosts] = useState<Omit<BuilderVideoPostProps, 'onLike' | 'onComment' | 'onShare' | 'onViewProfile'>[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
   const [newPostText, setNewPostText] = useState('');
@@ -639,7 +650,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
       const newPost: Omit<BuilderVideoPostProps, 'onLike' | 'onComment' | 'onShare' | 'onViewProfile'> = {
         id: newPostData?.id || `post-${Date.now()}`,
         builderId: postUserId,
-        builderName: profile?.full_name || currentUserName,
+        builderName: profile?.full_name || effectiveUserName,
         builderAvatar: profile?.avatar_url || currentUserAvatar,
         builderVerified: false,
         videoUrl: videoUrl || videoPreview || '',
@@ -697,7 +708,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         const newComment: VideoComment = {
           id: `comment-${Date.now()}`,
           userId: currentUserId || 'current-user',
-          userName: currentUserName,
+          userName: effectiveUserName,
           userAvatar: currentUserAvatar,
           content: comment,
           timestamp: new Date(),
@@ -755,7 +766,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
     <div className="w-full max-w-2xl mx-auto space-y-4">
       {/* Stories Section */}
       <BuilderStories
-        currentUserName={currentUserName}
+        currentUserName={effectiveUserName}
         currentUserAvatar={currentUserAvatar}
         onCreateStory={() => setIsCreatingPost(true)}
       />
@@ -768,14 +779,14 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
               <Avatar className="h-10 w-10">
                 <AvatarImage src={currentUserAvatar} />
                 <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
-                  {currentUserName.charAt(0).toUpperCase()}
+                  {effectiveUserName.charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               <button
                 className="flex-1 text-left px-4 py-2.5 bg-gray-100 dark:bg-gray-800 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                 onClick={() => setIsCreatingPost(true)}
               >
-                What's on your mind, {currentUserName.split(' ')[0]}?
+                What's on your mind, {effectiveUserName.split(' ')[0]}?
               </button>
             </div>
 

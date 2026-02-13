@@ -134,6 +134,10 @@ const Builders = () => {
       
       if (profile) {
         setUserProfile(profile as UserProfile);
+        // Store user name in localStorage for components that need it
+        if (profile.full_name) {
+          localStorage.setItem('user_name', profile.full_name);
+        }
         
         // Get role from user_roles table
         const { data: roleData } = await supabase
