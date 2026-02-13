@@ -347,38 +347,43 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
 
   const handlePost = async () => {
     console.log('📤 handlePost() called');
-    console.log('📤 effectiveUserId:', effectiveUserId);
-    console.log('📤 currentUserId:', currentUserId);
-    console.log('📤 storedUserId:', storedUserId);
     
     if (!newPostText.trim() && !selectedVideo) {
       console.log('📤 No content, returning early');
       return;
     }
     
-    // Use effectiveUserId which includes localStorage fallback
-    let userId = effectiveUserId || currentUserId;
-    console.log('📤 Using userId:', userId);
+    // ALWAYS get user from Supabase auth - this is the most reliable way
+    console.log('📤 Getting user from Supabase auth...');
+    const { data: { user }, error } = await supabase.auth.getUser();
     
-    if (!userId) {
-      console.log('📤 No userId found, checking Supabase auth...');
-      // Try to get user from Supabase auth as last resort
-      const { data: { user }, error } = await supabase.auth.getUser();
-      console.log('📤 Supabase auth result:', user?.id, error?.message);
-      
-      if (!user) {
-        toast({
-          title: 'Error',
-          description: 'You must be logged in to post. Please sign in again.',
-          variant: 'destructive'
-        });
-        return;
-      }
-      userId = user.id;
+    if (error) {
+      console.error('📤 Auth error:', error);
+      toast({
+        title: 'Authentication Error',
+        description: 'Please sign in again to post.',
+        variant: 'destructive'
+      });
+      return;
     }
     
-    console.log('📤 Calling handlePostWithUserId with:', userId);
-    await handlePostWithUserId(userId);
+    if (!user) {
+      console.log('📤 No user found');
+      toast({
+        title: 'Not Signed In',
+        description: 'Please sign in to post.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    console.log('📤 User authenticated:', user.id, user.email);
+    
+    // Store user_id in localStorage for future use
+    localStorage.setItem('user_id', user.id);
+    
+    console.log('📤 Calling handlePostWithUserId with:', user.id);
+    await handlePostWithUserId(user.id);
   };
   
   const handlePostWithUserId = async (postUserId: string) => {
