@@ -225,59 +225,115 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
 
   const fetchPosts = async () => {
     setLoadingPosts(true);
+    console.log('📥 Fetching posts from database...');
     try {
-      // Fetch posts from builder_posts table
-      const { data: postsData, error: postsError } = await supabase
-        .from('builder_posts')
-        .select('*')
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (postsError) {
-        console.log('builder_posts table may not exist yet, using demo data:', postsError.message);
-        // Fall back to demo posts if table doesn't exist
+      // Fetch posts from builder_posts table using fetch API (bypass Supabase client)
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      
+      let accessToken = '';
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          accessToken = parsed.access_token || '';
+        }
+      } catch (e) {}
+      
+      const postsRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/builder_posts?status=eq.active&order=created_at.desc&limit=50`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+          }
+        }
+      );
+      
+      const postsData = await postsRes.json();
+      console.log('📥 Posts fetched:', postsData?.length || 0, 'posts');
+      
+      if (!postsRes.ok || postsData?.error) {
+        console.log('📥 Error fetching posts, using demo data:', postsData?.message || postsData?.error);
         setPosts(DEMO_POSTS);
         setLoadingPosts(false);
         return;
       }
 
       if (postsData && postsData.length > 0) {
+        console.log('📥 First post:', postsData[0]?.id, postsData[0]?.video_url ? 'has video' : 'no video');
         // Get unique builder IDs (user_id from auth.users)
-        const builderIds = [...new Set(postsData.map(p => p.builder_id))];
+        const builderIds = [...new Set(postsData.map((p: any) => p.builder_id))];
         
-        // Fetch profiles for these builders
-        const { data: profilesData } = await supabase
-          .from('profiles')
-          .select('*')
-          .in('user_id', builderIds);
+        // Fetch profiles for these builders using fetch API
+        let profilesData: any[] = [];
+        try {
+          const profilesRes = await fetch(
+            `${SUPABASE_URL}/rest/v1/profiles?user_id=in.(${builderIds.join(',')})`,
+            {
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+              }
+            }
+          );
+          profilesData = await profilesRes.json();
+          console.log('📥 Profiles fetched:', profilesData?.length || 0);
+        } catch (e) {
+          console.log('📥 Profile fetch error:', e);
+        }
 
         // Create a map for quick lookup
-        const profilesMap = new Map((profilesData || []).map(p => [p.user_id, p]));
+        const profilesMap = new Map((profilesData || []).map((p: any) => [p.user_id, p]));
 
-        // Fetch comments for each post
-        const postIds = postsData.map(p => p.id);
-        const { data: commentsData } = await supabase
-          .from('post_comments')
-          .select('*')
-          .in('post_id', postIds)
-          .order('created_at', { ascending: false });
+        // Fetch comments for each post (optional, don't fail if table doesn't exist)
+        const postIds = postsData.map((p: any) => p.id);
+        let commentsData: any[] = [];
+        try {
+          const commentsRes = await fetch(
+            `${SUPABASE_URL}/rest/v1/post_comments?post_id=in.(${postIds.join(',')})&order=created_at.desc`,
+            {
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+              }
+            }
+          );
+          if (commentsRes.ok) {
+            commentsData = await commentsRes.json();
+          }
+        } catch (e) {
+          console.log('📥 Comments fetch skipped');
+        }
 
         // Get commenter profiles
-        const commenterIds = [...new Set((commentsData || []).map(c => c.user_id))];
-        const { data: commenterProfiles } = await supabase
-          .from('profiles')
-          .select('user_id, full_name, avatar_url')
-          .in('user_id', commenterIds);
+        const commenterIds = [...new Set((commentsData || []).map((c: any) => c.user_id))];
+        let commenterProfiles: any[] = [];
+        if (commenterIds.length > 0) {
+          try {
+            const commenterRes = await fetch(
+              `${SUPABASE_URL}/rest/v1/profiles?user_id=in.(${commenterIds.join(',')})&select=user_id,full_name,avatar_url`,
+              {
+                headers: {
+                  'apikey': SUPABASE_ANON_KEY,
+                  'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+                }
+              }
+            );
+            if (commenterRes.ok) {
+              commenterProfiles = await commenterRes.json();
+            }
+          } catch (e) {}
+        }
         
-        const commenterMap = new Map((commenterProfiles || []).map(p => [p.user_id, p]));
+        const commenterMap = new Map((commenterProfiles || []).map((p: any) => [p.user_id, p]));
 
         // Transform posts to match component format
-        const transformedPosts = postsData.map(post => {
+        const transformedPosts = postsData.map((post: any) => {
           const profile = profilesMap.get(post.builder_id);
           const postComments = (commentsData || [])
-            .filter(c => c.post_id === post.id)
-            .map(c => {
+            .filter((c: any) => c.post_id === post.id)
+            .map((c: any) => {
               const commenter = commenterMap.get(c.user_id);
               return {
                 id: c.id,
