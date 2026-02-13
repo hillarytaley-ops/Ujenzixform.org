@@ -170,10 +170,13 @@ export function BuilderVideoPortfolio({ builderId, isOwner = false }: BuilderVid
       const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
       const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
 
-      // Use XMLHttpRequest for better large file handling and progress
-      console.log('📹 Starting upload via XMLHttpRequest...');
+      // Try test-uploads bucket first, fallback to builder-videos
+      const bucketName = 'test-uploads'; // Using test bucket to debug RLS issues
       
-      const uploadUrl = `${SUPABASE_URL}/storage/v1/object/builder-videos/${filePath}`;
+      // Use XMLHttpRequest for better large file handling and progress
+      console.log('📹 Starting upload via XMLHttpRequest to bucket:', bucketName);
+      
+      const uploadUrl = `${SUPABASE_URL}/storage/v1/object/${bucketName}/${filePath}`;
       
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
@@ -219,8 +222,8 @@ export function BuilderVideoPortfolio({ builderId, isOwner = false }: BuilderVid
       });
 
       // Get public URL
-      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/builder-videos/${filePath}`;
-      console.log('📹 Video uploaded successfully!');
+      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${bucketName}/${filePath}`;
+      console.log('📹 Video uploaded successfully to', bucketName);
 
       console.log('📹 Public URL:', publicUrl);
 
