@@ -260,27 +260,35 @@ export const BuilderProfileEdit: React.FC<BuilderProfileEditProps> = ({
     }
   };
 
-  const createDefaultProfile = async () => {
+  const createDefaultProfile = () => {
+    console.log('📝 BuilderProfileEdit: Creating default profile from localStorage...');
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const defaultProfile: BuilderProfile = {
-          id: user.id,
-          user_id: user.id,
-          full_name: user.email?.split('@')[0] || 'User',
-          email: user.email,
-          specialties: [],
-          certifications: [],
-          service_areas: [],
-          show_phone: true,
-          show_email: true,
-          allow_messages: true,
-          allow_calls: true
-        };
-        setProfile(defaultProfile);
-        setIsOwner(true);
-        console.log('📝 BuilderProfileEdit: Using default profile');
+      // Get user from localStorage - don't use Supabase API as it might timeout
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        const user = parsed?.user;
+        if (user) {
+          const defaultProfile: BuilderProfile = {
+            id: user.id,
+            user_id: user.id,
+            full_name: user.email?.split('@')[0] || 'User',
+            email: user.email,
+            specialties: [],
+            certifications: [],
+            service_areas: [],
+            show_phone: true,
+            show_email: true,
+            allow_messages: true,
+            allow_calls: true
+          };
+          setProfile(defaultProfile);
+          setIsOwner(true);
+          console.log('✅ BuilderProfileEdit: Default profile created for:', user.email);
+          return;
+        }
       }
+      console.log('📝 BuilderProfileEdit: No user in localStorage for default profile');
     } catch (e) {
       console.error('Error creating default profile:', e);
     }
