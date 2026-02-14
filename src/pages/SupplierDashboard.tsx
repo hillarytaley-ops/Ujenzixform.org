@@ -937,7 +937,12 @@ const SupplierDashboard = () => {
               {t('supplier.tabs.orders')}
             </TabsTrigger>
             <TabsTrigger value="products" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
-              {t('supplier.tabs.myProducts')}
+              <Package className="h-4 w-4 mr-1" />
+              My Products
+            </TabsTrigger>
+            <TabsTrigger value="admin-catalog" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
+              <Store className="h-4 w-4 mr-1" />
+              Set Prices
             </TabsTrigger>
             <TabsTrigger value="analytics" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
               {t('supplier.tabs.analytics')}
@@ -954,10 +959,6 @@ const SupplierDashboard = () => {
             <TabsTrigger value="qr-codes" className="data-[state=active]:bg-cyan-500 data-[state=active]:text-white">
               <QrCode className="h-4 w-4 mr-1" />
               QR Codes
-            </TabsTrigger>
-            <TabsTrigger value="add-products" className="data-[state=active]:bg-green-500 data-[state=active]:text-white">
-              <Plus className="h-4 w-4 mr-1" />
-              Add New Products
             </TabsTrigger>
             <TabsTrigger value="support" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white">
               <Headphones className="h-4 w-4 mr-1" />
@@ -1048,8 +1049,23 @@ const SupplierDashboard = () => {
             <OrderManagement supplierId={supplierRecordId || user?.id || ''} isDarkMode={isDarkMode} />
           </TabsContent>
 
-          {/* Products Tab */}
+          {/* Products Tab - Supplier's Own Products with Full Edit Capabilities */}
           <TabsContent value="products">
+            <Card className={cardBg}>
+              <CardHeader>
+                <CardTitle className={textColor}>My Products</CardTitle>
+                <CardDescription className={mutedText}>
+                  Manage your products - add new products, update images, prices, and variants. Products require admin approval before appearing in the marketplace.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <SupplierProductManager supplierId={supplierRecordId || user?.id || ''} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          {/* Admin Catalog Tab - Set Prices on Admin Products */}
+          <TabsContent value="admin-catalog">
             <ProductManagement supplierId={supplierRecordId || user?.id || ''} isDarkMode={isDarkMode} />
           </TabsContent>
 
@@ -1369,20 +1385,6 @@ const SupplierDashboard = () => {
             </Card>
           </TabsContent>
 
-          {/* Add New Products Tab - For supplier-uploaded products (pending admin approval) */}
-          <TabsContent value="add-products">
-            <Card className={cardBg}>
-              <CardHeader>
-                <CardTitle className={textColor}>Add New Products</CardTitle>
-                <CardDescription className={mutedText}>
-                  Upload new products with images. Products will be pending admin approval before appearing in the marketplace.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <SupplierProductManager supplierId={supplierRecordId || user?.id || ''} />
-              </CardContent>
-            </Card>
-          </TabsContent>
 
           {/* Support Tab */}
           <TabsContent value="support">
