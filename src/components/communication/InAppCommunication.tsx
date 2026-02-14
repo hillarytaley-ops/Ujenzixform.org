@@ -164,12 +164,13 @@ export function InAppCommunication({
       const messagesData = await messagesResponse.json();
       
       // Convert to our Message format
+      // Note: support_messages uses 'message' column, not 'content'
       const formattedMessages: Message[] = (messagesData || []).map((m: any) => ({
         id: m.id,
         sender_id: m.sender_id,
         sender_name: m.sender_type === 'admin' ? 'Admin Support' : userName,
         sender_role: m.sender_type === 'admin' ? 'admin' : userRole,
-        content: m.content,
+        content: m.message, // support_messages table uses 'message' column
         created_at: m.created_at,
         is_read: m.is_read || false,
       }));
@@ -334,10 +335,11 @@ export function InAppCommunication({
       // If no chat exists, create one
       if (!currentChatId) {
         console.log('📤 Creating new support chat...');
+        // Note: support_chats table only has: id, user_id, subject, status, created_at, updated_at
+        // user_role is NOT a column in the table - it's fetched from user_roles table separately
         const chatData = {
           user_id: userId,
-          user_role: userRole,
-          subject: `Support Request from ${userName}`,
+          subject: `Support Request from ${userName} (${userRole})`,
           status: 'open',
         };
 
@@ -365,11 +367,12 @@ export function InAppCommunication({
       }
 
       // Now send the message
+      // Note: support_messages table uses 'message' column, not 'content'
       const messageData = {
         chat_id: currentChatId,
         sender_id: userId,
         sender_type: 'user',
-        content: newMessage.trim(),
+        message: newMessage.trim(), // support_messages uses 'message' column
         is_read: false,
       };
 
