@@ -353,31 +353,113 @@ const ProfessionalBuilderDashboardPage = () => {
     try {
       console.log('🚚 Loading deliveries for builder:', userId);
       
-      // Fetch delivery requests for this builder
-      const deliveryRequestsResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/delivery_requests?builder_id=eq.${userId}&order=created_at.desc`,
-        { headers }
-      );
-      
+      // First, get the profile ID (delivery_requests uses profile.id as builder_id)
+      let profileId = userId;
+      try {
+        const profileResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${userId}&select=id`,
+          { headers }
+        );
+        if (profileResponse.ok) {
+          const profiles = await profileResponse.json();
+          if (profiles && profiles.length > 0) {
+            profileId = profiles[0].id;
+            console.log('🚚 Found profile ID:', profileId);
+          }
+        }
+      } catch (e) {
+        console.log('Could not fetch profile, using user ID');
+      }
+
+      // Fetch delivery requests - try both user_id and profile_id as builder_id
       let deliveryRequests: any[] = [];
-      if (deliveryRequestsResponse.ok) {
-        deliveryRequests = await deliveryRequestsResponse.json();
-        console.log('🚚 Delivery requests loaded:', deliveryRequests.length);
-      }
-
-      // Fetch deliveries table (actual deliveries in progress)
-      const deliveriesResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/deliveries?builder_id=eq.${userId}&order=created_at.desc`,
+      
+      // Try with profile ID first (this is how DeliveryRequest.tsx saves it)
+      const deliveryRequestsResponse1 = await fetch(
+        `${SUPABASE_URL}/rest/v1/delivery_requests?builder_id=eq.${profileId}&order=created_at.desc`,
         { headers }
       );
-      
-      let deliveriesData: any[] = [];
-      if (deliveriesResponse.ok) {
-        deliveriesData = await deliveriesResponse.json();
-        console.log('🚚 Deliveries loaded:', deliveriesData.length);
+      if (deliveryRequestsResponse1.ok) {
+        const data1 = await deliveryRequestsResponse1.json();
+        deliveryRequests = [...deliveryRequests, ...data1];
+        console.log('🚚 Delivery requests (by profile_id):', data1.length);
       }
 
-      // Combine both - delivery requests and actual deliveries
+      // Also try with user_id if different (for deliveries created via DeliveryPromptDialog)
+      if (profileId !== userId) {
+        const deliveryRequestsResponse2 = await fetch(
+          `${SUPABASE_URL}/rest/v1/delivery_requests?builder_id=eq.${userId}&order=created_at.desc`,
+          { headers }
+        );
+        if (deliveryRequestsResponse2.ok) {
+          const data2 = await deliveryRequestsResponse2.json();
+          // Add only unique ones
+          const existingIds = new Set(deliveryRequests.map(d => d.id));
+          const newData = data2.filter((d: any) => !existingIds.has(d.id));
+          deliveryRequests = [...deliveryRequests, ...newData];
+          console.log('🚚 Delivery requests (by user_id):', data2.length);
+        }
+      }
+
+      // Fetch deliveries table (actual deliveries in progress) - try both IDs
+      let deliveriesData: any[] = [];
+      
+      const deliveriesResponse1 = await fetch(
+        `${SUPABASE_URL}/rest/v1/deliveries?builder_id=eq.${profileId}&order=created_at.desc`,
+        { headers }
+      );
+      if (deliveriesResponse1.ok) {
+        const data1 = await deliveriesResponse1.json();
+        deliveriesData = [...deliveriesData, ...data1];
+        console.log('🚚 Deliveries (by profile_id):', data1.length);
+      }
+
+      if (profileId !== userId) {
+        const deliveriesResponse2 = await fetch(
+          `${SUPABASE_URL}/rest/v1/deliveries?builder_id=eq.${userId}&order=created_at.desc`,
+          { headers }
+        );
+        if (deliveriesResponse2.ok) {
+          const data2 = await deliveriesResponse2.json();
+          const existingIds = new Set(deliveriesData.map(d => d.id));
+          const newData = data2.filter((d: any) => !existingIds.has(d.id));
+          deliveriesData = [...deliveriesData, ...newData];
+          console.log('🚚 Deliveries (by user_id):', data2.length);
+        }
+      }
+
+      // Also fetch from purchase_orders with delivery info (orders that have delivery requested)
+      let orderDeliveries: any[] = [];
+      try {
+        const ordersResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${userId}&status=in.(confirmed,shipped,delivered)&order=created_at.desc`,
+          { headers }
+        );
+        if (ordersResponse.ok) {
+          const orders = await ordersResponse.json();
+          // Transform orders with delivery info
+          orderDeliveries = orders
+            .filter((o: any) => o.delivery_address) // Only orders with delivery address
+            .map((o: any) => ({
+              id: `order-${o.id}`,
+              type: 'order',
+              display_status: o.status === 'delivered' ? 'delivered' : 
+                              o.status === 'shipped' ? 'in_transit' : 'pending',
+              pickup_address: o.supplier_name || 'Supplier',
+              delivery_address: o.delivery_address,
+              materials_description: o.items?.map((i: any) => i.material_name || i.name).join(', ') || 'Materials',
+              estimated_cost: o.total_amount,
+              created_at: o.created_at,
+              tracking_number: o.po_number,
+              estimated_delivery: o.delivery_date
+            }));
+          console.log('🚚 Order deliveries:', orderDeliveries.length);
+        }
+      } catch (e) {
+        console.log('Could not fetch order deliveries');
+      }
+
+      // Combine all - delivery requests, actual deliveries, and order deliveries
       const allDeliveries = [
         ...deliveryRequests.map(dr => ({
           ...dr,
@@ -388,11 +470,17 @@ const ProfessionalBuilderDashboardPage = () => {
           ...d,
           type: 'delivery',
           display_status: d.status || 'in_transit'
-        }))
+        })),
+        ...orderDeliveries
       ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-      setDeliveries(allDeliveries);
-      console.log('🚚 Total deliveries:', allDeliveries.length);
+      // Remove duplicates by ID
+      const uniqueDeliveries = allDeliveries.filter((delivery, index, self) =>
+        index === self.findIndex(d => d.id === delivery.id)
+      );
+
+      setDeliveries(uniqueDeliveries);
+      console.log('🚚 Total unique deliveries:', uniqueDeliveries.length);
 
     } catch (error) {
       console.error('Error loading deliveries:', error);
