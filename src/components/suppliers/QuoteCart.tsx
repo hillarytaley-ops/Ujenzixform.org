@@ -63,6 +63,30 @@ export function QuoteCart({
   // Note: We don't show estimated prices to Professional Builders - they get pricing via supplier quotes
 
   const handleSubmitQuoteRequest = async () => {
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // SECURITY: ONLY Professional Builders can request quotes
+    // Private Clients must use Buy Now instead
+    // ═══════════════════════════════════════════════════════════════════════════════
+    const currentRole = localStorage.getItem('user_role');
+    
+    if (currentRole === 'private_client') {
+      toast({
+        title: '🛒 Use Buy Now Instead',
+        description: 'As a Private Client, you can purchase directly. Please use the main cart to complete your purchase.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    if (currentRole !== 'professional_builder' && currentRole !== 'admin') {
+      toast({
+        title: '⚠️ Professional Builder Required',
+        description: 'Only Professional Builders can request quotes. Please register as a Professional Builder or Private Client.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     if (items.length === 0) {
       toast({
         title: '📋 No Items Selected',

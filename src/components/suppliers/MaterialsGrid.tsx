@@ -1466,14 +1466,36 @@ export const MaterialsGrid = () => {
         </Alert>
       )}
 
-      {/* Role-specific guidance banner */}
-      {isAuthenticated && (userRole === 'professional_builder' || userRole === 'private_client') && (
+      {/* ═══════════════════════════════════════════════════════════════════════════════
+          ROLE-SPECIFIC GUIDANCE BANNER - STRICT ENFORCEMENT
+          - Professional Builder: ONLY Request Quote
+          - Private Client: ONLY Buy Now
+          ═══════════════════════════════════════════════════════════════════════════════ */}
+      {isAuthenticated && userRole === 'professional_builder' && (
+        <Alert className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-300 border-2">
+          <FileText className="h-5 w-5 text-blue-600" />
+          <AlertDescription className="ml-2">
+            <strong className="text-blue-800">🏗️ Professional Builder Mode</strong>
+            <p className="text-sm text-blue-700 mt-1">
+              Add items to your cart, then <strong className="text-blue-600">Request Quotes from Multiple Suppliers</strong> to compare prices and get the best deal!
+            </p>
+            <p className="text-xs text-blue-600 mt-1 font-medium">
+              ℹ️ As a Professional Builder, you request quotes instead of buying directly.
+            </p>
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      {isAuthenticated && userRole === 'private_client' && (
         <Alert className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-300 border-2">
           <ShoppingCart className="h-5 w-5 text-green-600" />
           <AlertDescription className="ml-2">
-            <strong className="text-green-800">🛒 {userRole === 'professional_builder' ? 'Professional Builder' : 'Private Client'} Mode</strong>
+            <strong className="text-green-800">🏠 Private Client Mode</strong>
             <p className="text-sm text-green-700 mt-1">
-              Add items to your cart, then choose to <strong className="text-blue-600">Request Quote</strong> for competitive pricing or <strong className="text-green-600">Buy Now</strong> for immediate purchase!
+              Add items to your cart, then <strong className="text-green-600">Buy Now</strong> to complete your purchase instantly at listed prices!
+            </p>
+            <p className="text-xs text-green-600 mt-1 font-medium">
+              ℹ️ As a Private Client, you can purchase directly from suppliers.
             </p>
           </AlertDescription>
         </Alert>

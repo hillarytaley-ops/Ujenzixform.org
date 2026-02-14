@@ -122,6 +122,32 @@ export const CartSidebar: React.FC = () => {
   const handleRequestQuote = async () => {
     console.log('📝 RequestQuote: Starting quote request...');
     
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // SECURITY: ONLY Professional Builders can request quotes
+    // Private Clients must use Buy Now instead
+    // ═══════════════════════════════════════════════════════════════════════════════
+    const currentRole = userRole || localStorage.getItem('user_role');
+    
+    if (currentRole === 'private_client') {
+      console.log('🚫 Private Client attempted quote request - blocked');
+      toast({
+        title: '🛒 Use Buy Now Instead',
+        description: 'As a Private Client, you can purchase directly. Use the "Buy Now" button to complete your purchase.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    if (currentRole !== 'professional_builder' && currentRole !== 'admin') {
+      console.log('🚫 Non-builder attempted quote request - blocked');
+      toast({
+        title: '⚠️ Professional Builder Required',
+        description: 'Only Professional Builders can request quotes. Please register as a Professional Builder or Private Client to purchase.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
     try {
       // Get user from localStorage (faster than Supabase call)
       let userId: string | null = null;
@@ -270,13 +296,28 @@ export const CartSidebar: React.FC = () => {
   const handleBuyNow = async () => {
     if (isProcessing) return;
     
-    // SECURITY: Professional builders cannot buy directly - they must request quotes
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // SECURITY: ONLY Private Clients can buy directly
+    // Professional Builders must use Request Quote instead
+    // Other users (visitors, suppliers, delivery) cannot purchase
+    // ═══════════════════════════════════════════════════════════════════════════════
     const currentRole = userRole || localStorage.getItem('user_role');
+    
     if (currentRole === 'professional_builder') {
       console.log('🚫 Professional Builder attempted direct purchase - blocked');
       toast({
-        title: 'Request a Quote Instead',
+        title: '📋 Request a Quote Instead',
         description: 'As a Professional Builder, you need to request quotes from suppliers. Use the "Request Quotes from Multiple Suppliers" button above.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    if (currentRole !== 'private_client' && currentRole !== 'admin') {
+      console.log('🚫 Non-private-client attempted direct purchase - blocked');
+      toast({
+        title: '⚠️ Private Client Required',
+        description: 'Only Private Clients can purchase directly. Please register as a Private Client or Professional Builder to request quotes.',
         variant: 'destructive'
       });
       return;
@@ -676,56 +717,126 @@ export const CartSidebar: React.FC = () => {
                 </div>
               </div>
 
-              {/* Action Buttons - Different for Professional Builders */}
-              {/* Use both state and localStorage to ensure professional builders can't see Buy Now */}
-              {(userRole === 'professional_builder' || localStorage.getItem('user_role') === 'professional_builder') ? (
-                <>
-                  {/* Professional Builder: Multi-Supplier Quote Flow */}
-                  <Button 
-                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 h-14 flex items-center justify-center gap-3"
-                    onClick={() => setShowMultiSupplierQuote(true)}
-                  >
-                    <Users className="h-5 w-5" />
-                    <div className="text-left">
-                      <span className="text-sm font-semibold">Request Quotes from Multiple Suppliers</span>
-                      <p className="text-[10px] opacity-80">Compare prices & get the best deal</p>
-                    </div>
-                  </Button>
-                  <p className="text-[10px] text-center text-blue-600 font-medium">
-                    🏗️ Professional Builder: Send your list to multiple suppliers and compare their quotes!
-                  </p>
-                </>
-              ) : (
-                <>
-                  {/* Private Client / Other: Standard Flow */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button 
-                      className="bg-blue-600 hover:bg-blue-700 h-12 flex flex-col items-center justify-center"
-                      onClick={handleRequestQuote}
-                    >
-                      <FileText className="h-4 w-4 mb-0.5" />
-                      <span className="text-xs">Request Quote</span>
-                    </Button>
-                    <Button 
-                      className="bg-green-600 hover:bg-green-700 h-12 flex flex-col items-center justify-center"
-                      onClick={handleBuyNow}
-                      disabled={isProcessing}
-                    >
-                      {isProcessing ? (
-                        <>
-                          <div className="h-4 w-4 mb-0.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          <span className="text-xs">Processing...</span>
-                        </>
-                      ) : (
-                        <>
+              {/* ═══════════════════════════════════════════════════════════════════════════════
+                  ACTION BUTTONS - STRICT ROLE ENFORCEMENT
+                  - Professional Builder: ONLY Request Quote (no Buy Now)
+                  - Private Client: ONLY Buy Now (no Request Quote)
+                  - Other roles: Show message to register
+                  ═══════════════════════════════════════════════════════════════════════════════ */}
+              {(() => {
+                const effectiveRole = userRole || localStorage.getItem('user_role');
+                
+                // PROFESSIONAL BUILDER: Only Request Quote
+                if (effectiveRole === 'professional_builder') {
+                  return (
+                    <>
+                      <Button 
+                        className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 h-14 flex items-center justify-center gap-3"
+                        onClick={() => setShowMultiSupplierQuote(true)}
+                      >
+                        <Users className="h-5 w-5" />
+                        <div className="text-left">
+                          <span className="text-sm font-semibold">Request Quotes from Multiple Suppliers</span>
+                          <p className="text-[10px] opacity-80">Compare prices & get the best deal</p>
+                        </div>
+                      </Button>
+                      <p className="text-[10px] text-center text-blue-600 font-medium">
+                        🏗️ Professional Builder: Send your list to multiple suppliers and compare their quotes!
+                      </p>
+                    </>
+                  );
+                }
+                
+                // PRIVATE CLIENT: Only Buy Now
+                if (effectiveRole === 'private_client') {
+                  return (
+                    <>
+                      <Button 
+                        className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 h-14 flex items-center justify-center gap-3"
+                        onClick={handleBuyNow}
+                        disabled={isProcessing}
+                      >
+                        {isProcessing ? (
+                          <>
+                            <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            <span className="text-sm font-semibold">Processing Order...</span>
+                          </>
+                        ) : (
+                          <>
+                            <CreditCard className="h-5 w-5" />
+                            <div className="text-left">
+                              <span className="text-sm font-semibold">Buy Now - KES {getTotalPrice().toLocaleString()}</span>
+                              <p className="text-[10px] opacity-80">Complete your purchase instantly</p>
+                            </div>
+                          </>
+                        )}
+                      </Button>
+                      <p className="text-[10px] text-center text-green-600 font-medium">
+                        🏠 Private Client: Purchase directly from suppliers at listed prices!
+                      </p>
+                    </>
+                  );
+                }
+                
+                // ADMIN: Both options
+                if (effectiveRole === 'admin') {
+                  return (
+                    <>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button 
+                          className="bg-blue-600 hover:bg-blue-700 h-12 flex flex-col items-center justify-center"
+                          onClick={() => setShowMultiSupplierQuote(true)}
+                        >
+                          <FileText className="h-4 w-4 mb-0.5" />
+                          <span className="text-xs">Request Quote</span>
+                        </Button>
+                        <Button 
+                          className="bg-green-600 hover:bg-green-700 h-12 flex flex-col items-center justify-center"
+                          onClick={handleBuyNow}
+                          disabled={isProcessing}
+                        >
                           <CreditCard className="h-4 w-4 mb-0.5" />
                           <span className="text-xs">Buy Now</span>
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                  <p className="text-[10px] text-center text-gray-500">
-                    💡 Tip: Request a quote for bulk orders to get the best prices from suppliers
+                        </Button>
+                      </div>
+                      <p className="text-[10px] text-center text-purple-600 font-medium">
+                        👑 Admin: Full access to both quote requests and direct purchases
+                      </p>
+                    </>
+                  );
+                }
+                
+                // NOT LOGGED IN OR OTHER ROLES: Show registration message
+                return (
+                  <>
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center">
+                      <p className="text-amber-800 font-medium text-sm">⚠️ Registration Required</p>
+                      <p className="text-amber-700 text-xs mt-1">
+                        Please register as a <strong>Professional Builder</strong> (for quotes) or <strong>Private Client</strong> (for direct purchase) to continue.
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button 
+                        className="bg-blue-600 hover:bg-blue-700 h-10"
+                        onClick={() => window.location.href = '/professional-builder-auth'}
+                      >
+                        <FileText className="h-4 w-4 mr-1" />
+                        <span className="text-xs">Register as Pro</span>
+                      </Button>
+                      <Button 
+                        className="bg-green-600 hover:bg-green-700 h-10"
+                        onClick={() => window.location.href = '/private-client-auth'}
+                      >
+                        <CreditCard className="h-4 w-4 mr-1" />
+                        <span className="text-xs">Register as Private</span>
+                      </Button>
+                    </div>
+                  </>
+                );
+              })()}
+              
+              <p className="text-[10px] text-center text-gray-500">
+                💡 Professional Builders request quotes • Private Clients buy directly
                   </p>
                 </>
               )}

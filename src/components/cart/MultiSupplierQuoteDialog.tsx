@@ -177,6 +177,30 @@ export const MultiSupplierQuoteDialog: React.FC<MultiSupplierQuoteDialogProps> =
   };
 
   const handleSendQuotes = async () => {
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // SECURITY: ONLY Professional Builders can request quotes
+    // Private Clients must use Buy Now instead
+    // ═══════════════════════════════════════════════════════════════════════════════
+    const currentRole = localStorage.getItem('user_role');
+    
+    if (currentRole === 'private_client') {
+      toast({
+        title: '🛒 Use Buy Now Instead',
+        description: 'As a Private Client, you can purchase directly. Please close this dialog and use the "Buy Now" button.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    if (currentRole !== 'professional_builder' && currentRole !== 'admin') {
+      toast({
+        title: '⚠️ Professional Builder Required',
+        description: 'Only Professional Builders can request quotes. Please register as a Professional Builder.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     if (selectedSuppliers.length === 0) {
       toast({
         title: 'No Suppliers Selected',
