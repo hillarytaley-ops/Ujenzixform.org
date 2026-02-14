@@ -164,6 +164,7 @@ export const GroupedTabNav: React.FC<GroupedTabNavProps> = ({
       color: 'teal',
       tabs: [
         { value: 'communications', label: 'LiveChat', icon: MessageSquare },
+        { value: 'voice-calls', label: 'Voice Calls', icon: Headphones },
         { value: 'messaging', label: 'Messaging', icon: MessageCircle },
         { value: 'feedback', label: 'Feedback', icon: MessageSquare },
         { value: 'sms-test', label: 'SMS Test', icon: MessageSquare },
