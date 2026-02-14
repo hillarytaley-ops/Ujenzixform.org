@@ -109,9 +109,40 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
   
   const { toast } = useToast();
 
+  // Helper function to add timeout to any promise
+  const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Timeout')), ms))
+    ]);
+  };
+
+  // Get access token and Supabase config
+  const getSupabaseConfig = () => {
+    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+    
+    let accessToken = '';
+    try {
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        accessToken = parsed.access_token || '';
+      }
+    } catch (e) {}
+    
+    return { SUPABASE_URL, SUPABASE_ANON_KEY, accessToken };
+  };
+
   useEffect(() => {
     loadInventory();
     loadStockMovements();
+    
+    // Safety timeout - force loading to false after 10 seconds
+    const safetyTimeout = setTimeout(() => {
+      setLoading(false);
+      console.log('⏱️ Inventory safety timeout - forcing loading false');
+    }, 10000);
     
     // Set up real-time subscription
     const channel = supabase
@@ -119,12 +150,14 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'supplier_product_prices', filter: `supplier_id=eq.${supplierId}` },
         () => {
+          console.log('📦 Real-time inventory update received');
           loadInventory();
         }
       )
       .subscribe();
     
     return () => {
+      clearTimeout(safetyTimeout);
       supabase.removeChannel(channel);
     };
   }, [supplierId]);
@@ -132,14 +165,43 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
   const loadInventory = async () => {
     try {
       setLoading(true);
+      console.log('📦 Loading inventory for supplier:', supplierId);
       
-      // Get supplier's products with stock info (without join to avoid 400 errors)
-      const { data: products, error } = await (supabase as any)
-        .from('supplier_product_prices')
-        .select('*')
-        .eq('supplier_id', supplierId);
+      const { SUPABASE_URL, SUPABASE_ANON_KEY, accessToken } = getSupabaseConfig();
       
-      if (error) throw error;
+      // Use REST API for faster, more reliable fetching
+      let products: any[] = [];
+      try {
+        const response = await withTimeout(
+          fetch(
+            `${SUPABASE_URL}/rest/v1/supplier_product_prices?supplier_id=eq.${supplierId}`,
+            {
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+              },
+            }
+          ),
+          5000
+        );
+        
+        if (response.ok) {
+          products = await response.json();
+          console.log('📦 Products loaded via REST:', products?.length);
+        }
+      } catch (e) {
+        console.log('REST API timeout, trying Supabase client...');
+        // Fallback to Supabase client with timeout
+        try {
+          const { data, error } = await withTimeout(
+            supabase.from('supplier_product_prices').select('*').eq('supplier_id', supplierId),
+            5000
+          );
+          if (!error && data) products = data;
+        } catch (e2) {
+          console.log('Supabase client also timed out');
+        }
+      }
       
       // Get product IDs to fetch names from admin_material_images
       const productIds = (products || []).map((p: any) => p.product_id).filter(Boolean);
@@ -147,22 +209,39 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
       // Fetch product details from admin_material_images
       let productDetails: Record<string, any> = {};
       if (productIds.length > 0) {
-        const { data: materials } = await (supabase as any)
-          .from('admin_material_images')
-          .select('id, name, category, unit')
-          .in('id', productIds);
-        
-        if (materials) {
-          productDetails = materials.reduce((acc: Record<string, any>, m: any) => {
-            acc[m.id] = m;
-            return acc;
-          }, {});
+        try {
+          const idsParam = productIds.map((id: string) => `"${id}"`).join(',');
+          const materialsResponse = await withTimeout(
+            fetch(
+              `${SUPABASE_URL}/rest/v1/admin_material_images?id=in.(${idsParam})&select=id,name,category,unit`,
+              {
+                headers: {
+                  'apikey': SUPABASE_ANON_KEY,
+                  'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+                },
+              }
+            ),
+            5000
+          );
+          
+          if (materialsResponse.ok) {
+            const materials = await materialsResponse.json();
+            if (materials) {
+              productDetails = materials.reduce((acc: Record<string, any>, m: any) => {
+                acc[m.id] = m;
+                return acc;
+              }, {});
+            }
+            console.log('📦 Product details loaded:', Object.keys(productDetails).length);
+          }
+        } catch (e) {
+          console.log('Could not load product details');
         }
       }
       
       // Map products with fetched details
       const inventoryItems: InventoryItem[] = (products || []).map((p: any) => {
-        const stock = p.stock_quantity || (p.in_stock ? 100 : 0);
+        const stock = p.stock_quantity ?? (p.in_stock ? 100 : 0);
         const minStock = p.min_stock_level || 10;
         const details = productDetails[p.product_id] || {};
         
@@ -185,6 +264,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
         };
       });
       
+      console.log('📦 Inventory items mapped:', inventoryItems.length);
       setInventory(inventoryItems);
       calculateStats(inventoryItems);
     } catch (error: any) {
@@ -201,19 +281,30 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
 
   const loadStockMovements = async () => {
     try {
-      const { data, error } = await supabase
-        .from('stock_movements')
-        .select('*')
-        .eq('supplier_id', supplierId)
-        .order('created_at', { ascending: false })
-        .limit(50);
+      const { SUPABASE_URL, SUPABASE_ANON_KEY, accessToken } = getSupabaseConfig();
       
-      if (!error && data) {
+      // Use REST API for faster fetching
+      const response = await withTimeout(
+        fetch(
+          `${SUPABASE_URL}/rest/v1/stock_movements?supplier_id=eq.${supplierId}&order=created_at.desc&limit=50`,
+          {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+            },
+          }
+        ),
+        5000
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
         setStockMovements(data as StockMovement[]);
+        console.log('📦 Stock movements loaded:', data?.length);
       }
     } catch (error) {
       // Table might not exist yet - that's okay
-      console.log('Stock movements table not available');
+      console.log('Stock movements table not available or request timed out');
     }
   };
 
@@ -233,6 +324,8 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
     
     setSaving(true);
     try {
+      const { SUPABASE_URL, SUPABASE_ANON_KEY, accessToken } = getSupabaseConfig();
+      
       let newStock = selectedItem.current_stock;
       
       if (updateType === 'add') {
@@ -243,32 +336,63 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
         newStock = updateQuantity;
       }
       
-      // Update stock in database
-      const { error } = await supabase
-        .from('supplier_product_prices')
-        .update({
-          stock_quantity: newStock,
-          in_stock: newStock > 0,
-          last_restocked: updateType === 'add' ? new Date().toISOString() : undefined
-        })
-        .eq('id', selectedItem.id);
+      // Update stock in database using REST API
+      const updateData: any = {
+        stock_quantity: newStock,
+        in_stock: newStock > 0,
+      };
+      if (updateType === 'add') {
+        updateData.last_restocked = new Date().toISOString();
+      }
       
-      if (error) throw error;
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/supplier_product_prices?id=eq.${selectedItem.id}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal',
+          },
+          body: JSON.stringify(updateData),
+        }
+      );
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to update stock');
+      }
+      
+      console.log('📦 Stock updated successfully');
       
       // Log stock movement
       try {
-        await supabase
-          .from('stock_movements')
-          .insert({
-            supplier_id: supplierId,
-            product_id: selectedItem.product_id,
-            product_name: selectedItem.product_name,
-            movement_type: updateType === 'add' ? 'in' : updateType === 'remove' ? 'out' : 'adjustment',
-            quantity: updateQuantity,
-            previous_stock: selectedItem.current_stock,
-            new_stock: newStock,
-            reason: updateReason || `Stock ${updateType}`
-          });
+        const movementData = {
+          supplier_id: supplierId,
+          product_id: selectedItem.product_id,
+          product_name: selectedItem.product_name,
+          movement_type: updateType === 'add' ? 'in' : updateType === 'remove' ? 'out' : 'adjustment',
+          quantity: updateQuantity,
+          previous_stock: selectedItem.current_stock,
+          new_stock: newStock,
+          reason: updateReason || `Stock ${updateType}`
+        };
+        
+        await fetch(
+          `${SUPABASE_URL}/rest/v1/stock_movements`,
+          {
+            method: 'POST',
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=minimal',
+            },
+            body: JSON.stringify(movementData),
+          }
+        );
+        console.log('📦 Stock movement logged');
       } catch (e) {
         // Stock movements table might not exist
         console.log('Could not log stock movement');
