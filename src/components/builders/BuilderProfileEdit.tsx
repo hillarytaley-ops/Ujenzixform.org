@@ -293,19 +293,37 @@ export const BuilderProfileEdit: React.FC<BuilderProfileEditProps> = ({
     console.log('📝 BuilderProfileEdit: Saving profile...');
     
     try {
-      const userResult = await withTimeout(
-        supabase.auth.getUser(),
-        3000,
-        { data: { user: null }, error: null }
+      // Use getSession() instead of getUser() - it's faster
+      const sessionResult = await withTimeout(
+        supabase.auth.getSession(),
+        5000,
+        { data: { session: null }, error: null }
       );
       
-      const user = userResult.data?.user;
+      let user = sessionResult.data?.session?.user;
+      
+      // If session timeout, try to get user from localStorage as fallback
+      if (!user) {
+        console.log('📝 BuilderProfileEdit: Session timeout for save, trying localStorage fallback');
+        try {
+          const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          if (storedSession) {
+            const parsed = JSON.parse(storedSession);
+            user = parsed?.user;
+            console.log('📝 BuilderProfileEdit: Got user from localStorage for save:', user?.email);
+          }
+        } catch (e) {
+          console.log('📝 BuilderProfileEdit: localStorage fallback failed for save');
+        }
+      }
       
       // Double-check ownership before saving
       if (!user || profile.user_id !== user.id) {
         throw new Error('You can only edit your own profile');
       }
 
+      console.log('📝 BuilderProfileEdit: Updating profile for user:', user.id);
+      
       const updateResult = await withTimeout(
         supabase.from('profiles').update({
           full_name: profile.full_name,
@@ -330,7 +348,7 @@ export const BuilderProfileEdit: React.FC<BuilderProfileEditProps> = ({
           linkedin_url: profile.linkedin_url,
           updated_at: new Date().toISOString()
         }).eq('user_id', user.id),
-        8000,
+        15000,
         { data: null, error: { message: 'Save timeout - please try again' } }
       );
 
