@@ -401,17 +401,40 @@ export const MaterialImagesManager: React.FC = () => {
     }
   };
   
-  // ✅ LAZY LOAD: Fetch image URLs for specific IDs
+  // ✅ LAZY LOAD: Fetch image URLs for specific IDs using REST API
   const loadImageUrls = async (ids: string[]) => {
     if (ids.length === 0) return;
     
+    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+    
+    let accessToken: string | null = null;
     try {
-      const { data, error } = await (supabase as any)
-        .from('admin_material_images')
-        .select('id, image_url')
-        .in('id', ids);
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        accessToken = parsed.access_token;
+      }
+    } catch (e) {}
+    
+    const headers: Record<string, string> = {
+      'apikey': SUPABASE_ANON_KEY,
+      'Content-Type': 'application/json'
+    };
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+    
+    try {
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,image_url&id=in.(${ids.join(',')})`,
+        { headers }
+      );
       
-      if (error || !data) return;
+      if (!response.ok) return;
+      
+      const data = await response.json();
+      if (!data) return;
       
       // Update images with their URLs
       setAdminImages(prev => prev.map(img => {
@@ -423,11 +446,31 @@ export const MaterialImagesManager: React.FC = () => {
     }
   };
   
-  // ✅ PROGRESSIVE LOAD: Fetch image URLs in batches with progress tracking
+  // ✅ PROGRESSIVE LOAD: Fetch image URLs in batches with progress tracking using REST API
   const loadImageUrlsWithProgress = async (allIds: string[]) => {
     if (allIds.length === 0) {
       setImageLoadProgress(prev => ({ ...prev, isLoadingImages: false }));
       return;
+    }
+    
+    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+    
+    let accessToken: string | null = null;
+    try {
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        accessToken = parsed.access_token;
+      }
+    } catch (e) {}
+    
+    const headers: Record<string, string> = {
+      'apikey': SUPABASE_ANON_KEY,
+      'Content-Type': 'application/json'
+    };
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
     }
     
     const BATCH_SIZE = 20; // Load 20 images at a time
@@ -440,33 +483,37 @@ export const MaterialImagesManager: React.FC = () => {
       const batchIds = allIds.slice(i, i + BATCH_SIZE);
       
       try {
-        const { data, error } = await (supabase as any)
-          .from('admin_material_images')
-          .select('id, image_url')
-          .in('id', batchIds);
+        const response = await fetch(
+          `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,image_url&id=in.(${batchIds.join(',')})`,
+          { headers }
+        );
         
-        if (!error && data) {
-          // Count how many have actual image data
-          const withImages = data.filter((d: any) => d.image_url && d.image_url.length > 100).length;
-          imagesWithData += withImages;
-          loadedCount += batchIds.length;
+        if (response.ok) {
+          const data = await response.json();
           
-          // Update images with their URLs
-          setAdminImages(prev => prev.map(img => {
-            const found = data.find((d: any) => d.id === img.id);
-            return found ? { ...img, image_url: found.image_url } : img;
-          }));
-          
-          // Update progress
-          setImageLoadProgress({
-            totalProducts: allIds.length,
-            productsWithImages: imagesWithData,
-            imagesLoaded: loadedCount,
-            isLoadingImages: loadedCount < allIds.length,
-            lastUpdated: new Date()
-          });
-          
-          console.log(`📷 Progress: ${loadedCount}/${allIds.length} (${Math.round(loadedCount/allIds.length*100)}%) - ${imagesWithData} with images`);
+          if (data) {
+            // Count how many have actual image data
+            const withImages = data.filter((d: any) => d.image_url && d.image_url.length > 100).length;
+            imagesWithData += withImages;
+            loadedCount += batchIds.length;
+            
+            // Update images with their URLs
+            setAdminImages(prev => prev.map(img => {
+              const found = data.find((d: any) => d.id === img.id);
+              return found ? { ...img, image_url: found.image_url } : img;
+            }));
+            
+            // Update progress
+            setImageLoadProgress({
+              totalProducts: allIds.length,
+              productsWithImages: imagesWithData,
+              imagesLoaded: loadedCount,
+              isLoadingImages: loadedCount < allIds.length,
+              lastUpdated: new Date()
+            });
+            
+            console.log(`📷 Progress: ${loadedCount}/${allIds.length} (${Math.round(loadedCount/allIds.length*100)}%) - ${imagesWithData} with images`);
+          }
         }
       } catch (err) {
         console.error('Error loading batch:', err);
@@ -475,7 +522,7 @@ export const MaterialImagesManager: React.FC = () => {
       
       // Small delay between batches to prevent overwhelming the API
       if (i + BATCH_SIZE < allIds.length) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 50));
       }
     }
     
