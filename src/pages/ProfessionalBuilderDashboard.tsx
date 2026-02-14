@@ -103,6 +103,7 @@ const ProfessionalBuilderDashboardPage = () => {
   // Deliveries state
   const [deliveries, setDeliveries] = useState<any[]>([]);
   const [loadingDeliveries, setLoadingDeliveries] = useState(false);
+  const [deliveriesLoaded, setDeliveriesLoaded] = useState(false); // Track if initial load is done
 
   // Supabase config for REST API
   const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
@@ -341,7 +342,13 @@ const ProfessionalBuilderDashboardPage = () => {
   };
 
   // Load deliveries using REST API
-  const loadDeliveries = async (userId: string) => {
+  const loadDeliveries = async (userId: string, forceRefresh: boolean = false) => {
+    // Skip if already loaded and not forcing refresh (prevents flicker)
+    if (deliveriesLoaded && !forceRefresh && deliveries.length > 0) {
+      console.log('🚚 Deliveries already loaded, skipping fetch');
+      return;
+    }
+    
     setLoadingDeliveries(true);
     const accessToken = getAccessToken();
     const headers = {
@@ -480,11 +487,13 @@ const ProfessionalBuilderDashboardPage = () => {
       );
 
       setDeliveries(uniqueDeliveries);
+      setDeliveriesLoaded(true);
       console.log('🚚 Total unique deliveries:', uniqueDeliveries.length);
 
     } catch (error) {
       console.error('Error loading deliveries:', error);
-      setDeliveries([]);
+      // Don't clear existing data on error - keep showing what we have
+      // setDeliveries([]); // REMOVED - this was causing the flicker
     } finally {
       setLoadingDeliveries(false);
     }
@@ -584,7 +593,7 @@ const ProfessionalBuilderDashboardPage = () => {
         { event: '*', schema: 'public', table: 'delivery_requests', filter: `builder_id=eq.${userId}` },
         (payload) => {
           console.log('🚚 Delivery request change detected:', payload);
-          loadDeliveries(userId);
+          loadDeliveries(userId, true); // Force refresh on real-time update
           toast({
             title: "Delivery Update",
             description: "Your delivery status has been updated.",
@@ -595,7 +604,7 @@ const ProfessionalBuilderDashboardPage = () => {
         { event: '*', schema: 'public', table: 'deliveries', filter: `builder_id=eq.${userId}` },
         (payload) => {
           console.log('🚚 Delivery change detected:', payload);
-          loadDeliveries(userId);
+          loadDeliveries(userId, true); // Force refresh on real-time update
         }
       )
       .subscribe();
@@ -1018,7 +1027,7 @@ const ProfessionalBuilderDashboardPage = () => {
                 <Button 
                   variant="outline" 
                   size="sm"
-                  onClick={() => loadDeliveries(getUserId())}
+                  onClick={() => loadDeliveries(getUserId(), true)}
                   disabled={loadingDeliveries}
                 >
                   {loadingDeliveries ? 'Refreshing...' : 'Refresh'}
