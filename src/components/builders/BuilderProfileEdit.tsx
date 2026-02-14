@@ -332,35 +332,33 @@ export const BuilderProfileEdit: React.FC<BuilderProfileEditProps> = ({
 
       console.log('📝 BuilderProfileEdit: Updating profile for user:', user.id);
       
-      const updateResult = await withTimeout(
-        supabase.from('profiles').update({
-          full_name: profile.full_name,
-          company_name: profile.company_name,
-          phone: profile.phone,
-          location: profile.location,
-          bio: profile.bio,
-          website: profile.website,
-          years_experience: profile.years_experience,
-          team_size: profile.team_size,
-          service_areas: profile.service_areas,
-          certifications: profile.certifications,
-          specialties: profile.specialties,
-          price_range: profile.price_range,
-          show_phone: profile.show_phone,
-          show_email: profile.show_email,
-          allow_messages: profile.allow_messages,
-          allow_calls: profile.allow_calls,
-          facebook_url: profile.facebook_url,
-          twitter_url: profile.twitter_url,
-          instagram_url: profile.instagram_url,
-          linkedin_url: profile.linkedin_url,
-          updated_at: new Date().toISOString()
-        }).eq('user_id', user.id),
-        15000,
-        { data: null, error: { message: 'Save timeout - please try again' } }
-      );
+      // Don't use timeout for save - let it complete naturally
+      // Supabase has its own timeout handling
+      const { error: updateError } = await supabase.from('profiles').update({
+        full_name: profile.full_name,
+        company_name: profile.company_name,
+        phone: profile.phone,
+        location: profile.location,
+        bio: profile.bio,
+        website: profile.website,
+        years_experience: profile.years_experience,
+        team_size: profile.team_size,
+        service_areas: profile.service_areas,
+        certifications: profile.certifications,
+        specialties: profile.specialties,
+        price_range: profile.price_range,
+        show_phone: profile.show_phone,
+        show_email: profile.show_email,
+        allow_messages: profile.allow_messages,
+        allow_calls: profile.allow_calls,
+        facebook_url: profile.facebook_url,
+        twitter_url: profile.twitter_url,
+        instagram_url: profile.instagram_url,
+        linkedin_url: profile.linkedin_url,
+        updated_at: new Date().toISOString()
+      }).eq('user_id', user.id);
 
-      if (updateResult.error) throw updateResult.error;
+      if (updateError) throw updateError;
 
       console.log('✅ BuilderProfileEdit: Profile saved successfully');
       toast({
