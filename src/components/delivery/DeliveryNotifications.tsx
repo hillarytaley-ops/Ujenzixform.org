@@ -7,7 +7,8 @@ import { Label } from '@/components/ui/label';
 import { 
   Bell, BellOff, Volume2, VolumeX, Vibrate, 
   Package, Truck, AlertTriangle, CheckCircle, X,
-  Clock, MapPin, DollarSign, Star, RefreshCw
+  Clock, MapPin, DollarSign, Star, RefreshCw,
+  Check, XCircle, Loader2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -37,13 +38,19 @@ interface NotificationSettings {
 interface DeliveryNotificationsProps {
   userId: string;
   onNotificationClick?: (notification: Notification) => void;
+  onAcceptDelivery?: (requestId: string) => void;
+  onRejectDelivery?: (requestId: string) => void;
 }
 
 export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
   userId,
-  onNotificationClick
+  onNotificationClick,
+  onAcceptDelivery,
+  onRejectDelivery
 }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [acceptingId, setAcceptingId] = useState<string | null>(null);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [settings, setSettings] = useState<NotificationSettings>({
     pushEnabled: false,
     soundEnabled: true,
@@ -431,6 +438,81 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     }
   };
 
+  // Accept a delivery request
+  const handleAcceptDelivery = async (requestId: string) => {
+    setAcceptingId(requestId);
+    try {
+      const { url, headers } = getAuthHeaders();
+      
+      // Update the delivery request to assign this provider
+      const response = await fetch(
+        `${url}/rest/v1/delivery_requests?id=eq.${requestId}`,
+        {
+          method: 'PATCH',
+          headers: { ...headers, 'Prefer': 'return=representation' },
+          body: JSON.stringify({
+            provider_id: userId,
+            status: 'assigned',
+            updated_at: new Date().toISOString()
+          })
+        }
+      );
+      
+      if (response.ok) {
+        toast({
+          title: '✅ Delivery Accepted!',
+          description: 'You have been assigned to this delivery. Check Active tab for details.',
+        });
+        
+        // Remove from notifications list
+        setNotifications(prev => prev.filter(n => n.id !== requestId));
+        setUnreadCount(prev => Math.max(0, prev - 1));
+        
+        // Call parent callback if provided
+        if (onAcceptDelivery) onAcceptDelivery(requestId);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to accept delivery');
+      }
+    } catch (error: any) {
+      console.error('Error accepting delivery:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Could not accept delivery. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setAcceptingId(null);
+    }
+  };
+
+  // Reject/decline a delivery request (just removes from view)
+  const handleRejectDelivery = async (requestId: string) => {
+    setRejectingId(requestId);
+    try {
+      // Just remove from local notifications - don't update database
+      // This allows other providers to still see and accept it
+      setNotifications(prev => prev.filter(n => n.id !== requestId));
+      setUnreadCount(prev => Math.max(0, prev - 1));
+      
+      toast({
+        title: 'Delivery Declined',
+        description: 'Request removed from your list. Other providers can still accept it.',
+      });
+      
+      if (onRejectDelivery) onRejectDelivery(requestId);
+    } catch (error: any) {
+      console.error('Error rejecting delivery:', error);
+      toast({
+        title: 'Error',
+        description: 'Could not decline delivery.',
+        variant: 'destructive'
+      });
+    } finally {
+      setRejectingId(null);
+    }
+  };
+
   const formatTime = (date: Date) => {
     const diff = Date.now() - date.getTime();
     const minutes = Math.floor(diff / 60000);
@@ -602,44 +684,91 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             notifications.map((notification) => (
               <div
                 key={notification.id}
-                className={`flex items-start gap-3 p-3 rounded-lg border transition-colors cursor-pointer ${
+                className={`p-3 rounded-lg border transition-colors ${
                   notification.read 
                     ? 'bg-white border-gray-200' 
                     : 'bg-teal-50 border-teal-200'
                 }`}
-                onClick={() => {
-                  markAsRead(notification.id);
-                  onNotificationClick?.(notification);
-                }}
               >
-                <div className="flex-shrink-0 mt-0.5">
-                  {getNotificationIcon(notification.type)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className="font-medium text-sm truncate">{notification.title}</p>
-                    <Badge 
-                      variant="outline" 
-                      className={`text-xs ${getPriorityColor(notification.priority)}`}
-                    >
-                      {notification.priority}
-                    </Badge>
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 mt-0.5">
+                    {getNotificationIcon(notification.type)}
                   </div>
-                  <p className="text-sm text-gray-600 line-clamp-2">{notification.message}</p>
-                  <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {formatTime(notification.timestamp)}
-                  </p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="font-medium text-sm truncate">{notification.title}</p>
+                      <Badge 
+                        variant="outline" 
+                        className={`text-xs ${getPriorityColor(notification.priority)}`}
+                      >
+                        {notification.priority}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-gray-600 line-clamp-2">{notification.message}</p>
+                    <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {formatTime(notification.timestamp)}
+                    </p>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteNotification(notification.id);
+                    }}
+                    className="flex-shrink-0 p-1 hover:bg-gray-200 rounded"
+                  >
+                    <X className="h-4 w-4 text-gray-400" />
+                  </button>
                 </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteNotification(notification.id);
-                  }}
-                  className="flex-shrink-0 p-1 hover:bg-gray-200 rounded"
-                >
-                  <X className="h-4 w-4 text-gray-400" />
-                </button>
+                
+                {/* Accept/Reject Buttons - Only show for new delivery requests */}
+                {notification.type === 'new_delivery' && !notification.read && (
+                  <div className="flex gap-2 mt-3 pt-3 border-t border-gray-200">
+                    <Button
+                      size="sm"
+                      className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAcceptDelivery(notification.id);
+                      }}
+                      disabled={acceptingId === notification.id || rejectingId === notification.id}
+                    >
+                      {acceptingId === notification.id ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          Accepting...
+                        </>
+                      ) : (
+                        <>
+                          <Check className="h-4 w-4 mr-1" />
+                          Accept
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1 border-red-300 text-red-600 hover:bg-red-50"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRejectDelivery(notification.id);
+                      }}
+                      disabled={acceptingId === notification.id || rejectingId === notification.id}
+                    >
+                      {rejectingId === notification.id ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          Declining...
+                        </>
+                      ) : (
+                        <>
+                          <XCircle className="h-4 w-4 mr-1" />
+                          Decline
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
               </div>
             ))
           )}
