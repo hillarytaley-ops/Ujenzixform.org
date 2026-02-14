@@ -43,7 +43,8 @@ interface SupportMessage {
   chat_id: string;
   sender_id: string;
   sender_type: 'user' | 'admin';
-  message: string;
+  message?: string;  // Legacy column name
+  content?: string;  // Current column name
   created_at: string;
 }
 
@@ -183,7 +184,7 @@ export function AdminMessaging() {
           chat_id: selectedChat.id,
           sender_id: userData.user?.id,
           sender_type: 'admin',
-          message: newMessage.trim()
+          content: newMessage.trim()  // Use 'content' column
         });
 
       if (error) throw error;
@@ -297,7 +298,7 @@ export function AdminMessaging() {
               chat_id: chatId,
               sender_id: userData.user?.id,
               sender_type: 'admin',
-              message: `📢 **ADMIN BROADCAST**\n\n${broadcastMessage.trim()}`
+              content: `📢 **ADMIN BROADCAST**\n\n${broadcastMessage.trim()}`  // Use 'content' column
             });
         }
       }
@@ -612,7 +613,7 @@ export function AdminMessaging() {
                           ? 'bg-primary text-primary-foreground' 
                           : 'bg-muted'
                       }`}>
-                        <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
+                        <p className="text-sm whitespace-pre-wrap">{(msg as any).content || msg.message || ''}</p>
                         <p className={`text-xs mt-1 ${
                           msg.sender_type === 'admin' ? 'text-primary-foreground/70' : 'text-muted-foreground'
                         }`}>

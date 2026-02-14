@@ -268,7 +268,7 @@ export function AdminConversationsViewer({ staffId, staffName, isDarkMode = true
           chat_id: selectedSupportChat,
           sender_id: staffId,
           sender_type: 'admin',
-          message: replyMessage.trim()
+          content: replyMessage.trim()  // Use 'content' column
         });
 
       if (error) throw error;
@@ -397,7 +397,7 @@ export function AdminConversationsViewer({ staffId, staffName, isDarkMode = true
                               : 'bg-blue-600 text-white'
                           }`}
                         >
-                          <p className="text-sm">{msg.message}</p>
+                          <p className="text-sm">{(msg as any).content || msg.message || ''}</p>
                           <p className="text-xs opacity-70 mt-1">
                             {msg.sender === 'staff' ? '👤 Staff' : msg.sender === 'bot' ? '🤖 Bot' : '💬 User'} • 
                             {new Date(msg.created_at).toLocaleTimeString()}
@@ -493,7 +493,7 @@ export function AdminConversationsViewer({ staffId, staffName, isDarkMode = true
                               : 'bg-blue-600 text-white'
                           }`}
                         >
-                          <p className="text-sm">{msg.message}</p>
+                          <p className="text-sm">{(msg as any).content || msg.message || ''}</p>
                           <p className="text-xs opacity-70 mt-1">
                             {msg.sender_type === 'admin' ? '👤 Admin' : '💬 User'} • 
                             {new Date(msg.created_at).toLocaleTimeString()}
