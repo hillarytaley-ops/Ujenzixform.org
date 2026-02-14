@@ -1394,7 +1394,7 @@ const SupplierDashboard = () => {
               {user && (
                 <InAppCommunication
                   userId={user.id}
-                  userName={supplierName || user.email || 'Supplier'}
+                  userName={supplierProfile?.company_name || supplierProfile?.full_name || user.email || 'Supplier'}
                   userRole="supplier"
                   isDarkMode={isDarkMode}
                 />
