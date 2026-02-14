@@ -104,46 +104,70 @@ export function InAppCommunication({
     scrollToBottom();
   }, [messages]);
 
-  // Load messages
+  // Load messages using REST API
   const loadMessages = async () => {
     try {
-      const { data, error } = await supabase
-        .from('app_messages')
-        .select('*')
-        .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
-        .order('created_at', { ascending: true });
+      const tokenStr = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const token = tokenStr ? JSON.parse(tokenStr) : null;
+      const accessToken = token?.access_token;
 
-      if (error) {
-        console.error('Error loading messages:', error);
-        // If table doesn't exist, use empty array
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/app_messages?or=(sender_id.eq.${userId},receiver_id.eq.${userId})&order=created_at.asc`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        console.log('Messages table may not exist yet');
         setMessages([]);
         return;
       }
+
+      const data = await response.json();
       setMessages(data || []);
     } catch (err) {
-      console.error('Error:', err);
+      console.error('Error loading messages:', err);
       setMessages([]);
     }
   };
 
-  // Load call sessions
+  // Load call sessions using REST API
   const loadCallSessions = async () => {
     try {
-      const { data, error } = await supabase
-        .from('app_calls')
-        .select('*')
-        .or(`caller_id.eq.${userId},receiver_id.eq.${userId}`)
-        .order('created_at', { ascending: false })
-        .limit(50);
+      const tokenStr = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      const token = tokenStr ? JSON.parse(tokenStr) : null;
+      const accessToken = token?.access_token;
 
-      if (error) {
-        console.error('Error loading calls:', error);
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/app_calls?or=(caller_id.eq.${userId},receiver_id.eq.${userId})&order=created_at.desc&limit=50`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        console.log('Calls table may not exist yet');
         setCallSessions([]);
         return;
       }
+
+      const data = await response.json();
       setCallSessions(data || []);
     } catch (err) {
-      console.error('Error:', err);
+      console.error('Error loading calls:', err);
       setCallSessions([]);
     }
   };
@@ -247,37 +271,77 @@ export function InAppCommunication({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Send message
+  // Send message using REST API for reliability
   const sendMessage = async () => {
     if (!newMessage.trim()) return;
 
     setSendingMessage(true);
     try {
-      // Send to admin support
-      const { error } = await supabase
-        .from('app_messages')
-        .insert({
-          sender_id: userId,
-          sender_name: userName,
-          sender_role: userRole,
-          receiver_id: 'admin', // Admin receives all support messages
-          receiver_role: 'admin',
-          content: newMessage.trim(),
-          is_read: false,
-        });
+      // Get auth token
+      const tokenStr = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (!tokenStr) {
+        throw new Error('Not authenticated');
+      }
+      const token = JSON.parse(tokenStr);
+      const accessToken = token?.access_token;
 
-      if (error) throw error;
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+
+      const messageData = {
+        sender_id: userId,
+        sender_name: userName,
+        sender_role: userRole,
+        receiver_id: 'admin',
+        receiver_role: 'admin',
+        content: newMessage.trim(),
+        is_read: false,
+      };
+
+      console.log('📤 Sending message:', messageData);
+
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/app_messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+          'Prefer': 'return=representation',
+        },
+        body: JSON.stringify(messageData),
+      });
+
+      console.log('📤 Message response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('📤 Message error:', errorText);
+        
+        // If table doesn't exist, show helpful message
+        if (errorText.includes('relation') && errorText.includes('does not exist')) {
+          throw new Error('Chat system is being set up. Please try again later or contact support via phone.');
+        }
+        throw new Error(errorText || 'Failed to send message');
+      }
+
+      const result = await response.json();
+      console.log('📤 Message sent successfully:', result);
+
+      // Add message to local state immediately
+      if (result && result.length > 0) {
+        setMessages(prev => [...prev, result[0]]);
+      }
 
       setNewMessage('');
       toast({
-        title: 'Message Sent',
+        title: '✅ Message Sent',
         description: 'Admin will respond shortly.',
       });
     } catch (err: any) {
       console.error('Error sending message:', err);
       toast({
-        title: 'Error',
-        description: 'Failed to send message. Please try again.',
+        title: 'Message Not Sent',
+        description: err.message || 'Failed to send message. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -285,46 +349,81 @@ export function InAppCommunication({
     }
   };
 
-  // Initiate call to admin
+  // Initiate call to admin using REST API
   const initiateCall = async (callType: 'voice' | 'video') => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('app_calls')
-        .insert({
-          caller_id: userId,
-          caller_name: userName,
-          caller_role: userRole,
-          receiver_id: 'admin',
-          receiver_name: 'UjenziXform Support',
-          receiver_role: 'admin',
-          status: 'ringing',
-          call_type: callType,
-        })
-        .select()
-        .single();
+      const tokenStr = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (!tokenStr) {
+        throw new Error('Not authenticated');
+      }
+      const token = JSON.parse(tokenStr);
+      const accessToken = token?.access_token;
 
-      if (error) throw error;
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+
+      const callData = {
+        caller_id: userId,
+        caller_name: userName,
+        caller_role: userRole,
+        receiver_id: 'admin',
+        receiver_name: 'UjenziXform Support',
+        receiver_role: 'admin',
+        status: 'ringing',
+        call_type: callType,
+      };
+
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/app_calls`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+          'Prefer': 'return=representation',
+        },
+        body: JSON.stringify(callData),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        if (errorText.includes('relation') && errorText.includes('does not exist')) {
+          throw new Error('Call system is being set up. Please use the phone hotline for now.');
+        }
+        throw new Error(errorText || 'Failed to initiate call');
+      }
+
+      const result = await response.json();
+      const data = result[0];
 
       setActiveCall(data);
       toast({
-        title: 'Calling...',
+        title: '📞 Calling...',
         description: 'Connecting to UjenziXform Support',
       });
 
-      // Simulate call being answered after 3 seconds (in real app, this would be handled by WebRTC)
+      // Simulate call being answered after 3 seconds
       setTimeout(async () => {
-        await supabase
-          .from('app_calls')
-          .update({ status: 'active', started_at: new Date().toISOString() })
-          .eq('id', data.id);
+        try {
+          await fetch(`${SUPABASE_URL}/rest/v1/app_calls?id=eq.${data.id}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+            },
+            body: JSON.stringify({ status: 'active', started_at: new Date().toISOString() }),
+          });
+        } catch (e) {
+          console.error('Error updating call status:', e);
+        }
       }, 3000);
 
     } catch (err: any) {
       console.error('Error initiating call:', err);
       toast({
         title: 'Call Failed',
-        description: 'Unable to connect. Please try again.',
+        description: err.message || 'Unable to connect. Please try again.',
         variant: 'destructive',
       });
     } finally {
