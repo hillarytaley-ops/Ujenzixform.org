@@ -249,6 +249,14 @@ const ProfessionalBuilderDashboardPage = () => {
     }
   };
 
+  // Helper: wrap promise with timeout
+  const withTimeout = <T,>(promise: Promise<T>, ms: number, fallback: T): Promise<T> => {
+    return Promise.race([
+      promise,
+      new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))
+    ]);
+  };
+
   // Load real stats using Supabase client (handles auth automatically)
   const loadRealStats = async (userId: string) => {
     console.log('📊 loadRealStats called for:', userId);
@@ -261,30 +269,32 @@ const ProfessionalBuilderDashboardPage = () => {
     try {
       console.log('📊 Loading real stats for builder:', userId);
       
-      // Fetch purchase orders using Supabase client
-      const { data: orders, error: ordersError } = await supabase
-        .from('purchase_orders')
-        .select('*')
-        .eq('buyer_id', userId)
-        .order('created_at', { ascending: false });
+      // Fetch purchase orders using Supabase client with timeout
+      const ordersResult = await withTimeout(
+        supabase.from('purchase_orders').select('*').eq('buyer_id', userId).order('created_at', { ascending: false }),
+        5000,
+        { data: null, error: { message: 'Timeout' } }
+      );
       
-      if (ordersError) {
-        console.log('📊 Orders fetch error:', ordersError.message);
+      const orders = ordersResult.data;
+      if (ordersResult.error) {
+        console.log('📊 Orders fetch error:', ordersResult.error.message);
       } else {
-        console.log('📊 Orders loaded:', orders?.length || 0);
+        console.log('📊 Stats: Orders loaded:', orders?.length || 0);
       }
 
-      // Fetch builder projects using Supabase client
-      const { data: projectsData, error: projectsError } = await supabase
-        .from('builder_projects')
-        .select('*')
-        .eq('builder_id', userId)
-        .order('created_at', { ascending: false });
+      // Fetch builder projects using Supabase client with timeout
+      const projectsResult = await withTimeout(
+        supabase.from('builder_projects').select('*').eq('builder_id', userId).order('created_at', { ascending: false }),
+        5000,
+        { data: null, error: { message: 'Timeout' } }
+      );
       
-      if (projectsError) {
-        console.log('📊 Projects fetch error:', projectsError.message);
+      const projectsData = projectsResult.data;
+      if (projectsResult.error) {
+        console.log('📊 Projects fetch error:', projectsResult.error.message);
       } else {
-        console.log('📊 Projects loaded:', projectsData?.length || 0);
+        console.log('📊 Stats: Projects loaded:', projectsData?.length || 0);
         if (projectsData) setProjects(projectsData);
       }
 
@@ -309,16 +319,13 @@ const ProfessionalBuilderDashboardPage = () => {
       ).length;
 
       setStats({
-        activeProjects: activeProjects || projectsData.length,
+        activeProjects: activeProjects || (projectsData?.length || 0),
         pendingOrders,
         completedProjects: completedOrders,
         totalSpent
       });
 
       console.log('📊 Stats calculated:', { activeProjects, pendingOrders, completedOrders, totalSpent });
-
-      // Also load deliveries
-      await loadDeliveries(userId);
 
     } catch (error) {
       console.error('Error loading stats:', error);
@@ -346,96 +353,102 @@ const ProfessionalBuilderDashboardPage = () => {
     }
     
     setLoadingDeliveries(true);
+    
+    // Safety timeout - finish loading after 8 seconds max
+    const safetyTimeout = setTimeout(() => {
+      console.log('🚚 Safety timeout reached, finishing delivery load');
+      setLoadingDeliveries(false);
+      setDeliveriesLoaded(true);
+    }, 8000);
 
     try {
       console.log('🚚 Loading deliveries for builder:', userId);
       
       // First, get the profile ID (delivery_requests uses profile.id as builder_id)
       let profileId = userId;
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('user_id', userId)
-        .maybeSingle();
+      const profileResult = await withTimeout(
+        supabase.from('profiles').select('id').eq('user_id', userId).maybeSingle(),
+        3000,
+        { data: null, error: null }
+      );
       
-      if (profileData?.id) {
-        profileId = profileData.id;
+      if (profileResult.data?.id) {
+        profileId = profileResult.data.id;
         console.log('🚚 Found profile ID:', profileId);
       }
 
-      // Fetch delivery requests using Supabase client
+      // Fetch delivery requests using Supabase client with timeout
       let deliveryRequests: any[] = [];
       
       // Try with profile ID first
-      const { data: requests1, error: reqError1 } = await supabase
-        .from('delivery_requests')
-        .select('*')
-        .eq('builder_id', profileId)
-        .order('created_at', { ascending: false });
+      const reqResult1 = await withTimeout(
+        supabase.from('delivery_requests').select('*').eq('builder_id', profileId).order('created_at', { ascending: false }),
+        5000,
+        { data: [], error: null }
+      );
       
-      if (reqError1) {
-        console.log('🚚 Delivery requests (by profile_id) error:', reqError1.message);
-      } else if (requests1) {
-        deliveryRequests = [...deliveryRequests, ...requests1];
-        console.log('🚚 Delivery requests (by profile_id):', requests1.length);
+      if (reqResult1.error) {
+        console.log('🚚 Delivery requests (by profile_id) error:', reqResult1.error.message);
+      } else if (reqResult1.data) {
+        deliveryRequests = [...deliveryRequests, ...reqResult1.data];
+        console.log('🚚 Delivery requests (by profile_id):', reqResult1.data.length);
       }
 
       // Also try with user_id if different
       if (profileId !== userId) {
-        const { data: requests2 } = await supabase
-          .from('delivery_requests')
-          .select('*')
-          .eq('builder_id', userId)
-          .order('created_at', { ascending: false });
+        const reqResult2 = await withTimeout(
+          supabase.from('delivery_requests').select('*').eq('builder_id', userId).order('created_at', { ascending: false }),
+          5000,
+          { data: [], error: null }
+        );
         
-        if (requests2) {
+        if (reqResult2.data) {
           const existingIds = new Set(deliveryRequests.map(d => d.id));
-          const newData = requests2.filter((d: any) => !existingIds.has(d.id));
+          const newData = reqResult2.data.filter((d: any) => !existingIds.has(d.id));
           deliveryRequests = [...deliveryRequests, ...newData];
-          console.log('🚚 Delivery requests (by user_id):', requests2.length);
+          console.log('🚚 Delivery requests (by user_id):', reqResult2.data.length);
         }
       }
 
-      // Fetch deliveries table using Supabase client
+      // Fetch deliveries table using Supabase client with timeout
       let deliveriesData: any[] = [];
       
-      const { data: deliveries1 } = await supabase
-        .from('deliveries')
-        .select('*')
-        .eq('builder_id', profileId)
-        .order('created_at', { ascending: false });
+      const delResult1 = await withTimeout(
+        supabase.from('deliveries').select('*').eq('builder_id', profileId).order('created_at', { ascending: false }),
+        5000,
+        { data: [], error: null }
+      );
       
-      if (deliveries1) {
-        deliveriesData = [...deliveriesData, ...deliveries1];
-        console.log('🚚 Deliveries (by profile_id):', deliveries1.length);
+      if (delResult1.data) {
+        deliveriesData = [...deliveriesData, ...delResult1.data];
+        console.log('🚚 Deliveries (by profile_id):', delResult1.data.length);
       }
 
       if (profileId !== userId) {
-        const { data: deliveries2 } = await supabase
-          .from('deliveries')
-          .select('*')
-          .eq('builder_id', userId)
-          .order('created_at', { ascending: false });
+        const delResult2 = await withTimeout(
+          supabase.from('deliveries').select('*').eq('builder_id', userId).order('created_at', { ascending: false }),
+          5000,
+          { data: [], error: null }
+        );
         
-        if (deliveries2) {
+        if (delResult2.data) {
           const existingIds = new Set(deliveriesData.map(d => d.id));
-          const newData = deliveries2.filter((d: any) => !existingIds.has(d.id));
+          const newData = delResult2.data.filter((d: any) => !existingIds.has(d.id));
           deliveriesData = [...deliveriesData, ...newData];
-          console.log('🚚 Deliveries (by user_id):', deliveries2.length);
+          console.log('🚚 Deliveries (by user_id):', delResult2.data.length);
         }
       }
 
       // Also fetch from purchase_orders with delivery info
       let orderDeliveries: any[] = [];
-      const { data: orders } = await supabase
-        .from('purchase_orders')
-        .select('*')
-        .eq('buyer_id', userId)
-        .in('status', ['confirmed', 'shipped', 'delivered'])
-        .order('created_at', { ascending: false });
+      const ordersResult = await withTimeout(
+        supabase.from('purchase_orders').select('*').eq('buyer_id', userId).in('status', ['confirmed', 'shipped', 'delivered']).order('created_at', { ascending: false }),
+        5000,
+        { data: [], error: null }
+      );
       
-      if (orders) {
-        orderDeliveries = orders
+      if (ordersResult.data) {
+        orderDeliveries = ordersResult.data
           .filter((o: any) => o.delivery_address)
           .map((o: any) => ({
             id: `order-${o.id}`,
@@ -480,7 +493,9 @@ const ProfessionalBuilderDashboardPage = () => {
     } catch (error) {
       console.error('Error loading deliveries:', error);
       // Don't clear existing data on error - keep showing what we have
+      setDeliveriesLoaded(true);
     } finally {
+      clearTimeout(safetyTimeout);
       setLoadingDeliveries(false);
     }
   };
