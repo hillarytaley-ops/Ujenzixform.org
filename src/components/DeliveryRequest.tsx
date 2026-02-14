@@ -36,27 +36,50 @@ const DeliveryRequest = () => {
     checkUserAccess();
   }, []);
 
+  // Helper: wrap promise with timeout
+  const withTimeout = <T,>(promise: Promise<T>, ms: number, fallback: T): Promise<T> => {
+    return Promise.race([
+      promise,
+      new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))
+    ]);
+  };
+
   const checkUserAccess = async () => {
     setLoading(true);
+    
+    // Safety timeout - show form after 5 seconds max
+    const safetyTimeout = setTimeout(() => {
+      console.log('⚠️ DeliveryRequest: Safety timeout reached, showing form');
+      setLoading(false);
+    }, 5000);
+    
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const userResult = await withTimeout(
+        supabase.auth.getUser(),
+        3000,
+        { data: { user: null }, error: null }
+      );
+      
+      const user = userResult.data?.user;
       if (!user) {
         console.log('No user found for delivery request form');
+        clearTimeout(safetyTimeout);
         setLoading(false);
         return;
       }
 
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
+      const roleResult = await withTimeout(
+        supabase.from('user_roles').select('role').eq('user_id', user.id).limit(1).maybeSingle(),
+        3000,
+        { data: null, error: null }
+      );
 
-      setUserRole((roleData?.role as UserRole) || null);
+      setUserRole((roleResult.data?.role as UserRole) || null);
+      console.log('✅ DeliveryRequest: User role loaded:', roleResult.data?.role);
     } catch (error) {
       console.error('Error checking user access:', error);
     } finally {
+      clearTimeout(safetyTimeout);
       setLoading(false);
     }
   };
