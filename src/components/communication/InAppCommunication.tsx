@@ -164,15 +164,15 @@ export function InAppCommunication({
       const messagesData = await messagesResponse.json();
       
       // Convert to our Message format
-      // Note: support_messages columns: id, chat_id, sender_id, sender_type, message, created_at
+      // Note: support_messages may use 'message' or 'content' column depending on schema
       const formattedMessages: Message[] = (messagesData || []).map((m: any) => ({
         id: m.id,
         sender_id: m.sender_id,
         sender_name: m.sender_type === 'admin' ? 'Admin Support' : userName,
         sender_role: m.sender_type === 'admin' ? 'admin' : userRole,
-        content: m.message, // support_messages table uses 'message' column
+        content: m.content || m.message || '', // Try both column names
         created_at: m.created_at,
-        is_read: true, // support_messages doesn't have is_read column, default to true
+        is_read: true,
       }));
 
       setMessages(formattedMessages);
@@ -367,13 +367,12 @@ export function InAppCommunication({
       }
 
       // Now send the message
-      // Note: support_messages table columns: id, chat_id, sender_id, sender_type, message, created_at
-      // No 'is_read' column exists in this table
+      // Note: support_messages table - try 'content' column (schema cache may differ from interface)
       const messageData = {
         chat_id: currentChatId,
         sender_id: userId,
         sender_type: 'user',
-        message: newMessage.trim(),
+        content: newMessage.trim(),
       };
 
       console.log('📤 Sending message:', messageData);
