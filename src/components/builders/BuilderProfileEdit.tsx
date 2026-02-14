@@ -135,6 +135,14 @@ export const BuilderProfileEdit: React.FC<BuilderProfileEditProps> = ({
   const isDialogMode = isOpen !== undefined;
   const isEmbeddedMode = !isDialogMode;
 
+  // Helper: wrap promise with timeout
+  const withTimeout = <T,>(promise: Promise<T>, ms: number, fallback: T): Promise<T> => {
+    return Promise.race([
+      promise,
+      new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))
+    ]);
+  };
+
   useEffect(() => {
     // Load profile when dialog opens OR when in embedded mode
     if (isDialogMode && isOpen) {
@@ -146,37 +154,63 @@ export const BuilderProfileEdit: React.FC<BuilderProfileEditProps> = ({
 
   const loadProfile = async () => {
     setLoading(true);
+    console.log('📝 BuilderProfileEdit: Loading profile...');
+    
+    // Safety timeout - show form after 6 seconds max
+    const safetyTimeout = setTimeout(() => {
+      console.log('⚠️ BuilderProfileEdit: Safety timeout reached');
+      setLoading(false);
+    }, 6000);
+    
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const userResult = await withTimeout(
+        supabase.auth.getUser(),
+        3000,
+        { data: { user: null }, error: null }
+      );
+      
+      const user = userResult.data?.user;
       if (!user) {
         toast({
           title: 'Error',
           description: 'You must be logged in to edit your profile',
           variant: 'destructive'
         });
-        onClose();
+        clearTimeout(safetyTimeout);
+        setLoading(false);
+        if (onClose) onClose();
         return;
       }
 
-      const { data: profileData, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
+      console.log('📝 BuilderProfileEdit: Fetching profile for user:', user.id);
+      
+      const profileResult = await withTimeout(
+        supabase.from('profiles').select('*').eq('user_id', user.id).single(),
+        5000,
+        { data: null, error: { message: 'Timeout' } }
+      );
 
-      if (error) throw error;
+      if (profileResult.error) {
+        console.log('📝 BuilderProfileEdit: Profile fetch error:', profileResult.error.message);
+        throw profileResult.error;
+      }
 
+      const profileData = profileResult.data;
+      
       // Verify ownership
-      if (profileData.user_id !== user.id) {
+      if (profileData && profileData.user_id !== user.id) {
         toast({
           title: 'Access Denied',
           description: 'You can only edit your own profile',
           variant: 'destructive'
         });
-        onClose();
+        clearTimeout(safetyTimeout);
+        setLoading(false);
+        if (onClose) onClose();
         return;
       }
 
+      console.log('✅ BuilderProfileEdit: Profile loaded successfully');
       setProfile(profileData);
       setIsOwner(true);
     } catch (error) {
@@ -187,6 +221,7 @@ export const BuilderProfileEdit: React.FC<BuilderProfileEditProps> = ({
         variant: 'destructive'
       });
     } finally {
+      clearTimeout(safetyTimeout);
       setLoading(false);
     }
   };
@@ -195,17 +230,24 @@ export const BuilderProfileEdit: React.FC<BuilderProfileEditProps> = ({
     if (!profile || !isOwner) return;
 
     setSaving(true);
+    console.log('📝 BuilderProfileEdit: Saving profile...');
+    
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const userResult = await withTimeout(
+        supabase.auth.getUser(),
+        3000,
+        { data: { user: null }, error: null }
+      );
+      
+      const user = userResult.data?.user;
       
       // Double-check ownership before saving
       if (!user || profile.user_id !== user.id) {
         throw new Error('You can only edit your own profile');
       }
 
-      const { error } = await supabase
-        .from('profiles')
-        .update({
+      const updateResult = await withTimeout(
+        supabase.from('profiles').update({
           full_name: profile.full_name,
           company_name: profile.company_name,
           phone: profile.phone,
@@ -227,11 +269,14 @@ export const BuilderProfileEdit: React.FC<BuilderProfileEditProps> = ({
           instagram_url: profile.instagram_url,
           linkedin_url: profile.linkedin_url,
           updated_at: new Date().toISOString()
-        })
-        .eq('user_id', user.id); // Extra safety: only update own profile
+        }).eq('user_id', user.id),
+        8000,
+        { data: null, error: { message: 'Save timeout - please try again' } }
+      );
 
-      if (error) throw error;
+      if (updateResult.error) throw updateResult.error;
 
+      console.log('✅ BuilderProfileEdit: Profile saved successfully');
       toast({
         title: 'Profile Updated!',
         description: 'Your profile has been saved successfully'
