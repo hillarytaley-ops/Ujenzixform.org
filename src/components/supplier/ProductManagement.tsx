@@ -282,7 +282,6 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
     unit: 'piece',
     images: [] as { file: File; preview: string }[],
   });
-  const [uploadingImage, setUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Cache for loaded images
