@@ -732,14 +732,15 @@ const AdminDashboard = () => {
     
     const headers: Record<string, string> = {
       'apikey': SUPABASE_ANON_KEY,
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'Prefer': 'count=exact' // Request exact count in header
     };
     if (accessToken) {
       headers['Authorization'] = `Bearer ${accessToken}`;
     }
     
     // Use native fetch with individual timeouts for each stat
-    const fetchWithTimeout = async (url: string, timeoutMs: number = 5000) => {
+    const fetchWithTimeout = async (url: string, timeoutMs: number = 8000) => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
       try {
@@ -750,15 +751,22 @@ const AdminDashboard = () => {
           // Parse count from content-range header (e.g., "0-9/100" -> 100)
           if (countHeader) {
             const match = countHeader.match(/\/(\d+)/);
-            return match ? parseInt(match[1], 10) : 0;
+            if (match) {
+              console.log(`📊 Count from header: ${match[1]} for ${url}`);
+              return parseInt(match[1], 10);
+            }
           }
           // Fallback: count array length
           const data = await response.json();
-          return Array.isArray(data) ? data.length : 0;
+          const count = Array.isArray(data) ? data.length : 0;
+          console.log(`📊 Count from data: ${count} for ${url}`);
+          return count;
         }
+        console.warn(`📊 Request failed: ${response.status} for ${url}`);
         return 0;
-      } catch (e) {
+      } catch (e: any) {
         clearTimeout(timeoutId);
+        console.warn(`📊 Request error: ${e.message} for ${url}`);
         return 0;
       }
     };
@@ -869,62 +877,81 @@ const AdminDashboard = () => {
 
   const loadDashboardData = async () => {
     try {
-      // Use admin client if available (bypasses RLS), otherwise use regular client
-      const client = getAdminClient() || supabase;
-      const isAdminClient = !!getAdminClient();
+      console.log('📊 Loading dashboard data with REST API...');
       
-      // Get user counts by role - single query
-      const { data: rolesData, error: rolesError } = await client
-        .from('user_roles')
-        .select('role');
-
-      if (rolesError) {
-        console.warn('⚠️ Error loading user roles (RLS may be blocking):', rolesError.message);
-        // If RLS blocks access, set counts to 0 instead of failing
-        if (!isAdminClient && rolesError.code === 'PGRST301' || rolesError.code === '42501') {
-          console.warn('⚠️ RLS policy blocking access. Admin service key not configured or user lacks permissions.');
-          setStats(prev => ({
-            ...prev,
-            totalUsers: 0,
-            totalBuilders: 0,
-            totalSuppliers: 0,
-            totalDelivery: 0
-          }));
+      // Get auth token from localStorage
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      
+      let accessToken: string | null = null;
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          accessToken = parsed.access_token;
         }
-      } else if (rolesData) {
-        const builderCount = rolesData.filter(r => r.role === 'builder' || r.role === 'professional_builder' || r.role === 'private_client').length;
-        const supplierCount = rolesData.filter(r => r.role === 'supplier').length;
-        const deliveryCount = rolesData.filter(r => r.role === 'delivery_provider' || r.role === 'delivery').length;
-
-        setStats(prev => ({
-          ...prev,
-          totalUsers: rolesData.length,
-          totalBuilders: builderCount,
-          totalSuppliers: supplierCount,
-          totalDelivery: deliveryCount
-        }));
+      } catch (e) {}
+      
+      const headers: Record<string, string> = {
+        'apikey': SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json'
+      };
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
       }
 
-      // Get pending registrations count from correct tables - parallel with error handling
+      // Get user counts by role - using REST API
       try {
-        const [supplierRegs, deliveryRegs] = await Promise.all([
-          client.from('supplier_applications').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-          client.from('delivery_providers').select('id', { count: 'exact', head: true }).eq('is_verified', false)
+        const rolesResponse = await fetch(`${SUPABASE_URL}/rest/v1/user_roles?select=role`, { headers });
+        if (rolesResponse.ok) {
+          const rolesData = await rolesResponse.json();
+          console.log('📊 User roles loaded:', rolesData?.length);
+          
+          if (rolesData && Array.isArray(rolesData)) {
+            const builderCount = rolesData.filter((r: any) => r.role === 'builder' || r.role === 'professional_builder' || r.role === 'private_client').length;
+            const supplierCount = rolesData.filter((r: any) => r.role === 'supplier').length;
+            const deliveryCount = rolesData.filter((r: any) => r.role === 'delivery_provider' || r.role === 'delivery').length;
+
+            setStats(prev => ({
+              ...prev,
+              totalUsers: rolesData.length,
+              totalBuilders: builderCount,
+              totalSuppliers: supplierCount,
+              totalDelivery: deliveryCount
+            }));
+            console.log('📊 Role counts:', { total: rolesData.length, builders: builderCount, suppliers: supplierCount, delivery: deliveryCount });
+          }
+        } else {
+          console.warn('📊 Failed to load user roles:', rolesResponse.status);
+        }
+      } catch (e: any) {
+        console.warn('📊 Error loading user roles:', e.message);
+      }
+
+      // Get pending registrations count - using REST API
+      try {
+        const [supplierRegsResponse, deliveryRegsResponse] = await Promise.all([
+          fetch(`${SUPABASE_URL}/rest/v1/supplier_applications?status=eq.pending&select=id`, { headers }),
+          fetch(`${SUPABASE_URL}/rest/v1/delivery_providers?is_verified=eq.false&select=id`, { headers })
         ]);
 
-        const pendingCount = (supplierRegs.count || 0) + (deliveryRegs.count || 0);
+        let pendingCount = 0;
+        if (supplierRegsResponse.ok) {
+          const data = await supplierRegsResponse.json();
+          pendingCount += Array.isArray(data) ? data.length : 0;
+        }
+        if (deliveryRegsResponse.ok) {
+          const data = await deliveryRegsResponse.json();
+          pendingCount += Array.isArray(data) ? data.length : 0;
+        }
 
         setStats(prev => ({
           ...prev,
           pendingRegistrations: pendingCount
         }));
+        console.log('📊 Pending registrations:', pendingCount);
       } catch (regError: any) {
-        console.warn('⚠️ Error loading pending registrations (RLS may be blocking):', regError.message);
-        // Set to 0 if access is blocked
-        setStats(prev => ({
-          ...prev,
-          pendingRegistrations: 0
-        }));
+        console.warn('📊 Error loading pending registrations:', regError.message);
       }
 
     } catch (error: any) {
