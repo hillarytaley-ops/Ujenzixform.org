@@ -38,6 +38,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
+interface ProductVariant {
+  id: string;
+  sizeLabel: string;
+  price: number;
+}
+
 interface Product {
   id: string;
   supplier_id: string;
@@ -53,6 +59,9 @@ interface Product {
   updated_at: string;
   approval_status?: 'pending' | 'approved' | 'rejected';
   rejection_reason?: string;
+  // Variant support
+  pricing_type?: 'single' | 'variants';
+  variants?: ProductVariant[];
 }
 
 interface SupplierProductManagerProps {
@@ -146,7 +155,7 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const { toast } = useToast();
 
-  // Form state with multiple images support
+  // Form state with multiple images support and variants
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -155,8 +164,15 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
     unit_price: '',
     image_url: '',
     additional_images: [] as string[], // Up to 4 additional angle images
-    in_stock: true
+    in_stock: true,
+    // Variant pricing support
+    pricing_type: 'single' as 'single' | 'variants',
+    variants: [] as ProductVariant[]
   });
+  
+  // New variant form state
+  const [newVariantLabel, setNewVariantLabel] = useState('');
+  const [newVariantPrice, setNewVariantPrice] = useState('');
 
   useEffect(() => {
     fetchProducts();
@@ -200,10 +216,29 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name || !formData.category || !formData.unit || !formData.unit_price) {
+    if (!formData.name || !formData.category || !formData.unit) {
       toast({
         title: 'Missing information',
         description: 'Please fill in all required fields',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    // Validate pricing based on type
+    if (formData.pricing_type === 'single' && !formData.unit_price) {
+      toast({
+        title: 'Price required',
+        description: 'Please enter a price for your product',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    if (formData.pricing_type === 'variants' && formData.variants.length === 0) {
+      toast({
+        title: 'Variants required',
+        description: 'Please add at least one variant with a price',
         variant: 'destructive'
       });
       return;
@@ -219,23 +254,31 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
     }
 
     try {
+      // Calculate main price from variants if using variant pricing
+      const mainPrice = formData.pricing_type === 'variants' && formData.variants.length > 0
+        ? formData.variants[0].price
+        : parseFloat(formData.unit_price);
+      
       const productData = {
         supplier_id: supplierId,
         name: formData.name,
         description: formData.description,
         category: formData.category,
         unit: formData.unit,
-        unit_price: parseFloat(formData.unit_price),
+        unit_price: mainPrice,
         image_url: formData.image_url,
         additional_images: formData.additional_images.filter(img => img), // Filter empty strings
         in_stock: formData.in_stock,
+        pricing_type: formData.pricing_type,
+        variants: formData.pricing_type === 'variants' ? formData.variants : [],
         updated_at: new Date().toISOString()
       };
 
       if (editingProduct) {
-        // Update existing product - if changing image/price, set back to pending
+        // Update existing product - if changing image/price/variants, set back to pending
         const needsReapproval = editingProduct.image_url !== formData.image_url || 
-                               editingProduct.unit_price !== parseFloat(formData.unit_price);
+                               editingProduct.unit_price !== mainPrice ||
+                               JSON.stringify(editingProduct.variants || []) !== JSON.stringify(formData.variants);
         
         const updateData = needsReapproval 
           ? { ...productData, approval_status: 'pending' }
@@ -302,8 +345,12 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
       unit_price: product.unit_price.toString(),
       image_url: product.image_url || '',
       additional_images: product.additional_images || [],
-      in_stock: product.in_stock
+      in_stock: product.in_stock,
+      pricing_type: product.pricing_type || 'single',
+      variants: product.variants || []
     });
+    setNewVariantLabel('');
+    setNewVariantPrice('');
     setShowAddDialog(true);
   };
 
@@ -424,10 +471,58 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
       unit_price: '',
       image_url: '',
       additional_images: [],
-      in_stock: true
+      in_stock: true,
+      pricing_type: 'single',
+      variants: []
     });
+    setNewVariantLabel('');
+    setNewVariantPrice('');
     setEditingProduct(null);
     setShowAddDialog(false);
+  };
+
+  // Add a new variant
+  const addVariant = () => {
+    if (!newVariantLabel.trim() || !newVariantPrice) {
+      toast({
+        title: 'Missing variant info',
+        description: 'Please enter both size/label and price for the variant',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    const newVariant: ProductVariant = {
+      id: `variant-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      sizeLabel: newVariantLabel.trim(),
+      price: parseFloat(newVariantPrice)
+    };
+    
+    setFormData(prev => ({
+      ...prev,
+      variants: [...prev.variants, newVariant]
+    }));
+    
+    setNewVariantLabel('');
+    setNewVariantPrice('');
+  };
+
+  // Remove a variant
+  const removeVariant = (variantId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      variants: prev.variants.filter(v => v.id !== variantId)
+    }));
+  };
+
+  // Update variant price
+  const updateVariantPrice = (variantId: string, newPrice: number) => {
+    setFormData(prev => ({
+      ...prev,
+      variants: prev.variants.map(v => 
+        v.id === variantId ? { ...v, price: newPrice } : v
+      )
+    }));
   };
 
   // Image slot labels
@@ -605,32 +700,147 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
                   </div>
                 </div>
 
-                {/* Price Input - Prominent */}
-                <div className="space-y-2">
-                  <Label htmlFor="product-price" className="flex items-center gap-2">
+                {/* Pricing Type Selection */}
+                <div className="space-y-3">
+                  <Label className="flex items-center gap-2">
                     <DollarSign className="h-4 w-4 text-green-600" />
-                    Price (KES) *
+                    Pricing Type *
                   </Label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">KES</span>
-                    <Input
-                      id="product-price"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={formData.unit_price}
-                      onChange={(e) => setFormData({ ...formData, unit_price: e.target.value })}
-                      className="pl-12 text-lg font-semibold h-12"
-                      required
-                    />
-                    {formData.unit && (
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                        per {formData.unit}
-                      </span>
-                    )}
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="pricing_type"
+                        value="single"
+                        checked={formData.pricing_type === 'single'}
+                        onChange={() => setFormData({ ...formData, pricing_type: 'single' })}
+                        className="h-4 w-4 text-orange-600"
+                      />
+                      <span className="text-sm">Single Price</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="pricing_type"
+                        value="variants"
+                        checked={formData.pricing_type === 'variants'}
+                        onChange={() => setFormData({ ...formData, pricing_type: 'variants' })}
+                        className="h-4 w-4 text-orange-600"
+                      />
+                      <span className="text-sm">Multiple Sizes/Variants</span>
+                    </label>
                   </div>
                 </div>
+
+                {/* Single Price Input */}
+                {formData.pricing_type === 'single' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="product-price">Price (KES) *</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">KES</span>
+                      <Input
+                        id="product-price"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={formData.unit_price}
+                        onChange={(e) => setFormData({ ...formData, unit_price: e.target.value })}
+                        className="pl-12 text-lg font-semibold h-12"
+                        required
+                      />
+                      {formData.unit && (
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                          per {formData.unit}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Variant Pricing */}
+                {formData.pricing_type === 'variants' && (
+                  <div className="space-y-3 border rounded-lg p-4 bg-gray-50">
+                    <Label className="text-base font-semibold">Product Variants & Prices</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Add different sizes or variants with their prices (e.g., 25kg bag, 50kg bag)
+                    </p>
+                    
+                    {/* Existing Variants */}
+                    {formData.variants.length > 0 && (
+                      <div className="space-y-2">
+                        {formData.variants.map((variant) => (
+                          <div key={variant.id} className="flex items-center gap-3 p-2 bg-white rounded border">
+                            <div className="flex-1">
+                              <span className="font-medium">{variant.sizeLabel}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-muted-foreground">KES</span>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={variant.price}
+                                onChange={(e) => updateVariantPrice(variant.id, parseFloat(e.target.value) || 0)}
+                                className="w-28 h-8"
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeVariant(variant.id)}
+                                className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Add New Variant */}
+                    <div className="flex items-end gap-2 pt-2 border-t">
+                      <div className="flex-1">
+                        <Label className="text-xs text-muted-foreground">Size/Variant Label</Label>
+                        <Input
+                          placeholder="e.g., 50kg bag, 1 meter, Large"
+                          value={newVariantLabel}
+                          onChange={(e) => setNewVariantLabel(e.target.value)}
+                          className="h-9"
+                        />
+                      </div>
+                      <div className="w-32">
+                        <Label className="text-xs text-muted-foreground">Price (KES)</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={newVariantPrice}
+                          onChange={(e) => setNewVariantPrice(e.target.value)}
+                          className="h-9"
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={addVariant}
+                        className="h-9"
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add
+                      </Button>
+                    </div>
+                    
+                    {formData.variants.length === 0 && (
+                      <p className="text-sm text-amber-600 bg-amber-50 p-2 rounded">
+                        ⚠️ Please add at least one variant with a price
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {/* Description */}
                 <div className="space-y-2">
@@ -679,7 +889,14 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
                 <Button 
                   type="submit" 
                   className="bg-orange-600 hover:bg-orange-700"
-                  disabled={uploading || !formData.name || !formData.category || !formData.unit || !formData.unit_price}
+                  disabled={
+                    uploading || 
+                    !formData.name || 
+                    !formData.category || 
+                    !formData.unit || 
+                    (formData.pricing_type === 'single' && !formData.unit_price) ||
+                    (formData.pricing_type === 'variants' && formData.variants.length === 0)
+                  }
                 >
                   {uploading ? (
                     <>
@@ -806,9 +1023,27 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
                   <span className="text-xs text-muted-foreground">{product.unit}</span>
                 </div>
 
-                <div className="text-2xl font-bold text-primary">
-                  KES {(product.unit_price || 0).toLocaleString()}
-                </div>
+                {/* Price Display - Single or Variants */}
+                {product.pricing_type === 'variants' && product.variants && product.variants.length > 0 ? (
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground font-medium">Variants:</p>
+                    <div className="space-y-1 max-h-24 overflow-y-auto">
+                      {product.variants.slice(0, 3).map((variant: ProductVariant, idx: number) => (
+                        <div key={variant.id || idx} className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">{variant.sizeLabel}</span>
+                          <span className="font-semibold">KES {(variant.price || 0).toLocaleString()}</span>
+                        </div>
+                      ))}
+                      {product.variants.length > 3 && (
+                        <p className="text-xs text-muted-foreground">+{product.variants.length - 3} more variants</p>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-2xl font-bold text-primary">
+                    KES {(product.unit_price || 0).toLocaleString()}
+                  </div>
+                )}
 
                 {/* Action Buttons */}
                 <div className="flex gap-2">
