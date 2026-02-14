@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 import {
   User,
   Building2,
@@ -334,19 +334,22 @@ export const BuilderProfileEdit: React.FC<BuilderProfileEditProps> = ({
     }, 60000); // 60 second timeout
     
     try {
-      // Use fetch directly with abort signal for better timeout control
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY4NTk0NDYsImV4cCI6MjA1MjQzNTQ0Nn0.LXCPFDT1GlgA0B77kPPN1S6VLlxioK1YH4gFqUi7swQ';
-      
-      // Get access token from localStorage
-      let accessToken = SUPABASE_ANON_KEY;
+      // Get access token from localStorage - use the user's JWT for auth
+      let accessToken = '';
       try {
         const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
         if (storedSession) {
           const parsed = JSON.parse(storedSession);
-          accessToken = parsed?.access_token || SUPABASE_ANON_KEY;
+          accessToken = parsed?.access_token || '';
+          console.log('📝 BuilderProfileEdit: Got access token, length:', accessToken.length);
         }
-      } catch (e) {}
+      } catch (e) {
+        console.log('📝 BuilderProfileEdit: Failed to get access token');
+      }
+      
+      if (!accessToken) {
+        throw new Error('No access token found. Please log out and log back in.');
+      }
       
       const updateData = {
         full_name: profile.full_name,
