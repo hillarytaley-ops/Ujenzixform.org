@@ -167,110 +167,76 @@ const ProfessionalBuilderDashboardPage = () => {
 
       console.log('📋 ProfessionalBuilderDashboard: Loading profile for user:', userId);
       
-      // Set user object if not already set
-      if (!user) {
-        setUser(authUser || { id: userId, email: authUser?.email || 'user' });
-      }
+      // Set user object immediately
+      const userObj = authUser || { id: userId, email: authUser?.email || 'user' };
+      setUser(userObj);
 
-      // Get profile - try both 'id' and 'user_id' columns (different schemas use different names)
+      // IMMEDIATELY start loading deliveries and stats in background (don't wait for profile)
+      console.log('📋 Starting background data loads for:', userId);
+      loadRealStats(userId).catch(err => console.error('Stats load error:', err));
+      loadDeliveries(userId, true).catch(err => console.error('Deliveries load error:', err));
+
+      // Get profile using REST API with timeout (Supabase client can hang)
       let profileData = null;
-      let profileError = null;
+      const accessToken = getAccessToken();
+      const headers = {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json'
+      };
       
-      // First try with user_id (newer schema)
-      const { data: profileByUserId, error: errorByUserId } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
-      
-      if (!errorByUserId && profileByUserId) {
-        profileData = profileByUserId;
-      } else {
-        // Fallback to id column (older schema)
-        const { data: profileById, error: errorById } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', userId)
-          .maybeSingle();
+      try {
+        const profilePromise = fetch(
+          `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${userId}&select=*`,
+          { headers }
+        );
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Profile fetch timeout')), 5000)
+        );
         
-        if (!errorById && profileById) {
-          profileData = profileById;
-        } else {
-          profileError = errorByUserId || errorById;
+        const profileResponse = await Promise.race([profilePromise, timeoutPromise]) as Response;
+        if (profileResponse.ok) {
+          const profiles = await profileResponse.json();
+          if (profiles && profiles.length > 0) {
+            profileData = profiles[0];
+            console.log('📋 Profile loaded via REST:', profileData.full_name || profileData.email);
+          }
         }
+      } catch (profileError: any) {
+        console.warn('Profile fetch warning:', profileError.message);
       }
 
-      if (profileError || !profileData) {
-        console.warn('Profile fetch warning:', profileError?.message || 'No profile found');
+      if (!profileData) {
         // Create a basic profile from auth data if profiles table fails
+        console.log('📋 Using fallback profile');
         setProfile({
-          id: user.id,
-          user_id: user.id,
-          email: user.email,
-          full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Builder',
-          phone: user.user_metadata?.phone || '',
-          company_name: user.user_metadata?.company_name || '',
-          county: user.user_metadata?.county || '',
+          id: userId,
+          user_id: userId,
+          email: userObj.email,
+          full_name: userObj.user_metadata?.full_name || userObj.email?.split('@')[0] || 'Builder',
+          phone: userObj.user_metadata?.phone || '',
+          company_name: userObj.user_metadata?.company_name || '',
+          county: userObj.user_metadata?.county || '',
         });
       } else {
         setProfile(profileData);
       }
 
-      // Verify role - with timeout to prevent hanging
-      let roleVerified = false;
-      try {
-        const rolePromise = supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .maybeSingle();
-        
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Role check timeout')), 5000)
-        );
-        
-        const { data: roleData } = await Promise.race([rolePromise, timeoutPromise]) as any;
+      // Role already verified by RoleProtectedRoute, skip redundant check
+      console.log('📋 Profile setup complete, data loading in background');
 
-        if (roleData?.role !== 'professional_builder') {
-          toast({
-            title: "Access Denied",
-            description: "This dashboard is for Professional Builders only.",
-            variant: "destructive",
-          });
-          navigate('/');
-          return;
-        }
-        roleVerified = true;
-      } catch (roleError: any) {
-        console.warn('Role verification issue:', roleError.message);
-        // Continue anyway - localStorage has already verified the role
-        roleVerified = true;
-      }
-
-      // Fetch real stats using REST API - don't await, let it load in background
-      loadRealStats(userId).catch(err => console.error('Stats load error:', err));
-      
-      // Also explicitly load deliveries
-      loadDeliveries(userId, true).catch(err => console.error('Deliveries load error:', err));
-
-      // Fetch monitoring requests - use user_id (original schema column)
-      try {
-        const { data: monitoringData, error: monitoringError } = await supabase
-          .from('monitoring_service_requests')
-          .select('*')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false });
-        
-        if (monitoringError) {
-          console.log('Monitoring requests fetch info:', monitoringError.message);
-        }
-        
-        if (monitoringData) {
-          setMonitoringRequests(monitoringData);
-        }
-      } catch (e) {
-        console.log('Monitoring requests fetch error:', e);
-      }
+      // Fetch monitoring requests in background using REST API
+      fetch(
+        `${SUPABASE_URL}/rest/v1/monitoring_service_requests?user_id=eq.${userId}&order=created_at.desc`,
+        { headers }
+      )
+        .then(res => res.ok ? res.json() : [])
+        .then(data => {
+          if (data && data.length > 0) {
+            setMonitoringRequests(data);
+          }
+        })
+        .catch(e => console.log('Monitoring requests fetch error:', e));
 
     } catch (error) {
       console.error('Auth error:', error);
