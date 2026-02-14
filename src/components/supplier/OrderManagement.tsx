@@ -101,7 +101,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
   const [statusFilter, setStatusFilter] = useState('all');
   const [orderTypeFilter, setOrderTypeFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [isUpdating, setIsUpdating] = useState(false);
+  const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null); // Track which order is being updated
   const { toast } = useToast();
 
   useEffect(() => {
@@ -389,7 +389,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
   };
 
   const updateOrderStatus = async (orderId: string, newStatus: Order['status']) => {
-    setIsUpdating(true);
+    setUpdatingOrderId(orderId); // Track which specific order is being updated
     try {
       // Update in database
       const { error } = await supabase
@@ -428,7 +428,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
         variant: 'destructive'
       });
     } finally {
-      setIsUpdating(false);
+      setUpdatingOrderId(null); // Clear the updating state
     }
   };
 
@@ -693,10 +693,10 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
                               <Button 
                                 size="sm" 
                                 onClick={() => updateOrderStatus(order.id, 'processing')}
-                                disabled={isUpdating}
+                                disabled={updatingOrderId === order.id}
                                 className="bg-green-600 hover:bg-green-700 text-xs"
                               >
-                                ✅ Process
+                                {updatingOrderId === order.id ? '...' : '✅ Process'}
                               </Button>
                             )}
                             {/* For Quote Requests (pending), show Confirm/Reject */}
@@ -705,16 +705,16 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
                                 <Button 
                                   size="sm" 
                                   onClick={() => updateOrderStatus(order.id, 'confirmed')}
-                                  disabled={isUpdating}
+                                  disabled={updatingOrderId === order.id}
                                   className="bg-blue-600 hover:bg-blue-700 text-xs"
                                 >
-                                  Accept
+                                  {updatingOrderId === order.id ? '...' : 'Accept'}
                                 </Button>
                                 <Button 
                                   size="sm" 
                                   variant="destructive"
                                   onClick={() => updateOrderStatus(order.id, 'cancelled')}
-                                  disabled={isUpdating}
+                                  disabled={updatingOrderId === order.id}
                                   className="text-xs"
                                 >
                                   Reject
@@ -726,12 +726,16 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
                               <Button 
                                 size="sm" 
                                 onClick={() => updateOrderStatus(order.id, nextStatus)}
-                                disabled={isUpdating}
+                                disabled={updatingOrderId === order.id}
                                 className="bg-orange-500 hover:bg-orange-600 text-xs"
                               >
-                                {nextStatus === 'processing' && 'Process'}
-                                {nextStatus === 'shipped' && 'Ship'}
-                                {nextStatus === 'delivered' && 'Complete'}
+                                {updatingOrderId === order.id ? '...' : (
+                                  <>
+                                    {nextStatus === 'processing' && 'Process'}
+                                    {nextStatus === 'shipped' && 'Ship'}
+                                    {nextStatus === 'delivered' && 'Complete'}
+                                  </>
+                                )}
                               </Button>
                             )}
                             {/* Processing orders - show Ship button */}
@@ -739,10 +743,10 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
                               <Button 
                                 size="sm" 
                                 onClick={() => updateOrderStatus(order.id, 'shipped')}
-                                disabled={isUpdating}
+                                disabled={updatingOrderId === order.id}
                                 className="bg-purple-600 hover:bg-purple-700 text-xs"
                               >
-                                🚚 Ship
+                                {updatingOrderId === order.id ? '...' : '🚚 Ship'}
                               </Button>
                             )}
                             {/* Shipped orders - show Complete button */}
@@ -750,10 +754,10 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
                               <Button 
                                 size="sm" 
                                 onClick={() => updateOrderStatus(order.id, 'delivered')}
-                                disabled={isUpdating}
+                                disabled={updatingOrderId === order.id}
                                 className="bg-green-600 hover:bg-green-700 text-xs"
                               >
-                                ✅ Complete
+                                {updatingOrderId === order.id ? '...' : '✅ Complete'}
                               </Button>
                             )}
                           </div>
@@ -893,28 +897,34 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
                 <div className="flex justify-end gap-2">
                   {selectedOrder.status === 'pending' && (
                     <Button 
-                      variant="destructive" 
+                      variant="destructive"
+                      disabled={updatingOrderId === selectedOrder.id}
                       onClick={() => {
                         updateOrderStatus(selectedOrder.id, 'cancelled');
                         setSelectedOrder(null);
                       }}
                     >
                       <XCircle className="h-4 w-4 mr-2" />
-                      Cancel Order
+                      {updatingOrderId === selectedOrder.id ? 'Cancelling...' : 'Cancel Order'}
                     </Button>
                   )}
                   {getNextStatus(selectedOrder.status) && (
-                    <Button 
+                    <Button
+                      disabled={updatingOrderId === selectedOrder.id}
                       onClick={() => {
                         const next = getNextStatus(selectedOrder.status);
                         if (next) updateOrderStatus(selectedOrder.id, next);
                       }}
                       className="bg-orange-500 hover:bg-orange-600"
                     >
-                      {getNextStatus(selectedOrder.status) === 'confirmed' && 'Confirm Order'}
-                      {getNextStatus(selectedOrder.status) === 'processing' && 'Start Processing'}
-                      {getNextStatus(selectedOrder.status) === 'shipped' && 'Mark as Shipped'}
-                      {getNextStatus(selectedOrder.status) === 'delivered' && 'Mark as Delivered'}
+                      {updatingOrderId === selectedOrder.id ? 'Updating...' : (
+                        <>
+                          {getNextStatus(selectedOrder.status) === 'confirmed' && 'Confirm Order'}
+                          {getNextStatus(selectedOrder.status) === 'processing' && 'Start Processing'}
+                          {getNextStatus(selectedOrder.status) === 'shipped' && 'Mark as Shipped'}
+                          {getNextStatus(selectedOrder.status) === 'delivered' && 'Mark as Delivered'}
+                        </>
+                      )}
                     </Button>
                   )}
                 </div>
