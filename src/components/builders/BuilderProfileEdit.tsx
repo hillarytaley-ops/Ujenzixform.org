@@ -300,41 +300,55 @@ export const BuilderProfileEdit: React.FC<BuilderProfileEditProps> = ({
     setSaving(true);
     console.log('📝 BuilderProfileEdit: Saving profile...');
     
+    // Get user from localStorage directly - fastest method
+    let user: any = null;
     try {
-      // Use getSession() instead of getUser() - it's faster
-      const sessionResult = await withTimeout(
-        supabase.auth.getSession(),
-        5000,
-        { data: { session: null }, error: null }
-      );
-      
-      let user = sessionResult.data?.session?.user;
-      
-      // If session timeout, try to get user from localStorage as fallback
-      if (!user) {
-        console.log('📝 BuilderProfileEdit: Session timeout for save, trying localStorage fallback');
-        try {
-          const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-          if (storedSession) {
-            const parsed = JSON.parse(storedSession);
-            user = parsed?.user;
-            console.log('📝 BuilderProfileEdit: Got user from localStorage for save:', user?.email);
-          }
-        } catch (e) {
-          console.log('📝 BuilderProfileEdit: localStorage fallback failed for save');
-        }
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        user = parsed?.user;
+        console.log('📝 BuilderProfileEdit: Got user from localStorage for save:', user?.email);
       }
-      
-      // Double-check ownership before saving
-      if (!user || profile.user_id !== user.id) {
-        throw new Error('You can only edit your own profile');
-      }
+    } catch (e) {
+      console.log('📝 BuilderProfileEdit: localStorage read failed');
+    }
+    
+    // Double-check ownership before saving
+    if (!user || profile.user_id !== user.id) {
+      toast({
+        title: 'Error',
+        description: 'You can only edit your own profile',
+        variant: 'destructive'
+      });
+      setSaving(false);
+      return;
+    }
 
-      console.log('📝 BuilderProfileEdit: Updating profile for user:', user.id);
+    console.log('📝 BuilderProfileEdit: Updating profile for user:', user.id);
+    
+    // Create abort controller for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      console.log('⚠️ BuilderProfileEdit: Save timeout after 60 seconds');
+      controller.abort();
+    }, 60000); // 60 second timeout
+    
+    try {
+      // Use fetch directly with abort signal for better timeout control
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY4NTk0NDYsImV4cCI6MjA1MjQzNTQ0Nn0.LXCPFDT1GlgA0B77kPPN1S6VLlxioK1YH4gFqUi7swQ';
       
-      // Don't use timeout for save - let it complete naturally
-      // Supabase has its own timeout handling
-      const { error: updateError } = await supabase.from('profiles').update({
+      // Get access token from localStorage
+      let accessToken = SUPABASE_ANON_KEY;
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          accessToken = parsed?.access_token || SUPABASE_ANON_KEY;
+        }
+      } catch (e) {}
+      
+      const updateData = {
         full_name: profile.full_name,
         company_name: profile.company_name,
         phone: profile.phone,
@@ -356,9 +370,30 @@ export const BuilderProfileEdit: React.FC<BuilderProfileEditProps> = ({
         instagram_url: profile.instagram_url,
         linkedin_url: profile.linkedin_url,
         updated_at: new Date().toISOString()
-      }).eq('user_id', user.id);
-
-      if (updateError) throw updateError;
+      };
+      
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${user.id}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify(updateData),
+          signal: controller.signal
+        }
+      );
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('📝 BuilderProfileEdit: Save error:', response.status, errorText);
+        throw new Error(`Save failed: ${response.status}`);
+      }
 
       console.log('✅ BuilderProfileEdit: Profile saved successfully');
       toast({
@@ -369,12 +404,22 @@ export const BuilderProfileEdit: React.FC<BuilderProfileEditProps> = ({
       onSave?.();
       if (onClose) onClose();
     } catch (error: any) {
+      clearTimeout(timeoutId);
       console.error('Error saving profile:', error);
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to save profile',
-        variant: 'destructive'
-      });
+      
+      if (error.name === 'AbortError') {
+        toast({
+          title: 'Save Timeout',
+          description: 'The save took too long. Please check your internet connection and try again.',
+          variant: 'destructive'
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: error.message || 'Failed to save profile',
+          variant: 'destructive'
+        });
+      }
     } finally {
       setSaving(false);
     }
