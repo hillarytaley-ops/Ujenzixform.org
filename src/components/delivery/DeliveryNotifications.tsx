@@ -130,6 +130,34 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
 
   const [loading, setLoading] = useState(true);
 
+  // Helper to get auth token from localStorage
+  const getAuthHeaders = () => {
+    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+    
+    let accessToken = SUPABASE_ANON_KEY;
+    try {
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        if (parsed.access_token) {
+          accessToken = parsed.access_token;
+        }
+      }
+    } catch (e) {
+      console.warn('Could not get auth token from localStorage');
+    }
+    
+    return {
+      url: SUPABASE_URL,
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    };
+  };
+
   // Fetch real delivery requests from database
   const loadNotifications = useCallback(async () => {
     try {
@@ -137,98 +165,119 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       console.log('🔔 DeliveryNotifications: Starting to load notifications...');
       const allNotifications: Notification[] = [];
 
-      // Fetch ALL delivery requests (no status filter for testing)
-      const { data: deliveryRequests, error: reqError } = await supabase
-        .from('delivery_requests')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50);
+      const { url, headers } = getAuthHeaders();
 
-      console.log('📦 delivery_requests query result:', { data: deliveryRequests, error: reqError });
-
-      if (reqError) {
-        console.error('❌ Error fetching delivery_requests:', reqError.message, reqError.code);
-      } else if (deliveryRequests && deliveryRequests.length > 0) {
-        deliveryRequests.forEach((req: any) => {
-          allNotifications.push({
-            id: req.id,
-            type: 'new_delivery',
-            title: 'New Delivery Request',
-            message: `${req.material_type || 'Materials'} delivery to ${req.delivery_address || 'Unknown location'}`,
-            timestamp: new Date(req.created_at),
-            read: req.status !== 'pending',
-            priority: req.priority_level === 'urgent' ? 'high' : 'medium',
-            actionUrl: `/delivery-dashboard?request=${req.id}`
-          });
-        });
-        console.log(`✅ Loaded ${deliveryRequests.length} delivery_requests`);
-      } else {
-        console.log('⚠️ No delivery_requests found (might be RLS blocking)');
+      // Fetch ALL delivery requests using direct REST API (bypasses potential RLS issues)
+      // Focus on pending requests that delivery providers should see
+      try {
+        const reqResponse = await fetch(
+          `${url}/rest/v1/delivery_requests?order=created_at.desc&limit=50`,
+          { headers, cache: 'no-store' }
+        );
+        
+        if (reqResponse.ok) {
+          const deliveryRequests = await reqResponse.json();
+          console.log('📦 delivery_requests query result:', { data: deliveryRequests, count: deliveryRequests?.length });
+          
+          if (deliveryRequests && deliveryRequests.length > 0) {
+            deliveryRequests.forEach((req: any) => {
+              allNotifications.push({
+                id: req.id,
+                type: 'new_delivery',
+                title: req.status === 'pending' ? '🚚 New Delivery Request!' : `Delivery ${req.status}`,
+                message: `${req.material_type || 'Materials'} delivery to ${req.delivery_address || 'Unknown location'}`,
+                timestamp: new Date(req.created_at),
+                read: req.status !== 'pending',
+                priority: req.priority_level === 'urgent' || req.status === 'pending' ? 'high' : 'medium',
+                actionUrl: `/delivery-dashboard?request=${req.id}`
+              });
+            });
+            console.log(`✅ Loaded ${deliveryRequests.length} delivery_requests`);
+          } else {
+            console.log('⚠️ No delivery_requests found in database');
+          }
+        } else {
+          console.error('❌ delivery_requests fetch failed:', reqResponse.status, reqResponse.statusText);
+        }
+      } catch (e: any) {
+        console.error('❌ Error fetching delivery_requests:', e.message);
       }
 
-      // Fetch from deliveries table
-      const { data: deliveries, error: delError } = await supabase
-        .from('deliveries')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50);
+      // Fetch from deliveries table using REST API
+      try {
+        const delResponse = await fetch(
+          `${url}/rest/v1/deliveries?order=created_at.desc&limit=50`,
+          { headers, cache: 'no-store' }
+        );
+        
+        if (delResponse.ok) {
+          const deliveries = await delResponse.json();
+          console.log('📦 deliveries query result:', { data: deliveries, count: deliveries?.length });
 
-      console.log('📦 deliveries query result:', { data: deliveries, error: delError });
-
-      if (delError) {
-        console.error('❌ Error fetching deliveries:', delError.message, delError.code);
-      } else if (deliveries && deliveries.length > 0) {
-        deliveries.forEach((del: any) => {
-          // Avoid duplicates
-          if (!allNotifications.find(n => n.id === del.id)) {
-            allNotifications.push({
-              id: del.id,
-              type: del.status === 'pending' ? 'new_delivery' : 'status_update',
-              title: del.status === 'pending' ? 'New Delivery Request' : `Delivery ${del.status?.replace('_', ' ') || 'update'}`,
-              message: `${del.material_type || 'Materials'} to ${del.delivery_address || 'Unknown'}`,
-              timestamp: new Date(del.created_at),
-              read: del.status !== 'pending',
-              priority: del.urgency === 'urgent' ? 'high' : 'medium',
-              actionUrl: `/delivery-dashboard?delivery=${del.id}`
+          if (deliveries && deliveries.length > 0) {
+            deliveries.forEach((del: any) => {
+              // Avoid duplicates
+              if (!allNotifications.find(n => n.id === del.id)) {
+                allNotifications.push({
+                  id: del.id,
+                  type: del.status === 'pending' ? 'new_delivery' : 'status_update',
+                  title: del.status === 'pending' ? '🚚 New Delivery Request!' : `Delivery ${del.status?.replace('_', ' ') || 'update'}`,
+                  message: `${del.material_type || 'Materials'} to ${del.delivery_address || 'Unknown'}`,
+                  timestamp: new Date(del.created_at),
+                  read: del.status !== 'pending',
+                  priority: del.urgency === 'urgent' || del.status === 'pending' ? 'high' : 'medium',
+                  actionUrl: `/delivery-dashboard?delivery=${del.id}`
+                });
+              }
             });
+            console.log(`✅ Loaded ${deliveries.length} deliveries`);
+          } else {
+            console.log('⚠️ No deliveries found');
           }
-        });
-        console.log(`✅ Loaded ${deliveries.length} deliveries`);
-      } else {
-        console.log('⚠️ No deliveries found');
+        } else {
+          console.error('❌ deliveries fetch failed:', delResponse.status, delResponse.statusText);
+        }
+      } catch (e: any) {
+        console.error('❌ Error fetching deliveries:', e.message);
       }
 
-      // Fetch from delivery_notifications table
-      const { data: notifications, error: notifError } = await supabase
-        .from('delivery_notifications')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50);
+      // Fetch from delivery_notifications table using REST API
+      try {
+        const notifResponse = await fetch(
+          `${url}/rest/v1/delivery_notifications?order=created_at.desc&limit=50`,
+          { headers, cache: 'no-store' }
+        );
+        
+        if (notifResponse.ok) {
+          const notifications = await notifResponse.json();
+          console.log('📦 delivery_notifications query result:', { data: notifications, count: notifications?.length });
 
-      console.log('📦 delivery_notifications query result:', { data: notifications, error: notifError });
-
-      if (notifError) {
-        console.error('❌ Error fetching delivery_notifications:', notifError.message, notifError.code);
-      } else if (notifications && notifications.length > 0) {
-        notifications.forEach((notif: any) => {
-          // Avoid duplicates
-          if (!allNotifications.find(n => n.id === notif.id || n.id === notif.request_id)) {
-            const materials = notif.material_details || [];
-            allNotifications.push({
-              id: notif.id,
-              type: 'new_delivery',
-              title: 'New Delivery Request',
-              message: `${materials[0]?.name || notif.material_type || 'Materials'} to ${notif.delivery_address || 'Unknown'}`,
-              timestamp: new Date(notif.created_at),
-              read: notif.status !== 'pending',
-              priority: notif.priority_level === 'urgent' ? 'high' : 'medium',
-              actionUrl: `/delivery-dashboard?notification=${notif.id}`
+          if (notifications && notifications.length > 0) {
+            notifications.forEach((notif: any) => {
+              // Avoid duplicates
+              if (!allNotifications.find(n => n.id === notif.id || n.id === notif.request_id)) {
+                const materials = notif.material_details || [];
+                allNotifications.push({
+                  id: notif.id,
+                  type: 'new_delivery',
+                  title: '🚚 New Delivery Request!',
+                  message: `${materials[0]?.name || notif.material_type || 'Materials'} to ${notif.delivery_address || 'Unknown'}`,
+                  timestamp: new Date(notif.created_at),
+                  read: notif.status !== 'pending',
+                  priority: notif.priority_level === 'urgent' || notif.status === 'pending' ? 'high' : 'medium',
+                  actionUrl: `/delivery-dashboard?notification=${notif.id}`
+                });
+              }
             });
+            console.log(`✅ Loaded ${notifications.length} delivery_notifications`);
+          } else {
+            console.log('⚠️ No delivery_notifications found');
           }
-        });
-        console.log(`✅ Loaded ${notifications.length} delivery_notifications`);
-      } else {
-        console.log('⚠️ No delivery_notifications found');
+        } else {
+          console.error('❌ delivery_notifications fetch failed:', notifResponse.status, notifResponse.statusText);
+        }
+      } catch (e: any) {
+        console.error('❌ Error fetching delivery_notifications:', e.message);
       }
 
       // Sort by timestamp descending

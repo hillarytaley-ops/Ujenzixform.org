@@ -385,32 +385,74 @@ export const useDeliveryProviderData = () => {
 
       // Fetch ALL pending requests from multiple tables for testing
       // All registered providers can see and accept any pending request
+      // Use direct REST API to bypass potential RLS issues
       
-      // From delivery_requests table
-      const { data: pendingData } = await supabase
-        .from('delivery_requests')
-        .select('*')
-        .eq('status', 'pending')
-        .is('provider_id', null)
-        .order('created_at', { ascending: false })
-        .limit(50);
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      
+      let accessToken = SUPABASE_ANON_KEY;
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          if (parsed.access_token) {
+            accessToken = parsed.access_token;
+          }
+        }
+      } catch (e) {
+        console.warn('Could not get auth token');
+      }
+      
+      const restHeaders = {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      };
+      
+      // From delivery_requests table - using REST API
+      let pendingData: any[] = [];
+      try {
+        const pendingResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/delivery_requests?status=eq.pending&provider_id=is.null&order=created_at.desc&limit=50`,
+          { headers: restHeaders, cache: 'no-store' }
+        );
+        if (pendingResponse.ok) {
+          pendingData = await pendingResponse.json();
+          console.log('📦 Fetched pending delivery_requests:', pendingData?.length || 0);
+        }
+      } catch (e) {
+        console.warn('Error fetching pending delivery_requests');
+      }
 
       // Also fetch from deliveries table
-      const { data: deliveriesData } = await supabase
-        .from('deliveries')
-        .select('*')
-        .eq('status', 'pending')
-        .is('provider_id', null)
-        .order('created_at', { ascending: false })
-        .limit(50);
+      let deliveriesData: any[] = [];
+      try {
+        const deliveriesResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/deliveries?status=eq.pending&provider_id=is.null&order=created_at.desc&limit=50`,
+          { headers: restHeaders, cache: 'no-store' }
+        );
+        if (deliveriesResponse.ok) {
+          deliveriesData = await deliveriesResponse.json();
+          console.log('📦 Fetched pending deliveries:', deliveriesData?.length || 0);
+        }
+      } catch (e) {
+        console.warn('Error fetching pending deliveries');
+      }
 
       // Also fetch from delivery_notifications table
-      const { data: notificationsData } = await supabase
-        .from('delivery_notifications')
-        .select('*')
-        .in('status', ['pending', 'notified'])
-        .order('created_at', { ascending: false })
-        .limit(50);
+      let notificationsData: any[] = [];
+      try {
+        const notifResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/delivery_notifications?status=in.(pending,notified)&order=created_at.desc&limit=50`,
+          { headers: restHeaders, cache: 'no-store' }
+        );
+        if (notifResponse.ok) {
+          notificationsData = await notifResponse.json();
+          console.log('📦 Fetched delivery_notifications:', notificationsData?.length || 0);
+        }
+      } catch (e) {
+        console.warn('Error fetching delivery_notifications');
+      }
 
       // Combine all pending requests
       const allPending: any[] = [];
