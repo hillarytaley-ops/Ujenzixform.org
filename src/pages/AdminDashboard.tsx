@@ -821,10 +821,14 @@ const AdminDashboard = () => {
   const [loadedTabs, setLoadedTabs] = useState<Set<string>>(new Set());
   
   // Load data for specific tab (lazy loading)
-  const loadTabData = async (tab: string) => {
-    if (loadedTabs.has(tab)) return; // Already loaded
+  const loadTabData = async (tab: string, forceRefresh: boolean = false) => {
+    // Always refresh delivery-related tabs, or if forced
+    const alwaysRefreshTabs = ['delivery-requests', 'delivery-analytics', 'delivery', 'delivery-apps'];
+    if (loadedTabs.has(tab) && !forceRefresh && !alwaysRefreshTabs.includes(tab)) {
+      return; // Already loaded
+    }
     
-    console.log(`📊 Loading data for tab: ${tab}`);
+    console.log(`📊 Loading data for tab: ${tab} (force: ${forceRefresh})`);
     
     try {
       switch (tab) {
@@ -972,22 +976,44 @@ const AdminDashboard = () => {
   };
   
   const loadBuilderDeliveryRequests = async () => {
+    console.log('📦 Loading builder delivery requests with REST API...');
+    
+    // Get auth token from localStorage
+    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+    
+    let accessToken: string | null = null;
     try {
-      // Use admin client if available (bypasses RLS)
-      const client = getAdminClient() || supabase;
-      
-      // Query delivery_requests with ACTUAL database column names
-      const { data, error } = await client
-        .from('delivery_requests')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100);
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        accessToken = parsed.access_token;
+      }
+    } catch (e) {}
+    
+    const headers: Record<string, string> = {
+      'apikey': SUPABASE_ANON_KEY,
+      'Content-Type': 'application/json'
+    };
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
 
-      if (error) {
-        console.log('Error loading delivery requests:', error.message);
-        setBuilderDeliveryRequests([]);
+    try {
+      // Fetch delivery requests using REST API
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/delivery_requests?order=created_at.desc&limit=100`,
+        { headers }
+      );
+      
+      if (!response.ok) {
+        console.log('📦 Failed to load delivery requests:', response.status);
+        // Don't clear existing data on error
         return;
       }
+      
+      const data = await response.json();
+      console.log('📦 Delivery requests loaded:', data?.length);
 
       if (data && data.length > 0) {
         // Get builder names for the requests
@@ -995,12 +1021,18 @@ const AdminDashboard = () => {
         let profileMap = new Map();
         
         if (builderIds.length > 0) {
-          const { data: profiles } = await supabase
-            .from('profiles')
-            .select('id, full_name')
-            .in('id', builderIds);
-          
-          profileMap = new Map(profiles?.map((p: any) => [p.id, p.full_name]) || []);
+          try {
+            const profilesResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/profiles?id=in.(${builderIds.join(',')})&select=id,full_name`,
+              { headers }
+            );
+            if (profilesResponse.ok) {
+              const profiles = await profilesResponse.json();
+              profileMap = new Map(profiles?.map((p: any) => [p.id, p.full_name]) || []);
+            }
+          } catch (e) {
+            console.log('Could not fetch builder profiles');
+          }
         }
 
         const formattedRequests: BuilderDeliveryRequest[] = data.map((req: any) => ({
@@ -1038,12 +1070,14 @@ const AdminDashboard = () => {
           updated_at: req.updated_at
         }));
         setBuilderDeliveryRequests(formattedRequests);
+        console.log('📦 Formatted delivery requests:', formattedRequests.length);
       } else {
+        console.log('📦 No delivery requests found');
         setBuilderDeliveryRequests([]);
       }
     } catch (error) {
-      console.log('Error loading builder delivery requests:', error);
-      setBuilderDeliveryRequests([]);
+      console.log('📦 Error loading builder delivery requests:', error);
+      // Don't clear existing data on error
     }
   };
   
