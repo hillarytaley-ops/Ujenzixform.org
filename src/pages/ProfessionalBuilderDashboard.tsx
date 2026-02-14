@@ -88,6 +88,34 @@ const ProfessionalBuilderDashboardPage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // Projects state
+  const [projects, setProjects] = useState<any[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [showCreateProject, setShowCreateProject] = useState(false);
+  const [newProject, setNewProject] = useState({
+    name: '',
+    location: '',
+    description: '',
+    start_date: '',
+    budget: ''
+  });
+
+  // Supabase config for REST API
+  const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R2I6GLWrY9xKkxa0ZDnmmSCWgTo';
+
+  // Helper to get access token
+  const getAccessToken = (): string => {
+    try {
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        return parsed.access_token || '';
+      }
+    } catch (e) {}
+    return '';
+  };
+
   // Helper to get user ID reliably (from AuthContext or localStorage)
   const getUserId = (): string => {
     if (authUser?.id) return authUser.id;
@@ -200,28 +228,26 @@ const ProfessionalBuilderDashboardPage = () => {
         return;
       }
 
-      // Mock stats - replace with real data
-      setStats({
-        activeProjects: 5,
-        pendingOrders: 8,
-        completedProjects: 23,
-        totalSpent: 1850000,
-      });
+      // Fetch real stats using REST API
+      await loadRealStats(userId);
 
       // Fetch monitoring requests - use user_id (original schema column)
-      const { data: monitoringData, error: monitoringError } = await supabase
-        .from('monitoring_service_requests')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-      
-      if (monitoringError) {
-        console.log('Monitoring requests fetch info:', monitoringError.message);
-        // Table might not exist yet - not critical
-      }
-      
-      if (monitoringData) {
-        setMonitoringRequests(monitoringData);
+      try {
+        const { data: monitoringData, error: monitoringError } = await supabase
+          .from('monitoring_service_requests')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
+        
+        if (monitoringError) {
+          console.log('Monitoring requests fetch info:', monitoringError.message);
+        }
+        
+        if (monitoringData) {
+          setMonitoringRequests(monitoringData);
+        }
+      } catch (e) {
+        console.log('Monitoring requests fetch error:', e);
       }
 
     } catch (error) {
@@ -231,6 +257,178 @@ const ProfessionalBuilderDashboardPage = () => {
       setLoading(false);
     }
   };
+
+  // Load real stats using REST API
+  const loadRealStats = async (userId: string) => {
+    const accessToken = getAccessToken();
+    const headers = {
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+      'Content-Type': 'application/json'
+    };
+
+    try {
+      console.log('📊 Loading real stats for builder:', userId);
+      
+      // Fetch purchase orders for this builder
+      const ordersResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${userId}&order=created_at.desc`,
+        { headers }
+      );
+      
+      let orders: any[] = [];
+      if (ordersResponse.ok) {
+        orders = await ordersResponse.json();
+        console.log('📊 Orders loaded:', orders.length);
+      }
+
+      // Fetch builder projects
+      const projectsResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/builder_projects?builder_id=eq.${userId}&order=created_at.desc`,
+        { headers }
+      );
+      
+      let projectsData: any[] = [];
+      if (projectsResponse.ok) {
+        projectsData = await projectsResponse.json();
+        console.log('📊 Projects loaded:', projectsData.length);
+        setProjects(projectsData);
+      }
+
+      // Calculate stats
+      const pendingOrders = orders.filter(o => 
+        ['pending', 'quoted', 'processing'].includes(o.status?.toLowerCase())
+      ).length;
+      
+      const completedOrders = orders.filter(o => 
+        ['completed', 'delivered', 'confirmed'].includes(o.status?.toLowerCase())
+      ).length;
+      
+      const totalSpent = orders
+        .filter(o => ['completed', 'delivered', 'confirmed'].includes(o.status?.toLowerCase()))
+        .reduce((sum, o) => sum + (o.total_amount || 0), 0);
+
+      const activeProjects = projectsData.filter(p => 
+        ['active', 'in_progress'].includes(p.status?.toLowerCase())
+      ).length;
+
+      setStats({
+        activeProjects: activeProjects || projectsData.length,
+        pendingOrders,
+        completedProjects: completedOrders,
+        totalSpent
+      });
+
+      console.log('📊 Stats calculated:', { activeProjects, pendingOrders, completedOrders, totalSpent });
+
+    } catch (error) {
+      console.error('Error loading stats:', error);
+      // Set defaults
+      setStats({
+        activeProjects: 0,
+        pendingOrders: 0,
+        completedProjects: 0,
+        totalSpent: 0
+      });
+    }
+  };
+
+  // Create new project
+  const handleCreateProject = async () => {
+    if (!newProject.name || !newProject.location) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in the project name and location.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoadingProjects(true);
+    const userId = getUserId();
+    const accessToken = getAccessToken();
+    
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/builder_projects`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify({
+          builder_id: userId,
+          name: newProject.name,
+          location: newProject.location,
+          description: newProject.description || null,
+          start_date: newProject.start_date || null,
+          budget: newProject.budget ? parseFloat(newProject.budget) : null,
+          status: 'active'
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setProjects(prev => [data[0], ...prev]);
+        setStats(prev => ({ ...prev, activeProjects: prev.activeProjects + 1 }));
+        
+        toast({
+          title: "Project Created!",
+          description: "Your new project has been created successfully.",
+        });
+
+        setShowCreateProject(false);
+        setNewProject({ name: '', location: '', description: '', start_date: '', budget: '' });
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create project');
+      }
+    } catch (error: any) {
+      console.error('Error creating project:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create project. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingProjects(false);
+    }
+  };
+
+  // Set up real-time subscription for orders and projects
+  useEffect(() => {
+    const userId = getUserId();
+    if (!userId) return;
+
+    console.log('🔔 Setting up real-time subscriptions for builder:', userId);
+
+    const channel = supabase
+      .channel('builder-dashboard-updates')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'purchase_orders', filter: `buyer_id=eq.${userId}` },
+        (payload) => {
+          console.log('🛒 Order change detected:', payload);
+          loadRealStats(userId);
+          toast({
+            title: "Order Updated",
+            description: "Your order status has been updated.",
+          });
+        }
+      )
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'builder_projects', filter: `builder_id=eq.${userId}` },
+        (payload) => {
+          console.log('📁 Project change detected:', payload);
+          loadRealStats(userId);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [authUser]);
 
   const handleMonitoringRequest = async () => {
     if (!monitoringRequest.projectName || !monitoringRequest.projectLocation) {
@@ -464,23 +662,150 @@ const ProfessionalBuilderDashboardPage = () => {
 
           <TabsContent value="projects">
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5 text-blue-600" />
-                  Active Projects
-                </CardTitle>
-                <CardDescription>Manage your construction projects</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Building2 className="h-5 w-5 text-blue-600" />
+                    Active Projects
+                  </CardTitle>
+                  <CardDescription>Manage your construction projects</CardDescription>
+                </div>
+                <Dialog open={showCreateProject} onOpenChange={setShowCreateProject}>
+                  <DialogTrigger asChild>
+                    <Button className="bg-blue-600 hover:bg-blue-700">
+                      <Briefcase className="h-4 w-4 mr-2" />
+                      Create New Project
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Create New Project</DialogTitle>
+                      <DialogDescription>
+                        Add a new construction project to track materials and deliveries
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div>
+                        <Label htmlFor="project-name">Project Name *</Label>
+                        <Input
+                          id="project-name"
+                          placeholder="e.g., Residential Building Phase 1"
+                          value={newProject.name}
+                          onChange={(e) => setNewProject(prev => ({ ...prev, name: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="project-location">Location *</Label>
+                        <Input
+                          id="project-location"
+                          placeholder="e.g., Westlands, Nairobi"
+                          value={newProject.location}
+                          onChange={(e) => setNewProject(prev => ({ ...prev, location: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="project-description">Description</Label>
+                        <Textarea
+                          id="project-description"
+                          placeholder="Brief description of the project..."
+                          value={newProject.description}
+                          onChange={(e) => setNewProject(prev => ({ ...prev, description: e.target.value }))}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="project-start">Start Date</Label>
+                          <Input
+                            id="project-start"
+                            type="date"
+                            value={newProject.start_date}
+                            onChange={(e) => setNewProject(prev => ({ ...prev, start_date: e.target.value }))}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="project-budget">Budget (KES)</Label>
+                          <Input
+                            id="project-budget"
+                            type="number"
+                            placeholder="e.g., 5000000"
+                            value={newProject.budget}
+                            onChange={(e) => setNewProject(prev => ({ ...prev, budget: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setShowCreateProject(false)}>
+                        Cancel
+                      </Button>
+                      <Button 
+                        onClick={handleCreateProject} 
+                        disabled={loadingProjects}
+                        className="bg-blue-600 hover:bg-blue-700"
+                      >
+                        {loadingProjects ? 'Creating...' : 'Create Project'}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-12 text-gray-500">
-                  <Building2 className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-                  <p className="text-lg font-medium">No active projects</p>
-                  <p className="text-sm mb-4">Create your first project to get started</p>
-                  <Button className="bg-blue-600 hover:bg-blue-700">
-                    <Briefcase className="h-4 w-4 mr-2" />
-                    Create New Project
-                  </Button>
-                </div>
+                {projects.length === 0 ? (
+                  <div className="text-center py-12 text-gray-500">
+                    <Building2 className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+                    <p className="text-lg font-medium">No active projects</p>
+                    <p className="text-sm mb-4">Create your first project to get started</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {projects.map((project) => (
+                      <div 
+                        key={project.id} 
+                        className="border rounded-lg p-4 hover:border-blue-300 hover:bg-blue-50/30 transition-all"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Building2 className="h-5 w-5 text-blue-600" />
+                              <h3 className="font-semibold text-lg">{project.name}</h3>
+                              <Badge 
+                                variant={project.status === 'active' ? 'default' : 'secondary'}
+                                className={project.status === 'active' ? 'bg-green-500' : ''}
+                              >
+                                {project.status || 'Active'}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
+                              <span className="flex items-center gap-1">
+                                <MapPin className="h-4 w-4" />
+                                {project.location}
+                              </span>
+                              {project.start_date && (
+                                <span className="flex items-center gap-1">
+                                  <Calendar className="h-4 w-4" />
+                                  {new Date(project.start_date).toLocaleDateString()}
+                                </span>
+                              )}
+                            </div>
+                            {project.description && (
+                              <p className="text-sm text-gray-500">{project.description}</p>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            {project.budget && (
+                              <p className="text-lg font-bold text-blue-600">
+                                KES {project.budget.toLocaleString()}
+                              </p>
+                            )}
+                            <p className="text-xs text-gray-400">
+                              Created {new Date(project.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
