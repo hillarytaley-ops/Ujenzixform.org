@@ -100,6 +100,10 @@ const ProfessionalBuilderDashboardPage = () => {
     budget: ''
   });
 
+  // Deliveries state
+  const [deliveries, setDeliveries] = useState<any[]>([]);
+  const [loadingDeliveries, setLoadingDeliveries] = useState(false);
+
   // Supabase config for REST API
   const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R2I6GLWrY9xKkxa0ZDnmmSCWgTo';
@@ -321,6 +325,9 @@ const ProfessionalBuilderDashboardPage = () => {
 
       console.log('📊 Stats calculated:', { activeProjects, pendingOrders, completedOrders, totalSpent });
 
+      // Also load deliveries
+      await loadDeliveries(userId);
+
     } catch (error) {
       console.error('Error loading stats:', error);
       // Set defaults
@@ -330,6 +337,68 @@ const ProfessionalBuilderDashboardPage = () => {
         completedProjects: 0,
         totalSpent: 0
       });
+    }
+  };
+
+  // Load deliveries using REST API
+  const loadDeliveries = async (userId: string) => {
+    setLoadingDeliveries(true);
+    const accessToken = getAccessToken();
+    const headers = {
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+      'Content-Type': 'application/json'
+    };
+
+    try {
+      console.log('🚚 Loading deliveries for builder:', userId);
+      
+      // Fetch delivery requests for this builder
+      const deliveryRequestsResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/delivery_requests?builder_id=eq.${userId}&order=created_at.desc`,
+        { headers }
+      );
+      
+      let deliveryRequests: any[] = [];
+      if (deliveryRequestsResponse.ok) {
+        deliveryRequests = await deliveryRequestsResponse.json();
+        console.log('🚚 Delivery requests loaded:', deliveryRequests.length);
+      }
+
+      // Fetch deliveries table (actual deliveries in progress)
+      const deliveriesResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/deliveries?builder_id=eq.${userId}&order=created_at.desc`,
+        { headers }
+      );
+      
+      let deliveriesData: any[] = [];
+      if (deliveriesResponse.ok) {
+        deliveriesData = await deliveriesResponse.json();
+        console.log('🚚 Deliveries loaded:', deliveriesData.length);
+      }
+
+      // Combine both - delivery requests and actual deliveries
+      const allDeliveries = [
+        ...deliveryRequests.map(dr => ({
+          ...dr,
+          type: 'request',
+          display_status: dr.status || 'pending'
+        })),
+        ...deliveriesData.map(d => ({
+          ...d,
+          type: 'delivery',
+          display_status: d.status || 'in_transit'
+        }))
+      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      setDeliveries(allDeliveries);
+      console.log('🚚 Total deliveries:', allDeliveries.length);
+
+    } catch (error) {
+      console.error('Error loading deliveries:', error);
+      setDeliveries([]);
+    } finally {
+      setLoadingDeliveries(false);
     }
   };
 
@@ -421,6 +490,24 @@ const ProfessionalBuilderDashboardPage = () => {
         (payload) => {
           console.log('📁 Project change detected:', payload);
           loadRealStats(userId);
+        }
+      )
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'delivery_requests', filter: `builder_id=eq.${userId}` },
+        (payload) => {
+          console.log('🚚 Delivery request change detected:', payload);
+          loadDeliveries(userId);
+          toast({
+            title: "Delivery Update",
+            description: "Your delivery status has been updated.",
+          });
+        }
+      )
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'deliveries', filter: `builder_id=eq.${userId}` },
+        (payload) => {
+          console.log('🚚 Delivery change detected:', payload);
+          loadDeliveries(userId);
         }
       )
       .subscribe();
@@ -832,19 +919,152 @@ const ProfessionalBuilderDashboardPage = () => {
 
           <TabsContent value="deliveries">
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Truck className="h-5 w-5 text-blue-600" />
-                  Scheduled Deliveries
-                </CardTitle>
-                <CardDescription>Track incoming material deliveries</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Truck className="h-5 w-5 text-blue-600" />
+                    Scheduled Deliveries
+                  </CardTitle>
+                  <CardDescription>Track incoming material deliveries</CardDescription>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => loadDeliveries(getUserId())}
+                  disabled={loadingDeliveries}
+                >
+                  {loadingDeliveries ? 'Refreshing...' : 'Refresh'}
+                </Button>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-12 text-gray-500">
-                  <Truck className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-                  <p className="text-lg font-medium">No scheduled deliveries</p>
-                  <p className="text-sm">Your deliveries will appear here</p>
-                </div>
+                {loadingDeliveries ? (
+                  <div className="text-center py-12">
+                    <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4" />
+                    <p className="text-gray-500">Loading deliveries...</p>
+                  </div>
+                ) : deliveries.length === 0 ? (
+                  <div className="text-center py-12 text-gray-500">
+                    <Truck className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+                    <p className="text-lg font-medium">No scheduled deliveries</p>
+                    <p className="text-sm">Your deliveries will appear here</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {deliveries.map((delivery) => (
+                      <div 
+                        key={delivery.id} 
+                        className="border rounded-lg p-4 hover:border-blue-300 hover:bg-blue-50/30 transition-all"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Truck className={`h-5 w-5 ${
+                                delivery.display_status === 'delivered' ? 'text-green-600' :
+                                delivery.display_status === 'in_transit' ? 'text-blue-600' :
+                                delivery.display_status === 'accepted' ? 'text-teal-600' :
+                                'text-orange-500'
+                              }`} />
+                              <h3 className="font-semibold">
+                                {delivery.materials_description || delivery.pickup_address || 'Delivery Request'}
+                              </h3>
+                              <Badge 
+                                variant={
+                                  delivery.display_status === 'delivered' ? 'default' :
+                                  delivery.display_status === 'in_transit' ? 'default' :
+                                  delivery.display_status === 'accepted' ? 'default' :
+                                  'secondary'
+                                }
+                                className={
+                                  delivery.display_status === 'delivered' ? 'bg-green-500' :
+                                  delivery.display_status === 'in_transit' ? 'bg-blue-500' :
+                                  delivery.display_status === 'accepted' ? 'bg-teal-500' :
+                                  delivery.display_status === 'pending' ? 'bg-orange-500' :
+                                  ''
+                                }
+                              >
+                                {delivery.display_status?.replace('_', ' ') || 'Pending'}
+                              </Badge>
+                              {delivery.type === 'request' && (
+                                <Badge variant="outline" className="text-xs">Request</Badge>
+                              )}
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600 mb-2">
+                              {delivery.pickup_address && (
+                                <div className="flex items-center gap-1">
+                                  <MapPin className="h-4 w-4 text-gray-400" />
+                                  <span className="font-medium">From:</span> {delivery.pickup_address}
+                                </div>
+                              )}
+                              {delivery.delivery_address && (
+                                <div className="flex items-center gap-1">
+                                  <MapPin className="h-4 w-4 text-blue-400" />
+                                  <span className="font-medium">To:</span> {delivery.delivery_address}
+                                </div>
+                              )}
+                            </div>
+
+                            {delivery.estimated_delivery && (
+                              <div className="flex items-center gap-1 text-sm text-gray-500">
+                                <Calendar className="h-4 w-4" />
+                                <span>Expected: {new Date(delivery.estimated_delivery).toLocaleDateString()}</span>
+                              </div>
+                            )}
+
+                            {delivery.tracking_number && (
+                              <div className="mt-2 text-sm">
+                                <span className="font-medium text-gray-700">Tracking:</span>{' '}
+                                <code className="bg-gray-100 px-2 py-1 rounded">{delivery.tracking_number}</code>
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className="text-right">
+                            {delivery.estimated_cost && (
+                              <p className="text-lg font-bold text-blue-600">
+                                KES {delivery.estimated_cost.toLocaleString()}
+                              </p>
+                            )}
+                            <p className="text-xs text-gray-400">
+                              {new Date(delivery.created_at).toLocaleDateString()}
+                            </p>
+                            {delivery.provider_name && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                Driver: {delivery.provider_name}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Progress indicator for in-transit deliveries */}
+                        {delivery.display_status === 'in_transit' && (
+                          <div className="mt-4 pt-4 border-t">
+                            <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
+                              <span>Pickup</span>
+                              <span>In Transit</span>
+                              <span>Delivered</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div className="bg-blue-500 h-2 rounded-full w-1/2 transition-all duration-500" />
+                            </div>
+                          </div>
+                        )}
+
+                        {delivery.display_status === 'delivered' && (
+                          <div className="mt-4 pt-4 border-t flex items-center gap-2 text-green-600">
+                            <CheckCircle className="h-5 w-5" />
+                            <span className="font-medium">Delivered successfully</span>
+                            {delivery.delivered_at && (
+                              <span className="text-sm text-gray-500">
+                                on {new Date(delivery.delivered_at).toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
