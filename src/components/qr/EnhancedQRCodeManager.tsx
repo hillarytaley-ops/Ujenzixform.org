@@ -60,6 +60,22 @@ interface ClientGroup {
   items: MaterialItem[];
 }
 
+interface OrderGroup {
+  order_id: string;
+  order_number: string;  // Display-friendly order number
+  buyer_id: string;
+  buyer_name: string;
+  buyer_email: string;
+  buyer_phone: string;
+  total_items: number;
+  pending_items: number;
+  dispatched_items: number;
+  received_items: number;
+  invalid_items: number;
+  items: MaterialItem[];
+  created_at: string;
+}
+
 interface EnhancedQRCodeManagerProps {
   supplierId?: string; // Optional: pass supplier ID directly to skip lookup
 }
@@ -67,11 +83,12 @@ interface EnhancedQRCodeManagerProps {
 export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ supplierId: propSupplierId }) => {
   const [items, setItems] = useState<MaterialItem[]>([]);
   const [clientGroups, setClientGroups] = useState<ClientGroup[]>([]);
+  const [orderGroups, setOrderGroups] = useState<OrderGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<MaterialItem | null>(null);
   const [showQRDialog, setShowQRDialog] = useState(false);
-  const [viewMode, setViewMode] = useState<'all' | 'by-client'>('all'); // Default to 'all' - sorted by date, newest first
+  const [viewMode, setViewMode] = useState<'all' | 'by-client' | 'by-order'>('by-order'); // Default to 'by-order' for easy printing
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [selectionMode, setSelectionMode] = useState(false);
   const [resolvedSupplierId, setResolvedSupplierId] = useState<string | null>(propSupplierId || null);
@@ -97,6 +114,34 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
       clientGroup.items.forEach(item => newSet.add(item.id));
       return newSet;
     });
+  };
+
+  // Select all items for an order
+  const selectAllOrderItems = (orderGroup: OrderGroup) => {
+    setSelectedItems(prev => {
+      const newSet = new Set(prev);
+      orderGroup.items.forEach(item => newSet.add(item.id));
+      return newSet;
+    });
+  };
+
+  // Deselect all items for an order
+  const deselectAllOrderItems = (orderGroup: OrderGroup) => {
+    setSelectedItems(prev => {
+      const newSet = new Set(prev);
+      orderGroup.items.forEach(item => newSet.delete(item.id));
+      return newSet;
+    });
+  };
+
+  // Check if all order items are selected
+  const areAllOrderItemsSelected = (orderGroup: OrderGroup) => {
+    return orderGroup.items.every(item => selectedItems.has(item.id));
+  };
+
+  // Get selected items count for an order
+  const getSelectedCountForOrder = (orderGroup: OrderGroup) => {
+    return orderGroup.items.filter(item => selectedItems.has(item.id)).length;
   };
 
   // Deselect all items for a client
@@ -464,6 +509,71 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
     
     setClientGroups(sortedGroups);
     console.log('📊 Client groups:', sortedGroups.length, '- sorted by most recent activity');
+    
+    // Also group by order
+    groupItemsByOrder(materialItems);
+  };
+
+  // Group items by purchase order - sorted by most recent first
+  const groupItemsByOrder = (materialItems: MaterialItem[]) => {
+    const groups: Record<string, OrderGroup> = {};
+    
+    materialItems.forEach(item => {
+      const orderId = item.purchase_order_id || 'unknown';
+      
+      if (!groups[orderId]) {
+        groups[orderId] = {
+          order_id: orderId,
+          order_number: orderId.slice(0, 8).toUpperCase(), // Short display version
+          buyer_id: item.buyer_id || 'unknown',
+          buyer_name: item.buyer_name || 'Unknown Client',
+          buyer_email: item.buyer_email || '',
+          buyer_phone: item.buyer_phone || '',
+          total_items: 0,
+          pending_items: 0,
+          dispatched_items: 0,
+          received_items: 0,
+          invalid_items: 0,
+          items: [],
+          created_at: item.created_at || ''
+        };
+      }
+      
+      groups[orderId].total_items++;
+      groups[orderId].items.push(item);
+      
+      // Track the earliest item date for this order (order creation date)
+      if (item.created_at && (!groups[orderId].created_at || item.created_at < groups[orderId].created_at)) {
+        groups[orderId].created_at = item.created_at;
+      }
+      
+      // Check if item is invalid (both dispatch and receive scanned)
+      const isFullyScanned = item.dispatch_scanned && item.receive_scanned;
+      const isInvalidated = item.is_invalidated || isFullyScanned;
+      
+      if (isInvalidated) {
+        groups[orderId].invalid_items++;
+      } else if (item.status === 'pending') {
+        groups[orderId].pending_items++;
+      } else if (item.status === 'dispatched' || item.status === 'in_transit') {
+        groups[orderId].dispatched_items++;
+      } else if (item.status === 'received' || item.status === 'verified') {
+        groups[orderId].received_items++;
+      }
+    });
+    
+    // Sort groups by most recent order (newest first)
+    const sortedGroups = Object.values(groups).sort((a, b) => {
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+    
+    // Sort items within each order by item_sequence
+    sortedGroups.forEach(group => {
+      group.items.sort((a, b) => a.item_sequence - b.item_sequence);
+    });
+    
+    setOrderGroups(sortedGroups);
+    console.log('📦 Order groups:', sortedGroups.length, '- sorted by most recent order');
   };
 
   const downloadQRCode = async (qrCode: string, materialType: string, itemSeq: number) => {
@@ -661,6 +771,56 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
       itemsToPrint, 
       `QR Codes for ${clientGroup.buyer_name}`,
       `${clientGroup.buyer_email || ''} ${clientGroup.buyer_phone ? '• ' + clientGroup.buyer_phone : ''}`
+    );
+  };
+
+  // Download all QR codes for a specific order
+  const downloadOrderQRCodes = async (orderGroup: OrderGroup, selectedOnly: boolean = false) => {
+    const itemsToDownload = selectedOnly 
+      ? orderGroup.items.filter(item => selectedItems.has(item.id))
+      : orderGroup.items;
+
+    if (itemsToDownload.length === 0) {
+      toast({
+        title: "No items to download",
+        description: selectedOnly ? "Please select QR codes to download" : "No items found",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({
+      title: "📦 Downloading Order QR Codes",
+      description: `Generating ${itemsToDownload.length} QR codes for Order #${orderGroup.order_number}...`,
+    });
+
+    for (let i = 0; i < itemsToDownload.length; i++) {
+      const item = itemsToDownload[i];
+      setTimeout(() => {
+        downloadQRCode(item.qr_code, item.material_type, item.item_sequence);
+      }, i * 300); // Stagger downloads
+    }
+  };
+
+  // Print QR codes for a specific order
+  const printOrderQRCodes = async (orderGroup: OrderGroup, selectedOnly: boolean = false) => {
+    const itemsToPrint = selectedOnly 
+      ? orderGroup.items.filter(item => selectedItems.has(item.id))
+      : orderGroup.items;
+
+    if (itemsToPrint.length === 0) {
+      toast({
+        title: "No items to print",
+        description: selectedOnly ? "Please select QR codes to print" : "No items found",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    await printItemsList(
+      itemsToPrint, 
+      `Order #${orderGroup.order_number} - ${orderGroup.buyer_name}`,
+      `${itemsToPrint.length} items • ${orderGroup.buyer_email || ''} ${orderGroup.buyer_phone ? '• ' + orderGroup.buyer_phone : ''}`
     );
   };
 
@@ -997,7 +1157,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
             Material Item QR Codes
           </h2>
           <p className="text-muted-foreground mt-1">
-            {items.length} unique QR codes • {clientGroups.length} clients
+            {items.length} unique QR codes • {orderGroups.length} orders • {clientGroups.length} clients
           </p>
         </div>
         <div className="flex gap-2 flex-wrap items-center">
@@ -1033,6 +1193,16 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
           {/* View Mode Toggle */}
           <div className="flex rounded-lg border overflow-hidden">
             <Button 
+              variant={viewMode === 'by-order' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('by-order')}
+              className={viewMode === 'by-order' ? 'bg-cyan-600' : ''}
+              title="Group QR codes by order number for easy printing"
+            >
+              <Package className="h-4 w-4 mr-1" />
+              By Order
+            </Button>
+            <Button 
               variant={viewMode === 'by-client' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setViewMode('by-client')}
@@ -1048,7 +1218,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
               className={viewMode === 'all' ? 'bg-cyan-600' : ''}
             >
               <QrCode className="h-4 w-4 mr-1" />
-              All QR Codes
+              All
             </Button>
           </div>
 
@@ -1128,6 +1298,180 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
             </p>
           </CardContent>
         </Card>
+      ) : viewMode === 'by-order' ? (
+        /* Order-Grouped View - Click on order to expand and print */
+        <Accordion type="multiple" className="space-y-6" defaultValue={orderGroups.slice(0, 3).map(g => g.order_id)}>
+          {orderGroups.map((group) => {
+            const orderDate = group.created_at ? new Date(group.created_at) : null;
+            return (
+              <AccordionItem key={group.order_id} value={group.order_id} className="border-2 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                <AccordionTrigger className="px-5 py-4 bg-gradient-to-r from-blue-50 via-cyan-50 to-blue-50 hover:from-blue-100 hover:to-cyan-100">
+                  <div className="flex items-center justify-between w-full pr-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center shadow-lg">
+                        <Package className="h-7 w-7 text-white" />
+                      </div>
+                      <div className="text-left">
+                        <p className="font-bold text-xl text-blue-800">Order #{group.order_number}</p>
+                        <div className="flex items-center gap-3 text-sm text-slate-600 mt-1">
+                          <span className="flex items-center gap-1 font-medium">
+                            <User className="h-3 w-3" /> {group.buyer_name}
+                          </span>
+                          {orderDate && (
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" /> {orderDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {selectionMode && (
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          className="border-orange-300 text-orange-700 hover:bg-orange-50"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (areAllOrderItemsSelected(group)) {
+                              deselectAllOrderItems(group);
+                            } else {
+                              selectAllOrderItems(group);
+                            }
+                          }}
+                        >
+                          {areAllOrderItemsSelected(group) ? (
+                            <><CheckSquare className="h-4 w-4 mr-1" /> Deselect All</>
+                          ) : (
+                            <><Square className="h-4 w-4 mr-1" /> Select All ({group.total_items})</>
+                          )}
+                        </Button>
+                      )}
+                      {selectionMode && getSelectedCountForOrder(group) > 0 && (
+                        <Badge className="bg-orange-500">
+                          {getSelectedCountForOrder(group)} selected
+                        </Badge>
+                      )}
+                      <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-300">
+                        {group.pending_items} pending
+                      </Badge>
+                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300">
+                        {group.dispatched_items} dispatched
+                      </Badge>
+                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
+                        {group.received_items} received
+                      </Badge>
+                      {group.invalid_items > 0 && (
+                        <Badge variant="outline" className="bg-red-100 text-red-700 border-red-300">
+                          <ShieldX className="h-3 w-3 mr-1" />
+                          {group.invalid_items} invalid
+                        </Badge>
+                      )}
+                      <Badge className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-bold px-3">
+                        {group.total_items} items
+                      </Badge>
+                      {selectionMode && getSelectedCountForOrder(group) > 0 ? (
+                        <>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="ml-2 border-green-300 text-green-700 hover:bg-green-50"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              printOrderQRCodes(group, true);
+                            }}
+                          >
+                            <Printer className="h-4 w-4 mr-1" />
+                            Print Selected
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="border-cyan-300 text-cyan-700 hover:bg-cyan-50"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              downloadOrderQRCodes(group, true);
+                            }}
+                          >
+                            <DownloadCloud className="h-4 w-4 mr-1" />
+                            Download Selected
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button 
+                            size="sm" 
+                            className="ml-2 bg-green-600 hover:bg-green-700 text-white"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              printOrderQRCodes(group);
+                            }}
+                          >
+                            <Printer className="h-4 w-4 mr-1" />
+                            Print Order
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            className="bg-cyan-600 hover:bg-cyan-700 text-white"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              downloadOrderQRCodes(group);
+                            }}
+                          >
+                            <DownloadCloud className="h-4 w-4 mr-1" />
+                            Download
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="px-5 py-6 bg-gradient-to-b from-slate-50 to-white">
+                  {/* Order Summary */}
+                  <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="flex flex-wrap gap-4 text-sm">
+                      <span className="flex items-center gap-1">
+                        <User className="h-4 w-4 text-blue-600" />
+                        <strong>Client:</strong> {group.buyer_name}
+                      </span>
+                      {group.buyer_email && (
+                        <span className="flex items-center gap-1">
+                          <Mail className="h-4 w-4 text-blue-600" />
+                          {group.buyer_email}
+                        </span>
+                      )}
+                      {group.buyer_phone && (
+                        <span className="flex items-center gap-1">
+                          <Phone className="h-4 w-4 text-blue-600" />
+                          {group.buyer_phone}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {group.items.map((item) => (
+                      <QRCodeCard 
+                        key={item.id}
+                        item={item}
+                        getStatusColor={getStatusColor}
+                        getStatusIcon={getStatusIcon}
+                        downloadQRCode={downloadQRCode}
+                        onViewFullSize={() => {
+                          setSelectedItem(item);
+                          setShowQRDialog(true);
+                        }}
+                        showClientInfo={false}
+                        selectionMode={selectionMode}
+                        isSelected={selectedItems.has(item.id)}
+                        onToggleSelect={() => toggleItemSelection(item.id)}
+                      />
+                    ))}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            );
+          })}
+        </Accordion>
       ) : viewMode === 'by-client' ? (
         /* Client-Grouped View - Added extra spacing between clients */
         <Accordion type="multiple" className="space-y-8" defaultValue={clientGroups.slice(0, 3).map(g => g.buyer_id)}>
