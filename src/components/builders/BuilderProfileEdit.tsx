@@ -351,29 +351,22 @@ export const BuilderProfileEdit: React.FC<BuilderProfileEditProps> = ({
         throw new Error('No access token found. Please log out and log back in.');
       }
       
-      const updateData = {
+      // Only include fields that exist in the profiles table
+      // Removed: allow_messages, allow_calls, show_phone, show_email, facebook_url, twitter_url, instagram_url, linkedin_url
+      // These columns don't exist in the database schema
+      const updateData: Record<string, any> = {
         full_name: profile.full_name,
-        company_name: profile.company_name,
-        phone: profile.phone,
-        location: profile.location,
-        bio: profile.bio,
-        website: profile.website,
-        years_experience: profile.years_experience,
-        team_size: profile.team_size,
-        service_areas: profile.service_areas,
-        certifications: profile.certifications,
-        specialties: profile.specialties,
-        price_range: profile.price_range,
-        show_phone: profile.show_phone,
-        show_email: profile.show_email,
-        allow_messages: profile.allow_messages,
-        allow_calls: profile.allow_calls,
-        facebook_url: profile.facebook_url,
-        twitter_url: profile.twitter_url,
-        instagram_url: profile.instagram_url,
-        linkedin_url: profile.linkedin_url,
         updated_at: new Date().toISOString()
       };
+      
+      // Add optional fields only if they have values
+      if (profile.company_name) updateData.company_name = profile.company_name;
+      if (profile.phone) updateData.phone = profile.phone;
+      if (profile.location) updateData.location = profile.location;
+      if (profile.bio) updateData.bio = profile.bio;
+      if (profile.website) updateData.website = profile.website;
+      
+      console.log('📝 BuilderProfileEdit: Update data:', updateData);
       
       const response = await fetch(
         `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${user.id}`,
