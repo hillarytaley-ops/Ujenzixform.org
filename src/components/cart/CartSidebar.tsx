@@ -837,9 +837,7 @@ export const CartSidebar: React.FC = () => {
               
               <p className="text-[10px] text-center text-gray-500">
                 💡 Professional Builders request quotes • Private Clients buy directly
-                  </p>
-                </>
-              )}
+              </p>
             </div>
           </>
         )}
