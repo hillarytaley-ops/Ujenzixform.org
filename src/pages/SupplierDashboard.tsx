@@ -65,6 +65,7 @@ import { InventoryManager } from "@/components/supplier/InventoryManager";
 import { OrderHistory } from "@/components/orders/OrderHistory";
 import { ReviewsList, SupplierRatingSummary } from "@/components/reviews/ReviewSystem";
 import { UserAnalyticsDashboard } from "@/components/analytics/UserAnalyticsDashboard";
+import { InAppCommunication } from "@/components/communication/InAppCommunication";
 
 interface DashboardStats {
   totalProducts: number;
@@ -1388,76 +1389,46 @@ const SupplierDashboard = () => {
 
           {/* Support Tab */}
           <TabsContent value="support">
-            <Card className={cardBg}>
-              <CardHeader>
-                <CardTitle className={textColor}>
-                  <Headphones className="h-5 w-5 inline-block mr-2 text-purple-500" />
-                  Live Support
-                </CardTitle>
-                <CardDescription className={mutedText}>
-                  Chat directly with UjenziXform support team
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Live Chat Guide */}
-                <div className={`rounded-lg p-6 border ${isDarkMode ? 'bg-gradient-to-r from-purple-900/30 to-orange-900/30 border-purple-800' : 'bg-gradient-to-r from-purple-50 to-orange-50 border-purple-200'}`}>
-                  <div className="flex items-start gap-4">
-                    <div className="p-3 bg-purple-600 rounded-full text-white">
-                      <MessageSquare className="h-6 w-6" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className={`text-lg font-semibold mb-2 ${textColor}`}>💬 Live Chat Available</h3>
-                      <p className={`${mutedText} mb-4`}>
-                        Click the <strong className="text-purple-500">"Live"</strong> chat button in the bottom-right corner of your screen to:
-                      </p>
-                      <ul className="space-y-2 text-sm">
-                        <li className="flex items-center gap-2">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
-                          <span className={mutedText}>Chat with our AI assistant for instant answers</span>
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
-                          <span className={mutedText}>Request human support from our team</span>
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
-                          <span className={mutedText}>Get help with orders, products, and payments</span>
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
+            <div className="space-y-6">
+              {/* In-App Communication */}
+              {user && (
+                <InAppCommunication
+                  userId={user.id}
+                  userName={supplierName || user.email || 'Supplier'}
+                  userRole="supplier"
+                  isDarkMode={isDarkMode}
+                />
+              )}
 
-                {/* Quick Contact Info */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Card className={isDarkMode ? 'bg-orange-900/20 border-orange-800' : 'bg-orange-50 border-orange-200'}>
-                    <CardContent className="p-4">
-                      <h4 className={`font-semibold mb-2 flex items-center gap-2 ${textColor}`}>
-                        <Clock className="h-4 w-4 text-orange-500" />
-                        Support Hours
-                      </h4>
-                      <p className={`text-sm ${mutedText}`}>
-                        Mon - Fri: 8AM - 6PM<br />
-                        Saturday: 9AM - 4PM<br />
-                        Sunday: Closed
-                      </p>
-                    </CardContent>
-                  </Card>
-                  <Card className={isDarkMode ? 'bg-purple-900/20 border-purple-800' : 'bg-purple-50 border-purple-200'}>
-                    <CardContent className="p-4">
-                      <h4 className={`font-semibold mb-2 flex items-center gap-2 ${textColor}`}>
-                        <AlertCircle className="h-4 w-4 text-purple-500" />
-                        Supplier Hotline
-                      </h4>
-                      <p className={`text-sm ${mutedText}`}>
-                        Call: +254 700 000 000<br />
-                        Email: suppliers@UjenziXform.co.ke
-                      </p>
-                    </CardContent>
-                  </Card>
-                </div>
-              </CardContent>
-            </Card>
+              {/* Quick Contact Info */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Card className={isDarkMode ? 'bg-orange-900/20 border-orange-800' : 'bg-orange-50 border-orange-200'}>
+                  <CardContent className="p-4">
+                    <h4 className={`font-semibold mb-2 flex items-center gap-2 ${textColor}`}>
+                      <Clock className="h-4 w-4 text-orange-500" />
+                      Support Hours
+                    </h4>
+                    <p className={`text-sm ${mutedText}`}>
+                      Mon - Fri: 8AM - 6PM<br />
+                      Saturday: 9AM - 4PM<br />
+                      Sunday: Closed
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className={isDarkMode ? 'bg-purple-900/20 border-purple-800' : 'bg-purple-50 border-purple-200'}>
+                  <CardContent className="p-4">
+                    <h4 className={`font-semibold mb-2 flex items-center gap-2 ${textColor}`}>
+                      <AlertCircle className="h-4 w-4 text-purple-500" />
+                      Supplier Hotline
+                    </h4>
+                    <p className={`text-sm ${mutedText}`}>
+                      Call: +254 700 000 000<br />
+                      Email: suppliers@UjenziXform.co.ke
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
           </TabsContent>
 
           {/* Inventory Management Tab */}

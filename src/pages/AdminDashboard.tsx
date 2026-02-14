@@ -99,6 +99,7 @@ import { UserRolesManager } from "@/components/admin/UserRolesManager";
 import { AdminMessaging } from "@/components/admin/AdminMessaging";
 import { LiveChatManager } from "@/components/admin/LiveChatManager";
 import { EnhancedCommunicationsManager } from "@/components/admin/EnhancedCommunicationsManager";
+import { AdminVoiceCalls } from "@/components/admin/AdminVoiceCalls";
 import { SupabaseSecurityAdvisor } from "@/components/admin/SupabaseSecurityAdvisor";
 import { JobPositionsManager } from "@/components/admin/JobPositionsManager";
 import { AnalyticsDashboard } from "@/components/analytics/AnalyticsDashboard";
@@ -4445,11 +4446,34 @@ const AdminDashboard = () => {
 
           {/* Communications Tab - Enhanced Live Chat with Clients */}
           <TabsContent value="communications" className="space-y-6">
-            {/* Enhanced Communications Manager - Live chat, feedback, transcripts */}
-            <EnhancedCommunicationsManager 
-              staffId={adminEmail || 'admin'}
-              staffName={adminEmail?.split('@')[0] || 'Support Team'}
-            />
+            <Tabs defaultValue="chat" className="w-full">
+              <TabsList className="bg-gray-800 mb-4">
+                <TabsTrigger value="chat" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white">
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Live Chat
+                </TabsTrigger>
+                <TabsTrigger value="voice-calls" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
+                  <Phone className="h-4 w-4 mr-2" />
+                  Voice Calls
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="chat">
+                {/* Enhanced Communications Manager - Live chat, feedback, transcripts */}
+                <EnhancedCommunicationsManager 
+                  staffId={adminEmail || 'admin'}
+                  staffName={adminEmail?.split('@')[0] || 'Support Team'}
+                />
+              </TabsContent>
+
+              <TabsContent value="voice-calls">
+                {/* Admin Voice Calls - Voice/Video calls with all users */}
+                <AdminVoiceCalls 
+                  adminId={adminEmail || 'admin'}
+                  adminName={adminEmail?.split('@')[0] || 'Admin'}
+                />
+              </TabsContent>
+            </Tabs>
           </TabsContent>
 
           {/* Builder Moderation Tab */}

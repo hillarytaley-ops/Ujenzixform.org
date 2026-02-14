@@ -60,6 +60,7 @@ import {
 import { SupplierQuoteReview } from "@/components/builders/SupplierQuoteReview";
 import { PendingQuoteRequests } from "@/components/builders/PendingQuoteRequests";
 import DeliveryRequest from "@/components/DeliveryRequest";
+import { InAppCommunication } from "@/components/communication/InAppCommunication";
 
 const ProfessionalBuilderDashboardPage = () => {
   // Use AuthContext for reliable user data
@@ -1020,74 +1021,46 @@ const ProfessionalBuilderDashboardPage = () => {
           </TabsContent>
 
           <TabsContent value="support">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Headphones className="h-5 w-5 text-purple-600" />
-                  Live Support
-                </CardTitle>
-                <CardDescription>Chat directly with UjenziXform support team</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Live Chat Guide */}
-                <div className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-lg p-6 border border-purple-200 dark:border-purple-800">
-                  <div className="flex items-start gap-4">
-                    <div className="p-3 bg-purple-600 rounded-full text-white">
-                      <MessageSquare className="h-6 w-6" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold mb-2">💬 Live Chat Available</h3>
-                      <p className="text-muted-foreground mb-4">
-                        Click the <strong className="text-purple-600">"Live"</strong> chat button in the bottom-right corner of your screen to:
-                      </p>
-                      <ul className="space-y-2 text-sm">
-                        <li className="flex items-center gap-2">
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                          Chat with our AI assistant for instant answers
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                          Request human support from our team
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                          Get help with projects, materials, and quotes
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
+            <div className="space-y-6">
+              {/* In-App Communication */}
+              {user && (
+                <InAppCommunication
+                  userId={user.id}
+                  userName={user.email || 'Builder'}
+                  userRole="professional_builder"
+                  isDarkMode={false}
+                />
+              )}
 
-                {/* Quick Contact Info */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-                    <CardContent className="p-4">
-                      <h4 className="font-semibold mb-2 flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-blue-600" />
-                        Support Hours
-                      </h4>
-                      <p className="text-sm text-muted-foreground">
-                        Mon - Fri: 8AM - 6PM<br />
-                        Saturday: 9AM - 4PM<br />
-                        Sunday: Closed
-                      </p>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800">
-                    <CardContent className="p-4">
-                      <h4 className="font-semibold mb-2 flex items-center gap-2">
-                        <AlertCircle className="h-4 w-4 text-indigo-600" />
-                        Priority Support
-                      </h4>
-                      <p className="text-sm text-muted-foreground">
-                        Call: +254 700 000 000<br />
-                        Email: pro@UjenziXform.co.ke
-                      </p>
-                    </CardContent>
-                  </Card>
-                </div>
-              </CardContent>
-            </Card>
+              {/* Quick Contact Info */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+                  <CardContent className="p-4">
+                    <h4 className="font-semibold mb-2 flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-blue-600" />
+                      Support Hours
+                    </h4>
+                    <p className="text-sm text-muted-foreground">
+                      Mon - Fri: 8AM - 6PM<br />
+                      Saturday: 9AM - 4PM<br />
+                      Sunday: Closed
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800">
+                  <CardContent className="p-4">
+                    <h4 className="font-semibold mb-2 flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4 text-indigo-600" />
+                      Priority Support
+                    </h4>
+                    <p className="text-sm text-muted-foreground">
+                      Call: +254 700 000 000<br />
+                      Email: pro@UjenziXform.co.ke
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
           </TabsContent>
 
           {/* Order History Tab */}

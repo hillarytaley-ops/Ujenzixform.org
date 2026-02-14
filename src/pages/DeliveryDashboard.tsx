@@ -53,6 +53,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
 import { useDeliveryProviderData, logDataAccessAttempt } from "@/hooks/useDataIsolation";
 import { MessageSquare } from "lucide-react";
+import { InAppCommunication } from "@/components/communication/InAppCommunication";
 
 interface DashboardStats {
   totalDeliveries: number;
@@ -967,76 +968,46 @@ const DeliveryDashboard = () => {
 
           {/* Support Tab */}
           <TabsContent value="support">
-            <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : ''}>
-              <CardHeader>
-                <CardTitle className={isDarkMode ? 'text-white' : ''}>
-                  <Headphones className="h-5 w-5 inline-block mr-2 text-purple-500" />
-                  Live Support
-                </CardTitle>
-                <CardDescription className={isDarkMode ? 'text-gray-400' : ''}>
-                  Chat directly with UjenziXform support team
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Live Chat Guide */}
-                <div className={`rounded-lg p-6 border ${isDarkMode ? 'bg-gradient-to-r from-purple-900/30 to-teal-900/30 border-purple-800' : 'bg-gradient-to-r from-purple-50 to-teal-50 border-purple-200'}`}>
-                  <div className="flex items-start gap-4">
-                    <div className="p-3 bg-purple-600 rounded-full text-white">
-                      <MessageSquare className="h-6 w-6" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className={`text-lg font-semibold mb-2 ${isDarkMode ? 'text-white' : ''}`}>💬 Live Chat Available</h3>
-                      <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'} mb-4`}>
-                        Click the <strong className="text-purple-500">"Live"</strong> chat button in the bottom-right corner of your screen to:
-                      </p>
-                      <ul className="space-y-2 text-sm">
-                        <li className="flex items-center gap-2">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
-                          <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Chat with our AI assistant for instant answers</span>
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
-                          <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Request human support from our team</span>
-                        </li>
-                        <li className="flex items-center gap-2">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
-                          <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Get help with deliveries, routes, and payments</span>
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
+            <div className="space-y-6">
+              {/* In-App Communication */}
+              {user && (
+                <InAppCommunication
+                  userId={user.id}
+                  userName={providerData?.provider?.company_name || user.email || 'Driver'}
+                  userRole="delivery_provider"
+                  isDarkMode={isDarkMode}
+                />
+              )}
 
-                {/* Quick Contact Info */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Card className={isDarkMode ? 'bg-teal-900/20 border-teal-800' : 'bg-teal-50 border-teal-200'}>
-                    <CardContent className="p-4">
-                      <h4 className={`font-semibold mb-2 flex items-center gap-2 ${isDarkMode ? 'text-white' : ''}`}>
-                        <Clock className="h-4 w-4 text-teal-500" />
-                        Support Hours
-                      </h4>
-                      <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                        Mon - Fri: 8AM - 6PM<br />
-                        Saturday: 9AM - 4PM<br />
-                        Sunday: Closed
-                      </p>
-                    </CardContent>
-                  </Card>
-                  <Card className={isDarkMode ? 'bg-purple-900/20 border-purple-800' : 'bg-purple-50 border-purple-200'}>
-                    <CardContent className="p-4">
-                      <h4 className={`font-semibold mb-2 flex items-center gap-2 ${isDarkMode ? 'text-white' : ''}`}>
-                        <Phone className="h-4 w-4 text-purple-500" />
-                        Driver Hotline
-                      </h4>
-                      <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                        Call: +254 700 000 000<br />
-                        Email: drivers@UjenziXform.co.ke
-                      </p>
-                    </CardContent>
-                  </Card>
-                </div>
-              </CardContent>
-            </Card>
+              {/* Quick Contact Info */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Card className={isDarkMode ? 'bg-teal-900/20 border-teal-800' : 'bg-teal-50 border-teal-200'}>
+                  <CardContent className="p-4">
+                    <h4 className={`font-semibold mb-2 flex items-center gap-2 ${isDarkMode ? 'text-white' : ''}`}>
+                      <Clock className="h-4 w-4 text-teal-500" />
+                      Support Hours
+                    </h4>
+                    <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                      Mon - Fri: 8AM - 6PM<br />
+                      Saturday: 9AM - 4PM<br />
+                      Sunday: Closed
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className={isDarkMode ? 'bg-purple-900/20 border-purple-800' : 'bg-purple-50 border-purple-200'}>
+                  <CardContent className="p-4">
+                    <h4 className={`font-semibold mb-2 flex items-center gap-2 ${isDarkMode ? 'text-white' : ''}`}>
+                      <Phone className="h-4 w-4 text-purple-500" />
+                      Driver Hotline
+                    </h4>
+                    <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                      Call: +254 700 000 000<br />
+                      Email: drivers@UjenziXform.co.ke
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
           </TabsContent>
         </Tabs>
 
