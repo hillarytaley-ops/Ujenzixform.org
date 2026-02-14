@@ -309,6 +309,31 @@ async function updateSupplierRating(supplierId: string) {
   }
 }
 
+// Helper function to get Supabase config
+const getSupabaseConfig = () => {
+  const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+  
+  let accessToken = '';
+  try {
+    const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+    if (storedSession) {
+      const parsed = JSON.parse(storedSession);
+      accessToken = parsed.access_token || '';
+    }
+  } catch (e) {}
+  
+  return { SUPABASE_URL, SUPABASE_ANON_KEY, accessToken };
+};
+
+// Helper function to add timeout to any promise
+const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Timeout')), ms))
+  ]);
+};
+
 // Supplier Rating Summary Component
 interface SupplierRatingSummaryProps {
   supplierId: string;
@@ -321,37 +346,59 @@ export const SupplierRatingSummary: React.FC<SupplierRatingSummaryProps> = ({ su
 
   useEffect(() => {
     loadRating();
+    // Safety timeout
+    const safetyTimeout = setTimeout(() => {
+      setLoading(false);
+      console.log('⏱️ Rating summary safety timeout');
+    }, 8000);
+    return () => clearTimeout(safetyTimeout);
   }, [supplierId]);
 
   const loadRating = async () => {
     try {
-      const { data: reviews } = await supabase
-        .from('supplier_reviews')
-        .select('rating, delivery_rating, quality_rating, communication_rating')
-        .eq('supplier_id', supplierId)
-        .eq('status', 'approved');
+      const { SUPABASE_URL, SUPABASE_ANON_KEY, accessToken } = getSupabaseConfig();
+      console.log('⭐ Loading rating summary for supplier:', supplierId);
       
-      if (reviews && reviews.length > 0) {
-        const breakdown = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
-        let totalDelivery = 0, totalQuality = 0, totalComm = 0;
-        let deliveryCount = 0, qualityCount = 0, commCount = 0;
+      // Use REST API for faster loading
+      const response = await withTimeout(
+        fetch(
+          `${SUPABASE_URL}/rest/v1/supplier_reviews?supplier_id=eq.${supplierId}&status=eq.approved&select=rating,delivery_rating,quality_rating,communication_rating`,
+          {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+            },
+          }
+        ),
+        5000
+      );
+      
+      if (response.ok) {
+        const reviews = await response.json();
+        console.log('⭐ Reviews loaded for rating:', reviews?.length);
         
-        reviews.forEach((r: any) => {
-          breakdown[r.rating as keyof typeof breakdown]++;
-          if (r.delivery_rating) { totalDelivery += r.delivery_rating; deliveryCount++; }
-          if (r.quality_rating) { totalQuality += r.quality_rating; qualityCount++; }
-          if (r.communication_rating) { totalComm += r.communication_rating; commCount++; }
-        });
-        
-        setRating({
-          supplier_id: supplierId,
-          average_rating: reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length,
-          total_reviews: reviews.length,
-          rating_breakdown: breakdown,
-          average_delivery: deliveryCount > 0 ? totalDelivery / deliveryCount : 0,
-          average_quality: qualityCount > 0 ? totalQuality / qualityCount : 0,
-          average_communication: commCount > 0 ? totalComm / commCount : 0
-        });
+        if (reviews && reviews.length > 0) {
+          const breakdown = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+          let totalDelivery = 0, totalQuality = 0, totalComm = 0;
+          let deliveryCount = 0, qualityCount = 0, commCount = 0;
+          
+          reviews.forEach((r: any) => {
+            breakdown[r.rating as keyof typeof breakdown]++;
+            if (r.delivery_rating) { totalDelivery += r.delivery_rating; deliveryCount++; }
+            if (r.quality_rating) { totalQuality += r.quality_rating; qualityCount++; }
+            if (r.communication_rating) { totalComm += r.communication_rating; commCount++; }
+          });
+          
+          setRating({
+            supplier_id: supplierId,
+            average_rating: reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / reviews.length,
+            total_reviews: reviews.length,
+            rating_breakdown: breakdown,
+            average_delivery: deliveryCount > 0 ? totalDelivery / deliveryCount : 0,
+            average_quality: qualityCount > 0 ? totalQuality / qualityCount : 0,
+            average_communication: commCount > 0 ? totalComm / commCount : 0
+          });
+        }
       }
     } catch (error) {
       console.error('Error loading rating:', error);
@@ -454,25 +501,58 @@ export const ReviewsList: React.FC<ReviewsListProps> = ({ supplierId, limit }) =
 
   useEffect(() => {
     loadReviews();
+    
+    // Safety timeout
+    const safetyTimeout = setTimeout(() => {
+      setLoading(false);
+      console.log('⏱️ Reviews list safety timeout');
+    }, 8000);
+    
+    // Set up real-time subscription for new reviews
+    const channel = supabase
+      .channel('reviews-changes')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'supplier_reviews', filter: `supplier_id=eq.${supplierId}` },
+        () => {
+          console.log('⭐ Real-time review update received');
+          loadReviews();
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      clearTimeout(safetyTimeout);
+      supabase.removeChannel(channel);
+    };
   }, [supplierId]);
 
   const loadReviews = async () => {
     try {
-      let query = supabase
-        .from('supplier_reviews')
-        .select('*')
-        .eq('supplier_id', supplierId)
-        .eq('status', 'approved')
-        .order('created_at', { ascending: false });
+      const { SUPABASE_URL, SUPABASE_ANON_KEY, accessToken } = getSupabaseConfig();
+      console.log('⭐ Loading reviews for supplier:', supplierId);
       
+      // Build URL with query params
+      let url = `${SUPABASE_URL}/rest/v1/supplier_reviews?supplier_id=eq.${supplierId}&status=eq.approved&order=created_at.desc`;
       if (limit) {
-        query = query.limit(limit);
+        url += `&limit=${limit}`;
       }
       
-      const { data, error } = await query;
+      // Use REST API for faster loading
+      const response = await withTimeout(
+        fetch(url, {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+          },
+        }),
+        5000
+      );
       
-      if (error) throw error;
-      setReviews((data || []) as Review[]);
+      if (response.ok) {
+        const data = await response.json();
+        console.log('⭐ Reviews loaded:', data?.length);
+        setReviews((data || []) as Review[]);
+      }
       
     } catch (error) {
       console.error('Error loading reviews:', error);
