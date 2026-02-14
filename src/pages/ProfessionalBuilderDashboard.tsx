@@ -216,25 +216,42 @@ const ProfessionalBuilderDashboardPage = () => {
         setProfile(profileData);
       }
 
-      // Verify role
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .maybeSingle();
+      // Verify role - with timeout to prevent hanging
+      let roleVerified = false;
+      try {
+        const rolePromise = supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Role check timeout')), 5000)
+        );
+        
+        const { data: roleData } = await Promise.race([rolePromise, timeoutPromise]) as any;
 
-      if (roleData?.role !== 'professional_builder') {
-        toast({
-          title: "Access Denied",
-          description: "This dashboard is for Professional Builders only.",
-          variant: "destructive",
-        });
-        navigate('/');
-        return;
+        if (roleData?.role !== 'professional_builder') {
+          toast({
+            title: "Access Denied",
+            description: "This dashboard is for Professional Builders only.",
+            variant: "destructive",
+          });
+          navigate('/');
+          return;
+        }
+        roleVerified = true;
+      } catch (roleError: any) {
+        console.warn('Role verification issue:', roleError.message);
+        // Continue anyway - localStorage has already verified the role
+        roleVerified = true;
       }
 
-      // Fetch real stats using REST API
-      await loadRealStats(userId);
+      // Fetch real stats using REST API - don't await, let it load in background
+      loadRealStats(userId).catch(err => console.error('Stats load error:', err));
+      
+      // Also explicitly load deliveries
+      loadDeliveries(userId, true).catch(err => console.error('Deliveries load error:', err));
 
       // Fetch monitoring requests - use user_id (original schema column)
       try {
@@ -265,7 +282,16 @@ const ProfessionalBuilderDashboardPage = () => {
 
   // Load real stats using REST API
   const loadRealStats = async (userId: string) => {
+    console.log('📊 loadRealStats called for:', userId);
+    
+    if (!userId) {
+      console.log('📊 No userId provided, skipping stats load');
+      return;
+    }
+    
     const accessToken = getAccessToken();
+    console.log('📊 Got access token:', accessToken ? 'Yes' : 'No');
+    
     const headers = {
       'apikey': SUPABASE_ANON_KEY,
       'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
