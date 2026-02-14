@@ -237,6 +237,51 @@ const DeliveryDashboard = () => {
     }
   }, [user?.id]);
 
+  // Real-time subscription for new delivery requests
+  useEffect(() => {
+    if (!user) return;
+
+    console.log('🔔 Setting up real-time subscription for delivery requests...');
+    
+    const channel = supabase
+      .channel('delivery-requests-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'delivery_requests'
+        },
+        (payload) => {
+          console.log('🚚 New delivery request received:', payload);
+          // Refresh data when new request comes in
+          refetchData();
+          toast({
+            title: '🚚 New Delivery Request!',
+            description: 'A new delivery job is available. Check Available Jobs.',
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'delivery_requests'
+        },
+        (payload) => {
+          console.log('📦 Delivery request updated:', payload);
+          refetchData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('🔔 Cleaning up delivery requests subscription');
+      supabase.removeChannel(channel);
+    };
+  }, [user, refetchData, toast]);
+
   useEffect(() => {
     const fetchDashboardData = async () => {
       if (!user) return;
@@ -673,13 +718,83 @@ const DeliveryDashboard = () => {
           {/* Active Deliveries Tab */}
           <TabsContent value="active">
             <div className="space-y-4">
+              {/* Available Requests Section - From Database */}
+              {pendingRequests.length > 0 && (
+                <div className="mb-6">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
+                    <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      🚚 Available Delivery Jobs ({pendingRequests.length})
+                    </h3>
+                    <Badge className="bg-green-100 text-green-800 ml-2">First-Come-First-Served</Badge>
+                  </div>
+                  <Alert className="mb-4 bg-green-50 border-green-200">
+                    <Zap className="h-4 w-4 text-green-600" />
+                    <AlertDescription className="text-green-700">
+                      These are new delivery requests from builders. Accept quickly - first provider to accept gets the job!
+                    </AlertDescription>
+                  </Alert>
+                  <div className="space-y-4">
+                    {pendingRequests.map((request) => (
+                      <DeliveryRequestCard
+                        key={request.id}
+                        delivery={{
+                          id: request.id,
+                          pickup_location: request.pickup_address || request.pickup_location || 'Pickup location',
+                          delivery_location: request.delivery_address || request.delivery_location || 'Delivery location',
+                          material_type: request.material_type || 'Construction Materials',
+                          quantity: request.quantity?.toString() || 'N/A',
+                          customer_name: request.builder_name || request.contact_name || 'Builder',
+                          customer_phone: request.builder_phone || request.contact_phone || '',
+                          status: 'pending',
+                          estimated_time: '30 mins',
+                          price: request.estimated_cost || request.budget_range || 0,
+                          distance: request.distance_km || 0,
+                          urgency: request.priority_level || request.urgency || 'normal',
+                          special_instructions: request.special_instructions,
+                          created_at: request.created_at
+                        }}
+                        isDarkMode={isDarkMode}
+                        onAccept={async (id) => {
+                          const result = await handleAcceptDelivery(id);
+                          if (result.success) {
+                            toast({
+                              title: "✅ Delivery Accepted!",
+                              description: "You got the job! Navigate to pickup location.",
+                            });
+                            refetchData();
+                          } else {
+                            toast({
+                              title: "❌ Could not accept",
+                              description: result.error || "Someone else may have accepted this delivery.",
+                              variant: "destructive"
+                            });
+                            refetchData();
+                          }
+                        }}
+                        onReject={(id) => {
+                          handleRejectDelivery(id);
+                          toast({
+                            title: "Delivery Declined",
+                            description: "This delivery has been removed from your list.",
+                          });
+                        }}
+                        onNavigate={(delivery) => console.log('Navigate to:', delivery)}
+                        onCall={(phone) => phone && window.open(`tel:${phone}`)}
+                        onCaptureProof={(id) => setShowProofCapture(id)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Pending Requests Section */}
               {activeDeliveries.filter(d => d.status === 'pending' || d.status === 'assigned').length > 0 && (
                 <div className="mb-6">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="h-2 w-2 bg-yellow-500 rounded-full animate-pulse"></div>
                     <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                      New Delivery Requests ({activeDeliveries.filter(d => d.status === 'pending' || d.status === 'assigned').length})
+                      My Assigned Deliveries ({activeDeliveries.filter(d => d.status === 'pending' || d.status === 'assigned').length})
                     </h3>
                   </div>
                   <div className="space-y-4">
