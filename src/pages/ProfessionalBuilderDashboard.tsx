@@ -109,46 +109,43 @@ const ProfessionalBuilderDashboardPage = () => {
   const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R2I6GLWrY9xKkxa0ZDnmmSCWgTo';
 
-  // Helper to get access token - try multiple sources
+  // Helper to get access token - try localStorage first (faster), then Supabase session
   const getAccessToken = async (): Promise<string> => {
-    // First try to get fresh token from Supabase client
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.access_token) {
-        console.log('🔑 Got fresh access token from Supabase session');
-        return session.access_token;
-      }
-    } catch (e) {
-      console.log('🔑 Could not get session from Supabase client');
-    }
-    
-    // Fallback to localStorage
+    // FIRST try localStorage (fast and usually valid)
     try {
       const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
       if (storedSession) {
         const parsed = JSON.parse(storedSession);
         if (parsed.access_token) {
-          console.log('🔑 Got access token from localStorage');
+          console.log('🔑 Got access token from localStorage (length:', parsed.access_token.length, ')');
           return parsed.access_token;
         }
       }
     } catch (e) {
-      console.log('🔑 Could not get token from localStorage');
+      console.log('🔑 Could not get token from localStorage:', e);
+    }
+    
+    // Only try Supabase client if localStorage failed - with timeout
+    try {
+      console.log('🔑 Trying Supabase session...');
+      const sessionPromise = supabase.auth.getSession();
+      const timeoutPromise = new Promise<null>((resolve) => 
+        setTimeout(() => {
+          console.log('🔑 Supabase session timeout');
+          resolve(null);
+        }, 3000)
+      );
+      
+      const result = await Promise.race([sessionPromise, timeoutPromise]);
+      if (result && 'data' in result && result.data?.session?.access_token) {
+        console.log('🔑 Got fresh access token from Supabase session');
+        return result.data.session.access_token;
+      }
+    } catch (e) {
+      console.log('🔑 Could not get session from Supabase client:', e);
     }
     
     console.log('🔑 No access token available');
-    return '';
-  };
-  
-  // Sync version for immediate use (may be stale)
-  const getAccessTokenSync = (): string => {
-    try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-      if (storedSession) {
-        const parsed = JSON.parse(storedSession);
-        return parsed.access_token || '';
-      }
-    } catch (e) {}
     return '';
   };
 
