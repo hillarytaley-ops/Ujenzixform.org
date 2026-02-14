@@ -349,6 +349,11 @@ const ProfessionalBuilderDashboardPage = () => {
       return;
     }
     
+    if (!userId) {
+      console.log('🚚 No userId provided, skipping delivery load');
+      return;
+    }
+    
     setLoadingDeliveries(true);
     const accessToken = getAccessToken();
     const headers = {
@@ -359,6 +364,7 @@ const ProfessionalBuilderDashboardPage = () => {
 
     try {
       console.log('🚚 Loading deliveries for builder:', userId);
+      console.log('🚚 Using access token:', accessToken ? 'Yes' : 'No');
       
       // First, get the profile ID (delivery_requests uses profile.id as builder_id)
       let profileId = userId;
@@ -378,34 +384,61 @@ const ProfessionalBuilderDashboardPage = () => {
         console.log('Could not fetch profile, using user ID');
       }
 
-      // Fetch delivery requests - try both user_id and profile_id as builder_id
+      // Fetch delivery requests - try multiple ID fields
       let deliveryRequests: any[] = [];
       
       // Try with profile ID first (this is how DeliveryRequest.tsx saves it)
-      const deliveryRequestsResponse1 = await fetch(
-        `${SUPABASE_URL}/rest/v1/delivery_requests?builder_id=eq.${profileId}&order=created_at.desc`,
-        { headers }
-      );
-      if (deliveryRequestsResponse1.ok) {
-        const data1 = await deliveryRequestsResponse1.json();
-        deliveryRequests = [...deliveryRequests, ...data1];
-        console.log('🚚 Delivery requests (by profile_id):', data1.length);
+      try {
+        const deliveryRequestsResponse1 = await fetch(
+          `${SUPABASE_URL}/rest/v1/delivery_requests?builder_id=eq.${profileId}&order=created_at.desc`,
+          { headers }
+        );
+        if (deliveryRequestsResponse1.ok) {
+          const data1 = await deliveryRequestsResponse1.json();
+          deliveryRequests = [...deliveryRequests, ...data1];
+          console.log('🚚 Delivery requests (by profile_id):', data1.length, data1);
+        } else {
+          console.log('🚚 Delivery requests (by profile_id) failed:', deliveryRequestsResponse1.status);
+        }
+      } catch (e) {
+        console.error('🚚 Error fetching by profile_id:', e);
       }
 
       // Also try with user_id if different (for deliveries created via DeliveryPromptDialog)
       if (profileId !== userId) {
-        const deliveryRequestsResponse2 = await fetch(
-          `${SUPABASE_URL}/rest/v1/delivery_requests?builder_id=eq.${userId}&order=created_at.desc`,
+        try {
+          const deliveryRequestsResponse2 = await fetch(
+            `${SUPABASE_URL}/rest/v1/delivery_requests?builder_id=eq.${userId}&order=created_at.desc`,
+            { headers }
+          );
+          if (deliveryRequestsResponse2.ok) {
+            const data2 = await deliveryRequestsResponse2.json();
+            // Add only unique ones
+            const existingIds = new Set(deliveryRequests.map(d => d.id));
+            const newData = data2.filter((d: any) => !existingIds.has(d.id));
+            deliveryRequests = [...deliveryRequests, ...newData];
+            console.log('🚚 Delivery requests (by user_id):', data2.length, newData);
+          }
+        } catch (e) {
+          console.error('🚚 Error fetching by user_id:', e);
+        }
+      }
+      
+      // Also try with buyer_id (in case it's stored that way)
+      try {
+        const deliveryRequestsResponse3 = await fetch(
+          `${SUPABASE_URL}/rest/v1/delivery_requests?buyer_id=eq.${userId}&order=created_at.desc`,
           { headers }
         );
-        if (deliveryRequestsResponse2.ok) {
-          const data2 = await deliveryRequestsResponse2.json();
-          // Add only unique ones
+        if (deliveryRequestsResponse3.ok) {
+          const data3 = await deliveryRequestsResponse3.json();
           const existingIds = new Set(deliveryRequests.map(d => d.id));
-          const newData = data2.filter((d: any) => !existingIds.has(d.id));
+          const newData = data3.filter((d: any) => !existingIds.has(d.id));
           deliveryRequests = [...deliveryRequests, ...newData];
-          console.log('🚚 Delivery requests (by user_id):', data2.length);
+          console.log('🚚 Delivery requests (by buyer_id):', data3.length);
         }
+      } catch (e) {
+        // buyer_id column might not exist, that's ok
       }
 
       // Fetch deliveries table (actual deliveries in progress) - try both IDs
