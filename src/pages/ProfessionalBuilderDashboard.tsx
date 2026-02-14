@@ -109,80 +109,27 @@ const ProfessionalBuilderDashboardPage = () => {
   const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R2I6GLWrY9xKkxa0ZDnmmSCWgTo';
 
-  // Helper to get access token - check if expired and prompt re-login if needed
+  // Helper to get access token - USE SUPABASE CLIENT which handles token refresh automatically
   const getAccessToken = async (): Promise<string> => {
-    // Get token from localStorage
     try {
-      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-      if (storedSession) {
-        const parsed = JSON.parse(storedSession);
-        if (parsed.access_token) {
-          // Check if token is expired by decoding JWT
-          try {
-            const payload = JSON.parse(atob(parsed.access_token.split('.')[1]));
-            const expiry = payload.exp * 1000; // Convert to milliseconds
-            const now = Date.now();
-            
-            if (expiry > now) {
-              console.log('🔑 Token is valid, expires in', Math.round((expiry - now) / 1000 / 60), 'minutes');
-              return parsed.access_token;
-            } else {
-              console.log('🔑 Token EXPIRED', Math.round((now - expiry) / 1000 / 60), 'minutes ago');
-              
-              // Try to refresh using the refresh token
-              if (parsed.refresh_token) {
-                console.log('🔑 Attempting token refresh...');
-                try {
-                  const refreshResponse = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'apikey': SUPABASE_ANON_KEY
-                    },
-                    body: JSON.stringify({
-                      refresh_token: parsed.refresh_token
-                    })
-                  });
-                  
-                  if (refreshResponse.ok) {
-                    const newSession = await refreshResponse.json();
-                    if (newSession.access_token) {
-                      console.log('🔑 Token refreshed successfully!');
-                      // Update localStorage with new tokens
-                      localStorage.setItem('sb-wuuyjjpgzgeimiptuuws-auth-token', JSON.stringify({
-                        ...parsed,
-                        access_token: newSession.access_token,
-                        refresh_token: newSession.refresh_token || parsed.refresh_token
-                      }));
-                      return newSession.access_token;
-                    }
-                  } else {
-                    console.log('🔑 Token refresh failed:', refreshResponse.status);
-                  }
-                } catch (refreshError) {
-                  console.log('🔑 Token refresh error:', refreshError);
-                }
-              }
-              
-              // Token is expired and couldn't refresh - show toast to re-login
-              toast({
-                title: "Session Expired",
-                description: "Please log out and log back in to refresh your session.",
-                variant: "destructive",
-              });
-            }
-          } catch (decodeError) {
-            console.log('🔑 Could not decode token, using as-is');
-            return parsed.access_token;
-          }
-        }
+      // Use Supabase client to get fresh session - it handles token refresh automatically
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        console.log('🔑 Supabase getSession error:', error.message);
       }
+      
+      if (session?.access_token) {
+        console.log('🔑 Got fresh token from Supabase client (length:', session.access_token.length, ')');
+        return session.access_token;
+      }
+      
+      console.log('🔑 No session from Supabase client, user may need to log in again');
+      return '';
     } catch (e) {
-      console.log('🔑 Could not get token from localStorage:', e);
+      console.log('🔑 Error getting session:', e);
+      return '';
     }
-    
-    console.log('🔑 No valid access token available');
-    return '';
   };
 
   // Helper to get user ID reliably (from AuthContext or localStorage)
@@ -240,32 +187,22 @@ const ProfessionalBuilderDashboardPage = () => {
       loadRealStats(userId).catch(err => console.error('Stats load error:', err));
       loadDeliveries(userId, true).catch(err => console.error('Deliveries load error:', err));
 
-      // Get profile using REST API with timeout (Supabase client can hang)
+      // Get profile using Supabase client (handles auth automatically)
       let profileData = null;
-      const accessToken = await getAccessToken();
-      const headers = {
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
-        'Content-Type': 'application/json'
-      };
-      console.log('📋 Profile fetch using token length:', accessToken?.length || 0);
+      console.log('📋 Fetching profile using Supabase client...');
       
       try {
-        const profilePromise = fetch(
-          `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${userId}&select=*`,
-          { headers }
-        );
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Profile fetch timeout')), 5000)
-        );
+        const { data: profiles, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', userId)
+          .maybeSingle();
         
-        const profileResponse = await Promise.race([profilePromise, timeoutPromise]) as Response;
-        if (profileResponse.ok) {
-          const profiles = await profileResponse.json();
-          if (profiles && profiles.length > 0) {
-            profileData = profiles[0];
-            console.log('📋 Profile loaded via REST:', profileData.full_name || profileData.email);
-          }
+        if (profileError) {
+          console.warn('📋 Profile fetch error:', profileError.message);
+        } else if (profiles) {
+          profileData = profiles;
+          console.log('📋 Profile loaded:', profileData.full_name || profileData.email);
         }
       } catch (profileError: any) {
         console.warn('Profile fetch warning:', profileError.message);
@@ -290,18 +227,19 @@ const ProfessionalBuilderDashboardPage = () => {
       // Role already verified by RoleProtectedRoute, skip redundant check
       console.log('📋 Profile setup complete, data loading in background');
 
-      // Fetch monitoring requests in background using REST API
-      fetch(
-        `${SUPABASE_URL}/rest/v1/monitoring_service_requests?user_id=eq.${userId}&order=created_at.desc`,
-        { headers }
-      )
-        .then(res => res.ok ? res.json() : [])
-        .then(data => {
-          if (data && data.length > 0) {
+      // Fetch monitoring requests in background using Supabase client
+      supabase
+        .from('monitoring_service_requests')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .then(({ data, error }) => {
+          if (error) {
+            console.log('Monitoring requests fetch error:', error.message);
+          } else if (data && data.length > 0) {
             setMonitoringRequests(data);
           }
-        })
-        .catch(e => console.log('Monitoring requests fetch error:', e));
+        });
 
     } catch (error) {
       console.error('Auth error:', error);
@@ -311,7 +249,7 @@ const ProfessionalBuilderDashboardPage = () => {
     }
   };
 
-  // Load real stats using REST API
+  // Load real stats using Supabase client (handles auth automatically)
   const loadRealStats = async (userId: string) => {
     console.log('📊 loadRealStats called for:', userId);
     
@@ -319,63 +257,54 @@ const ProfessionalBuilderDashboardPage = () => {
       console.log('📊 No userId provided, skipping stats load');
       return;
     }
-    
-    const accessToken = await getAccessToken();
-    console.log('📊 Got access token:', accessToken ? 'Yes (length: ' + accessToken.length + ')' : 'No');
-    
-    if (!accessToken) {
-      console.log('📊 No access token, skipping stats load');
-      return;
-    }
-    
-    const headers = {
-      'apikey': SUPABASE_ANON_KEY,
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
-    };
 
     try {
       console.log('📊 Loading real stats for builder:', userId);
       
-      // Fetch purchase orders for this builder
-      const ordersResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${userId}&order=created_at.desc`,
-        { headers }
-      );
+      // Fetch purchase orders using Supabase client
+      const { data: orders, error: ordersError } = await supabase
+        .from('purchase_orders')
+        .select('*')
+        .eq('buyer_id', userId)
+        .order('created_at', { ascending: false });
       
-      let orders: any[] = [];
-      if (ordersResponse.ok) {
-        orders = await ordersResponse.json();
-        console.log('📊 Orders loaded:', orders.length);
+      if (ordersError) {
+        console.log('📊 Orders fetch error:', ordersError.message);
+      } else {
+        console.log('📊 Orders loaded:', orders?.length || 0);
       }
 
-      // Fetch builder projects
-      const projectsResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/builder_projects?builder_id=eq.${userId}&order=created_at.desc`,
-        { headers }
-      );
+      // Fetch builder projects using Supabase client
+      const { data: projectsData, error: projectsError } = await supabase
+        .from('builder_projects')
+        .select('*')
+        .eq('builder_id', userId)
+        .order('created_at', { ascending: false });
       
-      let projectsData: any[] = [];
-      if (projectsResponse.ok) {
-        projectsData = await projectsResponse.json();
-        console.log('📊 Projects loaded:', projectsData.length);
-        setProjects(projectsData);
+      if (projectsError) {
+        console.log('📊 Projects fetch error:', projectsError.message);
+      } else {
+        console.log('📊 Projects loaded:', projectsData?.length || 0);
+        if (projectsData) setProjects(projectsData);
       }
 
       // Calculate stats
-      const pendingOrders = orders.filter(o => 
+      const ordersList = orders || [];
+      const projectsList = projectsData || [];
+      
+      const pendingOrders = ordersList.filter(o => 
         ['pending', 'quoted', 'processing'].includes(o.status?.toLowerCase())
       ).length;
       
-      const completedOrders = orders.filter(o => 
+      const completedOrders = ordersList.filter(o => 
         ['completed', 'delivered', 'confirmed'].includes(o.status?.toLowerCase())
       ).length;
       
-      const totalSpent = orders
+      const totalSpent = ordersList
         .filter(o => ['completed', 'delivered', 'confirmed'].includes(o.status?.toLowerCase()))
         .reduce((sum, o) => sum + (o.total_amount || 0), 0);
 
-      const activeProjects = projectsData.filter(p => 
+      const activeProjects = projectsList.filter(p => 
         ['active', 'in_progress'].includes(p.status?.toLowerCase())
       ).length;
 
@@ -403,7 +332,7 @@ const ProfessionalBuilderDashboardPage = () => {
     }
   };
 
-  // Load deliveries using REST API
+  // Load deliveries using Supabase client (handles auth automatically)
   const loadDeliveries = async (userId: string, forceRefresh: boolean = false) => {
     // Skip if already loaded and not forcing refresh (prevents flicker)
     if (deliveriesLoaded && !forceRefresh && deliveries.length > 0) {
@@ -417,155 +346,111 @@ const ProfessionalBuilderDashboardPage = () => {
     }
     
     setLoadingDeliveries(true);
-    const accessToken = await getAccessToken();
-    
-    if (!accessToken) {
-      console.log('🚚 No access token available, skipping delivery load');
-      setLoadingDeliveries(false);
-      return;
-    }
-    
-    const headers = {
-      'apikey': SUPABASE_ANON_KEY,
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
-    };
 
     try {
       console.log('🚚 Loading deliveries for builder:', userId);
-      console.log('🚚 Using access token: Yes (length:', accessToken.length, ')');
       
       // First, get the profile ID (delivery_requests uses profile.id as builder_id)
       let profileId = userId;
-      try {
-        const profileResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${userId}&select=id`,
-          { headers }
-        );
-        if (profileResponse.ok) {
-          const profiles = await profileResponse.json();
-          if (profiles && profiles.length > 0) {
-            profileId = profiles[0].id;
-            console.log('🚚 Found profile ID:', profileId);
-          }
-        }
-      } catch (e) {
-        console.log('Could not fetch profile, using user ID');
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', userId)
+        .maybeSingle();
+      
+      if (profileData?.id) {
+        profileId = profileData.id;
+        console.log('🚚 Found profile ID:', profileId);
       }
 
-      // Fetch delivery requests - try multiple ID fields
+      // Fetch delivery requests using Supabase client
       let deliveryRequests: any[] = [];
       
-      // Try with profile ID first (this is how DeliveryRequest.tsx saves it)
-      try {
-        const deliveryRequestsResponse1 = await fetch(
-          `${SUPABASE_URL}/rest/v1/delivery_requests?builder_id=eq.${profileId}&order=created_at.desc`,
-          { headers }
-        );
-        if (deliveryRequestsResponse1.ok) {
-          const data1 = await deliveryRequestsResponse1.json();
-          deliveryRequests = [...deliveryRequests, ...data1];
-          console.log('🚚 Delivery requests (by profile_id):', data1.length, data1);
-        } else {
-          console.log('🚚 Delivery requests (by profile_id) failed:', deliveryRequestsResponse1.status);
-        }
-      } catch (e) {
-        console.error('🚚 Error fetching by profile_id:', e);
-      }
-
-      // Also try with user_id if different (for deliveries created via DeliveryPromptDialog)
-      if (profileId !== userId) {
-        try {
-          const deliveryRequestsResponse2 = await fetch(
-            `${SUPABASE_URL}/rest/v1/delivery_requests?builder_id=eq.${userId}&order=created_at.desc`,
-            { headers }
-          );
-          if (deliveryRequestsResponse2.ok) {
-            const data2 = await deliveryRequestsResponse2.json();
-            // Add only unique ones
-            const existingIds = new Set(deliveryRequests.map(d => d.id));
-            const newData = data2.filter((d: any) => !existingIds.has(d.id));
-            deliveryRequests = [...deliveryRequests, ...newData];
-            console.log('🚚 Delivery requests (by user_id):', data2.length, newData);
-          }
-        } catch (e) {
-          console.error('🚚 Error fetching by user_id:', e);
-        }
-      }
+      // Try with profile ID first
+      const { data: requests1, error: reqError1 } = await supabase
+        .from('delivery_requests')
+        .select('*')
+        .eq('builder_id', profileId)
+        .order('created_at', { ascending: false });
       
-      // Also try with buyer_id (in case it's stored that way)
-      try {
-        const deliveryRequestsResponse3 = await fetch(
-          `${SUPABASE_URL}/rest/v1/delivery_requests?buyer_id=eq.${userId}&order=created_at.desc`,
-          { headers }
-        );
-        if (deliveryRequestsResponse3.ok) {
-          const data3 = await deliveryRequestsResponse3.json();
-          const existingIds = new Set(deliveryRequests.map(d => d.id));
-          const newData = data3.filter((d: any) => !existingIds.has(d.id));
-          deliveryRequests = [...deliveryRequests, ...newData];
-          console.log('🚚 Delivery requests (by buyer_id):', data3.length);
-        }
-      } catch (e) {
-        // buyer_id column might not exist, that's ok
+      if (reqError1) {
+        console.log('🚚 Delivery requests (by profile_id) error:', reqError1.message);
+      } else if (requests1) {
+        deliveryRequests = [...deliveryRequests, ...requests1];
+        console.log('🚚 Delivery requests (by profile_id):', requests1.length);
       }
 
-      // Fetch deliveries table (actual deliveries in progress) - try both IDs
+      // Also try with user_id if different
+      if (profileId !== userId) {
+        const { data: requests2 } = await supabase
+          .from('delivery_requests')
+          .select('*')
+          .eq('builder_id', userId)
+          .order('created_at', { ascending: false });
+        
+        if (requests2) {
+          const existingIds = new Set(deliveryRequests.map(d => d.id));
+          const newData = requests2.filter((d: any) => !existingIds.has(d.id));
+          deliveryRequests = [...deliveryRequests, ...newData];
+          console.log('🚚 Delivery requests (by user_id):', requests2.length);
+        }
+      }
+
+      // Fetch deliveries table using Supabase client
       let deliveriesData: any[] = [];
       
-      const deliveriesResponse1 = await fetch(
-        `${SUPABASE_URL}/rest/v1/deliveries?builder_id=eq.${profileId}&order=created_at.desc`,
-        { headers }
-      );
-      if (deliveriesResponse1.ok) {
-        const data1 = await deliveriesResponse1.json();
-        deliveriesData = [...deliveriesData, ...data1];
-        console.log('🚚 Deliveries (by profile_id):', data1.length);
+      const { data: deliveries1 } = await supabase
+        .from('deliveries')
+        .select('*')
+        .eq('builder_id', profileId)
+        .order('created_at', { ascending: false });
+      
+      if (deliveries1) {
+        deliveriesData = [...deliveriesData, ...deliveries1];
+        console.log('🚚 Deliveries (by profile_id):', deliveries1.length);
       }
 
       if (profileId !== userId) {
-        const deliveriesResponse2 = await fetch(
-          `${SUPABASE_URL}/rest/v1/deliveries?builder_id=eq.${userId}&order=created_at.desc`,
-          { headers }
-        );
-        if (deliveriesResponse2.ok) {
-          const data2 = await deliveriesResponse2.json();
+        const { data: deliveries2 } = await supabase
+          .from('deliveries')
+          .select('*')
+          .eq('builder_id', userId)
+          .order('created_at', { ascending: false });
+        
+        if (deliveries2) {
           const existingIds = new Set(deliveriesData.map(d => d.id));
-          const newData = data2.filter((d: any) => !existingIds.has(d.id));
+          const newData = deliveries2.filter((d: any) => !existingIds.has(d.id));
           deliveriesData = [...deliveriesData, ...newData];
-          console.log('🚚 Deliveries (by user_id):', data2.length);
+          console.log('🚚 Deliveries (by user_id):', deliveries2.length);
         }
       }
 
-      // Also fetch from purchase_orders with delivery info (orders that have delivery requested)
+      // Also fetch from purchase_orders with delivery info
       let orderDeliveries: any[] = [];
-      try {
-        const ordersResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${userId}&status=in.(confirmed,shipped,delivered)&order=created_at.desc`,
-          { headers }
-        );
-        if (ordersResponse.ok) {
-          const orders = await ordersResponse.json();
-          // Transform orders with delivery info
-          orderDeliveries = orders
-            .filter((o: any) => o.delivery_address) // Only orders with delivery address
-            .map((o: any) => ({
-              id: `order-${o.id}`,
-              type: 'order',
-              display_status: o.status === 'delivered' ? 'delivered' : 
-                              o.status === 'shipped' ? 'in_transit' : 'pending',
-              pickup_address: o.supplier_name || 'Supplier',
-              delivery_address: o.delivery_address,
-              materials_description: o.items?.map((i: any) => i.material_name || i.name).join(', ') || 'Materials',
-              estimated_cost: o.total_amount,
-              created_at: o.created_at,
-              tracking_number: o.po_number,
-              estimated_delivery: o.delivery_date
-            }));
-          console.log('🚚 Order deliveries:', orderDeliveries.length);
-        }
-      } catch (e) {
-        console.log('Could not fetch order deliveries');
+      const { data: orders } = await supabase
+        .from('purchase_orders')
+        .select('*')
+        .eq('buyer_id', userId)
+        .in('status', ['confirmed', 'shipped', 'delivered'])
+        .order('created_at', { ascending: false });
+      
+      if (orders) {
+        orderDeliveries = orders
+          .filter((o: any) => o.delivery_address)
+          .map((o: any) => ({
+            id: `order-${o.id}`,
+            type: 'order',
+            display_status: o.status === 'delivered' ? 'delivered' : 
+                            o.status === 'shipped' ? 'in_transit' : 'pending',
+            pickup_address: o.supplier_name || 'Supplier',
+            delivery_address: o.delivery_address,
+            materials_description: o.items?.map((i: any) => i.material_name || i.name).join(', ') || 'Materials',
+            estimated_cost: o.total_amount,
+            created_at: o.created_at,
+            tracking_number: o.po_number,
+            estimated_delivery: o.delivery_date
+          }));
+        console.log('🚚 Order deliveries:', orderDeliveries.length);
       }
 
       // Combine all - delivery requests, actual deliveries, and order deliveries
@@ -595,7 +480,6 @@ const ProfessionalBuilderDashboardPage = () => {
     } catch (error) {
       console.error('Error loading deliveries:', error);
       // Don't clear existing data on error - keep showing what we have
-      // setDeliveries([]); // REMOVED - this was causing the flicker
     } finally {
       setLoadingDeliveries(false);
     }
