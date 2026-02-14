@@ -307,8 +307,31 @@ export const MaterialImagesManager: React.FC = () => {
   const { toast } = useToast();
 
   // Fetch admin-uploaded images from Supabase storage
-  // ✅ PERFORMANCE OPTIMIZED: Only fetch metadata first, load images lazily
+  // ✅ PERFORMANCE OPTIMIZED: Using REST API with timeout
   const fetchAdminImages = async () => {
+    console.log('🖼️ Fetching admin material images...');
+    
+    // Get auth token from localStorage
+    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+    
+    let accessToken: string | null = null;
+    try {
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        accessToken = parsed.access_token;
+      }
+    } catch (e) {}
+    
+    const headers: Record<string, string> = {
+      'apikey': SUPABASE_ANON_KEY,
+      'Content-Type': 'application/json'
+    };
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+
     try {
       // Reset progress
       setImageLoadProgress(prev => ({
@@ -318,23 +341,25 @@ export const MaterialImagesManager: React.FC = () => {
         lastUpdated: new Date()
       }));
       
-      // ✅ Fetch ALL admin images - no limit to ensure all uploaded images appear
-      const { data, error, count } = await (supabase as any)
-        .from('admin_material_images')
-        .select('id, name, category, is_featured, is_approved, created_at, description, unit, suggested_price, pricing_type, variants', { count: 'exact' })
-        .order('created_at', { ascending: false });
+      // Use REST API with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
       
-      if (error) {
-        console.error('❌ Admin images fetch error:', error.message, error);
-        toast({
-          title: 'Error loading images',
-          description: error.message,
-          variant: 'destructive'
-        });
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/admin_material_images?select=id,name,category,is_featured,is_approved,created_at,description,unit,suggested_price,pricing_type,variants&order=created_at.desc`,
+        { headers, signal: controller.signal }
+      );
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        console.error('❌ Admin images fetch error:', response.status);
         setAdminImages([]);
         setImageLoadProgress(prev => ({ ...prev, isLoadingImages: false, totalProducts: 0 }));
         return;
       }
+      
+      const data = await response.json();
       
       if (!data || data.length === 0) {
         console.log('📭 No admin images found in database');
@@ -343,7 +368,7 @@ export const MaterialImagesManager: React.FC = () => {
         return;
       }
       
-      console.log(`📊 Loaded ${data.length} material metadata records (total: ${count})`);
+      console.log(`📊 Loaded ${data.length} material metadata records`);
       
       // Update progress with total count
       setImageLoadProgress(prev => ({
@@ -365,8 +390,12 @@ export const MaterialImagesManager: React.FC = () => {
       
       // ✅ LAZY LOAD: Fetch image URLs in background - load ALL images progressively
       loadImageUrlsWithProgress(data.map((d: any) => d.id));
-    } catch (err) {
-      console.error('❌ Error fetching admin images:', err);
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.error('❌ Admin images fetch timeout');
+      } else {
+        console.error('❌ Error fetching admin images:', err);
+      }
       setAdminImages([]);
       setImageLoadProgress(prev => ({ ...prev, isLoadingImages: false }));
     }
@@ -463,15 +492,49 @@ export const MaterialImagesManager: React.FC = () => {
 
   // Fetch supplier materials with images
   const fetchSupplierMaterials = async () => {
+    console.log('🏪 Fetching supplier materials...');
+    
+    // Get auth token from localStorage
+    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+    
+    let accessToken: string | null = null;
     try {
-      // Use 'materials' table - using 'as any' to bypass strict typing
-      const { data, error } = await (supabase as any)
-        .from('materials')
-        .select('id, name, category, image_url, supplier_id, created_at')
-        .not('image_url', 'is', null)
-        .order('created_at', { ascending: false });
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        accessToken = parsed.access_token;
+      }
+    } catch (e) {}
+    
+    const headers: Record<string, string> = {
+      'apikey': SUPABASE_ANON_KEY,
+      'Content-Type': 'application/json'
+    };
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+
+    try {
+      // Use REST API with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
       
-      if (error) throw error;
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/materials?select=id,name,category,image_url,supplier_id,created_at&image_url=not.is.null&order=created_at.desc`,
+        { headers, signal: controller.signal }
+      );
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        console.error('🏪 Supplier materials fetch error:', response.status);
+        setSupplierMaterials([]);
+        return;
+      }
+      
+      const data = await response.json();
+      console.log(`🏪 Loaded ${data?.length || 0} supplier materials`);
       
       // Transform data - supplier info will be fetched separately if needed
       const transformed = ((data || []) as any[]).map((item: any) => ({
@@ -480,8 +543,12 @@ export const MaterialImagesManager: React.FC = () => {
       }));
       
       setSupplierMaterials(transformed as SupplierMaterial[]);
-    } catch (err) {
-      console.error('Error fetching supplier materials:', err);
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.error('🏪 Supplier materials fetch timeout');
+      } else {
+        console.error('Error fetching supplier materials:', err);
+      }
       setSupplierMaterials([]);
     }
   };
@@ -489,8 +556,21 @@ export const MaterialImagesManager: React.FC = () => {
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([fetchAdminImages(), fetchSupplierMaterials()]);
-      setLoading(false);
+      
+      // Add safety timeout to prevent infinite loading
+      const safetyTimeout = setTimeout(() => {
+        console.log('⚠️ MaterialImagesManager: Safety timeout - forcing loading to stop');
+        setLoading(false);
+      }, 15000); // 15 second timeout
+      
+      try {
+        await Promise.all([fetchAdminImages(), fetchSupplierMaterials()]);
+      } catch (err) {
+        console.error('Error loading material images:', err);
+      } finally {
+        clearTimeout(safetyTimeout);
+        setLoading(false);
+      }
     };
     loadData();
   }, []);
