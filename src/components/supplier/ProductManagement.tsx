@@ -71,7 +71,9 @@ import {
   Upload,
   Camera,
   DollarSign,
-  AlertCircle
+  AlertCircle,
+  Image as ImageIcon,
+  Trash2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -257,6 +259,19 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
   const { toast } = useToast();
   const { t } = useLanguage();
   const { user } = useAuth();
+  
+  // Image and variant editing state
+  const [editingImage, setEditingImage] = useState<string>('');
+  const [editingAdditionalImages, setEditingAdditionalImages] = useState<string[]>([]);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const additionalImageRefs = useRef<(HTMLInputElement | null)[]>([]);
+  
+  // Custom variant state for adding new variants
+  const [customVariants, setCustomVariants] = useState<Array<{id: string; sizeLabel: string; price: number}>>([]);
+  const [newVariantLabel, setNewVariantLabel] = useState('');
+  const [newVariantPrice, setNewVariantPrice] = useState('');
   
   // Request form state with multiple images
   const [requestForm, setRequestForm] = useState({
@@ -653,6 +668,136 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Handle image upload for supplier's product customization
+  const handleImageUpload = async (file: File, index: number) => {
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: 'Invalid file type',
+        description: 'Please select an image file (JPG, PNG, WebP)',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: 'File too large',
+        description: 'Please select an image under 5MB',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setUploadingImage(true);
+    setUploadingIndex(index);
+
+    try {
+      const effectiveSupplierId = getEffectiveSupplierId();
+      const fileName = `supplier-products/${effectiveSupplierId}/${Date.now()}-${index}.${file.name.split('.').pop()}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('product-images')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(fileName);
+
+      if (index === 0) {
+        // Main image
+        setEditingImage(publicUrl);
+      } else {
+        // Additional images (index 1-4)
+        setEditingAdditionalImages(prev => {
+          const newImages = [...prev];
+          newImages[index - 1] = publicUrl;
+          return newImages;
+        });
+      }
+
+      toast({
+        title: 'Image uploaded',
+        description: index === 0 ? 'Main product image uploaded' : `Additional image ${index} uploaded`
+      });
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast({
+        title: 'Upload failed',
+        description: 'Failed to upload image. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setUploadingImage(false);
+      setUploadingIndex(null);
+    }
+  };
+
+  // Remove uploaded image
+  const removeImage = (index: number) => {
+    if (index === 0) {
+      setEditingImage('');
+    } else {
+      setEditingAdditionalImages(prev => {
+        const newImages = [...prev];
+        newImages[index - 1] = '';
+        return newImages;
+      });
+    }
+  };
+
+  // Add custom variant
+  const addCustomVariant = () => {
+    if (!newVariantLabel.trim() || !newVariantPrice) {
+      toast({
+        title: 'Missing variant info',
+        description: 'Please enter both size/label and price',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    const newVariant = {
+      id: `custom-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      sizeLabel: newVariantLabel.trim(),
+      price: parseFloat(newVariantPrice)
+    };
+    
+    setCustomVariants(prev => [...prev, newVariant]);
+    setNewVariantLabel('');
+    setNewVariantPrice('');
+  };
+
+  // Remove custom variant
+  const removeCustomVariant = (variantId: string) => {
+    setCustomVariants(prev => prev.filter(v => v.id !== variantId));
+  };
+
+  // Update custom variant price
+  const updateCustomVariantPrice = (variantId: string, newPrice: number) => {
+    setCustomVariants(prev => prev.map(v => 
+      v.id === variantId ? { ...v, price: newPrice } : v
+    ));
+  };
+
+  // Initialize editing state when opening pricing dialog
+  const openPricingDialog = (product: any) => {
+    setPricingProduct(product);
+    setEditingImage(productImages[product.id] || product.image_url || '');
+    setEditingAdditionalImages(product.additional_images || []);
+    
+    // Load existing custom variants from supplier prices
+    const existingVariants = supplierPrices[product.id]?.variant_prices || [];
+    setCustomVariants(existingVariants.filter((v: any) => v.variant_id?.startsWith('custom-')));
+    
+    setEditingVariantPrices({});
   };
 
   // Request a new product to be added by admin
@@ -1211,7 +1356,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
                           <Button 
                             size="sm" 
                             variant="outline"
-                            onClick={() => setPricingProduct(product)}
+                            onClick={() => openPricingDialog(product)}
                           >
                             <Edit className="h-4 w-4 mr-1" />
                             Edit
@@ -1220,7 +1365,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
                       ) : (
                         <Button 
                           className="w-full bg-orange-500 hover:bg-orange-600"
-                          onClick={() => setPricingProduct(product)}
+                          onClick={() => openPricingDialog(product)}
                         >
                           <Plus className="h-4 w-4 mr-2" />
                           Set Your Price
@@ -1234,102 +1379,289 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
         </div>
       )}
 
-      {/* Pricing Dialog */}
+      {/* Pricing Dialog with Image & Variant Editing */}
       <Dialog open={pricingProduct !== null} onOpenChange={(open) => {
         if (!open) {
           setPricingProduct(null);
           setEditingVariantPrices({});
+          setEditingImage('');
+          setEditingAdditionalImages([]);
+          setCustomVariants([]);
+          setNewVariantLabel('');
+          setNewVariantPrice('');
         }
       }}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Set Your Prices</DialogTitle>
+            <DialogTitle>Edit Product - Prices, Images & Variants</DialogTitle>
             <DialogDescription>
-              Set your selling price for: {pricingProduct?.name}
+              Customize your listing for: {pricingProduct?.name}
             </DialogDescription>
           </DialogHeader>
           {pricingProduct && (
             <div className="grid gap-4 py-4">
-              {/* Product Preview */}
-              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+              {/* Product Image Upload Section */}
+              <div className="space-y-3 p-4 border rounded-lg bg-gray-50">
+                <Label className="text-base font-semibold flex items-center gap-2">
+                  <Camera className="h-4 w-4" />
+                  Product Images (Upload Your Own)
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Upload your own product images to replace the default. Up to 5 images.
+                </p>
+                
+                <div className="grid grid-cols-5 gap-2">
+                  {/* Main Image */}
+                  <div className="space-y-1">
+                    <div 
+                      className={`relative aspect-square rounded-lg border-2 border-dashed overflow-hidden cursor-pointer transition-all hover:border-orange-400 ${
+                        editingImage ? 'border-solid border-green-400' : 'border-orange-300 bg-orange-50'
+                      }`}
+                      onClick={() => !uploadingImage && imageInputRef.current?.click()}
+                    >
+                      {uploadingImage && uploadingIndex === 0 ? (
+                        <div className="absolute inset-0 flex items-center justify-center bg-white/80">
+                          <Loader2 className="h-5 w-5 animate-spin text-orange-600" />
+                        </div>
+                      ) : editingImage ? (
+                        <>
+                          <img src={editingImage} alt="Main" className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); removeImage(0); }}
+                            className="absolute top-0.5 right-0.5 p-0.5 bg-red-500 rounded-full text-white hover:bg-red-600"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                          <Badge className="absolute bottom-0.5 left-0.5 bg-orange-600 text-[8px] px-1 py-0">Main</Badge>
+                        </>
+                      ) : (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center p-1">
+                          <Upload className="h-4 w-4 text-orange-400" />
+                          <span className="text-[8px] text-orange-600 font-medium text-center">Main</span>
+                        </div>
+                      )}
+                      <input
+                        ref={imageInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleImageUpload(file, 0);
+                          e.target.value = '';
+                        }}
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Additional Images */}
+                  {[1, 2, 3, 4].map((idx) => {
+                    const imageUrl = editingAdditionalImages[idx - 1] || '';
+                    const isUploading = uploadingImage && uploadingIndex === idx;
+                    
+                    return (
+                      <div key={idx} className="space-y-1">
+                        <div 
+                          className={`relative aspect-square rounded-lg border-2 border-dashed overflow-hidden cursor-pointer transition-all hover:border-gray-400 ${
+                            imageUrl ? 'border-solid border-green-400' : 'border-gray-300 bg-gray-50'
+                          }`}
+                          onClick={() => !uploadingImage && additionalImageRefs.current[idx]?.click()}
+                        >
+                          {isUploading ? (
+                            <div className="absolute inset-0 flex items-center justify-center bg-white/80">
+                              <Loader2 className="h-4 w-4 animate-spin text-gray-600" />
+                            </div>
+                          ) : imageUrl ? (
+                            <>
+                              <img src={imageUrl} alt={`Angle ${idx}`} className="w-full h-full object-cover" />
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); removeImage(idx); }}
+                                className="absolute top-0.5 right-0.5 p-0.5 bg-red-500 rounded-full text-white hover:bg-red-600"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </>
+                          ) : (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center p-1">
+                              <ImageIcon className="h-4 w-4 text-gray-400" />
+                              <span className="text-[8px] text-gray-500 text-center">+{idx}</span>
+                            </div>
+                          )}
+                          <input
+                            ref={el => additionalImageRefs.current[idx] = el}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleImageUpload(file, idx);
+                              e.target.value = '';
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Current Product Info */}
+              <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
                 {(productImages[pricingProduct.id] || pricingProduct.image_url) ? (
                   <img 
                     src={productImages[pricingProduct.id] || pricingProduct.image_url} 
                     alt={pricingProduct.name}
-                    className="w-16 h-16 object-contain rounded"
+                    className="w-12 h-12 object-contain rounded"
                   />
                 ) : (
-                  <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center">
-                    <Package className="h-8 w-8 text-gray-400" />
+                  <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center">
+                    <Package className="h-6 w-6 text-gray-400" />
                   </div>
                 )}
-                <div>
-                  <p className="font-medium">{pricingProduct.name}</p>
-                  <p className="text-sm text-gray-500">{pricingProduct.category}</p>
-                  {pricingProduct.pricing_type === 'variants' && pricingProduct.variants?.length > 0 && (
-                    <Badge variant="outline" className="mt-1 text-xs">
-                      {pricingProduct.variants.length} variants
-                    </Badge>
-                  )}
+                <div className="flex-1">
+                  <p className="font-medium text-sm">{pricingProduct.name}</p>
+                  <p className="text-xs text-gray-500">{pricingProduct.category}</p>
                 </div>
+                <Badge variant="outline" className="text-xs">Original</Badge>
               </div>
               
-              {/* Variant Pricing - Show if product has variants */}
-              {pricingProduct.pricing_type === 'variants' && pricingProduct.variants?.length > 0 ? (
-                <div className="space-y-3">
-                  <Label className="text-base font-semibold">Set Price for Each Size/Variant</Label>
-                  <div className="space-y-2 max-h-60 overflow-y-auto border rounded-lg p-3 bg-gray-50">
-                    {pricingProduct.variants
-                      .filter((v: any) => v.sizeLabel) // Only show variants with labels
-                      .map((variant: any) => {
-                        const existingSupplierPrice = supplierPrices[pricingProduct.id]?.variant_prices?.find(
-                          (vp: any) => vp.variant_id === variant.id
-                        );
-                        const currentValue = editingVariantPrices[variant.id] ?? existingSupplierPrice?.price ?? variant.price ?? 0;
-                        
-                        return (
-                          <div key={variant.id} className="flex items-center justify-between gap-3 p-2 bg-white rounded border">
-                            <div className="flex-1">
-                              <span className="font-medium">{variant.sizeLabel}</span>
-                              <span className="text-xs text-gray-500 ml-2">
-                                (Admin: KES {(variant.price || 0).toLocaleString()})
-                              </span>
+              {/* Variant Pricing Section */}
+              <div className="space-y-3 p-4 border rounded-lg">
+                <Label className="text-base font-semibold flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-green-600" />
+                  Pricing & Variants
+                </Label>
+                
+                {/* Existing Admin Variants */}
+                {pricingProduct.pricing_type === 'variants' && pricingProduct.variants?.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-700">Admin-defined variants:</p>
+                    <div className="space-y-2 max-h-40 overflow-y-auto border rounded p-2 bg-gray-50">
+                      {pricingProduct.variants
+                        .filter((v: any) => v.sizeLabel)
+                        .map((variant: any) => {
+                          const existingSupplierPrice = supplierPrices[pricingProduct.id]?.variant_prices?.find(
+                            (vp: any) => vp.variant_id === variant.id
+                          );
+                          const currentValue = editingVariantPrices[variant.id] ?? existingSupplierPrice?.price ?? variant.price ?? 0;
+                          
+                          return (
+                            <div key={variant.id} className="flex items-center justify-between gap-2 p-2 bg-white rounded border">
+                              <div className="flex-1">
+                                <span className="font-medium text-sm">{variant.sizeLabel}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <span className="text-xs text-gray-500">KES</span>
+                                <Input
+                                  type="number"
+                                  className="w-24 h-7 text-sm"
+                                  value={currentValue}
+                                  onChange={(e) => {
+                                    setEditingVariantPrices(prev => ({
+                                      ...prev,
+                                      [variant.id]: parseFloat(e.target.value) || 0
+                                    }));
+                                  }}
+                                  placeholder="Price"
+                                />
+                              </div>
                             </div>
-                            <div className="flex items-center gap-1">
-                              <span className="text-sm text-gray-500">KES</span>
-                              <Input
-                                type="number"
-                                className="w-24 h-8 text-sm"
-                                value={currentValue}
-                                onChange={(e) => {
-                                  setEditingVariantPrices(prev => ({
-                                    ...prev,
-                                    [variant.id]: parseFloat(e.target.value) || 0
-                                  }));
-                                }}
-                                placeholder="Price"
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                    </div>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    💡 Your prices will override admin prices on the frontend
-                  </p>
+                )}
+                
+                {/* Custom Variants - Supplier can add their own */}
+                <div className="space-y-2 pt-2 border-t">
+                  <p className="text-sm font-medium text-green-700">Your custom variants:</p>
+                  
+                  {customVariants.length > 0 && (
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {customVariants.map((variant) => (
+                        <div key={variant.id} className="flex items-center gap-2 p-2 bg-green-50 rounded border border-green-200">
+                          <div className="flex-1">
+                            <span className="font-medium text-sm">{variant.sizeLabel}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-gray-500">KES</span>
+                            <Input
+                              type="number"
+                              className="w-24 h-7 text-sm"
+                              value={variant.price}
+                              onChange={(e) => updateCustomVariantPrice(variant.id, parseFloat(e.target.value) || 0)}
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeCustomVariant(variant.id)}
+                              className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Add New Variant Form */}
+                  <div className="flex items-end gap-2 pt-2">
+                    <div className="flex-1">
+                      <Label className="text-xs text-muted-foreground">Size/Variant Label</Label>
+                      <Input
+                        placeholder="e.g., 50kg bag, 2m length"
+                        value={newVariantLabel}
+                        onChange={(e) => setNewVariantLabel(e.target.value)}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <div className="w-28">
+                      <Label className="text-xs text-muted-foreground">Price (KES)</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={newVariantPrice}
+                        onChange={(e) => setNewVariantPrice(e.target.value)}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addCustomVariant}
+                      className="h-8"
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Add
+                    </Button>
+                  </div>
                 </div>
-              ) : (
-                /* Single Price - Show for non-variant products */
-                <div className="space-y-2">
-                  <Label>Your Price (KES) *</Label>
-                  <Input
-                    type="number"
-                    defaultValue={supplierPrices[pricingProduct.id]?.price || 0}
-                    id="pricing-input"
-                    placeholder="Enter your price"
-                  />
-                </div>
-              )}
+                
+                {/* Single Price - Always show as fallback/main price */}
+                {!(pricingProduct.pricing_type === 'variants' && pricingProduct.variants?.length > 0) && customVariants.length === 0 && (
+                  <div className="space-y-2 pt-2 border-t">
+                    <Label>Your Price (KES) *</Label>
+                    <Input
+                      type="number"
+                      defaultValue={supplierPrices[pricingProduct.id]?.price || 0}
+                      id="pricing-input"
+                      placeholder="Enter your price"
+                      className="h-10"
+                    />
+                  </div>
+                )}
+                
+                <p className="text-xs text-muted-foreground bg-blue-50 p-2 rounded">
+                  💡 Add your own size variants (e.g., 25kg, 50kg) with custom prices. Your variants will appear alongside admin variants.
+                </p>
+              </div>
               
               {/* Description Field - Optional */}
               <div className="space-y-2">
@@ -1367,13 +1699,16 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
               Cancel
             </Button>
             <Button 
-              onClick={() => {
+              onClick={async () => {
                 const stockCheckbox = document.getElementById('in-stock-checkbox') as HTMLInputElement;
                 const descriptionInput = document.getElementById('description-input') as HTMLTextAreaElement;
                 
-                // Handle variant pricing
+                // Collect all variant prices (admin variants + custom variants)
+                let allVariantPrices: any[] = [];
+                
+                // Add admin-defined variants with supplier prices
                 if (pricingProduct?.pricing_type === 'variants' && pricingProduct?.variants?.length > 0) {
-                  const variantPrices = pricingProduct.variants
+                  const adminVariants = pricingProduct.variants
                     .filter((v: any) => v.sizeLabel)
                     .map((variant: any) => {
                       const existingPrice = supplierPrices[pricingProduct.id]?.variant_prices?.find(
@@ -1385,32 +1720,80 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
                         price: editingVariantPrices[variant.id] ?? existingPrice?.price ?? variant.price ?? 0
                       };
                     });
-                  
-                  // Use the first variant price as the main price (for backwards compatibility)
-                  const mainPrice = variantPrices[0]?.price || 0;
-                  
-                  handleSetPrice(
-                    pricingProduct.id,
-                    mainPrice,
-                    stockCheckbox.checked,
-                    descriptionInput.value.trim() || undefined,
-                    variantPrices
-                  );
+                  allVariantPrices = [...adminVariants];
+                }
+                
+                // Add custom variants
+                if (customVariants.length > 0) {
+                  const customVariantData = customVariants.map(v => ({
+                    variant_id: v.id,
+                    sizeLabel: v.sizeLabel,
+                    price: v.price
+                  }));
+                  allVariantPrices = [...allVariantPrices, ...customVariantData];
+                }
+                
+                // Determine main price
+                let mainPrice = 0;
+                if (allVariantPrices.length > 0) {
+                  mainPrice = allVariantPrices[0]?.price || 0;
                 } else {
-                  // Single price product
                   const priceInput = document.getElementById('pricing-input') as HTMLInputElement;
-                  handleSetPrice(
-                    pricingProduct!.id, 
-                    parseFloat(priceInput.value) || 0,
-                    stockCheckbox.checked,
-                    descriptionInput.value.trim() || undefined
-                  );
+                  mainPrice = parseFloat(priceInput?.value) || 0;
+                }
+                
+                // Save price with images and variants
+                await handleSetPrice(
+                  pricingProduct!.id,
+                  mainPrice,
+                  stockCheckbox.checked,
+                  descriptionInput.value.trim() || undefined,
+                  allVariantPrices.length > 0 ? allVariantPrices : undefined
+                );
+                
+                // If custom images were uploaded, save them to supplier_product_prices
+                if (editingImage || editingAdditionalImages.some(img => img)) {
+                  try {
+                    const effectiveSupplierId = getEffectiveSupplierId();
+                    const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+                    
+                    let accessToken = '';
+                    try {
+                      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+                      if (storedSession) {
+                        const parsed = JSON.parse(storedSession);
+                        accessToken = parsed.access_token || '';
+                      }
+                    } catch (e) {}
+                    
+                    // Update supplier_product_prices with custom images
+                    await fetch(
+                      `https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/supplier_product_prices?supplier_id=eq.${effectiveSupplierId}&product_id=eq.${pricingProduct!.id}`,
+                      {
+                        method: 'PATCH',
+                        headers: {
+                          'apikey': apiKey,
+                          'Authorization': `Bearer ${accessToken}`,
+                          'Content-Type': 'application/json',
+                          'Prefer': 'return=representation'
+                        },
+                        body: JSON.stringify({
+                          custom_image_url: editingImage || null,
+                          custom_additional_images: editingAdditionalImages.filter(img => img) || [],
+                          updated_at: new Date().toISOString()
+                        })
+                      }
+                    );
+                    console.log('✅ Custom images saved');
+                  } catch (imgError) {
+                    console.log('Image save note:', imgError);
+                  }
                 }
               }}
-              disabled={isSubmitting}
+              disabled={isSubmitting || uploadingImage}
               className="bg-green-600 hover:bg-green-700"
             >
-              {isSubmitting ? 'Saving...' : 'Save All Prices'}
+              {isSubmitting ? 'Saving...' : uploadingImage ? 'Uploading...' : 'Save All Changes'}
             </Button>
           </DialogFooter>
         </DialogContent>
