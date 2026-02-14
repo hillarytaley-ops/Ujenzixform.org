@@ -132,6 +132,16 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
   });
   const { toast } = useToast();
 
+  // Auto-fill site address from delivery address when dialog opens or purchaseOrder changes
+  React.useEffect(() => {
+    if (isOpen && purchaseOrder?.delivery_address) {
+      setFormData(prev => ({
+        ...prev,
+        siteAddress: prev.siteAddress || purchaseOrder.delivery_address || ''
+      }));
+    }
+  }, [isOpen, purchaseOrder?.delivery_address]);
+
   const handleRequestMonitoring = async () => {
     if (!selectedPackage || !formData.siteAddress || !formData.contactPhone) {
       toast({

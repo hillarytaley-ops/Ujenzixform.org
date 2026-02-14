@@ -949,7 +949,14 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
     <MonitoringServicePrompt
       isOpen={showMonitoringPrompt}
       onOpenChange={setShowMonitoringPrompt}
-      purchaseOrder={purchaseOrder}
+      purchaseOrder={{
+        ...purchaseOrder,
+        id: purchaseOrder?.id || '',
+        // Pass the user-entered delivery address to auto-fill site address
+        delivery_address: deliveryData.deliveryCoordinates 
+          ? `${deliveryData.deliveryCoordinates}${deliveryData.deliveryAddress ? ` | ${deliveryData.deliveryAddress}` : ''}`
+          : deliveryData.deliveryAddress || purchaseOrder?.delivery_address
+      }}
       onServiceRequested={() => {
         if (onDeclined) onDeclined(); // Close the flow
       }}
