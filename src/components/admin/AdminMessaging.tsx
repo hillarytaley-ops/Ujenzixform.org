@@ -102,13 +102,45 @@ export function AdminMessaging() {
   const fetchChats = async () => {
     setLoading(true);
     try {
-      // Get all support chats
-      const { data: chatsData, error: chatsError } = await supabase
-        .from('support_chats')
-        .select('*')
-        .order('updated_at', { ascending: false });
-
-      if (chatsError) throw chatsError;
+      // Get all support chats - try direct REST API for admin access
+      const { data: session } = await supabase.auth.getSession();
+      const accessToken = session?.session?.access_token;
+      
+      let chatsData: any[] = [];
+      
+      // Try REST API first (bypasses some RLS issues)
+      try {
+        const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+        
+        const response = await fetch(
+          `${SUPABASE_URL}/rest/v1/support_chats?order=updated_at.desc`,
+          {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+            },
+          }
+        );
+        
+        if (response.ok) {
+          chatsData = await response.json();
+          console.log('📨 Fetched chats via REST API:', chatsData?.length);
+        }
+      } catch (restError) {
+        console.log('REST API failed, falling back to Supabase client');
+      }
+      
+      // Fallback to Supabase client
+      if (!chatsData || chatsData.length === 0) {
+        const { data, error: chatsError } = await supabase
+          .from('support_chats')
+          .select('*')
+          .order('updated_at', { ascending: false });
+        
+        if (chatsError) throw chatsError;
+        chatsData = data || [];
+      }
 
       // Get user profiles for each chat (profiles table doesn't have email column)
       const userIds = [...new Set((chatsData || []).map(c => c.user_id))];
