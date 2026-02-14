@@ -937,12 +937,12 @@ const SupplierDashboard = () => {
               {t('supplier.tabs.orders')}
             </TabsTrigger>
             <TabsTrigger value="products" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
-              <Package className="h-4 w-4 mr-1" />
-              My Products
-            </TabsTrigger>
-            <TabsTrigger value="admin-catalog" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
               <Store className="h-4 w-4 mr-1" />
-              Set Prices
+              Products & Prices
+            </TabsTrigger>
+            <TabsTrigger value="my-products" className="data-[state=active]:bg-green-500 data-[state=active]:text-white">
+              <Plus className="h-4 w-4 mr-1" />
+              My Uploads
             </TabsTrigger>
             <TabsTrigger value="analytics" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
               {t('supplier.tabs.analytics')}
@@ -1049,24 +1049,24 @@ const SupplierDashboard = () => {
             <OrderManagement supplierId={supplierRecordId || user?.id || ''} isDarkMode={isDarkMode} />
           </TabsContent>
 
-          {/* Products Tab - Supplier's Own Products with Full Edit Capabilities */}
+          {/* Products Tab - Admin Catalog with Pricing */}
           <TabsContent value="products">
+            <ProductManagement supplierId={supplierRecordId || user?.id || ''} isDarkMode={isDarkMode} />
+          </TabsContent>
+          
+          {/* My Products Tab - Supplier's Own Products with Full Edit Capabilities */}
+          <TabsContent value="my-products">
             <Card className={cardBg}>
               <CardHeader>
-                <CardTitle className={textColor}>My Products</CardTitle>
+                <CardTitle className={textColor}>My Uploaded Products</CardTitle>
                 <CardDescription className={mutedText}>
-                  Manage your products - add new products, update images, prices, and variants. Products require admin approval before appearing in the marketplace.
+                  Manage your own products - add new products, update images, prices, and variants. Products require admin approval before appearing in the marketplace.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <SupplierProductManager supplierId={supplierRecordId || user?.id || ''} />
               </CardContent>
             </Card>
-          </TabsContent>
-          
-          {/* Admin Catalog Tab - Set Prices on Admin Products */}
-          <TabsContent value="admin-catalog">
-            <ProductManagement supplierId={supplierRecordId || user?.id || ''} isDarkMode={isDarkMode} />
           </TabsContent>
 
           {/* Analytics Tab - Enhanced Dashboard */}
