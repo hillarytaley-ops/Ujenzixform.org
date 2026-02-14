@@ -104,7 +104,10 @@ export function InAppCommunication({
     scrollToBottom();
   }, [messages]);
 
-  // Load messages using REST API
+  // State for chat ID
+  const [chatId, setChatId] = useState<string | null>(null);
+
+  // Load messages using REST API - uses support_messages table
   const loadMessages = async () => {
     try {
       const tokenStr = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
@@ -114,8 +117,9 @@ export function InAppCommunication({
       const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
       const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
 
-      const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/app_messages?or=(sender_id.eq.${userId},receiver_id.eq.${userId})&order=created_at.asc`,
+      // First, find or create a support_chat for this user
+      const chatResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/support_chats?user_id=eq.${userId}&select=*`,
         {
           headers: {
             'apikey': SUPABASE_ANON_KEY,
@@ -124,14 +128,53 @@ export function InAppCommunication({
         }
       );
 
-      if (!response.ok) {
-        console.log('Messages table may not exist yet');
+      if (!chatResponse.ok) {
+        console.log('Support chats table error');
         setMessages([]);
         return;
       }
 
-      const data = await response.json();
-      setMessages(data || []);
+      const chats = await chatResponse.json();
+      let currentChatId = chats?.[0]?.id;
+      setChatId(currentChatId || null);
+
+      if (!currentChatId) {
+        // No existing chat, messages will be empty
+        setMessages([]);
+        return;
+      }
+
+      // Fetch messages for this chat
+      const messagesResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/support_messages?chat_id=eq.${currentChatId}&order=created_at.asc`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+          },
+        }
+      );
+
+      if (!messagesResponse.ok) {
+        console.log('Support messages table error');
+        setMessages([]);
+        return;
+      }
+
+      const messagesData = await messagesResponse.json();
+      
+      // Convert to our Message format
+      const formattedMessages: Message[] = (messagesData || []).map((m: any) => ({
+        id: m.id,
+        sender_id: m.sender_id,
+        sender_name: m.sender_type === 'admin' ? 'Admin Support' : userName,
+        sender_role: m.sender_type === 'admin' ? 'admin' : userRole,
+        content: m.content,
+        created_at: m.created_at,
+        is_read: m.is_read || false,
+      }));
+
+      setMessages(formattedMessages);
     } catch (err) {
       console.error('Error loading messages:', err);
       setMessages([]);
@@ -176,19 +219,17 @@ export function InAppCommunication({
     loadMessages();
     loadCallSessions();
 
-    // Real-time subscription for messages
+    // Real-time subscription for support messages
     const messageChannel = supabase
-      .channel('app_messages_changes')
+      .channel('support_messages_changes')
       .on('postgres_changes', {
-        event: '*',
+        event: 'INSERT',
         schema: 'public',
-        table: 'app_messages',
+        table: 'support_messages',
       }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          const newMsg = payload.new as Message;
-          if (newMsg.sender_id === userId || newMsg.receiver_id === userId) {
-            setMessages(prev => [...prev, newMsg]);
-          }
+        // Reload messages when new message arrives
+        if (chatId && payload.new && (payload.new as any).chat_id === chatId) {
+          loadMessages();
         }
       })
       .subscribe();
@@ -271,7 +312,7 @@ export function InAppCommunication({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Send message using REST API for reliability
+  // Send message using REST API - uses support_chats and support_messages tables
   const sendMessage = async () => {
     if (!newMessage.trim()) return;
 
@@ -288,19 +329,53 @@ export function InAppCommunication({
       const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
       const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
 
+      let currentChatId = chatId;
+
+      // If no chat exists, create one
+      if (!currentChatId) {
+        console.log('📤 Creating new support chat...');
+        const chatData = {
+          user_id: userId,
+          user_role: userRole,
+          subject: `Support Request from ${userName}`,
+          status: 'open',
+        };
+
+        const chatResponse = await fetch(`${SUPABASE_URL}/rest/v1/support_chats`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+            'Prefer': 'return=representation',
+          },
+          body: JSON.stringify(chatData),
+        });
+
+        if (!chatResponse.ok) {
+          const errorText = await chatResponse.text();
+          console.error('📤 Chat creation error:', errorText);
+          throw new Error('Failed to create support chat');
+        }
+
+        const chatResult = await chatResponse.json();
+        currentChatId = chatResult[0]?.id;
+        setChatId(currentChatId);
+        console.log('📤 Created chat:', currentChatId);
+      }
+
+      // Now send the message
       const messageData = {
+        chat_id: currentChatId,
         sender_id: userId,
-        sender_name: userName,
-        sender_role: userRole,
-        receiver_id: 'admin',
-        receiver_role: 'admin',
+        sender_type: 'user',
         content: newMessage.trim(),
         is_read: false,
       };
 
       console.log('📤 Sending message:', messageData);
 
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/app_messages`, {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/support_messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -316,20 +391,35 @@ export function InAppCommunication({
       if (!response.ok) {
         const errorText = await response.text();
         console.error('📤 Message error:', errorText);
-        
-        // If table doesn't exist, show helpful message
-        if (errorText.includes('relation') && errorText.includes('does not exist')) {
-          throw new Error('Chat system is being set up. Please try again later or contact support via phone.');
-        }
         throw new Error(errorText || 'Failed to send message');
       }
 
       const result = await response.json();
       console.log('📤 Message sent successfully:', result);
 
+      // Update the chat's updated_at timestamp
+      await fetch(`${SUPABASE_URL}/rest/v1/support_chats?id=eq.${currentChatId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({ updated_at: new Date().toISOString() }),
+      });
+
       // Add message to local state immediately
       if (result && result.length > 0) {
-        setMessages(prev => [...prev, result[0]]);
+        const newMsg: Message = {
+          id: result[0].id,
+          sender_id: userId,
+          sender_name: userName,
+          sender_role: userRole,
+          content: newMessage.trim(),
+          created_at: result[0].created_at,
+          is_read: false,
+        };
+        setMessages(prev => [...prev, newMsg]);
       }
 
       setNewMessage('');
