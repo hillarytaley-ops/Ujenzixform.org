@@ -125,18 +125,35 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
 
   useEffect(() => {
     loadAnalytics();
+    // Safety timeout - force loading to false after 10 seconds
+    const safetyTimeout = setTimeout(() => {
+      setLoading(false);
+      console.log('⏱️ Analytics safety timeout - forcing loading false');
+    }, 10000);
+    return () => clearTimeout(safetyTimeout);
   }, [supplierId, timeRange]);
+
+  // Helper function to add timeout to any promise
+  const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Timeout')), ms))
+    ]);
+  };
 
   const loadAnalytics = async () => {
     try {
       setLoading(true);
+      console.log('📊 Loading analytics for supplier:', supplierId);
 
-      // Load real data from database
+      // Load real data from database with timeouts
       const [ordersData, productsData, quotesData] = await Promise.all([
-        loadOrdersData(),
-        loadProductsData(),
-        loadQuotesData()
+        withTimeout(loadOrdersData(), 5000).catch(() => []),
+        withTimeout(loadProductsData(), 5000).catch(() => []),
+        withTimeout(loadQuotesData(), 5000).catch(() => [])
       ]);
+
+      console.log('📊 Analytics data loaded:', { orders: ordersData.length, products: productsData.length, quotes: quotesData.length });
 
       // Calculate metrics
       const calculatedMetrics = calculateMetrics(ordersData, quotesData);
@@ -168,56 +185,111 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
 
   const loadOrdersData = async () => {
     try {
-      // Use purchase_orders table which is the main orders table
-      const { data, error } = await supabase
-        .from('purchase_orders')
-        .select('*')
-        .eq('supplier_id', supplierId)
-        .order('created_at', { ascending: false });
-      
-      if (error) {
-        console.warn('Error loading orders:', error.message);
-        return [];
+      // Get access token for REST API
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      let accessToken = '';
+      if (storedSession) {
+        try {
+          const parsed = JSON.parse(storedSession);
+          accessToken = parsed.access_token || '';
+        } catch (e) {}
       }
-      return data || [];
-    } catch {
+
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+
+      // Use REST API for faster, more reliable fetching
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=eq.${supplierId}&order=created_at.desc`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('📊 Orders loaded via REST:', data?.length);
+        return data || [];
+      }
+      return [];
+    } catch (error) {
+      console.warn('Error loading orders:', error);
       return [];
     }
   };
 
   const loadProductsData = async () => {
     try {
-      // Load supplier products without the join (relationship may not exist)
-      const { data, error } = await supabase
-        .from('supplier_product_prices')
-        .select('*')
-        .eq('supplier_id', supplierId);
-      
-      if (error) {
-        console.warn('Error loading products:', error.message);
-        return [];
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      let accessToken = '';
+      if (storedSession) {
+        try {
+          const parsed = JSON.parse(storedSession);
+          accessToken = parsed.access_token || '';
+        } catch (e) {}
       }
-      return data || [];
-    } catch {
+
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/supplier_product_prices?supplier_id=eq.${supplierId}`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('📊 Products loaded via REST:', data?.length);
+        return data || [];
+      }
+      return [];
+    } catch (error) {
+      console.warn('Error loading products:', error);
       return [];
     }
   };
 
   const loadQuotesData = async () => {
     try {
-      // Use purchase_orders with status 'quoted' or 'pending' as quote data
-      const { data, error } = await supabase
-        .from('purchase_orders')
-        .select('*')
-        .eq('supplier_id', supplierId)
-        .in('status', ['pending', 'quoted']);
-      
-      if (error) {
-        console.warn('Error loading quotes:', error.message);
-        return [];
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      let accessToken = '';
+      if (storedSession) {
+        try {
+          const parsed = JSON.parse(storedSession);
+          accessToken = parsed.access_token || '';
+        } catch (e) {}
       }
-      return data || [];
-    } catch {
+
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+
+      // Use OR filter for multiple statuses
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=eq.${supplierId}&status=in.(pending,quoted)`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('📊 Quotes loaded via REST:', data?.length);
+        return data || [];
+      }
+      return [];
+    } catch (error) {
+      console.warn('Error loading quotes:', error);
       return [];
     }
   };
