@@ -269,10 +269,10 @@ const ProfessionalBuilderDashboardPage = () => {
     try {
       console.log('📊 Loading real stats for builder:', userId);
       
-      // Fetch purchase orders using Supabase client with timeout
+      // Fetch purchase orders using Supabase client with timeout (increased to 10s)
       const ordersResult = await withTimeout(
         supabase.from('purchase_orders').select('*').eq('buyer_id', userId).order('created_at', { ascending: false }),
-        5000,
+        10000,
         { data: null, error: { message: 'Timeout' } }
       );
       
@@ -283,10 +283,10 @@ const ProfessionalBuilderDashboardPage = () => {
         console.log('📊 Stats: Orders loaded:', orders?.length || 0);
       }
 
-      // Fetch builder projects using Supabase client with timeout
+      // Fetch builder projects using Supabase client with timeout (increased to 10s)
       const projectsResult = await withTimeout(
         supabase.from('builder_projects').select('*').eq('builder_id', userId).order('created_at', { ascending: false }),
-        5000,
+        10000,
         { data: null, error: { message: 'Timeout' } }
       );
       
@@ -354,12 +354,12 @@ const ProfessionalBuilderDashboardPage = () => {
     
     setLoadingDeliveries(true);
     
-    // Safety timeout - finish loading after 8 seconds max
+    // Safety timeout - finish loading after 15 seconds max
     const safetyTimeout = setTimeout(() => {
       console.log('🚚 Safety timeout reached, finishing delivery load');
       setLoadingDeliveries(false);
       setDeliveriesLoaded(true);
-    }, 8000);
+    }, 15000);
 
     try {
       console.log('🚚 Loading deliveries for builder:', userId);
@@ -368,7 +368,7 @@ const ProfessionalBuilderDashboardPage = () => {
       let profileId = userId;
       const profileResult = await withTimeout(
         supabase.from('profiles').select('id').eq('user_id', userId).maybeSingle(),
-        3000,
+        8000,
         { data: null, error: null }
       );
       
@@ -377,13 +377,13 @@ const ProfessionalBuilderDashboardPage = () => {
         console.log('🚚 Found profile ID:', profileId);
       }
 
-      // Fetch delivery requests using Supabase client with timeout
+      // Fetch delivery requests using Supabase client with timeout (increased to 10s)
       let deliveryRequests: any[] = [];
       
       // Try with profile ID first
       const reqResult1 = await withTimeout(
         supabase.from('delivery_requests').select('*').eq('builder_id', profileId).order('created_at', { ascending: false }),
-        5000,
+        10000,
         { data: [], error: null }
       );
       
@@ -398,7 +398,7 @@ const ProfessionalBuilderDashboardPage = () => {
       if (profileId !== userId) {
         const reqResult2 = await withTimeout(
           supabase.from('delivery_requests').select('*').eq('builder_id', userId).order('created_at', { ascending: false }),
-          5000,
+          10000,
           { data: [], error: null }
         );
         
@@ -410,12 +410,12 @@ const ProfessionalBuilderDashboardPage = () => {
         }
       }
 
-      // Fetch deliveries table using Supabase client with timeout
+      // Fetch deliveries table using Supabase client with timeout (increased to 10s)
       let deliveriesData: any[] = [];
       
       const delResult1 = await withTimeout(
         supabase.from('deliveries').select('*').eq('builder_id', profileId).order('created_at', { ascending: false }),
-        5000,
+        10000,
         { data: [], error: null }
       );
       
@@ -427,7 +427,7 @@ const ProfessionalBuilderDashboardPage = () => {
       if (profileId !== userId) {
         const delResult2 = await withTimeout(
           supabase.from('deliveries').select('*').eq('builder_id', userId).order('created_at', { ascending: false }),
-          5000,
+          10000,
           { data: [], error: null }
         );
         
@@ -439,11 +439,11 @@ const ProfessionalBuilderDashboardPage = () => {
         }
       }
 
-      // Also fetch from purchase_orders with delivery info
+      // Also fetch from purchase_orders with delivery info (increased to 10s)
       let orderDeliveries: any[] = [];
       const ordersResult = await withTimeout(
         supabase.from('purchase_orders').select('*').eq('buyer_id', userId).in('status', ['confirmed', 'shipped', 'delivered']).order('created_at', { ascending: false }),
-        5000,
+        10000,
         { data: [], error: null }
       );
       

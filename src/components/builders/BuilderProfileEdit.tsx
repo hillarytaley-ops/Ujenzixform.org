@@ -156,22 +156,40 @@ export const BuilderProfileEdit: React.FC<BuilderProfileEditProps> = ({
     setLoading(true);
     console.log('📝 BuilderProfileEdit: Loading profile...');
     
-    // Safety timeout - show form after 6 seconds max with default profile
+    // Safety timeout - show form after 8 seconds max with default profile
     const safetyTimeout = setTimeout(() => {
       console.log('⚠️ BuilderProfileEdit: Safety timeout reached, using default profile');
       createDefaultProfile();
       setLoading(false);
-    }, 6000);
+    }, 8000);
     
     try {
-      const userResult = await withTimeout(
-        supabase.auth.getUser(),
-        3000,
-        { data: { user: null }, error: null }
+      // Use getSession() instead of getUser() - it's faster and uses cached session
+      const sessionResult = await withTimeout(
+        supabase.auth.getSession(),
+        5000,
+        { data: { session: null }, error: null }
       );
       
-      const user = userResult.data?.user;
+      let user = sessionResult.data?.session?.user;
+      
+      // If session timeout, try to get user from localStorage as fallback
       if (!user) {
+        console.log('📝 BuilderProfileEdit: Session timeout, trying localStorage fallback');
+        try {
+          const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          if (storedSession) {
+            const parsed = JSON.parse(storedSession);
+            user = parsed?.user;
+            console.log('📝 BuilderProfileEdit: Got user from localStorage:', user?.email);
+          }
+        } catch (e) {
+          console.log('📝 BuilderProfileEdit: localStorage fallback failed');
+        }
+      }
+      
+      if (!user) {
+        console.log('📝 BuilderProfileEdit: No user found, showing error');
         toast({
           title: 'Error',
           description: 'You must be logged in to edit your profile',
@@ -187,7 +205,7 @@ export const BuilderProfileEdit: React.FC<BuilderProfileEditProps> = ({
       
       const profileResult = await withTimeout(
         supabase.from('profiles').select('*').eq('user_id', user.id).single(),
-        5000,
+        8000,
         { data: null, error: { message: 'Timeout' } }
       );
 
