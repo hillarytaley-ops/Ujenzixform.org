@@ -156,9 +156,10 @@ export const BuilderProfileEdit: React.FC<BuilderProfileEditProps> = ({
     setLoading(true);
     console.log('📝 BuilderProfileEdit: Loading profile...');
     
-    // Safety timeout - show form after 6 seconds max
+    // Safety timeout - show form after 6 seconds max with default profile
     const safetyTimeout = setTimeout(() => {
-      console.log('⚠️ BuilderProfileEdit: Safety timeout reached');
+      console.log('⚠️ BuilderProfileEdit: Safety timeout reached, using default profile');
+      createDefaultProfile();
       setLoading(false);
     }, 6000);
     
@@ -191,8 +192,26 @@ export const BuilderProfileEdit: React.FC<BuilderProfileEditProps> = ({
       );
 
       if (profileResult.error) {
-        console.log('📝 BuilderProfileEdit: Profile fetch error:', profileResult.error.message);
-        throw profileResult.error;
+        console.log('📝 BuilderProfileEdit: Profile fetch error, creating default:', profileResult.error.message);
+        // Create default profile with user info so they can still edit
+        const defaultProfile: BuilderProfile = {
+          id: user.id,
+          user_id: user.id,
+          full_name: user.email?.split('@')[0] || 'User',
+          email: user.email,
+          specialties: [],
+          certifications: [],
+          service_areas: [],
+          show_phone: true,
+          show_email: true,
+          allow_messages: true,
+          allow_calls: true
+        };
+        setProfile(defaultProfile);
+        setIsOwner(true);
+        clearTimeout(safetyTimeout);
+        setLoading(false);
+        return;
       }
 
       const profileData = profileResult.data;
@@ -215,14 +234,37 @@ export const BuilderProfileEdit: React.FC<BuilderProfileEditProps> = ({
       setIsOwner(true);
     } catch (error) {
       console.error('Error loading profile:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load profile',
-        variant: 'destructive'
-      });
+      // On error, create default profile so user can still edit
+      createDefaultProfile();
     } finally {
       clearTimeout(safetyTimeout);
       setLoading(false);
+    }
+  };
+
+  const createDefaultProfile = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const defaultProfile: BuilderProfile = {
+          id: user.id,
+          user_id: user.id,
+          full_name: user.email?.split('@')[0] || 'User',
+          email: user.email,
+          specialties: [],
+          certifications: [],
+          service_areas: [],
+          show_phone: true,
+          show_email: true,
+          allow_messages: true,
+          allow_calls: true
+        };
+        setProfile(defaultProfile);
+        setIsOwner(true);
+        console.log('📝 BuilderProfileEdit: Using default profile');
+      }
+    } catch (e) {
+      console.error('Error creating default profile:', e);
     }
   };
 
