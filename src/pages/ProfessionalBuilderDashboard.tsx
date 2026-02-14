@@ -109,8 +109,39 @@ const ProfessionalBuilderDashboardPage = () => {
   const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R2I6GLWrY9xKkxa0ZDnmmSCWgTo';
 
-  // Helper to get access token
-  const getAccessToken = (): string => {
+  // Helper to get access token - try multiple sources
+  const getAccessToken = async (): Promise<string> => {
+    // First try to get fresh token from Supabase client
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        console.log('🔑 Got fresh access token from Supabase session');
+        return session.access_token;
+      }
+    } catch (e) {
+      console.log('🔑 Could not get session from Supabase client');
+    }
+    
+    // Fallback to localStorage
+    try {
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        if (parsed.access_token) {
+          console.log('🔑 Got access token from localStorage');
+          return parsed.access_token;
+        }
+      }
+    } catch (e) {
+      console.log('🔑 Could not get token from localStorage');
+    }
+    
+    console.log('🔑 No access token available');
+    return '';
+  };
+  
+  // Sync version for immediate use (may be stale)
+  const getAccessTokenSync = (): string => {
     try {
       const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
       if (storedSession) {
@@ -178,12 +209,13 @@ const ProfessionalBuilderDashboardPage = () => {
 
       // Get profile using REST API with timeout (Supabase client can hang)
       let profileData = null;
-      const accessToken = getAccessToken();
+      const accessToken = await getAccessToken();
       const headers = {
         'apikey': SUPABASE_ANON_KEY,
         'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
         'Content-Type': 'application/json'
       };
+      console.log('📋 Profile fetch using token length:', accessToken?.length || 0);
       
       try {
         const profilePromise = fetch(
@@ -255,12 +287,17 @@ const ProfessionalBuilderDashboardPage = () => {
       return;
     }
     
-    const accessToken = getAccessToken();
-    console.log('📊 Got access token:', accessToken ? 'Yes' : 'No');
+    const accessToken = await getAccessToken();
+    console.log('📊 Got access token:', accessToken ? 'Yes (length: ' + accessToken.length + ')' : 'No');
+    
+    if (!accessToken) {
+      console.log('📊 No access token, skipping stats load');
+      return;
+    }
     
     const headers = {
       'apikey': SUPABASE_ANON_KEY,
-      'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+      'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/json'
     };
 
@@ -347,16 +384,23 @@ const ProfessionalBuilderDashboardPage = () => {
     }
     
     setLoadingDeliveries(true);
-    const accessToken = getAccessToken();
+    const accessToken = await getAccessToken();
+    
+    if (!accessToken) {
+      console.log('🚚 No access token available, skipping delivery load');
+      setLoadingDeliveries(false);
+      return;
+    }
+    
     const headers = {
       'apikey': SUPABASE_ANON_KEY,
-      'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+      'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/json'
     };
 
     try {
       console.log('🚚 Loading deliveries for builder:', userId);
-      console.log('🚚 Using access token:', accessToken ? 'Yes' : 'No');
+      console.log('🚚 Using access token: Yes (length:', accessToken.length, ')');
       
       // First, get the profile ID (delivery_requests uses profile.id as builder_id)
       let profileId = userId;
@@ -537,7 +581,7 @@ const ProfessionalBuilderDashboardPage = () => {
 
     setLoadingProjects(true);
     const userId = getUserId();
-    const accessToken = getAccessToken();
+    const accessToken = await getAccessToken();
     
     try {
       const response = await fetch(`${SUPABASE_URL}/rest/v1/builder_projects`, {
