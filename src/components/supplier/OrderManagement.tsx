@@ -68,6 +68,9 @@ interface Order {
   notes?: string;
   created_at: string;
   updated_at: string;
+  // Additional fields for order type identification
+  order_type?: 'quote_request' | 'direct_purchase';
+  buyer_role?: string;
 }
 
 interface OrderManagementProps {
@@ -96,6 +99,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [orderTypeFilter, setOrderTypeFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const { toast } = useToast();
@@ -274,6 +278,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
       // Fetch buyer profiles using native fetch
       const buyerIds = [...new Set(purchaseOrders.map(po => po.buyer_id).filter(Boolean))];
       let buyerProfiles: Record<string, any> = {};
+      let buyerRoles: Record<string, string> = {};
       
       if (buyerIds.length > 0) {
         try {
@@ -283,7 +288,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
           const timeoutId = setTimeout(() => controller.abort(), 5000);
           
           const profilesResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/profiles?user_id=in.(${buyerIdsParam})&select=id,user_id,full_name,phone,email`,
+            `${SUPABASE_URL}/rest/v1/profiles?user_id=in.(${buyerIdsParam})&select=id,user_id,full_name,phone,email,role`,
             {
               headers: authHeaders,
               signal: controller.signal,
@@ -295,17 +300,51 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
           if (profilesResponse.ok) {
             const profiles = await profilesResponse.json();
             buyerProfiles = Object.fromEntries(profiles.map((p: any) => [p.user_id, p]));
+            buyerRoles = Object.fromEntries(profiles.map((p: any) => [p.user_id, p.role || 'unknown']));
             console.log('👥 Buyer profiles loaded:', profiles.length);
           }
         } catch {
           console.log('Profiles fetch timeout');
+        }
+        
+        // Also check user_roles table for more accurate role info
+        try {
+          const rolesController = new AbortController();
+          const rolesTimeoutId = setTimeout(() => rolesController.abort(), 3000);
+          
+          const rolesResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/user_roles?user_id=in.(${buyerIdsParam})&select=user_id,role`,
+            {
+              headers: authHeaders,
+              signal: rolesController.signal,
+              cache: 'no-store'
+            }
+          );
+          clearTimeout(rolesTimeoutId);
+          
+          if (rolesResponse.ok) {
+            const roles = await rolesResponse.json();
+            roles.forEach((r: any) => {
+              buyerRoles[r.user_id] = r.role;
+            });
+            console.log('👤 Buyer roles loaded:', roles.length);
+          }
+        } catch {
+          console.log('Roles fetch timeout');
         }
       }
 
       // Transform purchase_orders to Order format
       const realOrders: Order[] = (purchaseOrders || []).map((po, index) => {
         const buyer = buyerProfiles[po.buyer_id] || {};
+        const buyerRole = buyerRoles[po.buyer_id] || buyer.role || 'unknown';
         const items = Array.isArray(po.items) ? po.items : [];
+        
+        // Determine order type based on PO number prefix and status
+        // QR- prefix = quote request from Professional Builder
+        // PO- prefix = direct purchase from Private Client
+        const isQuoteRequest = po.po_number?.startsWith('QR-') || po.status === 'pending' || po.status === 'quoted';
+        const orderType: 'quote_request' | 'direct_purchase' = isQuoteRequest ? 'quote_request' : 'direct_purchase';
         
         return {
           id: po.id,
@@ -324,7 +363,9 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
           payment_status: 'paid' as const, // Default to paid for now
           notes: po.special_instructions || po.delivery_notes || '',
           created_at: po.created_at,
-          updated_at: po.updated_at || po.created_at
+          updated_at: po.updated_at || po.created_at,
+          order_type: orderType,
+          buyer_role: buyerRole
         };
       });
 
@@ -418,7 +459,8 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
       order.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.customer_email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesType = orderTypeFilter === 'all' || order.order_type === orderTypeFilter;
+    return matchesSearch && matchesStatus && matchesType;
   });
 
   // Stats
@@ -428,7 +470,11 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
     processing: orders.filter(o => ['confirmed', 'processing'].includes(o.status)).length,
     shipped: orders.filter(o => o.status === 'shipped').length,
     delivered: orders.filter(o => o.status === 'delivered').length,
-    totalRevenue: orders.filter(o => o.status !== 'cancelled').reduce((sum, o) => sum + o.total_amount, 0)
+    totalRevenue: orders.filter(o => o.status !== 'cancelled').reduce((sum, o) => sum + o.total_amount, 0),
+    // New stats for order types
+    directPurchases: orders.filter(o => o.order_type === 'direct_purchase').length,
+    quoteRequests: orders.filter(o => o.order_type === 'quote_request').length,
+    newDirectOrders: orders.filter(o => o.order_type === 'direct_purchase' && o.status === 'confirmed').length
   };
 
   const cardBg = isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white';
@@ -438,7 +484,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
         <Card className={cardBg}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -450,12 +496,25 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
             </div>
           </CardContent>
         </Card>
+        <Card className={`${cardBg} ${stats.newDirectOrders > 0 ? 'ring-2 ring-green-500 animate-pulse' : ''}`}>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className={`text-sm ${mutedText}`}>🛒 New Orders</p>
+                <p className="text-2xl font-bold text-green-600">{stats.newDirectOrders}</p>
+                <p className={`text-[10px] ${mutedText}`}>Direct purchases to process</p>
+              </div>
+              <CheckCircle className="h-8 w-8 text-green-500 opacity-50" />
+            </div>
+          </CardContent>
+        </Card>
         <Card className={cardBg}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className={`text-sm ${mutedText}`}>Pending</p>
-                <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
+                <p className={`text-sm ${mutedText}`}>📋 Quotes</p>
+                <p className="text-2xl font-bold text-blue-600">{stats.pending}</p>
+                <p className={`text-[10px] ${mutedText}`}>Quote requests pending</p>
               </div>
               <Clock className="h-8 w-8 text-yellow-500 opacity-50" />
             </div>
@@ -466,9 +525,9 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
             <div className="flex items-center justify-between">
               <div>
                 <p className={`text-sm ${mutedText}`}>Processing</p>
-                <p className="text-2xl font-bold text-blue-600">{stats.processing}</p>
+                <p className="text-2xl font-bold text-indigo-600">{stats.processing}</p>
               </div>
-              <Package className="h-8 w-8 text-blue-500 opacity-50" />
+              <Package className="h-8 w-8 text-indigo-500 opacity-50" />
             </div>
           </CardContent>
         </Card>
@@ -509,6 +568,16 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
                 className="pl-10"
               />
             </div>
+            <Select value={orderTypeFilter} onValueChange={setOrderTypeFilter}>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectValue placeholder="Order type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="direct_purchase">🛒 Direct Purchases</SelectItem>
+                <SelectItem value="quote_request">📋 Quote Requests</SelectItem>
+              </SelectContent>
+            </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-full sm:w-[180px]">
                 <SelectValue placeholder="Filter by status" />
@@ -561,10 +630,10 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
                   <TableRow>
                     <TableHead>Order #</TableHead>
                     <TableHead>Customer</TableHead>
+                    <TableHead>Type</TableHead>
                     <TableHead>Items</TableHead>
                     <TableHead>Total</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Payment</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
@@ -585,6 +654,23 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
                           </div>
                         </TableCell>
                         <TableCell>
+                          <Badge 
+                            variant="outline" 
+                            className={order.order_type === 'direct_purchase' 
+                              ? 'bg-green-50 text-green-700 border-green-200' 
+                              : 'bg-blue-50 text-blue-700 border-blue-200'
+                            }
+                          >
+                            {order.order_type === 'direct_purchase' ? '🛒 Direct' : '📋 Quote'}
+                          </Badge>
+                          {order.buyer_role && (
+                            <p className={`text-[10px] mt-1 ${mutedText}`}>
+                              {order.buyer_role === 'private_client' ? 'Private Client' : 
+                               order.buyer_role === 'professional_builder' ? 'Pro Builder' : order.buyer_role}
+                            </p>
+                          )}
+                        </TableCell>
+                        <TableCell>
                           <p className="text-sm">{order.items.length} item(s)</p>
                         </TableCell>
                         <TableCell className="font-semibold">{formatCurrency(order.total_amount)}</TableCell>
@@ -592,11 +678,6 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
                           <Badge className={`${statusConfig.color} flex items-center gap-1 w-fit`}>
                             <StatusIcon className="h-3 w-3" />
                             {statusConfig.label}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={order.payment_status === 'paid' ? 'default' : 'secondary'}>
-                            {order.payment_status === 'paid' ? 'Paid' : 'Pending'}
                           </Badge>
                         </TableCell>
                         <TableCell className={`text-sm ${mutedText}`}>
@@ -607,17 +688,72 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
                             <Button variant="ghost" size="sm" onClick={() => setSelectedOrder(order)}>
                               <Eye className="h-4 w-4" />
                             </Button>
-                            {nextStatus && (
+                            {/* For Direct Purchase orders (confirmed), show Process button */}
+                            {order.order_type === 'direct_purchase' && order.status === 'confirmed' && (
+                              <Button 
+                                size="sm" 
+                                onClick={() => updateOrderStatus(order.id, 'processing')}
+                                disabled={isUpdating}
+                                className="bg-green-600 hover:bg-green-700 text-xs"
+                              >
+                                ✅ Process
+                              </Button>
+                            )}
+                            {/* For Quote Requests (pending), show Confirm/Reject */}
+                            {order.order_type === 'quote_request' && order.status === 'pending' && (
+                              <>
+                                <Button 
+                                  size="sm" 
+                                  onClick={() => updateOrderStatus(order.id, 'confirmed')}
+                                  disabled={isUpdating}
+                                  className="bg-blue-600 hover:bg-blue-700 text-xs"
+                                >
+                                  Accept
+                                </Button>
+                                <Button 
+                                  size="sm" 
+                                  variant="destructive"
+                                  onClick={() => updateOrderStatus(order.id, 'cancelled')}
+                                  disabled={isUpdating}
+                                  className="text-xs"
+                                >
+                                  Reject
+                                </Button>
+                              </>
+                            )}
+                            {/* Standard flow for other statuses */}
+                            {nextStatus && order.status !== 'confirmed' && order.status !== 'pending' && (
                               <Button 
                                 size="sm" 
                                 onClick={() => updateOrderStatus(order.id, nextStatus)}
                                 disabled={isUpdating}
                                 className="bg-orange-500 hover:bg-orange-600 text-xs"
                               >
-                                {nextStatus === 'confirmed' && 'Confirm'}
                                 {nextStatus === 'processing' && 'Process'}
                                 {nextStatus === 'shipped' && 'Ship'}
                                 {nextStatus === 'delivered' && 'Complete'}
+                              </Button>
+                            )}
+                            {/* Processing orders - show Ship button */}
+                            {order.status === 'processing' && (
+                              <Button 
+                                size="sm" 
+                                onClick={() => updateOrderStatus(order.id, 'shipped')}
+                                disabled={isUpdating}
+                                className="bg-purple-600 hover:bg-purple-700 text-xs"
+                              >
+                                🚚 Ship
+                              </Button>
+                            )}
+                            {/* Shipped orders - show Complete button */}
+                            {order.status === 'shipped' && (
+                              <Button 
+                                size="sm" 
+                                onClick={() => updateOrderStatus(order.id, 'delivered')}
+                                disabled={isUpdating}
+                                className="bg-green-600 hover:bg-green-700 text-xs"
+                              >
+                                ✅ Complete
                               </Button>
                             )}
                           </div>
@@ -640,12 +776,29 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
               <DialogHeader>
                 <DialogTitle className="flex items-center justify-between">
                   <span>Order {selectedOrder.order_number}</span>
-                  <Badge className={getStatusConfig(selectedOrder.status).color}>
-                    {getStatusConfig(selectedOrder.status).label}
-                  </Badge>
+                  <div className="flex gap-2">
+                    <Badge 
+                      variant="outline" 
+                      className={selectedOrder.order_type === 'direct_purchase' 
+                        ? 'bg-green-50 text-green-700 border-green-200' 
+                        : 'bg-blue-50 text-blue-700 border-blue-200'
+                      }
+                    >
+                      {selectedOrder.order_type === 'direct_purchase' ? '🛒 Direct Purchase' : '📋 Quote Request'}
+                    </Badge>
+                    <Badge className={getStatusConfig(selectedOrder.status).color}>
+                      {getStatusConfig(selectedOrder.status).label}
+                    </Badge>
+                  </div>
                 </DialogTitle>
                 <DialogDescription>
                   Placed on {format(new Date(selectedOrder.created_at), 'MMMM dd, yyyy HH:mm')}
+                  {selectedOrder.buyer_role && (
+                    <span className="ml-2">
+                      by {selectedOrder.buyer_role === 'private_client' ? 'Private Client' : 
+                          selectedOrder.buyer_role === 'professional_builder' ? 'Professional Builder' : selectedOrder.buyer_role}
+                    </span>
+                  )}
                 </DialogDescription>
               </DialogHeader>
               
