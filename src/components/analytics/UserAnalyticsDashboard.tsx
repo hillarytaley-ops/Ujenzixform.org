@@ -74,6 +74,31 @@ interface UserAnalyticsDashboardProps {
   userRole: 'supplier' | 'builder' | 'professional_builder' | 'private_client';
 }
 
+// Helper function to get Supabase config
+const getSupabaseConfig = () => {
+  const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+  
+  let accessToken = '';
+  try {
+    const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+    if (storedSession) {
+      const parsed = JSON.parse(storedSession);
+      accessToken = parsed.access_token || '';
+    }
+  } catch (e) {}
+  
+  return { SUPABASE_URL, SUPABASE_ANON_KEY, accessToken };
+};
+
+// Helper function to add timeout to any promise
+const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Timeout')), ms))
+  ]);
+};
+
 export const UserAnalyticsDashboard: React.FC<UserAnalyticsDashboardProps> = ({ userId, userRole }) => {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -84,11 +109,20 @@ export const UserAnalyticsDashboard: React.FC<UserAnalyticsDashboardProps> = ({ 
 
   useEffect(() => {
     loadAnalytics();
+    // Safety timeout - force loading to false after 10 seconds
+    const safetyTimeout = setTimeout(() => {
+      setLoading(false);
+      console.log('⏱️ User Analytics safety timeout - forcing loading false');
+    }, 10000);
+    return () => clearTimeout(safetyTimeout);
   }, [userId, userRole, dateRange]);
 
   const loadAnalytics = async () => {
     try {
       setLoading(true);
+      console.log('📊 Loading user analytics for:', userId, 'role:', userRole);
+      
+      const { SUPABASE_URL, SUPABASE_ANON_KEY, accessToken } = getSupabaseConfig();
       
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - parseInt(dateRange));
@@ -96,34 +130,49 @@ export const UserAnalyticsDashboard: React.FC<UserAnalyticsDashboardProps> = ({ 
       const previousStartDate = new Date(startDate);
       previousStartDate.setDate(previousStartDate.getDate() - parseInt(dateRange));
       
-      // Fetch orders
-      const orderQuery = supabase
-        .from('purchase_orders')
-        .select('*')
-        .gte('created_at', startDate.toISOString());
+      // Build query params based on role
+      const idField = isSupplier ? 'supplier_id' : 'buyer_id';
       
-      if (isSupplier) {
-        orderQuery.eq('supplier_id', userId);
-      } else {
-        orderQuery.eq('buyer_id', userId);
+      // Fetch orders using REST API
+      let orders: any[] = [];
+      try {
+        const ordersUrl = `${SUPABASE_URL}/rest/v1/purchase_orders?${idField}=eq.${userId}&created_at=gte.${startDate.toISOString()}&order=created_at.desc`;
+        const ordersResponse = await withTimeout(
+          fetch(ordersUrl, {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+            },
+          }),
+          5000
+        );
+        if (ordersResponse.ok) {
+          orders = await ordersResponse.json();
+          console.log('📊 Orders loaded:', orders?.length);
+        }
+      } catch (e) {
+        console.log('Orders fetch timeout');
       }
-      
-      const { data: orders, error: ordersError } = await orderQuery;
       
       // Fetch previous period orders for comparison
-      const prevOrderQuery = supabase
-        .from('purchase_orders')
-        .select('total_amount')
-        .gte('created_at', previousStartDate.toISOString())
-        .lt('created_at', startDate.toISOString());
-      
-      if (isSupplier) {
-        prevOrderQuery.eq('supplier_id', userId);
-      } else {
-        prevOrderQuery.eq('buyer_id', userId);
+      let prevOrders: any[] = [];
+      try {
+        const prevUrl = `${SUPABASE_URL}/rest/v1/purchase_orders?${idField}=eq.${userId}&created_at=gte.${previousStartDate.toISOString()}&created_at=lt.${startDate.toISOString()}&select=total_amount`;
+        const prevResponse = await withTimeout(
+          fetch(prevUrl, {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+            },
+          }),
+          5000
+        );
+        if (prevResponse.ok) {
+          prevOrders = await prevResponse.json();
+        }
+      } catch (e) {
+        console.log('Previous orders fetch timeout');
       }
-      
-      const { data: prevOrders } = await prevOrderQuery;
       
       // Calculate metrics
       const currentRevenue = (orders || []).reduce((sum, o) => sum + (o.total_amount || 0), 0);
@@ -191,28 +240,53 @@ export const UserAnalyticsDashboard: React.FC<UserAnalyticsDashboardProps> = ({ 
       let totalProducts = 0;
       let lowStockProducts = 0;
       if (isSupplier) {
-        const { data: products } = await supabase
-          .from('supplier_product_prices')
-          .select('id, stock_quantity, in_stock')
-          .eq('supplier_id', userId);
-        
-        totalProducts = products?.length || 0;
-        lowStockProducts = products?.filter((p: any) => 
-          (p.stock_quantity !== null && p.stock_quantity <= 10) || !p.in_stock
-        ).length || 0;
+        try {
+          const productsUrl = `${SUPABASE_URL}/rest/v1/supplier_product_prices?supplier_id=eq.${userId}&select=id,stock_quantity,in_stock`;
+          const productsResponse = await withTimeout(
+            fetch(productsUrl, {
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+              },
+            }),
+            5000
+          );
+          if (productsResponse.ok) {
+            const products = await productsResponse.json();
+            totalProducts = products?.length || 0;
+            lowStockProducts = products?.filter((p: any) => 
+              (p.stock_quantity !== null && p.stock_quantity <= 10) || !p.in_stock
+            ).length || 0;
+            console.log('📊 Products loaded:', totalProducts);
+          }
+        } catch (e) {
+          console.log('Products fetch timeout');
+        }
       }
       
       // Rating (for suppliers)
       let averageRating = 0;
       if (isSupplier) {
-        const { data: reviews } = await supabase
-          .from('supplier_reviews')
-          .select('rating')
-          .eq('supplier_id', userId)
-          .eq('status', 'approved');
-        
-        if (reviews && reviews.length > 0) {
-          averageRating = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
+        try {
+          const reviewsUrl = `${SUPABASE_URL}/rest/v1/supplier_reviews?supplier_id=eq.${userId}&status=eq.approved&select=rating`;
+          const reviewsResponse = await withTimeout(
+            fetch(reviewsUrl, {
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+              },
+            }),
+            5000
+          );
+          if (reviewsResponse.ok) {
+            const reviews = await reviewsResponse.json();
+            if (reviews && reviews.length > 0) {
+              averageRating = reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / reviews.length;
+            }
+            console.log('📊 Reviews loaded for rating:', reviews?.length);
+          }
+        } catch (e) {
+          console.log('Reviews fetch timeout');
         }
       }
       
