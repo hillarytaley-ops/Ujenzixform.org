@@ -973,7 +973,7 @@ const DeliveryDashboard = () => {
               {user && (
                 <InAppCommunication
                   userId={user.id}
-                  userName={providerData?.provider?.company_name || user.email || 'Driver'}
+                  userName={providerProfile?.company_name || providerProfile?.full_name || user.email || 'Driver'}
                   userRole="delivery_provider"
                   isDarkMode={isDarkMode}
                 />
