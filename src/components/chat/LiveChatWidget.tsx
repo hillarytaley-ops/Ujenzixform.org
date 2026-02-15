@@ -152,7 +152,7 @@ export function LiveChatWidget({ position = 'bottom-right' }: LiveChatWidgetProp
       const conversationData = {
         client_id: userId || null,
         client_name: userName || 'Guest',
-        client_email: userEmail || null,
+        client_email: userEmail || 'guest@ujenzixform.org', // Required field - use placeholder for guests
         status: 'open',
         source: 'live_chat',
         priority: 'normal'
