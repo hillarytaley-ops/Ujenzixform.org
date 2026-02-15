@@ -408,6 +408,11 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
               };
             });
 
+          // Get first image from image_urls array (database stores as array)
+          const firstImageUrl = Array.isArray(post.image_urls) && post.image_urls.length > 0 
+            ? post.image_urls[0] 
+            : '';
+
           return {
             id: post.id,
             builderId: post.builder_id,
@@ -416,7 +421,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
             builderAvatar: profile?.avatar_url || '',
             builderVerified: profile?.is_verified || false,
             videoUrl: post.video_url || '', // Database column is 'video_url'
-            imageUrl: post.image_url || '', // Database column is 'image_url'
+            imageUrl: firstImageUrl, // Database column is 'image_urls' (array)
             thumbnailUrl: post.thumbnail_url || '',
             caption: post.content || '', // Database column is 'content'
             location: post.project_location || profile?.location || '',
@@ -774,7 +779,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
           post_type: postType,
           content: newPostText,
           video_url: videoUrl || null,
-          image_url: imageUrl || null,
+          image_urls: imageUrl ? [imageUrl] : null, // Database uses image_urls (array)
           project_location: postLocation || null,
           privacy: privacy,
           status: 'active', // Posts are immediately visible
