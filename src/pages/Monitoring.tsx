@@ -886,6 +886,51 @@ const Monitoring = () => {
                         </ol>
                       </div>
 
+                      {/* Access Code Entry */}
+                      <div className="bg-gradient-to-r from-cyan-900/30 to-blue-900/30 rounded-xl p-6 border border-cyan-500/30 mb-6">
+                        <h4 className="font-semibold text-lg mb-4 flex items-center gap-2 text-white">
+                          <Key className="h-5 w-5 text-cyan-400" />
+                          Already Have an Access Code?
+                        </h4>
+                        <p className="text-sm text-slate-400 mb-4">
+                          Enter your access code below to view your assigned cameras
+                        </p>
+                        <div className="flex gap-3">
+                          <Input
+                            placeholder="Enter your access code (e.g., 2K4KVUH1)"
+                            value={accessCodeInput}
+                            onChange={(e) => setAccessCodeInput(e.target.value.toUpperCase())}
+                            className="bg-slate-900 border-cyan-500/30 text-white font-mono text-lg h-12 flex-1"
+                            maxLength={10}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAccessCodeSubmit()}
+                          />
+                          <Button 
+                            onClick={handleAccessCodeSubmit}
+                            disabled={loadingCameras || !accessCodeInput.trim()}
+                            className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 h-12 px-6"
+                          >
+                            {loadingCameras ? (
+                              <RefreshCw className="h-5 w-5 animate-spin" />
+                            ) : (
+                              <>
+                                <Eye className="h-5 w-5 mr-2" />
+                                View Cameras
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Divider */}
+                      <div className="relative my-6">
+                        <div className="absolute inset-0 flex items-center">
+                          <div className="w-full border-t border-slate-700"></div>
+                        </div>
+                        <div className="relative flex justify-center text-sm">
+                          <span className="px-4 bg-slate-800 text-slate-500">or request new service</span>
+                        </div>
+                      </div>
+
                       {/* CTA Button */}
                       <div className="text-center space-y-4">
                         <Button 
@@ -896,9 +941,6 @@ const Monitoring = () => {
                           <Camera className="h-5 w-5 mr-2" />
                           Request Monitoring Service
                         </Button>
-                        <p className="text-sm text-slate-500">
-                          Already have an access code? Contact support to activate your subscription.
-                        </p>
                       </div>
                     </div>
                   </CardContent>
