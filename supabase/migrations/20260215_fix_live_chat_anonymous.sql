@@ -39,8 +39,9 @@ ON public.conversations FOR SELECT
 USING (
     -- Admins see all conversations (using admin role from app_role enum)
     EXISTS (SELECT 1 FROM public.user_roles ur WHERE ur.user_id = auth.uid() AND ur.role = 'admin'::app_role) OR
-    -- Staff from admin_staff table can also see all
-    EXISTS (SELECT 1 FROM public.admin_staff s WHERE s.user_id = auth.uid())
+    -- Staff from admin_staff table can also see all (check by user_id OR email)
+    EXISTS (SELECT 1 FROM public.admin_staff s WHERE s.user_id = auth.uid()) OR
+    EXISTS (SELECT 1 FROM public.admin_staff s WHERE s.email = auth.jwt()->>'email')
 );
 
 -- Regular users see their own conversations
@@ -77,8 +78,9 @@ ON public.chat_messages FOR SELECT
 USING (
     -- Admins see all messages (using admin role from app_role enum)
     EXISTS (SELECT 1 FROM public.user_roles ur WHERE ur.user_id = auth.uid() AND ur.role = 'admin'::app_role) OR
-    -- Staff from admin_staff table can also see all
-    EXISTS (SELECT 1 FROM public.admin_staff s WHERE s.user_id = auth.uid())
+    -- Staff from admin_staff table can also see all (check by user_id OR email)
+    EXISTS (SELECT 1 FROM public.admin_staff s WHERE s.user_id = auth.uid()) OR
+    EXISTS (SELECT 1 FROM public.admin_staff s WHERE s.email = auth.jwt()->>'email')
 );
 
 -- Regular users see their own messages
@@ -105,7 +107,8 @@ USING (
         WHERE c.id = conversation_id AND c.client_id::text = auth.uid()::text
     ) OR
     EXISTS (SELECT 1 FROM public.user_roles ur WHERE ur.user_id = auth.uid() AND ur.role = 'admin'::app_role) OR
-    EXISTS (SELECT 1 FROM public.admin_staff s WHERE s.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.admin_staff s WHERE s.user_id = auth.uid()) OR
+    EXISTS (SELECT 1 FROM public.admin_staff s WHERE s.email = auth.jwt()->>'email')
 );
 
 -- =====================================================================
