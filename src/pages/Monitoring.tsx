@@ -547,9 +547,13 @@ const Monitoring = () => {
     }
   };
 
-  const isAdmin = effectiveRole === 'admin';
-  const isBuilder = ['builder', 'professional_builder', 'private_client'].includes(effectiveRole || '');
-  const isDeliveryProvider = effectiveRole === 'delivery_provider' || effectiveRole === 'delivery';
+  // Define effectiveRole early - use userRole from state, or fall back to localStorage
+  const storedRole = typeof window !== 'undefined' ? localStorage.getItem('user_role') : null;
+  const effectiveRoleEarly = userRole || storedRole;
+  
+  const isAdmin = effectiveRoleEarly === 'admin';
+  const isBuilder = ['builder', 'professional_builder', 'private_client'].includes(effectiveRoleEarly || '');
+  const isDeliveryProvider = effectiveRoleEarly === 'delivery_provider' || effectiveRoleEarly === 'delivery';
   // Builders can view cameras if they have the role (monitoring access check is done separately)
   const canViewCameras = isAdmin || isBuilder;
 
@@ -578,8 +582,7 @@ const Monitoring = () => {
 
   // Show loading ONLY if we don't have a cached role AND we're still checking
   // If we have a cached builder role, show content immediately
-  const cachedRole = localStorage.getItem('user_role');
-  const hasValidCachedRole = cachedRole && ['admin', 'professional_builder', 'private_client', 'builder'].includes(cachedRole);
+  const hasValidCachedRole = storedRole && ['admin', 'professional_builder', 'private_client', 'builder'].includes(storedRole);
   
   if (checkingAccess && !hasValidCachedRole) {
     return (
@@ -596,11 +599,10 @@ const Monitoring = () => {
     );
   }
 
-  // Use either the verified role or the cached role
-  const effectiveRole = userRole || cachedRole;
-  const isValidRole = effectiveRole && ['admin', 'professional_builder', 'private_client', 'builder'].includes(effectiveRole);
+  // Use either the verified role or the cached role (already defined as effectiveRoleEarly)
+  const isValidRole = effectiveRoleEarly && ['admin', 'professional_builder', 'private_client', 'builder'].includes(effectiveRoleEarly);
   
-  console.log('🔐 Monitoring RENDER - effectiveRole:', effectiveRole, 'userRole:', userRole, 'cachedRole:', cachedRole);
+  console.log('🔐 Monitoring RENDER - effectiveRole:', effectiveRoleEarly, 'userRole:', userRole, 'storedRole:', storedRole);
   
   // Block users without any valid role
   if (!isValidRole) {
