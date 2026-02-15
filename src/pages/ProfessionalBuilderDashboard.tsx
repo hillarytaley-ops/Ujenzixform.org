@@ -1670,6 +1670,7 @@ const ProfessionalBuilderDashboardPage = () => {
                 </div>
 
                 {/* Monitoring Requests List */}
+                {console.log('🎨 RENDER: monitoringRequests.length =', monitoringRequests.length)}
                 {monitoringRequests.length > 0 ? (
                   <div className="space-y-4">
                     <h4 className="font-semibold text-gray-700">Your Monitoring Requests</h4>
