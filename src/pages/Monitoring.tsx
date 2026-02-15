@@ -262,7 +262,7 @@ const Monitoring = () => {
     // Set default tab based on role
     if (userRole === 'admin') {
       setActiveTab("overview");
-    } else if (userRole === 'builder') {
+    } else if (['builder', 'professional_builder', 'private_client'].includes(userRole || '')) {
       setActiveTab("cameras");
     }
   }, [userRole]);
@@ -416,8 +416,10 @@ const Monitoring = () => {
       localStorage.setItem('user_role', dbRole);
       localStorage.setItem('user_role_id', authUser.id);
       
-      // For builders, check if they have an approved/active monitoring request
-      if (dbRole === 'builder') {
+      // For builders (including professional_builder and private_client), check if they have an approved/active monitoring request
+      const isBuilderRole = ['builder', 'professional_builder', 'private_client'].includes(dbRole);
+      
+      if (isBuilderRole) {
         const { data: monitoringData, error: monitoringError } = await supabase
           .from('monitoring_service_requests')
           .select('*')
@@ -429,6 +431,7 @@ const Monitoring = () => {
           setHasMonitoringAccess(true);
           setMonitoringRequest(monitoringData);
         } else {
+          // Builders without approved monitoring access can still request it
           setHasMonitoringAccess(false);
         }
       } else if (dbRole === 'admin') {
@@ -453,7 +456,7 @@ const Monitoring = () => {
   };
 
   const isAdmin = userRole === 'admin';
-  const isBuilder = userRole === 'builder';
+  const isBuilder = ['builder', 'professional_builder', 'private_client'].includes(userRole || '');
   const isDeliveryProvider = userRole === 'delivery_provider' || userRole === 'delivery';
   // Builders can only view cameras if they have an approved/active monitoring request
   const canViewCameras = isAdmin || (isBuilder && hasMonitoringAccess);
