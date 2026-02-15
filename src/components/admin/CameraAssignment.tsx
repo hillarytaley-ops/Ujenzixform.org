@@ -52,9 +52,23 @@ import {
   Calendar,
   Key
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+
+// Helper to get access token
+const getAccessToken = (): string => {
+  try {
+    const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+    if (storedSession) {
+      const parsed = JSON.parse(storedSession);
+      return parsed?.access_token || SUPABASE_ANON_KEY;
+    }
+  } catch (e) {
+    console.log('Using anon key for camera assignment');
+  }
+  return SUPABASE_ANON_KEY;
+};
 
 interface MonitoringRequest {
   id: string;
@@ -100,31 +114,75 @@ export const CameraAssignment: React.FC = () => {
 
   const loadData = async () => {
     setLoading(true);
+    console.log('📹 CameraAssignment: Loading data...');
+    
     try {
-      // Load approved monitoring requests
-      const { data: requestsData, error: requestsError } = await supabase
-        .from('monitoring_service_requests')
-        .select('*')
-        .in('status', ['approved', 'completed'])
-        .order('created_at', { ascending: false });
+      const accessToken = getAccessToken();
+      const headers = {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${accessToken}`,
+      };
 
-      if (requestsError) throw requestsError;
-      setRequests(requestsData || []);
+      // Load approved monitoring requests using REST API
+      console.log('📹 Fetching monitoring requests...');
+      const requestsRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/monitoring_service_requests?status=in.(approved,completed)&order=created_at.desc`,
+        { headers }
+      );
+      
+      if (requestsRes.ok) {
+        const requestsData = await requestsRes.json();
+        console.log('📹 Monitoring requests loaded:', requestsData?.length || 0);
+        setRequests(requestsData || []);
+      } else {
+        console.log('📹 Requests fetch failed:', requestsRes.status);
+        // Fallback to Supabase client
+        const { data: requestsData, error: requestsError } = await supabase
+          .from('monitoring_service_requests')
+          .select('*')
+          .in('status', ['approved', 'completed'])
+          .order('created_at', { ascending: false });
 
-      // Load all cameras
-      const { data: camerasData, error: camerasError } = await supabase
-        .from('cameras')
-        .select('*')
-        .order('name');
+        if (requestsError) {
+          console.error('📹 Supabase fallback error:', requestsError);
+        } else {
+          console.log('📹 Requests loaded via fallback:', requestsData?.length || 0);
+          setRequests(requestsData || []);
+        }
+      }
 
-      if (camerasError) throw camerasError;
-      setCameras(camerasData || []);
+      // Load all cameras using REST API
+      console.log('📹 Fetching cameras...');
+      const camerasRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/cameras?order=name`,
+        { headers }
+      );
+      
+      if (camerasRes.ok) {
+        const camerasData = await camerasRes.json();
+        console.log('📹 Cameras loaded:', camerasData?.length || 0);
+        setCameras(camerasData || []);
+      } else {
+        console.log('📹 Cameras fetch failed:', camerasRes.status);
+        // Fallback to Supabase client
+        const { data: camerasData, error: camerasError } = await supabase
+          .from('cameras')
+          .select('*')
+          .order('name');
+
+        if (camerasError) {
+          console.error('📹 Cameras fallback error:', camerasError);
+        } else {
+          console.log('📹 Cameras loaded via fallback:', camerasData?.length || 0);
+          setCameras(camerasData || []);
+        }
+      }
 
     } catch (error) {
-      console.error('Error loading data:', error);
+      console.error('📹 Error loading data:', error);
       toast({
         title: 'Error',
-        description: 'Failed to load data',
+        description: 'Failed to load data. Check console for details.',
         variant: 'destructive'
       });
     } finally {
@@ -157,18 +215,41 @@ export const CameraAssignment: React.FC = () => {
         accessCode = generateAccessCode();
       }
 
-      // Update the monitoring request with assigned cameras
-      const { error } = await supabase
-        .from('monitoring_service_requests')
-        .update({
-          assigned_cameras: selectedCameras,
-          access_code: accessCode,
-          status: selectedCameras.length > 0 ? 'approved' : selectedRequest.status,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', selectedRequest.id);
+      console.log('📹 Saving camera assignment:', {
+        requestId: selectedRequest.id,
+        cameras: selectedCameras.length,
+        accessCode
+      });
 
-      if (error) throw error;
+      const accessToken = getAccessToken();
+      
+      // Update the monitoring request with assigned cameras using REST API
+      const updateRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/monitoring_service_requests?id=eq.${selectedRequest.id}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify({
+            assigned_cameras: selectedCameras,
+            access_code: accessCode,
+            status: selectedCameras.length > 0 ? 'approved' : selectedRequest.status,
+            updated_at: new Date().toISOString()
+          })
+        }
+      );
+
+      if (!updateRes.ok) {
+        const errorText = await updateRes.text();
+        console.error('📹 Update failed:', updateRes.status, errorText);
+        throw new Error(`Update failed: ${updateRes.status}`);
+      }
+
+      console.log('📹 Assignment saved successfully!');
 
       toast({
         title: '✅ Cameras Assigned!',
