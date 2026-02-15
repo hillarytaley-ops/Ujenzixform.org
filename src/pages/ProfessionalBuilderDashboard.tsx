@@ -153,35 +153,68 @@ const ProfessionalBuilderDashboardPage = () => {
     }
   }, [authUser]);
 
-  // Fetch monitoring requests directly when user is available
+  // Fetch monitoring requests directly - run on mount and when authUser changes
   useEffect(() => {
     const loadMonitoringData = async () => {
-      const userId = getUserId();
-      if (!userId) return;
+      // Get user ID from multiple sources
+      let userId = authUser?.id || '';
+      
+      if (!userId) {
+        try {
+          const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          if (storedSession) {
+            const parsed = JSON.parse(storedSession);
+            userId = parsed.user?.id || '';
+          }
+        } catch (e) {}
+      }
+      
+      console.log('📹 DIRECT: userId =', userId || 'EMPTY');
+      
+      if (!userId) {
+        console.log('📹 DIRECT: No user ID yet, will retry...');
+        return;
+      }
       
       console.log('📹 DIRECT: Loading monitoring requests for:', userId);
       
       try {
+        // Get access token
+        let accessToken = '';
+        try {
+          const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          if (storedSession) {
+            const parsed = JSON.parse(storedSession);
+            accessToken = parsed.access_token || '';
+          }
+        } catch (e) {}
+        
+        console.log('📹 DIRECT: Using token length:', accessToken?.length || 0);
+        
         // Try REST API first
-        const accessToken = await getAccessToken();
         const response = await fetch(
           `https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/monitoring_service_requests?user_id=eq.${userId}&order=created_at.desc`,
           {
             headers: {
               'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo',
-              'Authorization': `Bearer ${accessToken}`,
+              'Authorization': `Bearer ${accessToken || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo'}`,
             }
           }
         );
         
+        console.log('📹 DIRECT: Response status:', response.status);
+        
         if (response.ok) {
           const data = await response.json();
           console.log('📹 DIRECT: Got', data?.length || 0, 'monitoring requests');
-          if (data) {
+          console.log('📹 DIRECT: First request:', data?.[0]?.project_name, data?.[0]?.status);
+          if (data && data.length > 0) {
             setMonitoringRequests(data);
+            console.log('📹 DIRECT: ✅ State updated with', data.length, 'requests');
           }
         } else {
-          console.log('📹 DIRECT: REST failed with', response.status, '- trying Supabase client');
+          const errorText = await response.text();
+          console.log('📹 DIRECT: REST failed:', response.status, errorText);
           // Fallback to Supabase client
           const { data, error } = await supabase
             .from('monitoring_service_requests')
@@ -193,7 +226,10 @@ const ProfessionalBuilderDashboardPage = () => {
             console.error('📹 DIRECT: Supabase error:', error.message);
           } else {
             console.log('📹 DIRECT: Supabase got', data?.length || 0, 'requests');
-            if (data) setMonitoringRequests(data);
+            if (data && data.length > 0) {
+              setMonitoringRequests(data);
+              console.log('📹 DIRECT: ✅ State updated via Supabase');
+            }
           }
         }
       } catch (e) {
@@ -201,7 +237,13 @@ const ProfessionalBuilderDashboardPage = () => {
       }
     };
     
+    // Run immediately
     loadMonitoringData();
+    
+    // Also set up a retry after 2 seconds in case auth isn't ready yet
+    const retryTimeout = setTimeout(loadMonitoringData, 2000);
+    
+    return () => clearTimeout(retryTimeout);
   }, [authUser]);
 
   useEffect(() => {
