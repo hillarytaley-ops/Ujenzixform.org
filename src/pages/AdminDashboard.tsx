@@ -403,6 +403,13 @@ const AdminDashboard = () => {
   const [filterRole, setFilterRole] = useState("all");
   const [activeTab, setActiveTab] = useState("overview");
   
+  // Chat/Communication Stats for badges
+  const [chatStats, setChatStats] = useState({
+    unreadChats: 0,
+    openConversations: 0,
+    pendingFeedback: 0
+  });
+  
   // Camera Management State
   const [cameras, setCameras] = useState<CameraRecord[]>([]);
   const [showAddCameraModal, setShowAddCameraModal] = useState(false);
@@ -650,6 +657,21 @@ const AdminDashboard = () => {
     };
   }, [loading]);
 
+  // Periodic refresh of chat stats for notification badges (every 10 seconds)
+  useEffect(() => {
+    if (loading) return;
+    
+    // Initial load
+    loadChatStats();
+    
+    // Refresh every 10 seconds for real-time badge updates
+    const chatStatsInterval = setInterval(() => {
+      loadChatStats();
+    }, 10000);
+    
+    return () => clearInterval(chatStatsInterval);
+  }, [loading]);
+
   const checkAdminAccess = async () => {
     try {
       // Check localStorage for admin session
@@ -701,6 +723,9 @@ const AdminDashboard = () => {
 
       // Load only essential dashboard stats first (fast)
       loadDashboardStats();
+      
+      // Load chat stats for notification badges
+      loadChatStats();
       
       // Load other data lazily based on active tab
       // This prevents loading ALL data at once
@@ -814,6 +839,55 @@ const AdminDashboard = () => {
         totalDeliveryRequests: 0,
         pendingDeliveryRequests: 0
       }));
+    }
+  };
+
+  // Load chat stats for notification badges
+  const loadChatStats = async () => {
+    try {
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      
+      const headers = {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json'
+      };
+
+      // Fetch unread chat messages (from clients)
+      const messagesResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/chat_messages?sender_type=eq.client&read=eq.false&select=id`,
+        { headers }
+      );
+      const unreadMessages = messagesResponse.ok ? await messagesResponse.json() : [];
+
+      // Fetch open conversations
+      const conversationsResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/conversations?status=eq.open&select=id`,
+        { headers }
+      );
+      const openConversations = conversationsResponse.ok ? await conversationsResponse.json() : [];
+
+      // Fetch unread feedback (not responded to)
+      const feedbackResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/chat_feedback?select=id`,
+        { headers }
+      );
+      const pendingFeedback = feedbackResponse.ok ? await feedbackResponse.json() : [];
+
+      setChatStats({
+        unreadChats: unreadMessages.length,
+        openConversations: openConversations.length,
+        pendingFeedback: pendingFeedback.length
+      });
+
+      console.log('💬 Chat stats loaded:', {
+        unreadChats: unreadMessages.length,
+        openConversations: openConversations.length,
+        pendingFeedback: pendingFeedback.length
+      });
+    } catch (error) {
+      console.error('Error loading chat stats:', error);
     }
   };
 
@@ -2203,6 +2277,7 @@ const AdminDashboard = () => {
             deliveryAppsCount={deliveryApplications.length}
             deliveryRequestsCount={builderDeliveryRequests.length}
             financialDocsCount={financialDocuments.length}
+            chatStats={chatStats}
           />
           
           {/* Legacy Tab List - Hidden but kept for direct access */}

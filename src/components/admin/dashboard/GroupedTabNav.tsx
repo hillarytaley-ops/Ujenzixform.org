@@ -79,6 +79,12 @@ interface GroupedTabNavProps {
   deliveryAppsCount: number;
   deliveryRequestsCount: number;
   financialDocsCount: number;
+  // Communication stats
+  chatStats?: {
+    unreadChats: number;
+    openConversations: number;
+    pendingFeedback: number;
+  };
 }
 
 export const GroupedTabNav: React.FC<GroupedTabNavProps> = ({
@@ -89,6 +95,7 @@ export const GroupedTabNav: React.FC<GroupedTabNavProps> = ({
   deliveryAppsCount,
   deliveryRequestsCount,
   financialDocsCount,
+  chatStats,
 }) => {
   const tabGroups: TabGroup[] = [
     {
@@ -163,10 +170,10 @@ export const GroupedTabNav: React.FC<GroupedTabNavProps> = ({
       icon: MessageSquare,
       color: 'teal',
       tabs: [
-        { value: 'communications', label: 'LiveChat', icon: MessageSquare },
+        { value: 'communications', label: 'LiveChat', icon: MessageSquare, badge: chatStats?.unreadChats || undefined },
         { value: 'voice-calls', label: 'Voice Calls', icon: Headphones },
         { value: 'messaging', label: 'Messaging', icon: MessageCircle },
-        { value: 'feedback', label: 'Feedback', icon: MessageSquare },
+        { value: 'feedback', label: 'Feedback', icon: MessageSquare, badge: chatStats?.pendingFeedback || undefined },
         { value: 'sms-test', label: 'SMS Test', icon: MessageSquare },
       ],
     },
