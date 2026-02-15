@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import {
   Dialog,
@@ -121,64 +121,126 @@ export function LiveChatWidget({ position = 'bottom-right' }: LiveChatWidgetProp
     }
   };
 
-  // Connect to live chat
+  // Connect to live chat using direct REST API for reliability
   const connectToLiveChat = async () => {
     if (isConnecting || isConnected) return;
     
     setIsConnecting(true);
     addMessage('system', '🔄 Connecting you to our support team...');
+    console.log('💬 LiveChat: Starting connection...');
 
     try {
-      // Create conversation
-      const { data: conv, error } = await supabase
-        .from('conversations')
-        .insert({
-          client_id: userId,
-          client_name: userName || 'Guest',
-          client_email: userEmail || null,
-          status: 'open',
-          source: 'live_chat',
-          priority: 'normal'
-        })
-        .select('id')
-        .single();
+      // Get access token if user is logged in
+      const accessToken = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      let token = SUPABASE_ANON_KEY;
+      
+      if (accessToken) {
+        try {
+          const parsed = JSON.parse(accessToken);
+          if (parsed?.access_token) {
+            token = parsed.access_token;
+          }
+        } catch (e) {
+          console.log('💬 LiveChat: Using anon key (no valid session)');
+        }
+      }
 
-      if (error) {
-        console.error('Error creating conversation:', error);
-        addMessage('system', '❌ Could not connect. Please try again.');
+      // Create conversation using direct REST API
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
+      const conversationData = {
+        client_id: userId || null,
+        client_name: userName || 'Guest',
+        client_email: userEmail || null,
+        status: 'open',
+        source: 'live_chat',
+        priority: 'normal'
+      };
+
+      console.log('💬 LiveChat: Creating conversation...', conversationData);
+
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/conversations`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${token}`,
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify(conversationData),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('💬 LiveChat: Conversation creation failed:', response.status, errorText);
+        addMessage('system', '❌ Could not connect. Please try again or contact us at info@ujenzixform.org');
         setIsConnecting(false);
         return;
       }
 
+      const convArray = await response.json();
+      const conv = Array.isArray(convArray) ? convArray[0] : convArray;
+      
+      if (!conv?.id) {
+        console.error('💬 LiveChat: No conversation ID returned');
+        addMessage('system', '❌ Connection error. Please refresh and try again.');
+        setIsConnecting(false);
+        return;
+      }
+
+      console.log('💬 LiveChat: Conversation created:', conv.id);
       setConversationId(conv.id);
       
-      // Save initial message
-      await supabase.from('chat_messages').insert({
-        conversation_id: conv.id,
-        sender_id: userId ? String(userId) : null,
-        sender_type: 'system',
-        sender_name: 'System',
-        content: `${userName || 'Guest'} started a live chat`,
-        message_type: 'text'
+      // Save initial system message
+      const msgController = new AbortController();
+      const msgTimeoutId = setTimeout(() => msgController.abort(), 10000);
+
+      await fetch(`${SUPABASE_URL}/rest/v1/chat_messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          conversation_id: conv.id,
+          sender_id: userId ? String(userId) : null,
+          sender_type: 'system',
+          sender_name: 'System',
+          content: `${userName || 'Guest'} started a live chat`,
+          message_type: 'text'
+        }),
+        signal: msgController.signal
       });
+
+      clearTimeout(msgTimeoutId);
 
       setIsConnected(true);
       setIsConnecting(false);
       addMessage('system', '✅ Connected! A staff member will respond shortly. Please type your message below.');
       
+      console.log('💬 LiveChat: Connected successfully!');
       toast({
         title: '✅ Connected',
         description: 'You are now connected to live support.'
       });
 
-    } catch (err) {
-      console.error('Error:', err);
-      addMessage('system', '❌ Connection failed. Please try again.');
+    } catch (err: any) {
+      console.error('💬 LiveChat Error:', err);
+      if (err.name === 'AbortError') {
+        addMessage('system', '❌ Connection timed out. Please check your internet and try again.');
+      } else {
+        addMessage('system', '❌ Connection failed. Please try again or email info@ujenzixform.org');
+      }
       setIsConnecting(false);
     }
   };
 
-  // Send message
+  // Send message using direct REST API
   const sendMessage = async () => {
     const content = inputValue.trim();
     if (!content || !conversationId) return;
@@ -187,36 +249,77 @@ export function LiveChatWidget({ position = 'bottom-right' }: LiveChatWidgetProp
     addMessage('user', content);
 
     try {
-      const { error } = await supabase.from('chat_messages').insert({
-        conversation_id: conversationId,
-        sender_id: userId ? String(userId) : null,
-        sender_type: 'client',
-        sender_name: userName || 'Guest',
-        content: content,
-        message_type: 'text'
+      // Get access token
+      const accessToken = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      let token = SUPABASE_ANON_KEY;
+      
+      if (accessToken) {
+        try {
+          const parsed = JSON.parse(accessToken);
+          if (parsed?.access_token) {
+            token = parsed.access_token;
+          }
+        } catch (e) {}
+      }
+
+      // Send message
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/chat_messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          conversation_id: conversationId,
+          sender_id: userId ? String(userId) : null,
+          sender_type: 'client',
+          sender_name: userName || 'Guest',
+          content: content,
+          message_type: 'text'
+        }),
+        signal: controller.signal
       });
 
-      if (error) {
-        console.error('Error sending message:', error);
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        console.error('💬 LiveChat: Failed to send message:', response.status);
+        toast({
+          variant: 'destructive',
+          title: 'Failed to send',
+          description: 'Please try again.'
+        });
+        return;
+      }
+
+      // Update conversation last message (non-blocking)
+      fetch(`${SUPABASE_URL}/rest/v1/conversations?id=eq.${conversationId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          last_message: content.substring(0, 100),
+          last_message_at: new Date().toISOString(),
+          unread_count: 1
+        })
+      }).catch(err => console.log('💬 Conversation update error (non-critical):', err));
+
+    } catch (err: any) {
+      console.error('💬 LiveChat send error:', err);
+      if (err.name !== 'AbortError') {
         toast({
           variant: 'destructive',
           title: 'Failed to send',
           description: 'Please try again.'
         });
       }
-
-      // Update conversation
-      await supabase
-        .from('conversations')
-        .update({
-          last_message: content.substring(0, 100),
-          last_message_at: new Date().toISOString(),
-          unread_count: 1
-        })
-        .eq('id', conversationId);
-
-    } catch (err) {
-      console.error('Error:', err);
     }
   };
 
@@ -232,15 +335,37 @@ export function LiveChatWidget({ position = 'bottom-right' }: LiveChatWidgetProp
   // Submit rating and close
   const submitRating = async () => {
     if (conversationId) {
-      await supabase
-        .from('conversations')
-        .update({
-          status: 'closed',
-          rating: rating,
-          rating_comment: ratingComment,
-          closed_at: new Date().toISOString()
-        })
-        .eq('id', conversationId);
+      try {
+        // Get access token
+        const accessToken = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        let token = SUPABASE_ANON_KEY;
+        
+        if (accessToken) {
+          try {
+            const parsed = JSON.parse(accessToken);
+            if (parsed?.access_token) {
+              token = parsed.access_token;
+            }
+          } catch (e) {}
+        }
+
+        await fetch(`${SUPABASE_URL}/rest/v1/conversations?id=eq.${conversationId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            status: 'closed',
+            rating: rating,
+            rating_comment: ratingComment,
+            closed_at: new Date().toISOString()
+          })
+        });
+      } catch (err) {
+        console.error('💬 LiveChat: Error closing conversation:', err);
+      }
     }
 
     setShowRatingDialog(false);
