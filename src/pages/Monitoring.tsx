@@ -420,17 +420,25 @@ const Monitoring = () => {
       const isBuilderRole = ['builder', 'professional_builder', 'private_client'].includes(dbRole);
       
       if (isBuilderRole) {
+        console.log('🔐 Monitoring - Checking monitoring requests for builder:', authUser.id);
+        
+        // Use limit(1) instead of maybeSingle() to handle multiple approved requests
         const { data: monitoringData, error: monitoringError } = await supabase
           .from('monitoring_service_requests')
           .select('*')
           .eq('user_id', authUser.id)
           .in('status', ['approved', 'active'])
-          .maybeSingle();
+          .order('created_at', { ascending: false })
+          .limit(1);
         
-        if (monitoringData && !monitoringError) {
+        console.log('🔐 Monitoring - Found requests:', monitoringData?.length || 0, 'error:', monitoringError?.message);
+        
+        if (monitoringData && monitoringData.length > 0 && !monitoringError) {
+          console.log('✅ Monitoring - Builder has approved access!');
           setHasMonitoringAccess(true);
-          setMonitoringRequest(monitoringData);
+          setMonitoringRequest(monitoringData[0]);
         } else {
+          console.log('⚠️ Monitoring - Builder has no approved monitoring requests');
           // Builders without approved monitoring access can still request it
           setHasMonitoringAccess(false);
         }
@@ -502,7 +510,10 @@ const Monitoring = () => {
 
   // STRICT CHECK: Block users without any role - database verification is complete
   // userRole is NULL if: no user, no role in DB, or DB error
+  console.log('🔐 Monitoring RENDER - userRole:', userRole, 'dbVerified:', dbVerified, 'user:', user?.email);
+  
   if (!userRole) {
+    console.log('🚫 Monitoring - Showing Registration Required because userRole is:', userRole);
     return (
       <div className="min-h-screen bg-slate-950">
         <Navigation />
