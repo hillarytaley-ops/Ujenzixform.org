@@ -132,6 +132,8 @@ const DeliveryDashboard = () => {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [showProofCapture, setShowProofCapture] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("active");
+  const [notificationCount, setNotificationCount] = useState(0);
+  const [pendingNotificationCount, setPendingNotificationCount] = useState(0);
 
   // Chart data
   const [deliveryTrends, setDeliveryTrends] = useState([
@@ -282,6 +284,55 @@ const DeliveryDashboard = () => {
       supabase.removeChannel(channel);
     };
   }, [user, refetchData, toast]);
+
+  // Load notification counts for the Alerts tab badge
+  useEffect(() => {
+    const loadNotificationCounts = async () => {
+      try {
+        // Get auth headers
+        const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+        
+        let accessToken = SUPABASE_ANON_KEY;
+        try {
+          const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          if (storedSession) {
+            const parsed = JSON.parse(storedSession);
+            if (parsed.access_token) accessToken = parsed.access_token;
+          }
+        } catch (e) {}
+
+        const headers = {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${accessToken}`
+        };
+
+        // Count all delivery requests
+        const allResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/delivery_requests?select=id,status&limit=100`,
+          { headers }
+        );
+        
+        if (allResponse.ok) {
+          const allData = await allResponse.json();
+          const totalCount = allData?.length || 0;
+          const pendingCount = allData?.filter((r: any) => r.status === 'pending')?.length || 0;
+          
+          setNotificationCount(totalCount);
+          setPendingNotificationCount(pendingCount);
+          console.log('🔔 Notification counts loaded:', { total: totalCount, pending: pendingCount });
+        }
+      } catch (error) {
+        console.error('Error loading notification counts:', error);
+      }
+    };
+
+    loadNotificationCounts();
+    
+    // Refresh counts every 30 seconds
+    const interval = setInterval(loadNotificationCounts, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -706,9 +757,20 @@ const DeliveryDashboard = () => {
               <Trophy className="h-4 w-4 mr-1" />
               Achievements
             </TabsTrigger>
-            <TabsTrigger value="notifications" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
+            <TabsTrigger value="notifications" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white relative">
               <Bell className="h-4 w-4 mr-1" />
               Alerts
+              {notificationCount > 0 && (
+                <Badge 
+                  className={`ml-1 text-xs px-1.5 py-0 min-w-[20px] h-5 ${
+                    pendingNotificationCount > 0 
+                      ? 'bg-red-500 text-white animate-pulse' 
+                      : 'bg-gray-500 text-white'
+                  }`}
+                >
+                  {pendingNotificationCount > 0 ? pendingNotificationCount : notificationCount}
+                </Badge>
+              )}
             </TabsTrigger>
             <TabsTrigger value="support" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white">
               <Headphones className="h-4 w-4 mr-1" />
