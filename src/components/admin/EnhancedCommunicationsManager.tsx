@@ -274,6 +274,11 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
     }
   }, []);
 
+  // Track known message IDs to detect new messages
+  const knownMessageIdsRef = useRef<Set<string>>(new Set());
+  const lastMessageCountRef = useRef<number>(0);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   // Initial fetch
   useEffect(() => {
     const loadData = async () => {
@@ -302,44 +307,129 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
     }
   }, [selectedConversation, fetchMessages]);
 
-  // Real-time subscriptions
+  // ============================================
+  // WHATSAPP-STYLE INSTANT MESSAGING
+  // Uses aggressive polling (2 sec) + sound alerts
+  // ============================================
   useEffect(() => {
+    let isActive = true;
+    
+    console.log('⚡ Starting WhatsApp-style instant polling...');
+    
+    // Poll for new messages every 2 seconds
+    const pollForMessages = async () => {
+      if (!isActive) return;
+      
+      try {
+        const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+        
+        // Fetch latest messages
+        const response = await fetch(
+          `${SUPABASE_URL}/rest/v1/chat_messages?select=*&order=created_at.desc&limit=100`,
+          {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+        
+        if (!response.ok) return;
+        
+        const allMessages: ChatMessage[] = await response.json();
+        
+        // Check for NEW messages we haven't seen
+        const newClientMessages = allMessages.filter(msg => 
+          msg.sender_type === 'client' && 
+          !knownMessageIdsRef.current.has(msg.id)
+        );
+        
+        // If there are new client messages, play sound and show notification
+        if (newClientMessages.length > 0) {
+          console.log(`🔔 ${newClientMessages.length} NEW client message(s)!`);
+          playNotificationSound();
+          
+          // Show toast for each new message
+          newClientMessages.forEach(msg => {
+            toast({
+              title: "💬 New Message!",
+              description: `${msg.sender_name}: ${msg.content.substring(0, 50)}${msg.content.length > 50 ? '...' : ''}`,
+            });
+          });
+          
+          // Refresh conversations list
+          await fetchConversations();
+          
+          // If we have a selected conversation, refresh its messages
+          if (selectedConversation) {
+            const conversationMessages = allMessages
+              .filter(m => m.conversation_id === selectedConversation.id)
+              .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+            setMessages(conversationMessages);
+          }
+        }
+        
+        // Update known message IDs
+        allMessages.forEach(msg => knownMessageIdsRef.current.add(msg.id));
+        
+      } catch (error) {
+        // Silent fail - will retry on next poll
+      }
+    };
+    
+    // Initial poll
+    pollForMessages();
+    
+    // Set up polling interval - 2 seconds for instant feel
+    pollingIntervalRef.current = setInterval(pollForMessages, 2000);
+    
+    // Also set up realtime as backup
     const channel = supabase
-      .channel('admin_communications')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'conversations' },
-        () => fetchConversations()
-      )
+      .channel('admin_communications_realtime')
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'chat_messages' },
         (payload) => {
           const newMsg = payload.new as ChatMessage;
-          if (newMsg.sender_type === 'client') {
-            playNotificationSound();
-            toast({
-              title: "💬 New Message",
-              description: `${newMsg.sender_name}: ${newMsg.content.substring(0, 50)}...`,
-            });
+          console.log('📨 Realtime: New message received', newMsg.sender_type);
+          
+          if (!knownMessageIdsRef.current.has(newMsg.id)) {
+            knownMessageIdsRef.current.add(newMsg.id);
+            
+            if (newMsg.sender_type === 'client') {
+              playNotificationSound();
+              toast({
+                title: "💬 New Message!",
+                description: `${newMsg.sender_name}: ${newMsg.content.substring(0, 50)}...`,
+              });
+            }
+            
+            // Update messages if viewing this conversation
+            if (selectedConversation && newMsg.conversation_id === selectedConversation.id) {
+              setMessages(prev => {
+                if (prev.some(m => m.id === newMsg.id)) return prev;
+                return [...prev, newMsg];
+              });
+            }
+            
+            fetchConversations();
           }
-          if (selectedConversation && newMsg.conversation_id === selectedConversation.id) {
-            setMessages(prev => [...prev, newMsg]);
-          }
-          fetchConversations();
         }
       )
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'chat_feedback' },
-        () => fetchFeedbacks()
-      )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('📡 Realtime subscription status:', status);
+      });
 
     return () => {
+      isActive = false;
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
       supabase.removeChannel(channel);
     };
-  }, [selectedConversation, fetchConversations, fetchFeedbacks, playNotificationSound, toast]);
+  }, [selectedConversation, fetchConversations, playNotificationSound, toast]);
 
   // Auto-scroll
   useEffect(() => {
@@ -363,18 +453,47 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
     updateStatus();
   }, [isOnline, staffId]);
 
-  // Send reply
+  // Send reply with OPTIMISTIC UPDATE (WhatsApp-style instant display)
   const handleSendReply = async () => {
     if (!selectedConversation || !replyMessage.trim()) return;
 
     const content = replyMessage.trim();
+    const tempId = `temp-${Date.now()}`;
+    const now = new Date().toISOString();
+    
+    // OPTIMISTIC UPDATE - Show message INSTANTLY before server confirms
+    const optimisticMessage: ChatMessage = {
+      id: tempId,
+      conversation_id: selectedConversation.id,
+      sender_id: currentUserId,
+      sender_type: 'staff',
+      sender_name: staffName,
+      content: content,
+      message_type: 'text',
+      read: true,
+      created_at: now
+    };
+    
+    // Add to UI immediately
+    setMessages(prev => [...prev, optimisticMessage]);
     setReplyMessage('');
+    
+    console.log('⚡ Optimistic update - message shown instantly');
 
     try {
-      // Insert message - use currentUserId (UUID) for sender_id
-      const { error } = await supabase
-        .from('chat_messages')
-        .insert({
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      
+      // Insert message via REST API
+      const insertResponse = await fetch(`${SUPABASE_URL}/rest/v1/chat_messages`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify({
           conversation_id: selectedConversation.id,
           sender_id: currentUserId,
           sender_type: 'staff',
@@ -382,33 +501,56 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
           content: content,
           message_type: 'text',
           read: true
-        });
+        })
+      });
 
-      if (error) throw error;
+      if (!insertResponse.ok) {
+        throw new Error(`Insert failed: ${insertResponse.status}`);
+      }
+      
+      const [insertedMessage] = await insertResponse.json();
+      console.log('✅ Message saved to database:', insertedMessage.id);
+      
+      // Replace temp message with real one
+      setMessages(prev => prev.map(m => m.id === tempId ? insertedMessage : m));
+      knownMessageIdsRef.current.add(insertedMessage.id);
 
-      // Update conversation - use currentUserId (UUID) for agent_id
-      await supabase
-        .from('conversations')
-        .update({
+      // Update conversation
+      await fetch(`${SUPABASE_URL}/rest/v1/conversations?id=eq.${selectedConversation.id}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
           status: 'open',
           agent_id: currentUserId,
           agent_name: staffName,
           last_message: content,
-          last_message_at: new Date().toISOString(),
+          last_message_at: now,
           unread_count: 0
         })
-        .eq('id', selectedConversation.id);
+      });
 
       // Mark client messages as read
-      await supabase
-        .from('chat_messages')
-        .update({ read: true })
-        .eq('conversation_id', selectedConversation.id)
-        .eq('sender_type', 'client');
+      await fetch(`${SUPABASE_URL}/rest/v1/chat_messages?conversation_id=eq.${selectedConversation.id}&sender_type=eq.client`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ read: true })
+      });
 
-      toast({ title: "✅ Reply sent" });
+      // Refresh conversations to update sidebar
+      fetchConversations();
+
     } catch (error) {
       console.error('Error sending reply:', error);
+      // Remove optimistic message on failure
+      setMessages(prev => prev.filter(m => m.id !== tempId));
       setReplyMessage(content);
       toast({ variant: 'destructive', title: 'Failed to send', description: 'Please try again' });
     }
