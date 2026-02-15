@@ -372,9 +372,33 @@ const Monitoring = () => {
     }, 5000); // 5 second timeout
     
     try {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
+      // Try to get user from Supabase auth
+      let authUser: any = null;
+      let userId: string = '';
       
-      if (!authUser) {
+      try {
+        const { data } = await supabase.auth.getUser();
+        authUser = data?.user;
+        userId = authUser?.id || '';
+      } catch (e) {
+        console.log('🔐 Monitoring - Supabase getUser failed, trying localStorage');
+      }
+      
+      // Fallback to localStorage if Supabase client fails
+      if (!userId) {
+        try {
+          const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          if (storedSession) {
+            const parsed = JSON.parse(storedSession);
+            userId = parsed.user?.id || '';
+            authUser = parsed.user;
+          }
+        } catch (e) {}
+      }
+      
+      console.log('🔐 Monitoring - userId:', userId);
+      
+      if (!userId) {
         // No user - block access
         console.log('🚫 Monitoring - No authenticated user');
         setUser(null);
@@ -388,15 +412,54 @@ const Monitoring = () => {
       
       setUser(authUser);
       
-      // ALWAYS check database for role - NEVER trust localStorage!
-      const { data: roleData, error } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', authUser.id)
-        .maybeSingle();
+      // Get access token for REST API
+      let accessToken = '';
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          accessToken = parsed.access_token || '';
+        }
+      } catch (e) {}
       
-      const dbRole = roleData?.role || null;
-      console.log('🔐 Monitoring - DB role:', dbRole, 'error:', error?.message);
+      // Try REST API first for role check (more reliable)
+      let dbRole: string | null = null;
+      
+      try {
+        const response = await fetch(
+          `https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/user_roles?user_id=eq.${userId}&select=role`,
+          {
+            headers: {
+              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo',
+              'Authorization': `Bearer ${accessToken || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo'}`,
+            }
+          }
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          dbRole = data?.[0]?.role || null;
+          console.log('🔐 Monitoring - REST API role:', dbRole);
+        } else {
+          console.log('🔐 Monitoring - REST API failed:', response.status);
+        }
+      } catch (e) {
+        console.log('🔐 Monitoring - REST API error:', e);
+      }
+      
+      // Fallback to Supabase client if REST fails
+      if (!dbRole) {
+        const { data: roleData, error } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', userId)
+          .maybeSingle();
+        
+        dbRole = roleData?.role || null;
+        console.log('🔐 Monitoring - Supabase client role:', dbRole, 'error:', error?.message);
+      }
+      
+      console.log('🔐 Monitoring - Final DB role:', dbRole);
       
       // NO ROLE IN DATABASE = BLOCK ACCESS
       if (!dbRole) {
