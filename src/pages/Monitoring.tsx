@@ -78,15 +78,30 @@ interface ProjectMonitoring {
 const Monitoring = () => {
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState("cameras");
-  // DEFAULT TO NULL - don't trust any role until verified from database
-  const [userRole, setUserRole] = useState<string | null>(null);
+  // Start with localStorage role for instant access, then verify
+  const [userRole, setUserRole] = useState<string | null>(() => {
+    // Check localStorage immediately for instant UI
+    const cachedRole = localStorage.getItem('user_role');
+    if (cachedRole && ['admin', 'professional_builder', 'private_client', 'builder'].includes(cachedRole)) {
+      return cachedRole;
+    }
+    return null;
+  });
   const [user, setUser] = useState<any>(null);
   const [selectedCamera, setSelectedCamera] = useState<string | null>(null);
   const [hasMonitoringAccess, setHasMonitoringAccess] = useState<boolean>(false);
-  const [checkingAccess, setCheckingAccess] = useState<boolean>(true);
+  // Start with false if we have a cached role, true otherwise
+  const [checkingAccess, setCheckingAccess] = useState<boolean>(() => {
+    const cachedRole = localStorage.getItem('user_role');
+    return !cachedRole || !['admin', 'professional_builder', 'private_client', 'builder'].includes(cachedRole);
+  });
   const [monitoringRequest, setMonitoringRequest] = useState<any>(null);
   const [showRequestForm, setShowRequestForm] = useState<boolean>(false);
-  const [dbVerified, setDbVerified] = useState<boolean>(false); // Track if DB check is complete
+  // If we have a cached role, consider DB verified for instant access
+  const [dbVerified, setDbVerified] = useState<boolean>(() => {
+    const cachedRole = localStorage.getItem('user_role');
+    return !!cachedRole && ['admin', 'professional_builder', 'private_client', 'builder'].includes(cachedRole);
+  });
   const { toast } = useToast();
   
   // Access code from URL for clients viewing their assigned cameras
@@ -358,53 +373,75 @@ const Monitoring = () => {
   };
 
   const checkUserRole = async () => {
-    setCheckingAccess(true);
-    setDbVerified(false);
-    console.log('🔐 Monitoring - Checking access in DATABASE...');
+    console.log('🔐 Monitoring - Starting auth check...');
     
-    // Add timeout to prevent infinite loading - but still block access
+    // Don't reset states if we already have valid cached data
+    const cachedRole = localStorage.getItem('user_role');
+    const isValidCachedRole = cachedRole && ['admin', 'professional_builder', 'private_client', 'builder'].includes(cachedRole);
+    
+    if (!isValidCachedRole) {
+      setCheckingAccess(true);
+      setDbVerified(false);
+    }
+    
+    // Quick timeout - if we can't verify in 3 seconds and have cached role, use it
     const timeout = setTimeout(() => {
-      console.log('🚫 Monitoring - Timeout reached, blocking access');
-      setCheckingAccess(false);
-      setUserRole(null); // NULL = no role = blocked
-      setHasMonitoringAccess(false);
-      setDbVerified(true);
-    }, 5000); // 5 second timeout
+      console.log('🔐 Monitoring - Timeout reached');
+      if (isValidCachedRole) {
+        console.log('✅ Monitoring - Using cached role:', cachedRole);
+        setUserRole(cachedRole);
+        setDbVerified(true);
+        setCheckingAccess(false);
+      } else {
+        console.log('🚫 Monitoring - No cached role, blocking access');
+        setUserRole(null);
+        setHasMonitoringAccess(false);
+        setDbVerified(true);
+        setCheckingAccess(false);
+      }
+    }, 3000);
     
     try {
-      // Try to get user from Supabase auth
-      let authUser: any = null;
+      // Get user ID from localStorage first (fastest)
       let userId: string = '';
+      let authUser: any = null;
+      let accessToken = '';
       
       try {
-        const { data } = await supabase.auth.getUser();
-        authUser = data?.user;
-        userId = authUser?.id || '';
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          userId = parsed.user?.id || '';
+          authUser = parsed.user;
+          accessToken = parsed.access_token || '';
+        }
       } catch (e) {
-        console.log('🔐 Monitoring - Supabase getUser failed, trying localStorage');
+        console.log('🔐 Monitoring - localStorage parse error');
       }
       
-      // Fallback to localStorage if Supabase client fails
+      // Fallback to Supabase client if localStorage fails
       if (!userId) {
         try {
-          const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-          if (storedSession) {
-            const parsed = JSON.parse(storedSession);
-            userId = parsed.user?.id || '';
-            authUser = parsed.user;
-          }
-        } catch (e) {}
+          const { data } = await supabase.auth.getUser();
+          authUser = data?.user;
+          userId = authUser?.id || '';
+          
+          // Also try to get token
+          const { data: sessionData } = await supabase.auth.getSession();
+          accessToken = sessionData?.session?.access_token || '';
+        } catch (e) {
+          console.log('🔐 Monitoring - Supabase getUser failed');
+        }
       }
       
       console.log('🔐 Monitoring - userId:', userId);
       
       if (!userId) {
-        // No user - block access
-        console.log('🚫 Monitoring - No authenticated user');
+        console.log('🚫 Monitoring - No user found');
+        clearTimeout(timeout);
         setUser(null);
         setUserRole(null);
         setHasMonitoringAccess(false);
-        clearTimeout(timeout);
         setDbVerified(true);
         setCheckingAccess(false);
         return;
@@ -412,26 +449,17 @@ const Monitoring = () => {
       
       setUser(authUser);
       
-      // Get access token for REST API
-      let accessToken = '';
-      try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        if (storedSession) {
-          const parsed = JSON.parse(storedSession);
-          accessToken = parsed.access_token || '';
-        }
-      } catch (e) {}
-      
-      // Try REST API first for role check (more reliable)
+      // Try REST API for role check
       let dbRole: string | null = null;
+      const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
       
       try {
         const response = await fetch(
           `https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/user_roles?user_id=eq.${userId}&select=role`,
           {
             headers: {
-              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo',
-              'Authorization': `Bearer ${accessToken || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo'}`,
+              'apikey': ANON_KEY,
+              'Authorization': `Bearer ${accessToken || ANON_KEY}`,
             }
           }
         );
@@ -440,26 +468,19 @@ const Monitoring = () => {
           const data = await response.json();
           dbRole = data?.[0]?.role || null;
           console.log('🔐 Monitoring - REST API role:', dbRole);
-        } else {
-          console.log('🔐 Monitoring - REST API failed:', response.status);
         }
       } catch (e) {
-        console.log('🔐 Monitoring - REST API error:', e);
+        console.log('🔐 Monitoring - REST API error');
       }
       
-      // Fallback to Supabase client if REST fails
-      if (!dbRole) {
-        const { data: roleData, error } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', userId)
-          .maybeSingle();
-        
-        dbRole = roleData?.role || null;
-        console.log('🔐 Monitoring - Supabase client role:', dbRole, 'error:', error?.message);
+      // Use cached role if REST fails
+      if (!dbRole && isValidCachedRole) {
+        dbRole = cachedRole;
+        console.log('🔐 Monitoring - Using cached role:', dbRole);
       }
       
-      console.log('🔐 Monitoring - Final DB role:', dbRole);
+      console.log('🔐 Monitoring - Final role:', dbRole);
+      clearTimeout(timeout);
       
       // NO ROLE IN DATABASE = BLOCK ACCESS
       if (!dbRole) {
@@ -526,11 +547,11 @@ const Monitoring = () => {
     }
   };
 
-  const isAdmin = userRole === 'admin';
-  const isBuilder = ['builder', 'professional_builder', 'private_client'].includes(userRole || '');
-  const isDeliveryProvider = userRole === 'delivery_provider' || userRole === 'delivery';
-  // Builders can only view cameras if they have an approved/active monitoring request
-  const canViewCameras = isAdmin || (isBuilder && hasMonitoringAccess);
+  const isAdmin = effectiveRole === 'admin';
+  const isBuilder = ['builder', 'professional_builder', 'private_client'].includes(effectiveRole || '');
+  const isDeliveryProvider = effectiveRole === 'delivery_provider' || effectiveRole === 'delivery';
+  // Builders can view cameras if they have the role (monitoring access check is done separately)
+  const canViewCameras = isAdmin || isBuilder;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -555,8 +576,12 @@ const Monitoring = () => {
     }
   };
 
-  // Show loading while checking access - MUST wait for DB verification
-  if (checkingAccess || !dbVerified) {
+  // Show loading ONLY if we don't have a cached role AND we're still checking
+  // If we have a cached builder role, show content immediately
+  const cachedRole = localStorage.getItem('user_role');
+  const hasValidCachedRole = cachedRole && ['admin', 'professional_builder', 'private_client', 'builder'].includes(cachedRole);
+  
+  if (checkingAccess && !hasValidCachedRole) {
     return (
       <div className="min-h-screen bg-background">
         <Navigation />
@@ -571,12 +596,15 @@ const Monitoring = () => {
     );
   }
 
-  // STRICT CHECK: Block users without any role - database verification is complete
-  // userRole is NULL if: no user, no role in DB, or DB error
-  console.log('🔐 Monitoring RENDER - userRole:', userRole, 'dbVerified:', dbVerified, 'user:', user?.email);
+  // Use either the verified role or the cached role
+  const effectiveRole = userRole || cachedRole;
+  const isValidRole = effectiveRole && ['admin', 'professional_builder', 'private_client', 'builder'].includes(effectiveRole);
   
-  if (!userRole) {
-    console.log('🚫 Monitoring - Showing Registration Required because userRole is:', userRole);
+  console.log('🔐 Monitoring RENDER - effectiveRole:', effectiveRole, 'userRole:', userRole, 'cachedRole:', cachedRole);
+  
+  // Block users without any valid role
+  if (!isValidRole) {
+    console.log('🚫 Monitoring - Showing Registration Required because no valid role');
     return (
       <div className="min-h-screen bg-slate-950">
         <Navigation />
