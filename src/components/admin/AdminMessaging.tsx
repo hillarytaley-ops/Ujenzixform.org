@@ -186,17 +186,41 @@ export function AdminMessaging() {
     setLoading(false);
   };
 
-  // Fetch messages for selected chat
+  // Fetch messages for selected chat using REST API
   const fetchMessages = async (chatId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('support_messages')
-        .select('*')
-        .eq('chat_id', chatId)
-        .order('created_at', { ascending: true });
+      console.log('📨 Fetching messages for chat:', chatId);
+      
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/support_messages?chat_id=eq.${chatId}&order=created_at.asc`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Messages fetched:', data?.length || 0);
+        setMessages(data || []);
+      } else {
+        console.error('❌ Error fetching messages:', response.status);
+        // Fallback to Supabase client
+        const { data, error } = await supabase
+          .from('support_messages')
+          .select('*')
+          .eq('chat_id', chatId)
+          .order('created_at', { ascending: true });
 
-      if (error) throw error;
-      setMessages(data || []);
+        if (error) throw error;
+        setMessages(data || []);
+      }
     } catch (error) {
       console.error('Error fetching messages:', error);
     }
@@ -374,11 +398,20 @@ export function AdminMessaging() {
     setFilteredChats(filtered);
   }, [chats, statusFilter, searchQuery]);
 
-  // Initial fetch and real-time subscription
+  // Initial fetch and real-time subscription with polling fallback
   useEffect(() => {
+    console.log('📨 AdminMessaging: Initializing...');
     fetchChats();
 
-    // Subscribe to new messages
+    // Poll for new chats every 5 seconds (ensures we don't miss any)
+    const pollInterval = setInterval(() => {
+      fetchChats();
+      if (selectedChat) {
+        fetchMessages(selectedChat.id);
+      }
+    }, 5000);
+
+    // Subscribe to new messages (real-time backup)
     const channel = supabase
       .channel('admin-support-messages')
       .on('postgres_changes', {
@@ -386,6 +419,7 @@ export function AdminMessaging() {
         schema: 'public',
         table: 'support_messages'
       }, () => {
+        console.log('📨 Real-time: support_messages change detected');
         if (selectedChat) {
           fetchMessages(selectedChat.id);
         }
@@ -396,11 +430,15 @@ export function AdminMessaging() {
         schema: 'public',
         table: 'support_chats'
       }, () => {
+        console.log('📨 Real-time: support_chats change detected');
         fetchChats();
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log('📨 Real-time subscription status:', status);
+      });
 
     return () => {
+      clearInterval(pollInterval);
       supabase.removeChannel(channel);
     };
   }, []);
