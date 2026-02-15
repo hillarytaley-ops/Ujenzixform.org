@@ -153,6 +153,57 @@ const ProfessionalBuilderDashboardPage = () => {
     }
   }, [authUser]);
 
+  // Fetch monitoring requests directly when user is available
+  useEffect(() => {
+    const loadMonitoringData = async () => {
+      const userId = getUserId();
+      if (!userId) return;
+      
+      console.log('📹 DIRECT: Loading monitoring requests for:', userId);
+      
+      try {
+        // Try REST API first
+        const accessToken = await getAccessToken();
+        const response = await fetch(
+          `https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/monitoring_service_requests?user_id=eq.${userId}&order=created_at.desc`,
+          {
+            headers: {
+              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo',
+              'Authorization': `Bearer ${accessToken}`,
+            }
+          }
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('📹 DIRECT: Got', data?.length || 0, 'monitoring requests');
+          if (data) {
+            setMonitoringRequests(data);
+          }
+        } else {
+          console.log('📹 DIRECT: REST failed with', response.status, '- trying Supabase client');
+          // Fallback to Supabase client
+          const { data, error } = await supabase
+            .from('monitoring_service_requests')
+            .select('*')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false });
+          
+          if (error) {
+            console.error('📹 DIRECT: Supabase error:', error.message);
+          } else {
+            console.log('📹 DIRECT: Supabase got', data?.length || 0, 'requests');
+            if (data) setMonitoringRequests(data);
+          }
+        }
+      } catch (e) {
+        console.error('📹 DIRECT: Error:', e);
+      }
+    };
+    
+    loadMonitoringData();
+  }, [authUser]);
+
   useEffect(() => {
     // Safety timeout - show UI after 2 seconds max
     const timeout = setTimeout(() => setLoading(false), 2000);
