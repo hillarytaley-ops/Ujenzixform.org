@@ -166,70 +166,108 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
     }
   }, [soundEnabled]);
 
-  // Fetch conversations
+  // Fetch conversations using REST API for reliability
   const fetchConversations = useCallback(async () => {
     try {
-      console.log('🔄 Fetching conversations...');
-      const { data, error } = await supabase
-        .from('conversations')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('❌ Error fetching conversations:', error);
-        throw error;
+      console.log('🔄 Fetching conversations via REST API...');
+      
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mjc4NjAxMTEsImV4cCI6MjA0MzQzNjExMX0.gPR5QHKM3nTcTz6cZhz-6RxVjvvz3AoFxpVhPVpZSi4';
+      
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/conversations?select=*&order=created_at.desc`, {
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ REST API error fetching conversations:', response.status, errorText);
+        return;
       }
-      console.log('✅ Conversations fetched:', data?.length || 0, data);
+      
+      const data = await response.json();
+      console.log('✅ Conversations fetched:', data?.length || 0, data?.slice(0, 2));
       setConversations(data || []);
     } catch (error) {
       console.error('❌ Exception fetching conversations:', error);
     }
   }, []);
 
-  // Fetch messages for a conversation
+  // Fetch messages for a conversation using REST API
   const fetchMessages = useCallback(async (conversationId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('chat_messages')
-        .select('*')
-        .eq('conversation_id', conversationId)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
+      console.log('🔄 Fetching messages for conversation:', conversationId);
+      
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mjc4NjAxMTEsImV4cCI6MjA0MzQzNjExMX0.gPR5QHKM3nTcTz6cZhz-6RxVjvvz3AoFxpVhPVpZSi4';
+      
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/chat_messages?conversation_id=eq.${conversationId}&select=*&order=created_at.asc`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      if (!response.ok) {
+        console.error('❌ Error fetching messages:', response.status);
+        return;
+      }
+      
+      const data = await response.json();
+      console.log('✅ Messages fetched:', data?.length || 0);
       setMessages(data || []);
     } catch (error) {
       console.error('Error fetching messages:', error);
     }
   }, []);
 
-  // Fetch chat feedback
+  // Fetch chat feedback using REST API
   const fetchFeedbacks = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('chat_feedback')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100);
-
-      if (!error && data) {
-        setFeedbacks(data);
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mjc4NjAxMTEsImV4cCI6MjA0MzQzNjExMX0.gPR5QHKM3nTcTz6cZhz-6RxVjvvz3AoFxpVhPVpZSi4';
+      
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/chat_feedback?select=*&order=created_at.desc&limit=100`, {
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setFeedbacks(data || []);
       }
     } catch (error) {
       console.error('Error fetching feedback:', error);
     }
   }, []);
 
-  // Fetch transcripts
+  // Fetch transcripts using REST API
   const fetchTranscripts = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('chat_transcripts')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (!error && data) {
-        setTranscripts(data);
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mjc4NjAxMTEsImV4cCI6MjA0MzQzNjExMX0.gPR5QHKM3nTcTz6cZhz-6RxVjvvz3AoFxpVhPVpZSi4';
+      
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/chat_transcripts?select=*&order=created_at.desc&limit=50`, {
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setTranscripts(data || []);
       }
     } catch (error) {
       console.error('Error fetching transcripts:', error);
@@ -239,13 +277,20 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
   // Initial fetch
   useEffect(() => {
     const loadData = async () => {
+      console.log('🔄 EnhancedCommunicationsManager: Starting data load...');
       setLoading(true);
-      await Promise.all([
-        fetchConversations(),
-        fetchFeedbacks(),
-        fetchTranscripts()
-      ]);
-      setLoading(false);
+      try {
+        await Promise.all([
+          fetchConversations(),
+          fetchFeedbacks(),
+          fetchTranscripts()
+        ]);
+        console.log('✅ EnhancedCommunicationsManager: Data load complete');
+      } catch (error) {
+        console.error('❌ EnhancedCommunicationsManager: Data load failed:', error);
+      } finally {
+        setLoading(false);
+      }
     };
     loadData();
   }, [fetchConversations, fetchFeedbacks, fetchTranscripts]);
