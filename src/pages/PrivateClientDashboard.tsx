@@ -782,6 +782,84 @@ const PrivateClientDashboard = () => {
           </TabsContent>
 
           <TabsContent value="monitoring">
+            {/* Camera Access Summary Cards */}
+            {monitoringRequests.filter(r => r.status === 'approved').length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                {/* Active Cameras Card */}
+                <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-green-700 font-medium">Active Cameras</p>
+                        <p className="text-3xl font-bold text-green-800">
+                          {monitoringRequests.filter(r => r.status === 'approved').reduce((sum, r) => sum + (r.camera_count || 1), 0)}
+                        </p>
+                      </div>
+                      <div className="p-3 bg-green-500 rounded-full">
+                        <Camera className="h-6 w-6 text-white" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                {/* Access Keys Card */}
+                <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-blue-700 font-medium">Access Keys</p>
+                        <p className="text-3xl font-bold text-blue-800">
+                          {monitoringRequests.filter(r => r.status === 'approved' && r.access_code).length}
+                        </p>
+                      </div>
+                      <div className="p-3 bg-blue-500 rounded-full">
+                        <Eye className="h-6 w-6 text-white" />
+                      </div>
+                    </div>
+                    {monitoringRequests.filter(r => r.status === 'approved' && r.access_code).length > 0 && (
+                      <div className="mt-3 p-2 bg-white rounded border border-blue-200">
+                        <p className="text-xs text-gray-500 mb-1">Your Access Codes:</p>
+                        {monitoringRequests.filter(r => r.status === 'approved' && r.access_code).map(r => (
+                          <div key={r.id} className="flex items-center justify-between text-sm">
+                            <span className="font-mono font-bold text-blue-700">{r.access_code}</span>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-6 px-2"
+                              onClick={() => {
+                                navigator.clipboard.writeText(r.access_code);
+                                toast({ title: "Copied!", description: "Access code copied to clipboard" });
+                              }}
+                            >
+                              Copy
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+                
+                {/* Quick Access Card */}
+                <Card className="bg-gradient-to-br from-cyan-50 to-teal-50 border-cyan-200">
+                  <CardContent className="p-4">
+                    <div className="flex flex-col h-full justify-between">
+                      <div>
+                        <p className="text-sm text-cyan-700 font-medium mb-1">Live Monitoring</p>
+                        <p className="text-xs text-cyan-600 mb-3">Access your cameras in real-time</p>
+                      </div>
+                      <Link to="/monitoring">
+                        <Button className="w-full bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-600 hover:to-teal-600">
+                          <Eye className="h-4 w-4 mr-2" />
+                          Open Monitoring Page
+                        </Button>
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+            
             <Card>
               <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
