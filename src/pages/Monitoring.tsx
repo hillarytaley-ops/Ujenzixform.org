@@ -284,25 +284,55 @@ const Monitoring = () => {
 
   // Load cameras assigned to a monitoring request via access code
   const loadCamerasFromAccessCode = async (code: string) => {
+    console.log('📹 Loading cameras for access code:', code);
     setLoadingCameras(true);
+    
+    const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+    const BASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1';
+    
+    // Get access token from localStorage
+    let accessToken = '';
     try {
-      // Find the monitoring request with this access code
-      const { data: requestData, error: requestError } = await supabase
-        .from('monitoring_service_requests')
-        .select('*')
-        .eq('access_code', code.toUpperCase())
-        .in('status', ['approved', 'completed'])
-        .maybeSingle();
-
-      if (requestError || !requestData) {
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        accessToken = parsed.access_token || '';
+      }
+    } catch (e) {}
+    
+    try {
+      // Find the monitoring request with this access code using REST API
+      console.log('📹 Fetching monitoring request...');
+      const requestResponse = await fetch(
+        `${BASE_URL}/monitoring_service_requests?access_code=eq.${code.toUpperCase()}&status=in.(approved,completed)&limit=1`,
+        {
+          headers: {
+            'apikey': ANON_KEY,
+            'Authorization': `Bearer ${accessToken || ANON_KEY}`,
+          }
+        }
+      );
+      
+      if (!requestResponse.ok) {
+        console.log('📹 Request fetch failed:', requestResponse.status);
+        throw new Error('Failed to fetch monitoring request');
+      }
+      
+      const requestDataArray = await requestResponse.json();
+      console.log('📹 Request data:', requestDataArray);
+      
+      if (!requestDataArray || requestDataArray.length === 0) {
         toast({
           title: 'Invalid Access Code',
           description: 'The access code is invalid or has expired.',
           variant: 'destructive'
         });
         setAssignedCameras([]);
+        setLoadingCameras(false);
         return;
       }
+      
+      const requestData = requestDataArray[0];
 
       // Set the monitoring request for context
       setMonitoringRequest(requestData);
@@ -310,6 +340,7 @@ const Monitoring = () => {
 
       // Get the assigned camera IDs
       const cameraIds = requestData.assigned_cameras || [];
+      console.log('📹 Camera IDs:', cameraIds);
       
       if (cameraIds.length === 0) {
         toast({
@@ -317,16 +348,30 @@ const Monitoring = () => {
           description: 'No cameras have been assigned to this project yet. Please contact admin.',
         });
         setAssignedCameras([]);
+        setLoadingCameras(false);
         return;
       }
 
-      // Fetch the actual camera records
-      const { data: camerasData, error: camerasError } = await supabase
-        .from('cameras')
-        .select('*')
-        .in('id', cameraIds);
-
-      if (camerasError) throw camerasError;
+      // Fetch the actual camera records using REST API
+      console.log('📹 Fetching cameras...');
+      const cameraIdsParam = cameraIds.map((id: string) => `"${id}"`).join(',');
+      const camerasResponse = await fetch(
+        `${BASE_URL}/cameras?id=in.(${cameraIdsParam})`,
+        {
+          headers: {
+            'apikey': ANON_KEY,
+            'Authorization': `Bearer ${accessToken || ANON_KEY}`,
+          }
+        }
+      );
+      
+      if (!camerasResponse.ok) {
+        console.log('📹 Cameras fetch failed:', camerasResponse.status);
+        throw new Error('Failed to fetch cameras');
+      }
+      
+      const camerasData = await camerasResponse.json();
+      console.log('📹 Cameras data:', camerasData);
 
       // Transform to CameraFeed format
       const transformedCameras = (camerasData || []).map((cam: any) => ({
@@ -347,6 +392,7 @@ const Monitoring = () => {
       }));
 
       setAssignedCameras(transformedCameras);
+      console.log('📹 ✅ Loaded', transformedCameras.length, 'cameras');
       
       toast({
         title: '✅ Cameras Loaded',
@@ -354,7 +400,7 @@ const Monitoring = () => {
       });
 
     } catch (error) {
-      console.error('Error loading cameras:', error);
+      console.error('📹 Error loading cameras:', error);
       toast({
         title: 'Error',
         description: 'Failed to load cameras. Please try again.',
