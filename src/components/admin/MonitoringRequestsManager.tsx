@@ -42,9 +42,23 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+
+// Helper to get access token
+const getAccessToken = (): string => {
+  try {
+    const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+    if (storedSession) {
+      const parsed = JSON.parse(storedSession);
+      return parsed?.access_token || SUPABASE_ANON_KEY;
+    }
+  } catch (e) {
+    console.log('Using anon key for monitoring requests');
+  }
+  return SUPABASE_ANON_KEY;
+};
 
 interface MonitoringRequest {
   id: string;
@@ -136,22 +150,44 @@ export const MonitoringRequestsManager: React.FC = () => {
   const loadRequests = async () => {
     try {
       setLoading(true);
+      console.log('📹 Loading monitoring requests via REST API...');
       
-      const { data, error } = await supabase
-        .from('monitoring_service_requests')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
+      const accessToken = getAccessToken();
+      
+      // Use direct REST API with timeout
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/monitoring_service_requests?order=created_at.desc`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          signal: controller.signal
+        }
+      );
+      
+      clearTimeout(timeout);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to load: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('✅ Monitoring requests loaded:', data?.length || 0);
       setRequests(data || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading requests:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load monitoring requests',
-        variant: 'destructive'
-      });
+      if (error.name !== 'AbortError') {
+        toast({
+          title: 'Error',
+          description: 'Failed to load monitoring requests',
+          variant: 'destructive'
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -179,6 +215,7 @@ export const MonitoringRequestsManager: React.FC = () => {
   const updateRequestStatus = async (requestId: string, newStatus: string, additionalData?: any) => {
     try {
       setIsUpdating(true);
+      console.log('📹 Updating monitoring request status...');
 
       const updateData = {
         status: newStatus,
@@ -186,24 +223,45 @@ export const MonitoringRequestsManager: React.FC = () => {
         ...additionalData
       };
 
-      const { error } = await supabase
-        .from('monitoring_service_requests')
-        .update(updateData)
-        .eq('id', requestId);
+      const accessToken = getAccessToken();
+      
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/monitoring_service_requests?id=eq.${requestId}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify(updateData),
+          signal: controller.signal
+        }
+      );
+      
+      clearTimeout(timeout);
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Update failed: ${response.status}`);
+      }
 
+      console.log('✅ Monitoring request status updated');
       toast({
         title: 'Status Updated',
         description: `Request status changed to ${newStatus}`,
       });
 
       loadRequests();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating status:', error);
       toast({
         title: 'Update Failed',
-        description: 'Failed to update request status',
+        description: error.message || 'Failed to update request status',
         variant: 'destructive'
       });
     } finally {
@@ -255,19 +313,41 @@ export const MonitoringRequestsManager: React.FC = () => {
 
     try {
       setIsUpdating(true);
+      console.log('📹 Updating quote...');
 
-      const { error } = await supabase
-        .from('monitoring_service_requests')
-        .update({
-          quote_amount: quoteAmount,
-          quote_valid_until: quoteValidUntil,
-          admin_notes: adminNotes,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', selectedRequest.id);
+      const accessToken = getAccessToken();
+      
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/monitoring_service_requests?id=eq.${selectedRequest.id}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify({
+            quote_amount: quoteAmount,
+            quote_valid_until: quoteValidUntil,
+            admin_notes: adminNotes,
+            updated_at: new Date().toISOString()
+          }),
+          signal: controller.signal
+        }
+      );
+      
+      clearTimeout(timeout);
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Update failed: ${response.status}`);
+      }
 
+      console.log('✅ Quote updated');
       toast({
         title: 'Quote Updated',
         description: 'The quote has been updated successfully.',
@@ -276,11 +356,11 @@ export const MonitoringRequestsManager: React.FC = () => {
       loadRequests();
       resetQuoteForm();
       setSelectedRequest(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating quote:', error);
       toast({
         title: 'Update Failed',
-        description: 'Failed to update the quote',
+        description: error.message || 'Failed to update the quote',
         variant: 'destructive'
       });
     } finally {
