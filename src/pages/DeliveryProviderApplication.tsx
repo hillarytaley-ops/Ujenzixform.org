@@ -122,27 +122,79 @@ const DeliveryProviderApplication = () => {
   // Get current user and check for existing application
   useEffect(() => {
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setCurrentUser(user);
-      if (user?.email) {
-        // Pre-fill email fields
-        setCompanyForm(prev => ({ ...prev, contactEmail: user.email || '' }));
-        setPrivateForm(prev => ({ ...prev, email: user.email || '' }));
-      }
-      
-      // Check for existing application
-      if (user?.id) {
-        const { data: application, error } = await supabase
-          .from('delivery_provider_registrations')
-          .select('id, status, full_name, company_name, is_company, created_at, updated_at, admin_notes')
-          .eq('auth_user_id', user.id)
-          .maybeSingle();
+      try {
+        // Try to get user with timeout
+        const userPromise = supabase.auth.getUser();
+        const timeoutPromise = new Promise<{ data: { user: null } }>((resolve) => 
+          setTimeout(() => resolve({ data: { user: null } }), 3000)
+        );
         
-        if (application && !error) {
-          setExistingApplication(application as ExistingApplication);
+        let { data: { user } } = await Promise.race([userPromise, timeoutPromise]);
+        
+        // If no user from Supabase, try localStorage fallback
+        if (!user) {
+          try {
+            const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+            if (storedSession) {
+              const parsed = JSON.parse(storedSession);
+              if (parsed.user) {
+                user = parsed.user;
+                console.log('📋 DeliveryProviderApplication: Got user from localStorage:', user?.email);
+              }
+            }
+          } catch (e) {
+            console.warn('Could not parse localStorage session');
+          }
         }
+        
+        setCurrentUser(user);
+        console.log('📋 DeliveryProviderApplication: User set:', user?.email || 'No user');
+        
+        if (user?.email) {
+          // Pre-fill email fields
+          setCompanyForm(prev => ({ ...prev, contactEmail: user.email || '' }));
+          setPrivateForm(prev => ({ ...prev, email: user.email || '' }));
+        }
+        
+        // Check for existing application
+        if (user?.id) {
+          try {
+            const { data: application, error } = await supabase
+              .from('delivery_provider_registrations')
+              .select('id, status, full_name, company_name, is_company, created_at, updated_at, admin_notes')
+              .eq('auth_user_id', user.id)
+              .maybeSingle();
+            
+            if (application && !error) {
+              setExistingApplication(application as ExistingApplication);
+            }
+          } catch (appError) {
+            console.warn('Error checking existing application:', appError);
+          }
+        }
+      } catch (error) {
+        console.error('Error getting user:', error);
+        
+        // Final fallback - try localStorage
+        try {
+          const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          if (storedSession) {
+            const parsed = JSON.parse(storedSession);
+            if (parsed.user) {
+              setCurrentUser(parsed.user);
+              console.log('📋 DeliveryProviderApplication: Fallback - Got user from localStorage:', parsed.user?.email);
+              if (parsed.user?.email) {
+                setCompanyForm(prev => ({ ...prev, contactEmail: parsed.user.email || '' }));
+                setPrivateForm(prev => ({ ...prev, email: parsed.user.email || '' }));
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Could not parse localStorage session');
+        }
+      } finally {
+        setIsLoadingApplication(false);
       }
-      setIsLoadingApplication(false);
     };
     getUser();
   }, []);
