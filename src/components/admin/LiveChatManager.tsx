@@ -193,8 +193,11 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
   useEffect(() => {
     let isSubscribed = true;
     
-    // Initial fetch
+    console.log('📨 LiveChatManager: Initializing...');
+    
+    // Initial fetch - run immediately
     fetchSessions().then(() => {
+      console.log('📨 LiveChatManager: Initial fetch complete');
       // Initialize known message IDs from fetched sessions
       setSessions(prev => {
         prev.forEach(session => {
@@ -205,8 +208,9 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
     });
 
     // Real-time subscription for instant message delivery
+    console.log('📨 LiveChatManager: Setting up realtime subscription...');
     const channel = supabase
-      .channel('chat_messages_admin_realtime')
+      .channel('chat_messages_admin_realtime_v2')
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'chat_messages' },
@@ -214,7 +218,7 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
           if (!isSubscribed || !isMountedRef.current) return;
           
           const newMsg = payload.new as ChatMessage;
-          console.log('📩 Admin received real-time message:', newMsg.sender_type, newMsg.content?.substring(0, 30));
+          console.log('📩 REALTIME: New message received!', newMsg.sender_type, newMsg.content?.substring(0, 30));
           
           // Skip if we've already seen this message
           if (knownMessageIdsRef.current.has(newMsg.id)) {
@@ -289,12 +293,18 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
           }
         }
       )
-      .subscribe((status) => {
-        console.log('📡 Admin chat subscription status:', status);
+      .subscribe((status, err) => {
+        console.log('📡 REALTIME subscription status:', status, err || '');
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ REALTIME: Successfully subscribed to chat_messages!');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('❌ REALTIME: Channel error', err);
+        }
       });
 
-    // POLLING FALLBACK: Check for new messages every 2 seconds
-    // Slightly slower to reduce server load but still responsive
+    // POLLING FALLBACK: Check for new messages every 3 seconds
+    // This ensures messages appear even if realtime fails
+    console.log('📨 LiveChatManager: Starting polling fallback...');
     const pollingInterval = setInterval(async () => {
       if (!isSubscribed || !isMountedRef.current) return;
       
@@ -336,11 +346,23 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
 
     return () => {
       isSubscribed = false;
-      console.log('🔌 Unsubscribing from admin chat channel');
+      console.log('🔌 LiveChatManager: Cleaning up subscriptions');
       supabase.removeChannel(channel);
       clearInterval(pollingInterval);
     };
   }, [fetchSessions, playNotificationSound, toast]);
+
+  // Also fetch when component becomes visible (tab switch)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('📨 LiveChatManager: Tab became visible, refreshing...');
+        fetchSessions();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [fetchSessions]);
 
   // Auto-scroll when new messages arrive
   useEffect(() => {
@@ -524,7 +546,12 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
             Chat Sessions ({sessions.length})
           </h3>
           <ScrollArea className="h-[500px]">
-            {sessions.length === 0 && !fetchError ? (
+            {loading ? (
+              <div className="text-center py-8 text-gray-400">
+                <RefreshCw className="w-12 h-12 mx-auto mb-2 animate-spin opacity-50" />
+                <p>Loading chat sessions...</p>
+              </div>
+            ) : sessions.length === 0 && !fetchError ? (
               <div className="text-center py-8 text-gray-500">
                 <MessageSquare className="w-12 h-12 mx-auto mb-2 opacity-50" />
                 <p>No chat sessions yet</p>
