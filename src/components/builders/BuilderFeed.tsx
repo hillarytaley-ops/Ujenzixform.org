@@ -769,6 +769,13 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         onUploadVideo(selectedVideo, newPostText);
       }
 
+      // Determine what media URL to use for display
+      // Use the uploaded URL (not the blob preview) for permanent display
+      const displayVideoUrl = videoUrl || '';
+      const displayImageUrl = imageUrl || '';
+      
+      console.log('📤 Media URLs for display:', { displayVideoUrl, displayImageUrl });
+
       // Add to local state for immediate display
       const newPost: Omit<BuilderVideoPostProps, 'onLike' | 'onComment' | 'onShare' | 'onViewProfile'> = {
         id: newPostData?.id || `post-${Date.now()}`,
@@ -776,8 +783,8 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         builderName: profile?.full_name || effectiveUserName,
         builderAvatar: profile?.avatar_url || currentUserAvatar,
         builderVerified: false,
-        videoUrl: videoUrl || videoPreview || '',
-        imageUrl: imageUrl || photoPreview || '',
+        videoUrl: displayVideoUrl,
+        imageUrl: displayImageUrl,
         caption: newPostText,
         location: postLocation || '',
         timestamp: new Date(),
@@ -787,7 +794,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         comments: []
       };
 
-      console.log('📤 Adding post to feed:', newPost.id);
+      console.log('📤 Adding post to feed:', newPost.id, 'imageUrl:', newPost.imageUrl, 'videoUrl:', newPost.videoUrl);
       setPosts([newPost, ...posts]);
       
       console.log('📤 Clearing form...');

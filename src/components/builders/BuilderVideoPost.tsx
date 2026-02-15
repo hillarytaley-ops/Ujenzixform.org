@@ -314,14 +314,22 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
           </div>
         </div>
       </div>
-      ) : imageUrl ? (
+      ) : imageUrl && imageUrl.length > 0 ? (
         /* Image Display */
-        <div className="relative bg-gray-100 dark:bg-gray-800">
+        <div className="relative bg-gray-100 dark:bg-gray-800 min-h-[200px]">
           <img
             src={imageUrl}
             alt={caption || 'Post image'}
             className="w-full max-h-[600px] object-contain"
             loading="lazy"
+            onError={(e) => {
+              console.error('Image failed to load:', imageUrl);
+              // Hide broken image
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+            onLoad={() => {
+              console.log('Image loaded successfully:', imageUrl);
+            }}
           />
         </div>
       ) : null}
