@@ -66,12 +66,14 @@ export function LiveChatWidget({ position = 'bottom-right' }: LiveChatWidgetProp
     }
   }, [messages]);
 
-  // Subscribe to messages when connected
+  // Subscribe to messages when connected - INSTANT DELIVERY like WhatsApp
   useEffect(() => {
     if (!conversationId) return;
 
+    console.log('💬 LiveChat: Setting up realtime subscription for conversation:', conversationId);
+
     const channel = supabase
-      .channel(`chat:${conversationId}`)
+      .channel(`livechat_client_${conversationId}`)
       .on(
         'postgres_changes',
         {
@@ -82,22 +84,75 @@ export function LiveChatWidget({ position = 'bottom-right' }: LiveChatWidgetProp
         },
         (payload) => {
           const msg = payload.new as any;
-          // Only add staff messages (user messages are added locally)
+          console.log('💬 LiveChat: REALTIME message received!', msg.sender_type, msg.content?.substring(0, 20));
+          
+          // Only add staff messages (user messages are added locally via optimistic update)
           if (msg.sender_type === 'staff') {
-            setMessages(prev => [...prev, {
-              id: msg.id,
-              role: 'staff',
-              content: msg.content,
-              timestamp: new Date(msg.created_at),
-              staffName: msg.sender_name
-            }]);
+            // Check if message already exists to avoid duplicates
+            setMessages(prev => {
+              if (prev.some(m => m.id === msg.id)) return prev;
+              return [...prev, {
+                id: msg.id,
+                role: 'staff',
+                content: msg.content,
+                timestamp: new Date(msg.created_at),
+                staffName: msg.sender_name
+              }];
+            });
+            
+            // Play notification sound
+            try {
+              const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleQoAHIreli4AAAB4nJ8sAAAA');
+              audio.volume = 0.5;
+              audio.play().catch(() => {});
+            } catch (e) {}
           }
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        console.log('💬 LiveChat: Subscription status:', status, err || '');
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ LiveChat: Realtime connected - messages will appear instantly!');
+        }
+      });
+
+    // POLLING FALLBACK: Check for new staff messages every 3 seconds
+    const pollInterval = setInterval(async () => {
+      try {
+        const { data } = await supabase
+          .from('chat_messages')
+          .select('*')
+          .eq('conversation_id', conversationId)
+          .eq('sender_type', 'staff')
+          .order('created_at', { ascending: false })
+          .limit(5);
+        
+        if (data && data.length > 0) {
+          setMessages(prev => {
+            const existingIds = new Set(prev.map(m => m.id));
+            const newMsgs = data.filter(m => !existingIds.has(m.id));
+            if (newMsgs.length > 0) {
+              console.log('💬 LiveChat: Polling found new staff messages:', newMsgs.length);
+              return [...prev, ...newMsgs.map(m => ({
+                id: m.id,
+                role: 'staff' as const,
+                content: m.content,
+                timestamp: new Date(m.created_at),
+                staffName: m.sender_name
+              }))];
+            }
+            return prev;
+          });
+        }
+      } catch (e) {
+        // Silent fail for polling
+      }
+    }, 3000);
 
     return () => {
+      console.log('💬 LiveChat: Cleaning up subscription');
       supabase.removeChannel(channel);
+      clearInterval(pollInterval);
     };
   }, [conversationId]);
 

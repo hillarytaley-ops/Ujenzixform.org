@@ -207,10 +207,10 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
       });
     });
 
-    // Real-time subscription for instant message delivery
-    console.log('📨 LiveChatManager: Setting up realtime subscription...');
+    // Real-time subscription for INSTANT message delivery (WhatsApp style)
+    console.log('📨 LiveChatManager: Setting up realtime subscription for INSTANT delivery...');
     const channel = supabase
-      .channel('chat_messages_admin_realtime_v2')
+      .channel('admin_livechat_instant')
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'chat_messages' },
@@ -218,7 +218,7 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
           if (!isSubscribed || !isMountedRef.current) return;
           
           const newMsg = payload.new as ChatMessage;
-          console.log('📩 REALTIME: New message received!', newMsg.sender_type, newMsg.content?.substring(0, 30));
+          console.log('📩 INSTANT: New message received!', newMsg.sender_type, newMsg.content?.substring(0, 30));
           
           // Skip if we've already seen this message
           if (knownMessageIdsRef.current.has(newMsg.id)) {
@@ -302,9 +302,9 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
         }
       });
 
-    // POLLING FALLBACK: Check for new messages every 3 seconds
+    // POLLING FALLBACK: Check for new messages every 2 seconds (faster for better UX)
     // This ensures messages appear even if realtime fails
-    console.log('📨 LiveChatManager: Starting polling fallback...');
+    console.log('📨 LiveChatManager: Starting 2-second polling fallback...');
     const pollingInterval = setInterval(async () => {
       if (!isSubscribed || !isMountedRef.current) return;
       
@@ -342,7 +342,7 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
       } catch (err) {
         // Silent fail for polling
       }
-    }, 1000); // Reduced from 2000ms to 1000ms for faster updates
+    }, 2000); // Poll every 2 seconds as fallback for instant delivery
 
     return () => {
       isSubscribed = false;
