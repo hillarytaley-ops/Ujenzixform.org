@@ -255,8 +255,28 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         }
       } catch (e) {}
       
+      // Get current user ID to show their own posts regardless of status
+      let currentUserId: string | null = null;
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          currentUserId = parsed.user?.id;
+        }
+      } catch (e) {}
+
+      // Fetch posts - include both active posts and user's own posts (any status)
+      // Using OR filter: status=active OR builder_id=currentUserId
+      let postsUrl = `${SUPABASE_URL}/rest/v1/builder_posts?order=created_at.desc&limit=50`;
+      if (currentUserId) {
+        // Show active posts OR user's own posts (any status except deleted)
+        postsUrl = `${SUPABASE_URL}/rest/v1/builder_posts?or=(status.eq.active,builder_id.eq.${currentUserId})&status=neq.deleted&order=created_at.desc&limit=50`;
+      } else {
+        postsUrl = `${SUPABASE_URL}/rest/v1/builder_posts?status=eq.active&order=created_at.desc&limit=50`;
+      }
+      
       const postsRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/builder_posts?status=eq.active&order=created_at.desc&limit=50`,
+        postsUrl,
         {
           headers: {
             'apikey': SUPABASE_ANON_KEY,
@@ -345,15 +365,8 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         const commenterMap = new Map((commenterProfiles || []).map((p: any) => [p.user_id, p]));
 
         // Fetch user's likes to show which posts they've liked
+        // Note: currentUserId was already set earlier in fetchPosts
         let userLikes: Set<string> = new Set();
-        let currentUserId: string | null = null;
-        try {
-          const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-          if (storedSession) {
-            const parsed = JSON.parse(storedSession);
-            currentUserId = parsed.user?.id;
-          }
-        } catch (e) {}
 
         if (currentUserId) {
           try {
