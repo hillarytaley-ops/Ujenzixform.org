@@ -71,17 +71,36 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
     try {
       console.log('📨 Fetching chat messages...');
       
-      // Try admin client first (bypasses RLS), fall back to regular client
-      const client = getAdminClient() || supabase;
-      const isUsingAdminClient = !!getAdminClient();
-      console.log('📨 Using admin client:', isUsingAdminClient);
+      // Check if we have a session
+      const { data: sessionData } = await supabase.auth.getSession();
+      console.log('📨 Session status:', sessionData?.session ? 'Active' : 'No session');
       
-      const { data, error } = await client
-        .from('chat_messages')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // Use direct REST API call to bypass any client-side caching issues
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mjc4NjAxMTEsImV4cCI6MjA0MzQzNjExMX0.gPR5QHKM3nTcTz6cZhz-6RxVjvvz3AoFxpVhPVpZSi4';
+      
+      const token = sessionData?.session?.access_token || SUPABASE_ANON_KEY;
+      
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/chat_messages?select=*&order=created_at.desc&limit=500`, {
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('📨 REST API error:', response.status, errorText);
+        setFetchError(`Failed to fetch messages: ${response.status}`);
+        setLoading(false);
+        return;
+      }
+      
+      const data = await response.json();
+      const error = null;
 
-      console.log('📨 Chat messages result:', { count: data?.length, error });
+      console.log('📨 Chat messages result:', { count: data?.length, sample: data?.slice(0, 2) });
       
       if (error) {
         console.error('Error fetching chat messages:', error);
