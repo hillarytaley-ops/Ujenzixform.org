@@ -67,45 +67,107 @@ const DeliverySignIn = () => {
 
   // Check if already logged in on page load - MUST verify role from DB
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        console.log('🔐 DeliverySignIn: Session found, checking DB role...');
+    const checkAuth = async () => {
+      try {
+        console.log('🚚 DeliverySignIn: Checking existing session...');
         
-        // MUST check database for actual role
-        const { data: roleData } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', session.user.id)
-          .maybeSingle();
+        // Quick timeout for session check
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Session check timeout')), 3000)
+        );
         
-        const dbRole = roleData?.role;
-        console.log('🔐 DeliverySignIn: DB role:', dbRole);
+        const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]) as any;
         
-        if (dbRole === 'delivery' || dbRole === 'delivery_provider') {
-          window.location.href = '/delivery-dashboard';
-        } else if (dbRole) {
-          // Wrong role - redirect to their actual dashboard
-          toast({
-            title: 'Wrong Portal',
-            description: `You are registered as ${dbRole}. Redirecting...`,
-          });
-          if (dbRole === 'private_client') window.location.href = '/private-client-dashboard';
-          else if (dbRole === 'professional_builder') window.location.href = '/professional-builder-dashboard';
-          else if (dbRole === 'supplier') window.location.href = '/supplier-dashboard';
-          else if (dbRole === 'admin') window.location.href = '/admin-dashboard';
-          else window.location.href = '/home';
-        } else {
-          setCheckingAuth(false);
+        if (session?.user) {
+          console.log('🚚 DeliverySignIn: Session found for:', session.user.email);
+          
+          // Quick check localStorage first for instant decision
+          const cachedRole = localStorage.getItem('user_role');
+          const cachedRoleId = localStorage.getItem('user_role_id');
+          
+          if (cachedRole && cachedRoleId === session.user.id) {
+            console.log('🚚 DeliverySignIn: Using cached role:', cachedRole);
+            if (cachedRole === 'delivery' || cachedRole === 'delivery_provider') {
+              window.location.href = '/delivery-dashboard';
+              return;
+            } else if (cachedRole === 'admin') {
+              // Admin can access delivery dashboard too
+              setCheckingAuth(false);
+              return;
+            } else {
+              // Wrong role - redirect to their dashboard
+              toast({
+                title: 'Wrong Portal',
+                description: `You are registered as ${cachedRole}. Redirecting...`,
+              });
+              if (cachedRole === 'private_client') window.location.href = '/private-client-dashboard';
+              else if (cachedRole === 'professional_builder' || cachedRole === 'builder') window.location.href = '/professional-builder-dashboard';
+              else if (cachedRole === 'supplier') window.location.href = '/supplier-dashboard';
+              else window.location.href = '/home';
+              return;
+            }
+          }
+          
+          // Check database for role with timeout
+          try {
+            const rolePromise = supabase
+              .from('user_roles')
+              .select('role')
+              .eq('user_id', session.user.id)
+              .maybeSingle();
+            
+            const roleTimeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Role check timeout')), 3000)
+            );
+            
+            const { data: roleData } = await Promise.race([rolePromise, roleTimeoutPromise]) as any;
+            const dbRole = roleData?.role;
+            console.log('🚚 DeliverySignIn: DB role:', dbRole);
+            
+            if (dbRole === 'delivery' || dbRole === 'delivery_provider') {
+              localStorage.setItem('user_role', dbRole);
+              localStorage.setItem('user_role_id', session.user.id);
+              window.location.href = '/delivery-dashboard';
+              return;
+            } else if (dbRole) {
+              // Wrong role - redirect to their actual dashboard
+              localStorage.setItem('user_role', dbRole);
+              localStorage.setItem('user_role_id', session.user.id);
+              toast({
+                title: 'Wrong Portal',
+                description: `You are registered as ${dbRole}. Redirecting...`,
+              });
+              if (dbRole === 'private_client') window.location.href = '/private-client-dashboard';
+              else if (dbRole === 'professional_builder' || dbRole === 'builder') window.location.href = '/professional-builder-dashboard';
+              else if (dbRole === 'supplier') window.location.href = '/supplier-dashboard';
+              else if (dbRole === 'admin') window.location.href = '/admin-dashboard';
+              else window.location.href = '/home';
+              return;
+            }
+          } catch (roleError) {
+            console.log('🚚 DeliverySignIn: Role check timeout/error, showing form');
+          }
         }
-      } else {
+        
+        // No session or no role - show sign in form
+        setCheckingAuth(false);
+      } catch (error) {
+        console.log('🚚 DeliverySignIn: Auth check error, showing form');
         setCheckingAuth(false);
       }
-    });
+    };
     
-    // Safety timeout
-    const timeout = setTimeout(() => setCheckingAuth(false), 3000);
+    checkAuth();
+    
+    // Safety timeout - always show form after 2 seconds
+    const timeout = setTimeout(() => {
+      console.log('🚚 DeliverySignIn: Safety timeout - showing form');
+      setCheckingAuth(false);
+    }, 2000);
+    
     return () => clearTimeout(timeout);
-  }, []);
+  }, [toast]);
 
   /**
    * ═══════════════════════════════════════════════════════════════════════════════
