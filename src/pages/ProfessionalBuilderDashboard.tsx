@@ -225,19 +225,51 @@ const ProfessionalBuilderDashboardPage = () => {
       // Role already verified by RoleProtectedRoute, skip redundant check
       console.log('📋 Profile setup complete, data loading in background');
 
-      // Fetch monitoring requests in background using Supabase client
-      supabase
-        .from('monitoring_service_requests')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .then(({ data, error }) => {
-          if (error) {
-            console.log('Monitoring requests fetch error:', error.message);
-          } else if (data && data.length > 0) {
-            setMonitoringRequests(data);
+      // Fetch monitoring requests using REST API for reliability
+      const fetchMonitoringRequests = async () => {
+        try {
+          const accessToken = await getAccessToken();
+          console.log('📹 Fetching monitoring requests for user:', userId);
+          
+          const response = await fetch(
+            `${SUPABASE_URL}/rest/v1/monitoring_service_requests?user_id=eq.${userId}&order=created_at.desc`,
+            {
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+              }
+            }
+          );
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log('📹 Monitoring requests loaded:', data?.length || 0, 'requests');
+            if (data && data.length > 0) {
+              console.log('📹 First request status:', data[0].status, 'access_code:', data[0].access_code);
+              setMonitoringRequests(data);
+            }
+          } else {
+            console.log('📹 Monitoring requests fetch failed:', response.status);
+            // Fallback to Supabase client
+            const { data, error } = await supabase
+              .from('monitoring_service_requests')
+              .select('*')
+              .eq('user_id', userId)
+              .order('created_at', { ascending: false });
+            
+            if (error) {
+              console.log('📹 Supabase client fallback error:', error.message);
+            } else if (data && data.length > 0) {
+              console.log('📹 Monitoring requests (fallback):', data.length);
+              setMonitoringRequests(data);
+            }
           }
-        });
+        } catch (e) {
+          console.error('📹 Error fetching monitoring requests:', e);
+        }
+      };
+      
+      fetchMonitoringRequests();
 
     } catch (error) {
       console.error('Auth error:', error);
@@ -1314,7 +1346,7 @@ const ProfessionalBuilderDashboardPage = () => {
                     <div>
                       <p className="text-sm text-green-700 font-medium">Active Cameras</p>
                       <p className="text-3xl font-bold text-green-800">
-                        {monitoringRequests.filter(r => r.status === 'approved').reduce((sum, r) => sum + (r.camera_count || 1), 0)}
+                        {monitoringRequests.filter(r => r.status === 'approved').reduce((sum, r) => sum + (r.assigned_cameras?.length || r.camera_count || 0), 0)}
                       </p>
                     </div>
                     <div className="p-3 bg-green-500 rounded-full">
@@ -1697,15 +1729,27 @@ const ProfessionalBuilderDashboardPage = () => {
                             <p className="text-sm text-green-700 mb-3">
                               Your cameras are set up and ready. Access your live feeds anytime.
                             </p>
+                            
+                            {/* Camera Assignment Info */}
+                            {request.assigned_cameras && request.assigned_cameras.length > 0 && (
+                              <div className="bg-white p-3 rounded border border-green-300 mb-3">
+                                <p className="text-xs text-gray-500 mb-1">Assigned Cameras</p>
+                                <p className="font-bold text-lg text-green-700">
+                                  {request.assigned_cameras.length} Camera{request.assigned_cameras.length > 1 ? 's' : ''}
+                                </p>
+                              </div>
+                            )}
+                            
                             {request.access_code && (
                               <div className="bg-white p-3 rounded border border-green-300 mb-3">
-                                <p className="text-xs text-gray-500">Access Code</p>
-                                <p className="font-mono font-bold text-lg text-green-700">{request.access_code}</p>
+                                <p className="text-xs text-gray-500">Your Access Code</p>
+                                <p className="font-mono font-bold text-2xl text-green-700 tracking-wider">{request.access_code}</p>
+                                <p className="text-xs text-gray-400 mt-1">Use this code on the Monitoring page to view your cameras</p>
                               </div>
                             )}
                             <Button 
                               className="w-full bg-green-600 hover:bg-green-700"
-                              onClick={() => window.open('/monitoring', '_blank')}
+                              onClick={() => navigate('/monitoring')}
                             >
                               <Eye className="h-4 w-4 mr-2" />
                               Access Live Cameras
