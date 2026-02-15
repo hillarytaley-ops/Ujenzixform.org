@@ -302,47 +302,63 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
         }
       });
 
-    // POLLING FALLBACK: Check for new messages every 2 seconds (faster for better UX)
+    // POLLING FALLBACK: Check for new messages every 2 seconds using REST API
     // This ensures messages appear even if realtime fails
-    console.log('📨 LiveChatManager: Starting 2-second polling fallback...');
+    console.log('📨 LiveChatManager: Starting 2-second polling fallback (REST API)...');
+    const POLL_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+    const POLL_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mjc4NjAxMTEsImV4cCI6MjA0MzQzNjExMX0.gPR5QHKM3nTcTz6cZhz-6RxVjvvz3AoFxpVhPVpZSi4';
+    
     const pollingInterval = setInterval(async () => {
       if (!isSubscribed || !isMountedRef.current) return;
       
       try {
-        const { data, error } = await supabase
-          .from('chat_messages')
-          .select('id, conversation_id, sender_type, sender_name, content, created_at')
-          .order('created_at', { ascending: false })
-          .limit(100); // Increased limit to catch more messages
-
-        if (!error && data && data.length > 0) {
-          // Find truly new messages
-          const newMessages = data.filter((msg: any) => !knownMessageIdsRef.current.has(msg.id));
-          
-          if (newMessages.length > 0) {
-            // Add to known IDs
-            newMessages.forEach((msg: any) => knownMessageIdsRef.current.add(msg.id));
-            
-            // Check for new client messages
-            const newClientMessages = newMessages.filter((msg: any) => msg.sender_type === 'client');
-            
-            if (newClientMessages.length > 0) {
-              const latestClientMsg = newClientMessages[0];
-              playNotificationSound();
-              toast({
-                title: "💬 New Chat Message",
-                description: `${latestClientMsg.sender_name || 'Guest'}: ${latestClientMsg.content.substring(0, 50)}...`,
-              });
+        // Use REST API for polling to bypass any client issues
+        const pollResponse = await fetch(
+          `${POLL_URL}/rest/v1/chat_messages?select=id,conversation_id,sender_type,sender_name,content,created_at&order=created_at.desc&limit=100`,
+          {
+            headers: {
+              'apikey': POLL_KEY,
+              'Authorization': `Bearer ${POLL_KEY}`,
+              'Content-Type': 'application/json'
             }
+          }
+        );
+        
+        if (pollResponse.ok) {
+          const data = await pollResponse.json();
+          
+          if (data && data.length > 0) {
+            // Find truly new messages
+            const newMessages = data.filter((msg: any) => !knownMessageIdsRef.current.has(msg.id));
             
-            // Refresh sessions to get updated data
-            fetchSessions();
+            if (newMessages.length > 0) {
+              console.log('📨 POLLING: Found', newMessages.length, 'new messages!');
+              
+              // Add to known IDs
+              newMessages.forEach((msg: any) => knownMessageIdsRef.current.add(msg.id));
+              
+              // Check for new client messages
+              const newClientMessages = newMessages.filter((msg: any) => msg.sender_type === 'client');
+              
+              if (newClientMessages.length > 0) {
+                const latestClientMsg = newClientMessages[0];
+                playNotificationSound();
+                toast({
+                  title: "💬 New Chat Message",
+                  description: `${latestClientMsg.sender_name || 'Guest'}: ${latestClientMsg.content.substring(0, 50)}...`,
+                });
+              }
+              
+              // Refresh sessions to get updated data
+              fetchSessions();
+            }
           }
         }
       } catch (err) {
         // Silent fail for polling
+        console.log('📨 Polling error (silent):', err);
       }
-    }, 2000); // Poll every 2 seconds as fallback for instant delivery
+    }, 2000); // Poll every 2 seconds for instant delivery
 
     return () => {
       isSubscribed = false;
