@@ -8,7 +8,7 @@ import {
   Bell, BellOff, Volume2, VolumeX, Vibrate, 
   Package, Truck, AlertTriangle, CheckCircle, X,
   Clock, MapPin, DollarSign, Star, RefreshCw,
-  Check, XCircle, Loader2
+  Check, XCircle, Loader2, Copy, Navigation, ExternalLink
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -23,6 +23,11 @@ interface Notification {
   actionUrl?: string;
   priority: 'low' | 'medium' | 'high';
   status?: string; // The actual delivery status (pending, assigned, in_transit, etc.)
+  pickupAddress?: string;
+  deliveryAddress?: string;
+  materialType?: string;
+  quantity?: string;
+  estimatedCost?: number;
 }
 
 interface NotificationSettings {
@@ -198,7 +203,12 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                 read: req.status !== 'pending',
                 priority: req.priority_level === 'urgent' || req.status === 'pending' ? 'high' : 'medium',
                 actionUrl: `/delivery-dashboard?request=${req.id}`,
-                status: req.status // Include the actual status
+                status: req.status,
+                pickupAddress: req.pickup_address || req.pickup_location || '',
+                deliveryAddress: req.delivery_address || req.delivery_location || '',
+                materialType: req.material_type || '',
+                quantity: req.quantity || '',
+                estimatedCost: req.estimated_cost || req.budget_range || 0
               });
             });
             console.log(`✅ Loaded ${deliveryRequests.length} delivery_requests`);
@@ -236,7 +246,12 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                   read: del.status !== 'pending',
                   priority: del.urgency === 'urgent' || del.status === 'pending' ? 'high' : 'medium',
                   actionUrl: `/delivery-dashboard?delivery=${del.id}`,
-                  status: del.status // Include the actual status
+                  status: del.status,
+                  pickupAddress: del.pickup_address || del.pickup_location || '',
+                  deliveryAddress: del.delivery_address || del.delivery_location || '',
+                  materialType: del.material_type || '',
+                  quantity: del.quantity || '',
+                  estimatedCost: del.estimated_cost || 0
                 });
               }
             });
@@ -276,7 +291,12 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                   read: notif.status !== 'pending',
                   priority: notif.priority_level === 'urgent' || notif.status === 'pending' ? 'high' : 'medium',
                   actionUrl: `/delivery-dashboard?notification=${notif.id}`,
-                  status: notif.status // Include the actual status
+                  status: notif.status,
+                  pickupAddress: notif.pickup_address || notif.pickup_location || '',
+                  deliveryAddress: notif.delivery_address || notif.delivery_location || '',
+                  materialType: materials[0]?.name || notif.material_type || '',
+                  quantity: notif.quantity || '',
+                  estimatedCost: notif.estimated_cost || 0
                 });
               }
             });
@@ -323,7 +343,13 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             timestamp: new Date(payload.new.created_at || Date.now()),
             read: false,
             priority: payload.new.priority_level === 'urgent' ? 'high' : 'medium',
-            actionUrl: `/delivery-dashboard?request=${payload.new.id}`
+            actionUrl: `/delivery-dashboard?request=${payload.new.id}`,
+            status: payload.new.status || 'pending',
+            pickupAddress: payload.new.pickup_address || payload.new.pickup_location || '',
+            deliveryAddress: payload.new.delivery_address || payload.new.delivery_location || '',
+            materialType: payload.new.material_type || '',
+            quantity: payload.new.quantity || '',
+            estimatedCost: payload.new.estimated_cost || 0
           };
           
           setNotifications(prev => [newNotification, ...prev]);
@@ -528,6 +554,61 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     return date.toLocaleDateString();
   };
 
+  // Copy address to clipboard
+  const copyAddress = async (address: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(address);
+      toast({
+        title: '📋 Copied!',
+        description: `${label} address copied to clipboard`,
+        duration: 2000
+      });
+    } catch (error) {
+      toast({
+        title: 'Copy failed',
+        description: 'Could not copy address',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  // Open address in Google Maps
+  const openInMaps = (address: string) => {
+    // Check if address contains coordinates
+    const coordMatch = address.match(/(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)/);
+    
+    let mapsUrl: string;
+    if (coordMatch) {
+      // If coordinates found, use them directly
+      const [, lat, lng] = coordMatch;
+      mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+    } else {
+      // Otherwise, search for the address
+      mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
+    }
+    
+    window.open(mapsUrl, '_blank');
+  };
+
+  // Open navigation with both pickup and delivery
+  const openNavigation = (pickup: string, delivery: string) => {
+    // Try to extract coordinates or use address
+    const getCoordOrAddress = (addr: string) => {
+      const coordMatch = addr.match(/(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)/);
+      if (coordMatch) {
+        return `${coordMatch[1]},${coordMatch[2]}`;
+      }
+      return encodeURIComponent(addr);
+    };
+
+    const pickupParam = getCoordOrAddress(pickup);
+    const deliveryParam = getCoordOrAddress(delivery);
+    
+    // Google Maps directions URL with waypoints
+    const mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=My+Location&waypoints=${pickupParam}&destination=${deliveryParam}&travelmode=driving`;
+    window.open(mapsUrl, '_blank');
+  };
+
   const updateSetting = (key: keyof NotificationSettings, value: boolean) => {
     setSettings(prev => ({ ...prev, [key]: value }));
   };
@@ -708,7 +789,112 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                         {notification.priority}
                       </Badge>
                     </div>
-                    <p className="text-sm text-gray-600 line-clamp-2">{notification.message}</p>
+                    
+                    {/* Material and quantity info */}
+                    {notification.materialType && (
+                      <p className="text-sm text-gray-700 font-medium flex items-center gap-1 mb-1">
+                        <Package className="h-3.5 w-3.5 text-blue-500" />
+                        {notification.materialType}
+                        {notification.quantity && <span className="text-gray-500">({notification.quantity})</span>}
+                      </p>
+                    )}
+                    
+                    {/* Pickup Address */}
+                    {notification.pickupAddress && (
+                      <div className="bg-green-50 rounded-md p-2 mb-2 border border-green-100">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-green-700 mb-0.5 flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              📦 PICKUP
+                            </p>
+                            <p className="text-sm text-green-800 break-words">{notification.pickupAddress}</p>
+                          </div>
+                          <div className="flex gap-1 flex-shrink-0">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                copyAddress(notification.pickupAddress!, 'Pickup');
+                              }}
+                              className="p-1.5 bg-green-100 hover:bg-green-200 rounded text-green-700 transition-colors"
+                              title="Copy pickup address"
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openInMaps(notification.pickupAddress!);
+                              }}
+                              className="p-1.5 bg-green-100 hover:bg-green-200 rounded text-green-700 transition-colors"
+                              title="Open in Google Maps"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Delivery Address */}
+                    {notification.deliveryAddress && (
+                      <div className="bg-orange-50 rounded-md p-2 mb-2 border border-orange-100">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-orange-700 mb-0.5 flex items-center gap-1">
+                              <Truck className="h-3 w-3" />
+                              🏠 DELIVERY
+                            </p>
+                            <p className="text-sm text-orange-800 break-words">{notification.deliveryAddress}</p>
+                          </div>
+                          <div className="flex gap-1 flex-shrink-0">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                copyAddress(notification.deliveryAddress!, 'Delivery');
+                              }}
+                              className="p-1.5 bg-orange-100 hover:bg-orange-200 rounded text-orange-700 transition-colors"
+                              title="Copy delivery address"
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openInMaps(notification.deliveryAddress!);
+                              }}
+                              className="p-1.5 bg-orange-100 hover:bg-orange-200 rounded text-orange-700 transition-colors"
+                              title="Open in Google Maps"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Start Navigation Button - shows when both addresses available */}
+                    {notification.pickupAddress && notification.deliveryAddress && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openNavigation(notification.pickupAddress!, notification.deliveryAddress!);
+                        }}
+                        className="w-full mb-2 py-2 px-3 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-md flex items-center justify-center gap-2 transition-colors"
+                      >
+                        <Navigation className="h-4 w-4" />
+                        Start Navigation (Pickup → Delivery)
+                      </button>
+                    )}
+                    
+                    {/* Estimated cost */}
+                    {notification.estimatedCost && notification.estimatedCost > 0 && (
+                      <p className="text-sm text-gray-600 flex items-center gap-1 mb-1">
+                        <DollarSign className="h-3.5 w-3.5 text-green-600" />
+                        Est. KES {notification.estimatedCost.toLocaleString()}
+                      </p>
+                    )}
+                    
                     <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
                       <Clock className="h-3 w-3" />
                       {formatTime(notification.timestamp)}
