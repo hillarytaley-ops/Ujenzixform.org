@@ -235,10 +235,10 @@ export const BuilderGrid = ({ onBuilderContact, onBuilderProfile, isAdmin = fals
     }
   };
 
-  // Combine registered builders with demo data (registered first)
+  // ONLY show registered builders from the database - no demo/fake data
   const allBuilders = useMemo(() => {
-    // Put registered builders first, then demo data
-    return [...registeredBuilders, ...KENYAN_BUILDERS, ...DEMO_BUILDERS];
+    // Only show real registered professional builders
+    return registeredBuilders;
   }, [registeredBuilders]);
   
   // Filter builders based on current filters

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -21,104 +21,36 @@ import {
   Calendar,
   Briefcase,
   X,
-  ArrowLeft
+  ArrowLeft,
+  Loader2
 } from 'lucide-react';
 import { BuilderFeed } from './BuilderFeed';
 import { BuilderGrid } from './BuilderGrid';
 import { BuilderVideoGallery } from './BuilderVideoGallery';
 import { MobileBottomNav, MobileHeader } from './MobileBottomNav';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { KENYAN_BUILDERS } from '@/data/kenyanBuilders';
+import { supabase } from '@/integrations/supabase/client';
 
-// Demo builders data
-const DEMO_BUILDERS = [
-  {
-    id: 'builder-1',
-    user_id: 'builder-1',
-    full_name: 'John Kamau',
-    company_name: 'Kamau Construction Ltd',
-    role: 'builder' as const,
-    user_type: 'company' as const,
-    is_professional: true,
-    phone: '+254 722 123 456',
-    email: 'info@kamauconstruction.co.ke',
-    location: 'Nairobi',
-    rating: 4.8,
-    total_projects: 45,
-    total_reviews: 23,
-    specialties: ['Residential Construction', 'Commercial Construction', 'Renovation & Remodeling'],
-    description: 'Leading construction company with over 10 years of experience.',
-    verified: true
-  },
-  {
-    id: 'builder-2',
-    user_id: 'builder-2',
-    full_name: 'Grace Wanjiku',
-    company_name: 'Elite Builders Kenya',
-    role: 'builder' as const,
-    user_type: 'company' as const,
-    is_professional: true,
-    phone: '+254 733 456 789',
-    email: 'contact@elitebuilders.co.ke',
-    location: 'Mombasa',
-    rating: 4.9,
-    total_projects: 62,
-    total_reviews: 18,
-    specialties: ['Commercial Construction', 'Interior Design'],
-    description: 'Premium construction services.',
-    verified: true
-  },
-  {
-    id: 'builder-3',
-    user_id: 'builder-3',
-    full_name: 'David Ochieng',
-    role: 'builder' as const,
-    user_type: 'individual' as const,
-    is_professional: true,
-    phone: '+254 745 678 901',
-    email: 'david.ochieng@gmail.com',
-    location: 'Kisumu',
-    rating: 4.6,
-    total_projects: 28,
-    total_reviews: 12,
-    specialties: ['Electrical Installation', 'Solar Installation'],
-    description: 'Certified electrical and solar specialist.',
-    verified: false
-  },
-  {
-    id: 'builder-4',
-    user_id: 'builder-4',
-    full_name: 'Mary Njeri',
-    company_name: 'Njeri Masonry Works',
-    role: 'builder' as const,
-    user_type: 'company' as const,
-    is_professional: true,
-    phone: '+254 756 789 012',
-    email: 'mary@njerimasonry.co.ke',
-    location: 'Nakuru',
-    rating: 4.7,
-    total_projects: 38,
-    specialties: ['Masonry', 'Foundation Work'],
-    description: 'Expert masonry and foundation work.',
-    verified: true
-  },
-  {
-    id: 'builder-5',
-    user_id: 'builder-5',
-    full_name: 'Peter Mwangi',
-    role: 'builder' as const,
-    user_type: 'individual' as const,
-    is_professional: true,
-    phone: '+254 767 890 123',
-    email: 'peter.mwangi@yahoo.com',
-    location: 'Eldoret',
-    rating: 4.5,
-    total_projects: 22,
-    specialties: ['Roofing', 'Carpentry'],
-    description: 'Specialized in roofing and finishing.',
-    verified: false
-  }
-];
+// Builder type for registered builders
+interface RegisteredBuilder {
+  id: string;
+  user_id: string;
+  full_name: string;
+  company_name?: string;
+  role: 'builder';
+  user_type: 'company' | 'individual';
+  is_professional: boolean;
+  phone?: string;
+  email?: string;
+  location?: string;
+  rating: number;
+  total_projects: number;
+  total_reviews?: number;
+  specialties: string[];
+  description?: string;
+  verified?: boolean;
+  avatar_url?: string;
+}
 
 interface BuilderFacebookLayoutProps {
   currentUserId?: string;
@@ -144,13 +76,79 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedBuilder, setExpandedBuilder] = useState<string | null>(null);
   const [showAllBuilders, setShowAllBuilders] = useState(false);
+  const [registeredBuilders, setRegisteredBuilders] = useState<RegisteredBuilder[]>([]);
+  const [loadingBuilders, setLoadingBuilders] = useState(true);
   
   // Mobile navigation state
   const [mobileTab, setMobileTab] = useState<'feed' | 'builders' | 'create' | 'notifications' | 'menu'>('feed');
   const [showMobileSearch, setShowMobileSearch] = useState(false);
 
-  // Combine demo builders with Kenyan builders
-  const allBuilders = [...DEMO_BUILDERS, ...KENYAN_BUILDERS.slice(0, 10)];
+  // Fetch registered professional builders from database
+  useEffect(() => {
+    const fetchRegisteredBuilders = async () => {
+      setLoadingBuilders(true);
+      try {
+        // First get all professional builder user IDs
+        const { data: roleData, error: roleError } = await supabase
+          .from('user_roles')
+          .select('user_id')
+          .eq('role', 'professional_builder');
+
+        if (roleError || !roleData || roleData.length === 0) {
+          console.log('No professional builders found');
+          setLoadingBuilders(false);
+          return;
+        }
+
+        const builderUserIds = roleData.map(r => r.user_id);
+
+        // Fetch profiles for these users
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select('*')
+          .in('user_id', builderUserIds);
+
+        if (profilesError) {
+          console.error('Error fetching builder profiles:', profilesError);
+          setLoadingBuilders(false);
+          return;
+        }
+
+        // Transform to match expected format
+        const transformedBuilders: RegisteredBuilder[] = (profilesData || []).map(profile => ({
+          id: profile.id,
+          user_id: profile.user_id,
+          full_name: profile.full_name || 'Builder',
+          company_name: profile.company_name,
+          role: 'builder' as const,
+          user_type: profile.company_name ? 'company' as const : 'individual' as const,
+          is_professional: true,
+          phone: profile.phone,
+          email: profile.email,
+          location: profile.location,
+          rating: profile.rating || 4.5,
+          total_projects: profile.total_projects || 0,
+          total_reviews: profile.total_reviews || 0,
+          specialties: profile.specialties || [],
+          description: profile.bio || '',
+          verified: profile.is_verified,
+          avatar_url: profile.avatar_url
+        }));
+
+        setRegisteredBuilders(transformedBuilders);
+        console.log(`Loaded ${transformedBuilders.length} registered builders`);
+      } catch (error) {
+        console.error('Error fetching registered builders:', error);
+      } finally {
+        setLoadingBuilders(false);
+      }
+    };
+
+    fetchRegisteredBuilders();
+  }, []);
+
+  // Only show real registered builders - no demo data
+  const allBuilders = registeredBuilders;
   
   // Filter builders based on search
   const filteredBuilders = allBuilders.filter(builder => {

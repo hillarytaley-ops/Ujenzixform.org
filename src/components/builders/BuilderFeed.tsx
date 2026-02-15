@@ -265,8 +265,9 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
       console.log('📥 Posts fetched:', postsData?.length || 0, 'posts');
       
       if (!postsRes.ok || postsData?.error) {
-        console.log('📥 Error fetching posts, using demo data:', postsData?.message || postsData?.error);
-        setPosts(DEMO_POSTS);
+        console.log('📥 Error fetching posts:', postsData?.message || postsData?.error);
+        // Don't show demo posts - only show real builder posts
+        setPosts([]);
         setLoadingPosts(false);
         return;
       }
@@ -379,17 +380,19 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
 
         // Combine real posts with demo posts if we have few real posts
         if (transformedPosts.length < 3) {
-          setPosts([...transformedPosts, ...DEMO_POSTS]);
+          // Only show real builder posts - no demo data
+          setPosts(transformedPosts);
         } else {
           setPosts(transformedPosts);
         }
       } else {
-        // No posts yet, use demo data
-        setPosts(DEMO_POSTS);
+        // No posts from registered builders yet
+        setPosts([]);
       }
     } catch (error) {
       console.error('Error fetching posts:', error);
-      setPosts(DEMO_POSTS);
+      // Don't show demo posts - only real builder content
+      setPosts([]);
     } finally {
       setLoadingPosts(false);
     }
