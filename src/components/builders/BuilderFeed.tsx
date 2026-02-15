@@ -646,11 +646,26 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
           console.error('📤 Photo upload error:', uploadError);
           toast({
             title: 'Photo Upload Failed',
-            description: uploadError.message || 'Could not upload photo.',
+            description: 'Storage bucket may not be configured for images. Please contact admin.',
             variant: 'destructive'
           });
-          // Continue without photo
+          // Don't continue - show error and stop
+          setIsPosting(false);
+          return;
         }
+      }
+
+      // Check if we have media to post
+      if (selectedPhoto && !imageUrl) {
+        console.log('📤 Photo was selected but upload failed, stopping');
+        setIsPosting(false);
+        return;
+      }
+      
+      if (selectedVideo && !videoUrl) {
+        console.log('📤 Video was selected but upload failed, stopping');
+        setIsPosting(false);
+        return;
       }
 
       console.log('📤 Upload done, now saving to database...');
