@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useToast } from "@/hooks/use-toast";
 import { UserRole } from "@/types/userProfile";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { MapPin, Package, Truck, Calendar, Shield, AlertTriangle, Navigation, Copy, Check } from "lucide-react";
 import { deliveryProviderNotificationService } from "@/services/DeliveryProviderNotificationService";
 
@@ -449,20 +449,63 @@ const DeliveryRequest = () => {
         status: 'pending'
       };
 
-      console.log('🚚 DeliveryRequest: Inserting delivery request...');
-      const insertResult = await withTimeout(
-        supabase.from('delivery_requests').insert(requestData).select().single(),
-        10000,
-        { data: null, error: { message: 'Insert timeout' } }
-      );
-
-      if (insertResult.error) {
-        console.error('🚚 DeliveryRequest: Insert error:', insertResult.error);
-        throw new Error(insertResult.error.message || 'Failed to create delivery request');
+      console.log('🚚 DeliveryRequest: Inserting delivery request via REST API...');
+      
+      // Get access token from localStorage
+      let accessToken = SUPABASE_ANON_KEY;
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          accessToken = parsed?.access_token || SUPABASE_ANON_KEY;
+        }
+      } catch (e) {
+        console.log('🚚 DeliveryRequest: Using anon key for insert');
       }
 
-      const deliveryRequest = insertResult.data;
-      console.log('✅ DeliveryRequest: Created successfully:', deliveryRequest?.id);
+      // Use direct REST API with AbortController for reliable timeout
+      const controller = new AbortController();
+      const insertTimeout = setTimeout(() => controller.abort(), 20000); // 20 second timeout
+      
+      try {
+        const response = await fetch(
+          `${SUPABASE_URL}/rest/v1/delivery_requests`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify(requestData),
+            signal: controller.signal
+          }
+        );
+        
+        clearTimeout(insertTimeout);
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('🚚 DeliveryRequest: Insert error:', response.status, errorData);
+          throw new Error(errorData.message || `Insert failed: ${response.status}`);
+        }
+        
+        const insertedData = await response.json();
+        const deliveryRequest = Array.isArray(insertedData) ? insertedData[0] : insertedData;
+        console.log('✅ DeliveryRequest: Created successfully:', deliveryRequest?.id);
+        
+        // Continue with notification below...
+        var deliveryRequestResult = deliveryRequest;
+      } catch (fetchError: any) {
+        clearTimeout(insertTimeout);
+        if (fetchError.name === 'AbortError') {
+          throw new Error('Request timed out. Please check your connection and try again.');
+        }
+        throw fetchError;
+      }
+
+      const deliveryRequest = deliveryRequestResult;
 
       // ✅ AUTO-NOTIFY: Alert ALL registered delivery providers (non-blocking)
       if (deliveryRequest) {
