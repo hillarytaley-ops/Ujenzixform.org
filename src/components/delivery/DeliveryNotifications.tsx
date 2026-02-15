@@ -22,6 +22,7 @@ interface Notification {
   read: boolean;
   actionUrl?: string;
   priority: 'low' | 'medium' | 'high';
+  status?: string; // The actual delivery status (pending, assigned, in_transit, etc.)
 }
 
 interface NotificationSettings {
@@ -196,7 +197,8 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                 timestamp: new Date(req.created_at),
                 read: req.status !== 'pending',
                 priority: req.priority_level === 'urgent' || req.status === 'pending' ? 'high' : 'medium',
-                actionUrl: `/delivery-dashboard?request=${req.id}`
+                actionUrl: `/delivery-dashboard?request=${req.id}`,
+                status: req.status // Include the actual status
               });
             });
             console.log(`✅ Loaded ${deliveryRequests.length} delivery_requests`);
@@ -233,7 +235,8 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                   timestamp: new Date(del.created_at),
                   read: del.status !== 'pending',
                   priority: del.urgency === 'urgent' || del.status === 'pending' ? 'high' : 'medium',
-                  actionUrl: `/delivery-dashboard?delivery=${del.id}`
+                  actionUrl: `/delivery-dashboard?delivery=${del.id}`,
+                  status: del.status // Include the actual status
                 });
               }
             });
@@ -267,12 +270,13 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                 allNotifications.push({
                   id: notif.id,
                   type: 'new_delivery',
-                  title: '🚚 New Delivery Request!',
+                  title: notif.status === 'pending' ? '🚚 New Delivery Request!' : `Delivery ${notif.status?.replace('_', ' ') || 'update'}`,
                   message: `${materials[0]?.name || notif.material_type || 'Materials'} to ${notif.delivery_address || 'Unknown'}`,
                   timestamp: new Date(notif.created_at),
                   read: notif.status !== 'pending',
                   priority: notif.priority_level === 'urgent' || notif.status === 'pending' ? 'high' : 'medium',
-                  actionUrl: `/delivery-dashboard?notification=${notif.id}`
+                  actionUrl: `/delivery-dashboard?notification=${notif.id}`,
+                  status: notif.status // Include the actual status
                 });
               }
             });
@@ -721,8 +725,8 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                   </button>
                 </div>
                 
-                {/* Accept/Reject Buttons - Only show for new delivery requests */}
-                {notification.type === 'new_delivery' && !notification.read && (
+                {/* Accept/Reject Buttons - Show for pending delivery requests */}
+                {notification.status === 'pending' && (
                   <div className="flex gap-2 mt-3 pt-3 border-t border-gray-200">
                     <Button
                       size="sm"
@@ -767,6 +771,23 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                         </>
                       )}
                     </Button>
+                  </div>
+                )}
+                
+                {/* Status indicator for non-pending deliveries */}
+                {notification.status && notification.status !== 'pending' && (
+                  <div className="mt-2 pt-2 border-t border-gray-100">
+                    <Badge 
+                      variant="outline" 
+                      className={`text-xs ${
+                        notification.status === 'assigned' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                        notification.status === 'in_transit' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
+                        notification.status === 'delivered' ? 'bg-green-50 text-green-700 border-green-200' :
+                        'bg-gray-50 text-gray-700 border-gray-200'
+                      }`}
+                    >
+                      Status: {notification.status?.replace('_', ' ')}
+                    </Badge>
                   </div>
                 )}
               </div>
