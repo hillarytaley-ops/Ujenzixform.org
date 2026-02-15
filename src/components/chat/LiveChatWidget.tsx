@@ -209,8 +209,8 @@ export function LiveChatWidget({ position = 'bottom-right' }: LiveChatWidgetProp
           },
           body: JSON.stringify({
             conversation_id: conv.id,
-            sender_id: userId ? String(userId) : null,
-            sender_type: 'client', // Use 'client' instead of 'system' for RLS compatibility
+            sender_id: userId ? String(userId) : `guest-${conv.id.substring(0, 8)}`, // Generate guest ID if no user
+            sender_type: 'client',
             sender_name: userName || 'Guest',
             content: `Chat started by ${userName || 'Guest'}`,
             message_type: 'text'
@@ -277,7 +277,7 @@ export function LiveChatWidget({ position = 'bottom-right' }: LiveChatWidgetProp
 
       const messageData = {
         conversation_id: conversationId,
-        sender_id: userId ? String(userId) : null,
+        sender_id: userId ? String(userId) : `guest-${conversationId?.substring(0, 8) || 'anon'}`, // Generate guest ID if no user
         sender_type: 'client',
         sender_name: userName || 'Guest',
         content: content,

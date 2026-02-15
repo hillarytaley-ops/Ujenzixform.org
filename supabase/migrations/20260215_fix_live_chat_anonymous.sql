@@ -11,6 +11,11 @@
 ALTER TABLE public.conversations ALTER COLUMN client_email DROP NOT NULL;
 
 -- =====================================================================
+-- FIX: Make sender_id nullable for guest users in chat_messages
+-- =====================================================================
+ALTER TABLE public.chat_messages ALTER COLUMN sender_id DROP NOT NULL;
+
+-- =====================================================================
 -- CONVERSATIONS TABLE - Allow anonymous inserts
 -- =====================================================================
 
