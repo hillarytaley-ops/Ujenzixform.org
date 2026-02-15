@@ -30,7 +30,7 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -324,37 +324,44 @@ const DeliverySignIn = () => {
 
     setLoading(true);
     
-    // Safety timeout - reset loading after 15 seconds
-    const safetyTimeout = setTimeout(() => {
-      console.log('🚚 DeliverySignIn: Safety timeout triggered');
-      setLoading(false);
-      toast({
-        variant: "destructive",
-        title: "Request Timeout",
-        description: "Sign in is taking too long. Please try again."
-      });
-    }, 15000);
+    // Create abort controller for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+      console.log('🚚 DeliverySignIn: Request aborted due to timeout');
+    }, 10000); // 10 second timeout
 
     try {
       console.log('🚚 DeliverySignIn: Attempting sign in for:', email);
       
-      // Sign in with Supabase
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
-        password: password
+      // Use direct REST API for sign in (more reliable than Supabase client)
+      const authResponse = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY
+        },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          password: password
+        }),
+        signal: controller.signal
       });
-
-      if (authError) {
-        clearTimeout(safetyTimeout);
-        console.error('🚚 Sign in error:', authError);
+      
+      clearTimeout(timeoutId);
+      
+      const authData = await authResponse.json();
+      
+      if (!authResponse.ok) {
+        console.error('🚚 Sign in error:', authData);
         
-        if (authError.message.includes('Invalid login credentials')) {
+        if (authData.error_description?.includes('Invalid login credentials') || authData.msg?.includes('Invalid')) {
           toast({
             variant: "destructive",
             title: "Incorrect credentials",
             description: "The email or password you entered is incorrect. Please try again."
           });
-        } else if (authError.message.includes('Email not confirmed')) {
+        } else if (authData.error_description?.includes('Email not confirmed')) {
           toast({
             variant: "destructive",
             title: "Email not verified",
@@ -364,15 +371,14 @@ const DeliverySignIn = () => {
           toast({
             variant: "destructive",
             title: "Sign in failed",
-            description: authError.message
+            description: authData.error_description || authData.msg || "Could not sign in. Please try again."
           });
         }
         setLoading(false);
         return;
       }
 
-      if (!authData.user) {
-        clearTimeout(safetyTimeout);
+      if (!authData.user || !authData.access_token) {
         toast({
           variant: "destructive",
           title: "Sign in failed",
@@ -384,43 +390,48 @@ const DeliverySignIn = () => {
 
       console.log('🚚 Sign in successful for:', authData.user.email);
       
+      // Store the session in localStorage for Supabase client to pick up
+      const session = {
+        access_token: authData.access_token,
+        refresh_token: authData.refresh_token,
+        expires_in: authData.expires_in,
+        expires_at: Math.floor(Date.now() / 1000) + authData.expires_in,
+        token_type: authData.token_type,
+        user: authData.user
+      };
+      
+      localStorage.setItem('sb-wuuyjjpgzgeimiptuuws-auth-token', JSON.stringify(session));
+      localStorage.setItem('access_token', authData.access_token);
+      localStorage.setItem('user_email', authData.user.email?.toLowerCase() || '');
+      
       const userId = authData.user.id;
       const userEmail = authData.user.email?.toLowerCase() || '';
       
-      // Store session info
-      localStorage.setItem('user_email', userEmail);
-      
-      // ✅ MOBILE OPTIMIZED: Check localStorage first for instant redirect
-      const cachedRole = localStorage.getItem('user_role');
-      const cachedRoleId = localStorage.getItem('user_role_id');
-      
-      // If we have a valid cached delivery/admin role for this user, redirect immediately
-      if (cachedRole && cachedRoleId === userId && (cachedRole === 'delivery' || cachedRole === 'delivery_provider' || cachedRole === 'admin')) {
-        clearTimeout(safetyTimeout);
-        console.log('🚚 Using cached role for fast redirect:', cachedRole);
-        localStorage.setItem('user_role_verified', Date.now().toString());
-        toast({ title: "✅ Welcome!", description: "Redirecting to dashboard..." });
-        window.location.href = '/delivery-dashboard';
-        return;
-      }
-      
-      // Fetch role from database (source of truth) with timeout
+      // Fetch role from database with timeout
       console.log('🚚 Fetching role from database...');
       let dbRole: string | null = null;
       
       try {
-        const rolePromise = supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', userId)
-          .maybeSingle();
+        const roleController = new AbortController();
+        const roleTimeoutId = setTimeout(() => roleController.abort(), 5000);
         
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Role fetch timeout')), 8000)
+        const roleResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${userId}&select=role`,
+          {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${authData.access_token}`
+            },
+            signal: roleController.signal
+          }
         );
         
-        const { data: roleData } = await Promise.race([rolePromise, timeoutPromise]) as any;
-        dbRole = roleData?.role || null;
+        clearTimeout(roleTimeoutId);
+        
+        if (roleResponse.ok) {
+          const roleData = await roleResponse.json();
+          dbRole = roleData?.[0]?.role || null;
+        }
       } catch (roleError) {
         console.log('🚚 Role fetch error/timeout, checking metadata...');
       }
@@ -439,11 +450,12 @@ const DeliverySignIn = () => {
         }
       }
       
-      // If user has a DIFFERENT role (not delivery/admin), BLOCK them
+      // If user has a DIFFERENT role (not delivery/admin), redirect them
       if (dbRole && dbRole !== 'delivery' && dbRole !== 'delivery_provider' && dbRole !== 'admin') {
-        clearTimeout(safetyTimeout);
-        // User has a different role - redirect them to correct portal
         console.log('🚚 User has different role:', dbRole);
+        localStorage.setItem('user_role', dbRole);
+        localStorage.setItem('user_role_id', userId);
+        
         toast({
           title: "Wrong Portal",
           description: `You are registered as ${dbRole}. Redirecting to your dashboard...`,
@@ -459,7 +471,6 @@ const DeliverySignIn = () => {
       
       // If NO role in database and no metadata, BLOCK them - they must register first
       if (!dbRole) {
-        clearTimeout(safetyTimeout);
         console.log('🚚 No role found - user must register first');
         toast({
           variant: "destructive",
@@ -467,7 +478,9 @@ const DeliverySignIn = () => {
           description: "You are not registered as a Delivery Provider. Please register first using the link below.",
           duration: 5000
         });
-        await supabase.auth.signOut();
+        // Clear the session
+        localStorage.removeItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        localStorage.removeItem('access_token');
         localStorage.removeItem('user_role');
         localStorage.removeItem('user_role_id');
         localStorage.removeItem('user_role_verified');
@@ -476,10 +489,10 @@ const DeliverySignIn = () => {
       }
       
       // User has valid delivery role - allow access
-      clearTimeout(safetyTimeout);
       localStorage.setItem('user_role', dbRole);
       localStorage.setItem('user_role_id', userId);
       localStorage.setItem('user_role_verified', Date.now().toString());
+      saveUserSession(userId, userEmail, dbRole);
       
       console.log('🚚 Redirecting to delivery dashboard...');
       toast({
@@ -491,13 +504,22 @@ const DeliverySignIn = () => {
       window.location.replace('/delivery-dashboard');
 
     } catch (error: any) {
-      clearTimeout(safetyTimeout);
+      clearTimeout(timeoutId);
       console.error('🚚 Sign in exception:', error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "An unexpected error occurred. Please try again."
-      });
+      
+      if (error.name === 'AbortError') {
+        toast({
+          variant: "destructive",
+          title: "Request Timeout",
+          description: "Sign in is taking too long. Please check your internet connection and try again."
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "An unexpected error occurred. Please try again."
+        });
+      }
       setLoading(false);
     }
   };
