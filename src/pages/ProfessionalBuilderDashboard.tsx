@@ -1671,6 +1671,14 @@ const ProfessionalBuilderDashboardPage = () => {
 
                 {/* Monitoring Requests List */}
                 {console.log('🎨 RENDER: monitoringRequests.length =', monitoringRequests.length)}
+                
+                {/* DEBUG: Show actual count in UI */}
+                <div className="bg-yellow-200 p-4 mb-4 rounded-lg border-2 border-yellow-500">
+                  <p className="font-bold text-black">DEBUG: monitoringRequests.length = {monitoringRequests.length}</p>
+                  <p className="text-sm text-gray-700">Approved: {monitoringRequests.filter(r => r.status === 'approved').length}</p>
+                  <p className="text-sm text-gray-700">Pending: {monitoringRequests.filter(r => r.status === 'pending').length}</p>
+                </div>
+                
                 {monitoringRequests.length > 0 ? (
                   <div className="space-y-4">
                     <h4 className="font-semibold text-gray-700">Your Monitoring Requests</h4>
