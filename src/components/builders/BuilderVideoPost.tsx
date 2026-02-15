@@ -52,7 +52,8 @@ export interface BuilderVideoPostProps {
   builderCompany?: string;
   builderAvatar?: string;
   builderVerified?: boolean;
-  videoUrl: string;
+  videoUrl?: string;
+  imageUrl?: string;
   thumbnailUrl?: string;
   caption: string;
   location?: string;
@@ -76,6 +77,7 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
   builderAvatar,
   builderVerified = false,
   videoUrl,
+  imageUrl,
   thumbnailUrl,
   caption,
   location,
@@ -250,51 +252,53 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
         </div>
       )}
 
-      {/* Video Player - Facebook Style */}
-      <div 
-        className="relative bg-black aspect-video cursor-pointer group"
-        onMouseEnter={() => setShowControls(true)}
-        onMouseLeave={() => setShowControls(false)}
-        onClick={togglePlay}
-      >
-        <video
-          ref={videoRef}
-          src={videoUrl}
-          poster={thumbnailUrl}
-          className="w-full h-full object-contain"
-          muted={isMuted}
-          loop
-          playsInline
-          onPlay={() => setIsPlaying(true)}
-          onPause={() => setIsPlaying(false)}
-        />
-        
-        {/* Play/Pause Overlay */}
-        {!isPlaying && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-            <div className="w-20 h-20 rounded-full bg-black/60 flex items-center justify-center hover:bg-black/80 transition-colors">
-              <Play className="h-10 w-10 text-white ml-1" fill="white" />
+      {/* Media Display - Video or Image */}
+      {videoUrl ? (
+        /* Video Player - Facebook Style */
+        <div 
+          className="relative bg-black aspect-video cursor-pointer group"
+          onMouseEnter={() => setShowControls(true)}
+          onMouseLeave={() => setShowControls(false)}
+          onClick={togglePlay}
+        >
+          <video
+            ref={videoRef}
+            src={videoUrl}
+            poster={thumbnailUrl}
+            className="w-full h-full object-contain"
+            muted={isMuted}
+            loop
+            playsInline
+            onPlay={() => setIsPlaying(true)}
+            onPause={() => setIsPlaying(false)}
+          />
+          
+          {/* Play/Pause Overlay */}
+          {!isPlaying && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+              <div className="w-20 h-20 rounded-full bg-black/60 flex items-center justify-center hover:bg-black/80 transition-colors">
+                <Play className="h-10 w-10 text-white ml-1" fill="white" />
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Video Controls */}
-        <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 transition-opacity duration-300 ${showControls || !isPlaying ? 'opacity-100' : 'opacity-0'}`}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-8 w-8 p-0 text-white hover:bg-white/20"
-                onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-              >
-                {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-8 w-8 p-0 text-white hover:bg-white/20"
-                onClick={(e) => { e.stopPropagation(); toggleMute(); }}
+          {/* Video Controls */}
+          <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 transition-opacity duration-300 ${showControls || !isPlaying ? 'opacity-100' : 'opacity-0'}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 w-8 p-0 text-white hover:bg-white/20"
+                  onClick={(e) => { e.stopPropagation(); togglePlay(); }}
+                >
+                  {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 w-8 p-0 text-white hover:bg-white/20"
+                  onClick={(e) => { e.stopPropagation(); toggleMute(); }}
               >
                 {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
               </Button>
@@ -310,6 +314,17 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
           </div>
         </div>
       </div>
+      ) : imageUrl ? (
+        /* Image Display */
+        <div className="relative bg-gray-100 dark:bg-gray-800">
+          <img
+            src={imageUrl}
+            alt={caption || 'Post image'}
+            className="w-full max-h-[600px] object-contain"
+            loading="lazy"
+          />
+        </div>
+      ) : null}
 
       {/* Engagement Stats */}
       <div className="px-4 py-2 flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">

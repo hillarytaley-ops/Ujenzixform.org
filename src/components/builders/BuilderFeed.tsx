@@ -217,6 +217,10 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   const [newPostText, setNewPostText] = useState('');
   const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
+  const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [postLocation, setPostLocation] = useState('');
+  const [showLocationInput, setShowLocationInput] = useState(false);
   const [isCreatingPost, setIsCreatingPost] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
   const [privacy, setPrivacy] = useState<'public' | 'friends'>('public');
@@ -367,6 +371,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
             builderAvatar: profile?.avatar_url || '',
             builderVerified: profile?.is_verified || false,
             videoUrl: post.video_url || '', // Database column is 'video_url'
+            imageUrl: post.image_url || '', // Database column is 'image_url'
             thumbnailUrl: post.thumbnail_url || '',
             caption: post.content || '', // Database column is 'content'
             location: post.project_location || profile?.location || '',
@@ -401,8 +406,53 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Validate file type
+      if (!file.type.startsWith('video/')) {
+        toast({
+          title: 'Invalid file type',
+          description: 'Please select a video file (MP4, WebM, MOV)',
+          variant: 'destructive'
+        });
+        return;
+      }
+      // Validate file size (100MB max)
+      if (file.size > 100 * 1024 * 1024) {
+        toast({
+          title: 'File too large',
+          description: 'Video must be under 100MB',
+          variant: 'destructive'
+        });
+        return;
+      }
       setSelectedVideo(file);
       setVideoPreview(URL.createObjectURL(file));
+      setIsCreatingPost(true);
+    }
+  };
+
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: 'Invalid file type',
+          description: 'Please select an image file (JPG, PNG, GIF, WebP)',
+          variant: 'destructive'
+        });
+        return;
+      }
+      // Validate file size (10MB max for photos)
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: 'File too large',
+          description: 'Image must be under 10MB',
+          variant: 'destructive'
+        });
+        return;
+      }
+      setSelectedPhoto(file);
+      setPhotoPreview(URL.createObjectURL(file));
       setIsCreatingPost(true);
     }
   };
@@ -415,10 +465,18 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
     }
   };
 
+  const handleRemovePhoto = () => {
+    setSelectedPhoto(null);
+    if (photoPreview) {
+      URL.revokeObjectURL(photoPreview);
+      setPhotoPreview(null);
+    }
+  };
+
   const handlePost = async () => {
     console.log('📤 handlePost() called');
     
-    if (!newPostText.trim() && !selectedVideo) {
+    if (!newPostText.trim() && !selectedVideo && !selectedPhoto) {
       console.log('📤 No content, returning early');
       return;
     }
@@ -459,7 +517,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   const handlePostWithUserId = async (postUserId: string) => {
     console.log('📤 handlePostWithUserId called with:', postUserId);
     
-    if (!newPostText.trim() && !selectedVideo) {
+    if (!newPostText.trim() && !selectedVideo && !selectedPhoto) {
       console.log('📤 No content to post');
       return;
     }
@@ -467,6 +525,22 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
     setIsPosting(true);
     try {
       let videoUrl = '';
+      let imageUrl = '';
+      
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      
+      // Get auth token for upload
+      let accessToken = '';
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          accessToken = parsed.access_token || '';
+        }
+      } catch (e) {
+        console.warn('📤 Could not get access token');
+      }
       
       // Upload video if selected - using fast XMLHttpRequest
       if (selectedVideo) {
@@ -475,21 +549,6 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         const fileSizeMB = (selectedVideo.size / 1024 / 1024).toFixed(2);
         
         console.log('📤 Uploading video:', fileName, `(${fileSizeMB}MB)`);
-        
-        // Get auth token for upload
-        let accessToken = '';
-        try {
-          const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-          if (storedSession) {
-            const parsed = JSON.parse(storedSession);
-            accessToken = parsed.access_token || '';
-          }
-        } catch (e) {
-          console.warn('📤 Could not get access token');
-        }
-        
-        const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
         
         try {
           // Fast upload using XMLHttpRequest with progress
@@ -500,13 +559,13 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
             xhr.upload.onprogress = (event) => {
               if (event.lengthComputable) {
                 const percent = Math.round((event.loaded / event.total) * 100);
-                console.log(`📤 Upload progress: ${percent}%`);
+                console.log(`📤 Video upload progress: ${percent}%`);
               }
             };
             
             xhr.onload = () => {
               if (xhr.status >= 200 && xhr.status < 300) {
-                console.log('📤 Upload complete!');
+                console.log('📤 Video upload complete!');
                 resolve();
               } else {
                 reject(new Error(`Upload failed: ${xhr.status}`));
@@ -536,6 +595,61 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
             variant: 'destructive'
           });
           // Continue without video
+        }
+      }
+      
+      // Upload photo if selected
+      if (selectedPhoto) {
+        const fileExt = selectedPhoto.name.split('.').pop();
+        const fileName = `${postUserId}/photos/${Date.now()}.${fileExt}`;
+        const fileSizeMB = (selectedPhoto.size / 1024 / 1024).toFixed(2);
+        
+        console.log('📤 Uploading photo:', fileName, `(${fileSizeMB}MB)`);
+        
+        try {
+          await new Promise<void>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            const uploadUrl = `${SUPABASE_URL}/storage/v1/object/builder-videos/${fileName}`;
+            
+            xhr.upload.onprogress = (event) => {
+              if (event.lengthComputable) {
+                const percent = Math.round((event.loaded / event.total) * 100);
+                console.log(`📤 Photo upload progress: ${percent}%`);
+              }
+            };
+            
+            xhr.onload = () => {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                console.log('📤 Photo upload complete!');
+                resolve();
+              } else {
+                reject(new Error(`Upload failed: ${xhr.status}`));
+              }
+            };
+            
+            xhr.onerror = () => reject(new Error('Network error'));
+            xhr.ontimeout = () => reject(new Error('Upload timeout'));
+            
+            xhr.open('POST', uploadUrl, true);
+            xhr.timeout = 60000; // 1 min timeout for photos
+            xhr.setRequestHeader('Authorization', `Bearer ${accessToken || SUPABASE_ANON_KEY}`);
+            xhr.setRequestHeader('apikey', SUPABASE_ANON_KEY);
+            xhr.setRequestHeader('Content-Type', selectedPhoto.type);
+            xhr.setRequestHeader('x-upsert', 'true');
+            xhr.send(selectedPhoto);
+          });
+          
+          imageUrl = `${SUPABASE_URL}/storage/v1/object/public/builder-videos/${fileName}`;
+          console.log('📤 Photo URL:', imageUrl);
+          
+        } catch (uploadError: any) {
+          console.error('📤 Photo upload error:', uploadError);
+          toast({
+            title: 'Photo Upload Failed',
+            description: uploadError.message || 'Could not upload photo.',
+            variant: 'destructive'
+          });
+          // Continue without photo
         }
       }
 
@@ -590,14 +704,20 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
           }
         } catch (e) {}
         
+        // Determine post type
+        let postType = 'text';
+        if (videoUrl) postType = 'video';
+        else if (imageUrl) postType = 'image';
+        
         const postPayload = {
           builder_id: postUserId,
-          post_type: videoUrl ? 'video' : 'text',
+          post_type: postType,
           content: newPostText,
           video_url: videoUrl || null,
-          project_location: '',
+          image_url: imageUrl || null,
+          project_location: postLocation || null,
           privacy: privacy,
-          status: 'pending', // Requires admin approval before showing publicly
+          status: 'active', // Posts are immediately visible
           likes_count: 0,
           shares_count: 0,
           comments_count: 0
@@ -657,7 +777,9 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         builderAvatar: profile?.avatar_url || currentUserAvatar,
         builderVerified: false,
         videoUrl: videoUrl || videoPreview || '',
+        imageUrl: imageUrl || photoPreview || '',
         caption: newPostText,
+        location: postLocation || '',
         timestamp: new Date(),
         likes: 0,
         shares: 0,
@@ -671,12 +793,15 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
       console.log('📤 Clearing form...');
       setNewPostText('');
       handleRemoveVideo();
+      handleRemovePhoto();
+      setPostLocation('');
+      setShowLocationInput(false);
       setIsCreatingPost(false);
 
       console.log('📤 Showing success toast...');
       toast({
-        title: '🎉 Video Submitted!',
-        description: 'Your video is pending admin approval before it appears publicly.'
+        title: '🎉 Post Published!',
+        description: 'Your post is now live on the builders feed.'
       });
       
       console.log('📤 ✅ All done!');
@@ -812,6 +937,25 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
               </div>
             )}
 
+            {/* Photo Preview */}
+            {photoPreview && (
+              <div className="relative mb-3 rounded-lg overflow-hidden">
+                <img 
+                  src={photoPreview} 
+                  alt="Preview"
+                  className="w-full max-h-64 object-contain bg-gray-100 dark:bg-gray-800"
+                />
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="absolute top-2 right-2 h-8 w-8 p-0 rounded-full bg-black/60 hover:bg-black/80"
+                  onClick={handleRemovePhoto}
+                >
+                  <X className="h-4 w-4 text-white" />
+                </Button>
+              </div>
+            )}
+
             {/* Expanded Post Creator */}
             {isCreatingPost && (
               <div className="space-y-3">
@@ -822,8 +966,32 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
                   className="min-h-[100px] resize-none border-0 focus-visible:ring-0 text-lg"
                 />
                 
+                {/* Location Input */}
+                {showLocationInput && (
+                  <div className="flex items-center gap-2 p-2 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
+                    <MapPin className="h-5 w-5 text-orange-500 flex-shrink-0" />
+                    <Input
+                      placeholder="Enter location (e.g., Karen, Nairobi)"
+                      value={postLocation}
+                      onChange={(e) => setPostLocation(e.target.value)}
+                      className="flex-1 border-0 bg-transparent focus-visible:ring-0 text-sm"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0"
+                      onClick={() => {
+                        setShowLocationInput(false);
+                        setPostLocation('');
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+                
                 {/* Privacy Selector */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="outline" size="sm" className="gap-2">
@@ -843,6 +1011,14 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
+                  
+                  {/* Show selected location badge */}
+                  {postLocation && (
+                    <Badge variant="secondary" className="gap-1">
+                      <MapPin className="h-3 w-3" />
+                      {postLocation}
+                    </Badge>
+                  )}
                 </div>
               </div>
             )}
@@ -867,19 +1043,26 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
                   type="file"
                   accept="image/*"
                   className="hidden"
+                  onChange={handlePhotoSelect}
                 />
                 <ImageIcon className="h-6 w-6 text-green-500" />
                 <span className="font-medium text-gray-600 dark:text-gray-400">Photo</span>
               </label>
 
-              <button className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex-1 justify-center">
-                <MapPin className="h-6 w-6 text-orange-500" />
+              <button 
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex-1 justify-center ${showLocationInput ? 'bg-orange-100 dark:bg-orange-900/30' : ''}`}
+                onClick={() => {
+                  setShowLocationInput(!showLocationInput);
+                  setIsCreatingPost(true);
+                }}
+              >
+                <MapPin className={`h-6 w-6 ${showLocationInput ? 'text-orange-600' : 'text-orange-500'}`} />
                 <span className="font-medium text-gray-600 dark:text-gray-400">Location</span>
               </button>
             </div>
 
-            {/* Post Button - Always show when there's content or video */}
-            {(isCreatingPost || newPostText.trim() || selectedVideo) && (
+            {/* Post Button - Always show when there's content or media */}
+            {(isCreatingPost || newPostText.trim() || selectedVideo || selectedPhoto) && (
               <div className="mt-3 flex gap-2">
                 <Button 
                   variant="outline" 
@@ -887,6 +1070,9 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
                   onClick={() => {
                     setIsCreatingPost(false);
                     handleRemoveVideo();
+                    handleRemovePhoto();
+                    setPostLocation('');
+                    setShowLocationInput(false);
                     setNewPostText('');
                   }}
                 >
@@ -901,6 +1087,8 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
                     console.log('📤 Post button clicked!');
                     console.log('📤 newPostText:', newPostText);
                     console.log('📤 selectedVideo:', selectedVideo?.name);
+                    console.log('📤 selectedPhoto:', selectedPhoto?.name);
+                    console.log('📤 postLocation:', postLocation);
                     console.log('📤 isPosting:', isPosting);
                     
                     if (isPosting) {
@@ -908,11 +1096,11 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
                       return;
                     }
                     
-                    if (!newPostText.trim() && !selectedVideo) {
+                    if (!newPostText.trim() && !selectedVideo && !selectedPhoto) {
                       console.log('📤 No content to post');
                       toast({
                         title: 'Nothing to post',
-                        description: 'Please add some text or select a video',
+                        description: 'Please add some text, photo, or video',
                         variant: 'destructive'
                       });
                       return;
@@ -921,7 +1109,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
                     // Call handlePost
                     handlePost();
                   }}
-                  disabled={isPosting || (!newPostText.trim() && !selectedVideo)}
+                  disabled={isPosting || (!newPostText.trim() && !selectedVideo && !selectedPhoto)}
                 >
                   {isPosting ? (
                     <>
