@@ -195,27 +195,36 @@ export function LiveChatWidget({ position = 'bottom-right' }: LiveChatWidgetProp
       console.log('💬 LiveChat: Conversation created:', conv.id);
       setConversationId(conv.id);
       
-      // Save initial system message
+      // Save initial system message (non-blocking - don't fail if this doesn't work)
       const msgController = new AbortController();
       const msgTimeoutId = setTimeout(() => msgController.abort(), 10000);
 
-      await fetch(`${SUPABASE_URL}/rest/v1/chat_messages`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          conversation_id: conv.id,
-          sender_id: userId ? String(userId) : null,
-          sender_type: 'system',
-          sender_name: 'System',
-          content: `${userName || 'Guest'} started a live chat`,
-          message_type: 'text'
-        }),
-        signal: msgController.signal
-      });
+      try {
+        const msgResponse = await fetch(`${SUPABASE_URL}/rest/v1/chat_messages`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            conversation_id: conv.id,
+            sender_id: userId ? String(userId) : null,
+            sender_type: 'client', // Use 'client' instead of 'system' for RLS compatibility
+            sender_name: userName || 'Guest',
+            content: `Chat started by ${userName || 'Guest'}`,
+            message_type: 'text'
+          }),
+          signal: msgController.signal
+        });
+        
+        if (!msgResponse.ok) {
+          const msgError = await msgResponse.text();
+          console.log('💬 LiveChat: Initial message insert failed (non-critical):', msgResponse.status, msgError);
+        }
+      } catch (msgErr) {
+        console.log('💬 LiveChat: Initial message error (non-critical):', msgErr);
+      }
 
       clearTimeout(msgTimeoutId);
 
@@ -266,6 +275,17 @@ export function LiveChatWidget({ position = 'bottom-right' }: LiveChatWidgetProp
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
 
+      const messageData = {
+        conversation_id: conversationId,
+        sender_id: userId ? String(userId) : null,
+        sender_type: 'client',
+        sender_name: userName || 'Guest',
+        content: content,
+        message_type: 'text'
+      };
+      
+      console.log('💬 LiveChat: Sending message...', messageData);
+
       const response = await fetch(`${SUPABASE_URL}/rest/v1/chat_messages`, {
         method: 'POST',
         headers: {
@@ -273,28 +293,24 @@ export function LiveChatWidget({ position = 'bottom-right' }: LiveChatWidgetProp
           'apikey': SUPABASE_ANON_KEY,
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({
-          conversation_id: conversationId,
-          sender_id: userId ? String(userId) : null,
-          sender_type: 'client',
-          sender_name: userName || 'Guest',
-          content: content,
-          message_type: 'text'
-        }),
+        body: JSON.stringify(messageData),
         signal: controller.signal
       });
 
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        console.error('💬 LiveChat: Failed to send message:', response.status);
+        const errorText = await response.text();
+        console.error('💬 LiveChat: Failed to send message:', response.status, errorText);
         toast({
           variant: 'destructive',
           title: 'Failed to send',
-          description: 'Please try again.'
+          description: 'Message could not be sent. Please try again.'
         });
         return;
       }
+      
+      console.log('💬 LiveChat: Message sent successfully');
 
       // Update conversation last message (non-blocking)
       fetch(`${SUPABASE_URL}/rest/v1/conversations?id=eq.${conversationId}`, {
