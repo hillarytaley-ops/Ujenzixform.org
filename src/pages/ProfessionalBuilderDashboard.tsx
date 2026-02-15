@@ -626,25 +626,77 @@ const ProfessionalBuilderDashboardPage = () => {
     }
 
     setSubmittingRequest(true);
-    try {
-      const { error } = await supabase
-        .from('monitoring_service_requests')
-        .insert({
-          user_id: user.id,
-          contact_name: profile?.full_name || profile?.company_name || user?.email?.split('@')[0] || 'User',
-          contact_email: user?.email || '',
-          contact_phone: profile?.phone || 'N/A',
-          company_name: profile?.company_name || '',
-          project_name: monitoringRequest.projectName,
-          project_location: monitoringRequest.projectLocation,
-          selected_services: ['cctv'],
-          camera_count: parseInt(monitoringRequest.numberOfCameras) || 1,
-          special_requirements: monitoringRequest.projectDescription || null,
-          additional_notes: monitoringRequest.additionalNotes || null,
-          status: 'pending'
-        });
+    console.log('📹 Submitting monitoring request...');
+    
+    // Safety timeout
+    const safetyTimeout = setTimeout(() => {
+      console.log('⚠️ Monitoring request safety timeout');
+      setSubmittingRequest(false);
+      toast({
+        title: "Timeout",
+        description: "Request took too long. Please try again.",
+        variant: "destructive",
+      });
+    }, 25000);
 
-      if (error) throw error;
+    try {
+      // Get access token from localStorage
+      let accessToken = SUPABASE_ANON_KEY;
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          accessToken = parsed?.access_token || SUPABASE_ANON_KEY;
+        }
+      } catch (e) {
+        console.log('📹 Using anon key for monitoring request');
+      }
+
+      const requestData = {
+        user_id: user?.id || authUser?.id,
+        contact_name: profile?.full_name || profile?.company_name || user?.email?.split('@')[0] || 'User',
+        contact_email: user?.email || authUser?.email || '',
+        contact_phone: profile?.phone || 'N/A',
+        company_name: profile?.company_name || '',
+        project_name: monitoringRequest.projectName,
+        project_location: monitoringRequest.projectLocation,
+        selected_services: ['cctv'],
+        camera_count: parseInt(monitoringRequest.numberOfCameras) || 1,
+        special_requirements: monitoringRequest.projectDescription || null,
+        additional_notes: monitoringRequest.additionalNotes || null,
+        start_date: monitoringRequest.preferredStartDate || null,
+        status: 'pending'
+      };
+
+      // Use direct REST API with AbortController
+      const controller = new AbortController();
+      const insertTimeout = setTimeout(() => controller.abort(), 20000);
+
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/monitoring_service_requests`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify(requestData),
+          signal: controller.signal
+        }
+      );
+
+      clearTimeout(insertTimeout);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('📹 Monitoring request error:', response.status, errorData);
+        throw new Error(errorData.message || `Request failed: ${response.status}`);
+      }
+
+      console.log('✅ Monitoring request submitted successfully');
+      clearTimeout(safetyTimeout);
 
       toast({
         title: "Request Submitted!",
@@ -661,20 +713,29 @@ const ProfessionalBuilderDashboardPage = () => {
         additionalNotes: ''
       });
 
-      // Refresh monitoring requests
-      const { data: newData } = await supabase
-        .from('monitoring_service_requests')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-      
-      if (newData) setMonitoringRequests(newData);
+      // Refresh monitoring requests in background (non-blocking)
+      fetch(
+        `${SUPABASE_URL}/rest/v1/monitoring_service_requests?user_id=eq.${user?.id || authUser?.id}&order=created_at.desc`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`
+          }
+        }
+      ).then(res => res.json()).then(data => {
+        if (Array.isArray(data)) setMonitoringRequests(data);
+      }).catch(err => console.error('Error refreshing monitoring requests:', err));
 
     } catch (error: any) {
+      clearTimeout(safetyTimeout);
       console.error('Error submitting monitoring request:', error);
+      let errorMessage = error.message || "Failed to submit request. Please try again.";
+      if (error.name === 'AbortError') {
+        errorMessage = "Request timed out. Please check your connection and try again.";
+      }
       toast({
         title: "Error",
-        description: error.message || "Failed to submit request. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
