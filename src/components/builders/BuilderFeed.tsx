@@ -344,6 +344,38 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         
         const commenterMap = new Map((commenterProfiles || []).map((p: any) => [p.user_id, p]));
 
+        // Fetch user's likes to show which posts they've liked
+        let userLikes: Set<string> = new Set();
+        let currentUserId: string | null = null;
+        try {
+          const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          if (storedSession) {
+            const parsed = JSON.parse(storedSession);
+            currentUserId = parsed.user?.id;
+          }
+        } catch (e) {}
+
+        if (currentUserId) {
+          try {
+            const likesRes = await fetch(
+              `${SUPABASE_URL}/rest/v1/post_likes?user_id=eq.${currentUserId}&post_id=in.(${postIds.join(',')})&select=post_id`,
+              {
+                headers: {
+                  'apikey': SUPABASE_ANON_KEY,
+                  'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+                }
+              }
+            );
+            if (likesRes.ok) {
+              const likesData = await likesRes.json();
+              userLikes = new Set((likesData || []).map((l: any) => l.post_id));
+              console.log('📥 User has liked', userLikes.size, 'posts');
+            }
+          } catch (e) {
+            console.log('📥 Likes fetch skipped');
+          }
+        }
+
         // Transform posts to match component format
         const transformedPosts = postsData.map((post: any) => {
           const profile = profilesMap.get(post.builder_id);
@@ -378,7 +410,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
             timestamp: new Date(post.created_at),
             likes: post.likes_count || 0,
             shares: post.shares_count || 0,
-            isLiked: false,
+            isLiked: userLikes.has(post.id), // Check if user has liked this post
             comments: postComments
           };
         });
@@ -839,32 +871,156 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
     }
   };
 
-  const handleLike = (postId: string) => {
-    setPosts(posts.map(post => {
-      if (post.id === postId) {
+  const handleLike = async (postId: string) => {
+    // Get current user ID
+    let userId: string | null = effectiveUserId || null;
+    if (!userId) {
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          userId = parsed.user?.id;
+        }
+      } catch (e) {}
+    }
+    
+    if (!userId) {
+      toast({
+        title: 'Sign in required',
+        description: 'Please sign in to like posts',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    const post = posts.find(p => p.id === postId);
+    if (!post) return;
+    
+    const newLikedState = !post.isLiked;
+    const newLikeCount = newLikedState ? post.likes + 1 : post.likes - 1;
+    
+    // Optimistic update
+    setPosts(posts.map(p => {
+      if (p.id === postId) {
         return {
-          ...post,
-          isLiked: !post.isLiked,
-          likes: post.isLiked ? post.likes - 1 : post.likes + 1
+          ...p,
+          isLiked: newLikedState,
+          likes: newLikeCount
         };
       }
-      return post;
+      return p;
     }));
+
+    // Persist to database
+    try {
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      
+      let accessToken = '';
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          accessToken = parsed.access_token || '';
+        }
+      } catch (e) {}
+
+      if (newLikedState) {
+        // Add like
+        await fetch(`${SUPABASE_URL}/rest/v1/post_likes`, {
+          method: 'POST',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify({
+            post_id: postId,
+            user_id: userId
+          })
+        });
+      } else {
+        // Remove like
+        await fetch(`${SUPABASE_URL}/rest/v1/post_likes?post_id=eq.${postId}&user_id=eq.${userId}`, {
+          method: 'DELETE',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+          }
+        });
+      }
+
+      // Update the post's like count in the database
+      await fetch(`${SUPABASE_URL}/rest/v1/builder_posts?id=eq.${postId}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({
+          likes_count: newLikeCount
+        })
+      });
+
+      console.log('👍 Like saved to database');
+    } catch (error) {
+      console.error('Error saving like:', error);
+      // Revert optimistic update on error
+      setPosts(posts.map(p => {
+        if (p.id === postId) {
+          return {
+            ...p,
+            isLiked: !newLikedState,
+            likes: post.likes
+          };
+        }
+        return p;
+      }));
+    }
   };
 
-  const handleComment = (postId: string, comment: string) => {
+  const handleComment = async (postId: string, comment: string) => {
+    if (!comment.trim()) return;
+    
+    // Get current user ID
+    let userId: string | null = effectiveUserId || null;
+    if (!userId) {
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          userId = parsed.user?.id;
+        }
+      } catch (e) {}
+    }
+    
+    if (!userId) {
+      toast({
+        title: 'Sign in required',
+        description: 'Please sign in to comment',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    const tempId = `temp-${Date.now()}`;
+    const newComment: VideoComment = {
+      id: tempId,
+      userId: userId,
+      userName: effectiveUserName,
+      userAvatar: currentUserAvatar,
+      content: comment,
+      timestamp: new Date(),
+      likes: 0,
+      isLiked: false
+    };
+
+    // Optimistic update
     setPosts(posts.map(post => {
       if (post.id === postId) {
-        const newComment: VideoComment = {
-          id: `comment-${Date.now()}`,
-          userId: currentUserId || 'current-user',
-          userName: effectiveUserName,
-          userAvatar: currentUserAvatar,
-          content: comment,
-          timestamp: new Date(),
-          likes: 0,
-          isLiked: false
-        };
         return {
           ...post,
           comments: [newComment, ...post.comments]
@@ -872,6 +1028,87 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
       }
       return post;
     }));
+
+    // Persist to database
+    try {
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      
+      let accessToken = '';
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          accessToken = parsed.access_token || '';
+        }
+      } catch (e) {}
+
+      // Insert comment
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/post_comments`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify({
+          post_id: postId,
+          user_id: userId,
+          content: comment
+        })
+      });
+
+      const result = await response.json();
+      
+      if (response.ok && result?.[0]) {
+        // Update the temp comment with the real ID
+        setPosts(posts.map(post => {
+          if (post.id === postId) {
+            return {
+              ...post,
+              comments: post.comments.map(c => 
+                c.id === tempId ? { ...c, id: result[0].id } : c
+              )
+            };
+          }
+          return post;
+        }));
+
+        // Update comment count in the post
+        await fetch(`${SUPABASE_URL}/rest/v1/builder_posts?id=eq.${postId}`, {
+          method: 'PATCH',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify({
+            comments_count: posts.find(p => p.id === postId)?.comments.length || 0
+          })
+        });
+
+        console.log('💬 Comment saved to database');
+      }
+    } catch (error) {
+      console.error('Error saving comment:', error);
+      // Remove optimistic comment on error
+      setPosts(posts.map(post => {
+        if (post.id === postId) {
+          return {
+            ...post,
+            comments: post.comments.filter(c => c.id !== tempId)
+          };
+        }
+        return post;
+      }));
+      toast({
+        title: 'Error',
+        description: 'Failed to save comment',
+        variant: 'destructive'
+      });
+    }
   };
 
   const handleShare = (postId: string) => {
