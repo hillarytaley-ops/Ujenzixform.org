@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate, Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import Navigation from "@/components/Navigation";
@@ -105,9 +105,7 @@ const ProfessionalBuilderDashboardPage = () => {
   const [loadingDeliveries, setLoadingDeliveries] = useState(false);
   const [deliveriesLoaded, setDeliveriesLoaded] = useState(false); // Track if initial load is done
 
-  // Supabase config for REST API
-  const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R2I6GLWrY9xKkxa0ZDnmmSCWgTo';
+  // SUPABASE_URL and SUPABASE_ANON_KEY are imported from @/integrations/supabase/client
 
   // Helper to get access token - USE SUPABASE CLIENT which handles token refresh automatically
   const getAccessToken = async (): Promise<string> => {
