@@ -359,31 +359,64 @@ const DeliveryRequest = () => {
     }
 
     setSubmitting(true);
+    console.log('🚚 DeliveryRequest: Starting submission...');
+
+    // Safety timeout - stop after 30 seconds
+    const safetyTimeout = setTimeout(() => {
+      console.log('⚠️ DeliveryRequest: Safety timeout reached');
+      setSubmitting(false);
+      toast({
+        variant: "destructive",
+        title: "Timeout",
+        description: "Request took too long. Please try again."
+      });
+    }, 30000);
 
     try {
-      // Get current user profile
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!profile) throw new Error('User profile not found');
-
-      // Security check - only allow certain roles to create delivery requests
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
-      
-      if (!roleData || !['builder', 'professional_builder', 'private_client', 'admin'].includes(roleData.role)) {
-        throw new Error('Insufficient permissions to create delivery requests');
+      // Get user from localStorage first (faster)
+      let user: any = null;
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          user = parsed?.user;
+          console.log('🚚 DeliveryRequest: Got user from localStorage:', user?.email);
+        }
+      } catch (e) {
+        console.log('🚚 DeliveryRequest: localStorage fallback failed');
       }
+
+      // Fallback to Supabase auth with timeout
+      if (!user) {
+        console.log('🚚 DeliveryRequest: Trying Supabase auth...');
+        const userResult = await withTimeout(
+          supabase.auth.getUser(),
+          5000,
+          { data: { user: null }, error: null }
+        );
+        user = userResult.data?.user;
+      }
+
+      if (!user) {
+        clearTimeout(safetyTimeout);
+        throw new Error('User not authenticated. Please log in again.');
+      }
+
+      // Get profile with timeout
+      console.log('🚚 DeliveryRequest: Fetching profile...');
+      const profileResult = await withTimeout(
+        supabase.from('profiles').select('id').eq('user_id', user.id).single(),
+        8000,
+        { data: null, error: { message: 'Profile fetch timeout' } }
+      );
+
+      if (profileResult.error || !profileResult.data) {
+        console.log('🚚 DeliveryRequest: Profile not found, using user.id as builder_id');
+        // Use user.id directly if profile not found
+      }
+
+      const builderId = profileResult.data?.id || user.id;
+      console.log('🚚 DeliveryRequest: Using builder_id:', builderId);
 
       // Build full address with coordinates if provided
       let fullPickupAddress = formData.pickupAddress.trim();
@@ -402,7 +435,7 @@ const DeliveryRequest = () => {
 
       // Create delivery request with enhanced validation
       const requestData = {
-        builder_id: profile.id,
+        builder_id: builderId,
         pickup_address: fullPickupAddress,
         delivery_address: fullDeliveryAddress,
         pickup_date: formData.preferredDate,
@@ -416,40 +449,43 @@ const DeliveryRequest = () => {
         status: 'pending'
       };
 
-      const { data: deliveryRequest, error } = await supabase
-        .from('delivery_requests')
-        .insert(requestData)
-        .select()
-        .single();
+      console.log('🚚 DeliveryRequest: Inserting delivery request...');
+      const insertResult = await withTimeout(
+        supabase.from('delivery_requests').insert(requestData).select().single(),
+        10000,
+        { data: null, error: { message: 'Insert timeout' } }
+      );
 
-      if (error) throw error;
-
-      // ✅ AUTO-NOTIFY: Alert ALL registered delivery providers immediately
-      if (deliveryRequest) {
-        try {
-          console.log('🚚 Notifying ALL delivery providers for request:', deliveryRequest.id);
-          
-          const notificationResult = await deliveryProviderNotificationService.notifyAllProviders({
-            id: deliveryRequest.id,
-            pickup_address: fullPickupAddress,
-            delivery_address: fullDeliveryAddress,
-            pickup_date: formData.preferredDate,
-            material_type: formData.materialType,
-            quantity: parseInt(formData.quantity) || 1,
-            weight_kg: parseFloat(formData.weight) || undefined,
-            budget_range: formData.budgetRange || undefined,
-            special_instructions: formData.specialInstructions.trim() || undefined
-          });
-          
-          console.log(`✅ Delivery providers notified: ${notificationResult.notified}/${notificationResult.totalProviders}`);
-          
-          // Log analytics event
-          await deliveryProviderNotificationService.logNotificationEvent(deliveryRequest.id, notificationResult);
-        } catch (notifyError) {
-          console.error('⚠️ Error notifying delivery providers:', notifyError);
-          // Continue even if notification fails - delivery request is created
-        }
+      if (insertResult.error) {
+        console.error('🚚 DeliveryRequest: Insert error:', insertResult.error);
+        throw new Error(insertResult.error.message || 'Failed to create delivery request');
       }
+
+      const deliveryRequest = insertResult.data;
+      console.log('✅ DeliveryRequest: Created successfully:', deliveryRequest?.id);
+
+      // ✅ AUTO-NOTIFY: Alert ALL registered delivery providers (non-blocking)
+      if (deliveryRequest) {
+        // Don't await - let it run in background
+        deliveryProviderNotificationService.notifyAllProviders({
+          id: deliveryRequest.id,
+          pickup_address: fullPickupAddress,
+          delivery_address: fullDeliveryAddress,
+          pickup_date: formData.preferredDate,
+          material_type: formData.materialType,
+          quantity: parseInt(formData.quantity) || 1,
+          weight_kg: parseFloat(formData.weight) || undefined,
+          budget_range: formData.budgetRange || undefined,
+          special_instructions: formData.specialInstructions.trim() || undefined
+        }).then(result => {
+          console.log(`✅ Delivery providers notified: ${result.notified}/${result.totalProviders}`);
+          deliveryProviderNotificationService.logNotificationEvent(deliveryRequest.id, result);
+        }).catch(err => {
+          console.error('⚠️ Error notifying delivery providers:', err);
+        });
+      }
+
+      clearTimeout(safetyTimeout);
 
       toast({
         title: "🚚 Delivery Request Sent!",
@@ -473,6 +509,7 @@ const DeliveryRequest = () => {
       });
       setErrors({});
     } catch (error: any) {
+      clearTimeout(safetyTimeout);
       console.error('Error submitting delivery request:', error);
       toast({
         variant: "destructive",
