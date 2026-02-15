@@ -249,6 +249,8 @@ const DeliverySignIn = () => {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('🚚 DeliverySignIn: Sign in button clicked');
+    
     if (!email || !password) {
       toast({
         variant: "destructive",
@@ -260,10 +262,20 @@ const DeliverySignIn = () => {
 
     setLoading(true);
     
-    // Safety timeout - reset loading after 5 seconds no matter what
-    const safetyTimeout = setTimeout(() => setLoading(false), 5000);
+    // Safety timeout - reset loading after 15 seconds
+    const safetyTimeout = setTimeout(() => {
+      console.log('🚚 DeliverySignIn: Safety timeout triggered');
+      setLoading(false);
+      toast({
+        variant: "destructive",
+        title: "Request Timeout",
+        description: "Sign in is taking too long. Please try again."
+      });
+    }, 15000);
 
     try {
+      console.log('🚚 DeliverySignIn: Attempting sign in for:', email);
+      
       // Sign in with Supabase
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: email.trim().toLowerCase(),
@@ -271,7 +283,8 @@ const DeliverySignIn = () => {
       });
 
       if (authError) {
-        console.error('🔐 Sign in error:', authError);
+        clearTimeout(safetyTimeout);
+        console.error('🚚 Sign in error:', authError);
         
         if (authError.message.includes('Invalid login credentials')) {
           toast({
@@ -297,6 +310,7 @@ const DeliverySignIn = () => {
       }
 
       if (!authData.user) {
+        clearTimeout(safetyTimeout);
         toast({
           variant: "destructive",
           title: "Sign in failed",
@@ -306,10 +320,13 @@ const DeliverySignIn = () => {
         return;
       }
 
-      console.log('🔐 Sign in successful for:', authData.user.email);
+      console.log('🚚 Sign in successful for:', authData.user.email);
       
       const userId = authData.user.id;
       const userEmail = authData.user.email?.toLowerCase() || '';
+      
+      // Store session info
+      localStorage.setItem('user_email', userEmail);
       
       // ✅ MOBILE OPTIMIZED: Check localStorage first for instant redirect
       const cachedRole = localStorage.getItem('user_role');
@@ -317,54 +334,75 @@ const DeliverySignIn = () => {
       
       // If we have a valid cached delivery/admin role for this user, redirect immediately
       if (cachedRole && cachedRoleId === userId && (cachedRole === 'delivery' || cachedRole === 'delivery_provider' || cachedRole === 'admin')) {
-        console.log('🔐 Using cached role for fast redirect:', cachedRole);
+        clearTimeout(safetyTimeout);
+        console.log('🚚 Using cached role for fast redirect:', cachedRole);
         localStorage.setItem('user_role_verified', Date.now().toString());
-        localStorage.setItem('user_email', userEmail);
         toast({ title: "✅ Welcome!", description: "Redirecting to dashboard..." });
         window.location.href = '/delivery-dashboard';
         return;
       }
       
-      // Fetch role from database (source of truth)
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-        .maybeSingle();
+      // Fetch role from database (source of truth) with timeout
+      console.log('🚚 Fetching role from database...');
+      let dbRole: string | null = null;
       
-      let dbRole = roleData?.role;
-      console.log('🔐 Database role:', dbRole);
+      try {
+        const rolePromise = supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', userId)
+          .maybeSingle();
+        
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Role fetch timeout')), 8000)
+        );
+        
+        const { data: roleData } = await Promise.race([rolePromise, timeoutPromise]) as any;
+        dbRole = roleData?.role || null;
+      } catch (roleError) {
+        console.log('🚚 Role fetch error/timeout, checking metadata...');
+      }
+      
+      console.log('🚚 Database role:', dbRole);
       
       // If no role in DB, check user metadata (set during registration)
       if (!dbRole) {
         const metadataRole = authData.user.user_metadata?.role;
-        console.log('🔐 Metadata role:', metadataRole);
+        console.log('🚚 Metadata role:', metadataRole);
         
-        // SECURITY: Do NOT auto-create roles from metadata
-        // Users must register through proper registration pages
-        console.log('🔐 Metadata role (for info only, NOT auto-creating):', metadataRole);
+        // If metadata says delivery, use that
+        if (metadataRole === 'delivery' || metadataRole === 'delivery_provider') {
+          dbRole = metadataRole;
+          console.log('🚚 Using metadata role:', dbRole);
+        }
       }
       
       // If user has a DIFFERENT role (not delivery/admin), BLOCK them
-      // @ts-ignore - TypeScript types may not match actual DB values
       if (dbRole && dbRole !== 'delivery' && dbRole !== 'delivery_provider' && dbRole !== 'admin') {
-        // User has a different role - block them
+        clearTimeout(safetyTimeout);
+        // User has a different role - redirect them to correct portal
+        console.log('🚚 User has different role:', dbRole);
         toast({
-          variant: "destructive",
-          title: "Access Denied",
-          description: `You are registered as a ${dbRole}. This portal is only for Delivery Providers.`,
+          title: "Wrong Portal",
+          description: `You are registered as ${dbRole}. Redirecting to your dashboard...`,
         });
-        setLoading(false);
+        
+        // Redirect to their correct dashboard
+        if (dbRole === 'private_client') window.location.href = '/private-client-dashboard';
+        else if (dbRole === 'professional_builder' || dbRole === 'builder') window.location.href = '/professional-builder-dashboard';
+        else if (dbRole === 'supplier') window.location.href = '/supplier-dashboard';
+        else window.location.href = '/home';
         return;
       }
       
-      // If NO role in database, BLOCK them - they must register first
+      // If NO role in database and no metadata, BLOCK them - they must register first
       if (!dbRole) {
-        console.log('🔐 No role found - user must register first');
+        clearTimeout(safetyTimeout);
+        console.log('🚚 No role found - user must register first');
         toast({
           variant: "destructive",
           title: "❌ Not Registered",
-          description: "You are not registered as a Delivery Provider. Please register first.",
+          description: "You are not registered as a Delivery Provider. Please register first using the link below.",
           duration: 5000
         });
         await supabase.auth.signOut();
@@ -376,11 +414,12 @@ const DeliverySignIn = () => {
       }
       
       // User has valid delivery role - allow access
+      clearTimeout(safetyTimeout);
       localStorage.setItem('user_role', dbRole);
       localStorage.setItem('user_role_id', userId);
       localStorage.setItem('user_role_verified', Date.now().toString());
-      localStorage.setItem('user_email', userEmail);
       
+      console.log('🚚 Redirecting to delivery dashboard...');
       toast({
         title: "✅ Welcome Delivery Provider!",
         description: "Redirecting to dashboard...",
@@ -390,7 +429,8 @@ const DeliverySignIn = () => {
       window.location.replace('/delivery-dashboard');
 
     } catch (error: any) {
-      console.error('Sign in exception:', error);
+      clearTimeout(safetyTimeout);
+      console.error('🚚 Sign in exception:', error);
       toast({
         variant: "destructive",
         title: "Error",
