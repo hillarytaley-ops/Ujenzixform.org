@@ -10,17 +10,145 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useToast } from "@/hooks/use-toast";
 import { UserRole } from "@/types/userProfile";
 import { supabase } from "@/integrations/supabase/client";
-import { MapPin, Package, Truck, Calendar, Shield, AlertTriangle } from "lucide-react";
+import { MapPin, Package, Truck, Calendar, Shield, AlertTriangle, Navigation, Copy, Check } from "lucide-react";
 import { deliveryProviderNotificationService } from "@/services/DeliveryProviderNotificationService";
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMPREHENSIVE KENYA CONSTRUCTION MATERIALS CATEGORIES
+// ═══════════════════════════════════════════════════════════════════════════════
+const MATERIAL_CATEGORIES = [
+  // STRUCTURAL & FOUNDATION
+  { value: "cement", label: "Cement & Concrete" },
+  { value: "steel", label: "Steel & Reinforcement" },
+  { value: "aggregates", label: "Aggregates & Ballast" },
+  { value: "sand", label: "Sand" },
+  { value: "stones", label: "Building Stones" },
+  { value: "blocks", label: "Blocks & Bricks" },
+  { value: "ready-mix", label: "Ready Mix Concrete" },
+  // ROOFING
+  { value: "roofing", label: "Roofing Materials" },
+  { value: "iron-sheets", label: "Iron Sheets (Mabati)" },
+  { value: "roofing-tiles", label: "Roofing Tiles" },
+  { value: "gutters", label: "Gutters & Downpipes" },
+  { value: "waterproofing", label: "Waterproofing" },
+  // TIMBER & WOOD
+  { value: "timber", label: "Timber & Wood" },
+  { value: "plywood", label: "Plywood & Boards" },
+  { value: "formwork", label: "Formwork & Shuttering" },
+  { value: "treated-poles", label: "Treated Poles" },
+  // DOORS, WINDOWS & OPENINGS
+  { value: "doors", label: "Doors & Frames" },
+  { value: "windows", label: "Windows & Glass" },
+  { value: "aluminium", label: "Aluminium Works" },
+  { value: "door-hardware", label: "Door & Window Hardware" },
+  // PLUMBING & WATER
+  { value: "plumbing", label: "Plumbing Supplies" },
+  { value: "pipes", label: "Pipes & Fittings" },
+  { value: "water-tanks", label: "Water Tanks & Pumps" },
+  { value: "sanitary", label: "Sanitary Ware" },
+  { value: "taps", label: "Taps & Mixers" },
+  { value: "water-heaters", label: "Water Heaters" },
+  // ELECTRICAL
+  { value: "electrical", label: "Electrical Supplies" },
+  { value: "cables", label: "Cables & Wires" },
+  { value: "switches", label: "Switches & Sockets" },
+  { value: "lighting", label: "Lighting" },
+  { value: "solar", label: "Solar Equipment" },
+  { value: "generators", label: "Generators" },
+  // TILES & FLOORING
+  { value: "tiles", label: "Tiles & Flooring" },
+  { value: "ceramic", label: "Ceramic & Porcelain" },
+  { value: "granite-marble", label: "Granite & Marble" },
+  { value: "vinyl-carpet", label: "Vinyl & Carpet" },
+  { value: "tile-adhesive", label: "Tile Adhesive & Grout" },
+  // PAINT & FINISHES
+  { value: "paint", label: "Paint & Finishes" },
+  { value: "emulsion-paint", label: "Emulsion Paint" },
+  { value: "exterior-paint", label: "Exterior Paint" },
+  { value: "varnish", label: "Varnish & Wood Finish" },
+  { value: "primers", label: "Primers & Putty" },
+  // WALL & CEILING
+  { value: "gypsum", label: "Gypsum & Ceiling" },
+  { value: "insulation", label: "Insulation Materials" },
+  { value: "wall-cladding", label: "Wall Cladding" },
+  // HARDWARE & FASTENERS
+  { value: "hardware", label: "Hardware & Fasteners" },
+  { value: "nails-screws", label: "Nails & Screws" },
+  { value: "bolts-nuts", label: "Bolts & Nuts" },
+  { value: "locks-hinges", label: "Locks & Hinges" },
+  { value: "wire-mesh", label: "Wire & Mesh" },
+  // TOOLS & EQUIPMENT
+  { value: "tools", label: "Tools & Equipment" },
+  { value: "power-tools", label: "Power Tools" },
+  { value: "hand-tools", label: "Hand Tools" },
+  { value: "safety-equipment", label: "Safety Equipment" },
+  { value: "scaffolding", label: "Scaffolding & Ladders" },
+  // ADHESIVES & SEALANTS
+  { value: "adhesives", label: "Adhesives & Sealants" },
+  { value: "epoxy", label: "Epoxy & Grout" },
+  // FENCING & SECURITY
+  { value: "fencing", label: "Fencing Materials" },
+  { value: "gates", label: "Gates & Security" },
+  // LANDSCAPING & OUTDOOR
+  { value: "paving", label: "Paving & Cabro" },
+  { value: "drainage", label: "Drainage Systems" },
+  { value: "garden", label: "Garden Materials" },
+  // KITCHEN & BUILT-IN
+  { value: "kitchen", label: "Kitchen Fittings" },
+  { value: "countertops", label: "Countertops" },
+  { value: "wardrobes", label: "Wardrobes & Closets" },
+  // HVAC & VENTILATION
+  { value: "hvac", label: "HVAC & Ventilation" },
+  { value: "air-conditioning", label: "Air Conditioning" },
+  // FIRE SAFETY
+  { value: "fire-safety", label: "Fire Safety Equipment" },
+  { value: "fire-doors", label: "Fire Doors & Alarms" },
+  // SPECIALTY MATERIALS
+  { value: "damp-proofing", label: "Damp Proofing" },
+  { value: "admixtures", label: "Concrete Admixtures" },
+  { value: "reinforcement-acc", label: "Reinforcement Accessories" },
+  // MISCELLANEOUS
+  { value: "geotextiles", label: "Geotextiles & Covers" },
+  { value: "mixed", label: "Mixed Materials" },
+  { value: "other", label: "Other Materials" }
+];
+
+// Budget ranges in Kenyan Shillings
+const BUDGET_RANGES = [
+  { value: "under-5000", label: "Under KES 5,000" },
+  { value: "5000-10000", label: "KES 5,000 - 10,000" },
+  { value: "10000-25000", label: "KES 10,000 - 25,000" },
+  { value: "25000-50000", label: "KES 25,000 - 50,000" },
+  { value: "50000-100000", label: "KES 50,000 - 100,000" },
+  { value: "over-100000", label: "Over KES 100,000" }
+];
+
+// Vehicle types with descriptions
+const VEHICLE_TYPES = [
+  { value: "motorcycle", label: "Motorcycle (Boda Boda) - Small items" },
+  { value: "tuk-tuk", label: "Tuk-Tuk - Light loads up to 500kg" },
+  { value: "pickup", label: "Pickup Truck - Up to 1 ton" },
+  { value: "van", label: "Van - Enclosed delivery" },
+  { value: "truck-small", label: "Small Truck (Canter) - 2-5 tons" },
+  { value: "truck-medium", label: "Medium Truck - 5-10 tons" },
+  { value: "truck-large", label: "Large Truck (Fuso) - 10-20 tons" },
+  { value: "trailer", label: "Trailer - Heavy loads 20+ tons" }
+];
 
 const DeliveryRequest = () => {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [gettingPickupLocation, setGettingPickupLocation] = useState(false);
+  const [gettingDeliveryLocation, setGettingDeliveryLocation] = useState(false);
+  const [copiedPickup, setCopiedPickup] = useState(false);
+  const [copiedDelivery, setCopiedDelivery] = useState(false);
   const [formData, setFormData] = useState({
     pickupAddress: "",
+    pickupCoordinates: "",
     deliveryAddress: "",
+    deliveryCoordinates: "",
     preferredDate: "",
     preferredTime: "",
     specialInstructions: "",
@@ -31,6 +159,99 @@ const DeliveryRequest = () => {
     weight: ""
   });
   const { toast } = useToast();
+
+  // Get current location coordinates
+  const getCurrentLocation = (type: 'pickup' | 'delivery') => {
+    if (!navigator.geolocation) {
+      toast({
+        variant: "destructive",
+        title: "Geolocation not supported",
+        description: "Your browser doesn't support location services"
+      });
+      return;
+    }
+
+    if (type === 'pickup') {
+      setGettingPickupLocation(true);
+    } else {
+      setGettingDeliveryLocation(true);
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const coords = `${position.coords.latitude.toFixed(6)}, ${position.coords.longitude.toFixed(6)}`;
+        if (type === 'pickup') {
+          setFormData(prev => ({ ...prev, pickupCoordinates: coords }));
+          setGettingPickupLocation(false);
+        } else {
+          setFormData(prev => ({ ...prev, deliveryCoordinates: coords }));
+          setGettingDeliveryLocation(false);
+        }
+        toast({
+          title: "📍 Location captured!",
+          description: `Coordinates: ${coords}`
+        });
+      },
+      (error) => {
+        console.error('Geolocation error:', error);
+        if (type === 'pickup') {
+          setGettingPickupLocation(false);
+        } else {
+          setGettingDeliveryLocation(false);
+        }
+        toast({
+          variant: "destructive",
+          title: "Location Error",
+          description: error.message || "Failed to get your location. Please enter coordinates manually."
+        });
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
+  // Copy coordinates to clipboard
+  const copyCoordinates = (coords: string, type: 'pickup' | 'delivery') => {
+    navigator.clipboard.writeText(coords).then(() => {
+      if (type === 'pickup') {
+        setCopiedPickup(true);
+        setTimeout(() => setCopiedPickup(false), 2000);
+      } else {
+        setCopiedDelivery(true);
+        setTimeout(() => setCopiedDelivery(false), 2000);
+      }
+      toast({
+        title: "Copied!",
+        description: "Coordinates copied to clipboard"
+      });
+    });
+  };
+
+  // Parse coordinates from various formats
+  const parseCoordinates = (input: string): { lat: number; lng: number } | null => {
+    // Try format: "lat, lng" or "lat,lng"
+    const commaFormat = input.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
+    if (commaFormat) {
+      return { lat: parseFloat(commaFormat[1]), lng: parseFloat(commaFormat[2]) };
+    }
+    
+    // Try Google Maps URL format
+    const gmapsFormat = input.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+    if (gmapsFormat) {
+      return { lat: parseFloat(gmapsFormat[1]), lng: parseFloat(gmapsFormat[2]) };
+    }
+
+    // Try format with degrees: "1.2345°S, 36.7890°E"
+    const degreeFormat = input.match(/(-?\d+\.?\d*)°?\s*([NS])?\s*,?\s*(-?\d+\.?\d*)°?\s*([EW])?/i);
+    if (degreeFormat) {
+      let lat = parseFloat(degreeFormat[1]);
+      let lng = parseFloat(degreeFormat[3]);
+      if (degreeFormat[2]?.toUpperCase() === 'S') lat = -lat;
+      if (degreeFormat[4]?.toUpperCase() === 'W') lng = -lng;
+      return { lat, lng };
+    }
+
+    return null;
+  };
 
   useEffect(() => {
     checkUserAccess();
@@ -88,8 +309,27 @@ const DeliveryRequest = () => {
     const newErrors: Record<string, string> = {};
 
     if (!formData.materialType) newErrors.materialType = "Material type is required";
-    if (!formData.pickupAddress.trim()) newErrors.pickupAddress = "Pickup address is required";
-    if (!formData.deliveryAddress.trim()) newErrors.deliveryAddress = "Delivery address is required";
+    
+    // Pickup: require either address or coordinates
+    if (!formData.pickupAddress.trim() && !formData.pickupCoordinates.trim()) {
+      newErrors.pickupAddress = "Pickup address or coordinates required";
+    }
+    
+    // Validate pickup coordinates format if provided
+    if (formData.pickupCoordinates.trim() && !parseCoordinates(formData.pickupCoordinates)) {
+      newErrors.pickupCoordinates = "Invalid coordinates format. Use: lat, lng (e.g., -1.2921, 36.8219)";
+    }
+    
+    // Delivery: require either address or coordinates
+    if (!formData.deliveryAddress.trim() && !formData.deliveryCoordinates.trim()) {
+      newErrors.deliveryAddress = "Delivery address or coordinates required";
+    }
+    
+    // Validate delivery coordinates format if provided
+    if (formData.deliveryCoordinates.trim() && !parseCoordinates(formData.deliveryCoordinates)) {
+      newErrors.deliveryCoordinates = "Invalid coordinates format. Use: lat, lng (e.g., -1.2921, 36.8219)";
+    }
+    
     if (!formData.preferredDate) newErrors.preferredDate = "Preferred date is required";
     if (!formData.quantity) newErrors.quantity = "Quantity is required";
 
@@ -145,11 +385,26 @@ const DeliveryRequest = () => {
         throw new Error('Insufficient permissions to create delivery requests');
       }
 
+      // Build full address with coordinates if provided
+      let fullPickupAddress = formData.pickupAddress.trim();
+      if (formData.pickupCoordinates.trim()) {
+        fullPickupAddress = fullPickupAddress 
+          ? `${fullPickupAddress} [Coords: ${formData.pickupCoordinates.trim()}]`
+          : `GPS: ${formData.pickupCoordinates.trim()}`;
+      }
+      
+      let fullDeliveryAddress = formData.deliveryAddress.trim();
+      if (formData.deliveryCoordinates.trim()) {
+        fullDeliveryAddress = fullDeliveryAddress
+          ? `${fullDeliveryAddress} [Coords: ${formData.deliveryCoordinates.trim()}]`
+          : `GPS: ${formData.deliveryCoordinates.trim()}`;
+      }
+
       // Create delivery request with enhanced validation
       const requestData = {
         builder_id: profile.id,
-        pickup_address: formData.pickupAddress.trim(),
-        delivery_address: formData.deliveryAddress.trim(),
+        pickup_address: fullPickupAddress,
+        delivery_address: fullDeliveryAddress,
         pickup_date: formData.preferredDate,
         preferred_time: formData.preferredTime || null,
         special_instructions: formData.specialInstructions.trim() || null,
@@ -176,8 +431,8 @@ const DeliveryRequest = () => {
           
           const notificationResult = await deliveryProviderNotificationService.notifyAllProviders({
             id: deliveryRequest.id,
-            pickup_address: formData.pickupAddress.trim(),
-            delivery_address: formData.deliveryAddress.trim(),
+            pickup_address: fullPickupAddress,
+            delivery_address: fullDeliveryAddress,
             pickup_date: formData.preferredDate,
             material_type: formData.materialType,
             quantity: parseInt(formData.quantity) || 1,
@@ -204,7 +459,9 @@ const DeliveryRequest = () => {
       // Reset form
       setFormData({
         pickupAddress: "",
+        pickupCoordinates: "",
         deliveryAddress: "",
+        deliveryCoordinates: "",
         preferredDate: "",
         preferredTime: "",
         specialInstructions: "",
@@ -264,14 +521,12 @@ const DeliveryRequest = () => {
                   <SelectTrigger className={errors.materialType ? "border-red-500" : ""}>
                     <SelectValue placeholder="Select material type" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cement">Cement</SelectItem>
-                    <SelectItem value="steel">Steel Bars</SelectItem>
-                    <SelectItem value="bricks">Bricks</SelectItem>
-                    <SelectItem value="sand">Sand</SelectItem>
-                    <SelectItem value="gravel">Gravel</SelectItem>
-                    <SelectItem value="timber">Timber</SelectItem>
-                    <SelectItem value="mixed">Mixed Materials</SelectItem>
+                  <SelectContent className="max-h-[300px]">
+                    {MATERIAL_CATEGORIES.map((category) => (
+                      <SelectItem key={category.value} value={category.value}>
+                        {category.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 {errors.materialType && (
@@ -324,42 +579,163 @@ const DeliveryRequest = () => {
                     <SelectValue placeholder="Select vehicle type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="van">Van</SelectItem>
-                    <SelectItem value="truck">Truck</SelectItem>
-                    <SelectItem value="pickup">Pickup Truck</SelectItem>
-                    <SelectItem value="trailer">Trailer</SelectItem>
+                    {VEHICLE_TYPES.map((vehicle) => (
+                      <SelectItem key={vehicle.value} value={vehicle.value}>
+                        {vehicle.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
-            <div className="space-y-4">
+            {/* Pickup Location Section */}
+            <div className="space-y-4 p-4 border rounded-lg bg-green-50/50">
+              <h3 className="font-semibold flex items-center gap-2 text-green-700">
+                <MapPin className="h-5 w-5" />
+                Pickup Location *
+              </h3>
+              
               <div className="space-y-2">
-                <Label htmlFor="pickupAddress" className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4" />
-                  Pickup Address
-                </Label>
+                <Label htmlFor="pickupAddress">Address / Description</Label>
                 <Textarea
                   id="pickupAddress"
-                  placeholder="Enter the pickup location..."
+                  placeholder="e.g., Mombasa Road, Industrial Area, Near Sameer Park..."
                   value={formData.pickupAddress}
                   onChange={(e) => setFormData(prev => ({ ...prev, pickupAddress: e.target.value }))}
-                  required
+                  className={errors.pickupAddress ? "border-red-500" : ""}
                 />
+                {errors.pickupAddress && (
+                  <p className="text-sm text-red-500 flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    {errors.pickupAddress}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="deliveryAddress" className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4" />
-                  Delivery Address
+                <Label htmlFor="pickupCoordinates" className="flex items-center gap-2">
+                  <Navigation className="h-4 w-4" />
+                  GPS Coordinates (optional but recommended)
                 </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="pickupCoordinates"
+                    placeholder="e.g., -1.2921, 36.8219 or paste Google Maps link"
+                    value={formData.pickupCoordinates}
+                    onChange={(e) => setFormData(prev => ({ ...prev, pickupCoordinates: e.target.value }))}
+                    className={`flex-1 ${errors.pickupCoordinates ? "border-red-500" : ""}`}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => getCurrentLocation('pickup')}
+                    disabled={gettingPickupLocation}
+                    title="Get current location"
+                  >
+                    {gettingPickupLocation ? (
+                      <LoadingSpinner className="h-4 w-4" />
+                    ) : (
+                      <Navigation className="h-4 w-4" />
+                    )}
+                  </Button>
+                  {formData.pickupCoordinates && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => copyCoordinates(formData.pickupCoordinates, 'pickup')}
+                      title="Copy coordinates"
+                    >
+                      {copiedPickup ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                    </Button>
+                  )}
+                </div>
+                {errors.pickupCoordinates && (
+                  <p className="text-sm text-red-500 flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    {errors.pickupCoordinates}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  💡 Tip: Click the location button to auto-detect your GPS, or paste coordinates from Google Maps
+                </p>
+              </div>
+            </div>
+
+            {/* Delivery Location Section */}
+            <div className="space-y-4 p-4 border rounded-lg bg-blue-50/50">
+              <h3 className="font-semibold flex items-center gap-2 text-blue-700">
+                <MapPin className="h-5 w-5" />
+                Delivery Location *
+              </h3>
+              
+              <div className="space-y-2">
+                <Label htmlFor="deliveryAddress">Address / Description</Label>
                 <Textarea
                   id="deliveryAddress"
-                  placeholder="Enter the delivery location..."
+                  placeholder="e.g., Plot 123, Kiambu Road, opposite Ridgeways Mall..."
                   value={formData.deliveryAddress}
                   onChange={(e) => setFormData(prev => ({ ...prev, deliveryAddress: e.target.value }))}
-                  required
+                  className={errors.deliveryAddress ? "border-red-500" : ""}
                 />
+                {errors.deliveryAddress && (
+                  <p className="text-sm text-red-500 flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    {errors.deliveryAddress}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="deliveryCoordinates" className="flex items-center gap-2">
+                  <Navigation className="h-4 w-4" />
+                  GPS Coordinates (optional but recommended)
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="deliveryCoordinates"
+                    placeholder="e.g., -1.2345, 36.7890 or paste Google Maps link"
+                    value={formData.deliveryCoordinates}
+                    onChange={(e) => setFormData(prev => ({ ...prev, deliveryCoordinates: e.target.value }))}
+                    className={`flex-1 ${errors.deliveryCoordinates ? "border-red-500" : ""}`}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => getCurrentLocation('delivery')}
+                    disabled={gettingDeliveryLocation}
+                    title="Get current location"
+                  >
+                    {gettingDeliveryLocation ? (
+                      <LoadingSpinner className="h-4 w-4" />
+                    ) : (
+                      <Navigation className="h-4 w-4" />
+                    )}
+                  </Button>
+                  {formData.deliveryCoordinates && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => copyCoordinates(formData.deliveryCoordinates, 'delivery')}
+                      title="Copy coordinates"
+                    >
+                      {copiedDelivery ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                    </Button>
+                  )}
+                </div>
+                {errors.deliveryCoordinates && (
+                  <p className="text-sm text-red-500 flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    {errors.deliveryCoordinates}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  💡 Tip: For construction sites without addresses, GPS coordinates help drivers find the exact location
+                </p>
               </div>
             </div>
 
@@ -390,7 +766,7 @@ const DeliveryRequest = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="budgetRange">Budget Range</Label>
+              <Label htmlFor="budgetRange">Budget Range (Delivery Cost)</Label>
               <Select
                 value={formData.budgetRange}
                 onValueChange={(value) => setFormData(prev => ({ ...prev, budgetRange: value }))}
@@ -399,11 +775,11 @@ const DeliveryRequest = () => {
                   <SelectValue placeholder="Select budget range" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="under-50">Under $50</SelectItem>
-                  <SelectItem value="50-100">$50 - $100</SelectItem>
-                  <SelectItem value="100-200">$100 - $200</SelectItem>
-                  <SelectItem value="200-500">$200 - $500</SelectItem>
-                  <SelectItem value="over-500">Over $500</SelectItem>
+                  {BUDGET_RANGES.map((range) => (
+                    <SelectItem key={range.value} value={range.value}>
+                      {range.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
