@@ -45,6 +45,34 @@ export const AuthRequired = ({ children }: AuthRequiredProps) => {
       return;
     }
 
+    // FAST PATH: Check localStorage first for instant access
+    const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+    const adminAuthenticated = localStorage.getItem('admin_authenticated') === 'true';
+    
+    if (storedSession || adminAuthenticated) {
+      console.log('🔓 AuthRequired: Fast path - localStorage auth found');
+      setIsAuthenticated(true);
+      setLoading(false);
+      // Still verify in background but don't block UI
+      checkAuth();
+      return;
+    }
+
+    // Safety timeout - don't hang forever
+    const timeout = setTimeout(() => {
+      console.log('🔓 AuthRequired: Safety timeout triggered');
+      if (loading) {
+        setLoading(false);
+        // Check localStorage one more time
+        const hasSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (hasSession) {
+          setIsAuthenticated(true);
+        } else {
+          setIsAuthenticated(false);
+        }
+      }
+    }, 3000);
+
     checkAuth();
 
     // Listen for auth changes
@@ -59,22 +87,33 @@ export const AuthRequired = ({ children }: AuthRequiredProps) => {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(timeout);
+      subscription.unsubscribe();
+    };
   }, [navigate, location.pathname]);
 
   const checkAuth = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      // Add timeout to prevent hanging
+      const sessionPromise = supabase.auth.getSession();
+      const timeoutPromise = new Promise<{ data: { session: null } }>((resolve) => 
+        setTimeout(() => resolve({ data: { session: null } }), 3000)
+      );
+      
+      const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]);
       
       // Also check localStorage for admin authentication (fallback for admin portal)
       const adminAuthenticated = localStorage.getItem('admin_authenticated') === 'true';
       const adminLoginTime = localStorage.getItem('admin_login_time');
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
       
       // Check if admin session is still valid (24 hour expiry)
       const isAdminSessionValid = adminAuthenticated && adminLoginTime && 
         (Date.now() - parseInt(adminLoginTime)) < 24 * 60 * 60 * 1000;
       
-      const isAuthenticated = !!session || isAdminSessionValid;
+      // Also consider localStorage Supabase session as valid
+      const isAuthenticated = !!session || isAdminSessionValid || !!storedSession;
       
       setIsAuthenticated(isAuthenticated);
       setLoading(false);
@@ -88,7 +127,9 @@ export const AuthRequired = ({ children }: AuthRequiredProps) => {
       
       // Check localStorage fallback even on error
       const adminAuthenticated = localStorage.getItem('admin_authenticated') === 'true';
-      if (adminAuthenticated) {
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      
+      if (adminAuthenticated || storedSession) {
         setIsAuthenticated(true);
         setLoading(false);
         return;
