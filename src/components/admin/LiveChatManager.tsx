@@ -77,7 +77,7 @@ export function LiveChatManager({ staffId, staffName }: LiveChatManagerProps) {
       
       // Use direct REST API call to bypass any client-side caching issues
       const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mjc4NjAxMTEsImV4cCI6MjA0MzQzNjExMX0.gPR5QHKM3nTcTz6cZhz-6RxVjvvz3AoFxpVhPVpZSi4';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
       
       const token = sessionData?.session?.access_token || SUPABASE_ANON_KEY;
       
