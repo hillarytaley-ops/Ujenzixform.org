@@ -284,52 +284,86 @@ const Delivery = () => {
             </Link>
           </div>
 
-          {/* Portal Cards */}
+          {/* Portal Cards - Role-aware Quick Access */}
           <div className="max-w-4xl mx-auto">
             <p className="text-white/60 text-sm font-medium mb-4 uppercase tracking-wider">Quick Access</p>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Request Materials */}
+              {/* Buy Materials / Builder Dashboard */}
               <div className="group bg-gradient-to-br from-emerald-600/80 to-emerald-700/80 backdrop-blur-sm rounded-2xl p-5 border border-emerald-400/30 hover:border-emerald-400/60 transition-all duration-300 hover:scale-[1.02]">
                 <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center mb-3 mx-auto">
                   <ShoppingCart className="h-5 w-5 text-white" />
                 </div>
-                <h3 className="text-white font-bold mb-1">Buy Materials</h3>
-                <p className="text-emerald-100/70 text-sm mb-3">Browse supplier marketplace</p>
+                <h3 className="text-white font-bold mb-1">
+                  {isBuilder ? 'Builder Dashboard' : 'Buy Materials'}
+                </h3>
+                <p className="text-emerald-100/70 text-sm mb-3">
+                  {isBuilder ? 'Access your projects & orders' : 'Browse supplier marketplace'}
+                </p>
                 <Button 
-                  onClick={() => handlePurchaseAction('buy')}
+                  onClick={() => {
+                    if (isBuilder) {
+                      navigate('/professional-builder-dashboard');
+                    } else if (user) {
+                      navigate('/suppliers');
+                    } else {
+                      navigate('/builder-signin');
+                    }
+                  }}
                   className="w-full bg-white text-emerald-700 hover:bg-emerald-50 font-semibold"
                 >
-                  Shop Now
+                  {isBuilder ? 'Go to Dashboard' : 'Shop Now'}
                 </Button>
               </div>
 
-              {/* Delivery Provider */}
+              {/* Delivery Provider Dashboard / Sign In */}
               <div className="group bg-gradient-to-br from-blue-600/80 to-blue-700/80 backdrop-blur-sm rounded-2xl p-5 border border-blue-400/30 hover:border-blue-400/60 transition-all duration-300 hover:scale-[1.02]">
                 <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center mb-3 mx-auto">
                   <Truck className="h-5 w-5 text-white" />
                 </div>
-                <h3 className="text-white font-bold mb-1">Delivery Provider</h3>
-                <p className="text-blue-100/70 text-sm mb-3">Access your dashboard</p>
-                <Link to="/delivery-signin">
-                  <Button className="w-full bg-white text-blue-700 hover:bg-blue-50 font-semibold">
-                    Sign In
-                  </Button>
-                </Link>
+                <h3 className="text-white font-bold mb-1">
+                  {userRole === 'delivery' || userRole === 'delivery_provider' ? 'Delivery Dashboard' : 'Delivery Provider'}
+                </h3>
+                <p className="text-blue-100/70 text-sm mb-3">
+                  {userRole === 'delivery' || userRole === 'delivery_provider' ? 'Manage your deliveries' : 'Access your dashboard'}
+                </p>
+                <Button 
+                  onClick={() => {
+                    if (userRole === 'delivery' || userRole === 'delivery_provider') {
+                      navigate('/delivery-dashboard');
+                    } else {
+                      navigate('/delivery-signin');
+                    }
+                  }}
+                  className="w-full bg-white text-blue-700 hover:bg-blue-50 font-semibold"
+                >
+                  {userRole === 'delivery' || userRole === 'delivery_provider' ? 'Go to Dashboard' : 'Sign In'}
+                </Button>
               </div>
 
-              {/* Become Provider */}
+              {/* Become Provider / Supplier Dashboard */}
               <div className="group bg-gradient-to-br from-amber-600/80 to-orange-600/80 backdrop-blur-sm rounded-2xl p-5 border border-amber-400/30 hover:border-amber-400/60 transition-all duration-300 hover:scale-[1.02]">
                 <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center mb-3 mx-auto">
                   <Users className="h-5 w-5 text-white" />
                 </div>
-                <h3 className="text-white font-bold mb-1">Join Our Network</h3>
-                <p className="text-amber-100/70 text-sm mb-3">Become a delivery partner</p>
-                <Link to="/delivery/apply">
-                  <Button className="w-full bg-white text-amber-700 hover:bg-amber-50 font-semibold">
-                    Apply Now
-                  </Button>
-                </Link>
+                <h3 className="text-white font-bold mb-1">
+                  {userRole === 'supplier' ? 'Supplier Dashboard' : 'Join Our Network'}
+                </h3>
+                <p className="text-amber-100/70 text-sm mb-3">
+                  {userRole === 'supplier' ? 'Manage your products' : 'Become a delivery partner'}
+                </p>
+                <Button 
+                  onClick={() => {
+                    if (userRole === 'supplier') {
+                      navigate('/supplier-dashboard');
+                    } else {
+                      navigate('/delivery/apply');
+                    }
+                  }}
+                  className="w-full bg-white text-amber-700 hover:bg-amber-50 font-semibold"
+                >
+                  {userRole === 'supplier' ? 'Go to Dashboard' : 'Apply Now'}
+                </Button>
               </div>
             </div>
           </div>
@@ -343,7 +377,7 @@ const Delivery = () => {
 
         {/* Delivery Provider Portal Cards */}
         <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto mb-8">
-          {/* Sign In Portal */}
+          {/* Sign In Portal / Dashboard Access */}
           <Card className="border-teal-200 bg-gradient-to-br from-teal-50 to-white">
             <CardContent className="p-6">
               <div className="flex items-center gap-4">
@@ -351,16 +385,31 @@ const Delivery = () => {
                   <User className="h-7 w-7 text-teal-600" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-xl font-semibold mb-1 text-teal-800">Delivery Provider Portal</h3>
+                  <h3 className="text-xl font-semibold mb-1 text-teal-800">
+                    {userRole === 'delivery' || userRole === 'delivery_provider' 
+                      ? 'Your Delivery Dashboard' 
+                      : 'Delivery Provider Portal'}
+                  </h3>
                   <p className="text-sm text-muted-foreground mb-3">
-                    Already a provider? Sign in to access your dashboard
+                    {userRole === 'delivery' || userRole === 'delivery_provider'
+                      ? 'Manage deliveries, track earnings, and view assignments'
+                      : 'Already a provider? Sign in to access your dashboard'}
                   </p>
-                  <Link to="/delivery-signin">
-                    <Button className="bg-teal-600 hover:bg-teal-700 text-white">
-                      <Truck className="h-4 w-4 mr-2" />
-                      Sign In to Dashboard
-                    </Button>
-                  </Link>
+                  <Button 
+                    onClick={() => {
+                      if (userRole === 'delivery' || userRole === 'delivery_provider') {
+                        navigate('/delivery-dashboard');
+                      } else {
+                        navigate('/delivery-signin');
+                      }
+                    }}
+                    className="bg-teal-600 hover:bg-teal-700 text-white"
+                  >
+                    <Truck className="h-4 w-4 mr-2" />
+                    {userRole === 'delivery' || userRole === 'delivery_provider' 
+                      ? 'Go to Dashboard' 
+                      : 'Sign In to Dashboard'}
+                  </Button>
                 </div>
               </div>
             </CardContent>
@@ -378,12 +427,13 @@ const Delivery = () => {
                   <p className="text-sm text-muted-foreground mb-3">
                     Join our network of trusted delivery partners
                   </p>
-                  <Link to="/delivery/apply">
-                    <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-                      <Users className="h-4 w-4 mr-2" />
-                      Apply Now
-                    </Button>
-                  </Link>
+                  <Button 
+                    onClick={() => navigate('/delivery/apply')}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    <Users className="h-4 w-4 mr-2" />
+                    Apply Now
+                  </Button>
                 </div>
               </div>
             </CardContent>
