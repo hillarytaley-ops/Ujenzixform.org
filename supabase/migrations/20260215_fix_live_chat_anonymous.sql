@@ -37,8 +37,9 @@ DROP POLICY IF EXISTS "Staff can view all conversations" ON public.conversations
 CREATE POLICY "Staff can view all conversations"
 ON public.conversations FOR SELECT
 USING (
-    -- Admins/staff see all conversations
-    EXISTS (SELECT 1 FROM public.user_roles ur WHERE ur.user_id = auth.uid() AND ur.role IN ('admin', 'super_admin', 'staff')) OR
+    -- Admins see all conversations (using admin role from app_role enum)
+    EXISTS (SELECT 1 FROM public.user_roles ur WHERE ur.user_id = auth.uid() AND ur.role = 'admin'::app_role) OR
+    -- Staff from admin_staff table can also see all
     EXISTS (SELECT 1 FROM public.admin_staff s WHERE s.user_id = auth.uid())
 );
 
@@ -74,8 +75,9 @@ DROP POLICY IF EXISTS "Staff can view all messages" ON public.chat_messages;
 CREATE POLICY "Staff can view all messages"
 ON public.chat_messages FOR SELECT
 USING (
-    -- Admins/staff see all messages
-    EXISTS (SELECT 1 FROM public.user_roles ur WHERE ur.user_id = auth.uid() AND ur.role IN ('admin', 'super_admin', 'staff')) OR
+    -- Admins see all messages (using admin role from app_role enum)
+    EXISTS (SELECT 1 FROM public.user_roles ur WHERE ur.user_id = auth.uid() AND ur.role = 'admin'::app_role) OR
+    -- Staff from admin_staff table can also see all
     EXISTS (SELECT 1 FROM public.admin_staff s WHERE s.user_id = auth.uid())
 );
 
@@ -102,7 +104,8 @@ USING (
         SELECT 1 FROM public.conversations c
         WHERE c.id = conversation_id AND c.client_id::text = auth.uid()::text
     ) OR
-    EXISTS (SELECT 1 FROM public.user_roles ur WHERE ur.user_id = auth.uid() AND ur.role = 'admin')
+    EXISTS (SELECT 1 FROM public.user_roles ur WHERE ur.user_id = auth.uid() AND ur.role = 'admin'::app_role) OR
+    EXISTS (SELECT 1 FROM public.admin_staff s WHERE s.user_id = auth.uid())
 );
 
 -- =====================================================================
