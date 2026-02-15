@@ -31,14 +31,23 @@ WITH CHECK (true);
 
 -- Update select policy to include anonymous access
 DROP POLICY IF EXISTS "Users can view own conversations" ON public.conversations;
+DROP POLICY IF EXISTS "Staff can view all conversations" ON public.conversations;
 
+-- Staff/Admin can see ALL conversations
+CREATE POLICY "Staff can view all conversations"
+ON public.conversations FOR SELECT
+USING (
+    -- Admins/staff see all conversations
+    EXISTS (SELECT 1 FROM public.user_roles ur WHERE ur.user_id = auth.uid() AND ur.role IN ('admin', 'super_admin', 'staff')) OR
+    EXISTS (SELECT 1 FROM public.admin_staff s WHERE s.user_id = auth.uid())
+);
+
+-- Regular users see their own conversations
 CREATE POLICY "Users can view own conversations"
 ON public.conversations FOR SELECT
 USING (
     -- Authenticated users see their own conversations
     (auth.uid() IS NOT NULL AND client_id::text = auth.uid()::text) OR
-    -- Admins see all
-    EXISTS (SELECT 1 FROM public.user_roles ur WHERE ur.user_id = auth.uid() AND ur.role = 'admin') OR
     -- Anonymous users with null client_id can see conversations (limited by conversation_id in app)
     (auth.uid() IS NULL AND client_id IS NULL)
 );
@@ -59,7 +68,18 @@ WITH CHECK (true);
 
 -- Update select policy for anonymous access
 DROP POLICY IF EXISTS "Users can view own messages" ON public.chat_messages;
+DROP POLICY IF EXISTS "Staff can view all messages" ON public.chat_messages;
 
+-- Staff/Admin can see ALL chat messages
+CREATE POLICY "Staff can view all messages"
+ON public.chat_messages FOR SELECT
+USING (
+    -- Admins/staff see all messages
+    EXISTS (SELECT 1 FROM public.user_roles ur WHERE ur.user_id = auth.uid() AND ur.role IN ('admin', 'super_admin', 'staff')) OR
+    EXISTS (SELECT 1 FROM public.admin_staff s WHERE s.user_id = auth.uid())
+);
+
+-- Regular users see their own messages
 CREATE POLICY "Users can view own messages"
 ON public.chat_messages FOR SELECT
 USING (
@@ -68,8 +88,6 @@ USING (
         SELECT 1 FROM public.conversations c
         WHERE c.id = conversation_id AND c.client_id::text = auth.uid()::text
     ) OR
-    -- Admins see all
-    EXISTS (SELECT 1 FROM public.user_roles ur WHERE ur.user_id = auth.uid() AND ur.role = 'admin') OR
     -- Anonymous access - allow reading messages (app filters by conversation_id)
     (auth.uid() IS NULL)
 );
