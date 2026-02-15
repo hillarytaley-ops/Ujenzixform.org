@@ -31,6 +31,8 @@ export function LiveChatWidget({ position = 'bottom-right' }: LiveChatWidgetProp
   const [isOpen, setIsOpen] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -58,6 +60,36 @@ export function LiveChatWidget({ position = 'bottom-right' }: LiveChatWidgetProp
     };
     getUser();
   }, []);
+
+  // Track online/offline status
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      if (connectionError) {
+        toast({
+          title: '🌐 Back Online',
+          description: 'Your connection has been restored.'
+        });
+      }
+    };
+    
+    const handleOffline = () => {
+      setIsOnline(false);
+      toast({
+        variant: 'destructive',
+        title: '📶 Connection Lost',
+        description: 'You appear to be offline. Messages will send when you reconnect.'
+      });
+    };
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [connectionError, toast]);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -180,7 +212,19 @@ export function LiveChatWidget({ position = 'bottom-right' }: LiveChatWidgetProp
   const connectToLiveChat = async () => {
     if (isConnecting || isConnected) return;
     
+    // Check if online first
+    if (!navigator.onLine) {
+      addMessage('system', '📶 You appear to be offline. Please check your internet connection and try again.');
+      toast({
+        variant: 'destructive',
+        title: 'No Internet Connection',
+        description: 'Please connect to the internet to start a chat.'
+      });
+      return;
+    }
+    
     setIsConnecting(true);
+    setConnectionError(null);
     addMessage('system', '🔄 Connecting you to our support team...');
     console.log('💬 LiveChat: Starting connection...');
 
@@ -232,7 +276,25 @@ export function LiveChatWidget({ position = 'bottom-right' }: LiveChatWidgetProp
       if (!response.ok) {
         const errorText = await response.text();
         console.error('💬 LiveChat: Conversation creation failed:', response.status, errorText);
-        addMessage('system', '❌ Could not connect. Please try again or contact us at info@ujenzixform.org');
+        
+        // User-friendly error messages based on error type
+        let errorMessage = '❌ Could not connect to support. ';
+        if (response.status === 401 || response.status === 403) {
+          errorMessage += 'Please refresh the page and try again.';
+        } else if (response.status >= 500) {
+          errorMessage += 'Our servers are temporarily busy. Please try again in a moment.';
+        } else if (!navigator.onLine) {
+          errorMessage += 'You appear to be offline. Please check your internet connection.';
+        } else {
+          errorMessage += 'Please try again or email us at info@ujenzixform.org';
+        }
+        
+        addMessage('system', errorMessage);
+        toast({
+          variant: 'destructive',
+          title: 'Connection Failed',
+          description: 'Unable to start chat. Please try again.'
+        });
         setIsConnecting(false);
         return;
       }
@@ -242,7 +304,12 @@ export function LiveChatWidget({ position = 'bottom-right' }: LiveChatWidgetProp
       
       if (!conv?.id) {
         console.error('💬 LiveChat: No conversation ID returned');
-        addMessage('system', '❌ Connection error. Please refresh and try again.');
+        addMessage('system', '❌ Something went wrong. Please refresh the page and try connecting again.');
+        toast({
+          variant: 'destructive',
+          title: 'Connection Error',
+          description: 'Could not establish chat session. Please refresh and try again.'
+        });
         setIsConnecting(false);
         return;
       }
@@ -295,11 +362,28 @@ export function LiveChatWidget({ position = 'bottom-right' }: LiveChatWidgetProp
 
     } catch (err: any) {
       console.error('💬 LiveChat Error:', err);
+      let errorTitle = 'Connection Failed';
+      let errorDescription = 'Unable to connect to support.';
+      let systemMessage = '❌ ';
+      
       if (err.name === 'AbortError') {
-        addMessage('system', '❌ Connection timed out. Please check your internet and try again.');
+        errorTitle = 'Connection Timeout';
+        errorDescription = 'The connection took too long. Please try again.';
+        systemMessage += 'Connection timed out. This usually means slow internet - please check your connection and try again.';
+      } else if (!navigator.onLine) {
+        errorTitle = 'No Internet';
+        errorDescription = 'Please check your internet connection.';
+        systemMessage += 'You appear to be offline. Please connect to the internet and try again.';
       } else {
-        addMessage('system', '❌ Connection failed. Please try again or email info@ujenzixform.org');
+        systemMessage += 'We couldn\'t connect you to support. Please try again, or reach us at info@ujenzixform.org';
       }
+      
+      addMessage('system', systemMessage);
+      toast({
+        variant: 'destructive',
+        title: errorTitle,
+        description: errorDescription
+      });
       setIsConnecting(false);
     }
   };
@@ -357,10 +441,20 @@ export function LiveChatWidget({ position = 'bottom-right' }: LiveChatWidgetProp
       if (!response.ok) {
         const errorText = await response.text();
         console.error('💬 LiveChat: Failed to send message:', response.status, errorText);
+        
+        let description = 'Your message couldn\'t be sent. ';
+        if (response.status === 401 || response.status === 403) {
+          description += 'Session may have expired - try refreshing the page.';
+        } else if (!navigator.onLine) {
+          description += 'You appear to be offline.';
+        } else {
+          description += 'Please try again.';
+        }
+        
         toast({
           variant: 'destructive',
-          title: 'Failed to send',
-          description: 'Message could not be sent. Please try again.'
+          title: '❌ Message Not Sent',
+          description: description
         });
         return;
       }
@@ -384,13 +478,23 @@ export function LiveChatWidget({ position = 'bottom-right' }: LiveChatWidgetProp
 
     } catch (err: any) {
       console.error('💬 LiveChat send error:', err);
-      if (err.name !== 'AbortError') {
-        toast({
-          variant: 'destructive',
-          title: 'Failed to send',
-          description: 'Please try again.'
-        });
+      
+      let title = '❌ Message Failed';
+      let description = 'Please try again.';
+      
+      if (err.name === 'AbortError') {
+        title = '⏱️ Message Timeout';
+        description = 'Sending took too long. Check your connection and try again.';
+      } else if (!navigator.onLine) {
+        title = '📶 No Connection';
+        description = 'You\'re offline. Message will send when you reconnect.';
       }
+      
+      toast({
+        variant: 'destructive',
+        title: title,
+        description: description
+      });
     }
   };
 
@@ -514,7 +618,10 @@ export function LiveChatWidget({ position = 'bottom-right' }: LiveChatWidgetProp
               <div>
                 <h3 className="font-semibold text-white">Live Support</h3>
                 <p className="text-xs text-white/80">
-                  {isConnected ? '🟢 Connected' : isConnecting ? '🔄 Connecting...' : 'Click to start'}
+                  {!isOnline ? '🔴 Offline - No internet' : 
+                   isConnected ? '🟢 Connected' : 
+                   isConnecting ? '🔄 Connecting...' : 
+                   'Click to start'}
                 </p>
               </div>
             </div>
@@ -526,6 +633,15 @@ export function LiveChatWidget({ position = 'bottom-right' }: LiveChatWidgetProp
             </button>
           </div>
 
+          {/* Offline Banner */}
+          {!isOnline && (
+            <div className="bg-red-500/20 border-b border-red-500/30 px-4 py-2 text-center">
+              <p className="text-red-400 text-sm">
+                📶 You're offline. Messages will send when you reconnect.
+              </p>
+            </div>
+          )}
+
           {/* Messages */}
           <ScrollArea className="flex-1 p-4" ref={scrollRef}>
             {messages.length === 0 && !isConnected && (
@@ -535,18 +651,23 @@ export function LiveChatWidget({ position = 'bottom-right' }: LiveChatWidgetProp
                 </div>
                 <h4 className="text-white font-medium mb-2">Welcome to Live Chat</h4>
                 <p className="text-gray-400 text-sm mb-4">
-                  Connect with our support team for immediate assistance.
+                  {!isOnline 
+                    ? 'Please connect to the internet to start chatting.'
+                    : 'Connect with our support team for immediate assistance.'
+                  }
                 </p>
                 <Button
                   onClick={handleStartChat}
-                  disabled={isConnecting}
-                  className="bg-orange-500 hover:bg-orange-600"
+                  disabled={isConnecting || !isOnline}
+                  className="bg-orange-500 hover:bg-orange-600 disabled:opacity-50"
                 >
                   {isConnecting ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                       Connecting...
                     </>
+                  ) : !isOnline ? (
+                    '📶 Waiting for connection...'
                   ) : (
                     'Start Chat'
                   )}

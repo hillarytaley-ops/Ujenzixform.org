@@ -185,6 +185,11 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
       if (!response.ok) {
         const errorText = await response.text();
         console.error('❌ REST API error fetching conversations:', response.status, errorText);
+        toast({
+          title: "⚠️ Connection Issue",
+          description: "Couldn't load conversations. Auto-retrying in a few seconds...",
+          variant: "destructive"
+        });
         return;
       }
       
@@ -193,8 +198,13 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
       setConversations(data || []);
     } catch (error) {
       console.error('❌ Exception fetching conversations:', error);
+      toast({
+        title: "⚠️ Network Error",
+        description: "Check your internet connection. Will retry automatically.",
+        variant: "destructive"
+      });
     }
-  }, []);
+  }, [toast]);
 
   // Fetch messages for a conversation using REST API
   const fetchMessages = useCallback(async (conversationId: string) => {
@@ -217,6 +227,11 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
       
       if (!response.ok) {
         console.error('❌ Error fetching messages:', response.status);
+        toast({
+          title: "⚠️ Unable to Load Messages",
+          description: "Messages couldn't be loaded. Please try selecting the conversation again.",
+          variant: "destructive"
+        });
         return;
       }
       
@@ -225,8 +240,13 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
       setMessages(data || []);
     } catch (error) {
       console.error('Error fetching messages:', error);
+      toast({
+        title: "⚠️ Error Loading Messages",
+        description: "Please check your connection and try again.",
+        variant: "destructive"
+      });
     }
-  }, []);
+  }, [toast]);
 
   // Fetch chat feedback using REST API
   const fetchFeedbacks = useCallback(async () => {
@@ -245,9 +265,12 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
       if (response.ok) {
         const data = await response.json();
         setFeedbacks(data || []);
+      } else {
+        console.error('❌ Error fetching feedback:', response.status);
       }
     } catch (error) {
       console.error('Error fetching feedback:', error);
+      // Silent fail for feedback - non-critical
     }
   }, []);
 
@@ -268,9 +291,12 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
       if (response.ok) {
         const data = await response.json();
         setTranscripts(data || []);
+      } else {
+        console.error('❌ Error fetching transcripts:', response.status);
       }
     } catch (error) {
       console.error('Error fetching transcripts:', error);
+      // Silent fail for transcripts - non-critical
     }
   }, []);
 
@@ -552,7 +578,11 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
       // Remove optimistic message on failure
       setMessages(prev => prev.filter(m => m.id !== tempId));
       setReplyMessage(content);
-      toast({ variant: 'destructive', title: 'Failed to send', description: 'Please try again' });
+      toast({ 
+        variant: 'destructive', 
+        title: '❌ Message Not Sent', 
+        description: 'Your message couldn\'t be delivered. Please check your connection and try again.' 
+      });
     }
   };
 
@@ -567,10 +597,15 @@ export function EnhancedCommunicationsManager({ staffId, staffName }: EnhancedCo
         })
         .eq('id', conversation.id);
 
-      toast({ title: "Conversation closed" });
+      toast({ title: "✅ Conversation Closed", description: "The chat has been marked as closed." });
       fetchConversations();
     } catch (error) {
       console.error('Error closing conversation:', error);
+      toast({ 
+        variant: 'destructive', 
+        title: '⚠️ Couldn\'t Close Chat', 
+        description: 'Please try again.' 
+      });
     }
   };
 

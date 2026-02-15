@@ -223,6 +223,11 @@ export function AdminMessaging() {
       }
     } catch (error) {
       console.error('Error fetching messages:', error);
+      toast({
+        title: "⚠️ Unable to Load Messages",
+        description: "Messages couldn't be loaded. Please select the chat again or refresh the page.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -293,6 +298,11 @@ export function AdminMessaging() {
       });
     } catch (error) {
       console.error('Error closing chat:', error);
+      toast({
+        title: "⚠️ Couldn't Close Chat",
+        description: "The chat couldn't be closed. Please try again.",
+        variant: "destructive"
+      });
     }
   };
 
