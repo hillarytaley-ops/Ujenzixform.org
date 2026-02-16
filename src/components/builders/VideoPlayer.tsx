@@ -413,47 +413,41 @@ export const VideoPlayer = ({ video, isOpen, onClose, onVideoUpdate }: VideoPlay
                 <DialogTitle className="text-xl">{video.title}</DialogTitle>
               </DialogHeader>
 
-              {/* Builder Info */}
-              {video.builder_profile && (
-                <div className="bg-gradient-to-r from-orange-50 to-amber-50 p-3 rounded-lg border border-orange-200">
-                  <div className="flex items-center space-x-3 mb-2">
-                    <Avatar className="h-12 w-12 border-2 border-orange-300">
-                      <AvatarImage src={video.builder_profile.avatar_url} />
-                      <AvatarFallback className="bg-orange-500 text-white font-bold">
-                        {(video.builder_profile.company_name || video.builder_profile.full_name || 'U').charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-bold text-gray-900">
-                        {video.builder_profile.company_name || video.builder_profile.full_name || 'UjenziXform Builder'}
-                      </p>
-                      {video.builder_profile.full_name && video.builder_profile.company_name && (
-                        <p className="text-xs text-gray-600">{video.builder_profile.full_name}</p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="space-y-1 text-sm">
-                    {video.builder_profile.phone && (
-                      <div className="flex items-center text-gray-600">
-                        <Phone className="h-3 w-3 mr-2 text-green-600" />
-                        <a href={`tel:${video.builder_profile.phone}`} className="hover:text-green-600">{video.builder_profile.phone}</a>
-                      </div>
-                    )}
-                    {video.builder_profile.email && (
-                      <div className="flex items-center text-gray-600">
-                        <Mail className="h-3 w-3 mr-2 text-blue-600" />
-                        <a href={`mailto:${video.builder_profile.email}`} className="hover:text-blue-600 text-xs">{video.builder_profile.email}</a>
-                      </div>
-                    )}
-                    {video.builder_profile.location && (
-                      <div className="flex items-center text-gray-600">
-                        <Building className="h-3 w-3 mr-2 text-purple-600" />
-                        <span className="text-xs">{video.builder_profile.location}</span>
-                      </div>
-                    )}
+              {/* Builder Info - Always show with defaults */}
+              <div className="bg-gradient-to-r from-orange-50 to-amber-50 p-3 rounded-lg border border-orange-200">
+                <div className="flex items-center space-x-3 mb-2">
+                  <Avatar className="h-12 w-12 border-2 border-orange-300">
+                    <AvatarImage src={video.builder_profile?.avatar_url} />
+                    <AvatarFallback className="bg-orange-500 text-white font-bold">
+                      {(video.builder_profile?.company_name || video.builder_profile?.full_name || video.title || 'U').charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="font-bold text-gray-900">
+                      {video.builder_profile?.company_name || video.builder_profile?.full_name || video.title?.split(' ')[0] || 'UjenziXform'}
+                    </p>
+                    <p className="text-xs text-gray-600">Professional Builder</p>
                   </div>
                 </div>
-              )}
+                <div className="space-y-1 text-sm">
+                  <div className="flex items-center text-gray-600">
+                    <Phone className="h-3 w-3 mr-2 text-green-600" />
+                    <a href={`tel:${video.builder_profile?.phone || '+254700000000'}`} className="hover:text-green-600">
+                      {video.builder_profile?.phone || '+254 700 000 000'}
+                    </a>
+                  </div>
+                  <div className="flex items-center text-gray-600">
+                    <Mail className="h-3 w-3 mr-2 text-blue-600" />
+                    <a href={`mailto:${video.builder_profile?.email || 'info@ujenzixform.org'}`} className="hover:text-blue-600 text-xs">
+                      {video.builder_profile?.email || 'info@ujenzixform.org'}
+                    </a>
+                  </div>
+                  <div className="flex items-center text-gray-600">
+                    <Building className="h-3 w-3 mr-2 text-purple-600" />
+                    <span className="text-xs">{video.builder_profile?.location || 'Kenya'}</span>
+                  </div>
+                </div>
+              </div>
 
               {/* Project Details */}
               <div className="space-y-2 text-sm">
