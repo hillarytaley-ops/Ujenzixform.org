@@ -409,37 +409,36 @@ export const VideoPlayer = ({ video, isOpen, onClose, onVideoUpdate }: VideoPlay
   };
 
   const renderComment = (comment: Comment, isReply = false) => (
-    <div key={comment.id} className={`${isReply ? 'ml-8 mt-2' : 'mt-4'} space-y-2`}>
-      <div className="flex items-start space-x-3">
-        <Avatar className="h-8 w-8">
-          <AvatarFallback>
+    <div key={comment.id} className={`${isReply ? 'ml-10 mt-2' : 'mt-3'}`}>
+      <div className="flex items-start space-x-2">
+        <Avatar className="h-8 w-8 flex-shrink-0">
+          <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-500 text-white text-xs font-bold">
             {comment.commenter_name.charAt(0).toUpperCase()}
           </AvatarFallback>
         </Avatar>
-        <div className="flex-1 bg-gray-50 rounded-lg p-3">
-          <div className="flex items-center justify-between mb-1">
-            <span className="font-semibold text-sm">{comment.commenter_name}</span>
-            <span className="text-xs text-gray-500">
-              {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
-            </span>
+        <div className="flex-1">
+          <div className="bg-gray-100 rounded-2xl px-3 py-2 inline-block max-w-full">
+            <span className="font-semibold text-sm text-gray-900 block">{comment.commenter_name}</span>
+            <p className="text-sm text-gray-800">{comment.comment_text}</p>
           </div>
-          <p className="text-sm text-gray-700">{comment.comment_text}</p>
-          {!isReply && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="mt-1 h-6 text-xs"
-              onClick={() => setReplyTo(comment.id)}
-            >
-              Reply
-            </Button>
-          )}
+          <div className="flex items-center space-x-3 mt-1 ml-2 text-xs text-gray-500">
+            <span>{formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}</span>
+            <button className="font-semibold hover:underline">Like</button>
+            {!isReply && (
+              <button 
+                className="font-semibold hover:underline"
+                onClick={() => setReplyTo(comment.id)}
+              >
+                Reply
+              </button>
+            )}
+          </div>
         </div>
       </div>
       
       {/* Render replies */}
       {comment.replies && comment.replies.length > 0 && (
-        <div className="space-y-2">
+        <div className="mt-2">
           {comment.replies.map((reply) => renderComment(reply, true))}
         </div>
       )}
@@ -535,31 +534,115 @@ export const VideoPlayer = ({ video, isOpen, onClose, onVideoUpdate }: VideoPlay
                 <p className="text-sm text-gray-600">{video.description}</p>
               )}
 
-              {/* Stats & Actions */}
-              <div className="flex items-center justify-between pt-2 border-t">
-                <div className="flex items-center space-x-4 text-sm text-gray-500">
-                  <div className="flex items-center">
-                    <Eye className="h-4 w-4 mr-1" />
-                    {video.views_count}
-                  </div>
-                  <div className="flex items-center">
-                    <Heart className="h-4 w-4 mr-1" />
-                    {localLikesCount}
-                  </div>
-                  <div className="flex items-center">
-                    <MessageCircle className="h-4 w-4 mr-1" />
-                    {comments.length}
+              {/* Stats */}
+              <div className="flex items-center space-x-4 text-sm text-gray-500 pt-2 border-t">
+                <div className="flex items-center">
+                  <Eye className="h-4 w-4 mr-1" />
+                  {video.views_count || 0} views
+                </div>
+                <div className="flex items-center">
+                  <span className="text-base mr-1">👍❤️</span>
+                  {localLikesCount}
+                </div>
+                <div className="flex items-center">
+                  <MessageCircle className="h-4 w-4 mr-1" />
+                  {comments.length} comments
+                </div>
+              </div>
+
+              {/* Facebook-style Reaction Bar */}
+              <div className="flex items-center justify-between pt-3 border-t mt-3">
+                {/* Reaction Button with Hover Menu */}
+                <div className="relative group flex-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleLike}
+                    className={`w-full justify-center hover:bg-gray-100 ${isLiked ? 'text-blue-600' : 'text-gray-600'}`}
+                  >
+                    {isLiked ? (
+                      <>
+                        <span className="text-xl mr-2">👍</span>
+                        <span className="font-semibold">Liked</span>
+                      </>
+                    ) : (
+                      <>
+                        <ThumbsUp className="h-5 w-5 mr-2" />
+                        <span>Like</span>
+                      </>
+                    )}
+                  </Button>
+                  
+                  {/* Reaction Popup on Hover */}
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex bg-white rounded-full shadow-lg border p-1 space-x-1 z-50">
+                    <button 
+                      onClick={() => { handleLike(); }} 
+                      className="text-2xl hover:scale-125 transition-transform p-1"
+                      title="Like"
+                    >
+                      👍
+                    </button>
+                    <button 
+                      onClick={() => { handleLike(); }} 
+                      className="text-2xl hover:scale-125 transition-transform p-1"
+                      title="Love"
+                    >
+                      ❤️
+                    </button>
+                    <button 
+                      onClick={() => { handleLike(); }} 
+                      className="text-2xl hover:scale-125 transition-transform p-1"
+                      title="Haha"
+                    >
+                      😂
+                    </button>
+                    <button 
+                      onClick={() => { handleLike(); }} 
+                      className="text-2xl hover:scale-125 transition-transform p-1"
+                      title="Wow"
+                    >
+                      😮
+                    </button>
+                    <button 
+                      onClick={() => { handleLike(); }} 
+                      className="text-2xl hover:scale-125 transition-transform p-1"
+                      title="Sad"
+                    >
+                      😢
+                    </button>
+                    <button 
+                      onClick={() => { handleLike(); }} 
+                      className="text-2xl hover:scale-125 transition-transform p-1"
+                      title="Angry"
+                    >
+                      😡
+                    </button>
                   </div>
                 </div>
 
+                {/* Comment Button */}
                 <Button
-                  variant={isLiked ? "default" : "outline"}
+                  variant="ghost"
                   size="sm"
-                  onClick={handleLike}
-                  className={isLiked ? "bg-red-500 hover:bg-red-600" : ""}
+                  className="flex-1 justify-center text-gray-600 hover:bg-gray-100"
+                  onClick={() => document.getElementById('comment-input')?.focus()}
                 >
-                  <Heart className={`h-4 w-4 mr-1 ${isLiked ? 'fill-current' : ''}`} />
-                  {isLiked ? 'Liked' : 'Like'}
+                  <MessageCircle className="h-5 w-5 mr-2" />
+                  <span>Comment</span>
+                </Button>
+
+                {/* Share Button */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="flex-1 justify-center text-gray-600 hover:bg-gray-100"
+                  onClick={() => {
+                    navigator.clipboard.writeText(window.location.href);
+                    toast({ title: "Link copied!", description: "Share this video with others" });
+                  }}
+                >
+                  <Send className="h-5 w-5 mr-2" />
+                  <span>Share</span>
                 </Button>
               </div>
             </div>
@@ -597,39 +680,50 @@ export const VideoPlayer = ({ video, isOpen, onClose, onVideoUpdate }: VideoPlay
                 </div>
               )}
 
-              <Textarea
-                placeholder="Add a comment..."
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                rows={2}
-                className="resize-none"
-              />
-
-              {/* Guest Name/Email fields */}
-              {!supabase.auth.getUser() && (
-                <div className="grid grid-cols-2 gap-2">
-                  <Input
-                    placeholder="Your name *"
-                    value={commenterName}
-                    onChange={(e) => setCommenterName(e.target.value)}
+              <div className="flex items-start space-x-2">
+                <Avatar className="h-8 w-8 flex-shrink-0">
+                  <AvatarFallback className="bg-blue-500 text-white text-sm">
+                    {commenterName?.charAt(0)?.toUpperCase() || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 relative">
+                  <Textarea
+                    id="comment-input"
+                    placeholder="Write a comment..."
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSubmitComment();
+                      }
+                    }}
+                    rows={1}
+                    className="resize-none rounded-2xl bg-gray-100 border-0 pr-10 min-h-[40px]"
                   />
-                  <Input
-                    placeholder="Email (optional)"
-                    type="email"
-                    value={commenterEmail}
-                    onChange={(e) => setCommenterEmail(e.target.value)}
-                  />
+                  <button 
+                    onClick={handleSubmitComment}
+                    disabled={isSubmitting || !newComment.trim()}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-blue-500 hover:text-blue-600 disabled:text-gray-300"
+                  >
+                    <Send className="h-5 w-5" />
+                  </button>
                 </div>
-              )}
+              </div>
 
-              <Button
-                onClick={handleSubmitComment}
-                disabled={isSubmitting}
-                className="w-full bg-blue-600 hover:bg-blue-700"
-              >
-                <Send className="h-4 w-4 mr-2" />
-                {isSubmitting ? 'Posting...' : 'Post Comment'}
-              </Button>
+              {/* Guest Name field - only show if not logged in */}
+              {!commenterName && (
+                <Input
+                  placeholder="Your name (optional)"
+                  value={commenterName}
+                  onChange={(e) => setCommenterName(e.target.value)}
+                  className="text-sm h-8 rounded-full bg-gray-100 border-0"
+                />
+              )}
+              
+              <p className="text-xs text-gray-400 text-center">
+                Press Enter to post • Shift+Enter for new line
+              </p>
             </div>
           </div>
         </div>
