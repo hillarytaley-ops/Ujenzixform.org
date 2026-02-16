@@ -90,15 +90,20 @@ const DeliveryTrackingInput: React.FC = () => {
     setShowGPSMap(false);
 
     try {
-      // PRIORITY 1: Search tracking_numbers table (new system)
+      const searchTerm = trackingNumber.trim().toUpperCase();
+      console.log('🔍 Searching for tracking number:', searchTerm);
+
+      // PRIORITY 1: Search tracking_numbers table (new system) - exact match first
       const { data: trackingNumberData, error: trackingNumberError } = await supabase
         .from('tracking_numbers')
         .select('*')
-        .ilike('tracking_number', trackingNumber.trim())
+        .eq('tracking_number', searchTerm)
         .maybeSingle();
 
+      console.log('📊 tracking_numbers query result:', { data: trackingNumberData, error: trackingNumberError });
+
       if (trackingNumberError && trackingNumberError.code !== 'PGRST116') {
-        console.error('Tracking numbers query error:', trackingNumberError);
+        console.error('❌ Tracking numbers query error:', trackingNumberError);
       }
 
       if (trackingNumberData) {
@@ -115,18 +120,45 @@ const DeliveryTrackingInput: React.FC = () => {
         return;
       }
 
+      // Try case-insensitive search if exact match failed
+      const { data: trackingNumberDataIlike, error: trackingNumberErrorIlike } = await supabase
+        .from('tracking_numbers')
+        .select('*')
+        .ilike('tracking_number', `%${searchTerm}%`)
+        .limit(1)
+        .maybeSingle();
+
+      console.log('📊 tracking_numbers ILIKE result:', { data: trackingNumberDataIlike, error: trackingNumberErrorIlike });
+
+      if (trackingNumberDataIlike) {
+        console.log('✅ Found in tracking_numbers table (ILIKE):', trackingNumberDataIlike);
+        setTrackingResult({
+          type: 'tracking_number',
+          data: trackingNumberDataIlike
+        });
+        toast({
+          title: "✅ Delivery Found",
+          description: "Click 'View Live GPS Map' to see real-time location"
+        });
+        setTracking(false);
+        return;
+      }
+
       // PRIORITY 2: Search delivery_requests by tracking_number
       const { data: trackingData, error: trackingError } = await supabase
         .from('delivery_requests')
         .select('*')
-        .ilike('tracking_number', trackingNumber.trim())
+        .eq('tracking_number', searchTerm)
         .maybeSingle();
 
+      console.log('📊 delivery_requests query result:', { data: trackingData, error: trackingError });
+
       if (trackingError && trackingError.code !== 'PGRST116') {
-        console.error('Tracking query error:', trackingError);
+        console.error('❌ Tracking query error:', trackingError);
       }
 
       if (trackingData) {
+        console.log('✅ Found in delivery_requests table:', trackingData);
         setTrackingResult({
           type: 'delivery_request',
           data: trackingData
