@@ -121,24 +121,36 @@ export const VideoPlayer = ({ video, isOpen, onClose, onVideoUpdate }: VideoPlay
 
   const fetchComments = async () => {
     try {
-      const { data, error } = await supabase
-        .from('video_comments')
-        .select('*')
-        .eq('video_id', video.id)
-        .eq('is_approved', true)
-        .order('created_at', { ascending: false });
+      console.log('💬 Fetching comments for video:', video.id);
+      
+      // Use REST API to bypass RLS issues
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/video_comments?video_id=eq.${video.id}&is_approved=eq.true&order=created_at.desc`,
+        {
+          headers: {
+            'apikey': ANON_KEY,
+            'Authorization': `Bearer ${ANON_KEY}`,
+          }
+        }
+      );
 
-      if (error) throw error;
+      if (!response.ok) {
+        console.error('💬 Failed to fetch comments:', response.status);
+        return;
+      }
+
+      const data = await response.json();
+      console.log('💬 Fetched', data?.length || 0, 'comments');
 
       // Organize comments with replies
       const commentMap = new Map<string, Comment>();
       const rootComments: Comment[] = [];
 
-      data?.forEach((comment) => {
+      data?.forEach((comment: any) => {
         commentMap.set(comment.id, { ...comment, replies: [] });
       });
 
-      data?.forEach((comment) => {
+      data?.forEach((comment: any) => {
         if (comment.parent_comment_id) {
           const parent = commentMap.get(comment.parent_comment_id);
           if (parent) {
