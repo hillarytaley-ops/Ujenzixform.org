@@ -48,6 +48,8 @@ import {
 import DeliveryRequest from "@/components/DeliveryRequest";
 import { DeliveryPromptDialog } from "@/components/builders/DeliveryPromptDialog";
 import { MonitoringServicePrompt } from "@/components/builders/MonitoringServicePrompt";
+import { TrackingTab } from "@/components/tracking/TrackingTab";
+import { Navigation as NavigationIcon } from "lucide-react";
 
 interface Order {
   id: string;
@@ -535,6 +537,10 @@ const PrivateClientDashboard = () => {
               <Truck className="h-4 w-4 mr-2" />
               Deliveries
             </TabsTrigger>
+            <TabsTrigger value="tracking" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
+              <NavigationIcon className="h-4 w-4 mr-2" />
+              Tracking
+            </TabsTrigger>
             <TabsTrigger value="request-delivery" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
               <Plus className="h-4 w-4 mr-2" />
               Request Delivery
@@ -782,6 +788,28 @@ const PrivateClientDashboard = () => {
                     })}
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Tracking Tab */}
+          <TabsContent value="tracking">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <NavigationIcon className="h-5 w-5 text-blue-600" />
+                  Delivery Tracking
+                </CardTitle>
+                <CardDescription>
+                  Track your material deliveries in real-time with tracking numbers
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <TrackingTab
+                  userId={user?.id || ''}
+                  userRole="private_client"
+                  userName={profile?.full_name || user?.email?.split('@')[0]}
+                />
               </CardContent>
             </Card>
           </TabsContent>

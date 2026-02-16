@@ -105,8 +105,9 @@ import { JobPositionsManager } from "@/components/admin/JobPositionsManager";
 import { AnalyticsDashboard } from "@/components/analytics/AnalyticsDashboard";
 import { ReviewsManager } from "@/components/reviews/ReviewsManager";
 import { SMSTestPanel } from "@/components/admin/SMSTestPanel";
-import { Camera, UserCog, MessageCircle, Link2 } from "lucide-react";
+import { Camera, UserCog, MessageCircle, Link2, Navigation as NavigationIcon } from "lucide-react";
 import { CameraAssignment } from "@/components/admin/CameraAssignment";
+import { TrackingTab } from "@/components/tracking/TrackingTab";
 import {
   Table,
   TableBody,
@@ -2503,6 +2504,28 @@ const AdminDashboard = () => {
               onDeleteCamera={deleteCamera}
               onToggleStatus={toggleCameraStatus}
             />
+          </TabsContent>
+
+          {/* Tracking Numbers Tab */}
+          <TabsContent value="tracking" className="space-y-6">
+            <Card className="bg-slate-900/50 border-slate-800">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center gap-2">
+                  <NavigationIcon className="h-5 w-5 text-blue-500" />
+                  Delivery Tracking Numbers
+                </CardTitle>
+                <CardDescription className="text-gray-400">
+                  Manage and monitor all delivery tracking numbers in the system
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <TrackingTab
+                  userId={user?.id || ''}
+                  userRole="admin"
+                  userName="Admin"
+                />
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* GPS Tracking Tab */}

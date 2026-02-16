@@ -61,6 +61,8 @@ import { SupplierQuoteReview } from "@/components/builders/SupplierQuoteReview";
 import { PendingQuoteRequests } from "@/components/builders/PendingQuoteRequests";
 import DeliveryRequest from "@/components/DeliveryRequest";
 import { InAppCommunication } from "@/components/communication/InAppCommunication";
+import { TrackingTab } from "@/components/tracking/TrackingTab";
+import { Navigation as NavigationIcon } from "lucide-react";
 
 const ProfessionalBuilderDashboardPage = () => {
   // Use AuthContext for reliable user data
@@ -991,6 +993,10 @@ const ProfessionalBuilderDashboardPage = () => {
               <Truck className="h-4 w-4 mr-2" />
               Deliveries
             </TabsTrigger>
+            <TabsTrigger value="tracking" className="data-[state=active]:bg-green-500 data-[state=active]:text-white">
+              <NavigationIcon className="h-4 w-4 mr-2" />
+              Tracking
+            </TabsTrigger>
             <TabsTrigger value="request-delivery" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
               <Send className="h-4 w-4 mr-2" />
               Request Delivery
@@ -1347,6 +1353,28 @@ const ProfessionalBuilderDashboardPage = () => {
                     ))}
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Tracking Tab */}
+          <TabsContent value="tracking">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <NavigationIcon className="h-5 w-5 text-green-600" />
+                  Delivery Tracking
+                </CardTitle>
+                <CardDescription>
+                  Track your material deliveries in real-time with tracking numbers
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <TrackingTab
+                  userId={user?.id || ''}
+                  userRole="professional_builder"
+                  userName={profile?.full_name || user?.email?.split('@')[0]}
+                />
               </CardContent>
             </Card>
           </TabsContent>
