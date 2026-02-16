@@ -157,17 +157,35 @@ export const VideoPlayer = ({ video, isOpen, onClose, onVideoUpdate }: VideoPlay
 
   const checkIfLiked = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      // Get user info from localStorage
+      let userId: string | null = null;
+      let accessToken = '';
       
-      if (user) {
-        const { data } = await supabase
-          .from('video_likes')
-          .select('id')
-          .eq('video_id', video.id)
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        setIsLiked(!!data);
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          userId = parsed.user?.id || null;
+          accessToken = parsed.access_token || '';
+        }
+      } catch (e) {}
+      
+      if (userId) {
+        // Check via REST API
+        const response = await fetch(
+          `${SUPABASE_URL}/rest/v1/video_likes?video_id=eq.${video.id}&user_id=eq.${userId}&select=id`,
+          {
+            headers: {
+              'apikey': ANON_KEY,
+              'Authorization': `Bearer ${accessToken || ANON_KEY}`,
+            }
+          }
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          setIsLiked(data && data.length > 0);
+        }
       } else {
         // Check guest likes using localStorage
         const guestLikes = localStorage.getItem('guestLikes');
@@ -197,11 +215,32 @@ export const VideoPlayer = ({ video, isOpen, onClose, onVideoUpdate }: VideoPlay
       } catch (e) {}
 
       if (isLiked) {
-        // Unlike - just update UI for now (proper delete would need the like ID)
+        // Unlike - delete the like record
+        console.log('💔 Removing like via REST API...');
+        
+        let deleteUrl = `${SUPABASE_URL}/rest/v1/video_likes?video_id=eq.${video.id}`;
+        if (userId) {
+          deleteUrl += `&user_id=eq.${userId}`;
+        }
+        
+        const response = await fetch(deleteUrl, {
+          method: 'DELETE',
+          headers: {
+            'apikey': ANON_KEY,
+            'Authorization': `Bearer ${accessToken || ANON_KEY}`,
+          },
+        });
+
+        if (response.ok) {
+          console.log('💔 Like removed successfully!');
+        } else {
+          console.error('💔 Unlike failed:', response.status);
+        }
+        
         setIsLiked(false);
         setLocalLikesCount(prev => Math.max(0, prev - 1));
         
-        // Update localStorage for guests
+        // Update localStorage
         const guestLikes = JSON.parse(localStorage.getItem('guestLikes') || '[]');
         const updatedLikes = guestLikes.filter((id: string) => id !== video.id);
         localStorage.setItem('guestLikes', JSON.stringify(updatedLikes));
@@ -226,10 +265,25 @@ export const VideoPlayer = ({ video, isOpen, onClose, onVideoUpdate }: VideoPlay
           }),
         });
 
-        if (!response.ok) {
+        if (response.status === 409) {
+          // Already liked - this means we should toggle to unlike
+          console.log('❤️ Already liked, toggling to unlike...');
+          setIsLiked(true);
+          // Try to delete instead
+          const deleteUrl = `${SUPABASE_URL}/rest/v1/video_likes?video_id=eq.${video.id}${userId ? `&user_id=eq.${userId}` : ''}`;
+          await fetch(deleteUrl, {
+            method: 'DELETE',
+            headers: {
+              'apikey': ANON_KEY,
+              'Authorization': `Bearer ${accessToken || ANON_KEY}`,
+            },
+          });
+          setIsLiked(false);
+          setLocalLikesCount(prev => Math.max(0, prev - 1));
+          return;
+        } else if (!response.ok) {
           const errorText = await response.text();
           console.error('❤️ Like failed:', response.status, errorText);
-          // Still update UI optimistically
         } else {
           console.log('❤️ Like added successfully!');
         }
@@ -237,10 +291,12 @@ export const VideoPlayer = ({ video, isOpen, onClose, onVideoUpdate }: VideoPlay
         setIsLiked(true);
         setLocalLikesCount(prev => prev + 1);
         
-        // Update localStorage for guests
+        // Update localStorage
         const guestLikes = JSON.parse(localStorage.getItem('guestLikes') || '[]');
-        guestLikes.push(video.id);
-        localStorage.setItem('guestLikes', JSON.stringify(guestLikes));
+        if (!guestLikes.includes(video.id)) {
+          guestLikes.push(video.id);
+          localStorage.setItem('guestLikes', JSON.stringify(guestLikes));
+        }
       }
 
       if (onVideoUpdate) {

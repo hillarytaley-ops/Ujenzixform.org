@@ -57,6 +57,7 @@ DROP POLICY IF EXISTS "Anyone can insert likes" ON video_likes;
 -- Simple policies
 CREATE POLICY "video_likes_select" ON video_likes FOR SELECT USING (true);
 CREATE POLICY "video_likes_insert" ON video_likes FOR INSERT WITH CHECK (true);
+CREATE POLICY "video_likes_delete" ON video_likes FOR DELETE USING (true);
 
 -- ============================================================
 -- 4. VIDEO_COMMENTS TABLE
