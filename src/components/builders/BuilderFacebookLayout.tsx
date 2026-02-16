@@ -87,35 +87,107 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
   useEffect(() => {
     const fetchRegisteredBuilders = async () => {
       setLoadingBuilders(true);
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      
       try {
-        // First get all professional builder user IDs
-        const { data: roleData, error: roleError } = await supabase
-          .from('user_roles')
-          .select('user_id')
-          .eq('role', 'professional_builder');
+        console.log('🏗️ Fetching registered professional builders...');
+        
+        // Get access token if available
+        let accessToken = '';
+        try {
+          const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          if (storedSession) {
+            const parsed = JSON.parse(storedSession);
+            accessToken = parsed.access_token || '';
+          }
+        } catch (e) {}
+        
+        // First get all professional builder user IDs using REST API
+        const rolesRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/user_roles?role=eq.professional_builder&select=user_id`,
+          {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+            }
+          }
+        );
+        
+        const roleData = await rolesRes.json();
+        console.log('🏗️ Professional builder roles found:', roleData?.length || 0);
 
-        if (roleError || !roleData || roleData.length === 0) {
-          console.log('No professional builders found');
+        if (!rolesRes.ok || !roleData || roleData.length === 0) {
+          console.log('🏗️ No professional builders found in user_roles');
+          
+          // Fallback: Try fetching profiles with role = 'professional_builder' directly
+          const profilesRes = await fetch(
+            `${SUPABASE_URL}/rest/v1/profiles?role=eq.professional_builder&select=*`,
+            {
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+              }
+            }
+          );
+          
+          const profilesData = await profilesRes.json();
+          console.log('🏗️ Profiles with professional_builder role:', profilesData?.length || 0);
+          
+          if (profilesData && profilesData.length > 0) {
+            const transformedBuilders: RegisteredBuilder[] = profilesData.map((profile: any) => ({
+              id: profile.id,
+              user_id: profile.user_id,
+              full_name: profile.full_name || 'Builder',
+              company_name: profile.company_name,
+              role: 'builder' as const,
+              user_type: profile.company_name ? 'company' as const : 'individual' as const,
+              is_professional: true,
+              phone: profile.phone,
+              email: profile.email,
+              location: profile.location,
+              rating: profile.rating || 4.5,
+              total_projects: profile.total_projects || 0,
+              total_reviews: profile.total_reviews || 0,
+              specialties: profile.specialties || [],
+              description: profile.bio || '',
+              verified: profile.is_verified,
+              avatar_url: profile.avatar_url
+            }));
+            
+            setRegisteredBuilders(transformedBuilders);
+            console.log(`🏗️ Loaded ${transformedBuilders.length} builders from profiles`);
+          }
+          
           setLoadingBuilders(false);
           return;
         }
 
-        const builderUserIds = roleData.map(r => r.user_id);
+        const builderUserIds = roleData.map((r: any) => r.user_id);
+        console.log('🏗️ Builder user IDs:', builderUserIds);
 
-        // Fetch profiles for these users
-        const { data: profilesData, error: profilesError } = await supabase
-          .from('profiles')
-          .select('*')
-          .in('user_id', builderUserIds);
+        // Fetch profiles for these users using REST API
+        const profilesRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/profiles?user_id=in.(${builderUserIds.join(',')})&select=*`,
+          {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+            }
+          }
+        );
+        
+        const profilesData = await profilesRes.json();
+        console.log('🏗️ Builder profiles fetched:', profilesData?.length || 0);
 
-        if (profilesError) {
-          console.error('Error fetching builder profiles:', profilesError);
+        if (!profilesRes.ok || profilesData?.error) {
+          console.error('🏗️ Error fetching builder profiles:', profilesData?.message || profilesData?.error);
           setLoadingBuilders(false);
           return;
         }
 
         // Transform to match expected format
-        const transformedBuilders: RegisteredBuilder[] = (profilesData || []).map(profile => ({
+        const transformedBuilders: RegisteredBuilder[] = (profilesData || []).map((profile: any) => ({
           id: profile.id,
           user_id: profile.user_id,
           full_name: profile.full_name || 'Builder',
@@ -136,9 +208,9 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
         }));
 
         setRegisteredBuilders(transformedBuilders);
-        console.log(`Loaded ${transformedBuilders.length} registered builders`);
+        console.log(`🏗️ Loaded ${transformedBuilders.length} registered builders`);
       } catch (error) {
-        console.error('Error fetching registered builders:', error);
+        console.error('🏗️ Error fetching registered builders:', error);
       } finally {
         setLoadingBuilders(false);
       }
@@ -498,34 +570,50 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
               <CardTitle className="text-sm text-gray-500 font-medium">Featured Builders</CardTitle>
             </CardHeader>
             <CardContent className="pt-0 space-y-3">
-              {allBuilders.slice(0, 3).map((builder) => (
-                <div 
-                  key={builder.id}
-                  className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors"
-                  onClick={() => onBuilderProfile?.(builder)}
-                >
-                  <Avatar className="h-12 w-12">
-                    <AvatarFallback className="bg-gradient-to-br from-orange-500 to-orange-600 text-white font-semibold">
-                      {getInitials(builder.company_name || builder.full_name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1">
-                      <span className="font-medium text-sm text-gray-900 dark:text-white truncate">
-                        {builder.company_name || builder.full_name}
-                      </span>
-                      {(builder as any).verified && (
-                        <CheckCircle2 className="h-3.5 w-3.5 text-blue-500" fill="currentColor" />
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-500 truncate">{builder.specialties?.[0]}</p>
-                    <div className="flex items-center gap-1 text-xs text-gray-400">
-                      <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                      {builder.rating?.toFixed(1)} • {builder.location}
+              {loadingBuilders ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="h-5 w-5 animate-spin text-orange-500" />
+                  <span className="ml-2 text-sm text-gray-500">Loading builders...</span>
+                </div>
+              ) : allBuilders.length > 0 ? (
+                allBuilders.slice(0, 3).map((builder) => (
+                  <div 
+                    key={builder.id}
+                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors"
+                    onClick={() => onBuilderProfile?.(builder)}
+                  >
+                    <Avatar className="h-12 w-12">
+                      {builder.avatar_url ? (
+                        <AvatarImage src={builder.avatar_url} alt={builder.full_name} />
+                      ) : null}
+                      <AvatarFallback className="bg-gradient-to-br from-orange-500 to-orange-600 text-white font-semibold">
+                        {getInitials(builder.company_name || builder.full_name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1">
+                        <span className="font-medium text-sm text-gray-900 dark:text-white truncate">
+                          {builder.company_name || builder.full_name}
+                        </span>
+                        {builder.verified && (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-blue-500" fill="currentColor" />
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 truncate">{builder.specialties?.[0] || 'Professional Builder'}</p>
+                      <div className="flex items-center gap-1 text-xs text-gray-400">
+                        <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                        {builder.rating?.toFixed(1)} • {builder.location || 'Kenya'}
+                      </div>
                     </div>
                   </div>
+                ))
+              ) : (
+                <div className="text-center py-4 text-sm text-gray-500">
+                  <Users className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                  <p>No builders registered yet</p>
+                  <p className="text-xs mt-1">Be the first to join!</p>
                 </div>
-              ))}
+              )}
             </CardContent>
           </Card>
 
@@ -535,24 +623,31 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
               <CardTitle className="text-sm text-gray-500 font-medium">Recent Activity</CardTitle>
             </CardHeader>
             <CardContent className="pt-0 space-y-3">
-              <div className="flex items-start gap-2 text-sm">
-                <div className="w-2 h-2 rounded-full bg-green-500 mt-1.5 flex-shrink-0"></div>
-                <p className="text-gray-600 dark:text-gray-400">
-                  <span className="font-medium text-gray-900 dark:text-white">Kamau Construction</span> posted a new project update
-                </p>
-              </div>
-              <div className="flex items-start gap-2 text-sm">
-                <div className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 flex-shrink-0"></div>
-                <p className="text-gray-600 dark:text-gray-400">
-                  <span className="font-medium text-gray-900 dark:text-white">Elite Builders</span> completed a project in Mombasa
-                </p>
-              </div>
-              <div className="flex items-start gap-2 text-sm">
-                <div className="w-2 h-2 rounded-full bg-orange-500 mt-1.5 flex-shrink-0"></div>
-                <p className="text-gray-600 dark:text-gray-400">
-                  <span className="font-medium text-gray-900 dark:text-white">3 new builders</span> joined this week
-                </p>
-              </div>
+              {allBuilders.length > 0 ? (
+                <>
+                  {allBuilders.slice(0, 2).map((builder, idx) => (
+                    <div key={builder.id} className="flex items-start gap-2 text-sm">
+                      <div className={`w-2 h-2 rounded-full ${idx === 0 ? 'bg-green-500' : 'bg-blue-500'} mt-1.5 flex-shrink-0`}></div>
+                      <p className="text-gray-600 dark:text-gray-400">
+                        <span className="font-medium text-gray-900 dark:text-white">{builder.company_name || builder.full_name}</span> {idx === 0 ? 'posted a new project update' : `is available in ${builder.location || 'Kenya'}`}
+                      </p>
+                    </div>
+                  ))}
+                  <div className="flex items-start gap-2 text-sm">
+                    <div className="w-2 h-2 rounded-full bg-orange-500 mt-1.5 flex-shrink-0"></div>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      <span className="font-medium text-gray-900 dark:text-white">{allBuilders.length} professional builder{allBuilders.length !== 1 ? 's' : ''}</span> registered
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-start gap-2 text-sm">
+                  <div className="w-2 h-2 rounded-full bg-orange-500 mt-1.5 flex-shrink-0"></div>
+                  <p className="text-gray-600 dark:text-gray-400">
+                    <span className="font-medium text-gray-900 dark:text-white">Be the first</span> professional builder to register!
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
