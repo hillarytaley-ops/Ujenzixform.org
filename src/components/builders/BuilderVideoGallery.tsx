@@ -48,6 +48,10 @@ interface BuilderVideo {
   builder_profile?: {
     full_name: string;
     company_name: string;
+    phone?: string;
+    email?: string;
+    location?: string;
+    avatar_url?: string;
   };
 }
 
@@ -133,7 +137,7 @@ export const BuilderVideoGallery = ({
         if (builderIds.length > 0) {
           const idsParam = builderIds.map(id => `"${id}"`).join(',');
           const profilesResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/profiles?id=in.(${idsParam})&select=id,full_name,company_name`,
+            `${SUPABASE_URL}/rest/v1/profiles?id=in.(${idsParam})&select=id,full_name,company_name,phone,email,location,avatar_url`,
             {
               headers: {
                 'apikey': ANON_KEY,
@@ -143,14 +147,19 @@ export const BuilderVideoGallery = ({
           );
           
           const profilesData = profilesResponse.ok ? await profilesResponse.json() : [];
+          console.log('🎬 Builder profiles:', profilesData);
           
           // Create a map of builder_id to profile
-          const profilesMap: Record<string, { full_name: string; company_name: string }> = {};
+          const profilesMap: Record<string, { full_name: string; company_name: string; phone?: string; email?: string; location?: string; avatar_url?: string }> = {};
           if (profilesData) {
             profilesData.forEach((p: any) => {
               profilesMap[p.id] = { 
-                full_name: p.full_name || 'Unknown Builder', 
-                company_name: p.company_name || '' 
+                full_name: p.full_name || 'UjenziXform Builder', 
+                company_name: p.company_name || '',
+                phone: p.phone || '',
+                email: p.email || '',
+                location: p.location || '',
+                avatar_url: p.avatar_url || '',
               };
             });
           }
