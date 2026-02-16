@@ -115,6 +115,9 @@ CREATE POLICY "tracking_history_insert" ON public.tracking_history
 FOR INSERT WITH CHECK (true);
 
 -- 5. FUNCTION TO GENERATE TRACKING NUMBER
+-- Drop existing function first to allow return type change
+DROP FUNCTION IF EXISTS generate_tracking_number();
+
 CREATE OR REPLACE FUNCTION generate_tracking_number()
 RETURNS TEXT AS $$
 DECLARE

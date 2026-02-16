@@ -2520,7 +2520,7 @@ const AdminDashboard = () => {
               </CardHeader>
               <CardContent>
                 <TrackingTab
-                  userId={user?.id || ''}
+                  userId={localStorage.getItem('admin_user_id') || 'admin'}
                   userRole="admin"
                   userName="Admin"
                 />
