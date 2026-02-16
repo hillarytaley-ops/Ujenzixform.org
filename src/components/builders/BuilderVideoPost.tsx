@@ -323,18 +323,30 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
 
       {/* Media Display - Video or Image */}
       {videoUrl ? (
-        /* Video Player - Facebook Style */
+        /* Video Player - Facebook/Instagram Reels Style */
         <div 
-          className="relative bg-black aspect-video cursor-pointer group"
+          className="relative bg-gradient-to-b from-gray-900 to-black aspect-video cursor-pointer group overflow-hidden"
           onMouseEnter={() => setShowControls(true)}
           onMouseLeave={() => setShowControls(false)}
           onClick={togglePlay}
         >
+          {/* Thumbnail/Cover when not playing */}
+          {!isPlaying && thumbnailUrl && (
+            <div 
+              className="absolute inset-0 bg-cover bg-center z-10"
+              style={{ 
+                backgroundImage: `url(${thumbnailUrl})`,
+                filter: 'brightness(0.8)'
+              }}
+            />
+          )}
+          
+          {/* Video element */}
           <video
             ref={videoRef}
             src={videoUrl}
             poster={thumbnailUrl}
-            className="w-full h-full object-contain"
+            className="w-full h-full object-cover"
             muted={isMuted}
             loop
             playsInline
@@ -342,11 +354,42 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
             onPause={() => setIsPlaying(false)}
           />
           
-          {/* Play/Pause Overlay */}
+          {/* Gradient overlay for better visibility */}
           {!isPlaying && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-              <div className="w-20 h-20 rounded-full bg-black/60 flex items-center justify-center hover:bg-black/80 transition-colors">
-                <Play className="h-10 w-10 text-white ml-1" fill="white" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30 z-20" />
+          )}
+          
+          {/* Play Button Overlay - Modern Reels Style */}
+          {!isPlaying && (
+            <div className="absolute inset-0 flex items-center justify-center z-30">
+              <div className="w-20 h-20 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 hover:scale-110 transition-all duration-300 shadow-2xl border border-white/30">
+                <Play className="h-10 w-10 text-white ml-1 drop-shadow-lg" fill="white" />
+              </div>
+            </div>
+          )}
+          
+          {/* Video duration badge */}
+          {!isPlaying && (
+            <div className="absolute bottom-3 right-3 z-30 bg-black/70 text-white text-xs px-2 py-1 rounded-md font-medium backdrop-blur-sm">
+              <Video className="h-3 w-3 inline mr-1" />
+              Video
+            </div>
+          )}
+          
+          {/* Builder info overlay when paused */}
+          {!isPlaying && (
+            <div className="absolute bottom-3 left-3 z-30 flex items-center gap-2">
+              <div className="flex items-center gap-2 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1.5">
+                <Avatar className="h-6 w-6 border border-white/50">
+                  <AvatarImage src={builderAvatar} />
+                  <AvatarFallback className="text-xs bg-blue-600 text-white">{initials}</AvatarFallback>
+                </Avatar>
+                <span className="text-white text-sm font-medium drop-shadow-lg">
+                  {builderCompany || builderName}
+                </span>
+                {builderVerified && (
+                  <CheckCircle2 className="h-3.5 w-3.5 text-blue-400 fill-blue-400" />
+                )}
               </div>
             </div>
           )}

@@ -391,25 +391,33 @@ export const BuilderVideoGallery = ({
               key={video.id}
               className="overflow-hidden hover:shadow-xl transition-shadow duration-300 group"
             >
-              {/* Video Thumbnail/Preview */}
+              {/* Video Thumbnail/Preview - Instagram Reels Style */}
               <div 
-                className="relative aspect-video bg-gray-900 cursor-pointer overflow-hidden"
+                className="relative aspect-video bg-gradient-to-br from-gray-900 via-gray-800 to-black cursor-pointer overflow-hidden"
                 onClick={() => handleVideoClick(video)}
               >
+                {/* Video with poster/thumbnail */}
                 <video
                   src={video.video_url}
+                  poster={video.thumbnail_url || undefined}
                   className="w-full h-full object-cover"
                   preload="metadata"
                 />
-                <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center group-hover:bg-opacity-30 transition-all">
-                  <div className="bg-white rounded-full p-4 transform group-hover:scale-110 transition-transform">
-                    <Play className="h-8 w-8 text-blue-600" fill="currentColor" />
+                
+                {/* Gradient overlays for depth */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30" />
+                <div className="absolute inset-0 bg-black/30 group-hover:bg-black/10 transition-all duration-300" />
+                
+                {/* Play button - Modern glass style */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="bg-white/20 backdrop-blur-sm rounded-full p-5 transform group-hover:scale-110 group-hover:bg-white/30 transition-all duration-300 shadow-2xl border border-white/30">
+                    <Play className="h-10 w-10 text-white drop-shadow-lg" fill="white" />
                   </div>
                 </div>
                 
                 {/* Featured Badge */}
                 {video.is_featured && (
-                  <Badge className="absolute top-2 left-2 bg-yellow-500">
+                  <Badge className="absolute top-3 left-3 bg-gradient-to-r from-yellow-500 to-orange-500 shadow-lg border-0">
                     <Star className="h-3 w-3 mr-1" fill="white" />
                     Featured
                   </Badge>
@@ -417,10 +425,34 @@ export const BuilderVideoGallery = ({
                 
                 {/* Project Type Badge */}
                 {video.project_type && (
-                  <Badge className="absolute top-2 right-2 bg-blue-600">
+                  <Badge className="absolute top-3 right-3 bg-blue-600/90 backdrop-blur-sm shadow-lg border-0">
                     {video.project_type}
                   </Badge>
                 )}
+                
+                {/* Builder info overlay at bottom */}
+                <div className="absolute bottom-0 left-0 right-0 p-3 z-10">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold shadow-lg border-2 border-white/50">
+                        {(video.builder_profile?.company_name || video.builder_profile?.full_name || 'U').charAt(0).toUpperCase()}
+                      </div>
+                      <span className="text-white text-sm font-medium drop-shadow-lg truncate max-w-[120px]">
+                        {video.builder_profile?.company_name || video.builder_profile?.full_name || 'Builder'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 text-white/90 text-xs">
+                      <span className="flex items-center gap-1">
+                        <Eye className="h-3.5 w-3.5" />
+                        {video.views_count || 0}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Heart className="h-3.5 w-3.5" />
+                        {video.likes_count || 0}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Video Info */}

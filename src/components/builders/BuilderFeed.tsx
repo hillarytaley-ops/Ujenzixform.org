@@ -1181,7 +1181,15 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         <Card className="bg-white dark:bg-gray-900 shadow-md rounded-lg">
           <CardContent className="p-4">
             <div className="flex items-center gap-3 mb-3">
-              <Avatar className="h-10 w-10">
+              <Avatar 
+                className="h-10 w-10 cursor-pointer ring-2 ring-transparent hover:ring-blue-500 transition-all"
+                onClick={() => {
+                  // Navigate to user's profile
+                  if (effectiveUserId) {
+                    window.location.href = `/builder-profile/${effectiveUserId}`;
+                  }
+                }}
+              >
                 <AvatarImage src={currentUserAvatar} />
                 <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
                   {effectiveUserName.charAt(0).toUpperCase()}
