@@ -420,6 +420,27 @@ export const VideoPlayer = ({ video, isOpen, onClose, onVideoUpdate }: VideoPlay
     }
   };
 
+  const [commentLikes, setCommentLikes] = useState<Record<string, boolean>>({});
+
+  const handleCommentLike = async (commentId: string) => {
+    // Toggle like state locally
+    setCommentLikes(prev => ({
+      ...prev,
+      [commentId]: !prev[commentId]
+    }));
+    
+    toast({
+      title: commentLikes[commentId] ? 'Unliked' : '❤️ Liked!',
+      description: 'Comment reaction updated',
+    });
+  };
+
+  const handleReply = (commentId: string, commenterName: string) => {
+    setReplyTo(commentId);
+    setNewComment(`@${commenterName} `);
+    document.getElementById('comment-input')?.focus();
+  };
+
   const renderComment = (comment: Comment, isReply = false) => (
     <div key={comment.id} className={`${isReply ? 'ml-10 mt-2' : 'mt-3'}`}>
       <div className="flex items-start space-x-2">
@@ -435,11 +456,16 @@ export const VideoPlayer = ({ video, isOpen, onClose, onVideoUpdate }: VideoPlay
           </div>
           <div className="flex items-center space-x-3 mt-1 ml-2 text-xs text-gray-500">
             <span>{formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}</span>
-            <button className="font-semibold hover:underline">Like</button>
+            <button 
+              className={`font-semibold hover:underline ${commentLikes[comment.id] ? 'text-blue-600' : ''}`}
+              onClick={() => handleCommentLike(comment.id)}
+            >
+              {commentLikes[comment.id] ? '❤️ Liked' : 'Like'}
+            </button>
             {!isReply && (
               <button 
                 className="font-semibold hover:underline"
-                onClick={() => setReplyTo(comment.id)}
+                onClick={() => handleReply(comment.id, comment.commenter_name)}
               >
                 Reply
               </button>
@@ -680,15 +706,20 @@ export const VideoPlayer = ({ video, isOpen, onClose, onVideoUpdate }: VideoPlay
             {/* Comment Input */}
             <div className="p-4 border-t space-y-3 bg-gray-50">
               {replyTo && (
-                <div className="flex items-center justify-between text-sm text-gray-600 bg-blue-50 p-2 rounded">
-                  <span>Replying to comment...</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setReplyTo(null)}
+                <div className="flex items-center justify-between text-sm bg-blue-50 p-2 rounded-lg border border-blue-200">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-blue-600">↩️</span>
+                    <span className="text-gray-700">Replying to comment</span>
+                  </div>
+                  <button
+                    className="text-gray-500 hover:text-red-500 font-medium text-xs"
+                    onClick={() => {
+                      setReplyTo(null);
+                      setNewComment('');
+                    }}
                   >
-                    Cancel
-                  </Button>
+                    ✕ Cancel
+                  </button>
                 </div>
               )}
 
