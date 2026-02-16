@@ -38,11 +38,36 @@ const DeliveryTrackingInput: React.FC = () => {
     setShowGPSMap(false);
 
     try {
-      // First, search by tracking_number (new format: TRK-YYYYMMDD-XXXXX)
+      // PRIORITY 1: Search tracking_numbers table (new system)
+      const { data: trackingNumberData, error: trackingNumberError } = await supabase
+        .from('tracking_numbers')
+        .select('*')
+        .ilike('tracking_number', trackingNumber.trim())
+        .maybeSingle();
+
+      if (trackingNumberError && trackingNumberError.code !== 'PGRST116') {
+        console.error('Tracking numbers query error:', trackingNumberError);
+      }
+
+      if (trackingNumberData) {
+        console.log('✅ Found in tracking_numbers table:', trackingNumberData);
+        setTrackingResult({
+          type: 'tracking_number',
+          data: trackingNumberData
+        });
+        toast({
+          title: "✅ Delivery Found",
+          description: "Click 'View Live GPS Map' to see real-time location"
+        });
+        setTracking(false);
+        return;
+      }
+
+      // PRIORITY 2: Search delivery_requests by tracking_number
       const { data: trackingData, error: trackingError } = await supabase
         .from('delivery_requests')
         .select('*')
-        .eq('tracking_number', trackingNumber.toUpperCase())
+        .ilike('tracking_number', trackingNumber.trim())
         .maybeSingle();
 
       if (trackingError && trackingError.code !== 'PGRST116') {
@@ -53,26 +78,6 @@ const DeliveryTrackingInput: React.FC = () => {
         setTrackingResult({
           type: 'delivery_request',
           data: trackingData
-        });
-        toast({
-          title: "✅ Delivery Found",
-          description: "Click 'View Live GPS Map' to see real-time location"
-        });
-        setTracking(false);
-        return;
-      }
-
-      // Also try case-insensitive search
-      const { data: trackingDataLower, error: trackingErrorLower } = await supabase
-        .from('delivery_requests')
-        .select('*')
-        .ilike('tracking_number', trackingNumber)
-        .maybeSingle();
-
-      if (trackingDataLower) {
-        setTrackingResult({
-          type: 'delivery_request',
-          data: trackingDataLower
         });
         toast({
           title: "✅ Delivery Found",
@@ -217,7 +222,14 @@ const DeliveryTrackingInput: React.FC = () => {
 
   // If showing GPS Map view
   if (showGPSMap && trackingResult) {
-    const deliveryId = trackingResult.data.tracking_number || trackingResult.data.id;
+    const displayTrackingNumber = trackingResult.type === 'tracking_number' 
+      ? trackingResult.data.tracking_number 
+      : (trackingResult.data.tracking_number || trackingResult.data.id);
+    
+    // For tracking_numbers table, use delivery_request_id for GPS tracker
+    const gpsDeliveryId = trackingResult.type === 'tracking_number' 
+      ? trackingResult.data.delivery_request_id 
+      : trackingResult.data.id;
     
     return (
       <div className="space-y-4">
@@ -253,20 +265,61 @@ const DeliveryTrackingInput: React.FC = () => {
                   <Badge className="bg-green-500 animate-pulse">LIVE</Badge>
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  Tracking: <span className="font-mono font-medium">{deliveryId}</span>
+                  Tracking: <span className="font-mono font-medium">{displayTrackingNumber}</span>
                 </p>
               </div>
             </div>
+
+            {/* Show provider info if available from tracking_numbers */}
+            {trackingResult.type === 'tracking_number' && trackingResult.data.provider_name && (
+              <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-blue-700">Delivery Provider</p>
+                    <p className="font-semibold text-blue-900">{trackingResult.data.provider_name}</p>
+                  </div>
+                  {trackingResult.data.provider_phone && (
+                    <a 
+                      href={`tel:${trackingResult.data.provider_phone}`}
+                      className="px-3 py-2 bg-green-500 text-white rounded-lg text-sm flex items-center gap-2 hover:bg-green-600"
+                    >
+                      📞 Call Driver
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
         {/* GPS Tracker Component with Full Map View */}
         <GPSTracker 
-          deliveryId={trackingResult.data.id}
+          deliveryId={gpsDeliveryId}
           userRole="builder"
-          showDriverContact={false}
+          showDriverContact={trackingResult.type !== 'tracking_number'}
           autoRefresh={true}
         />
+
+        {/* Real-time location from tracking_numbers table */}
+        {trackingResult.type === 'tracking_number' && trackingResult.data.current_latitude && trackingResult.data.current_longitude && (
+          <Card className="border-2 border-blue-500/30">
+            <CardContent className="pt-4">
+              <div className="flex items-center gap-2 mb-2">
+                <MapPin className="h-5 w-5 text-blue-600 animate-pulse" />
+                <span className="font-semibold text-blue-800">Current Location</span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Lat: {trackingResult.data.current_latitude.toFixed(6)}, 
+                Lng: {trackingResult.data.current_longitude.toFixed(6)}
+              </p>
+              {trackingResult.data.last_location_update && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Updated: {new Date(trackingResult.data.last_location_update).toLocaleString()}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
     );
   }
@@ -326,14 +379,166 @@ const DeliveryTrackingInput: React.FC = () => {
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Truck className="h-5 w-5 text-green-600" />
-                {trackingResult.type === 'delivery_request' ? 'Delivery Found' : 
+                {trackingResult.type === 'tracking_number' ? 'Delivery Tracking' :
+                 trackingResult.type === 'delivery_request' ? 'Delivery Found' : 
                  trackingResult.type === 'delivery' ? 'Delivery Found' : 'Order Found'}
               </CardTitle>
               <Badge className="bg-green-500">Found</Badge>
             </div>
           </CardHeader>
           <CardContent className="pt-4">
-            {(trackingResult.type === 'delivery_request' || trackingResult.type === 'delivery') ? (
+            {/* NEW: tracking_numbers table result */}
+            {trackingResult.type === 'tracking_number' ? (
+              <div className="space-y-4">
+                {/* Tracking Number - Prominent Display */}
+                <div className="p-4 bg-gradient-to-r from-green-50 to-teal-50 rounded-lg border border-green-200">
+                  <span className="text-xs text-muted-foreground">Tracking Number</span>
+                  <p className="font-mono font-bold text-2xl text-green-700">{trackingResult.data.tracking_number}</p>
+                </div>
+
+                {/* Delivery Status Timeline */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className={`p-3 rounded-lg border-2 text-center ${trackingResult.data.accepted_at ? 'bg-green-50 border-green-300' : 'bg-gray-50 border-gray-200'}`}>
+                    <CheckCircle className={`h-6 w-6 mx-auto mb-1 ${trackingResult.data.accepted_at ? 'text-green-600' : 'text-gray-400'}`} />
+                    <p className="text-xs font-medium">Accepted</p>
+                    {trackingResult.data.accepted_at && (
+                      <p className="text-xs text-muted-foreground">{new Date(trackingResult.data.accepted_at).toLocaleDateString()}</p>
+                    )}
+                  </div>
+                  <div className={`p-3 rounded-lg border-2 text-center ${trackingResult.data.picked_up_at ? 'bg-blue-50 border-blue-300' : 'bg-gray-50 border-gray-200'}`}>
+                    <Package className={`h-6 w-6 mx-auto mb-1 ${trackingResult.data.picked_up_at ? 'text-blue-600' : 'text-gray-400'}`} />
+                    <p className="text-xs font-medium">Picked Up</p>
+                    {trackingResult.data.picked_up_at && (
+                      <p className="text-xs text-muted-foreground">{new Date(trackingResult.data.picked_up_at).toLocaleDateString()}</p>
+                    )}
+                  </div>
+                  <div className={`p-3 rounded-lg border-2 text-center ${trackingResult.data.status === 'in_transit' ? 'bg-orange-50 border-orange-300' : 'bg-gray-50 border-gray-200'}`}>
+                    <Truck className={`h-6 w-6 mx-auto mb-1 ${trackingResult.data.status === 'in_transit' ? 'text-orange-600' : 'text-gray-400'}`} />
+                    <p className="text-xs font-medium">In Transit</p>
+                  </div>
+                  <div className={`p-3 rounded-lg border-2 text-center ${trackingResult.data.delivered_at ? 'bg-purple-50 border-purple-300' : 'bg-gray-50 border-gray-200'}`}>
+                    <CheckCircle className={`h-6 w-6 mx-auto mb-1 ${trackingResult.data.delivered_at ? 'text-purple-600' : 'text-gray-400'}`} />
+                    <p className="text-xs font-medium">Delivered</p>
+                    {trackingResult.data.delivered_at && (
+                      <p className="text-xs text-muted-foreground">{new Date(trackingResult.data.delivered_at).toLocaleDateString()}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Current Status */}
+                <div className="space-y-1">
+                  <span className="text-xs text-muted-foreground">Current Status</span>
+                  <div>
+                    <Badge className={`capitalize text-sm ${
+                      trackingResult.data.status === 'accepted' ? 'bg-green-500' :
+                      trackingResult.data.status === 'picked_up' ? 'bg-blue-500' :
+                      trackingResult.data.status === 'in_transit' ? 'bg-orange-500' :
+                      trackingResult.data.status === 'delivered' ? 'bg-purple-500' :
+                      trackingResult.data.status === 'pending' ? 'bg-yellow-500' :
+                      'bg-gray-500'
+                    }`}>
+                      {trackingResult.data.status?.replace('_', ' ')}
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Provider Info */}
+                {trackingResult.data.provider_name && (
+                  <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Truck className="h-4 w-4 text-blue-600" />
+                      <span className="text-xs font-medium text-blue-800">Delivery Provider</span>
+                    </div>
+                    <p className="font-semibold text-blue-900">{trackingResult.data.provider_name}</p>
+                    {trackingResult.data.provider_phone && (
+                      <p className="text-sm text-blue-700">📞 {trackingResult.data.provider_phone}</p>
+                    )}
+                    {trackingResult.data.vehicle_type && (
+                      <p className="text-sm text-blue-700">🚛 {trackingResult.data.vehicle_type} {trackingResult.data.vehicle_registration && `(${trackingResult.data.vehicle_registration})`}</p>
+                    )}
+                  </div>
+                )}
+
+                {/* Locations */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <MapPin className="h-3 w-3" /> Pickup Location
+                    </span>
+                    <p className="text-sm font-medium">{trackingResult.data.pickup_address || 'Not specified'}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <MapPin className="h-3 w-3 text-green-600" /> Delivery Location
+                    </span>
+                    <p className="text-sm font-medium">{trackingResult.data.delivery_address || 'Not specified'}</p>
+                  </div>
+                </div>
+
+                {/* Materials Description */}
+                {trackingResult.data.materials_description && (
+                  <div className="p-3 bg-orange-50 rounded-lg">
+                    <span className="text-xs text-muted-foreground">Materials</span>
+                    <p className="font-medium">{trackingResult.data.materials_description}</p>
+                  </div>
+                )}
+
+                {/* Estimated Delivery */}
+                {trackingResult.data.estimated_delivery_date && (
+                  <div className="p-3 bg-indigo-50 rounded-lg border border-indigo-200">
+                    <span className="text-xs text-muted-foreground">Estimated Delivery</span>
+                    <p className="font-medium text-indigo-900">
+                      {new Date(trackingResult.data.estimated_delivery_date).toLocaleDateString('en-KE', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                      {trackingResult.data.estimated_arrival_time && ` at ${trackingResult.data.estimated_arrival_time}`}
+                    </p>
+                  </div>
+                )}
+
+                {/* Last Location Update */}
+                {trackingResult.data.current_latitude && trackingResult.data.current_longitude && (
+                  <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                    <div className="flex items-center gap-2 mb-1">
+                      <NavIcon className="h-4 w-4 text-green-600 animate-pulse" />
+                      <span className="text-xs font-medium text-green-800">Live Location Available</span>
+                    </div>
+                    {trackingResult.data.last_location_update && (
+                      <p className="text-xs text-green-700">
+                        Last updated: {new Date(trackingResult.data.last_location_update).toLocaleString()}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* GPS Map Button */}
+                {trackingResult.data.status === 'accepted' || trackingResult.data.status === 'picked_up' || trackingResult.data.status === 'in_transit' ? (
+                  <Button 
+                    onClick={() => setShowGPSMap(true)}
+                    className="w-full h-14 text-lg gap-3 bg-green-600 hover:bg-green-700"
+                    size="lg"
+                  >
+                    <NavIcon className="h-6 w-6" />
+                    View Live GPS Map
+                    <Badge variant="secondary" className="ml-2 bg-white/20">Real-Time</Badge>
+                  </Button>
+                ) : trackingResult.data.status === 'delivered' ? (
+                  <div className="p-4 bg-green-50 rounded-lg border border-green-200 text-center">
+                    <CheckCircle className="h-8 w-8 text-green-600 mx-auto mb-2" />
+                    <p className="font-medium text-green-800">Delivery Completed!</p>
+                    <p className="text-sm text-green-700">Your materials have been delivered successfully.</p>
+                    {trackingResult.data.actual_delivery_date && (
+                      <p className="text-xs text-green-600 mt-1">
+                        Delivered on: {new Date(trackingResult.data.actual_delivery_date).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            ) : (trackingResult.type === 'delivery_request' || trackingResult.type === 'delivery') ? (
               <div className="space-y-4">
                 {/* Tracking Number - Prominent Display */}
                 {trackingResult.data.tracking_number && (
