@@ -81,53 +81,68 @@ export const BuilderVideoGallery = ({
   }, [builderId, filterType]);
 
   const fetchVideos = async () => {
+    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+    const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+    
     try {
       setLoading(true);
-      console.log('🎬 Fetching builder videos...');
+      console.log('🎬 Fetching builder videos via REST API...');
       
-      // First fetch videos without the problematic join
-      let query = supabase
-        .from('builder_videos')
-        .select('*')
-        .eq('is_published', true)
-        .order('created_at', { ascending: false });
-
+      // Build query params
+      let queryParams = 'is_published=eq.true&order=created_at.desc';
+      
       // Filter by builder if specified
       if (builderId) {
-        query = query.eq('builder_id', builderId);
+        queryParams += `&builder_id=eq.${builderId}`;
       }
 
       // Filter by project type
       if (filterType !== 'all' && filterType !== 'featured') {
-        query = query.eq('project_type', filterType);
+        queryParams += `&project_type=eq.${filterType}`;
       }
 
       // Filter featured
       if (filterType === 'featured') {
-        query = query.eq('is_featured', true);
+        queryParams += '&is_featured=eq.true';
       }
 
-      const { data, error } = await query;
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/builder_videos?${queryParams}`,
+        {
+          headers: {
+            'apikey': ANON_KEY,
+            'Authorization': `Bearer ${ANON_KEY}`,
+          }
+        }
+      );
 
-      if (error) {
-        // Silently handle error - table might not exist yet
-        console.warn('🎬 Builder videos not available:', error.message);
+      if (!response.ok) {
+        console.warn('🎬 Builder videos fetch failed:', response.status);
         setVideos([]);
         setLoading(false);
         return;
       }
 
-      console.log('🎬 Found', data?.length || 0, 'videos');
+      const data = await response.json();
+      console.log('🎬 Found', data?.length || 0, 'published videos');
 
       // Fetch builder profiles separately if we have videos
       if (data && data.length > 0) {
-        const builderIds = [...new Set(data.map(v => v.builder_id).filter(Boolean))];
+        const builderIds = [...new Set(data.map((v: any) => v.builder_id).filter(Boolean))];
         
         if (builderIds.length > 0) {
-          const { data: profilesData } = await supabase
-            .from('profiles')
-            .select('id, full_name, company_name')
-            .in('id', builderIds);
+          const idsParam = builderIds.map(id => `"${id}"`).join(',');
+          const profilesResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/profiles?id=in.(${idsParam})&select=id,full_name,company_name`,
+            {
+              headers: {
+                'apikey': ANON_KEY,
+                'Authorization': `Bearer ${ANON_KEY}`,
+              }
+            }
+          );
+          
+          const profilesData = profilesResponse.ok ? await profilesResponse.json() : [];
           
           // Create a map of builder_id to profile
           const profilesMap: Record<string, { full_name: string; company_name: string }> = {};
@@ -141,7 +156,7 @@ export const BuilderVideoGallery = ({
           }
 
           // Merge profile data into videos
-          const videosWithProfiles = data.map(video => ({
+          const videosWithProfiles = data.map((video: any) => ({
             ...video,
             builder_profile: profilesMap[video.builder_id] || { full_name: 'Unknown Builder', company_name: '' }
           }));
