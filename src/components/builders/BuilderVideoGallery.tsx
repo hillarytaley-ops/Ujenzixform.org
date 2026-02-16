@@ -71,11 +71,19 @@ export const BuilderVideoGallery = ({
 
   useEffect(() => {
     fetchVideos();
+    
+    // Safety timeout - stop loading after 5 seconds
+    const timeout = setTimeout(() => {
+      setLoading(false);
+    }, 5000);
+    
+    return () => clearTimeout(timeout);
   }, [builderId, filterType]);
 
   const fetchVideos = async () => {
     try {
       setLoading(true);
+      console.log('🎬 Fetching builder videos...');
       
       // First fetch videos without the problematic join
       let query = supabase
@@ -103,11 +111,13 @@ export const BuilderVideoGallery = ({
 
       if (error) {
         // Silently handle error - table might not exist yet
-        console.warn('Builder videos not available:', error.message);
+        console.warn('🎬 Builder videos not available:', error.message);
         setVideos([]);
         setLoading(false);
         return;
       }
+
+      console.log('🎬 Found', data?.length || 0, 'videos');
 
       // Fetch builder profiles separately if we have videos
       if (data && data.length > 0) {
