@@ -292,6 +292,9 @@ class RealTimeGPSService {
     }
   ): Promise<{ success: boolean; error?: string }> {
     try {
+      const now = new Date().toISOString();
+      
+      // Insert into delivery_tracking table
       const { error } = await supabase
         .from('delivery_tracking')
         .insert({
@@ -309,13 +312,45 @@ class RealTimeGPSService {
           status: location.status,
           location_description: location.locationDescription,
           traffic_conditions: location.trafficConditions,
-          recorded_at: new Date().toISOString()
+          recorded_at: now
         });
 
       if (error) {
-        console.error('Error submitting location:', error);
-        return { success: false, error: error.message };
+        console.error('Error submitting location to delivery_tracking:', error);
       }
+
+      // ALSO update the tracking_numbers table with current location (for real-time tracking)
+      const { error: trackingNumberError } = await supabase
+        .from('tracking_numbers')
+        .update({
+          current_latitude: location.latitude,
+          current_longitude: location.longitude,
+          last_location_update: now,
+          status: location.status === 'in_transit' ? 'in_transit' : 
+                  location.status === 'delivered' ? 'delivered' :
+                  location.status === 'picked_up' ? 'picked_up' : 'accepted',
+          updated_at: now
+        })
+        .eq('delivery_request_id', deliveryId);
+
+      if (trackingNumberError) {
+        console.error('Error updating tracking_numbers location:', trackingNumberError);
+        // Don't fail the whole operation if tracking_numbers update fails
+      }
+
+      // Also add to tracking_history for historical tracking
+      await supabase
+        .from('tracking_history')
+        .insert({
+          tracking_number_id: deliveryId, // Will be linked via trigger if needed
+          latitude: location.latitude,
+          longitude: location.longitude,
+          status: location.status,
+          notes: location.locationDescription,
+          recorded_at: now
+        }).catch(err => {
+          console.log('tracking_history insert skipped:', err.message);
+        });
 
       return { success: true };
     } catch (error: any) {

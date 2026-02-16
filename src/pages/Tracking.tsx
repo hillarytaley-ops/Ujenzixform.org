@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Badge } from "@/components/ui/badge";
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 // FloatingSocialSidebar moved to App.tsx for global availability
 import { DeliveryAccessGuard } from '@/components/security/DeliveryAccessGuard';
-import { Package, Truck, Shield, Eye, Search, MapPin, ArrowLeft, Navigation as NavIcon, Clock, CheckCircle, Loader2 } from 'lucide-react';
+import { Package, Truck, Shield, Eye, Search, MapPin, ArrowLeft, Navigation as NavIcon, Clock, CheckCircle, Loader2, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { useToast } from '@/hooks/use-toast';
@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { GPSTracker } from '@/components/delivery/GPSTracker';
 import { trackingNumberService } from '@/services/TrackingNumberService';
+import { RealtimeChannel } from '@supabase/supabase-js';
 
 
 // Delivery Tracking Input Component with GPS Map View
@@ -21,7 +22,58 @@ const DeliveryTrackingInput: React.FC = () => {
   const [tracking, setTracking] = useState(false);
   const [trackingResult, setTrackingResult] = useState<any>(null);
   const [showGPSMap, setShowGPSMap] = useState(false);
+  const [realtimeChannel, setRealtimeChannel] = useState<RealtimeChannel | null>(null);
+  const [isLiveUpdating, setIsLiveUpdating] = useState(false);
   const { toast } = useToast();
+
+  // Subscribe to real-time updates when we have a tracking result from tracking_numbers table
+  useEffect(() => {
+    if (trackingResult?.type === 'tracking_number' && trackingResult?.data?.id) {
+      const channel = supabase
+        .channel(`tracking-${trackingResult.data.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'tracking_numbers',
+            filter: `id=eq.${trackingResult.data.id}`
+          },
+          (payload) => {
+            console.log('🔴 Real-time tracking update:', payload.new);
+            setTrackingResult((prev: any) => ({
+              ...prev,
+              data: { ...prev.data, ...payload.new }
+            }));
+            setIsLiveUpdating(true);
+            setTimeout(() => setIsLiveUpdating(false), 2000);
+            
+            toast({
+              title: "📍 Location Updated",
+              description: "Delivery provider location has been updated",
+            });
+          }
+        )
+        .subscribe();
+
+      setRealtimeChannel(channel);
+      console.log('✅ Subscribed to real-time tracking updates for:', trackingResult.data.tracking_number);
+
+      return () => {
+        channel.unsubscribe();
+        setRealtimeChannel(null);
+      };
+    }
+  }, [trackingResult?.data?.id, trackingResult?.type, toast]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (realtimeChannel) {
+        realtimeChannel.unsubscribe();
+      }
+    };
+  }, [realtimeChannel]);
 
   const handleTrackDelivery = async () => {
     if (!trackingNumber.trim()) {
@@ -374,7 +426,7 @@ const DeliveryTrackingInput: React.FC = () => {
 
       {/* Tracking Result with GPS Map Button */}
       {trackingResult && (
-        <Card className="border-2 border-green-500/30">
+        <Card className={`border-2 ${isLiveUpdating ? 'border-blue-500 animate-pulse' : 'border-green-500/30'}`}>
           <CardHeader className="pb-3 bg-green-50/50">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-lg">
@@ -383,7 +435,15 @@ const DeliveryTrackingInput: React.FC = () => {
                  trackingResult.type === 'delivery_request' ? 'Delivery Found' : 
                  trackingResult.type === 'delivery' ? 'Delivery Found' : 'Order Found'}
               </CardTitle>
-              <Badge className="bg-green-500">Found</Badge>
+              <div className="flex items-center gap-2">
+                {trackingResult.type === 'tracking_number' && realtimeChannel && (
+                  <Badge className="bg-blue-500 animate-pulse flex items-center gap-1">
+                    <RefreshCw className="h-3 w-3 animate-spin" />
+                    LIVE
+                  </Badge>
+                )}
+                <Badge className="bg-green-500">Found</Badge>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="pt-4">
