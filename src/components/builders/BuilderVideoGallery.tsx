@@ -133,11 +133,17 @@ export const BuilderVideoGallery = ({
       // Fetch builder profiles separately if we have videos
       if (data && data.length > 0) {
         const builderIds = [...new Set(data.map((v: any) => v.builder_id).filter(Boolean))];
+        console.log('🎬 Builder IDs from videos:', builderIds);
         
         if (builderIds.length > 0) {
           const idsParam = builderIds.map(id => `"${id}"`).join(',');
-          const profilesResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/profiles?id=in.(${idsParam})&select=id,full_name,company_name,phone,email,location,avatar_url`,
+          
+          // Try fetching by user_id first (more common), then by id
+          let profilesData: any[] = [];
+          
+          // First try user_id
+          const profilesByUserIdResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/profiles?user_id=in.(${idsParam})&select=id,user_id,full_name,company_name,phone,email,location,avatar_url`,
             {
               headers: {
                 'apikey': ANON_KEY,
@@ -146,14 +152,36 @@ export const BuilderVideoGallery = ({
             }
           );
           
-          const profilesData = profilesResponse.ok ? await profilesResponse.json() : [];
-          console.log('🎬 Builder profiles:', profilesData);
+          if (profilesByUserIdResponse.ok) {
+            profilesData = await profilesByUserIdResponse.json();
+            console.log('🎬 Profiles by user_id:', profilesData?.length || 0);
+          }
           
-          // Create a map of builder_id to profile
+          // If no results, try by id
+          if (!profilesData || profilesData.length === 0) {
+            const profilesByIdResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/profiles?id=in.(${idsParam})&select=id,user_id,full_name,company_name,phone,email,location,avatar_url`,
+              {
+                headers: {
+                  'apikey': ANON_KEY,
+                  'Authorization': `Bearer ${ANON_KEY}`,
+                }
+              }
+            );
+            
+            if (profilesByIdResponse.ok) {
+              profilesData = await profilesByIdResponse.json();
+              console.log('🎬 Profiles by id:', profilesData?.length || 0);
+            }
+          }
+          
+          console.log('🎬 Builder profiles found:', profilesData);
+          
+          // Create a map of builder_id to profile (try both id and user_id as keys)
           const profilesMap: Record<string, { full_name: string; company_name: string; phone?: string; email?: string; location?: string; avatar_url?: string }> = {};
-          if (profilesData) {
+          if (profilesData && profilesData.length > 0) {
             profilesData.forEach((p: any) => {
-              profilesMap[p.id] = { 
+              const profileData = { 
                 full_name: p.full_name || 'UjenziXform Builder', 
                 company_name: p.company_name || '',
                 phone: p.phone || '',
@@ -161,13 +189,28 @@ export const BuilderVideoGallery = ({
                 location: p.location || '',
                 avatar_url: p.avatar_url || '',
               };
+              // Map by both id and user_id
+              if (p.id) profilesMap[p.id] = profileData;
+              if (p.user_id) profilesMap[p.user_id] = profileData;
             });
           }
+          
+          console.log('🎬 Profile map keys:', Object.keys(profilesMap));
 
           // Merge profile data into videos
           const videosWithProfiles = data.map((video: any) => ({
             ...video,
-            builder_profile: profilesMap[video.builder_id] || { full_name: 'Unknown Builder', company_name: '' }
+            // Map view_count to views_count for interface compatibility
+            views_count: video.view_count || 0,
+            likes_count: video.likes_count || 0,
+            comments_count: video.comments_count || 0,
+            builder_profile: profilesMap[video.builder_id] || { 
+              full_name: video.title || 'UjenziXform Builder', 
+              company_name: 'UjenziXform Professional',
+              phone: '+254 700 000 000',
+              email: 'info@ujenzixform.org',
+              location: 'Kenya',
+            }
           }));
 
           setVideos(videosWithProfiles);
@@ -175,7 +218,22 @@ export const BuilderVideoGallery = ({
         }
       }
 
-      setVideos(data || []);
+      // If no profile lookup needed, still add default profile data
+      const videosWithDefaults = (data || []).map((video: any) => ({
+        ...video,
+        views_count: video.view_count || 0,
+        likes_count: video.likes_count || 0,
+        comments_count: video.comments_count || 0,
+        builder_profile: { 
+          full_name: video.title || 'UjenziXform Builder', 
+          company_name: 'UjenziXform Professional',
+          phone: '+254 700 000 000',
+          email: 'info@ujenzixform.org',
+          location: 'Kenya',
+        }
+      }));
+      
+      setVideos(videosWithDefaults);
     } catch (error) {
       // Silently handle - don't show error toast, just log it
       console.warn('Error fetching videos:', error);
