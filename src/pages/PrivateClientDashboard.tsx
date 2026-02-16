@@ -120,6 +120,64 @@ const PrivateClientDashboard = () => {
     return () => clearTimeout(timeout);
   }, []);
 
+  // Immediate monitoring data loader - runs on mount
+  useEffect(() => {
+    const loadMonitoringData = async () => {
+      // Get user ID from localStorage first (fastest)
+      let userId = '';
+      let accessToken = '';
+      
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          userId = parsed.user?.id || '';
+          accessToken = parsed.access_token || '';
+        }
+      } catch (e) {}
+      
+      if (!userId) {
+        console.log('📹 DIRECT: No user ID in localStorage');
+        return;
+      }
+      
+      console.log('📹 DIRECT: Loading monitoring requests for:', userId);
+      
+      const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      
+      try {
+        const response = await fetch(
+          `https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/monitoring_service_requests?user_id=eq.${userId}&order=created_at.desc`,
+          {
+            headers: {
+              'apikey': ANON_KEY,
+              'Authorization': `Bearer ${accessToken || ANON_KEY}`,
+            }
+          }
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('📹 DIRECT: Got', data?.length || 0, 'monitoring requests');
+          if (data && data.length > 0) {
+            console.log('📹 DIRECT: First request:', data[0].project_name, data[0].status);
+          }
+          setMonitoringRequests(data || []);
+        } else {
+          console.log('📹 DIRECT: Response status:', response.status);
+        }
+      } catch (e) {
+        console.error('📹 DIRECT: Error:', e);
+      }
+    };
+    
+    loadMonitoringData();
+    // Retry after 2 seconds in case session wasn't ready
+    const retryTimeout = setTimeout(loadMonitoringData, 2000);
+    
+    return () => clearTimeout(retryTimeout);
+  }, []);
+
   const checkAuth = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
