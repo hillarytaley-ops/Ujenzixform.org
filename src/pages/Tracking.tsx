@@ -5,7 +5,7 @@ import Footer from '@/components/Footer';
 // FloatingSocialSidebar moved to App.tsx for global availability
 import { DeliveryAccessGuard } from '@/components/security/DeliveryAccessGuard';
 import { Package, Truck, Shield, Eye, Search, MapPin, ArrowLeft, Navigation as NavIcon, Clock, CheckCircle, Loader2, RefreshCw } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, supabaseFetch, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
@@ -93,55 +93,63 @@ const DeliveryTrackingInput: React.FC = () => {
       const searchTerm = trackingNumber.trim().toUpperCase();
       console.log('🔍 Searching for tracking number:', searchTerm);
 
-      // PRIORITY 1: Search tracking_numbers table (new system) - exact match first
-      const { data: trackingNumberData, error: trackingNumberError } = await supabase
-        .from('tracking_numbers')
-        .select('*')
-        .eq('tracking_number', searchTerm)
-        .maybeSingle();
+      // PRIORITY 1: Search tracking_numbers table using direct REST API (more reliable)
+      try {
+        const response = await fetch(
+          `${SUPABASE_URL}/rest/v1/tracking_numbers?tracking_number=eq.${encodeURIComponent(searchTerm)}&select=*`,
+          {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Content-Type': 'application/json',
+            }
+          }
+        );
+        
+        const trackingNumberData = await response.json();
+        console.log('📊 tracking_numbers REST API result:', trackingNumberData);
 
-      console.log('📊 tracking_numbers query result:', { data: trackingNumberData, error: trackingNumberError });
-
-      if (trackingNumberError && trackingNumberError.code !== 'PGRST116') {
-        console.error('❌ Tracking numbers query error:', trackingNumberError);
+        if (Array.isArray(trackingNumberData) && trackingNumberData.length > 0) {
+          console.log('✅ Found in tracking_numbers table:', trackingNumberData[0]);
+          setTrackingResult({
+            type: 'tracking_number',
+            data: trackingNumberData[0]
+          });
+          toast({
+            title: "✅ Delivery Found",
+            description: "Click 'View Live GPS Map' to see real-time location"
+          });
+          setTracking(false);
+          return;
+        }
+      } catch (restError) {
+        console.error('❌ REST API error:', restError);
       }
 
-      if (trackingNumberData) {
-        console.log('✅ Found in tracking_numbers table:', trackingNumberData);
-        setTrackingResult({
-          type: 'tracking_number',
-          data: trackingNumberData
-        });
-        toast({
-          title: "✅ Delivery Found",
-          description: "Click 'View Live GPS Map' to see real-time location"
-        });
-        setTracking(false);
-        return;
-      }
+      // Fallback: Try Supabase client with ILIKE for partial match
+      try {
+        const { data: trackingNumberDataIlike, error: trackingNumberErrorIlike } = await supabase
+          .from('tracking_numbers' as any)
+          .select('*')
+          .ilike('tracking_number', `%${searchTerm}%`)
+          .limit(1);
 
-      // Try case-insensitive search if exact match failed
-      const { data: trackingNumberDataIlike, error: trackingNumberErrorIlike } = await supabase
-        .from('tracking_numbers')
-        .select('*')
-        .ilike('tracking_number', `%${searchTerm}%`)
-        .limit(1)
-        .maybeSingle();
+        console.log('📊 tracking_numbers ILIKE result:', { data: trackingNumberDataIlike, error: trackingNumberErrorIlike });
 
-      console.log('📊 tracking_numbers ILIKE result:', { data: trackingNumberDataIlike, error: trackingNumberErrorIlike });
-
-      if (trackingNumberDataIlike) {
-        console.log('✅ Found in tracking_numbers table (ILIKE):', trackingNumberDataIlike);
-        setTrackingResult({
-          type: 'tracking_number',
-          data: trackingNumberDataIlike
-        });
-        toast({
-          title: "✅ Delivery Found",
-          description: "Click 'View Live GPS Map' to see real-time location"
-        });
-        setTracking(false);
-        return;
+        if (trackingNumberDataIlike && trackingNumberDataIlike.length > 0) {
+          console.log('✅ Found in tracking_numbers table (ILIKE):', trackingNumberDataIlike[0]);
+          setTrackingResult({
+            type: 'tracking_number',
+            data: trackingNumberDataIlike[0]
+          });
+          toast({
+            title: "✅ Delivery Found",
+            description: "Click 'View Live GPS Map' to see real-time location"
+          });
+          setTracking(false);
+          return;
+        }
+      } catch (ilikeError) {
+        console.error('❌ ILIKE query error:', ilikeError);
       }
 
       // PRIORITY 2: Search delivery_requests by tracking_number
