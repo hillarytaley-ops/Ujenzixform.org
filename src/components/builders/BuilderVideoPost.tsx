@@ -26,7 +26,8 @@ import {
   Phone,
   Mail,
   Link2,
-  X
+  X,
+  Video
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
