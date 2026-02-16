@@ -24,8 +24,11 @@ import {
   Clock,
   CheckCircle2,
   Phone,
-  Mail
+  Mail,
+  Link2,
+  X
 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -100,7 +103,22 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [showControls, setShowControls] = useState(false);
+  const [showReactions, setShowReactions] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<{ id: string; name: string } | null>(null);
+  const [likedComments, setLikedComments] = useState<Set<string>>(new Set());
   const videoRef = useRef<HTMLVideoElement>(null);
+  const commentInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
+
+  // Reaction emojis
+  const reactions = [
+    { emoji: '👍', name: 'Like', color: 'text-blue-500' },
+    { emoji: '❤️', name: 'Love', color: 'text-red-500' },
+    { emoji: '😂', name: 'Haha', color: 'text-yellow-500' },
+    { emoji: '😮', name: 'Wow', color: 'text-yellow-500' },
+    { emoji: '😢', name: 'Sad', color: 'text-yellow-500' },
+    { emoji: '😡', name: 'Angry', color: 'text-orange-500' },
+  ];
 
   const initials = (builderCompany || builderName || 'U')
     .split(' ')
@@ -138,11 +156,17 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
   const handleComment = () => {
     if (!commentText.trim()) return;
     
+    // Check if this is a reply
+    const isReply = replyingTo !== null;
+    const content = isReply 
+      ? commentText.replace(`@${replyingTo?.name} `, '') 
+      : commentText;
+    
     const newComment: VideoComment = {
       id: `comment-${Date.now()}`,
       userId: 'current-user',
       userName: 'You',
-      content: commentText,
+      content: isReply ? `@${replyingTo?.name} ${content}` : content,
       timestamp: new Date(),
       likes: 0,
       isLiked: false
@@ -151,6 +175,51 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
     setLocalComments(prev => [newComment, ...prev]);
     onComment?.(id, commentText);
     setCommentText('');
+    setReplyingTo(null);
+  };
+
+  const handleCommentLike = (commentId: string) => {
+    setLikedComments(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(commentId)) {
+        newSet.delete(commentId);
+      } else {
+        newSet.add(commentId);
+      }
+      return newSet;
+    });
+    
+    // Update comment likes count
+    setLocalComments(prev => prev.map(comment => {
+      if (comment.id === commentId) {
+        const wasLiked = likedComments.has(commentId);
+        return {
+          ...comment,
+          likes: wasLiked ? comment.likes - 1 : comment.likes + 1,
+          isLiked: !wasLiked
+        };
+      }
+      return comment;
+    }));
+  };
+
+  const handleReply = (commentId: string, userName: string) => {
+    setReplyingTo({ id: commentId, name: userName });
+    setCommentText(`@${userName} `);
+    setShowComments(true);
+    setTimeout(() => {
+      commentInputRef.current?.focus();
+    }, 100);
+  };
+
+  const handleShare = () => {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url);
+    toast({
+      title: "Link copied!",
+      description: "Post link has been copied to clipboard",
+    });
+    onShare?.(id);
   };
 
   const togglePlay = () => {
@@ -371,14 +440,43 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
       {/* Action Buttons - Facebook Style */}
       <div className="px-2 py-1">
         <div className="flex items-center justify-around">
-          <Button
-            variant="ghost"
-            className={`flex-1 h-10 gap-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${liked ? 'text-blue-500' : 'text-gray-600 dark:text-gray-400'}`}
-            onClick={handleLike}
+          {/* Like Button with Reactions */}
+          <div 
+            className="relative flex-1"
+            onMouseEnter={() => setShowReactions(true)}
+            onMouseLeave={() => setShowReactions(false)}
           >
-            <ThumbsUp className={`h-5 w-5 ${liked ? 'fill-blue-500' : ''}`} />
-            <span className="font-medium">Like</span>
-          </Button>
+            {/* Reaction Popup */}
+            {showReactions && (
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-white dark:bg-gray-800 rounded-full shadow-lg border border-gray-200 dark:border-gray-700 px-2 py-1 flex gap-1 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                {reactions.map((reaction) => (
+                  <button
+                    key={reaction.name}
+                    onClick={() => {
+                      handleLike();
+                      setShowReactions(false);
+                    }}
+                    className="text-2xl hover:scale-125 transition-transform p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"
+                    title={reaction.name}
+                  >
+                    {reaction.emoji}
+                  </button>
+                ))}
+              </div>
+            )}
+            <Button
+              variant="ghost"
+              className={`w-full h-10 gap-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${liked ? 'text-blue-500' : 'text-gray-600 dark:text-gray-400'}`}
+              onClick={handleLike}
+            >
+              {liked ? (
+                <span className="text-lg">👍</span>
+              ) : (
+                <ThumbsUp className="h-5 w-5" />
+              )}
+              <span className="font-medium">Like</span>
+            </Button>
+          </div>
           <Button
             variant="ghost"
             className="flex-1 h-10 gap-2 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
@@ -390,9 +488,9 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
           <Button
             variant="ghost"
             className="flex-1 h-10 gap-2 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-            onClick={() => onShare?.(id)}
+            onClick={handleShare}
           >
-            <Share2 className="h-5 w-5" />
+            <Link2 className="h-5 w-5" />
             <span className="font-medium">Share</span>
           </Button>
         </div>
@@ -403,6 +501,24 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
       {/* Comments Section */}
       {showComments && (
         <CardContent className="p-4 space-y-4">
+          {/* Reply indicator */}
+          {replyingTo && (
+            <div className="flex items-center justify-between bg-gray-100 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm">
+              <span className="text-gray-600 dark:text-gray-400">
+                Replying to <span className="font-semibold text-gray-900 dark:text-white">@{replyingTo.name}</span>
+              </span>
+              <button 
+                onClick={() => {
+                  setReplyingTo(null);
+                  setCommentText('');
+                }}
+                className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
           {/* Comment Input */}
           <div className="flex items-start gap-3">
             <Avatar className="h-8 w-8">
@@ -410,10 +526,16 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
             </Avatar>
             <div className="flex-1 relative">
               <Input
-                placeholder="Write a comment..."
+                ref={commentInputRef}
+                placeholder={replyingTo ? `Reply to ${replyingTo.name}...` : "Write a comment..."}
                 value={commentText}
                 onChange={(e) => setCommentText(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleComment()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleComment();
+                  }
+                }}
                 className="pr-20 rounded-full bg-gray-100 dark:bg-gray-800 border-0 focus-visible:ring-1"
               />
               <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
@@ -452,16 +574,37 @@ export const BuilderVideoPost: React.FC<BuilderVideoPostProps> = ({
                     <span className="font-semibold text-sm text-gray-900 dark:text-white">
                       {comment.userName}
                     </span>
-                    <p className="text-sm text-gray-700 dark:text-gray-300">{comment.content}</p>
+                    <p className="text-sm text-gray-700 dark:text-gray-300">
+                      {/* Highlight @mentions */}
+                      {comment.content.split(/(@\w+)/g).map((part, i) => 
+                        part.startsWith('@') ? (
+                          <span key={i} className="text-blue-500 font-medium">{part}</span>
+                        ) : (
+                          <span key={i}>{part}</span>
+                        )
+                      )}
+                    </p>
                   </div>
                   <div className="flex items-center gap-4 mt-1 ml-3 text-xs text-gray-500">
                     <span>{formatTimeAgo(comment.timestamp)}</span>
-                    <button className="font-semibold hover:underline">Like</button>
-                    <button className="font-semibold hover:underline">Reply</button>
-                    {comment.likes > 0 && (
-                      <span className="flex items-center gap-1">
-                        <ThumbsUp className="h-3 w-3" />
-                        {comment.likes}
+                    <button 
+                      onClick={() => handleCommentLike(comment.id)}
+                      className={`font-semibold hover:underline transition-colors ${
+                        likedComments.has(comment.id) ? 'text-blue-500' : ''
+                      }`}
+                    >
+                      {likedComments.has(comment.id) ? '❤️ Liked' : 'Like'}
+                    </button>
+                    <button 
+                      onClick={() => handleReply(comment.id, comment.userName)}
+                      className="font-semibold hover:underline"
+                    >
+                      Reply
+                    </button>
+                    {(comment.likes > 0 || likedComments.has(comment.id)) && (
+                      <span className="flex items-center gap-1 text-blue-500">
+                        <ThumbsUp className="h-3 w-3 fill-blue-500" />
+                        {comment.likes + (likedComments.has(comment.id) && !comment.isLiked ? 1 : 0)}
                       </span>
                     )}
                   </div>
