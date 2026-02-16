@@ -12,8 +12,8 @@ CREATE TABLE IF NOT EXISTS public.tracking_numbers (
     -- References
     delivery_request_id UUID,
     purchase_order_id UUID,
-    builder_id UUID NOT NULL REFERENCES auth.users(id),
-    delivery_provider_id UUID REFERENCES auth.users(id),
+    builder_id UUID,  -- Can be profile.id or user.id
+    delivery_provider_id UUID,
     supplier_id UUID,
     
     -- Status tracking
@@ -133,11 +133,44 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- 6. FUNCTION TO CREATE TRACKING NUMBER WHEN DELIVERY IS ACCEPTED
+DROP FUNCTION IF EXISTS create_tracking_on_delivery_accept() CASCADE;
+
 CREATE OR REPLACE FUNCTION create_tracking_on_delivery_accept()
 RETURNS TRIGGER AS $$
+DECLARE
+    v_builder_user_id UUID;
+    v_provider_name TEXT;
+    v_provider_phone TEXT;
+    v_delivery_address TEXT;
 BEGIN
     -- When a delivery request is accepted (status changes to 'accepted' or 'assigned')
-    IF (NEW.status IN ('accepted', 'assigned') AND OLD.status = 'pending') THEN
+    IF (NEW.status IN ('accepted', 'assigned') AND (OLD.status = 'pending' OR OLD.status IS NULL)) THEN
+        
+        -- Get builder's user_id from profiles table (builder_id in delivery_requests is profile.id)
+        SELECT user_id INTO v_builder_user_id
+        FROM profiles
+        WHERE id = NEW.builder_id;
+        
+        -- If builder_id is already a user_id (UUID format check), use it directly
+        IF v_builder_user_id IS NULL THEN
+            v_builder_user_id := NEW.builder_id;
+        END IF;
+        
+        -- Get provider info
+        SELECT full_name, phone INTO v_provider_name, v_provider_phone
+        FROM profiles
+        WHERE user_id = NEW.provider_id OR id = NEW.provider_id
+        LIMIT 1;
+        
+        -- Get delivery address (try multiple column names)
+        v_delivery_address := COALESCE(
+            NEW.delivery_address,
+            NEW.dropoff_address,
+            NEW.dropoff_location,
+            'Address not specified'
+        );
+        
+        -- Insert tracking number
         INSERT INTO public.tracking_numbers (
             tracking_number,
             delivery_request_id,
@@ -151,21 +184,32 @@ BEGIN
             provider_phone,
             accepted_at
         )
-        SELECT 
+        VALUES (
             generate_tracking_number(),
             NEW.id,
-            NEW.builder_id,
+            v_builder_user_id,
             NEW.provider_id,
             'accepted',
-            NEW.delivery_address,
-            NEW.materials_description,
+            v_delivery_address,
+            COALESCE(NEW.materials_description, NEW.item_description, 'Materials'),
             NEW.preferred_date,
-            p.full_name,
-            p.phone,
+            COALESCE(v_provider_name, 'Delivery Provider'),
+            v_provider_phone,
             NOW()
-        FROM profiles p
-        WHERE p.user_id = NEW.provider_id
+        )
         ON CONFLICT DO NOTHING;
+        
+        -- Also update the delivery_request with tracking number
+        UPDATE delivery_requests
+        SET tracking_number = (
+            SELECT tracking_number 
+            FROM tracking_numbers 
+            WHERE delivery_request_id = NEW.id 
+            ORDER BY created_at DESC 
+            LIMIT 1
+        )
+        WHERE id = NEW.id;
+        
     END IF;
     
     RETURN NEW;

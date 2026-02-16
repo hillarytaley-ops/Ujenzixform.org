@@ -98,19 +98,45 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId, userRole, user
     try {
       const accessToken = getAccessToken();
       
+      // For builders, we need to get their profile ID as well
+      let profileId = userId;
+      if (userRole === 'professional_builder' || userRole === 'private_client') {
+        try {
+          const profileResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${userId}&select=id`,
+            {
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+              }
+            }
+          );
+          if (profileResponse.ok) {
+            const profiles = await profileResponse.json();
+            if (profiles && profiles.length > 0) {
+              profileId = profiles[0].id;
+              console.log('📦 Got profile ID:', profileId);
+            }
+          }
+        } catch (e) {
+          console.log('📦 Could not fetch profile, using userId');
+        }
+      }
+      
       // Build query based on user role
-      let url = `${SUPABASE_URL}/rest/v1/tracking_numbers?order=created_at.desc`;
+      let url = `${SUPABASE_URL}/rest/v1/tracking_numbers?order=created_at.desc&select=*`;
       
       if (userRole === 'admin') {
-        // Admin sees all tracking numbers
-        url += '&select=*';
+        // Admin sees all tracking numbers - no filter needed
       } else if (userRole === 'delivery_provider') {
         // Delivery provider sees their assigned deliveries
-        url += `&delivery_provider_id=eq.${userId}&select=*`;
+        url += `&delivery_provider_id=eq.${userId}`;
       } else {
-        // Builders see their own tracking numbers
-        url += `&builder_id=eq.${userId}&select=*`;
+        // Builders see their own tracking numbers - check both user_id and profile_id
+        url += `&or=(builder_id.eq.${userId},builder_id.eq.${profileId})`;
       }
+
+      console.log('📦 Fetching tracking numbers from:', url);
 
       const response = await fetch(url, {
         headers: {
@@ -122,9 +148,10 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId, userRole, user
       if (response.ok) {
         const data = await response.json();
         setTrackingNumbers(data || []);
-        console.log('📦 Tracking numbers loaded:', data?.length || 0);
+        console.log('📦 Tracking numbers loaded:', data?.length || 0, data);
       } else {
-        console.error('Failed to fetch tracking numbers:', response.status);
+        const errorText = await response.text();
+        console.error('Failed to fetch tracking numbers:', response.status, errorText);
         setTrackingNumbers([]);
       }
     } catch (error) {
