@@ -10,7 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Truck, Scan, CheckCircle, AlertCircle, Camera, Lock, ArrowRight, RotateCcw, Smartphone, Flashlight, ZoomIn } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { BrowserMultiFormatReader, BrowserCodeReader } from '@zxing/browser';
+import { BrowserMultiFormatReader, BrowserCodeReader, IScannerControls } from '@zxing/browser';
 import { DecodeHintType, BarcodeFormat } from '@zxing/library';
 
 
@@ -33,6 +33,9 @@ export const DispatchScanner: React.FC = () => {
   const [materialCondition, setMaterialCondition] = useState('good');
   const [notes, setNotes] = useState('');
   const [codeReader, setCodeReader] = useState<BrowserMultiFormatReader | null>(null);
+  const scannerControlsRef = useRef<IScannerControls | null>(null);
+  const lastScannedRef = useRef<string>('');
+  const lastScanTimeRef = useRef<number>(0);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [facing, setFacing] = useState<'environment' | 'user'>('environment');
   const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
@@ -140,6 +143,16 @@ export const DispatchScanner: React.FC = () => {
   };
 
   const cleanupCamera = useCallback(() => {
+    // Stop scanner controls first
+    try {
+      if (scannerControlsRef.current) {
+        scannerControlsRef.current.stop();
+        scannerControlsRef.current = null;
+      }
+    } catch (e) {
+      console.log('Scanner controls cleanup:', e);
+    }
+    
     try {
       codeReader?.reset();
     } catch {}
@@ -192,59 +205,56 @@ export const DispatchScanner: React.FC = () => {
 
       setIsScanning(true);
 
-      // Build constraints optimized for mobile devices
-      const constraints: MediaStreamConstraints = {
-        audio: false,
-        video: selectedCameraId ? {
-          deviceId: { exact: selectedCameraId },
-          width: { ideal: 1920, min: 640 },
-          height: { ideal: 1080, min: 480 },
-          aspectRatio: { ideal: 16/9 },
-          frameRate: { ideal: 30, min: 15 }
-        } : {
-          facingMode: { ideal: facing },
-          width: { ideal: 1920, min: 640 },
-          height: { ideal: 1080, min: 480 },
-          aspectRatio: { ideal: 16/9 },
-          frameRate: { ideal: 30, min: 15 }
+      // Determine which camera to use
+      const deviceId = selectedCameraId || undefined;
+      
+      console.log('🎥 Starting scanner with device:', deviceId || 'default');
+
+      // Use decodeFromVideoDevice for more reliable continuous scanning
+      const controls = await codeReader.decodeFromVideoDevice(
+        deviceId,
+        videoRef.current,
+        (result, error, controls) => {
+          if (result) {
+            const qrText = result.getText();
+            const now = Date.now();
+            
+            // Debounce: prevent scanning same code within 3 seconds
+            if (qrText === lastScannedRef.current && now - lastScanTimeRef.current < 3000) {
+              console.log('🔄 Debounced duplicate scan:', qrText);
+              return;
+            }
+            
+            lastScannedRef.current = qrText;
+            lastScanTimeRef.current = now;
+            
+            console.log('✅ QR Code scanned:', qrText);
+            
+            // Vibrate on successful scan (mobile)
+            if (navigator.vibrate) {
+              navigator.vibrate(200);
+            }
+            processQRScan(qrText, 'mobile_camera');
+          }
+          // Note: errors are normal during scanning (no QR found), only log real errors
+          if (error && error.name !== 'NotFoundException') {
+            console.log('Scanner error:', error.name, error.message);
+          }
         }
-      };
-
-      // Get media stream
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      streamRef.current = stream;
-      videoRef.current.srcObject = stream;
-
+      );
+      
+      scannerControlsRef.current = controls;
+      
       // Check for flash/torch capability
-      const videoTrack = stream.getVideoTracks()[0];
-      if (videoTrack) {
-        const capabilities = videoTrack.getCapabilities?.() as any;
-        if (capabilities?.torch) {
-          setHasFlash(true);
+      if (streamRef.current) {
+        const videoTrack = streamRef.current.getVideoTracks()[0];
+        if (videoTrack) {
+          const capabilities = videoTrack.getCapabilities?.() as any;
+          if (capabilities?.torch) {
+            setHasFlash(true);
+          }
         }
       }
-
-      // Wait for video to be ready
-      await new Promise<void>((resolve) => {
-        if (videoRef.current) {
-          videoRef.current.onloadedmetadata = () => {
-            resolve();
-          };
-        }
-      });
-
-      await videoRef.current.play();
-      
-      // Start continuous QR code scanning
-      codeReader.decodeFromVideoElement(videoRef.current, (result, error) => {
-        if (result) {
-          // Vibrate on successful scan (mobile)
-          if (navigator.vibrate) {
-            navigator.vibrate(200);
-          }
-          processQRScan(result.getText(), 'mobile_camera');
-        }
-      });
 
       localStorage.setItem(CAMERA_CONSENT_KEY, 'true');
       toast.success('📷 Camera ready! Point at QR code to scan.');
@@ -264,25 +274,27 @@ export const DispatchScanner: React.FC = () => {
         setCameraError('Camera is in use by another application. Please close other apps using the camera.');
         toast.error('Camera is busy');
       } else if (error.name === 'OverconstrainedError') {
-        // Try with simpler constraints
+        // Try with simpler constraints - use default camera
         try {
-          const simpleStream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: facing }, 
-            audio: false 
-          });
-          streamRef.current = simpleStream;
-          if (videoRef.current) {
-            videoRef.current.srcObject = simpleStream;
-            await videoRef.current.play();
-            codeReader.decodeFromVideoElement(videoRef.current, (result) => {
+          console.log('🔄 Retrying with default camera...');
+          const controls = await codeReader.decodeFromVideoDevice(
+            undefined, // Use default camera
+            videoRef.current!,
+            (result, error) => {
               if (result) {
+                const qrText = result.getText();
+                const now = Date.now();
+                if (qrText === lastScannedRef.current && now - lastScanTimeRef.current < 3000) return;
+                lastScannedRef.current = qrText;
+                lastScanTimeRef.current = now;
                 if (navigator.vibrate) navigator.vibrate(200);
-                processQRScan(result.getText(), 'mobile_camera');
+                processQRScan(qrText, 'mobile_camera');
               }
-            });
-            setIsScanning(true);
-            toast.success('Camera started with basic settings');
-          }
+            }
+          );
+          scannerControlsRef.current = controls;
+          setIsScanning(true);
+          toast.success('Camera started with basic settings');
         } catch (fallbackError) {
           setCameraError('Could not start camera with available settings.');
           toast.error('Camera settings not supported');
@@ -298,6 +310,8 @@ export const DispatchScanner: React.FC = () => {
     cleanupCamera();
     setIsScanning(false);
     setFlashOn(false);
+    lastScannedRef.current = '';
+    lastScanTimeRef.current = 0;
     toast.info('Scanner stopped');
   };
 
