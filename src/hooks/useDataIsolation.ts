@@ -566,13 +566,30 @@ export const useDeliveryProviderData = () => {
 
   // Function to accept a delivery request
   const acceptDelivery = async (deliveryId: string) => {
-    if (!user?.id) return { success: false, error: 'Not authenticated' };
+    // Get userId from context or localStorage fallback
+    let userId = user?.id;
+    if (!userId) {
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          userId = parsed.user?.id;
+        }
+      } catch (e) {}
+    }
+    
+    if (!userId) {
+      console.error('❌ acceptDelivery: No userId available');
+      return { success: false, error: 'Not authenticated' };
+    }
+
+    console.log('✅ acceptDelivery: Accepting delivery', deliveryId, 'for provider', userId);
 
     try {
       const { error } = await supabase
         .from('delivery_requests')
         .update({ 
-          provider_id: user.id,
+          provider_id: userId,
           status: 'assigned',
           accepted_at: new Date().toISOString()
         })
@@ -586,6 +603,7 @@ export const useDeliveryProviderData = () => {
       await fetchData();
       return { success: true };
     } catch (err: any) {
+      console.error('❌ acceptDelivery error:', err);
       return { success: false, error: err.message };
     }
   };
@@ -599,7 +617,24 @@ export const useDeliveryProviderData = () => {
 
   // Function to update delivery status
   const updateDeliveryStatus = async (deliveryId: string, newStatus: string) => {
-    if (!user?.id) return { success: false, error: 'Not authenticated' };
+    // Get userId from context or localStorage fallback
+    let userId = user?.id;
+    if (!userId) {
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          userId = parsed.user?.id;
+        }
+      } catch (e) {}
+    }
+    
+    if (!userId) {
+      console.error('❌ updateDeliveryStatus: No userId available');
+      return { success: false, error: 'Not authenticated' };
+    }
+
+    console.log('📦 updateDeliveryStatus:', deliveryId, 'to', newStatus, 'by provider', userId);
 
     try {
       const { error } = await supabase
@@ -609,13 +644,14 @@ export const useDeliveryProviderData = () => {
           updated_at: new Date().toISOString()
         })
         .eq('id', deliveryId)
-        .eq('provider_id', user.id); // CRITICAL: Only update if assigned to this provider
+        .eq('provider_id', userId); // CRITICAL: Only update if assigned to this provider
 
       if (error) throw error;
 
       await fetchData();
       return { success: true };
     } catch (err: any) {
+      console.error('❌ updateDeliveryStatus error:', err);
       return { success: false, error: err.message };
     }
   };
