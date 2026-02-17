@@ -244,6 +244,13 @@ export const DispatchScanner: React.FC = () => {
 
   const processQRScan = async (qrCode: string, scannerType: 'mobile_camera' | 'physical_scanner' | 'web_scanner') => {
     try {
+      console.log('🔍 Processing QR scan for DISPATCH:', qrCode);
+      console.log('📱 Scanner type:', scannerType);
+      console.log('📦 Material condition:', materialCondition);
+      
+      // Show immediate feedback
+      toast.info('Processing scan...', { duration: 2000 });
+      
       // Call the record_qr_scan function
       const { data, error } = await supabase.rpc('record_qr_scan', {
         _qr_code: qrCode,
@@ -254,9 +261,11 @@ export const DispatchScanner: React.FC = () => {
         _notes: notes || null
       });
 
+      console.log('📊 RPC Response:', { data, error });
+
       if (error) {
-        console.error('Dispatch scan error:', error);
-        toast.error('Failed to record dispatch scan');
+        console.error('❌ Dispatch scan error:', error);
+        toast.error(`Failed to record dispatch scan: ${error.message}`);
         return;
       }
 

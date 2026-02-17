@@ -237,6 +237,13 @@ export const ReceivingScanner: React.FC = () => {
 
   const processQRScan = async (qrCode: string, scannerType: 'mobile_camera' | 'physical_scanner' | 'web_scanner') => {
     try {
+      console.log('🔍 Processing QR scan for RECEIVING:', qrCode);
+      console.log('📱 Scanner type:', scannerType);
+      console.log('📦 Material condition:', materialCondition);
+      
+      // Show immediate feedback
+      toast.info('Processing scan...', { duration: 2000 });
+      
       // Call the record_qr_scan function for receiving
       const { data, error } = await supabase.rpc('record_qr_scan', {
         _qr_code: qrCode,
@@ -247,9 +254,11 @@ export const ReceivingScanner: React.FC = () => {
         _notes: notes || null
       });
 
+      console.log('📊 RPC Response:', { data, error });
+
       if (error) {
-        console.error('Receiving scan error:', error);
-        toast.error('Failed to record receiving scan');
+        console.error('❌ Receiving scan error:', error);
+        toast.error(`Failed to record receiving scan: ${error.message}`);
         return;
       }
 
