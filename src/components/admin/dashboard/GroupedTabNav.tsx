@@ -53,6 +53,7 @@ import {
   Cog,
   Headphones,
   Navigation,
+  Video,
 } from 'lucide-react';
 
 interface TabGroup {
@@ -151,6 +152,7 @@ export const GroupedTabNav: React.FC<GroupedTabNavProps> = ({
       icon: Eye,
       color: 'red',
       tabs: [
+        { value: 'videos', label: 'Video Approvals', icon: Video },
         { value: 'monitoring', label: 'Cameras', icon: Eye },
         { value: 'monitoring-requests', label: 'Monitoring Requests', icon: Camera },
         { value: 'camera-assignment', label: 'Camera Assignment', icon: Link2 },
