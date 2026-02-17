@@ -806,7 +806,16 @@ const PrivateClientDashboard = () => {
               </CardHeader>
               <CardContent>
                 <TrackingTab
-                  userId={user?.id || ''}
+                  userId={user?.id || localStorage.getItem('user_id') || (() => {
+                    try {
+                      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+                      if (storedSession) {
+                        const parsed = JSON.parse(storedSession);
+                        return parsed.user?.id || '';
+                      }
+                    } catch (e) {}
+                    return '';
+                  })()}
                   userRole="private_client"
                   userName={profile?.full_name || user?.email?.split('@')[0]}
                 />

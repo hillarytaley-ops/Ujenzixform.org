@@ -71,16 +71,50 @@ interface TrackingTabProps {
 const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
 
-export const TrackingTab: React.FC<TrackingTabProps> = ({ userId, userRole, userName }) => {
+export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, userRole, userName }) => {
   const [trackingNumbers, setTrackingNumbers] = useState<TrackingNumber[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const { toast } = useToast();
 
+  // Get userId from props or localStorage fallback
+  const getUserId = (): string => {
+    if (propUserId) return propUserId;
+    
+    // Try localStorage user_id
+    const storedUserId = localStorage.getItem('user_id');
+    if (storedUserId) return storedUserId;
+    
+    // Try parsing from Supabase session
+    try {
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        return parsed.user?.id || '';
+      }
+    } catch (e) {}
+    
+    return '';
+  };
+
+  const userId = getUserId();
+
   useEffect(() => {
-    fetchTrackingNumbers();
-  }, [userId, userRole]);
+    if (userId) {
+      fetchTrackingNumbers();
+    } else {
+      console.log('📦 TrackingTab: Waiting for userId...');
+      // Retry after a short delay
+      const retryTimeout = setTimeout(() => {
+        const newUserId = getUserId();
+        if (newUserId) {
+          fetchTrackingNumbers();
+        }
+      }, 1000);
+      return () => clearTimeout(retryTimeout);
+    }
+  }, [propUserId, userRole]);
 
   const getAccessToken = () => {
     try {

@@ -1371,7 +1371,16 @@ const ProfessionalBuilderDashboardPage = () => {
               </CardHeader>
               <CardContent>
                 <TrackingTab
-                  userId={user?.id || ''}
+                  userId={user?.id || authUser?.id || localStorage.getItem('user_id') || (() => {
+                    try {
+                      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+                      if (storedSession) {
+                        const parsed = JSON.parse(storedSession);
+                        return parsed.user?.id || '';
+                      }
+                    } catch (e) {}
+                    return '';
+                  })()}
                   userRole="professional_builder"
                   userName={profile?.full_name || user?.email?.split('@')[0]}
                 />
