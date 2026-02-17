@@ -132,18 +132,19 @@ export const DeliveryAnalytics: React.FC = () => {
   });
   const [providers, setProviders] = useState<DeliveryProvider[]>([]);
   const [trends, setTrends] = useState<DeliveryTrend[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Start with false to show UI immediately
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [timeRange, setTimeRange] = useState('7days');
   const { toast } = useToast();
 
   useEffect(() => {
-    loadAnalytics();
+    loadAnalytics(false);
   }, [timeRange]);
 
-  const loadAnalytics = async () => {
-    setLoading(true);
+  const loadAnalytics = async (showLoading = true) => {
+    if (showLoading) setIsRefreshing(true);
     try {
       // Load delivery providers
       const { data: providersData, error: providersError } = await supabase
@@ -255,6 +256,7 @@ export const DeliveryAnalytics: React.FC = () => {
       });
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -329,14 +331,6 @@ export const DeliveryAnalytics: React.FC = () => {
     return acc;
   }, []);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500"></div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -361,9 +355,9 @@ export const DeliveryAnalytics: React.FC = () => {
               <SelectItem value="90days">Last 90 Days</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" onClick={loadAnalytics} className="border-slate-700">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
+          <Button variant="outline" onClick={() => loadAnalytics(true)} disabled={isRefreshing} className="border-slate-700">
+            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Loading...' : 'Refresh'}
           </Button>
           <Button onClick={exportToCSV} className="bg-green-600 hover:bg-green-700">
             <Download className="h-4 w-4 mr-2" />
