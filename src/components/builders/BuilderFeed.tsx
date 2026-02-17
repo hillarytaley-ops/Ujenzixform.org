@@ -774,6 +774,9 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         if (videoUrl) postType = 'video';
         else if (imageUrl) postType = 'image';
         
+        // Videos require admin approval, text/image posts are immediately visible
+        const postStatus = videoUrl ? 'pending' : 'active';
+        
         const postPayload = {
           builder_id: postUserId,
           post_type: postType,
@@ -782,7 +785,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
           image_urls: imageUrl ? [imageUrl] : null, // Database uses image_urls (array)
           project_location: postLocation || null,
           privacy: privacy,
-          status: 'active', // Posts are immediately visible
+          status: postStatus,
           likes_count: 0,
           shares_count: 0,
           comments_count: 0
@@ -859,8 +862,13 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         comments: []
       };
 
-      console.log('📤 Adding post to feed:', newPost.id, 'imageUrl:', newPost.imageUrl, 'videoUrl:', newPost.videoUrl);
-      setPosts([newPost, ...posts]);
+      // Only add to feed immediately if it's not a video (videos need approval)
+      if (!videoUrl) {
+        console.log('📤 Adding post to feed:', newPost.id, 'imageUrl:', newPost.imageUrl, 'videoUrl:', newPost.videoUrl);
+        setPosts([newPost, ...posts]);
+      } else {
+        console.log('📤 Video post submitted for approval, not adding to feed yet');
+      }
       
       console.log('📤 Clearing form...');
       setNewPostText('');
@@ -871,10 +879,18 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
       setIsCreatingPost(false);
 
       console.log('📤 Showing success toast...');
-      toast({
-        title: '🎉 Post Published!',
-        description: 'Your post is now live on the builders feed.'
-      });
+      // Different message for video posts (pending approval) vs other posts (immediate)
+      if (videoUrl) {
+        toast({
+          title: '📹 Video Submitted!',
+          description: 'Your video is pending admin approval before it goes live.'
+        });
+      } else {
+        toast({
+          title: '🎉 Post Published!',
+          description: 'Your post is now live on the builders feed.'
+        });
+      }
       
       console.log('📤 ✅ All done!');
     } catch (error: any) {
