@@ -132,30 +132,45 @@ export const DispatchScanner: React.FC = () => {
 
       // Stop any existing scanner
       await stopScanning();
+      
+      // Small delay to ensure cleanup is complete
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       // Create new scanner instance
-      scannerRef.current = new Html5Qrcode(scannerContainerId);
+      console.log('🎥 Creating Html5Qrcode instance for container:', scannerContainerId);
+      scannerRef.current = new Html5Qrcode(scannerContainerId, { verbose: true });
       
-      // Determine which camera to use
-      const cameraId = selectedCameraId || (facing === 'environment' ? { facingMode: 'environment' } : { facingMode: 'user' });
-      
-      console.log('🎥 Starting HTML5 QR scanner with camera:', cameraId);
+      // Use facingMode for mobile, or specific camera ID if selected
+      let cameraConfig: any;
+      if (selectedCameraId) {
+        cameraConfig = selectedCameraId;
+        console.log('📷 Using selected camera ID:', selectedCameraId);
+      } else {
+        cameraConfig = { facingMode: facing };
+        console.log('📷 Using facing mode:', facing);
+      }
 
-      const config = {
-        fps: 10,
-        qrbox: { width: 250, height: 250 },
-        aspectRatio: 1.0,
-        disableFlip: false,
-        experimentalFeatures: {
-          useBarCodeDetectorIfSupported: true
-        }
+      const scannerConfig = {
+        fps: 15,
+        qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+          const boxSize = Math.floor(minEdge * 0.7);
+          return { width: boxSize, height: boxSize };
+        },
+        aspectRatio: isMobile ? 1.0 : 1.777778,
+        formatsToSupport: [0], // 0 = QR_CODE format
       };
 
+      console.log('🎥 Starting scanner with config:', scannerConfig);
+
       await scannerRef.current.start(
-        cameraId,
-        config,
+        cameraConfig,
+        scannerConfig,
         (decodedText, decodedResult) => {
           const now = Date.now();
+          
+          console.log('🎯 QR DETECTED! Raw text:', decodedText);
+          console.log('🎯 Decoded result:', decodedResult);
           
           // Debounce: prevent scanning same code within 3 seconds
           if (decodedText === lastScannedRef.current && now - lastScanTimeRef.current < 3000) {
@@ -166,27 +181,47 @@ export const DispatchScanner: React.FC = () => {
           lastScannedRef.current = decodedText;
           lastScanTimeRef.current = now;
           
-          console.log('✅ QR Code scanned:', decodedText);
+          console.log('✅ Processing QR Code:', decodedText);
           
           // Vibrate on successful scan (mobile)
           if (navigator.vibrate) {
-            navigator.vibrate(200);
+            navigator.vibrate([100, 50, 100]);
+          }
+          
+          // Play a beep sound
+          try {
+            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            oscillator.frequency.value = 800;
+            oscillator.type = 'sine';
+            gainNode.gain.value = 0.3;
+            oscillator.start();
+            setTimeout(() => oscillator.stop(), 150);
+          } catch (e) {
+            // Audio not supported
           }
           
           processQRScan(decodedText, 'mobile_camera');
         },
         (errorMessage) => {
-          // This is called continuously when no QR code is found - ignore it
           // Only log actual errors, not "QR code not found" messages
+          if (!errorMessage.includes('No QR code found') && !errorMessage.includes('NotFoundException')) {
+            console.log('📷 Scanner message:', errorMessage);
+          }
         }
       );
 
       setIsScanning(true);
       localStorage.setItem(CAMERA_CONSENT_KEY, 'true');
       toast.success('📷 Camera ready! Point at QR code to scan.');
+      console.log('✅ Scanner started successfully');
 
     } catch (error: any) {
-      console.error('Camera error:', error);
+      console.error('❌ Camera error:', error);
+      console.error('Error details:', { name: error.name, message: error.message, stack: error.stack });
       setIsScanning(false);
       
       // Provide helpful error messages
@@ -201,7 +236,7 @@ export const DispatchScanner: React.FC = () => {
         toast.error('Camera is busy');
       } else {
         setCameraError(`Camera error: ${error.message || 'Unknown error'}`);
-        toast.error('Failed to access camera');
+        toast.error(`Failed to access camera: ${error.message}`);
       }
     }
   };
