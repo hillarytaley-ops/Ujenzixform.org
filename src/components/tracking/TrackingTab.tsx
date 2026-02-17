@@ -98,6 +98,8 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId, userRole, user
     try {
       const accessToken = getAccessToken();
       
+      console.log('📦 TrackingTab: Starting fetch for userId:', userId, 'role:', userRole);
+      
       // For builders, we need to get their profile ID as well
       let profileId = userId;
       if (userRole === 'professional_builder' || userRole === 'private_client') {
@@ -113,6 +115,7 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId, userRole, user
           );
           if (profileResponse.ok) {
             const profiles = await profileResponse.json();
+            console.log('📦 Profile lookup result:', profiles);
             if (profiles && profiles.length > 0) {
               profileId = profiles[0].id;
               console.log('📦 Got profile ID:', profileId);
@@ -128,12 +131,16 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId, userRole, user
       
       if (userRole === 'admin') {
         // Admin sees all tracking numbers - no filter needed
+        console.log('📦 Admin mode: fetching ALL tracking numbers');
       } else if (userRole === 'delivery_provider') {
         // Delivery provider sees their assigned deliveries
         url += `&delivery_provider_id=eq.${userId}`;
+        console.log('📦 Delivery provider mode: filtering by provider_id');
       } else {
         // Builders see their own tracking numbers - check both user_id and profile_id
+        // Also check if builder_id is null (for testing)
         url += `&or=(builder_id.eq.${userId},builder_id.eq.${profileId})`;
+        console.log('📦 Builder mode: filtering by userId:', userId, 'and profileId:', profileId);
       }
 
       console.log('📦 Fetching tracking numbers from:', url);
@@ -149,13 +156,37 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId, userRole, user
         const data = await response.json();
         setTrackingNumbers(data || []);
         console.log('📦 Tracking numbers loaded:', data?.length || 0, data);
+        
+        // Debug: show what builder_ids exist in the data
+        if (data && data.length > 0) {
+          console.log('📦 Builder IDs in tracking numbers:', data.map((t: any) => t.builder_id));
+        }
       } else {
         const errorText = await response.text();
-        console.error('Failed to fetch tracking numbers:', response.status, errorText);
+        console.error('📦 Failed to fetch tracking numbers:', response.status, errorText);
         setTrackingNumbers([]);
       }
+      
+      // Also fetch ALL tracking numbers to see what exists (for debugging)
+      if (userRole !== 'admin') {
+        const allResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/tracking_numbers?select=id,tracking_number,builder_id,status&limit=10`,
+          {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+            }
+          }
+        );
+        if (allResponse.ok) {
+          const allData = await allResponse.json();
+          console.log('📦 DEBUG - All tracking numbers in system:', allData);
+          console.log('📦 DEBUG - Your userId is:', userId);
+          console.log('📦 DEBUG - Your profileId is:', profileId);
+        }
+      }
     } catch (error) {
-      console.error('Error fetching tracking numbers:', error);
+      console.error('📦 Error fetching tracking numbers:', error);
       setTrackingNumbers([]);
     } finally {
       setLoading(false);
