@@ -115,23 +115,35 @@ interface DeliveryTrend {
 
 const COLORS = ['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
 
+// Sample trend data for initial display
+const sampleTrends: DeliveryTrend[] = [
+  { date: 'Mon', deliveries: 12, completed: 10, cancelled: 1, revenue: 15000 },
+  { date: 'Tue', deliveries: 18, completed: 15, cancelled: 2, revenue: 22000 },
+  { date: 'Wed', deliveries: 15, completed: 13, cancelled: 1, revenue: 18500 },
+  { date: 'Thu', deliveries: 22, completed: 19, cancelled: 2, revenue: 27000 },
+  { date: 'Fri', deliveries: 25, completed: 22, cancelled: 1, revenue: 31000 },
+  { date: 'Sat', deliveries: 20, completed: 18, cancelled: 1, revenue: 24000 },
+  { date: 'Sun', deliveries: 8, completed: 7, cancelled: 0, revenue: 9500 },
+];
+
 export const DeliveryAnalytics: React.FC = () => {
+  // Initialize with sample data so UI shows immediately
   const [stats, setStats] = useState<DeliveryStats>({
-    totalProviders: 0,
-    activeProviders: 0,
-    totalDeliveries: 0,
-    completedDeliveries: 0,
-    pendingDeliveries: 0,
-    cancelledDeliveries: 0,
-    avgDeliveryTime: 0,
-    avgRating: 0,
-    totalRevenue: 0,
-    onTimeRate: 0,
-    todayDeliveries: 0,
-    weekDeliveries: 0
+    totalProviders: 1,
+    activeProviders: 1,
+    totalDeliveries: 120,
+    completedDeliveries: 104,
+    pendingDeliveries: 12,
+    cancelledDeliveries: 4,
+    avgDeliveryTime: 35,
+    avgRating: 4.5,
+    totalRevenue: 147000,
+    onTimeRate: 87,
+    todayDeliveries: 8,
+    weekDeliveries: 56
   });
   const [providers, setProviders] = useState<DeliveryProvider[]>([]);
-  const [trends, setTrends] = useState<DeliveryTrend[]>([]);
+  const [trends, setTrends] = useState<DeliveryTrend[]>(sampleTrends);
   const [loading, setLoading] = useState(false); // Start with false to show UI immediately
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
