@@ -326,9 +326,20 @@ export const MaterialsGrid = () => {
   const [priceRange, setPriceRange] = useState('all');
   const [stockFilter, setStockFilter] = useState('all');
   
-  // Derive auth state from AuthContext (more reliable than separate Supabase calls)
-  const userRole = authUserRole;
-  const isAuthenticated = !!authUser;
+  // Derive auth state from AuthContext with localStorage fallback
+  const userRole = authUserRole || localStorage.getItem('user_role');
+  
+  // Check authentication from multiple sources for reliability
+  const isAuthenticated = !!authUser || !!localStorage.getItem('user_id') || (() => {
+    try {
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        return !!parsed.user?.id;
+      }
+    } catch (e) {}
+    return false;
+  })();
   const [showWelcome, setShowWelcome] = useState(false);
   const [isMultiQuoteOpen, setIsMultiQuoteOpen] = useState(false);
   const [builderId, setBuilderId] = useState<string>('');
