@@ -49,7 +49,8 @@ import DeliveryRequest from "@/components/DeliveryRequest";
 import { DeliveryPromptDialog } from "@/components/builders/DeliveryPromptDialog";
 import { MonitoringServicePrompt } from "@/components/builders/MonitoringServicePrompt";
 import { TrackingTab } from "@/components/tracking/TrackingTab";
-import { Navigation as NavigationIcon } from "lucide-react";
+import { BuilderOrdersTracker } from "@/components/builders/BuilderOrdersTracker";
+import { Navigation as NavigationIcon, QrCode } from "lucide-react";
 
 interface Order {
   id: string;
@@ -533,6 +534,10 @@ const PrivateClientDashboard = () => {
               <Package className="h-4 w-4 mr-2" />
               My Orders
             </TabsTrigger>
+            <TabsTrigger value="order-tracking" className="data-[state=active]:bg-cyan-500 data-[state=active]:text-white">
+              <QrCode className="h-4 w-4 mr-2" />
+              QR Scan Status
+            </TabsTrigger>
             <TabsTrigger value="deliveries" className="data-[state=active]:bg-green-500 data-[state=active]:text-white">
               <Truck className="h-4 w-4 mr-2" />
               Deliveries
@@ -677,6 +682,33 @@ const PrivateClientDashboard = () => {
                         )}
                       </div>
                     ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* QR Scan Status Tab - Shows dispatch and receive scan status */}
+          <TabsContent value="order-tracking">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <QrCode className="h-5 w-5 text-cyan-600" />
+                  QR Code Scan Status
+                </CardTitle>
+                <CardDescription>
+                  Track when your materials are dispatched by the supplier and received at your location. 
+                  Each item has a unique QR code that gets scanned at dispatch and delivery.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {user?.id ? (
+                  <BuilderOrdersTracker builderId={user.id} />
+                ) : (
+                  <div className="text-center py-12 text-gray-500">
+                    <QrCode className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+                    <p className="text-lg font-medium">Loading...</p>
+                    <p className="text-sm">Please wait while we load your order tracking data</p>
                   </div>
                 )}
               </CardContent>
