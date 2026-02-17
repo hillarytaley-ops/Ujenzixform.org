@@ -277,12 +277,19 @@ export const useRegistrations = () => {
 // Hook for fetching feedback
 export const useFeedback = () => {
   const [feedback, setFeedback] = useState<FeedbackRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Start with loading=false to show empty table immediately instead of skeleton
+  const [loading, setLoading] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
   const { toast } = useToast();
 
   const fetchFeedback = useCallback(async () => {
-    try {
+    // Only show loading skeleton on manual refresh, not initial load
+    if (isInitialized) {
       setLoading(true);
+    }
+    
+    try {
+      console.log('📝 Fetching feedback via REST API...');
       
       // Use REST API with timeout for reliability
       const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
@@ -349,18 +356,12 @@ export const useFeedback = () => {
       }
     } finally {
       setLoading(false);
+      setIsInitialized(true);
     }
-  }, [toast]);
+  }, [toast, isInitialized]);
 
   useEffect(() => {
     fetchFeedback();
-    
-    // Safety timeout to prevent infinite loading
-    const safetyTimeout = setTimeout(() => {
-      setLoading(false);
-    }, 10000);
-    
-    return () => clearTimeout(safetyTimeout);
   }, [fetchFeedback]);
 
   return { feedback, loading, refetch: fetchFeedback };
