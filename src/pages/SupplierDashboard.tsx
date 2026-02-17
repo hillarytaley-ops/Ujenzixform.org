@@ -607,8 +607,65 @@ const SupplierDashboard = () => {
           console.log('Profile fetch timeout');
         }
 
-        // Use user.id as the supplier ID (this matches how orders are assigned)
+        // Build supplier IDs list - check suppliers table for this user
         const orderSupplierIds = [user.id];
+        
+        // Look up supplier record by user_id or email
+        try {
+          const supplierController = new AbortController();
+          const supplierTimeout = setTimeout(() => supplierController.abort(), 5000);
+          
+          // Try by user_id first
+          const supplierResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${user.id}&select=id,user_id`,
+            { headers: authHeaders, signal: supplierController.signal, cache: 'no-store' }
+          );
+          clearTimeout(supplierTimeout);
+          
+          if (supplierResponse.ok) {
+            const supplierData = await supplierResponse.json();
+            if (supplierData?.[0]) {
+              if (supplierData[0].id && !orderSupplierIds.includes(supplierData[0].id)) {
+                orderSupplierIds.push(supplierData[0].id);
+              }
+              if (supplierData[0].user_id && !orderSupplierIds.includes(supplierData[0].user_id)) {
+                orderSupplierIds.push(supplierData[0].user_id);
+              }
+              // Also store the supplier record ID for child components
+              setSupplierRecordId(supplierData[0].id);
+              console.log('📦 Dashboard: Found supplier record:', supplierData[0]);
+            }
+          }
+          
+          // If not found by user_id, try by email
+          if (orderSupplierIds.length === 1 && user.email) {
+            const emailController = new AbortController();
+            const emailTimeout = setTimeout(() => emailController.abort(), 5000);
+            
+            const emailResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/suppliers?email=eq.${encodeURIComponent(user.email)}&select=id,user_id`,
+              { headers: authHeaders, signal: emailController.signal, cache: 'no-store' }
+            );
+            clearTimeout(emailTimeout);
+            
+            if (emailResponse.ok) {
+              const emailData = await emailResponse.json();
+              if (emailData?.[0]) {
+                if (emailData[0].id && !orderSupplierIds.includes(emailData[0].id)) {
+                  orderSupplierIds.push(emailData[0].id);
+                }
+                if (emailData[0].user_id && !orderSupplierIds.includes(emailData[0].user_id)) {
+                  orderSupplierIds.push(emailData[0].user_id);
+                }
+                setSupplierRecordId(emailData[0].id);
+                console.log('📦 Dashboard: Found supplier record by email:', emailData[0]);
+              }
+            }
+          }
+        } catch (e) {
+          console.log('Supplier lookup timeout');
+        }
+        
         console.log('📊 Dashboard: Fetching stats for supplier IDs:', orderSupplierIds);
 
         // Fetch ALL orders for this supplier (not just 10) for accurate stats
@@ -704,6 +761,30 @@ const SupplierDashboard = () => {
           }
         } catch (e) {
           console.log('Orders fetch timeout for stats');
+        }
+
+        // Fetch products count from supplier_product_prices
+        try {
+          const supplierIdsParam = orderSupplierIds.join(',');
+          const productsController = new AbortController();
+          const productsTimeout = setTimeout(() => productsController.abort(), 5000);
+          
+          const productsResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/supplier_product_prices?supplier_id=in.(${supplierIdsParam})&select=id`,
+            { headers: authHeaders, signal: productsController.signal, cache: 'no-store' }
+          );
+          clearTimeout(productsTimeout);
+          
+          if (productsResponse.ok) {
+            const productsData = await productsResponse.json();
+            console.log('📦 Dashboard: Products count:', productsData?.length || 0);
+            setStats(prev => ({
+              ...prev,
+              totalProducts: productsData?.length || 0
+            }));
+          }
+        } catch (e) {
+          console.log('Products count fetch timeout');
         }
 
       } catch (error) {
