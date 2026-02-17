@@ -10,7 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Truck, Scan, CheckCircle, AlertCircle, Camera, Lock, ArrowRight, RotateCcw, Smartphone, Flashlight, ZoomIn } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
+import { Html5Qrcode, Html5QrcodeScannerState, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 
 
 interface ScanResult {
@@ -151,14 +151,11 @@ export const DispatchScanner: React.FC = () => {
       }
 
       const scannerConfig = {
-        fps: 15,
-        qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
-          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-          const boxSize = Math.floor(minEdge * 0.7);
-          return { width: boxSize, height: boxSize };
-        },
-        aspectRatio: isMobile ? 1.0 : 1.777778,
-        formatsToSupport: [0], // 0 = QR_CODE format
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
+        rememberLastUsedCamera: true,
+        supportedScanTypes: [],
+        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
       };
 
       console.log('🎥 Starting scanner with config:', scannerConfig);
@@ -286,21 +283,47 @@ export const DispatchScanner: React.FC = () => {
       // Show immediate feedback
       toast.info('Processing scan...', { duration: 2000 });
       
-      // Call the record_qr_scan function
-      const { data, error } = await supabase.rpc('record_qr_scan', {
-        _qr_code: qrCode,
-        _scan_type: 'dispatch',
-        _scanner_device_id: navigator.userAgent,
-        _scanner_type: scannerType,
-        _material_condition: materialCondition,
-        _notes: notes || null
+      // Get auth token
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      
+      let accessToken = ANON_KEY;
+      try {
+        const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          accessToken = parsed.access_token || ANON_KEY;
+        }
+      } catch (e) {}
+      
+      console.log('🔐 Using access token:', accessToken ? 'Found' : 'Using anon key');
+      
+      // Call the record_qr_scan function via REST API
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/record_qr_scan`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': ANON_KEY,
+          'Authorization': `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          _qr_code: qrCode,
+          _scan_type: 'dispatch',
+          _scanner_device_id: navigator.userAgent.substring(0, 100),
+          _scanner_type: scannerType,
+          _material_condition: materialCondition,
+          _notes: notes || null
+        })
       });
 
-      console.log('📊 RPC Response:', { data, error });
+      console.log('📊 RPC Response status:', response.status);
+      
+      const data = await response.json();
+      console.log('📊 RPC Response data:', data);
 
-      if (error) {
-        console.error('❌ Dispatch scan error:', error);
-        toast.error(`Failed to record dispatch scan: ${error.message}`);
+      if (!response.ok) {
+        console.error('❌ Dispatch scan error:', data);
+        toast.error(`Failed to record dispatch scan: ${data.message || data.error || 'Unknown error'}`);
         return;
       }
 
