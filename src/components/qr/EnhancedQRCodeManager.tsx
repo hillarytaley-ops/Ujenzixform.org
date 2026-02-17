@@ -1300,7 +1300,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
         </Card>
       ) : viewMode === 'by-order' ? (
         /* Order-Grouped View - Click on order to expand and print */
-        <Accordion type="multiple" className="space-y-6" defaultValue={orderGroups.slice(0, 3).map(g => g.order_id)}>
+        <Accordion type="multiple" className="space-y-4" defaultValue={orderGroups.length > 0 ? [orderGroups[0].order_id] : []}>
           {orderGroups.map((group) => {
             const orderDate = group.created_at ? new Date(group.created_at) : null;
             return (
@@ -1426,10 +1426,10 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
                     </div>
                   </div>
                 </AccordionTrigger>
-                <AccordionContent className="px-5 py-6 bg-gradient-to-b from-slate-50 to-white">
+                <AccordionContent className="px-4 py-4 bg-gradient-to-b from-slate-50 to-white">
                   {/* Order Summary */}
-                  <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                    <div className="flex flex-wrap gap-4 text-sm">
+                  <div className="mb-3 p-2 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="flex flex-wrap gap-3 text-sm">
                       <span className="flex items-center gap-1">
                         <User className="h-4 w-4 text-blue-600" />
                         <strong>Client:</strong> {group.buyer_name}
@@ -1448,19 +1448,17 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
                       )}
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
                     {group.items.map((item) => (
-                      <QRCodeCard 
+                      <CompactQRCard 
                         key={item.id}
                         item={item}
                         getStatusColor={getStatusColor}
-                        getStatusIcon={getStatusIcon}
-                        downloadQRCode={downloadQRCode}
                         onViewFullSize={() => {
                           setSelectedItem(item);
                           setShowQRDialog(true);
                         }}
-                        showClientInfo={false}
+                        downloadQRCode={downloadQRCode}
                         selectionMode={selectionMode}
                         isSelected={selectedItems.has(item.id)}
                         onToggleSelect={() => toggleItemSelection(item.id)}
@@ -2059,5 +2057,109 @@ const QRCodeFullDialog: React.FC<{
         </div>
       </DialogContent>
     </Dialog>
+  );
+};
+
+// Compact QR Card for Order-Grouped View - smaller, more grid-friendly
+const CompactQRCard: React.FC<{
+  item: MaterialItem;
+  getStatusColor: (status: string) => string;
+  onViewFullSize: () => void;
+  downloadQRCode: (qrCode: string, materialType: string, itemSeq: number) => void;
+  selectionMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: () => void;
+}> = ({ item, getStatusColor, onViewFullSize, downloadQRCode, selectionMode = false, isSelected = false, onToggleSelect }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  
+  useEffect(() => {
+    if (canvasRef.current && item.qr_code) {
+      QRCodeLib.toCanvas(canvasRef.current, item.qr_code, {
+        width: 120,
+        margin: 1,
+        errorCorrectionLevel: 'H',
+        color: { dark: '#000000', light: '#ffffff' }
+      }).catch(err => console.error('QR Code generation error:', err));
+    }
+  }, [item.qr_code]);
+
+  const isFullyScanned = item.dispatch_scanned && item.receive_scanned;
+  const isInvalidated = item.is_invalidated || isFullyScanned;
+
+  return (
+    <Card className={`overflow-hidden transition-all relative ${
+      isInvalidated 
+        ? 'border-red-400 bg-red-50/50 opacity-60' 
+        : isSelected 
+          ? 'ring-2 ring-orange-500 bg-orange-50 border-orange-300' 
+          : 'border-slate-200 hover:border-cyan-300 hover:shadow-md'
+    }`}>
+      {/* INVALID Overlay */}
+      {isInvalidated && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+          <div className="bg-red-600/90 text-white px-2 py-1 rounded text-xs font-bold transform -rotate-12">
+            USED
+          </div>
+        </div>
+      )}
+      
+      {/* Selection checkbox */}
+      {selectionMode && (
+        <div className="absolute top-1 left-1 z-20">
+          <Checkbox 
+            checked={isSelected}
+            onCheckedChange={onToggleSelect}
+            className="h-4 w-4 bg-white"
+          />
+        </div>
+      )}
+      
+      {/* Compact Header */}
+      <div className={`px-2 py-1 text-center text-xs font-medium ${
+        isInvalidated ? 'bg-red-600 text-white' : 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white'
+      }`}>
+        #{item.item_sequence} - {item.material_type.slice(0, 15)}{item.material_type.length > 15 ? '...' : ''}
+      </div>
+      
+      {/* QR Code */}
+      <div className="p-2 flex justify-center">
+        <div 
+          className="cursor-pointer hover:scale-105 transition-transform"
+          onClick={onViewFullSize}
+          title="Click to view full size"
+        >
+          <canvas ref={canvasRef} className="rounded" />
+        </div>
+      </div>
+      
+      {/* Compact Info */}
+      <div className="px-2 pb-2 space-y-1">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-slate-600">{item.quantity} {item.unit}</span>
+          <Badge className={`${getStatusColor(item.status)} text-[10px] px-1 py-0`}>
+            {item.status}
+          </Badge>
+        </div>
+        
+        {/* Action Buttons */}
+        <div className="flex gap-1">
+          <Button 
+            size="sm" 
+            variant="outline" 
+            className="flex-1 h-6 text-[10px] px-1"
+            onClick={onViewFullSize}
+          >
+            <Maximize2 className="h-3 w-3" />
+          </Button>
+          <Button 
+            size="sm" 
+            className="flex-1 h-6 text-[10px] px-1 bg-cyan-600 hover:bg-cyan-700"
+            onClick={() => downloadQRCode(item.qr_code, item.material_type, item.item_sequence)}
+          >
+            <Download className="h-3 w-3" />
+          </Button>
+        </div>
+      </div>
+    </Card>
   );
 };
