@@ -248,16 +248,96 @@ export const AdminScanDashboard: React.FC = () => {
 
   const fetchStatistics = async () => {
     try {
-      const { data, error } = await supabase.rpc('get_scan_statistics', {
-        _start_date: null,
-        _end_date: null,
-        _supplier_id: null
-      });
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      
+      // Get access token for authenticated requests
+      let accessToken = ANON_KEY;
+      try {
+        const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          accessToken = parsed.access_token || ANON_KEY;
+        }
+      } catch (e) {}
+      
+      // Try RPC first
+      const rpcResponse = await fetchWithTimeout(
+        `${SUPABASE_URL}/rest/v1/rpc/get_scan_statistics`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            _start_date: null,
+            _end_date: null,
+            _supplier_id: null
+          })
+        },
+        5000
+      );
 
-      if (error) throw error;
-
-      if (data && data.length > 0) {
-        setStats(data[0] as ScanStatistics);
+      if (rpcResponse.ok) {
+        const data = await rpcResponse.json();
+        console.log('📊 Scan statistics from RPC:', data);
+        if (data && data.length > 0) {
+          setStats(data[0] as ScanStatistics);
+          return;
+        }
+      }
+      
+      // Fallback: Calculate stats from direct table queries
+      console.log('📊 Calculating stats from direct queries...');
+      
+      // Fetch material_items counts
+      const itemsResponse = await fetchWithTimeout(
+        `${SUPABASE_URL}/rest/v1/material_items?select=status`,
+        {
+          headers: {
+            'apikey': ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+          }
+        },
+        5000
+      );
+      
+      // Fetch qr_scan_events counts
+      const scansResponse = await fetchWithTimeout(
+        `${SUPABASE_URL}/rest/v1/qr_scan_events?select=scan_type`,
+        {
+          headers: {
+            'apikey': ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+          }
+        },
+        5000
+      );
+      
+      if (itemsResponse.ok && scansResponse.ok) {
+        const items = await itemsResponse.json();
+        const scans = await scansResponse.json();
+        
+        console.log('📦 Direct items count:', items?.length);
+        console.log('📷 Direct scans count:', scans?.length);
+        
+        const calculatedStats: ScanStatistics = {
+          total_items: items?.length || 0,
+          pending_items: items?.filter((i: any) => i.status === 'pending').length || 0,
+          dispatched_items: items?.filter((i: any) => i.status === 'dispatched').length || 0,
+          received_items: items?.filter((i: any) => i.status === 'received').length || 0,
+          verified_items: items?.filter((i: any) => i.status === 'verified').length || 0,
+          damaged_items: items?.filter((i: any) => i.status === 'damaged').length || 0,
+          total_scans: scans?.length || 0,
+          dispatch_scans: scans?.filter((s: any) => s.scan_type === 'dispatch').length || 0,
+          receiving_scans: scans?.filter((s: any) => s.scan_type === 'receiving').length || 0,
+          verification_scans: scans?.filter((s: any) => s.scan_type === 'verification').length || 0,
+          avg_dispatch_to_receive_hours: 0
+        };
+        
+        setStats(calculatedStats);
       }
     } catch (error) {
       console.error('Error fetching statistics:', error);
@@ -271,28 +351,36 @@ export const AdminScanDashboard: React.FC = () => {
 
   const fetchMaterialItems = async () => {
     try {
-      // Fetch material items with purchase order info
-      const { data: items, error } = await supabase
-        .from('material_items')
-        .select(`
-          id,
-          qr_code,
-          material_type,
-          status,
-          supplier_id,
-          purchase_order_id,
-          created_at,
-          dispatch_scanned_at,
-          receive_scanned_at
-        `)
-        .order('created_at', { ascending: false })
-        .limit(100);
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      
+      let accessToken = ANON_KEY;
+      try {
+        const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          accessToken = parsed.access_token || ANON_KEY;
+        }
+      } catch (e) {}
+      
+      // Fetch material items with REST API
+      const response = await fetchWithTimeout(
+        `${SUPABASE_URL}/rest/v1/material_items?select=id,qr_code,material_type,status,supplier_id,purchase_order_id,created_at,dispatch_scanned_at,receive_scanned_at&order=created_at.desc&limit=100`,
+        {
+          headers: {
+            'apikey': ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+          }
+        },
+        8000
+      );
 
-      if (error) {
-        console.error('Error fetching material_items:', error);
-        throw error;
+      if (!response.ok) {
+        console.error('Error fetching material_items:', response.status);
+        throw new Error(`HTTP ${response.status}`);
       }
-
+      
+      const items = await response.json();
       console.log('📦 Material items loaded:', items?.length);
 
       // Fetch purchase orders to get buyer info
@@ -429,14 +517,34 @@ export const AdminScanDashboard: React.FC = () => {
 
   const fetchRecentScans = async () => {
     try {
-      const { data, error } = await supabase
-        .from('qr_scan_events')
-        .select('*')
-        .order('scanned_at', { ascending: false })
-        .limit(50);
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      
+      let accessToken = ANON_KEY;
+      try {
+        const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          accessToken = parsed.access_token || ANON_KEY;
+        }
+      } catch (e) {}
+      
+      const response = await fetchWithTimeout(
+        `${SUPABASE_URL}/rest/v1/qr_scan_events?select=*&order=scanned_at.desc&limit=50`,
+        {
+          headers: {
+            'apikey': ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+          }
+        },
+        5000
+      );
 
-      if (error) throw error;
-      setRecentScans(data || []);
+      if (response.ok) {
+        const data = await response.json();
+        console.log('📷 Recent scans loaded:', data?.length);
+        setRecentScans(data || []);
+      }
     } catch (error) {
       console.error('Error fetching scans:', error);
     }
