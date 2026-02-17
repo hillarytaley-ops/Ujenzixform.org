@@ -8,6 +8,8 @@
  * 
  * This provides client-side filtering as an additional layer of security
  * on top of Supabase RLS policies.
+ * 
+ * Updated: Feb 17, 2026 - Added robust getUserId() fallback for localStorage
  */
 
 import { useEffect, useState, useCallback } from 'react';
