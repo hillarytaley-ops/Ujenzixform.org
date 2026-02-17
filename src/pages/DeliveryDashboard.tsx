@@ -227,10 +227,40 @@ const DeliveryDashboard = () => {
   }, [isolatedProfile, isolatedStats, isolatedActiveDeliveries, isolatedHistory, isolatedPendingRequests]);
 
   // Show UI immediately - don't wait for data
+  // Use safety timeout to prevent infinite loading
   useEffect(() => {
+    // Check if user is available from context
     if (user) {
       setLoading(false);
+      return;
     }
+    
+    // Fallback: Check localStorage for auth
+    const checkLocalAuth = () => {
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          if (parsed.user?.id) {
+            console.log('🚚 DeliveryDashboard: Found user in localStorage, showing UI');
+            setLoading(false);
+            return true;
+          }
+        }
+      } catch (e) {}
+      return false;
+    };
+    
+    // Try localStorage immediately
+    if (checkLocalAuth()) return;
+    
+    // Safety timeout - show UI after 2 seconds max
+    const timeout = setTimeout(() => {
+      console.log('🚚 DeliveryDashboard: Safety timeout - forcing loading false');
+      setLoading(false);
+    }, 2000);
+    
+    return () => clearTimeout(timeout);
   }, [user]);
 
   // Log data access for security audit

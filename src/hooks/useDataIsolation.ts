@@ -333,20 +333,40 @@ export const useDeliveryProviderData = () => {
   });
 
   const fetchData = useCallback(async () => {
-    if (!user?.id) {
+    // Try to get userId from context or localStorage fallback
+    let userId = user?.id;
+    if (!userId) {
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          userId = parsed.user?.id;
+        }
+      } catch (e) {}
+    }
+    
+    if (!userId) {
+      console.log('📦 useDeliveryProviderData: No userId available');
       setLoading(false);
       return;
     }
 
+    console.log('📦 useDeliveryProviderData: Fetching data for userId:', userId);
     setLoading(true);
     setError(null);
+    
+    // Safety timeout - finish loading after 10 seconds max
+    const safetyTimeout = setTimeout(() => {
+      console.log('📦 useDeliveryProviderData: Safety timeout reached');
+      setLoading(false);
+    }, 10000);
 
     try {
       // Fetch delivery provider profile - ONLY for current user
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .maybeSingle();
 
       if (profileError) throw profileError;
@@ -356,7 +376,7 @@ export const useDeliveryProviderData = () => {
       const { data: providerReg } = await supabase
         .from('delivery_provider_registrations')
         .select('*')
-        .eq('auth_user_id', user.id)
+        .eq('auth_user_id', userId)
         .maybeSingle();
 
       // Fetch active deliveries assigned to THIS provider only
@@ -364,7 +384,7 @@ export const useDeliveryProviderData = () => {
       const { data: activeData, error: activeError } = await supabase
         .from('delivery_requests')
         .select('*')
-        .eq('provider_id', user.id)
+        .eq('provider_id', userId)
         .in('status', ['assigned', 'picked_up', 'in_transit', 'out_for_delivery'])
         .order('created_at', { ascending: false });
 
@@ -375,7 +395,7 @@ export const useDeliveryProviderData = () => {
       const { data: historyData, error: historyError } = await supabase
         .from('delivery_requests')
         .select('*')
-        .eq('provider_id', user.id)
+        .eq('provider_id', userId)
         .eq('status', 'delivered')
         .order('updated_at', { ascending: false })
         .limit(50);
@@ -535,6 +555,7 @@ export const useDeliveryProviderData = () => {
       console.error('Error fetching delivery provider data:', err);
       setError(err.message || 'Failed to load data');
     } finally {
+      clearTimeout(safetyTimeout);
       setLoading(false);
     }
   }, [user?.id]);
