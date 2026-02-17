@@ -10,8 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Truck, Scan, CheckCircle, AlertCircle, Camera, Lock, ArrowRight, RotateCcw, Smartphone, Flashlight, ZoomIn } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { BrowserMultiFormatReader, BrowserCodeReader, IScannerControls } from '@zxing/browser';
-import { DecodeHintType, BarcodeFormat } from '@zxing/library';
+import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
 
 
 interface ScanResult {
@@ -25,23 +24,19 @@ interface ScanResult {
 }
 
 export const DispatchScanner: React.FC = () => {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const scannerContainerId = 'dispatch-qr-scanner';
   const [isScanning, setIsScanning] = useState(false);
   const [scanResults, setScanResults] = useState<ScanResult[]>([]);
   const [manualQRCode, setManualQRCode] = useState('');
   const [materialCondition, setMaterialCondition] = useState('good');
   const [notes, setNotes] = useState('');
-  const [codeReader, setCodeReader] = useState<BrowserMultiFormatReader | null>(null);
-  const scannerControlsRef = useRef<IScannerControls | null>(null);
   const lastScannedRef = useRef<string>('');
   const lastScanTimeRef = useRef<number>(0);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [facing, setFacing] = useState<'environment' | 'user'>('environment');
-  const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
+  const [availableCameras, setAvailableCameras] = useState<{ id: string; label: string }[]>([]);
   const [selectedCameraId, setSelectedCameraId] = useState<string>('');
-  const [hasFlash, setHasFlash] = useState(false);
-  const [flashOn, setFlashOn] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [deviceInfo, setDeviceInfo] = useState<string>('');
   const CAMERA_CONSENT_KEY = 'scanner_camera_consent';
@@ -53,16 +48,15 @@ export const DispatchScanner: React.FC = () => {
 
   useEffect(() => {
     checkAuth();
-    initializeScanner();
     detectDeviceInfo();
+    listAvailableCameras();
     
     return () => {
-      cleanupCamera();
+      stopScanning();
     };
   }, []);
 
   const detectDeviceInfo = () => {
-    const ua = navigator.userAgent;
     if (isIOS) {
       setDeviceInfo('iOS Device');
     } else if (isAndroid) {
@@ -72,49 +66,32 @@ export const DispatchScanner: React.FC = () => {
     }
   };
 
-  const initializeScanner = async () => {
-    try {
-      // Configure hints for better QR code detection
-      const hints = new Map();
-      hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.QR_CODE]);
-      hints.set(DecodeHintType.TRY_HARDER, true);
-      
-      const reader = new BrowserMultiFormatReader(hints);
-      setCodeReader(reader);
-
-      // Get available cameras
-      await listAvailableCameras();
-    } catch (error) {
-      console.error('Scanner initialization error:', error);
-    }
-  };
-
   const listAvailableCameras = async () => {
     try {
-      // Request permission first to get full device list
-      await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      const devices = await Html5Qrcode.getCameras();
+      console.log('📷 Available cameras:', devices);
       
-      const devices = await BrowserCodeReader.listVideoInputDevices();
-      setAvailableCameras(devices);
-      
-      // Prefer back camera on mobile devices
-      const backCamera = devices.find(d => 
-        d.label.toLowerCase().includes('back') || 
-        d.label.toLowerCase().includes('rear') ||
-        d.label.toLowerCase().includes('environment')
-      );
-      
-      if (backCamera) {
-        setSelectedCameraId(backCamera.deviceId);
-      } else if (devices.length > 0) {
-        // On mobile, usually the last camera is the back camera
-        setSelectedCameraId(isMobile && devices.length > 1 ? devices[devices.length - 1].deviceId : devices[0].deviceId);
+      if (devices && devices.length > 0) {
+        const cameraList = devices.map(d => ({ id: d.id, label: d.label || `Camera ${d.id}` }));
+        setAvailableCameras(cameraList);
+        
+        // Prefer back camera on mobile devices
+        const backCamera = cameraList.find(d => 
+          d.label.toLowerCase().includes('back') || 
+          d.label.toLowerCase().includes('rear') ||
+          d.label.toLowerCase().includes('environment')
+        );
+        
+        if (backCamera) {
+          setSelectedCameraId(backCamera.id);
+        } else {
+          // On mobile, usually the last camera is the back camera
+          setSelectedCameraId(isMobile && cameraList.length > 1 ? cameraList[cameraList.length - 1].id : cameraList[0].id);
+        }
       }
-      
-      console.log('Available cameras:', devices.map(d => d.label));
     } catch (error) {
       console.error('Error listing cameras:', error);
-      setCameraError('Unable to access camera list. Please grant camera permissions.');
+      // Don't show error - cameras will be requested when scanning starts
     }
   };
 
@@ -142,39 +119,7 @@ export const DispatchScanner: React.FC = () => {
     }
   };
 
-  const cleanupCamera = useCallback(() => {
-    // Stop scanner controls first
-    try {
-      if (scannerControlsRef.current) {
-        scannerControlsRef.current.stop();
-        scannerControlsRef.current = null;
-      }
-    } catch (e) {
-      console.log('Scanner controls cleanup:', e);
-    }
-    
-    try {
-      codeReader?.reset();
-    } catch {}
-    
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => {
-        track.stop();
-      });
-      streamRef.current = null;
-    }
-    
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-  }, [codeReader]);
-
   const startCameraScanning = async () => {
-    if (!codeReader) {
-      toast.error('Scanner not initialized. Please refresh the page.');
-      return;
-    }
-
     setCameraError(null);
 
     try {
@@ -185,77 +130,58 @@ export const DispatchScanner: React.FC = () => {
         return;
       }
 
-      // Check for camera API support
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setCameraError('Your browser does not support camera access. Please use a modern browser.');
-        toast.error('Camera not supported on this browser');
-        return;
-      }
+      // Stop any existing scanner
+      await stopScanning();
 
-      // Clean up any existing stream
-      cleanupCamera();
-
-      if (!videoRef.current) return;
-
-      // Configure video element for mobile compatibility
-      videoRef.current.setAttribute('playsinline', 'true');
-      videoRef.current.setAttribute('webkit-playsinline', 'true');
-      videoRef.current.setAttribute('muted', 'true');
-      videoRef.current.muted = true;
-
-      setIsScanning(true);
-
-      // Determine which camera to use
-      const deviceId = selectedCameraId || undefined;
+      // Create new scanner instance
+      scannerRef.current = new Html5Qrcode(scannerContainerId);
       
-      console.log('🎥 Starting scanner with device:', deviceId || 'default');
+      // Determine which camera to use
+      const cameraId = selectedCameraId || (facing === 'environment' ? { facingMode: 'environment' } : { facingMode: 'user' });
+      
+      console.log('🎥 Starting HTML5 QR scanner with camera:', cameraId);
 
-      // Use decodeFromVideoDevice for more reliable continuous scanning
-      const controls = await codeReader.decodeFromVideoDevice(
-        deviceId,
-        videoRef.current,
-        (result, error, controls) => {
-          if (result) {
-            const qrText = result.getText();
-            const now = Date.now();
-            
-            // Debounce: prevent scanning same code within 3 seconds
-            if (qrText === lastScannedRef.current && now - lastScanTimeRef.current < 3000) {
-              console.log('🔄 Debounced duplicate scan:', qrText);
-              return;
-            }
-            
-            lastScannedRef.current = qrText;
-            lastScanTimeRef.current = now;
-            
-            console.log('✅ QR Code scanned:', qrText);
-            
-            // Vibrate on successful scan (mobile)
-            if (navigator.vibrate) {
-              navigator.vibrate(200);
-            }
-            processQRScan(qrText, 'mobile_camera');
+      const config = {
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
+        aspectRatio: 1.0,
+        disableFlip: false,
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true
+        }
+      };
+
+      await scannerRef.current.start(
+        cameraId,
+        config,
+        (decodedText, decodedResult) => {
+          const now = Date.now();
+          
+          // Debounce: prevent scanning same code within 3 seconds
+          if (decodedText === lastScannedRef.current && now - lastScanTimeRef.current < 3000) {
+            console.log('🔄 Debounced duplicate scan:', decodedText);
+            return;
           }
-          // Note: errors are normal during scanning (no QR found), only log real errors
-          if (error && error.name !== 'NotFoundException') {
-            console.log('Scanner error:', error.name, error.message);
+          
+          lastScannedRef.current = decodedText;
+          lastScanTimeRef.current = now;
+          
+          console.log('✅ QR Code scanned:', decodedText);
+          
+          // Vibrate on successful scan (mobile)
+          if (navigator.vibrate) {
+            navigator.vibrate(200);
           }
+          
+          processQRScan(decodedText, 'mobile_camera');
+        },
+        (errorMessage) => {
+          // This is called continuously when no QR code is found - ignore it
+          // Only log actual errors, not "QR code not found" messages
         }
       );
-      
-      scannerControlsRef.current = controls;
-      
-      // Check for flash/torch capability
-      if (streamRef.current) {
-        const videoTrack = streamRef.current.getVideoTracks()[0];
-        if (videoTrack) {
-          const capabilities = videoTrack.getCapabilities?.() as any;
-          if (capabilities?.torch) {
-            setHasFlash(true);
-          }
-        }
-      }
 
+      setIsScanning(true);
       localStorage.setItem(CAMERA_CONSENT_KEY, 'true');
       toast.success('📷 Camera ready! Point at QR code to scan.');
 
@@ -264,41 +190,15 @@ export const DispatchScanner: React.FC = () => {
       setIsScanning(false);
       
       // Provide helpful error messages
-      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+      if (error.message?.includes('Permission') || error.name === 'NotAllowedError') {
         setCameraError('Camera permission denied. Please allow camera access in your browser settings.');
         toast.error('Camera permission denied');
-      } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+      } else if (error.message?.includes('not found') || error.name === 'NotFoundError') {
         setCameraError('No camera found on this device.');
         toast.error('No camera found');
-      } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+      } else if (error.message?.includes('in use') || error.name === 'NotReadableError') {
         setCameraError('Camera is in use by another application. Please close other apps using the camera.');
         toast.error('Camera is busy');
-      } else if (error.name === 'OverconstrainedError') {
-        // Try with simpler constraints - use default camera
-        try {
-          console.log('🔄 Retrying with default camera...');
-          const controls = await codeReader.decodeFromVideoDevice(
-            undefined, // Use default camera
-            videoRef.current!,
-            (result, error) => {
-              if (result) {
-                const qrText = result.getText();
-                const now = Date.now();
-                if (qrText === lastScannedRef.current && now - lastScanTimeRef.current < 3000) return;
-                lastScannedRef.current = qrText;
-                lastScanTimeRef.current = now;
-                if (navigator.vibrate) navigator.vibrate(200);
-                processQRScan(qrText, 'mobile_camera');
-              }
-            }
-          );
-          scannerControlsRef.current = controls;
-          setIsScanning(true);
-          toast.success('Camera started with basic settings');
-        } catch (fallbackError) {
-          setCameraError('Could not start camera with available settings.');
-          toast.error('Camera settings not supported');
-        }
       } else {
         setCameraError(`Camera error: ${error.message || 'Unknown error'}`);
         toast.error('Failed to access camera');
@@ -306,13 +206,22 @@ export const DispatchScanner: React.FC = () => {
     }
   };
 
-  const stopScanning = () => {
-    cleanupCamera();
+  const stopScanning = async () => {
+    try {
+      if (scannerRef.current) {
+        const state = scannerRef.current.getState();
+        if (state === Html5QrcodeScannerState.SCANNING || state === Html5QrcodeScannerState.PAUSED) {
+          await scannerRef.current.stop();
+        }
+        scannerRef.current.clear();
+        scannerRef.current = null;
+      }
+    } catch (e) {
+      console.log('Scanner cleanup:', e);
+    }
     setIsScanning(false);
-    setFlashOn(false);
     lastScannedRef.current = '';
     lastScanTimeRef.current = 0;
-    toast.info('Scanner stopped');
   };
 
   const toggleCamera = async () => {
@@ -322,32 +231,14 @@ export const DispatchScanner: React.FC = () => {
       setFacing(next);
     } else {
       // Cycle through available cameras
-      const currentIndex = availableCameras.findIndex(c => c.deviceId === selectedCameraId);
+      const currentIndex = availableCameras.findIndex(c => c.id === selectedCameraId);
       const nextIndex = (currentIndex + 1) % availableCameras.length;
-      setSelectedCameraId(availableCameras[nextIndex].deviceId);
+      setSelectedCameraId(availableCameras[nextIndex].id);
     }
     
     if (isScanning) {
-      stopScanning();
+      await stopScanning();
       setTimeout(() => startCameraScanning(), 300);
-    }
-  };
-
-  const toggleFlash = async () => {
-    if (!streamRef.current) return;
-    
-    const videoTrack = streamRef.current.getVideoTracks()[0];
-    if (videoTrack) {
-      try {
-        await videoTrack.applyConstraints({
-          advanced: [{ torch: !flashOn } as any]
-        });
-        setFlashOn(!flashOn);
-        toast.success(flashOn ? 'Flash off' : 'Flash on');
-      } catch (error) {
-        console.error('Flash toggle error:', error);
-        toast.error('Could not toggle flash');
-      }
     }
   };
 
@@ -539,43 +430,15 @@ export const DispatchScanner: React.FC = () => {
             </Alert>
           )}
           
-          {/* Camera View */}
-          <div className="relative bg-black rounded-lg overflow-hidden">
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              webkit-playsinline="true"
-              className="w-full h-72 md:h-80 object-cover"
-              style={{ transform: facing === 'user' ? 'scaleX(-1)' : 'none' }}
+          {/* Camera View - html5-qrcode creates its own video element */}
+          <div className="relative bg-black rounded-lg overflow-hidden min-h-[300px]">
+            {/* Scanner container - html5-qrcode will render here */}
+            <div 
+              id={scannerContainerId} 
+              className="w-full"
+              style={{ minHeight: '300px' }}
             />
             
-            {/* Scanning overlay */}
-            {isScanning && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                {/* Scanning frame */}
-                <div className="relative w-56 h-56 md:w-64 md:h-64">
-                  {/* Corner brackets */}
-                  <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-green-500 rounded-tl-lg" />
-                  <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-green-500 rounded-tr-lg" />
-                  <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-green-500 rounded-bl-lg" />
-                  <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-green-500 rounded-br-lg" />
-                  
-                  {/* Scanning line animation */}
-                  <div className="absolute inset-x-4 h-0.5 bg-green-500 animate-scan-line" 
-                       style={{ animation: 'scan-line 2s ease-in-out infinite' }} />
-                </div>
-                
-                {/* Instruction text */}
-                <div className="absolute bottom-4 left-0 right-0 text-center">
-                  <span className="bg-black/70 text-white text-sm px-3 py-1 rounded-full">
-                    📱 Point camera at QR code
-                  </span>
-                </div>
-              </div>
-            )}
-
             {/* Not scanning overlay */}
             {!isScanning && !cameraError && (
               <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80">
@@ -584,6 +447,15 @@ export const DispatchScanner: React.FC = () => {
                   <p className="text-sm opacity-70">Camera not active</p>
                   <p className="text-xs opacity-50">Tap "Start Scanner" to begin</p>
                 </div>
+              </div>
+            )}
+            
+            {/* Scanning indicator */}
+            {isScanning && (
+              <div className="absolute bottom-4 left-0 right-0 text-center pointer-events-none">
+                <span className="bg-green-600 text-white text-sm px-3 py-1 rounded-full animate-pulse">
+                  🔍 Scanning for QR codes...
+                </span>
               </div>
             )}
           </div>
@@ -596,31 +468,21 @@ export const DispatchScanner: React.FC = () => {
                 Start Scanner
               </Button>
             ) : (
-              <Button onClick={stopScanning} variant="destructive" className="flex-1 sm:flex-none" size="lg">
+              <Button onClick={() => { stopScanning(); toast.info('Scanner stopped'); }} variant="destructive" className="flex-1 sm:flex-none" size="lg">
                 <RotateCcw className="h-5 w-5 mr-2" />
                 Stop Scanner
               </Button>
             )}
             
-            <Button 
-              onClick={toggleCamera} 
-              variant="outline" 
-              size="lg"
-              disabled={!isScanning && availableCameras.length <= 1}
-              title={availableCameras.length > 1 ? 'Switch between cameras' : 'Toggle front/back camera'}
-            >
-              <RotateCcw className="h-5 w-5 mr-2" />
-              {isMobile ? 'Flip' : 'Switch Camera'}
-            </Button>
-
-            {hasFlash && isScanning && (
+            {availableCameras.length > 1 && (
               <Button 
-                onClick={toggleFlash} 
-                variant={flashOn ? 'default' : 'outline'}
+                onClick={toggleCamera} 
+                variant="outline" 
                 size="lg"
-                title="Toggle flashlight"
+                title="Switch between cameras"
               >
-                <Flashlight className={`h-5 w-5 ${flashOn ? 'text-yellow-300' : ''}`} />
+                <RotateCcw className="h-5 w-5 mr-2" />
+                {isMobile ? 'Flip' : 'Switch Camera'}
               </Button>
             )}
           </div>
@@ -629,10 +491,10 @@ export const DispatchScanner: React.FC = () => {
           {availableCameras.length > 1 && (
             <div className="space-y-2">
               <Label className="text-sm text-muted-foreground">Select Camera</Label>
-              <Select value={selectedCameraId} onValueChange={(value) => {
+              <Select value={selectedCameraId} onValueChange={async (value) => {
                 setSelectedCameraId(value);
                 if (isScanning) {
-                  stopScanning();
+                  await stopScanning();
                   setTimeout(() => startCameraScanning(), 300);
                 }
               }}>
@@ -641,7 +503,7 @@ export const DispatchScanner: React.FC = () => {
                 </SelectTrigger>
                 <SelectContent>
                   {availableCameras.map((camera, index) => (
-                    <SelectItem key={camera.deviceId} value={camera.deviceId}>
+                    <SelectItem key={camera.id} value={camera.id}>
                       {camera.label || `Camera ${index + 1}`}
                     </SelectItem>
                   ))}
