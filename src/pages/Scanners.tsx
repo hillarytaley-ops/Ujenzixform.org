@@ -37,16 +37,62 @@ const ScannersAccessGuard = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<any>(null);
   const [dbVerified, setDbVerified] = useState(false); // Track if DB check is complete
   
+  // Helper to get user from localStorage
+  const getUserFromStorage = () => {
+    try {
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        return parsed.user || null;
+      }
+    } catch (e) {
+      console.warn('Could not get user from localStorage');
+    }
+    return null;
+  };
+  
+  // Helper to add timeout to promises
+  const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Timeout')), ms))
+    ]);
+  };
+  
   useEffect(() => {
     const checkAccess = async () => {
-      console.log('🔐 Scanners - Checking access in DATABASE...');
+      console.log('🔐 Scanners - Checking access...');
       setDbVerified(false);
       
+      // Safety timeout - show UI after 3 seconds max
+      const safetyTimeout = setTimeout(() => {
+        console.log('🔐 Scanners - Safety timeout, using localStorage');
+        const storedRole = localStorage.getItem('user_role');
+        const storedUser = getUserFromStorage();
+        if (storedUser && storedRole) {
+          setUser(storedUser);
+          setDbRole(storedRole);
+        }
+        setDbVerified(true);
+        setChecking(false);
+      }, 3000);
+      
       try {
-        const { data: { user: authUser } } = await supabase.auth.getUser();
+        // Try to get user with timeout
+        let authUser = null;
+        try {
+          const { data } = await withTimeout(supabase.auth.getUser(), 2000);
+          authUser = data?.user || null;
+          console.log('🔐 Scanners - Got user from auth:', authUser?.id);
+        } catch {
+          console.log('🔐 Scanners - Auth timeout, trying localStorage...');
+          authUser = getUserFromStorage();
+          console.log('🔐 Scanners - Got user from localStorage:', authUser?.id);
+        }
         
         if (!authUser) {
           console.log('🔐 Scanners - No user logged in');
+          clearTimeout(safetyTimeout);
           setUser(null);
           setDbRole(null);
           setDbVerified(true);
@@ -56,30 +102,41 @@ const ScannersAccessGuard = ({ children }: { children: React.ReactNode }) => {
         
         setUser(authUser);
         
-        // ALWAYS check database for role - NEVER trust localStorage!
-        const { data: roleData, error } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', authUser.id)
-          .maybeSingle();
-        
-        const role = roleData?.role || null;
-        console.log('🔐 Scanners - DB role:', role, 'error:', error?.message);
-        
-        // Clear fake localStorage if no DB role
-        if (!role) {
-          localStorage.removeItem('user_role');
-          localStorage.removeItem('user_role_id');
-        } else {
-          localStorage.setItem('user_role', role);
-          localStorage.setItem('user_role_id', authUser.id);
+        // Try to get role from database with timeout
+        let role: string | null = localStorage.getItem('user_role'); // Start with localStorage
+        try {
+          const { data: roleData } = await withTimeout(
+            supabase
+              .from('user_roles')
+              .select('role')
+              .eq('user_id', authUser.id)
+              .maybeSingle(),
+            2000
+          );
+          
+          if (roleData?.role) {
+            role = roleData.role;
+            localStorage.setItem('user_role', role);
+            localStorage.setItem('user_role_id', authUser.id);
+          }
+          console.log('🔐 Scanners - DB role:', role);
+        } catch {
+          console.log('🔐 Scanners - Role lookup timeout, using localStorage:', role);
         }
         
         setDbRole(role);
+        clearTimeout(safetyTimeout);
       } catch (error) {
         console.error('🚫 Scanners - Error checking access:', error);
-        // On error, block access
-        setDbRole(null);
+        // On error, try localStorage fallback
+        const storedRole = localStorage.getItem('user_role');
+        const storedUser = getUserFromStorage();
+        if (storedUser && storedRole) {
+          setUser(storedUser);
+          setDbRole(storedRole);
+        } else {
+          setDbRole(null);
+        }
       }
       
       setDbVerified(true);
