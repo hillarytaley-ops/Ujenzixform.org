@@ -702,15 +702,33 @@ const PrivateClientDashboard = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {user?.id ? (
-                  <BuilderOrdersTracker builderId={user.id} />
-                ) : (
-                  <div className="text-center py-12 text-gray-500">
-                    <QrCode className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-                    <p className="text-lg font-medium">Loading...</p>
-                    <p className="text-sm">Please wait while we load your order tracking data</p>
-                  </div>
-                )}
+                {(() => {
+                  // Get builderId with localStorage fallback
+                  let builderId = user?.id || '';
+                  if (!builderId) {
+                    try {
+                      const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+                      if (stored) {
+                        const parsed = JSON.parse(stored);
+                        builderId = parsed.user?.id || '';
+                      }
+                    } catch (e) {}
+                    // Also check other localStorage keys
+                    if (!builderId) {
+                      builderId = localStorage.getItem('user_id') || '';
+                    }
+                  }
+                  
+                  return builderId ? (
+                    <BuilderOrdersTracker builderId={builderId} />
+                  ) : (
+                    <div className="text-center py-12 text-gray-500">
+                      <QrCode className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+                      <p className="text-lg font-medium">Loading...</p>
+                      <p className="text-sm">Please wait while we load your order tracking data</p>
+                    </div>
+                  );
+                })()}
               </CardContent>
             </Card>
           </TabsContent>

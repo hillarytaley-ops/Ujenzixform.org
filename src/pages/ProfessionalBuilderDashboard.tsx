@@ -1202,7 +1202,23 @@ const ProfessionalBuilderDashboardPage = () => {
           </TabsContent>
 
           <TabsContent value="orders">
-            <BuilderOrdersTracker builderId={user?.id || ''} />
+            {(() => {
+              // Get builderId with localStorage fallback
+              let builderId = user?.id || '';
+              if (!builderId) {
+                try {
+                  const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+                  if (stored) {
+                    const parsed = JSON.parse(stored);
+                    builderId = parsed.user?.id || '';
+                  }
+                } catch (e) {}
+                if (!builderId) {
+                  builderId = localStorage.getItem('user_id') || '';
+                }
+              }
+              return <BuilderOrdersTracker builderId={builderId} />;
+            })()}
           </TabsContent>
 
           <TabsContent value="deliveries">

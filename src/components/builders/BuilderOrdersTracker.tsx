@@ -235,7 +235,20 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
     if (builderId) {
       fetchOrders();
       fetchScanEvents();
-      setupRealtimeSubscription();
+      const cleanup = setupRealtimeSubscription();
+      
+      // Safety timeout - stop loading after 10 seconds max
+      const timeout = setTimeout(() => {
+        setLoading(false);
+      }, 10000);
+      
+      return () => {
+        clearTimeout(timeout);
+        if (cleanup) cleanup();
+      };
+    } else {
+      // No builderId - stop loading immediately
+      setLoading(false);
     }
   }, [builderId]);
 
