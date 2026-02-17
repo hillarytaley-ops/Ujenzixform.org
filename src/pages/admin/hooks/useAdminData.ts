@@ -283,14 +283,41 @@ export const useFeedback = () => {
   const fetchFeedback = useCallback(async () => {
     try {
       setLoading(true);
-      const client = getAdminClient() || supabase;
-
-      const { data, error } = await client
-        .from('feedback')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      
+      // Use REST API with timeout for reliability
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      
+      let accessToken = ANON_KEY;
+      try {
+        const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          accessToken = parsed.access_token || ANON_KEY;
+        }
+      } catch (e) {}
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/feedback?select=*&order=created_at.desc`,
+        {
+          headers: {
+            'apikey': ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+          },
+          signal: controller.signal
+        }
+      );
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('📝 Feedback loaded:', data?.length || 0);
 
       const formattedFeedback: FeedbackRecord[] = (data || []).map((f: Record<string, unknown>) => ({
         id: f.id as string,
@@ -311,13 +338,15 @@ export const useFeedback = () => {
       }));
 
       setFeedback(formattedFeedback);
-    } catch (error) {
-      console.error('Error fetching feedback:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load feedback',
-        variant: 'destructive',
-      });
+    } catch (error: any) {
+      if (error?.name !== 'AbortError') {
+        console.error('Error fetching feedback:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load feedback',
+          variant: 'destructive',
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -325,6 +354,13 @@ export const useFeedback = () => {
 
   useEffect(() => {
     fetchFeedback();
+    
+    // Safety timeout to prevent infinite loading
+    const safetyTimeout = setTimeout(() => {
+      setLoading(false);
+    }, 10000);
+    
+    return () => clearTimeout(safetyTimeout);
   }, [fetchFeedback]);
 
   return { feedback, loading, refetch: fetchFeedback };
