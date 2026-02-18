@@ -132,14 +132,127 @@ const SupplierAuth: React.FC = () => {
     e.preventDefault();
     setIsLoading(true);
     if (!fullName.trim() || !companyName.trim()) { setIsLoading(false); toast({ title: 'Error', description: 'Please enter your full name and company name', variant: 'destructive' }); return; }
+    
     try {
+      // First, try to sign in to check if user already exists
+      console.log('🔐 Checking if user already exists...');
+      const signInResponse = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
+        body: JSON.stringify({ email: email.trim(), password }),
+      });
+      const signInData = await signInResponse.json();
+      
+      if (signInResponse.ok && signInData.access_token && signInData.user) {
+        // User already exists! Update their role to supplier
+        console.log('🔐 User exists! Updating role to supplier...');
+        const userId = signInData.user.id;
+        const accessToken = signInData.access_token;
+        
+        // Check current role
+        const roleCheckResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${userId}&select=role`,
+          { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}` } }
+        );
+        const roleCheckData = await roleCheckResponse.json();
+        const currentRole = roleCheckData?.[0]?.role;
+        
+        if (currentRole === ROLE) {
+          // Already a supplier - just redirect
+          console.log('🔐 User is already a supplier, redirecting...');
+          localStorage.setItem('sb-wuuyjjpgzgeimiptuuws-auth-token', JSON.stringify({
+            access_token: accessToken,
+            refresh_token: signInData.refresh_token,
+            expires_at: Math.floor(Date.now() / 1000) + signInData.expires_in,
+            expires_in: signInData.expires_in,
+            token_type: signInData.token_type,
+            user: signInData.user
+          }));
+          localStorage.setItem('user_role', ROLE);
+          localStorage.setItem('user_role_id', userId);
+          localStorage.setItem('user_email', signInData.user.email || '');
+          toast({ title: 'Welcome back!', description: 'Redirecting to your dashboard...' });
+          window.location.href = DASHBOARD;
+          return;
+        }
+        
+        // Update or insert role
+        if (currentRole) {
+          // Update existing role
+          console.log('🔐 Updating role from', currentRole, 'to', ROLE);
+          await fetch(`${SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${userId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}`, 'Prefer': 'return=minimal' },
+            body: JSON.stringify({ role: ROLE }),
+          });
+        } else {
+          // Insert new role
+          console.log('🔐 Inserting new role:', ROLE);
+          await fetch(`${SUPABASE_URL}/rest/v1/user_roles`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}`, 'Prefer': 'return=minimal' },
+            body: JSON.stringify({ user_id: userId, role: ROLE }),
+          });
+        }
+        
+        // Create/update supplier profile
+        console.log('🔐 Creating supplier profile...');
+        await fetch(`${SUPABASE_URL}/rest/v1/suppliers`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}`, 'Prefer': 'return=minimal,resolution=merge-duplicates' },
+          body: JSON.stringify({ 
+            user_id: userId, 
+            business_name: companyName.trim(),
+            contact_name: fullName.trim(),
+            email: email.trim(),
+            phone: phone || null,
+            location: location || null,
+            status: 'active'
+          }),
+        });
+        
+        // Store session and redirect
+        localStorage.setItem('sb-wuuyjjpgzgeimiptuuws-auth-token', JSON.stringify({
+          access_token: accessToken,
+          refresh_token: signInData.refresh_token,
+          expires_at: Math.floor(Date.now() / 1000) + signInData.expires_in,
+          expires_in: signInData.expires_in,
+          token_type: signInData.token_type,
+          user: signInData.user
+        }));
+        localStorage.setItem('user_role', ROLE);
+        localStorage.setItem('user_role_id', userId);
+        localStorage.setItem('user_email', signInData.user.email || '');
+        
+        toast({ title: '✅ Supplier Profile Created!', description: 'Redirecting to your dashboard...' });
+        window.location.href = DASHBOARD;
+        return;
+      }
+      
+      // User doesn't exist - create new account
+      console.log('🔐 Creating new user account...');
       const response = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
         body: JSON.stringify({ email: email.trim(), password, data: { full_name: fullName.trim(), role: ROLE, company_name: companyName.trim() } }),
       });
       const data = await response.json();
-      if (!response.ok || data.error) { setIsLoading(false); toast({ title: 'Registration failed', description: data.error_description || data.error, variant: 'destructive' }); return; }
+      
+      if (!response.ok || data.error) { 
+        // Check if error is "already registered"
+        if (data.error_description?.includes('already') || data.msg?.includes('already')) {
+          setIsLoading(false);
+          toast({ 
+            title: 'Account exists', 
+            description: 'This email is already registered. Please check your password and try again.',
+            variant: 'destructive' 
+          });
+          return;
+        }
+        setIsLoading(false); 
+        toast({ title: 'Registration failed', description: data.error_description || data.error || data.msg, variant: 'destructive' }); 
+        return; 
+      }
       
       // Insert role into user_roles table
       if (data.user?.id) {
