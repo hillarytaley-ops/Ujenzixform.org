@@ -172,32 +172,55 @@ export const StaffManagement = () => {
     }
   };
 
-  // Fetch staff members
+  // Fetch staff members using REST API with timeout
   const fetchStaffMembers = async () => {
     setLoading(true);
+    console.log('👥 Fetching staff members...');
+    
+    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+    
+    // Get access token
+    let accessToken = '';
     try {
-      // Try to fetch with all columns including staff_code
-      let { data, error } = await db
-        .from('admin_staff')
-        .select('id, email, full_name, phone, role, staff_code, status, created_at, last_login, created_by')
-        .order('created_at', { ascending: false });
-
-      // If staff_code column doesn't exist, fetch without it
-      if (error && error.message?.includes('staff_code')) {
-        console.log('📝 staff_code column not found, fetching without it...');
-        const result = await db
-          .from('admin_staff')
-          .select('id, email, full_name, phone, role, status, created_at, last_login, created_by')
-          .order('created_at', { ascending: false });
-        data = result.data;
-        error = result.error;
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        accessToken = parsed.access_token || '';
       }
-
-      if (error) {
-        console.error('Error fetching staff:', error);
-        // If table doesn't exist, show empty state
+    } catch (e) {
+      console.log('👥 Could not get access token from localStorage');
+    }
+    
+    try {
+      // Use fetch with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/admin_staff?select=id,email,full_name,phone,role,staff_code,status,created_at,last_login,created_by,custom_tabs&order=created_at.desc`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+          },
+          signal: controller.signal
+        }
+      );
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        console.error('👥 Staff fetch error:', response.status);
         setStaffMembers([]);
-      } else {
+        setLoading(false);
+        return;
+      }
+      
+      const data = await response.json();
+      console.log('👥 Staff members fetched:', data?.length || 0);
+
+      if (data) {
         // Add empty staff_code if not present
         const staffWithCode = (data || []).map((staff: any) => ({
           ...staff,
@@ -206,8 +229,12 @@ export const StaffManagement = () => {
         setStaffMembers(staffWithCode);
         console.log('👥 Loaded', staffWithCode.length, 'staff members');
       }
-    } catch (err) {
-      console.error('Staff fetch error:', err);
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.log('👥 Staff fetch timed out');
+      } else {
+        console.error('👥 Staff fetch error:', err);
+      }
       setStaffMembers([]);
     } finally {
       setLoading(false);
@@ -216,6 +243,13 @@ export const StaffManagement = () => {
 
   useEffect(() => {
     fetchStaffMembers();
+    
+    // Safety timeout - ensure loading stops after 12 seconds
+    const safetyTimeout = setTimeout(() => {
+      setLoading(false);
+    }, 12000);
+    
+    return () => clearTimeout(safetyTimeout);
   }, []);
 
   // State for generated staff code
