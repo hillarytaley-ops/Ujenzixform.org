@@ -62,8 +62,12 @@ import {
   Copy,
   UserCheck,
   UserX,
-  Clock
+  Clock,
+  Settings,
+  Check,
+  X
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { logActivity } from "@/utils/activityLogger";
 
 interface StaffMember {
@@ -77,6 +81,7 @@ interface StaffMember {
   created_at: string;
   last_login?: string;
   created_by?: string;
+  custom_tabs?: string[]; // Custom tab permissions (overrides role defaults)
 }
 
 import { STAFF_ROLES as ROLE_CONFIG, getAllStaffRoles, TAB_METADATA, AdminTab } from '@/config/staffPermissions';
@@ -108,6 +113,14 @@ export const StaffManagement = () => {
     role: 'support',
     password: ''
   });
+
+  // Edit staff state
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
+  const [editRole, setEditRole] = useState('');
+  const [editCustomTabs, setEditCustomTabs] = useState<string[]>([]);
+  const [useCustomTabs, setUseCustomTabs] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   // Generate random password
   const generatePassword = () => {
@@ -408,6 +421,97 @@ export const StaffManagement = () => {
       title: "Copied!",
       description: "Password copied to clipboard."
     });
+  };
+
+  // Open edit dialog for a staff member
+  const openEditDialog = (staff: StaffMember) => {
+    setEditingStaff(staff);
+    setEditRole(staff.role);
+    // If staff has custom tabs, use those; otherwise use role defaults
+    const roleConfig = STAFF_ROLES.find(r => r.value === staff.role);
+    if (staff.custom_tabs && staff.custom_tabs.length > 0) {
+      setEditCustomTabs(staff.custom_tabs);
+      setUseCustomTabs(true);
+    } else {
+      setEditCustomTabs(roleConfig?.allowedTabs || []);
+      setUseCustomTabs(false);
+    }
+    setShowEditDialog(true);
+  };
+
+  // Handle role change in edit dialog
+  const handleEditRoleChange = (newRole: string) => {
+    setEditRole(newRole);
+    // If not using custom tabs, update to new role's default tabs
+    if (!useCustomTabs) {
+      const roleConfig = STAFF_ROLES.find(r => r.value === newRole);
+      setEditCustomTabs(roleConfig?.allowedTabs || []);
+    }
+  };
+
+  // Toggle a tab in custom permissions
+  const toggleTab = (tab: string) => {
+    setEditCustomTabs(prev => 
+      prev.includes(tab) 
+        ? prev.filter(t => t !== tab)
+        : [...prev, tab]
+    );
+  };
+
+  // Save staff changes
+  const handleSaveStaff = async () => {
+    if (!editingStaff) return;
+    
+    setSaving(true);
+    try {
+      const updateData: any = {
+        role: editRole
+      };
+      
+      // If using custom tabs, save them; otherwise clear custom_tabs
+      if (useCustomTabs) {
+        updateData.custom_tabs = editCustomTabs;
+      } else {
+        updateData.custom_tabs = null;
+      }
+
+      const { error } = await db
+        .from('admin_staff')
+        .update(updateData)
+        .eq('id', editingStaff.id);
+
+      if (error) throw error;
+
+      // Log the activity
+      await logActivity({
+        action: 'staff_role_updated',
+        category: 'admin',
+        details: `Updated role for ${editingStaff.email} to ${editRole}${useCustomTabs ? ' with custom permissions' : ''}`,
+        metadata: { 
+          staff_id: editingStaff.id, 
+          old_role: editingStaff.role, 
+          new_role: editRole,
+          custom_tabs: useCustomTabs ? editCustomTabs : null
+        }
+      });
+
+      toast({
+        title: "Staff Updated",
+        description: `${editingStaff.full_name}'s role and permissions have been updated.`
+      });
+
+      setShowEditDialog(false);
+      setEditingStaff(null);
+      fetchStaffMembers();
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Update Failed",
+        description: error.message
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -760,6 +864,16 @@ export const StaffManagement = () => {
                             <SelectItem value="suspended">Suspended</SelectItem>
                           </SelectContent>
                         </Select>
+
+                        {/* Edit Button */}
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="h-8 border-blue-600 text-blue-400 hover:bg-blue-600/20"
+                          onClick={() => openEditDialog(staff)}
+                        >
+                          <Edit className="h-3 w-3" />
+                        </Button>
                         
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
@@ -843,6 +957,204 @@ export const StaffManagement = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Edit Staff Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="bg-slate-900 border-slate-700 max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <Settings className="h-5 w-5 text-blue-400" />
+              Edit Staff Member
+            </DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Change role and customize dashboard access permissions for {editingStaff?.full_name}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            {/* Staff Info */}
+            <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center">
+                  <User className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-white font-medium">{editingStaff?.full_name}</p>
+                  <p className="text-gray-400 text-sm">{editingStaff?.email}</p>
+                </div>
+                <code className="ml-auto text-green-400 font-mono text-xs bg-slate-800 px-2 py-1 rounded">
+                  {editingStaff?.staff_code}
+                </code>
+              </div>
+            </div>
+
+            {/* Role Selection */}
+            <div className="space-y-2">
+              <Label className="text-gray-300 flex items-center gap-2">
+                <Shield className="h-4 w-4 text-purple-400" />
+                Staff Role
+              </Label>
+              <Select value={editRole} onValueChange={handleEditRoleChange}>
+                <SelectTrigger className="bg-slate-800 border-slate-600">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-800 border-slate-600 max-h-[300px]">
+                  {STAFF_ROLES.map((role) => (
+                    <SelectItem key={role.value} value={role.value}>
+                      <div className="flex items-center gap-2">
+                        <Badge className={`${role.color} text-xs`}>{role.label}</Badge>
+                        <span className="text-gray-400 text-xs">({role.allowedTabs.length} tabs)</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-gray-500 text-xs">
+                {STAFF_ROLES.find(r => r.value === editRole)?.description}
+              </p>
+            </div>
+
+            {/* Custom Permissions Toggle */}
+            <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+              <div>
+                <Label className="text-gray-300 flex items-center gap-2">
+                  <Settings className="h-4 w-4 text-orange-400" />
+                  Custom Tab Permissions
+                </Label>
+                <p className="text-gray-500 text-xs mt-1">
+                  Override default role permissions with custom access
+                </p>
+              </div>
+              <div 
+                className={`w-12 h-6 rounded-full cursor-pointer transition-colors ${useCustomTabs ? 'bg-orange-600' : 'bg-slate-600'}`}
+                onClick={() => {
+                  setUseCustomTabs(!useCustomTabs);
+                  if (!useCustomTabs) {
+                    // Switching to custom: keep current tabs
+                  } else {
+                    // Switching to role default: reset to role tabs
+                    const roleConfig = STAFF_ROLES.find(r => r.value === editRole);
+                    setEditCustomTabs(roleConfig?.allowedTabs || []);
+                  }
+                }}
+              >
+                <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform mt-0.5 ${useCustomTabs ? 'translate-x-6 ml-0.5' : 'translate-x-0.5'}`} />
+              </div>
+            </div>
+
+            {/* Tab Permissions Grid */}
+            <div className="space-y-3">
+              <Label className="text-gray-300">
+                {useCustomTabs ? 'Custom Tab Access' : 'Role Default Tabs'} ({editCustomTabs.length} selected)
+              </Label>
+              
+              {/* Group tabs by category */}
+              {['General', 'Operations', 'Logistics', 'Monitoring', 'Users', 'Support', 'Finance', 'Analytics', 'System', 'Admin'].map(category => {
+                const categoryTabs = Object.entries(TAB_METADATA)
+                  .filter(([_, meta]) => meta.category === category)
+                  .map(([tab]) => tab);
+                
+                if (categoryTabs.length === 0) return null;
+                
+                return (
+                  <div key={category} className="bg-slate-800/30 rounded-lg p-3 border border-slate-700/50">
+                    <p className="text-gray-400 text-xs font-medium mb-2">{category}</p>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                      {categoryTabs.map(tab => {
+                        const tabMeta = TAB_METADATA[tab as AdminTab];
+                        const isSelected = editCustomTabs.includes(tab);
+                        const isDisabled = !useCustomTabs;
+                        
+                        return (
+                          <div
+                            key={tab}
+                            className={`
+                              flex items-center gap-2 p-2 rounded-lg border transition-all cursor-pointer
+                              ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}
+                              ${isSelected 
+                                ? 'bg-indigo-600/20 border-indigo-500/50 text-indigo-300' 
+                                : 'bg-slate-800/50 border-slate-700 text-gray-400 hover:border-slate-600'
+                              }
+                            `}
+                            onClick={() => !isDisabled && toggleTab(tab)}
+                          >
+                            <div className={`w-4 h-4 rounded border flex items-center justify-center ${
+                              isSelected ? 'bg-indigo-600 border-indigo-500' : 'border-slate-600'
+                            }`}>
+                              {isSelected && <Check className="h-3 w-3 text-white" />}
+                            </div>
+                            <span className="text-xs truncate">{tabMeta?.name || tab}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Quick Actions */}
+            {useCustomTabs && (
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-slate-600 text-xs"
+                  onClick={() => setEditCustomTabs([...Object.keys(TAB_METADATA)])}
+                >
+                  Select All
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-slate-600 text-xs"
+                  onClick={() => setEditCustomTabs([])}
+                >
+                  Clear All
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-slate-600 text-xs"
+                  onClick={() => {
+                    const roleConfig = STAFF_ROLES.find(r => r.value === editRole);
+                    setEditCustomTabs(roleConfig?.allowedTabs || []);
+                  }}
+                >
+                  Reset to Role Default
+                </Button>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowEditDialog(false)}
+              className="border-slate-600"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveStaff}
+              disabled={saving}
+              className="bg-indigo-600 hover:bg-indigo-700"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Save Changes
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
