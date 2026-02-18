@@ -95,13 +95,17 @@ const STAFF_ROLES = getAllStaffRoles().map(role => ({
   allowedTabs: role.allowedTabs
 }));
 
+// Super Admin email - only this user can manage staff
+const SUPER_ADMIN_EMAIL = 'hillarytaley@gmail.com';
+
 export const StaffManagement = () => {
   const { toast } = useToast();
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
   const [currentUserRole, setCurrentUserRole] = useState<string>('');
+  const [currentUserEmail, setCurrentUserEmail] = useState<string>('');
   
-  // Check if current user is super admin
-  const isSuperAdmin = currentUserRole === 'super_admin';
+  // Check if current user is super admin (by role OR by email)
+  const isSuperAdmin = currentUserRole === 'super_admin' || currentUserEmail === SUPER_ADMIN_EMAIL;
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -279,6 +283,10 @@ export const StaffManagement = () => {
                 setCurrentUserRole(data[0].role);
               }
             }
+            
+            // Also set the email for super admin check
+            console.log('👥 Current user email:', userEmail);
+            setCurrentUserEmail(userEmail);
           }
         }
       } catch (e) {
@@ -998,7 +1006,8 @@ export const StaffManagement = () => {
         </CardContent>
       </Card>
 
-      {/* Role Permissions Info */}
+      {/* Role Permissions Info - Only visible to Super Admin */}
+      {isSuperAdmin && (
       <Card className="bg-slate-900/50 border-slate-800">
         <CardHeader>
           <CardTitle className="text-white flex items-center gap-2">
@@ -1043,6 +1052,7 @@ export const StaffManagement = () => {
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* Edit Staff Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
