@@ -98,6 +98,10 @@ const STAFF_ROLES = getAllStaffRoles().map(role => ({
 export const StaffManagement = () => {
   const { toast } = useToast();
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
+  const [currentUserRole, setCurrentUserRole] = useState<string>('');
+  
+  // Check if current user is super admin
+  const isSuperAdmin = currentUserRole === 'super_admin';
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -243,6 +247,46 @@ export const StaffManagement = () => {
 
   useEffect(() => {
     fetchStaffMembers();
+    
+    // Get current user's role from localStorage or admin_staff table
+    const getCurrentUserRole = async () => {
+      try {
+        // First check localStorage for staff role
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          const userEmail = parsed.user?.email;
+          
+          if (userEmail) {
+            // Check if this user is in admin_staff and get their role
+            const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+            
+            const response = await fetch(
+              `${SUPABASE_URL}/rest/v1/admin_staff?email=eq.${encodeURIComponent(userEmail)}&select=role`,
+              {
+                headers: {
+                  'apikey': SUPABASE_ANON_KEY,
+                  'Authorization': `Bearer ${parsed.access_token || SUPABASE_ANON_KEY}`,
+                }
+              }
+            );
+            
+            if (response.ok) {
+              const data = await response.json();
+              if (data?.[0]?.role) {
+                console.log('👥 Current user role:', data[0].role);
+                setCurrentUserRole(data[0].role);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.log('👥 Could not get current user role');
+      }
+    };
+    
+    getCurrentUserRole();
     
     // Safety timeout - ensure loading stops after 12 seconds
     const safetyTimeout = setTimeout(() => {
@@ -597,6 +641,8 @@ export const StaffManagement = () => {
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Refresh
               </Button>
+              {/* Add Staff Member - Only visible to Super Admin */}
+              {isSuperAdmin && (
               <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
                 <DialogTrigger asChild>
                   <Button className="bg-indigo-600 hover:bg-indigo-700">
@@ -827,6 +873,7 @@ export const StaffManagement = () => {
                   )}
                 </DialogContent>
               </Dialog>
+              )}
             </div>
           </div>
         </CardHeader>
@@ -899,30 +946,34 @@ export const StaffManagement = () => {
                           </SelectContent>
                         </Select>
 
-                        {/* Edit Button */}
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          className="h-8 border-blue-600 text-blue-400 hover:bg-blue-600/20"
-                          onClick={() => openEditDialog(staff)}
-                        >
-                          <Edit className="h-3 w-3" />
-                        </Button>
+                        {/* Edit Button - Only visible to Super Admin */}
+                        {isSuperAdmin && (
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="h-8 border-blue-600 text-blue-400 hover:bg-blue-600/20"
+                            onClick={() => openEditDialog(staff)}
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                        )}
                         
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button size="sm" variant="destructive" className="h-8">
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent className="bg-slate-900 border-slate-700">
-                            <AlertDialogHeader>
-                              <AlertDialogTitle className="text-white">Remove Staff Member?</AlertDialogTitle>
-                              <AlertDialogDescription className="text-gray-400">
-                                This will remove {staff.full_name} ({staff.email}) from the staff list.
-                                This action cannot be undone.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
+                        {/* Delete Button - Only visible to Super Admin */}
+                        {isSuperAdmin && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button size="sm" variant="destructive" className="h-8">
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent className="bg-slate-900 border-slate-700">
+                              <AlertDialogHeader>
+                                <AlertDialogTitle className="text-white">Remove Staff Member?</AlertDialogTitle>
+                                <AlertDialogDescription className="text-gray-400">
+                                  This will remove {staff.full_name} ({staff.email}) from the staff list.
+                                  This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel className="bg-slate-800 border-slate-600">
                                 Cancel
@@ -936,6 +987,7 @@ export const StaffManagement = () => {
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
