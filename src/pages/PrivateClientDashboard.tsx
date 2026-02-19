@@ -727,44 +727,84 @@ const PrivateClientDashboard = () => {
       {/* Main Content */}
       <div className="container mx-auto max-w-7xl px-4 py-8">
         <Tabs defaultValue="orders" className="space-y-6">
-          <TabsList className="bg-white shadow-sm border">
-            <TabsTrigger value="orders" className="data-[state=active]:bg-green-500 data-[state=active]:text-white">
-              <Package className="h-4 w-4 mr-2" />
-              My Orders
-            </TabsTrigger>
-            <TabsTrigger value="order-tracking" className="data-[state=active]:bg-cyan-500 data-[state=active]:text-white">
-              <QrCode className="h-4 w-4 mr-2" />
-              QR Scan Status
-            </TabsTrigger>
-            <TabsTrigger value="deliveries" className="data-[state=active]:bg-green-500 data-[state=active]:text-white">
-              <Truck className="h-4 w-4 mr-2" />
-              Deliveries
-            </TabsTrigger>
-            <TabsTrigger value="tracking" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
-              <NavigationIcon className="h-4 w-4 mr-2" />
-              Tracking
-            </TabsTrigger>
-            <TabsTrigger value="request-delivery" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
-              <Plus className="h-4 w-4 mr-2" />
-              Request Delivery
-            </TabsTrigger>
-            <TabsTrigger value="payments" className="data-[state=active]:bg-green-500 data-[state=active]:text-white">
-              <CreditCard className="h-4 w-4 mr-2" />
-              Payments
-            </TabsTrigger>
-            <TabsTrigger value="wishlist" className="data-[state=active]:bg-green-500 data-[state=active]:text-white">
-              <Heart className="h-4 w-4 mr-2" />
-              Wishlist
-            </TabsTrigger>
-            <TabsTrigger value="monitoring" className="data-[state=active]:bg-cyan-500 data-[state=active]:text-white">
-              <Video className="h-4 w-4 mr-2" />
-              Monitoring
-            </TabsTrigger>
-            <TabsTrigger value="support" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white">
-              <Headphones className="h-4 w-4 mr-2" />
-              Support
-            </TabsTrigger>
-          </TabsList>
+          {/* Responsive Tabs - Scrollable on mobile, wrapped on larger screens */}
+          <div className="overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 md:overflow-visible">
+            <TabsList className="bg-white shadow-sm border inline-flex md:flex md:flex-wrap h-auto gap-1 p-1 min-w-max md:min-w-0">
+              <TabsTrigger 
+                value="orders" 
+                className="data-[state=active]:bg-green-500 data-[state=active]:text-white flex items-center gap-1 px-2 py-1.5 text-xs sm:text-sm sm:px-3 sm:gap-2"
+                title="My Orders"
+              >
+                <Package className="h-4 w-4 flex-shrink-0" />
+                <span className="hidden xs:inline sm:inline">Orders</span>
+                <span className="xs:hidden sm:hidden">Orders</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="order-tracking" 
+                className="data-[state=active]:bg-cyan-500 data-[state=active]:text-white flex items-center gap-1 px-2 py-1.5 text-xs sm:text-sm sm:px-3 sm:gap-2"
+                title="QR Scan Status"
+              >
+                <QrCode className="h-4 w-4 flex-shrink-0" />
+                <span className="hidden sm:inline">QR Status</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="deliveries" 
+                className="data-[state=active]:bg-green-500 data-[state=active]:text-white flex items-center gap-1 px-2 py-1.5 text-xs sm:text-sm sm:px-3 sm:gap-2"
+                title="Deliveries"
+              >
+                <Truck className="h-4 w-4 flex-shrink-0" />
+                <span className="hidden xs:inline sm:inline">Deliveries</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="tracking" 
+                className="data-[state=active]:bg-blue-500 data-[state=active]:text-white flex items-center gap-1 px-2 py-1.5 text-xs sm:text-sm sm:px-3 sm:gap-2"
+                title="Tracking"
+              >
+                <NavigationIcon className="h-4 w-4 flex-shrink-0" />
+                <span className="hidden sm:inline">Tracking</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="request-delivery" 
+                className="data-[state=active]:bg-teal-500 data-[state=active]:text-white flex items-center gap-1 px-2 py-1.5 text-xs sm:text-sm sm:px-3 sm:gap-2"
+                title="Request Delivery"
+              >
+                <Plus className="h-4 w-4 flex-shrink-0" />
+                <span className="hidden sm:inline">Request</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="payments" 
+                className="data-[state=active]:bg-green-500 data-[state=active]:text-white flex items-center gap-1 px-2 py-1.5 text-xs sm:text-sm sm:px-3 sm:gap-2"
+                title="Payments"
+              >
+                <CreditCard className="h-4 w-4 flex-shrink-0" />
+                <span className="hidden sm:inline">Payments</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="wishlist" 
+                className="data-[state=active]:bg-green-500 data-[state=active]:text-white flex items-center gap-1 px-2 py-1.5 text-xs sm:text-sm sm:px-3 sm:gap-2"
+                title="Wishlist"
+              >
+                <Heart className="h-4 w-4 flex-shrink-0" />
+                <span className="hidden sm:inline">Wishlist</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="monitoring" 
+                className="data-[state=active]:bg-cyan-500 data-[state=active]:text-white flex items-center gap-1 px-2 py-1.5 text-xs sm:text-sm sm:px-3 sm:gap-2"
+                title="Monitoring"
+              >
+                <Video className="h-4 w-4 flex-shrink-0" />
+                <span className="hidden sm:inline">Monitor</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="support" 
+                className="data-[state=active]:bg-purple-500 data-[state=active]:text-white flex items-center gap-1 px-2 py-1.5 text-xs sm:text-sm sm:px-3 sm:gap-2"
+                title="Support"
+              >
+                <Headphones className="h-4 w-4 flex-shrink-0" />
+                <span className="hidden sm:inline">Support</span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="orders">
             <Card>
