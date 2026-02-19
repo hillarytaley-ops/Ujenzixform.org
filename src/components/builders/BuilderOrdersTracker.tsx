@@ -523,71 +523,102 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
     );
   }
 
+  // Calculate stats
+  const totalItems = orders.reduce((acc, o) => acc + (o.material_items?.length || 0), 0);
+  const dispatchedItems = orders.reduce((acc, o) => acc + (o.material_items?.filter(i => i.status === 'dispatched' || i.dispatch_scanned).length || 0), 0);
+  const inTransitItems = orders.reduce((acc, o) => acc + (o.material_items?.filter(i => i.status === 'in_transit').length || 0), 0);
+  const receivedItems = orders.reduce((acc, o) => acc + (o.material_items?.filter(i => ['received', 'verified'].includes(i.status) || i.receive_scanned).length || 0), 0);
+  const pendingItems = orders.reduce((acc, o) => acc + (o.material_items?.filter(i => !i.dispatch_scanned && !['dispatched', 'in_transit', 'received', 'verified'].includes(i.status)).length || 0), 0);
+
   return (
     <div className="space-y-6">
-      {/* Summary Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
+      {/* Summary Stats - 5 columns for full status flow */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+        {/* Total Items */}
+        <Card className="border-blue-200 bg-blue-50/50">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
               <div className="p-2 bg-blue-100 rounded-lg">
-                <Package className="h-5 w-5 text-blue-600" />
+                <Package className="h-4 w-4 text-blue-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{orders.length}</p>
-                <p className="text-xs text-gray-500">Total Orders</p>
+                <p className="text-xl font-bold text-blue-700">{totalItems}</p>
+                <p className="text-xs text-blue-600">Total Items</p>
               </div>
             </div>
           </CardContent>
         </Card>
         
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
+        {/* Pending/Confirmed */}
+        <Card className="border-amber-200 bg-amber-50/50">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-amber-100 rounded-lg">
+                <Clock className="h-4 w-4 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-xl font-bold text-amber-700">{pendingItems}</p>
+                <p className="text-xs text-amber-600">Pending</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Dispatched */}
+        <Card className="border-orange-200 bg-orange-50/50">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-orange-100 rounded-lg">
+                <Package className="h-4 w-4 text-orange-600" />
+              </div>
+              <div>
+                <p className="text-xl font-bold text-orange-700">{dispatchedItems}</p>
+                <p className="text-xs text-orange-600">📦 Dispatched</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        {/* In Transit */}
+        <Card className="border-purple-200 bg-purple-50/50">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
               <div className="p-2 bg-purple-100 rounded-lg">
-                <Truck className="h-5 w-5 text-purple-600" />
+                <Truck className="h-4 w-4 text-purple-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">
-                  {orders.reduce((acc, o) => acc + (o.material_items?.filter(i => i.status === 'in_transit').length || 0), 0)}
-                </p>
-                <p className="text-xs text-gray-500">In Transit</p>
+                <p className="text-xl font-bold text-purple-700">{inTransitItems}</p>
+                <p className="text-xs text-purple-600">🚚 In Transit</p>
               </div>
             </div>
           </CardContent>
         </Card>
         
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
+        {/* Received */}
+        <Card className="border-green-200 bg-green-50/50">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
               <div className="p-2 bg-green-100 rounded-lg">
-                <CheckCircle className="h-5 w-5 text-green-600" />
+                <CheckCircle className="h-4 w-4 text-green-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">
-                  {orders.reduce((acc, o) => acc + (o.material_items?.filter(i => ['received', 'verified'].includes(i.status)).length || 0), 0)}
-                </p>
-                <p className="text-xs text-gray-500">Received</p>
+                <p className="text-xl font-bold text-green-700">{receivedItems}</p>
+                <p className="text-xs text-green-600">✅ Received</p>
               </div>
             </div>
           </CardContent>
         </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-yellow-100 rounded-lg">
-                <Clock className="h-5 w-5 text-yellow-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">
-                  {orders.reduce((acc, o) => acc + (o.material_items?.filter(i => i.status === 'pending').length || 0), 0)}
-                </p>
-                <p className="text-xs text-gray-500">Pending</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      </div>
+      
+      {/* Status Flow Legend */}
+      <div className="flex items-center justify-center gap-2 text-xs text-gray-500 flex-wrap">
+        <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded">Pending</span>
+        <span>→</span>
+        <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded">📦 Dispatched</span>
+        <span>→</span>
+        <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded">🚚 In Transit</span>
+        <span>→</span>
+        <span className="bg-green-100 text-green-700 px-2 py-1 rounded">✅ Received</span>
       </div>
 
       {/* Orders List */}
