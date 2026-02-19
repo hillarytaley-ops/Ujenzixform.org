@@ -222,6 +222,35 @@ const PrivateClientDashboard = () => {
       } catch (e) {
         console.error('📹 DIRECT: Error:', e);
       }
+      
+      // Fetch deliveries directly
+      try {
+        console.log('🚚 DIRECT: Fetching deliveries for user:', userId);
+        
+        // Try by user_id first
+        const deliveryResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/delivery_requests?or=(user_id.eq.${userId},builder_id.eq.${userId})&order=created_at.desc`,
+          {
+            headers: {
+              'apikey': ANON_KEY,
+              'Authorization': `Bearer ${accessToken || ANON_KEY}`,
+            }
+          }
+        );
+        
+        if (deliveryResponse.ok) {
+          const deliveryData = await deliveryResponse.json();
+          console.log('🚚 DIRECT: Got', deliveryData?.length || 0, 'deliveries');
+          if (deliveryData && deliveryData.length > 0) {
+            console.log('🚚 DIRECT: First delivery:', deliveryData[0].id, deliveryData[0].status);
+            setDeliveries(deliveryData);
+          }
+        } else {
+          console.log('🚚 DIRECT: Deliveries response status:', deliveryResponse.status);
+        }
+      } catch (e) {
+        console.error('🚚 DIRECT: Deliveries error:', e);
+      }
     };
     
     loadData();
@@ -362,21 +391,115 @@ const PrivateClientDashboard = () => {
         console.error('📦 Error fetching orders:', ordersError);
       }
 
-      // Fetch delivery requests for this user
-      // First get the profile ID to query delivery_requests
-      const profileId = profileByUserId?.id || profile?.id;
-      if (profileId) {
-        const { data: deliveryData, error: deliveryError } = await supabase
-          .from('delivery_requests')
-          .select('*')
-          .eq('builder_id', profileId)
-          .order('created_at', { ascending: false });
+      // Fetch delivery requests for this user using direct REST API
+      // Try multiple query approaches: user_id, builder_id, and purchase_order buyer matching
+      console.log('🚚 Fetching deliveries for user:', user.id);
+      
+      try {
+        // Approach 1: Query by user_id
+        const deliveryResponse1 = await fetch(
+          `${SUPABASE_URL}/rest/v1/delivery_requests?user_id=eq.${user.id}&order=created_at.desc`,
+          {
+            headers: {
+              'apikey': ANON_KEY,
+              'Authorization': `Bearer ${accessToken || ANON_KEY}`,
+              'Content-Type': 'application/json',
+            }
+          }
+        );
 
-        if (deliveryError) {
-          console.error('Error fetching deliveries:', deliveryError);
-        } else {
-          setDeliveries(deliveryData || []);
-          console.log('🚚 Private client deliveries loaded:', deliveryData?.length || 0);
+        let allDeliveries: any[] = [];
+        
+        if (deliveryResponse1.ok) {
+          const data1 = await deliveryResponse1.json();
+          console.log('🚚 Deliveries by user_id:', data1?.length || 0);
+          allDeliveries = [...(data1 || [])];
+        }
+
+        // Approach 2: Query by builder_id (profile ID)
+        const profileId = profileByUserId?.id || profile?.id;
+        if (profileId && profileId !== user.id) {
+          const deliveryResponse2 = await fetch(
+            `${SUPABASE_URL}/rest/v1/delivery_requests?builder_id=eq.${profileId}&order=created_at.desc`,
+            {
+              headers: {
+                'apikey': ANON_KEY,
+                'Authorization': `Bearer ${accessToken || ANON_KEY}`,
+                'Content-Type': 'application/json',
+              }
+            }
+          );
+
+          if (deliveryResponse2.ok) {
+            const data2 = await deliveryResponse2.json();
+            console.log('🚚 Deliveries by builder_id:', data2?.length || 0);
+            // Merge without duplicates
+            const existingIds = new Set(allDeliveries.map(d => d.id));
+            (data2 || []).forEach((d: any) => {
+              if (!existingIds.has(d.id)) {
+                allDeliveries.push(d);
+              }
+            });
+          }
+        }
+
+        // Approach 3: Query by purchase_order_id matching user's orders
+        if (orders.length > 0) {
+          const orderIds = orders.map((o: Order) => o.id);
+          for (const orderId of orderIds.slice(0, 20)) { // Limit to first 20 orders
+            try {
+              const deliveryResponse3 = await fetch(
+                `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${orderId}`,
+                {
+                  headers: {
+                    'apikey': ANON_KEY,
+                    'Authorization': `Bearer ${accessToken || ANON_KEY}`,
+                    'Content-Type': 'application/json',
+                  }
+                }
+              );
+
+              if (deliveryResponse3.ok) {
+                const data3 = await deliveryResponse3.json();
+                const existingIds = new Set(allDeliveries.map(d => d.id));
+                (data3 || []).forEach((d: any) => {
+                  if (!existingIds.has(d.id)) {
+                    allDeliveries.push(d);
+                  }
+                });
+              }
+            } catch (e) {
+              // Continue with other orders
+            }
+          }
+        }
+
+        // Sort by created_at descending
+        allDeliveries.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        
+        setDeliveries(allDeliveries);
+        console.log('🚚 Total deliveries loaded:', allDeliveries.length);
+        
+        if (allDeliveries.length > 0) {
+          console.log('🚚 First delivery:', allDeliveries[0].id, allDeliveries[0].status);
+        }
+      } catch (deliveryError) {
+        console.error('🚚 Error fetching deliveries:', deliveryError);
+        
+        // Fallback to Supabase client
+        try {
+          const { data: deliveryData, error } = await supabase
+            .from('delivery_requests')
+            .select('*')
+            .or(`user_id.eq.${user.id},builder_id.eq.${user.id}`)
+            .order('created_at', { ascending: false });
+
+          if (!error && deliveryData) {
+            setDeliveries(deliveryData);
+            console.log('🚚 Fallback deliveries loaded:', deliveryData.length);
+          }
+        } catch (e) {
+          console.error('🚚 Fallback also failed:', e);
         }
       }
 
