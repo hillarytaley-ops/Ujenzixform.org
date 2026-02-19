@@ -225,30 +225,66 @@ const PrivateClientDashboard = () => {
         console.error('📹 DIRECT: Error:', e);
       }
       
-      // Fetch deliveries directly
+      // Fetch deliveries directly - try multiple approaches
       try {
         console.log('🚚 DIRECT: Fetching deliveries for user:', userId);
+        let allDeliveries: any[] = [];
         
-        // Try by user_id first
-        const deliveryResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/delivery_requests?or=(user_id.eq.${userId},builder_id.eq.${userId})&order=created_at.desc`,
-          {
-            headers: {
-              'apikey': ANON_KEY,
-              'Authorization': `Bearer ${accessToken || ANON_KEY}`,
+        // Approach 1: Query by user_id
+        try {
+          const deliveryResponse1 = await fetch(
+            `${SUPABASE_URL}/rest/v1/delivery_requests?user_id=eq.${userId}&order=created_at.desc`,
+            {
+              headers: {
+                'apikey': ANON_KEY,
+                'Authorization': `Bearer ${accessToken || ANON_KEY}`,
+              }
             }
+          );
+          
+          if (deliveryResponse1.ok) {
+            const data1 = await deliveryResponse1.json();
+            console.log('🚚 DIRECT: By user_id:', data1?.length || 0);
+            allDeliveries = [...(data1 || [])];
           }
-        );
+        } catch (e1) {
+          console.log('🚚 DIRECT: user_id query failed');
+        }
         
-        if (deliveryResponse.ok) {
-          const deliveryData = await deliveryResponse.json();
-          console.log('🚚 DIRECT: Got', deliveryData?.length || 0, 'deliveries');
-          if (deliveryData && deliveryData.length > 0) {
-            console.log('🚚 DIRECT: First delivery:', deliveryData[0].id, deliveryData[0].status);
-            setDeliveries(deliveryData);
+        // Approach 2: Query by builder_id (same as user_id for most cases)
+        try {
+          const deliveryResponse2 = await fetch(
+            `${SUPABASE_URL}/rest/v1/delivery_requests?builder_id=eq.${userId}&order=created_at.desc`,
+            {
+              headers: {
+                'apikey': ANON_KEY,
+                'Authorization': `Bearer ${accessToken || ANON_KEY}`,
+              }
+            }
+          );
+          
+          if (deliveryResponse2.ok) {
+            const data2 = await deliveryResponse2.json();
+            console.log('🚚 DIRECT: By builder_id:', data2?.length || 0);
+            // Merge without duplicates
+            const existingIds = new Set(allDeliveries.map(d => d.id));
+            (data2 || []).forEach((d: any) => {
+              if (!existingIds.has(d.id)) {
+                allDeliveries.push(d);
+              }
+            });
           }
-        } else {
-          console.log('🚚 DIRECT: Deliveries response status:', deliveryResponse.status);
+        } catch (e2) {
+          console.log('🚚 DIRECT: builder_id query failed');
+        }
+        
+        // Sort by created_at descending
+        allDeliveries.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        
+        console.log('🚚 DIRECT: Total deliveries:', allDeliveries.length);
+        if (allDeliveries.length > 0) {
+          console.log('🚚 DIRECT: First delivery:', allDeliveries[0].id, allDeliveries[0].status);
+          setDeliveries(allDeliveries);
         }
       } catch (e) {
         console.error('🚚 DIRECT: Deliveries error:', e);
@@ -394,35 +430,40 @@ const PrivateClientDashboard = () => {
       }
 
       // Fetch delivery requests for this user using direct REST API
-      // Try multiple query approaches: user_id, builder_id, and purchase_order buyer matching
+      // Try multiple query approaches: user_id and builder_id
       console.log('🚚 Fetching deliveries for user:', user.id);
       
       try {
-        // Approach 1: Query by user_id
-        const deliveryResponse1 = await fetch(
-          `${SUPABASE_URL}/rest/v1/delivery_requests?user_id=eq.${user.id}&order=created_at.desc`,
-          {
-            headers: {
-              'apikey': ANON_KEY,
-              'Authorization': `Bearer ${accessToken || ANON_KEY}`,
-              'Content-Type': 'application/json',
-            }
-          }
-        );
-
         let allDeliveries: any[] = [];
         
-        if (deliveryResponse1.ok) {
-          const data1 = await deliveryResponse1.json();
-          console.log('🚚 Deliveries by user_id:', data1?.length || 0);
-          allDeliveries = [...(data1 || [])];
+        // Approach 1: Query by user_id
+        try {
+          const deliveryResponse1 = await fetch(
+            `${SUPABASE_URL}/rest/v1/delivery_requests?user_id=eq.${user.id}&order=created_at.desc`,
+            {
+              headers: {
+                'apikey': ANON_KEY,
+                'Authorization': `Bearer ${accessToken || ANON_KEY}`,
+                'Content-Type': 'application/json',
+              }
+            }
+          );
+
+          if (deliveryResponse1.ok) {
+            const data1 = await deliveryResponse1.json();
+            console.log('🚚 Deliveries by user_id:', data1?.length || 0);
+            allDeliveries = [...(data1 || [])];
+          } else {
+            console.log('🚚 user_id query status:', deliveryResponse1.status);
+          }
+        } catch (e1) {
+          console.log('🚚 user_id query error:', e1);
         }
 
-        // Approach 2: Query by builder_id (profile ID)
-        const profileId = profileByUserId?.id || profile?.id;
-        if (profileId && profileId !== user.id) {
+        // Approach 2: Query by builder_id (same as user.id for most cases)
+        try {
           const deliveryResponse2 = await fetch(
-            `${SUPABASE_URL}/rest/v1/delivery_requests?builder_id=eq.${profileId}&order=created_at.desc`,
+            `${SUPABASE_URL}/rest/v1/delivery_requests?builder_id=eq.${user.id}&order=created_at.desc`,
             {
               headers: {
                 'apikey': ANON_KEY,
@@ -442,45 +483,23 @@ const PrivateClientDashboard = () => {
                 allDeliveries.push(d);
               }
             });
+          } else {
+            console.log('🚚 builder_id query status:', deliveryResponse2.status);
           }
-        }
-
-        // Approach 3: Query by purchase_order_id matching user's orders
-        if (orders.length > 0) {
-          const orderIds = orders.map((o: Order) => o.id);
-          for (const orderId of orderIds.slice(0, 20)) { // Limit to first 20 orders
-            try {
-              const deliveryResponse3 = await fetch(
-                `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${orderId}`,
-                {
-                  headers: {
-                    'apikey': ANON_KEY,
-                    'Authorization': `Bearer ${accessToken || ANON_KEY}`,
-                    'Content-Type': 'application/json',
-                  }
-                }
-              );
-
-              if (deliveryResponse3.ok) {
-                const data3 = await deliveryResponse3.json();
-                const existingIds = new Set(allDeliveries.map(d => d.id));
-                (data3 || []).forEach((d: any) => {
-                  if (!existingIds.has(d.id)) {
-                    allDeliveries.push(d);
-                  }
-                });
-              }
-            } catch (e) {
-              // Continue with other orders
-            }
-          }
+        } catch (e2) {
+          console.log('🚚 builder_id query error:', e2);
         }
 
         // Sort by created_at descending
         allDeliveries.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         
-        setDeliveries(allDeliveries);
-        console.log('🚚 Total deliveries loaded:', allDeliveries.length);
+        // Only update if we found deliveries OR if we haven't loaded any yet
+        if (allDeliveries.length > 0) {
+          setDeliveries(allDeliveries);
+          console.log('🚚 Total deliveries loaded:', allDeliveries.length);
+        } else {
+          console.log('🚚 No deliveries found for this user');
+        }
         
         if (allDeliveries.length > 0) {
           console.log('🚚 First delivery:', allDeliveries[0].id, allDeliveries[0].status);
