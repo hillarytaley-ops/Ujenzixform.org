@@ -102,6 +102,14 @@ const Suppliers = () => {
 
   // Check if user is a delivery provider (restricted access)
   const isDeliveryProvider = userRole === 'delivery' || userRole === 'delivery_provider';
+  
+  // Check if user is already logged in as a builder (hide explore sections)
+  const isLoggedInBuilder = user && (
+    userRole === 'professional_builder' || 
+    userRole === 'private_client' || 
+    userRole === 'builder' ||
+    userRole === 'supplier'
+  );
 
   // Show restricted access message for delivery providers
   if (user && isDeliveryProvider) {
@@ -206,58 +214,95 @@ const Suppliers = () => {
             Browse Materials
           </Button>
 
-          {/* Portal Cards - Responsive Grid */}
-          <div className="max-w-5xl mx-auto" id="portals">
-            <p className="text-white/50 text-xs md:text-sm font-medium mb-4 md:mb-6 uppercase tracking-widest">
-              Choose Your Portal
-            </p>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
-              {/* Private Client Portal */}
-              <PortalCard
-                icon={<ShoppingCart className="h-6 w-6 md:h-7 md:w-7 text-white" />}
-                title="Private Builder"
-                description="Home projects & personal purchases"
-                gradient="from-emerald-600 to-emerald-700"
-                borderColor="emerald"
-                explorePath="/private-client-auth"
-                features={["Buy materials", "Track deliveries"]}
-              />
+          {/* Portal Cards - Only show for non-logged-in users or those without builder/supplier roles */}
+          {!isLoggedInBuilder && (
+            <div className="max-w-5xl mx-auto" id="portals">
+              <p className="text-white/50 text-xs md:text-sm font-medium mb-4 md:mb-6 uppercase tracking-widest">
+                Choose Your Portal
+              </p>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
+                {/* Private Client Portal */}
+                <PortalCard
+                  icon={<ShoppingCart className="h-6 w-6 md:h-7 md:w-7 text-white" />}
+                  title="Private Builder"
+                  description="Home projects & personal purchases"
+                  gradient="from-emerald-600 to-emerald-700"
+                  borderColor="emerald"
+                  explorePath="/private-client-auth"
+                  features={["Buy materials", "Track deliveries"]}
+                />
 
-              {/* Professional Builder Portal */}
-              <PortalCard
-                icon={<FileText className="h-6 w-6 md:h-7 md:w-7 text-white" />}
-                title="Professional Builder"
-                description="Request quotes for bulk orders"
-                gradient="from-blue-600 to-blue-700"
-                borderColor="blue"
-                explorePath="/professional-builder-auth"
-                features={["Bulk quotes", "Manage projects"]}
-              />
+                {/* Professional Builder Portal */}
+                <PortalCard
+                  icon={<FileText className="h-6 w-6 md:h-7 md:w-7 text-white" />}
+                  title="Professional Builder"
+                  description="Request quotes for bulk orders"
+                  gradient="from-blue-600 to-blue-700"
+                  borderColor="blue"
+                  explorePath="/professional-builder-auth"
+                  features={["Bulk quotes", "Manage projects"]}
+                />
 
-              {/* Supplier Portal */}
-              <PortalCard
-                icon={<Store className="h-6 w-6 md:h-7 md:w-7 text-white" />}
-                title="Supplier"
-                description="List & sell your products"
-                gradient="from-amber-600 to-amber-700"
-                borderColor="amber"
-                explorePath="/supplier-auth"
-                features={["List products", "Receive orders"]}
-              />
+                {/* Supplier Portal */}
+                <PortalCard
+                  icon={<Store className="h-6 w-6 md:h-7 md:w-7 text-white" />}
+                  title="Supplier"
+                  description="List & sell your products"
+                  gradient="from-amber-600 to-amber-700"
+                  borderColor="amber"
+                  explorePath="/supplier-auth"
+                  features={["List products", "Receive orders"]}
+                />
 
-              {/* Delivery Provider Portal */}
-              <PortalCard
-                icon={<Truck className="h-6 w-6 md:h-7 md:w-7 text-white" />}
-                title="Delivery Provider"
-                description="Transport & logistics services"
-                gradient="from-purple-600 to-purple-700"
-                borderColor="purple"
-                explorePath="/delivery-auth"
-                features={["Get jobs", "Earn per delivery"]}
-              />
+                {/* Delivery Provider Portal */}
+                <PortalCard
+                  icon={<Truck className="h-6 w-6 md:h-7 md:w-7 text-white" />}
+                  title="Delivery Provider"
+                  description="Transport & logistics services"
+                  gradient="from-purple-600 to-purple-700"
+                  borderColor="purple"
+                  explorePath="/delivery-auth"
+                  features={["Get jobs", "Earn per delivery"]}
+                />
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Welcome message for logged-in builders */}
+          {isLoggedInBuilder && (
+            <div className="max-w-2xl mx-auto text-center">
+              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
+                <div className="flex items-center justify-center gap-3 mb-3">
+                  <div className="w-10 h-10 bg-emerald-500/20 rounded-full flex items-center justify-center">
+                    <ShoppingCart className="h-5 w-5 text-emerald-400" />
+                  </div>
+                  <h3 className="text-xl font-bold text-white">
+                    Welcome back, {userRole === 'professional_builder' ? 'Professional Builder' : userRole === 'supplier' ? 'Supplier' : 'Builder'}!
+                  </h3>
+                </div>
+                <p className="text-white/70 text-sm mb-4">
+                  Browse materials below and add them to your cart. 
+                  {userRole === 'professional_builder' && ' Request quotes for bulk pricing.'}
+                  {userRole === 'private_client' && ' Buy directly at listed prices.'}
+                </p>
+                <div className="flex flex-wrap justify-center gap-3">
+                  <Button 
+                    variant="outline"
+                    size="sm"
+                    className="bg-white/10 border-white/30 text-white hover:bg-white/20"
+                    onClick={() => navigate(
+                      userRole === 'professional_builder' ? '/professional-builder-dashboard' :
+                      userRole === 'supplier' ? '/supplier-dashboard' :
+                      '/builder-dashboard'
+                    )}
+                  >
+                    ← Back to Dashboard
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
