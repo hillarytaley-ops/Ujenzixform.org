@@ -171,12 +171,35 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     };
   };
 
+  // Fetch supplier address by ID
+  const fetchSupplierAddress = async (supplierId: string): Promise<string> => {
+    try {
+      const { url, headers } = getAuthHeaders();
+      const response = await fetch(
+        `${url}/rest/v1/suppliers?id=eq.${supplierId}&select=company_name,address,location`,
+        { headers, cache: 'no-store' }
+      );
+      if (response.ok) {
+        const suppliers = await response.json();
+        if (suppliers?.[0]) {
+          const s = suppliers[0];
+          // Return the actual address, or company name + location, or just company name
+          return s.address || (s.location ? `${s.company_name}, ${s.location}` : s.company_name) || 'Supplier location';
+        }
+      }
+    } catch (e) {
+      console.warn('Could not fetch supplier address');
+    }
+    return 'Supplier location';
+  };
+
   // Fetch real delivery requests from database
   const loadNotifications = useCallback(async () => {
     try {
       setLoading(true);
       console.log('🔔 DeliveryNotifications: Starting to load notifications...');
       const allNotifications: Notification[] = [];
+      const supplierAddressCache: Record<string, string> = {};
 
       const { url, headers } = getAuthHeaders();
 
@@ -193,7 +216,36 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           console.log('📦 delivery_requests query result:', { data: deliveryRequests, count: deliveryRequests?.length });
           
           if (deliveryRequests && deliveryRequests.length > 0) {
+            // Fetch supplier addresses for requests that have supplier_id
+            const supplierIds = [...new Set(deliveryRequests.filter((r: any) => r.supplier_id).map((r: any) => r.supplier_id))];
+            if (supplierIds.length > 0) {
+              try {
+                const suppliersResponse = await fetch(
+                  `${url}/rest/v1/suppliers?id=in.(${supplierIds.join(',')})&select=id,company_name,address,location`,
+                  { headers, cache: 'no-store' }
+                );
+                if (suppliersResponse.ok) {
+                  const suppliers = await suppliersResponse.json();
+                  suppliers.forEach((s: any) => {
+                    supplierAddressCache[s.id] = s.address || (s.location ? `${s.company_name}, ${s.location}` : s.company_name) || 'Supplier location';
+                  });
+                }
+              } catch (e) {
+                console.warn('Could not batch fetch supplier addresses');
+              }
+            }
+
             deliveryRequests.forEach((req: any) => {
+              // Determine the pickup address - use supplier address from cache, or existing pickup_address
+              let pickupAddr = req.pickup_address || req.pickup_location || '';
+              if (req.supplier_id && supplierAddressCache[req.supplier_id]) {
+                pickupAddr = supplierAddressCache[req.supplier_id];
+              }
+              // If pickup address is generic "Supplier location", try to enrich it
+              if (pickupAddr === 'Supplier location' && req.supplier_name) {
+                pickupAddr = `${req.supplier_name} - Pickup`;
+              }
+
               allNotifications.push({
                 id: req.id,
                 type: 'new_delivery',
@@ -204,7 +256,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                 priority: req.priority_level === 'urgent' || req.status === 'pending' ? 'high' : 'medium',
                 actionUrl: `/delivery-dashboard?request=${req.id}`,
                 status: req.status,
-                pickupAddress: req.pickup_address || req.pickup_location || '',
+                pickupAddress: pickupAddr,
                 deliveryAddress: req.delivery_address || req.delivery_location || '',
                 materialType: req.material_type || '',
                 quantity: req.quantity || '',
@@ -237,6 +289,11 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             deliveries.forEach((del: any) => {
               // Avoid duplicates
               if (!allNotifications.find(n => n.id === del.id)) {
+                let pickupAddr = del.pickup_address || del.pickup_location || '';
+                if (del.supplier_id && supplierAddressCache[del.supplier_id]) {
+                  pickupAddr = supplierAddressCache[del.supplier_id];
+                }
+
                 allNotifications.push({
                   id: del.id,
                   type: del.status === 'pending' ? 'new_delivery' : 'status_update',
@@ -247,7 +304,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                   priority: del.urgency === 'urgent' || del.status === 'pending' ? 'high' : 'medium',
                   actionUrl: `/delivery-dashboard?delivery=${del.id}`,
                   status: del.status,
-                  pickupAddress: del.pickup_address || del.pickup_location || '',
+                  pickupAddress: pickupAddr,
                   deliveryAddress: del.delivery_address || del.delivery_location || '',
                   materialType: del.material_type || '',
                   quantity: del.quantity || '',
@@ -282,6 +339,11 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
               // Avoid duplicates
               if (!allNotifications.find(n => n.id === notif.id || n.id === notif.request_id)) {
                 const materials = notif.material_details || [];
+                let pickupAddr = notif.pickup_address || notif.pickup_location || '';
+                if (notif.supplier_id && supplierAddressCache[notif.supplier_id]) {
+                  pickupAddr = supplierAddressCache[notif.supplier_id];
+                }
+
                 allNotifications.push({
                   id: notif.id,
                   type: 'new_delivery',
@@ -292,7 +354,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                   priority: notif.priority_level === 'urgent' || notif.status === 'pending' ? 'high' : 'medium',
                   actionUrl: `/delivery-dashboard?notification=${notif.id}`,
                   status: notif.status,
-                  pickupAddress: notif.pickup_address || notif.pickup_location || '',
+                  pickupAddress: pickupAddr,
                   deliveryAddress: notif.delivery_address || notif.delivery_location || '',
                   materialType: materials[0]?.name || notif.material_type || '',
                   quantity: notif.quantity || '',
@@ -911,53 +973,29 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                   </button>
                 </div>
                 
-                {/* Accept/Reject Buttons - Show for pending delivery requests */}
+                {/* Single Accept Button - Show for pending delivery requests */}
                 {notification.status === 'pending' && (
-                  <div className="flex gap-2 mt-3 pt-3 border-t border-gray-200">
-                    <Button
-                      size="sm"
-                      className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAcceptDelivery(notification.id);
-                      }}
-                      disabled={acceptingId === notification.id || rejectingId === notification.id}
-                    >
-                      {acceptingId === notification.id ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                          Accepting...
-                        </>
-                      ) : (
-                        <>
-                          <Check className="h-4 w-4 mr-1" />
-                          Accept
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="flex-1 border-red-300 text-red-600 hover:bg-red-50"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRejectDelivery(notification.id);
-                      }}
-                      disabled={acceptingId === notification.id || rejectingId === notification.id}
-                    >
-                      {rejectingId === notification.id ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                          Declining...
-                        </>
-                      ) : (
-                        <>
-                          <XCircle className="h-4 w-4 mr-1" />
-                          Decline
-                        </>
-                      )}
-                    </Button>
-                  </div>
+                  <Button
+                    size="sm"
+                    className="w-full mt-3 bg-green-600 hover:bg-green-700 text-white font-medium"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleAcceptDelivery(notification.id);
+                    }}
+                    disabled={acceptingId === notification.id}
+                  >
+                    {acceptingId === notification.id ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Accepting Delivery...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Accept This Delivery
+                      </>
+                    )}
+                  </Button>
                 )}
                 
                 {/* Status indicator for non-pending deliveries */}
