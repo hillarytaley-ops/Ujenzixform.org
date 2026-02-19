@@ -441,12 +441,18 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
     };
   };
 
+  // Order status flow: confirmed → dispatched → in_transit → delivered
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'dispatched': return 'bg-blue-100 text-blue-800';
+      case 'pending': return 'bg-gray-100 text-gray-800';
+      case 'confirmed': return 'bg-amber-100 text-amber-800';
+      case 'quoted': return 'bg-blue-100 text-blue-800';
+      case 'dispatched': return 'bg-orange-100 text-orange-800';
+      case 'partially_dispatched': return 'bg-orange-50 text-orange-700';
       case 'in_transit': return 'bg-purple-100 text-purple-800';
+      case 'partially_delivered': return 'bg-teal-100 text-teal-800';
       case 'received': return 'bg-green-100 text-green-800';
+      case 'delivered': return 'bg-green-100 text-green-800';
       case 'verified': return 'bg-emerald-100 text-emerald-800';
       case 'damaged': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
@@ -456,11 +462,34 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'pending': return <Clock className="h-4 w-4" />;
+      case 'confirmed': return <CheckCircle className="h-4 w-4" />;
+      case 'quoted': return <Clock className="h-4 w-4" />;
       case 'dispatched': return <Package className="h-4 w-4" />;
+      case 'partially_dispatched': return <Package className="h-4 w-4" />;
       case 'in_transit': return <Truck className="h-4 w-4" />;
+      case 'partially_delivered': return <Truck className="h-4 w-4" />;
       case 'received': return <CheckCircle className="h-4 w-4" />;
+      case 'delivered': return <CheckCircle className="h-4 w-4" />;
       case 'verified': return <CheckCircle className="h-4 w-4" />;
       default: return <QrCode className="h-4 w-4" />;
+    }
+  };
+
+  // Get human-readable status label
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'pending': return 'Pending';
+      case 'confirmed': return 'Order Confirmed';
+      case 'quoted': return 'Quoted';
+      case 'dispatched': return '📦 Dispatched';
+      case 'partially_dispatched': return '📦 Partially Dispatched';
+      case 'in_transit': return '🚚 In Transit';
+      case 'partially_delivered': return '📬 Partially Delivered';
+      case 'received': return '✅ Received';
+      case 'delivered': return '✅ Delivered';
+      case 'verified': return '✓ Verified';
+      case 'damaged': return '⚠️ Damaged';
+      default: return status;
     }
   };
 
@@ -617,8 +646,9 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                         </div>
                       </div>
                       
-                      <Badge className={getStatusColor(order.status)}>
-                        {order.status}
+                      <Badge className={`${getStatusColor(order.status)} px-3 py-1`}>
+                        {getStatusIcon(order.status)}
+                        <span className="ml-1">{getStatusLabel(order.status)}</span>
                       </Badge>
                       
                       {isExpanded ? (
@@ -632,6 +662,84 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                   {/* Order Details (Expanded) */}
                   {isExpanded && (
                     <div className="mt-4 pt-4 border-t space-y-4">
+                      {/* Order Status Timeline */}
+                      <div className="bg-gray-50 rounded-lg p-4">
+                        <p className="font-medium text-sm text-gray-600 mb-3">Order Status Timeline</p>
+                        <div className="flex items-center justify-between">
+                          {/* Step 1: Confirmed */}
+                          <div className="flex flex-col items-center">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                              ['confirmed', 'dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status)
+                                ? 'bg-green-500 text-white'
+                                : 'bg-gray-200 text-gray-400'
+                            }`}>
+                              <CheckCircle className="h-5 w-5" />
+                            </div>
+                            <span className="text-xs mt-1 font-medium">Confirmed</span>
+                          </div>
+                          
+                          {/* Line */}
+                          <div className={`flex-1 h-1 mx-2 ${
+                            ['dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status)
+                              ? 'bg-green-500'
+                              : 'bg-gray-200'
+                          }`} />
+                          
+                          {/* Step 2: Dispatched */}
+                          <div className="flex flex-col items-center">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                              ['dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status)
+                                ? 'bg-orange-500 text-white'
+                                : 'bg-gray-200 text-gray-400'
+                            }`}>
+                              <Package className="h-5 w-5" />
+                            </div>
+                            <span className="text-xs mt-1 font-medium">Dispatched</span>
+                            <span className="text-[10px] text-gray-500">QR Scanned</span>
+                          </div>
+                          
+                          {/* Line */}
+                          <div className={`flex-1 h-1 mx-2 ${
+                            ['in_transit', 'delivered', 'received', 'verified'].includes(order.status)
+                              ? 'bg-green-500'
+                              : 'bg-gray-200'
+                          }`} />
+                          
+                          {/* Step 3: In Transit */}
+                          <div className="flex flex-col items-center">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                              ['in_transit', 'delivered', 'received', 'verified'].includes(order.status)
+                                ? 'bg-purple-500 text-white animate-pulse'
+                                : 'bg-gray-200 text-gray-400'
+                            }`}>
+                              <Truck className="h-5 w-5" />
+                            </div>
+                            <span className="text-xs mt-1 font-medium">In Transit</span>
+                            <span className="text-[10px] text-gray-500">Being Tracked</span>
+                          </div>
+                          
+                          {/* Line */}
+                          <div className={`flex-1 h-1 mx-2 ${
+                            ['delivered', 'received', 'verified'].includes(order.status)
+                              ? 'bg-green-500'
+                              : 'bg-gray-200'
+                          }`} />
+                          
+                          {/* Step 4: Delivered/Received */}
+                          <div className="flex flex-col items-center">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                              ['delivered', 'received', 'verified'].includes(order.status)
+                                ? 'bg-green-500 text-white'
+                                : 'bg-gray-200 text-gray-400'
+                            }`}>
+                              <CheckCircle className="h-5 w-5" />
+                            </div>
+                            <span className="text-xs mt-1 font-medium">Delivered</span>
+                            <span className="text-[10px] text-gray-500">QR Received</span>
+                          </div>
+                        </div>
+                      </div>
+                      
                       {/* Delivery Info */}
                       <div className="flex items-start gap-2 text-sm">
                         <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
@@ -658,7 +766,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                                 <h3 className="text-xl font-bold text-gray-800">{item.material_type}</h3>
                                 <Badge className={`text-base px-4 py-2 ${getStatusColor(item.status)}`}>
                                   {getStatusIcon(item.status)}
-                                  <span className="ml-2">{item.status.replace('_', ' ').toUpperCase()}</span>
+                                  <span className="ml-2">{getStatusLabel(item.status)}</span>
                                 </Badge>
                               </div>
                               
