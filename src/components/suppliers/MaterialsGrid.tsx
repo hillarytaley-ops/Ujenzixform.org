@@ -1148,32 +1148,42 @@ export const MaterialsGrid = () => {
       }
 
       // Filter supplier materials:
-      // - Only approved products
-      // - Accept base64 data URLs OR Supabase storage URLs (reject external URLs like Unsplash)
+      // - Only approved products (or no approval status for backward compatibility)
+      // - Accept any valid image (base64, Supabase storage, or will use category default)
       const supplierMaterials = data ? data
         .filter(item => {
           // Must be approved (or no approval status for backward compatibility)
           const isApproved = !item.approval_status || item.approval_status === 'approved';
           
+          // Log filtered out items for debugging
+          if (!isApproved) {
+            console.log(`⏳ Supplier product "${item.name}" filtered out - status: ${item.approval_status}`);
+          }
+          
+          return isApproved;
+        })
+        .map(item => {
           // Accept images that are:
           // 1. Base64 data URLs (starts with 'data:image/')
           // 2. Supabase storage URLs (contains 'supabase.co/storage')
-          // REJECT external URLs like Unsplash, Unsplash, etc.
+          // 3. If no valid image, will use category default in the UI
           const imageUrl = item.image_url || '';
           const isBase64 = imageUrl.startsWith('data:image/');
           const isSupabaseStorage = imageUrl.includes('supabase.co/storage');
           const hasValidImage = imageUrl && (isBase64 || isSupabaseStorage);
           
-          return isApproved && hasValidImage;
-        })
-        .map(item => ({
-          ...item,
-          supplier: {
-            company_name: 'Supplier',
-            location: 'Kenya',
-            rating: 4.5
-          }
-        })) : [];
+          return {
+            ...item,
+            image_url: hasValidImage ? imageUrl : '', // Will fallback to category default in UI
+            supplier: {
+              company_name: 'Supplier',
+              location: 'Kenya',
+              rating: 4.5
+            }
+          };
+        }) : [];
+      
+      console.log(`📦 Supplier materials loaded: ${supplierMaterials.length} approved products`);
 
       // Combine: Admin materials FIRST, then supplier-uploaded materials
       const combinedMaterials = [...adminMaterials, ...supplierMaterials];

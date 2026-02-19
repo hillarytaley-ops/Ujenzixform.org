@@ -275,10 +275,9 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
       };
 
       if (editingProduct) {
-        // Update existing product - if changing image/price/variants, set back to pending
-        const needsReapproval = editingProduct.image_url !== formData.image_url || 
-                               editingProduct.unit_price !== mainPrice ||
-                               JSON.stringify(editingProduct.variants || []) !== JSON.stringify(formData.variants);
+        // Update existing product - ONLY image changes require re-approval
+        // Price and stock changes should NOT require re-approval (suppliers can update freely)
+        const needsReapproval = editingProduct.image_url !== formData.image_url;
         
         const updateData = needsReapproval 
           ? { ...productData, approval_status: 'pending' }
@@ -294,8 +293,8 @@ export const SupplierProductManager: React.FC<SupplierProductManagerProps> = ({ 
         toast({
           title: 'Product updated',
           description: needsReapproval 
-            ? 'Your product has been submitted for admin approval'
-            : 'Your product has been updated successfully'
+            ? 'Image changed - your product has been submitted for admin approval'
+            : 'Your product has been updated successfully! Price changes are live immediately.'
         });
       } else {
         // Create new product - always set to pending for admin approval
