@@ -877,10 +877,8 @@ export const MaterialsGrid = () => {
       let supplierPrices: Record<string, { price: number; in_stock: boolean; supplier_id: string; description?: string; variant_prices?: any[] }> = {};
       
       try {
-        // Add timestamp to bust browser cache and ensure fresh data
-        const cacheBuster = Date.now();
         const pricesResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/supplier_product_prices?select=*&_t=${cacheBuster}`,
+          `${SUPABASE_URL}/rest/v1/supplier_product_prices?select=*`,
           {
             headers: {
               'apikey': SUPABASE_ANON_KEY,
@@ -889,7 +887,7 @@ export const MaterialsGrid = () => {
               'Cache-Control': 'no-cache, no-store, must-revalidate',
               'Pragma': 'no-cache'
             },
-            cache: 'no-store' // Prevent browser caching
+            cache: 'no-store'
           }
         );
         
