@@ -1,17 +1,18 @@
 /**
- * DeliveryAuth - BUILD v15 - FETCH API + DB ROLE CHECK
+ * DeliveryAuth - BUILD v16 - PRE-FILL FROM GENERAL LOGIN
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
-import { Truck, Eye, EyeOff, Loader2, ArrowLeft, Mail, Lock, User, Phone, MapPin, ChevronRight, Briefcase } from 'lucide-react';
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
+import { Truck, Eye, EyeOff, Loader2, ArrowLeft, Mail, Lock, User, Phone, MapPin, ChevronRight, Briefcase, CheckCircle } from 'lucide-react';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 
 const ROLE = 'delivery';
 const DASHBOARD = '/delivery-dashboard';
@@ -28,16 +29,17 @@ const ROLE_DASHBOARDS: Record<string, string> = {
 
 const cachedRole = localStorage.getItem('user_role');
 const cachedUserId = localStorage.getItem('user_role_id');
-if (cachedRole === ROLE && cachedUserId) {
+if ((cachedRole === ROLE || cachedRole === 'delivery_provider') && cachedUserId) {
   window.location.replace(DASHBOARD);
 }
 
-console.log('🔐 DeliveryAuth BUILD v15 - SECURE');
+console.log('🔐 DeliveryAuth BUILD v16 - PRE-FILL FROM GENERAL LOGIN');
 
 const DeliveryAuth: React.FC = () => {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
   const [isLoading, setIsLoading] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -45,7 +47,84 @@ const DeliveryAuth: React.FC = () => {
   const [companyName, setCompanyName] = useState('');
   const [phone, setPhone] = useState('');
   const [location, setLocation] = useState('');
+  const [isPrefilledFromLogin, setIsPrefilledFromLogin] = useState(false);
+  const [prefilledUserId, setPrefilledUserId] = useState<string | null>(null);
+  const [prefilledAccessToken, setPrefilledAccessToken] = useState<string | null>(null);
   const redirecting = useRef(false);
+
+  // Check if user is already logged in via general login
+  useEffect(() => {
+    const checkExistingAuth = async () => {
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          if (parsed?.user?.email && parsed?.access_token) {
+            console.log('🔐 Found existing session for:', parsed.user.email);
+            
+            const roleResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${parsed.user.id}&select=role`,
+              { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${parsed.access_token}` } }
+            );
+            const roleData = await roleResponse.json();
+            const currentRole = roleData?.[0]?.role;
+            
+            if (currentRole === ROLE || currentRole === 'delivery_provider') {
+              console.log('🔐 User is already a delivery provider, redirecting...');
+              localStorage.setItem('user_role', currentRole);
+              localStorage.setItem('user_role_id', parsed.user.id);
+              window.location.href = DASHBOARD;
+              return;
+            }
+            
+            setEmail(parsed.user.email);
+            setPrefilledUserId(parsed.user.id);
+            setPrefilledAccessToken(parsed.access_token);
+            setIsPrefilledFromLogin(true);
+            setActiveTab('signup');
+            
+            toast({
+              title: '👋 Welcome!',
+              description: 'Complete your delivery provider registration below.',
+            });
+          }
+        }
+        
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.email && !isPrefilledFromLogin) {
+          const { data: roleData } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', session.user.id)
+            .maybeSingle();
+          
+          if (roleData?.role === ROLE || roleData?.role === 'delivery_provider') {
+            localStorage.setItem('user_role', roleData.role);
+            localStorage.setItem('user_role_id', session.user.id);
+            window.location.href = DASHBOARD;
+            return;
+          }
+          
+          setEmail(session.user.email);
+          setPrefilledUserId(session.user.id);
+          setPrefilledAccessToken(session.access_token);
+          setIsPrefilledFromLogin(true);
+          setActiveTab('signup');
+          
+          toast({
+            title: '👋 Welcome!',
+            description: 'Complete your delivery provider registration below.',
+          });
+        }
+      } catch (error) {
+        console.log('🔐 No existing auth session found');
+      } finally {
+        setCheckingAuth(false);
+      }
+    };
+    
+    checkExistingAuth();
+  }, []);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -134,6 +213,56 @@ const DeliveryAuth: React.FC = () => {
     if (!fullName.trim()) { setIsLoading(false); toast({ title: 'Error', description: 'Please enter your full name', variant: 'destructive' }); return; }
     
     try {
+      // If user is pre-filled from general login, use their existing session
+      if (isPrefilledFromLogin && prefilledUserId && prefilledAccessToken) {
+        console.log('🔐 Using pre-filled session from general login...');
+        const userId = prefilledUserId;
+        const accessToken = prefilledAccessToken;
+        
+        const roleCheckResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${userId}&select=role`,
+          { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}` } }
+        );
+        const roleCheckData = await roleCheckResponse.json();
+        const currentRole = roleCheckData?.[0]?.role;
+        
+        if (currentRole) {
+          console.log('🔐 Updating role from', currentRole, 'to', ROLE);
+          await fetch(`${SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${userId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}`, 'Prefer': 'return=minimal' },
+            body: JSON.stringify({ role: ROLE }),
+          });
+        } else {
+          console.log('🔐 Inserting new role:', ROLE);
+          await fetch(`${SUPABASE_URL}/rest/v1/user_roles`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}`, 'Prefer': 'return=minimal' },
+            body: JSON.stringify({ user_id: userId, role: ROLE }),
+          });
+        }
+        
+        // Update profile
+        await fetch(`${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${userId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}`, 'Prefer': 'return=minimal' },
+          body: JSON.stringify({ 
+            full_name: fullName.trim(),
+            company_name: companyName.trim() || null,
+            phone: phone || null,
+            location: location || null,
+          }),
+        });
+        
+        localStorage.setItem('user_role', ROLE);
+        localStorage.setItem('user_role_id', userId);
+        localStorage.setItem('user_email', email);
+        
+        toast({ title: '✅ Delivery Provider Profile Created!', description: 'Redirecting to your dashboard...' });
+        window.location.href = DASHBOARD;
+        return;
+      }
+      
       // First, try to sign in to check if user already exists
       console.log('🔐 Checking if user already exists...');
       const signInResponse = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
@@ -296,13 +425,57 @@ const DeliveryAuth: React.FC = () => {
                 </TabsContent>
                 <TabsContent value="signup">
                   <form onSubmit={handleSignUp} className="space-y-4">
+                    {isPrefilledFromLogin && (
+                      <Alert className="bg-green-50 border-green-200">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                        <AlertDescription className="text-green-800">
+                          <strong>Already logged in!</strong> Complete your delivery provider profile below.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                    
                     <div className="space-y-2"><Label>Full Name *</Label><div className="relative"><User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input type="text" placeholder="John Doe" value={fullName} onChange={(e) => setFullName(e.target.value)} className="pl-10" required /></div></div>
                     <div className="space-y-2"><Label>Company Name</Label><div className="relative"><Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input type="text" placeholder="Fast Deliveries Ltd" value={companyName} onChange={(e) => setCompanyName(e.target.value)} className="pl-10" /></div></div>
-                    <div className="space-y-2"><Label>Email *</Label><div className="relative"><Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input type="email" placeholder="your@email.com" value={email} onChange={(e) => setEmail(e.target.value)} className="pl-10" required /></div></div>
+                    
+                    {/* Email - Read-only if pre-filled */}
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-2">
+                        Email *
+                        {isPrefilledFromLogin && <span className="text-xs text-green-600 flex items-center gap-1"><CheckCircle className="h-3 w-3" />Verified</span>}
+                      </Label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input 
+                          type="email" 
+                          placeholder="your@email.com" 
+                          value={email} 
+                          onChange={(e) => !isPrefilledFromLogin && setEmail(e.target.value)} 
+                          className={`pl-10 ${isPrefilledFromLogin ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                          readOnly={isPrefilledFromLogin}
+                          disabled={isPrefilledFromLogin}
+                          required 
+                        />
+                      </div>
+                      {isPrefilledFromLogin && <p className="text-xs text-gray-500">Email from your existing account</p>}
+                    </div>
+                    
                     <div className="space-y-2"><Label>Phone</Label><div className="relative"><Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input type="tel" placeholder="+254 7XX XXX XXX" value={phone} onChange={(e) => setPhone(e.target.value)} className="pl-10" /></div></div>
                     <div className="space-y-2"><Label>Location</Label><div className="relative"><MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input type="text" placeholder="Nairobi, Kenya" value={location} onChange={(e) => setLocation(e.target.value)} className="pl-10" /></div></div>
-                    <div className="space-y-2"><Label>Password *</Label><div className="relative"><Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input type="password" placeholder="Min 6 characters" value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10" minLength={6} required autoComplete="new-password" /></div></div>
-                    <Button type="submit" className="w-full bg-gradient-to-r from-purple-500 to-purple-600" disabled={isLoading}>{isLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Creating...</> : 'Create Account'}</Button>
+                    
+                    {/* Password - Hidden if pre-filled */}
+                    {!isPrefilledFromLogin && (
+                      <div className="space-y-2"><Label>Password *</Label><div className="relative"><Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input type="password" placeholder="Min 6 characters" value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10" minLength={6} required autoComplete="new-password" /></div></div>
+                    )}
+                    
+                    <Button type="submit" className="w-full bg-gradient-to-r from-purple-500 to-purple-600" disabled={isLoading}>
+                      {isLoading ? (
+                        <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Creating...</>
+                      ) : isPrefilledFromLogin ? (
+                        'Complete Registration'
+                      ) : (
+                        'Create Account'
+                      )}
+                    </Button>
                   </form>
                 </TabsContent>
               </Tabs>

@@ -1,8 +1,12 @@
 /**
- * SupplierAuth - BUILD v15 - FETCH API + DB ROLE CHECK
+ * SupplierAuth - BUILD v16 - PRE-FILL FROM GENERAL LOGIN
+ * If user is already logged in via general login:
+ * - Pre-fill email from session
+ * - Make email/password fields read-only
+ * - Auto-switch to signup tab
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,8 +14,9 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Package, Eye, EyeOff, Loader2, ArrowLeft, Mail, Lock, User, Phone, MapPin, ChevronRight, Briefcase } from 'lucide-react';
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Package, Eye, EyeOff, Loader2, ArrowLeft, Mail, Lock, User, Phone, MapPin, ChevronRight, Briefcase, CheckCircle, Info } from 'lucide-react';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 
 const ROLE = 'supplier';
 const DASHBOARD = '/supplier-dashboard';
@@ -32,12 +37,13 @@ if (cachedRole === ROLE && cachedUserId) {
   window.location.replace(DASHBOARD);
 }
 
-console.log('🔐 SupplierAuth BUILD v15 - SECURE');
+console.log('🔐 SupplierAuth BUILD v16 - PRE-FILL FROM GENERAL LOGIN');
 
 const SupplierAuth: React.FC = () => {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
   const [isLoading, setIsLoading] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -45,7 +51,95 @@ const SupplierAuth: React.FC = () => {
   const [companyName, setCompanyName] = useState('');
   const [phone, setPhone] = useState('');
   const [location, setLocation] = useState('');
+  const [isPrefilledFromLogin, setIsPrefilledFromLogin] = useState(false);
+  const [prefilledUserId, setPrefilledUserId] = useState<string | null>(null);
+  const [prefilledAccessToken, setPrefilledAccessToken] = useState<string | null>(null);
   const redirecting = useRef(false);
+
+  // Check if user is already logged in via general login
+  useEffect(() => {
+    const checkExistingAuth = async () => {
+      try {
+        // First check localStorage for existing session
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          if (parsed?.user?.email && parsed?.access_token) {
+            console.log('🔐 Found existing session for:', parsed.user.email);
+            
+            // Check if user already has supplier role
+            const roleResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${parsed.user.id}&select=role`,
+              { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${parsed.access_token}` } }
+            );
+            const roleData = await roleResponse.json();
+            const currentRole = roleData?.[0]?.role;
+            
+            if (currentRole === ROLE) {
+              // Already a supplier - redirect to dashboard
+              console.log('🔐 User is already a supplier, redirecting...');
+              localStorage.setItem('user_role', ROLE);
+              localStorage.setItem('user_role_id', parsed.user.id);
+              window.location.href = DASHBOARD;
+              return;
+            }
+            
+            // User is logged in but not a supplier - pre-fill and show signup
+            setEmail(parsed.user.email);
+            setPrefilledUserId(parsed.user.id);
+            setPrefilledAccessToken(parsed.access_token);
+            setIsPrefilledFromLogin(true);
+            setActiveTab('signup');
+            
+            toast({
+              title: '👋 Welcome!',
+              description: 'Complete your supplier registration below.',
+            });
+          }
+        }
+        
+        // Also try Supabase client
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.email && !isPrefilledFromLogin) {
+          console.log('🔐 Found Supabase session for:', session.user.email);
+          
+          // Check if user already has supplier role
+          const { data: roleData } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', session.user.id)
+            .maybeSingle();
+          
+          if (roleData?.role === ROLE) {
+            // Already a supplier - redirect to dashboard
+            console.log('🔐 User is already a supplier, redirecting...');
+            localStorage.setItem('user_role', ROLE);
+            localStorage.setItem('user_role_id', session.user.id);
+            window.location.href = DASHBOARD;
+            return;
+          }
+          
+          // User is logged in but not a supplier - pre-fill and show signup
+          setEmail(session.user.email);
+          setPrefilledUserId(session.user.id);
+          setPrefilledAccessToken(session.access_token);
+          setIsPrefilledFromLogin(true);
+          setActiveTab('signup');
+          
+          toast({
+            title: '👋 Welcome!',
+            description: 'Complete your supplier registration below.',
+          });
+        }
+      } catch (error) {
+        console.log('🔐 No existing auth session found');
+      } finally {
+        setCheckingAuth(false);
+      }
+    };
+    
+    checkExistingAuth();
+  }, []);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -134,6 +228,63 @@ const SupplierAuth: React.FC = () => {
     if (!fullName.trim() || !companyName.trim()) { setIsLoading(false); toast({ title: 'Error', description: 'Please enter your full name and company name', variant: 'destructive' }); return; }
     
     try {
+      // If user is pre-filled from general login, use their existing session
+      if (isPrefilledFromLogin && prefilledUserId && prefilledAccessToken) {
+        console.log('🔐 Using pre-filled session from general login...');
+        const userId = prefilledUserId;
+        const accessToken = prefilledAccessToken;
+        
+        // Check current role
+        const roleCheckResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${userId}&select=role`,
+          { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}` } }
+        );
+        const roleCheckData = await roleCheckResponse.json();
+        const currentRole = roleCheckData?.[0]?.role;
+        
+        // Update or insert role
+        if (currentRole) {
+          console.log('🔐 Updating role from', currentRole, 'to', ROLE);
+          await fetch(`${SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${userId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}`, 'Prefer': 'return=minimal' },
+            body: JSON.stringify({ role: ROLE }),
+          });
+        } else {
+          console.log('🔐 Inserting new role:', ROLE);
+          await fetch(`${SUPABASE_URL}/rest/v1/user_roles`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}`, 'Prefer': 'return=minimal' },
+            body: JSON.stringify({ user_id: userId, role: ROLE }),
+          });
+        }
+        
+        // Create supplier profile
+        console.log('🔐 Creating supplier profile...');
+        await fetch(`${SUPABASE_URL}/rest/v1/suppliers`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}`, 'Prefer': 'return=minimal,resolution=merge-duplicates' },
+          body: JSON.stringify({ 
+            user_id: userId, 
+            business_name: companyName.trim(),
+            contact_name: fullName.trim(),
+            email: email.trim(),
+            phone: phone || null,
+            location: location || null,
+            status: 'active'
+          }),
+        });
+        
+        // Update localStorage and redirect
+        localStorage.setItem('user_role', ROLE);
+        localStorage.setItem('user_role_id', userId);
+        localStorage.setItem('user_email', email);
+        
+        toast({ title: '✅ Supplier Profile Created!', description: 'Redirecting to your dashboard...' });
+        window.location.href = DASHBOARD;
+        return;
+      }
+      
       // First, try to sign in to check if user already exists
       console.log('🔐 Checking if user already exists...');
       const signInResponse = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
@@ -306,13 +457,60 @@ const SupplierAuth: React.FC = () => {
                 </TabsContent>
                 <TabsContent value="signup">
                   <form onSubmit={handleSignUp} className="space-y-4">
+                    {/* Show info banner if pre-filled from general login */}
+                    {isPrefilledFromLogin && (
+                      <Alert className="bg-green-50 border-green-200">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                        <AlertDescription className="text-green-800">
+                          <strong>Already logged in!</strong> Complete your supplier profile below.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                    
                     <div className="space-y-2"><Label>Full Name *</Label><div className="relative"><User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input type="text" placeholder="John Doe" value={fullName} onChange={(e) => setFullName(e.target.value)} className="pl-10" required /></div></div>
                     <div className="space-y-2"><Label>Company Name *</Label><div className="relative"><Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input type="text" placeholder="ABC Supplies Ltd" value={companyName} onChange={(e) => setCompanyName(e.target.value)} className="pl-10" required /></div></div>
-                    <div className="space-y-2"><Label>Email *</Label><div className="relative"><Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input type="email" placeholder="your@email.com" value={email} onChange={(e) => setEmail(e.target.value)} className="pl-10" required /></div></div>
+                    
+                    {/* Email - Read-only if pre-filled */}
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-2">
+                        Email *
+                        {isPrefilledFromLogin && <span className="text-xs text-green-600 flex items-center gap-1"><CheckCircle className="h-3 w-3" />Verified</span>}
+                      </Label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input 
+                          type="email" 
+                          placeholder="your@email.com" 
+                          value={email} 
+                          onChange={(e) => !isPrefilledFromLogin && setEmail(e.target.value)} 
+                          className={`pl-10 ${isPrefilledFromLogin ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                          readOnly={isPrefilledFromLogin}
+                          disabled={isPrefilledFromLogin}
+                          required 
+                        />
+                      </div>
+                      {isPrefilledFromLogin && (
+                        <p className="text-xs text-gray-500">Email from your existing account</p>
+                      )}
+                    </div>
+                    
                     <div className="space-y-2"><Label>Phone</Label><div className="relative"><Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input type="tel" placeholder="+254 7XX XXX XXX" value={phone} onChange={(e) => setPhone(e.target.value)} className="pl-10" /></div></div>
                     <div className="space-y-2"><Label>Location</Label><div className="relative"><MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input type="text" placeholder="Nairobi, Kenya" value={location} onChange={(e) => setLocation(e.target.value)} className="pl-10" /></div></div>
-                    <div className="space-y-2"><Label>Password *</Label><div className="relative"><Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input type="password" placeholder="Min 6 characters" value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10" minLength={6} required autoComplete="new-password" /></div></div>
-                    <Button type="submit" className="w-full bg-gradient-to-r from-orange-500 to-orange-600" disabled={isLoading}>{isLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Creating...</> : 'Create Account'}</Button>
+                    
+                    {/* Password - Hidden if pre-filled (user already authenticated) */}
+                    {!isPrefilledFromLogin && (
+                      <div className="space-y-2"><Label>Password *</Label><div className="relative"><Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input type="password" placeholder="Min 6 characters" value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10" minLength={6} required autoComplete="new-password" /></div></div>
+                    )}
+                    
+                    <Button type="submit" className="w-full bg-gradient-to-r from-orange-500 to-orange-600" disabled={isLoading}>
+                      {isLoading ? (
+                        <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Creating...</>
+                      ) : isPrefilledFromLogin ? (
+                        'Complete Registration'
+                      ) : (
+                        'Create Account'
+                      )}
+                    </Button>
                   </form>
                 </TabsContent>
               </Tabs>
