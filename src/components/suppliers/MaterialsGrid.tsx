@@ -896,7 +896,10 @@ export const MaterialsGrid = () => {
         if (pricesResponse.ok) {
           const pricesData = await pricesResponse.json();
           console.log(`💰 Supplier prices loaded: ${pricesData?.length || 0} entries at ${new Date().toISOString()}`);
+          
+          // DEBUG: Show raw response
           if (pricesData && pricesData.length > 0) {
+            console.log('💰 RAW supplier_product_prices from DB (first 10):', pricesData.slice(0, 10));
             // Log all prices for debugging
             console.log('💰 All supplier prices from DB:', pricesData.map((p: any) => ({ 
               product_id: p.product_id, 
@@ -904,6 +907,9 @@ export const MaterialsGrid = () => {
               supplier_id: p.supplier_id,
               updated_at: p.updated_at 
             })));
+          } else {
+            console.warn('⚠️ NO supplier prices found in database! Check if supplier_product_prices table has data.');
+          }
             
             // Create a map of product_id -> price info
             // If multiple suppliers have prices, use the MOST RECENT price (not lowest)
@@ -990,6 +996,14 @@ export const MaterialsGrid = () => {
           if (firstBatchResponse.ok && metadataResponse.ok) {
             const firstBatchData = await firstBatchResponse.json();
             const metadataData = await metadataResponse.json();
+            
+            // DEBUG: Log first few admin material IDs
+            console.log('🔍 DEBUG - First 5 admin_material_images IDs:', firstBatchData.slice(0, 5).map((m: any) => ({ id: m.id, name: m.name })));
+            console.log('🔍 DEBUG - Supplier prices product_ids:', Object.keys(supplierPrices).slice(0, 10));
+            
+            // Check for matches
+            const matchCount = firstBatchData.filter((m: any) => supplierPrices[m.id]).length;
+            console.log(`🔍 DEBUG - Matched ${matchCount} of ${firstBatchData.length} products with supplier prices`);
             
             // Get total count
             const countHeader = metadataResponse.headers.get('content-range');
