@@ -93,9 +93,9 @@ const ProfessionalBuilderDashboardPage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Projects state
+  // Projects state - start with loading false to show empty state immediately
   const [projects, setProjects] = useState<any[]>([]);
-  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [loadingProjects, setLoadingProjects] = useState(true); // Will be set to false quickly
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [selectedProject, setSelectedProject] = useState<any>(null);
   const [newProject, setNewProject] = useState({
@@ -635,39 +635,96 @@ const ProfessionalBuilderDashboardPage = () => {
   // Fetch projects
   const fetchProjects = async () => {
     const userId = getUserId();
-    if (!userId) return;
+    if (!userId) {
+      console.log('📁 No userId for projects fetch');
+      setLoadingProjects(false);
+      return;
+    }
     
+    console.log('📁 Fetching projects for:', userId);
     setLoadingProjects(true);
+    
+    // Safety timeout - don't hang forever
+    const safetyTimeout = setTimeout(() => {
+      console.log('📁 Projects fetch safety timeout');
+      setLoadingProjects(false);
+    }, 8000);
+    
     try {
       const accessToken = await getAccessToken();
+      
+      const controller = new AbortController();
+      const fetchTimeout = setTimeout(() => controller.abort(), 7000);
+      
       const response = await fetch(
         `${SUPABASE_URL}/rest/v1/builder_projects?builder_id=eq.${userId}&order=created_at.desc`,
         {
           headers: {
             'apikey': SUPABASE_ANON_KEY,
             'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`
-          }
+          },
+          signal: controller.signal
         }
       );
+      
+      clearTimeout(fetchTimeout);
       
       if (response.ok) {
         const data = await response.json();
         setProjects(data);
         console.log('📁 Loaded', data.length, 'projects');
+      } else {
+        console.log('📁 Projects fetch failed:', response.status);
+        // Try with Supabase client as fallback
+        const { data, error } = await supabase
+          .from('builder_projects')
+          .select('*')
+          .eq('builder_id', userId)
+          .order('created_at', { ascending: false });
+        
+        if (!error && data) {
+          setProjects(data);
+          console.log('📁 Loaded', data.length, 'projects via fallback');
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching projects:', error);
+      if (error.name !== 'AbortError') {
+        // Try Supabase client as fallback
+        try {
+          const { data } = await supabase
+            .from('builder_projects')
+            .select('*')
+            .eq('builder_id', userId)
+            .order('created_at', { ascending: false });
+          
+          if (data) {
+            setProjects(data);
+            console.log('📁 Loaded', data.length, 'projects via fallback');
+          }
+        } catch (e) {
+          console.error('📁 Fallback also failed:', e);
+        }
+      }
     } finally {
+      clearTimeout(safetyTimeout);
       setLoadingProjects(false);
     }
   };
 
-  // Load projects on mount
+  // Load projects on mount - with delay to ensure auth is ready
   useEffect(() => {
-    const userId = getUserId();
-    if (userId) {
-      fetchProjects();
-    }
+    // Small delay to ensure auth context is ready
+    const timer = setTimeout(() => {
+      const userId = getUserId();
+      if (userId) {
+        fetchProjects();
+      } else {
+        setLoadingProjects(false);
+      }
+    }, 500);
+    
+    return () => clearTimeout(timer);
   }, [authUser]);
 
   // Create new project
