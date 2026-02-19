@@ -4,10 +4,12 @@
  * ║   💰 CART PRICE COMPARISON ALL - Compare prices for ALL items in cart                ║
  * ║                                                                                      ║
  * ║   CREATED: February 4, 2026                                                          ║
+ * ║   UPDATED: February 19, 2026 - Added supplier selection for both builders            ║
  * ║   FEATURES:                                                                          ║
  * ║   1. Shows price comparisons for ALL cart items in one view                          ║
  * ║   2. Groups by supplier to find best overall deal                                    ║
  * ║   3. Highlights total potential savings                                              ║
+ * ║   4. ALLOWS BOTH Private Clients & Professional Builders to SELECT suppliers         ║
  * ║                                                                                      ║
  * ╚══════════════════════════════════════════════════════════════════════════════════════╝
  */
@@ -33,7 +35,9 @@ import {
   Package,
   Check,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  CheckCircle2,
+  ArrowRight
 } from 'lucide-react';
 
 interface SupplierPrice {
@@ -65,11 +69,13 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
   isOpen,
   onClose
 }) => {
-  const { items } = useCart();
+  const { items, updateCartItem } = useCart();
   const { toast } = useToast();
   const [comparisons, setComparisons] = useState<ProductComparison[]>([]);
   const [loading, setLoading] = useState(false);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  // Track selected suppliers for each product
+  const [selectedSuppliers, setSelectedSuppliers] = useState<Map<string, SupplierPrice>>(new Map());
 
   // Fetch prices for all cart items when modal opens
   useEffect(() => {
@@ -233,6 +239,66 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
     });
   };
 
+  // Handle supplier selection for an item
+  const handleSelectSupplier = (productId: string, supplier: SupplierPrice) => {
+    setSelectedSuppliers(prev => {
+      const next = new Map(prev);
+      // If already selected, deselect
+      if (next.get(productId)?.supplier_id === supplier.supplier_id) {
+        next.delete(productId);
+      } else {
+        next.set(productId, supplier);
+      }
+      return next;
+    });
+    
+    // Update the comparison to show new selection
+    setComparisons(prev => prev.map(comp => {
+      if (comp.product_id === productId) {
+        return {
+          ...comp,
+          current_price: supplier.price,
+          current_supplier: supplier.supplier_name
+        };
+      }
+      return comp;
+    }));
+  };
+
+  // Apply all selected suppliers to cart
+  const handleApplySelections = () => {
+    if (selectedSuppliers.size === 0) {
+      toast({
+        title: '⚠️ No Suppliers Selected',
+        description: 'Click on a supplier to select them for your items.',
+      });
+      return;
+    }
+
+    let updatedCount = 0;
+    
+    selectedSuppliers.forEach((supplier, productId) => {
+      const item = items.find(i => i.id === productId);
+      if (item && updateCartItem) {
+        updateCartItem(productId, {
+          unit_price: supplier.price,
+          supplier_name: supplier.supplier_name,
+          supplier_id: supplier.supplier_id
+        });
+        updatedCount++;
+      }
+    });
+
+    toast({
+      title: '✅ Cart Updated!',
+      description: `${updatedCount} item${updatedCount !== 1 ? 's' : ''} updated with selected suppliers.`,
+    });
+
+    // Clear selections and close
+    setSelectedSuppliers(new Map());
+    onClose();
+  };
+
   // Calculate totals
   const currentTotal = comparisons.reduce((sum, c) => sum + (c.current_price * c.quantity), 0);
   const bestTotal = comparisons.reduce((sum, c) => sum + (c.best_price * c.quantity), 0);
@@ -336,29 +402,48 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
                           </div>
                         </div>
 
-                        {/* Expanded Alternatives */}
+                        {/* Expanded Alternatives - SELECTABLE */}
                         {isExpanded && item.alternatives.length > 0 && (
                           <div className="mt-3 pt-3 border-t border-gray-100 space-y-2">
                             <p className="text-xs font-medium text-gray-500 uppercase">
-                              Alternative Prices ({item.alternatives.length} suppliers)
+                              Click to select a supplier ({item.alternatives.length} available)
                             </p>
                             {item.alternatives
                               .sort((a, b) => a.price - b.price)
                               .map((alt, idx) => {
                                 const isBest = alt.price === item.best_price && alt.price < item.current_price;
-                                const savings = (item.current_price - alt.price) * item.quantity;
+                                const originalPrice = items.find(i => i.id === item.product_id)?.unit_price || item.current_price;
+                                const savings = (originalPrice - alt.price) * item.quantity;
+                                const isSelected = selectedSuppliers.get(item.product_id)?.supplier_id === alt.supplier_id;
                                 
                                 return (
                                   <div 
                                     key={alt.supplier_id}
-                                    className={`flex items-center justify-between p-2 rounded-lg ${
-                                      isBest ? 'bg-green-100 border border-green-200' : 'bg-gray-50'
-                                    }`}
+                                    onClick={() => alt.in_stock && handleSelectSupplier(item.product_id, alt)}
+                                    className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all ${
+                                      isSelected 
+                                        ? 'bg-blue-100 border-2 border-blue-500 shadow-md' 
+                                        : isBest 
+                                          ? 'bg-green-100 border border-green-200 hover:border-green-400' 
+                                          : 'bg-gray-50 border border-transparent hover:border-gray-300'
+                                    } ${!alt.in_stock ? 'opacity-50 cursor-not-allowed' : ''}`}
                                   >
                                     <div className="flex items-center gap-2">
-                                      {isBest && <Trophy className="h-4 w-4 text-amber-500" />}
-                                      <Store className="h-4 w-4 text-gray-400" />
-                                      <span className="text-sm font-medium">{alt.supplier_name}</span>
+                                      {isSelected ? (
+                                        <CheckCircle2 className="h-5 w-5 text-blue-600" />
+                                      ) : isBest ? (
+                                        <Trophy className="h-4 w-4 text-amber-500" />
+                                      ) : (
+                                        <Store className="h-4 w-4 text-gray-400" />
+                                      )}
+                                      <span className={`text-sm font-medium ${isSelected ? 'text-blue-800' : ''}`}>
+                                        {alt.supplier_name}
+                                      </span>
+                                      {isBest && !isSelected && (
+                                        <Badge className="bg-amber-100 text-amber-700 text-xs">
+                                          Best Price
+                                        </Badge>
+                                      )}
                                       {!alt.in_stock && (
                                         <Badge variant="outline" className="text-xs text-red-500 border-red-200">
                                           Out of Stock
@@ -367,7 +452,7 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
                                     </div>
                                     <div className="flex items-center gap-3">
                                       <div className="text-right">
-                                        <p className={`font-semibold ${isBest ? 'text-green-700' : ''}`}>
+                                        <p className={`font-semibold ${isSelected ? 'text-blue-700' : isBest ? 'text-green-700' : ''}`}>
                                           KES {alt.price.toLocaleString()}/unit
                                         </p>
                                         {savings > 0 && (
@@ -376,6 +461,24 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
                                           </p>
                                         )}
                                       </div>
+                                      {!isSelected && alt.in_stock && (
+                                        <Button 
+                                          size="sm" 
+                                          variant="outline"
+                                          className="h-7 text-xs border-blue-300 text-blue-600 hover:bg-blue-50"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleSelectSupplier(item.product_id, alt);
+                                          }}
+                                        >
+                                          Select
+                                        </Button>
+                                      )}
+                                      {isSelected && (
+                                        <Badge className="bg-blue-600 text-white">
+                                          Selected
+                                        </Badge>
+                                      )}
                                     </div>
                                   </div>
                                 );
@@ -410,10 +513,40 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
                   <span className="font-bold text-lg">KES {bestTotal.toLocaleString()}</span>
                 </div>
               )}
-              <Button onClick={onClose} className="w-full">
-                <Check className="h-4 w-4 mr-2" />
-                Done
-              </Button>
+              
+              {/* Show selected suppliers count */}
+              {selectedSuppliers.size > 0 && (
+                <div className="flex justify-between items-center bg-blue-50 p-2 rounded-lg border border-blue-200">
+                  <span className="text-blue-700 font-medium">
+                    {selectedSuppliers.size} supplier{selectedSuppliers.size !== 1 ? 's' : ''} selected
+                  </span>
+                  <span className="text-blue-600 text-sm">
+                    New Total: KES {comparisons.reduce((sum, c) => sum + (c.current_price * c.quantity), 0).toLocaleString()}
+                  </span>
+                </div>
+              )}
+              
+              <div className="flex gap-2">
+                {selectedSuppliers.size > 0 ? (
+                  <>
+                    <Button variant="outline" onClick={onClose} className="flex-1">
+                      Cancel
+                    </Button>
+                    <Button 
+                      onClick={handleApplySelections} 
+                      className="flex-1 bg-blue-600 hover:bg-blue-700"
+                    >
+                      <ArrowRight className="h-4 w-4 mr-2" />
+                      Apply Selected Suppliers
+                    </Button>
+                  </>
+                ) : (
+                  <Button onClick={onClose} className="w-full">
+                    <Check className="h-4 w-4 mr-2" />
+                    Done
+                  </Button>
+                )}
+              </div>
             </div>
           </>
         )}
