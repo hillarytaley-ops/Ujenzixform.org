@@ -123,9 +123,12 @@ const PrivateClientDashboard = () => {
     return () => clearTimeout(timeout);
   }, []);
 
-  // Immediate monitoring data loader - runs on mount
+  // Immediate data loader - runs on mount for orders and monitoring
   useEffect(() => {
-    const loadMonitoringData = async () => {
+    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+    const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+
+    const loadData = async () => {
       // Get user ID from localStorage first (fastest)
       let userId = '';
       let accessToken = '';
@@ -140,17 +143,64 @@ const PrivateClientDashboard = () => {
       } catch (e) {}
       
       if (!userId) {
-        console.log('📹 DIRECT: No user ID in localStorage');
+        console.log('📦 DIRECT: No user ID in localStorage');
         return;
       }
       
-      console.log('📹 DIRECT: Loading monitoring requests for:', userId);
+      console.log('📦 DIRECT: Loading data for user:', userId);
       
-      const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      // Fetch orders directly
+      try {
+        const ordersResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${userId}&order=created_at.desc`,
+          {
+            headers: {
+              'apikey': ANON_KEY,
+              'Authorization': `Bearer ${accessToken || ANON_KEY}`,
+              'Content-Type': 'application/json',
+            }
+          }
+        );
+
+        if (ordersResponse.ok) {
+          const ordersData = await ordersResponse.json();
+          console.log('📦 DIRECT: Got', ordersData?.length || 0, 'orders');
+          if (ordersData && ordersData.length > 0) {
+            console.log('📦 DIRECT: First order:', ordersData[0].po_number, ordersData[0].status);
+            setOrders(ordersData);
+            
+            // Calculate stats
+            const totalOrders = ordersData.length;
+            const pendingOrders = ordersData.filter((o: Order) => 
+              o.status === 'pending' || o.status === 'quoted' || o.status === 'processing'
+            ).length;
+            const completedOrders = ordersData.filter((o: Order) => 
+              o.status === 'completed' || o.status === 'delivered' || o.status === 'confirmed'
+            ).length;
+            const totalSpent = ordersData
+              .filter((o: Order) => o.status === 'completed' || o.status === 'delivered' || o.status === 'confirmed')
+              .reduce((sum: number, o: Order) => sum + (o.total_amount || 0), 0);
+
+            setStats({
+              totalOrders,
+              pendingOrders,
+              completedOrders,
+              totalSpent,
+            });
+          } else {
+            console.log('📦 DIRECT: No orders found for this user');
+          }
+        } else {
+          console.log('📦 DIRECT: Orders response status:', ordersResponse.status);
+        }
+      } catch (e) {
+        console.error('📦 DIRECT: Orders error:', e);
+      }
       
+      // Fetch monitoring requests
       try {
         const response = await fetch(
-          `https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/monitoring_service_requests?user_id=eq.${userId}&order=created_at.desc`,
+          `${SUPABASE_URL}/rest/v1/monitoring_service_requests?user_id=eq.${userId}&order=created_at.desc`,
           {
             headers: {
               'apikey': ANON_KEY,
@@ -174,9 +224,9 @@ const PrivateClientDashboard = () => {
       }
     };
     
-    loadMonitoringData();
+    loadData();
     // Retry after 2 seconds in case session wasn't ready
-    const retryTimeout = setTimeout(loadMonitoringData, 2000);
+    const retryTimeout = setTimeout(loadData, 2000);
     
     return () => clearTimeout(retryTimeout);
   }, []);
@@ -249,42 +299,67 @@ const PrivateClientDashboard = () => {
         // Continue anyway - localStorage already verified role
       }
 
-      // Fetch real orders from purchase_orders table
-      const { data: ordersData, error: ordersError } = await supabase
-        .from('purchase_orders')
-        .select('*')
-        .eq('buyer_id', user.id)
-        .order('created_at', { ascending: false });
+      // Fetch real orders from purchase_orders table using direct REST API
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      
+      // Get access token for authenticated request
+      let accessToken = '';
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          accessToken = parsed.access_token || '';
+        }
+      } catch (e) {}
 
-      console.log('📦 Private client orders loaded:', ordersData?.length || 0, ordersData);
+      console.log('📦 Fetching orders for user:', user.id);
+      
+      try {
+        const ordersResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${user.id}&order=created_at.desc`,
+          {
+            headers: {
+              'apikey': ANON_KEY,
+              'Authorization': `Bearer ${accessToken || ANON_KEY}`,
+              'Content-Type': 'application/json',
+            }
+          }
+        );
 
-      if (ordersError) {
-        console.error('Error fetching orders:', ordersError);
-      } else {
-        const fetchedOrders = ordersData || [];
-        setOrders(fetchedOrders);
-        console.log('📦 Orders set to state:', fetchedOrders.length);
-        
-        // Calculate real stats from orders
-        const totalOrders = fetchedOrders.length;
-        const pendingOrders = fetchedOrders.filter(o => 
-          o.status === 'pending' || o.status === 'quoted' || o.status === 'processing'
-        ).length;
-        const completedOrders = fetchedOrders.filter(o => 
-          o.status === 'completed' || o.status === 'delivered' || o.status === 'confirmed'
-        ).length;
-        const totalSpent = fetchedOrders
-          .filter(o => o.status === 'completed' || o.status === 'delivered' || o.status === 'confirmed')
-          .reduce((sum, o) => sum + (o.total_amount || 0), 0);
+        if (ordersResponse.ok) {
+          const ordersData = await ordersResponse.json();
+          console.log('📦 Private client orders loaded:', ordersData?.length || 0, ordersData);
+          
+          const fetchedOrders = ordersData || [];
+          setOrders(fetchedOrders);
+          console.log('📦 Orders set to state:', fetchedOrders.length);
+          
+          // Calculate real stats from orders
+          const totalOrders = fetchedOrders.length;
+          const pendingOrders = fetchedOrders.filter((o: Order) => 
+            o.status === 'pending' || o.status === 'quoted' || o.status === 'processing'
+          ).length;
+          const completedOrders = fetchedOrders.filter((o: Order) => 
+            o.status === 'completed' || o.status === 'delivered' || o.status === 'confirmed'
+          ).length;
+          const totalSpent = fetchedOrders
+            .filter((o: Order) => o.status === 'completed' || o.status === 'delivered' || o.status === 'confirmed')
+            .reduce((sum: number, o: Order) => sum + (o.total_amount || 0), 0);
 
-        setStats({
-          totalOrders,
-          pendingOrders,
-          completedOrders,
-          totalSpent,
-        });
-        
-        console.log('📦 Private client orders loaded:', totalOrders);
+          setStats({
+            totalOrders,
+            pendingOrders,
+            completedOrders,
+            totalSpent,
+          });
+          
+          console.log('📦 Private client stats:', { totalOrders, pendingOrders, completedOrders, totalSpent });
+        } else {
+          console.error('📦 Orders fetch failed:', ordersResponse.status, await ordersResponse.text());
+        }
+      } catch (ordersError) {
+        console.error('📦 Error fetching orders:', ordersError);
       }
 
       // Fetch delivery requests for this user
