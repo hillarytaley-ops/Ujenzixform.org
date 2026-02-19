@@ -758,6 +758,39 @@ export const MaterialsGrid = () => {
     }
   }, [visibleStart, visibleEnd, paginatedMaterials]);
 
+  // ✅ PREFETCH: Preload images for next page when approaching end of current page
+  useEffect(() => {
+    // When user is on the last 3 items of current page, prefetch next page images
+    const currentPageEnd = validCurrentPage * itemsPerPage;
+    const itemsRemaining = paginatedMaterials.length - (visibleEnd - ((validCurrentPage - 1) * itemsPerPage));
+    
+    if (itemsRemaining <= 3 && validCurrentPage < totalPages) {
+      // Prefetch next page images
+      const nextPageStart = currentPageEnd;
+      const nextPageEnd = Math.min(nextPageStart + itemsPerPage, computedFilteredMaterials.length);
+      const nextPageMaterials = computedFilteredMaterials.slice(nextPageStart, nextPageEnd);
+      
+      // Use requestIdleCallback for non-blocking prefetch
+      const prefetchImages = () => {
+        nextPageMaterials.forEach(material => {
+          if (material.image_url) {
+            const link = document.createElement('link');
+            link.rel = 'prefetch';
+            link.as = 'image';
+            link.href = material.image_url;
+            document.head.appendChild(link);
+          }
+        });
+      };
+      
+      if ('requestIdleCallback' in window) {
+        (window as any).requestIdleCallback(prefetchImages);
+      } else {
+        setTimeout(prefetchImages, 200);
+      }
+    }
+  }, [visibleEnd, validCurrentPage, totalPages, itemsPerPage, computedFilteredMaterials, paginatedMaterials.length]);
+
   // Track which images are being loaded to prevent duplicate requests
   const loadingImagesRef = useRef<Set<string>>(new Set());
 
@@ -1207,6 +1240,23 @@ export const MaterialsGrid = () => {
       setCurrentPage(page);
       // Scroll to top of grid
       gridRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      
+      // Prefetch next page images in background
+      if (page < totalPages) {
+        const nextPageStart = page * itemsPerPage;
+        const nextPageEnd = Math.min(nextPageStart + itemsPerPage, computedFilteredMaterials.length);
+        const nextPageMaterials = computedFilteredMaterials.slice(nextPageStart, nextPageEnd);
+        
+        // Preload images for next page
+        setTimeout(() => {
+          nextPageMaterials.forEach(material => {
+            if (material.image_url) {
+              const img = new Image();
+              img.src = material.image_url;
+            }
+          });
+        }, 100);
+      }
     }
   };
 
@@ -1393,54 +1443,74 @@ export const MaterialsGrid = () => {
         {/* Skeleton Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <div className="h-8 w-72 bg-muted rounded-md animate-pulse mb-2"></div>
-            <div className="h-4 w-48 bg-muted rounded-md animate-pulse"></div>
+            <div className="h-8 w-72 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-md animate-shimmer mb-2"></div>
+            <div className="h-4 w-48 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-md animate-shimmer"></div>
           </div>
           <div className="flex items-center gap-2">
-            <div className="h-10 w-28 bg-muted rounded-md animate-pulse"></div>
-            <div className="h-10 w-24 bg-muted rounded-md animate-pulse"></div>
+            <div className="h-10 w-28 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-md animate-shimmer"></div>
+            <div className="h-10 w-24 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-md animate-shimmer"></div>
           </div>
         </div>
         
         {/* Skeleton Filters */}
         <div className="bg-card border rounded-lg p-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="md:col-span-2 h-10 bg-muted rounded-md animate-pulse"></div>
-            <div className="h-10 bg-muted rounded-md animate-pulse"></div>
-            <div className="h-10 bg-muted rounded-md animate-pulse"></div>
+            <div className="md:col-span-2 h-10 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-md animate-shimmer"></div>
+            <div className="h-10 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-md animate-shimmer" style={{ animationDelay: '0.1s' }}></div>
+            <div className="h-10 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded-md animate-shimmer" style={{ animationDelay: '0.2s' }}></div>
           </div>
         </div>
         
-        {/* Skeleton Product Grid */}
+        {/* Skeleton Product Grid - Enhanced with shimmer effect */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {[...Array(8)].map((_, i) => (
-            <div key={i} className="bg-card border rounded-lg overflow-hidden">
-              {/* Image skeleton */}
-              <div className="h-48 bg-muted animate-pulse"></div>
+          {[...Array(itemsPerPage)].map((_, i) => (
+            <div key={i} className="bg-card border rounded-lg overflow-hidden shadow-sm" style={{ animationDelay: `${i * 0.05}s` }}>
+              {/* Image skeleton with shimmer */}
+              <div className="relative h-44 bg-gray-100 overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-shimmer"></div>
+                {/* Category badge placeholder */}
+                <div className="absolute top-2 left-2 h-5 w-16 bg-gray-300/50 rounded-full"></div>
+                {/* Stock badge placeholder */}
+                <div className="absolute top-2 right-2 h-5 w-14 bg-gray-300/50 rounded-full"></div>
+              </div>
               {/* Content skeleton */}
               <div className="p-4 space-y-3">
-                <div className="flex justify-between items-start">
-                  <div className="h-5 w-32 bg-muted rounded animate-pulse"></div>
-                  <div className="h-5 w-16 bg-muted rounded animate-pulse"></div>
+                {/* Title */}
+                <div className="h-5 w-3/4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer"></div>
+                {/* Description */}
+                <div className="h-4 w-full bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer" style={{ animationDelay: '0.1s' }}></div>
+                {/* Supplier info */}
+                <div className="flex items-center gap-2">
+                  <div className="h-4 w-4 bg-gray-200 rounded"></div>
+                  <div className="h-4 w-32 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer"></div>
                 </div>
-                <div className="h-4 w-full bg-muted rounded animate-pulse"></div>
-                <div className="h-4 w-3/4 bg-muted rounded animate-pulse"></div>
+                {/* Price */}
+                <div className="flex items-baseline justify-between pt-1">
+                  <div className="h-6 w-24 bg-gradient-to-r from-blue-100 via-blue-50 to-blue-100 rounded animate-shimmer"></div>
+                  <div className="h-4 w-12 bg-gray-200 rounded"></div>
+                </div>
+                {/* Quantity controls */}
                 <div className="flex items-center gap-2 pt-2">
-                  <div className="h-8 w-20 bg-muted rounded animate-pulse"></div>
-                  <div className="h-8 flex-1 bg-muted rounded animate-pulse"></div>
+                  <div className="h-8 w-8 bg-gray-200 rounded"></div>
+                  <div className="h-8 w-12 bg-gray-200 rounded"></div>
+                  <div className="h-8 w-8 bg-gray-200 rounded"></div>
+                  <div className="h-8 flex-1 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 rounded animate-shimmer"></div>
                 </div>
-                <div className="h-10 w-full bg-muted rounded animate-pulse"></div>
+                {/* Action button */}
+                <div className="h-10 w-full bg-gradient-to-r from-orange-100 via-orange-50 to-orange-100 rounded-lg animate-shimmer"></div>
               </div>
             </div>
           ))}
         </div>
         
-        {/* Loading indicator */}
-        <div className="flex items-center justify-center py-4">
-          <div className="flex items-center gap-3">
-            <div className="animate-spin rounded-full h-5 w-5 border-2 border-primary border-t-transparent"></div>
-            <p className="text-muted-foreground text-sm">Loading materials from suppliers...</p>
+        {/* Loading indicator with progress */}
+        <div className="flex flex-col items-center justify-center py-6 gap-3">
+          <div className="relative">
+            <div className="animate-spin rounded-full h-10 w-10 border-4 border-orange-200 border-t-orange-600"></div>
+            <Package className="absolute inset-0 m-auto h-4 w-4 text-orange-600" />
           </div>
+          <p className="text-muted-foreground text-sm font-medium">Loading construction materials...</p>
+          <p className="text-xs text-gray-400">Fetching latest prices from suppliers</p>
         </div>
       </div>
     );
