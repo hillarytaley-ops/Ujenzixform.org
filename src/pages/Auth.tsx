@@ -1,5 +1,5 @@
-// Auth Page - Build v2 - Force cache bust
-import { useState, useEffect } from "react";
+// Auth Page - Build v8 - Fix session caching issue
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import AnimatedSection from "@/components/AnimatedSection";
 import { User, Session } from '@supabase/supabase-js';
 import { Separator } from "@/components/ui/separator";
-import { Github, Mail, KeyRound, CheckCircle, Loader2 } from "lucide-react";
+import { Github, Mail, KeyRound, CheckCircle, Loader2, LogOut } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 
-console.log('🔐 Auth.tsx BUILD v7 - USE onAuthStateChange Feb 8 2026');
+console.log('🔐 Auth.tsx BUILD v8 - Fix session caching Feb 20 2026');
 
 const Auth = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -33,6 +33,9 @@ const Auth = () => {
   const [resetLoading, setResetLoading] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [shouldRedirect, setShouldRedirect] = useState<string | null>(null);
+  const [existingSession, setExistingSession] = useState<Session | null>(null);
+  const [checkingSession, setCheckingSession] = useState(true);
+  const hasSignedIn = useRef(false); // Track if user explicitly signed in this session
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -40,6 +43,7 @@ const Auth = () => {
   const urlParams = new URLSearchParams(window.location.search);
   const redirectTo = urlParams.get('redirect') || null;
   const liteParam = urlParams.get('lite');
+  const forceLogout = urlParams.get('logout') === '1'; // Allow force logout via URL
   // Only use lite mode if explicitly requested with lite=1, NOT just because there's a redirect
   const liteMode = liteParam === '1';
 
@@ -52,17 +56,42 @@ const Auth = () => {
     }
   }, [shouldRedirect]);
 
+  // Check for existing session on mount - but DON'T auto-redirect
+  // This allows users to sign in as a different account
   useEffect(() => {
-    let redirected = false;
+    const checkExistingSession = async () => {
+      // If force logout requested, sign out first
+      if (forceLogout) {
+        console.log('🔐 Force logout requested');
+        await supabase.auth.signOut();
+        // Remove the logout param from URL
+        window.history.replaceState({}, '', window.location.pathname);
+        setCheckingSession(false);
+        return;
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        console.log('🔐 Existing session found:', session.user.email);
+        setExistingSession(session);
+        setUser(session.user);
+      }
+      setCheckingSession(false);
+    };
     
-    // Listen for auth state - this is more reliable than getSession
+    checkExistingSession();
+  }, [forceLogout]);
+
+  // Listen for auth state changes - ONLY redirect on explicit SIGNED_IN event
+  useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('🔐 Auth event:', event, session?.user?.email);
       
-      if (!redirected && session?.user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
-        redirected = true;
+      // ONLY redirect on explicit sign-in, NOT on INITIAL_SESSION
+      // This prevents auto-redirect when user wants to sign in as different account
+      if (hasSignedIn.current && session?.user && event === 'SIGNED_IN') {
         const target = redirectTo || '/home';
-        console.log('🔐 REDIRECTING NOW to:', target);
+        console.log('🔐 REDIRECTING after explicit sign-in to:', target);
         window.location.href = target;
       }
     });
@@ -70,8 +99,26 @@ const Auth = () => {
     return () => subscription.unsubscribe();
   }, [redirectTo]);
 
+  // Sign out current user to allow signing in as different account
+  const handleSignOutToSwitch = async () => {
+    try {
+      await supabase.auth.signOut();
+      setExistingSession(null);
+      setUser(null);
+      toast({
+        title: "Signed out",
+        description: "You can now sign in with a different account.",
+      });
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
+  };
+
   const signUp = async (email: string, password: string) => {
     try {
+      // Mark that user is explicitly signing up
+      hasSignedIn.current = true;
+      
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -85,6 +132,7 @@ const Auth = () => {
       
       if (error) {
         console.error('Sign up error:', error);
+        hasSignedIn.current = false;
         return { error };
       }
       
@@ -92,6 +140,7 @@ const Auth = () => {
       if (data.user && !data.session) {
         // Email confirmation is enabled in Supabase
         console.log('Email confirmation required');
+        hasSignedIn.current = false;
         return { error: null, needsConfirmation: true };
       }
       
@@ -99,12 +148,16 @@ const Auth = () => {
       return { error: null, needsConfirmation: false };
     } catch (err: any) {
       console.error('Sign up exception:', err);
+      hasSignedIn.current = false;
       return { error: err };
     }
   };
 
   const signIn = async (email: string, password: string) => {
     try {
+      // Mark that user is explicitly signing in (not auto-redirect from cached session)
+      hasSignedIn.current = true;
+      
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
@@ -112,6 +165,7 @@ const Auth = () => {
       
       if (error) {
         console.error('Sign in error:', error);
+        hasSignedIn.current = false; // Reset on error
         return { error };
       }
       
@@ -119,12 +173,16 @@ const Auth = () => {
       return { error: null };
     } catch (err: any) {
       console.error('Sign in exception:', err);
+      hasSignedIn.current = false; // Reset on error
       return { error: err };
     }
   };
 
   const signInWithProvider = async (provider: 'google' | 'github') => {
     setLoading(true);
+    // Mark explicit sign-in
+    hasSignedIn.current = true;
+    
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
@@ -134,6 +192,7 @@ const Auth = () => {
       });
       
       if (error) {
+        hasSignedIn.current = false;
         toast({
           variant: "destructive",
           title: "Authentication error",
@@ -141,6 +200,7 @@ const Auth = () => {
         });
       }
     } catch (error) {
+      hasSignedIn.current = false;
       toast({
         variant: "destructive",
         title: "Error",
@@ -280,8 +340,44 @@ const Auth = () => {
     }
   };
 
+  // Show existing session banner if user is already logged in
+  const existingSessionBanner = existingSession && (
+    <Alert className="mb-4 bg-blue-50 border-blue-200">
+      <AlertDescription className="flex items-center justify-between">
+        <div>
+          <span className="text-blue-800">
+            Currently signed in as <strong>{existingSession.user.email}</strong>
+          </span>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              const target = redirectTo || '/home';
+              window.location.href = target;
+            }}
+            className="text-blue-700 border-blue-300 hover:bg-blue-100"
+          >
+            Continue as {existingSession.user.email?.split('@')[0]}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={handleSignOutToSwitch}
+            className="text-red-600 hover:bg-red-50"
+          >
+            <LogOut className="h-4 w-4 mr-1" />
+            Switch Account
+          </Button>
+        </div>
+      </AlertDescription>
+    </Alert>
+  );
+
   const authTabs = (
     <Tabs defaultValue="signup" className="w-full">
+            {existingSessionBanner}
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>
