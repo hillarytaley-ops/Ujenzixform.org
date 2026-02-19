@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 import { 
   FileText, 
   Trash2, 
@@ -20,8 +20,17 @@ import {
   MapPin,
   Calendar,
   Package,
-  X
+  X,
+  Building2,
+  FolderPlus
 } from 'lucide-react';
+
+interface Project {
+  id: string;
+  name: string;
+  location: string;
+  status: string;
+}
 
 export interface QuoteCartItem {
   id: string;
@@ -56,11 +65,55 @@ export function QuoteCart({
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [deliveryDate, setDeliveryDate] = useState('');
   const [projectName, setProjectName] = useState('');
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
   const [notes, setNotes] = useState('');
   const { toast } = useToast();
 
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
   // Note: We don't show estimated prices to Professional Builders - they get pricing via supplier quotes
+
+  // Fetch user's projects when dialog opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchProjects();
+    }
+  }, [isOpen]);
+
+  const fetchProjects = async () => {
+    setLoadingProjects(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      let accessToken = '';
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        accessToken = session?.access_token || '';
+      } catch {}
+
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/builder_projects?builder_id=eq.${user.id}&status=in.(active,in_progress)&order=created_at.desc`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`
+          }
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setProjects(data);
+        console.log('📁 Loaded', data.length, 'projects for quote cart');
+      }
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+    } finally {
+      setLoadingProjects(false);
+    }
+  };
 
   const handleSubmitQuoteRequest = async () => {
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -172,7 +225,11 @@ export function QuoteCart({
 
         const poNumber = `QR-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
         
-        const orderPayload = {
+        // Get project name from selected project or use manual input
+        const selectedProject = projects.find(p => p.id === selectedProjectId);
+        const finalProjectName = selectedProject?.name || projectName || 'Quote Request';
+        
+        const orderPayload: any = {
           po_number: poNumber,
           buyer_id: user.id,
           supplier_id: validSupplierId,
@@ -180,7 +237,7 @@ export function QuoteCart({
           delivery_address: deliveryAddress,
           delivery_date: deliveryDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           status: 'pending',
-          project_name: projectName || 'Quote Request',
+          project_name: finalProjectName,
           special_instructions: notes,
           items: supplierItems.map(item => ({
             material_id: item.id,
@@ -191,6 +248,11 @@ export function QuoteCart({
             unit_price: item.unit_price
           }))
         };
+        
+        // Link to project if selected
+        if (selectedProjectId) {
+          orderPayload.project_id = selectedProjectId;
+        }
         
         console.log('📤 Submitting quote request:', orderPayload);
         
@@ -213,9 +275,12 @@ export function QuoteCart({
       }
 
       if (successCount > 0) {
+        const selectedProject = projects.find(p => p.id === selectedProjectId);
         toast({
           title: '📋 Quote Requests Sent!',
-          description: `${successCount} quote request(s) sent to ${successCount} supplier(s). They will respond with pricing.`,
+          description: selectedProject 
+            ? `${successCount} quote request(s) sent for project "${selectedProject.name}". Suppliers will respond with pricing.`
+            : `${successCount} quote request(s) sent to ${successCount} supplier(s). They will respond with pricing.`,
         });
         
         // Clear the cart and form
@@ -223,6 +288,7 @@ export function QuoteCart({
         setDeliveryAddress('');
         setDeliveryDate('');
         setProjectName('');
+        setSelectedProjectId('');
         setNotes('');
         onOpenChange(false);
       } else {
@@ -336,15 +402,79 @@ export function QuoteCart({
 
               {/* Quote Details Form */}
               <div className="space-y-4 pb-4">
-                <div>
-                  <Label htmlFor="projectName">Project Name (Optional)</Label>
-                  <Input
-                    id="projectName"
-                    placeholder="e.g., Residential Building Project"
-                    value={projectName}
-                    onChange={(e) => setProjectName(e.target.value)}
-                  />
+                {/* Project Selection */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1">
+                    <Building2 className="h-3 w-3" />
+                    Link to Project
+                  </Label>
+                  {loadingProjects ? (
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading projects...
+                    </div>
+                  ) : projects.length > 0 ? (
+                    <div className="space-y-2">
+                      <select
+                        className="w-full h-10 px-3 rounded-md border border-gray-300 bg-white text-sm"
+                        value={selectedProjectId}
+                        onChange={(e) => {
+                          setSelectedProjectId(e.target.value);
+                          // Auto-fill project name if project selected
+                          const project = projects.find(p => p.id === e.target.value);
+                          if (project) {
+                            setProjectName(project.name);
+                          }
+                        }}
+                      >
+                        <option value="">-- Select a project (optional) --</option>
+                        {projects.map((project) => (
+                          <option key={project.id} value={project.id}>
+                            {project.name} - {project.location}
+                          </option>
+                        ))}
+                      </select>
+                      {selectedProjectId && (
+                        <div className="flex items-center gap-2 text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                          <Building2 className="h-3 w-3" />
+                          Order will be linked to this project for tracking
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                      <p className="text-sm text-amber-800 mb-2">
+                        No active projects found. Create a project to track your materials and spending.
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-amber-700 border-amber-300 hover:bg-amber-100"
+                        onClick={() => {
+                          onOpenChange(false);
+                          // Navigate to dashboard projects tab
+                          window.location.href = '/professional-builder-dashboard?tab=projects';
+                        }}
+                      >
+                        <FolderPlus className="h-4 w-4 mr-2" />
+                        Create a Project
+                      </Button>
+                    </div>
+                  )}
                 </div>
+
+                {/* Manual Project Name (if no project selected) */}
+                {!selectedProjectId && (
+                  <div>
+                    <Label htmlFor="projectName">Or Enter Project Name</Label>
+                    <Input
+                      id="projectName"
+                      placeholder="e.g., Residential Building Project"
+                      value={projectName}
+                      onChange={(e) => setProjectName(e.target.value)}
+                    />
+                  </div>
+                )}
 
                 <div>
                   <Label htmlFor="deliveryAddress" className="flex items-center gap-1">

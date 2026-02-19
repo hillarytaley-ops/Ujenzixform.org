@@ -64,6 +64,7 @@ import { InAppCommunication } from "@/components/communication/InAppCommunicatio
 import { TrackingTab } from "@/components/tracking/TrackingTab";
 import { Navigation as NavigationIcon, Settings } from "lucide-react";
 import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
+import { ProjectDetails } from "@/components/projects/ProjectDetails";
 
 const ProfessionalBuilderDashboardPage = () => {
   // Use AuthContext for reliable user data
@@ -96,12 +97,16 @@ const ProfessionalBuilderDashboardPage = () => {
   const [projects, setProjects] = useState<any[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [showCreateProject, setShowCreateProject] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<any>(null);
   const [newProject, setNewProject] = useState({
     name: '',
     location: '',
     description: '',
     start_date: '',
-    budget: ''
+    budget: '',
+    project_type: 'residential',
+    client_name: '',
+    expected_end_date: ''
   });
 
   // Deliveries state
@@ -627,6 +632,44 @@ const ProfessionalBuilderDashboardPage = () => {
     }
   };
 
+  // Fetch projects
+  const fetchProjects = async () => {
+    const userId = getUserId();
+    if (!userId) return;
+    
+    setLoadingProjects(true);
+    try {
+      const accessToken = await getAccessToken();
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/builder_projects?builder_id=eq.${userId}&order=created_at.desc`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`
+          }
+        }
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        setProjects(data);
+        console.log('📁 Loaded', data.length, 'projects');
+      }
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+    } finally {
+      setLoadingProjects(false);
+    }
+  };
+
+  // Load projects on mount
+  useEffect(() => {
+    const userId = getUserId();
+    if (userId) {
+      fetchProjects();
+    }
+  }, [authUser]);
+
   // Create new project
   const handleCreateProject = async () => {
     if (!newProject.name || !newProject.location) {
@@ -657,8 +700,12 @@ const ProfessionalBuilderDashboardPage = () => {
           location: newProject.location,
           description: newProject.description || null,
           start_date: newProject.start_date || null,
+          expected_end_date: newProject.expected_end_date || null,
           budget: newProject.budget ? parseFloat(newProject.budget) : null,
-          status: 'active'
+          project_type: newProject.project_type || 'residential',
+          client_name: newProject.client_name || null,
+          status: 'active',
+          progress: 0
         })
       });
 
@@ -668,12 +715,21 @@ const ProfessionalBuilderDashboardPage = () => {
         setStats(prev => ({ ...prev, activeProjects: prev.activeProjects + 1 }));
         
         toast({
-          title: "Project Created!",
+          title: "🏗️ Project Created!",
           description: "Your new project has been created successfully.",
         });
 
         setShowCreateProject(false);
-        setNewProject({ name: '', location: '', description: '', start_date: '', budget: '' });
+        setNewProject({ 
+          name: '', 
+          location: '', 
+          description: '', 
+          start_date: '', 
+          budget: '',
+          project_type: 'residential',
+          client_name: '',
+          expected_end_date: ''
+        });
       } else {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to create project');
@@ -688,6 +744,12 @@ const ProfessionalBuilderDashboardPage = () => {
     } finally {
       setLoadingProjects(false);
     }
+  };
+
+  // Handle project update from ProjectDetails
+  const handleProjectUpdate = (updatedProject: any) => {
+    setProjects(prev => prev.map(p => p.id === updatedProject.id ? updatedProject : p));
+    setSelectedProject(updatedProject);
   };
 
   // Set up real-time subscription for orders and projects
@@ -1046,153 +1108,305 @@ const ProfessionalBuilderDashboardPage = () => {
           </TabsList>
 
           <TabsContent value="projects">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Building2 className="h-5 w-5 text-blue-600" />
-                    Active Projects
-                  </CardTitle>
-                  <CardDescription>Manage your construction projects</CardDescription>
-                </div>
-                <Dialog open={showCreateProject} onOpenChange={setShowCreateProject}>
-                  <DialogTrigger asChild>
-                    <Button className="bg-blue-600 hover:bg-blue-700">
-                      <Briefcase className="h-4 w-4 mr-2" />
-                      Create New Project
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>Create New Project</DialogTitle>
-                      <DialogDescription>
-                        Add a new construction project to track materials and deliveries
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                      <div>
-                        <Label htmlFor="project-name">Project Name *</Label>
-                        <Input
-                          id="project-name"
-                          placeholder="e.g., Residential Building Phase 1"
-                          value={newProject.name}
-                          onChange={(e) => setNewProject(prev => ({ ...prev, name: e.target.value }))}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="project-location">Location *</Label>
-                        <Input
-                          id="project-location"
-                          placeholder="e.g., Westlands, Nairobi"
-                          value={newProject.location}
-                          onChange={(e) => setNewProject(prev => ({ ...prev, location: e.target.value }))}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="project-description">Description</Label>
-                        <Textarea
-                          id="project-description"
-                          placeholder="Brief description of the project..."
-                          value={newProject.description}
-                          onChange={(e) => setNewProject(prev => ({ ...prev, description: e.target.value }))}
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="project-start">Start Date</Label>
-                          <Input
-                            id="project-start"
-                            type="date"
-                            value={newProject.start_date}
-                            onChange={(e) => setNewProject(prev => ({ ...prev, start_date: e.target.value }))}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="project-budget">Budget (KES)</Label>
-                          <Input
-                            id="project-budget"
-                            type="number"
-                            placeholder="e.g., 5000000"
-                            value={newProject.budget}
-                            onChange={(e) => setNewProject(prev => ({ ...prev, budget: e.target.value }))}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setShowCreateProject(false)}>
-                        Cancel
+            {selectedProject ? (
+              <ProjectDetails 
+                project={selectedProject}
+                onBack={() => setSelectedProject(null)}
+                onUpdate={handleProjectUpdate}
+                userId={getUserId()}
+              />
+            ) : (
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Building2 className="h-5 w-5 text-blue-600" />
+                      Active Projects
+                    </CardTitle>
+                    <CardDescription>Manage your construction projects</CardDescription>
+                  </div>
+                  <Dialog open={showCreateProject} onOpenChange={setShowCreateProject}>
+                    <DialogTrigger asChild>
+                      <Button className="bg-blue-600 hover:bg-blue-700">
+                        <Briefcase className="h-4 w-4 mr-2" />
+                        Create New Project
                       </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl">
+                      <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                          <Building2 className="h-5 w-5 text-blue-600" />
+                          Create New Project
+                        </DialogTitle>
+                        <DialogDescription>
+                          Add a new construction project to track materials, deliveries, and spending
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="grid md:grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="project-name">Project Name *</Label>
+                            <Input
+                              id="project-name"
+                              placeholder="e.g., Residential Building Phase 1"
+                              value={newProject.name}
+                              onChange={(e) => setNewProject(prev => ({ ...prev, name: e.target.value }))}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="project-location">Location *</Label>
+                            <Input
+                              id="project-location"
+                              placeholder="e.g., Westlands, Nairobi"
+                              value={newProject.location}
+                              onChange={(e) => setNewProject(prev => ({ ...prev, location: e.target.value }))}
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="grid md:grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="project-type">Project Type</Label>
+                            <select
+                              id="project-type"
+                              className="w-full h-10 px-3 rounded-md border border-gray-300 bg-white"
+                              value={newProject.project_type}
+                              onChange={(e) => setNewProject(prev => ({ ...prev, project_type: e.target.value }))}
+                            >
+                              <option value="residential">Residential</option>
+                              <option value="commercial">Commercial</option>
+                              <option value="industrial">Industrial</option>
+                              <option value="infrastructure">Infrastructure</option>
+                              <option value="renovation">Renovation</option>
+                            </select>
+                          </div>
+                          <div>
+                            <Label htmlFor="project-client">Client Name</Label>
+                            <Input
+                              id="project-client"
+                              placeholder="e.g., ABC Development Ltd"
+                              value={newProject.client_name}
+                              onChange={(e) => setNewProject(prev => ({ ...prev, client_name: e.target.value }))}
+                            />
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <Label htmlFor="project-description">Description</Label>
+                          <Textarea
+                            id="project-description"
+                            placeholder="Brief description of the project..."
+                            value={newProject.description}
+                            onChange={(e) => setNewProject(prev => ({ ...prev, description: e.target.value }))}
+                          />
+                        </div>
+                        
+                        <div className="grid md:grid-cols-3 gap-4">
+                          <div>
+                            <Label htmlFor="project-start">Start Date</Label>
+                            <Input
+                              id="project-start"
+                              type="date"
+                              value={newProject.start_date}
+                              onChange={(e) => setNewProject(prev => ({ ...prev, start_date: e.target.value }))}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="project-end">Expected End Date</Label>
+                            <Input
+                              id="project-end"
+                              type="date"
+                              value={newProject.expected_end_date}
+                              onChange={(e) => setNewProject(prev => ({ ...prev, expected_end_date: e.target.value }))}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="project-budget">Budget (KES)</Label>
+                            <Input
+                              id="project-budget"
+                              type="number"
+                              placeholder="e.g., 5000000"
+                              value={newProject.budget}
+                              onChange={(e) => setNewProject(prev => ({ ...prev, budget: e.target.value }))}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowCreateProject(false)}>
+                          Cancel
+                        </Button>
+                        <Button 
+                          onClick={handleCreateProject} 
+                          disabled={loadingProjects}
+                          className="bg-blue-600 hover:bg-blue-700"
+                        >
+                          {loadingProjects ? 'Creating...' : 'Create Project'}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </CardHeader>
+                <CardContent>
+                  {loadingProjects ? (
+                    <div className="text-center py-12">
+                      <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4" />
+                      <p className="text-gray-500">Loading projects...</p>
+                    </div>
+                  ) : projects.length === 0 ? (
+                    <div className="text-center py-12 text-gray-500">
+                      <Building2 className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+                      <p className="text-lg font-medium">No active projects</p>
+                      <p className="text-sm mb-4">Create your first project to get started</p>
                       <Button 
-                        onClick={handleCreateProject} 
-                        disabled={loadingProjects}
+                        onClick={() => setShowCreateProject(true)}
                         className="bg-blue-600 hover:bg-blue-700"
                       >
-                        {loadingProjects ? 'Creating...' : 'Create Project'}
+                        <Briefcase className="h-4 w-4 mr-2" />
+                        Create Your First Project
                       </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              </CardHeader>
-              <CardContent>
-                {projects.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500">
-                    <Building2 className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-                    <p className="text-lg font-medium">No active projects</p>
-                    <p className="text-sm mb-4">Create your first project to get started</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {projects.map((project) => (
-                      <div 
-                        key={project.id} 
-                        className="border rounded-lg p-4 hover:border-blue-300 hover:bg-blue-50/30 transition-all"
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <Building2 className="h-5 w-5 text-blue-600" />
-                              <h3 className="font-semibold text-lg">{project.name}</h3>
-                              <Badge 
-                                variant={project.status === 'active' ? 'default' : 'secondary'}
-                                className={project.status === 'active' ? 'bg-green-500' : ''}
-                              >
-                                {project.status || 'Active'}
-                              </Badge>
-                            </div>
-                            <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
-                              <span className="flex items-center gap-1">
-                                <MapPin className="h-4 w-4" />
-                                {project.location}
-                              </span>
-                              {project.start_date && (
-                                <span className="flex items-center gap-1">
-                                  <Calendar className="h-4 w-4" />
-                                  {new Date(project.start_date).toLocaleDateString()}
-                                </span>
-                              )}
-                            </div>
-                            {project.description && (
-                              <p className="text-sm text-gray-500">{project.description}</p>
-                            )}
-                          </div>
-                          <div className="text-right">
-                            {project.budget && (
-                              <p className="text-lg font-bold text-blue-600">
-                                KES {project.budget.toLocaleString()}
-                              </p>
-                            )}
-                            <p className="text-xs text-gray-400">
-                              Created {new Date(project.created_at).toLocaleDateString()}
-                            </p>
-                          </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {/* Project Stats Summary */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                        <div className="bg-blue-50 p-4 rounded-lg">
+                          <p className="text-sm text-blue-700">Active</p>
+                          <p className="text-2xl font-bold text-blue-800">
+                            {projects.filter(p => ['active', 'in_progress'].includes(p.status)).length}
+                          </p>
+                        </div>
+                        <div className="bg-green-50 p-4 rounded-lg">
+                          <p className="text-sm text-green-700">Completed</p>
+                          <p className="text-2xl font-bold text-green-800">
+                            {projects.filter(p => p.status === 'completed').length}
+                          </p>
+                        </div>
+                        <div className="bg-amber-50 p-4 rounded-lg">
+                          <p className="text-sm text-amber-700">On Hold</p>
+                          <p className="text-2xl font-bold text-amber-800">
+                            {projects.filter(p => p.status === 'on_hold').length}
+                          </p>
+                        </div>
+                        <div className="bg-purple-50 p-4 rounded-lg">
+                          <p className="text-sm text-purple-700">Total Budget</p>
+                          <p className="text-xl font-bold text-purple-800">
+                            KES {(projects.reduce((sum, p) => sum + (p.budget || 0), 0) / 1000000).toFixed(1)}M
+                          </p>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                      
+                      {/* Project Cards */}
+                      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {projects.map((project) => (
+                          <Card 
+                            key={project.id} 
+                            className="border-2 hover:border-blue-300 hover:shadow-lg transition-all cursor-pointer"
+                            onClick={() => setSelectedProject(project)}
+                          >
+                            <CardContent className="p-5">
+                              <div className="flex items-start justify-between mb-3">
+                                <div className="flex-1">
+                                  <h3 className="font-bold text-lg">{project.name}</h3>
+                                  <p className="text-sm text-gray-500 flex items-center gap-1">
+                                    <MapPin className="h-3 w-3" />
+                                    {project.location}
+                                  </p>
+                                </div>
+                                <Badge 
+                                  className={
+                                    project.status === 'active' ? 'bg-green-500 text-white' :
+                                    project.status === 'in_progress' ? 'bg-blue-500 text-white' :
+                                    project.status === 'completed' ? 'bg-emerald-600 text-white' :
+                                    project.status === 'on_hold' ? 'bg-amber-500 text-white' :
+                                    'bg-gray-500 text-white'
+                                  }
+                                >
+                                  {project.status?.replace('_', ' ') || 'Active'}
+                                </Badge>
+                              </div>
+                              
+                              {/* Progress Bar */}
+                              {project.budget && (
+                                <div className="mb-3">
+                                  <div className="flex justify-between text-xs mb-1">
+                                    <span className="text-gray-500">Progress</span>
+                                    <span className="font-semibold">{project.progress || 0}%</span>
+                                  </div>
+                                  <div className="w-full bg-gray-200 rounded-full h-2">
+                                    <div 
+                                      className="bg-blue-600 h-2 rounded-full transition-all"
+                                      style={{ width: `${project.progress || 0}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* Project Stats */}
+                              <div className="grid grid-cols-2 gap-2 mb-3">
+                                <div className="bg-gray-50 p-2 rounded">
+                                  <p className="text-xs text-gray-500">Budget</p>
+                                  <p className="font-semibold text-sm">
+                                    {project.budget ? `KES ${(project.budget / 1000000).toFixed(1)}M` : 'Not set'}
+                                  </p>
+                                </div>
+                                <div className="bg-gray-50 p-2 rounded">
+                                  <p className="text-xs text-gray-500">Spent</p>
+                                  <p className="font-semibold text-sm text-blue-600">
+                                    KES {((project.spent || 0) / 1000000).toFixed(1)}M
+                                  </p>
+                                </div>
+                              </div>
+                              
+                              {/* Footer */}
+                              <div className="flex items-center justify-between pt-3 border-t text-xs text-gray-500">
+                                <span className="flex items-center gap-1">
+                                  <Calendar className="h-3 w-3" />
+                                  {project.start_date ? new Date(project.start_date).toLocaleDateString() : 'No date'}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Package className="h-3 w-3" />
+                                  {project.total_orders || 0} orders
+                                </span>
+                              </div>
+                              
+                              {/* View Details Button */}
+                              <Button 
+                                variant="outline" 
+                                className="w-full mt-3"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedProject(project);
+                                }}
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Details
+                              </Button>
+                            </CardContent>
+                          </Card>
+                        ))}
+                        
+                        {/* Add New Project Card */}
+                        <Card 
+                          className="border-2 border-dashed border-gray-300 hover:border-blue-400 cursor-pointer bg-gray-50/50 transition-colors"
+                          onClick={() => setShowCreateProject(true)}
+                        >
+                          <CardContent className="p-5 flex flex-col items-center justify-center min-h-[280px]">
+                            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                              <Briefcase className="h-8 w-8 text-blue-600" />
+                            </div>
+                            <h3 className="font-semibold text-lg mb-1">Start New Project</h3>
+                            <p className="text-sm text-gray-500 text-center">
+                              Create a new construction project to track materials and spending
+                            </p>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           {/* Quotes Tab - Review supplier pricing */}
