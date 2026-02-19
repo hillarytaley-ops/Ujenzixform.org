@@ -877,14 +877,17 @@ export const MaterialsGrid = () => {
       let supplierPrices: Record<string, { price: number; in_stock: boolean; supplier_id: string; description?: string; variant_prices?: any[] }> = {};
       
       try {
+        // Add timestamp to bust browser cache and ensure fresh data
+        const cacheBuster = Date.now();
         const pricesResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/supplier_product_prices?select=*`,
+          `${SUPABASE_URL}/rest/v1/supplier_product_prices?select=*&_t=${cacheBuster}`,
           {
             headers: {
               'apikey': SUPABASE_ANON_KEY,
               'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
               'Content-Type': 'application/json',
-              'Cache-Control': 'no-cache, no-store, must-revalidate'
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache'
             },
             cache: 'no-store' // Prevent browser caching
           }
@@ -892,13 +895,28 @@ export const MaterialsGrid = () => {
         
         if (pricesResponse.ok) {
           const pricesData = await pricesResponse.json();
-          console.log(`💰 Supplier prices loaded: ${pricesData?.length || 0} entries`);
+          console.log(`💰 Supplier prices loaded: ${pricesData?.length || 0} entries at ${new Date().toISOString()}`);
           if (pricesData && pricesData.length > 0) {
+            // Log all prices for debugging
+            console.log('💰 All supplier prices from DB:', pricesData.map((p: any) => ({ 
+              product_id: p.product_id, 
+              price: p.price, 
+              supplier_id: p.supplier_id,
+              updated_at: p.updated_at 
+            })));
+            
             // Create a map of product_id -> price info
-            // If multiple suppliers have prices, use the lowest price
-            pricesData.forEach((item: any) => {
-              const existingPrice = supplierPrices[item.product_id];
-              if (!existingPrice || item.price < existingPrice.price) {
+            // If multiple suppliers have prices, use the MOST RECENT price (not lowest)
+            // Sort by updated_at descending to get most recent first
+            const sortedPrices = [...pricesData].sort((a: any, b: any) => {
+              const dateA = new Date(a.updated_at || 0).getTime();
+              const dateB = new Date(b.updated_at || 0).getTime();
+              return dateB - dateA; // Most recent first
+            });
+            
+            sortedPrices.forEach((item: any) => {
+              // Only set if not already set (first one is most recent)
+              if (!supplierPrices[item.product_id]) {
                 supplierPrices[item.product_id] = {
                   price: item.price,
                   in_stock: item.in_stock,
@@ -908,13 +926,14 @@ export const MaterialsGrid = () => {
                 };
               }
             });
-            console.log(`💰 Supplier prices mapped: ${Object.keys(supplierPrices).length} products with prices`);
+            console.log(`💰 Supplier prices mapped (most recent): ${Object.keys(supplierPrices).length} products with prices`);
+            console.log('💰 Mapped prices:', Object.entries(supplierPrices).map(([id, p]) => ({ id, price: (p as any).price })));
           }
         } else {
           console.log(`❌ Failed to load supplier prices: ${pricesResponse.status}`);
         }
       } catch (pricesErr: any) {
-        console.log('Supplier prices table not available');
+        console.log('Supplier prices table not available:', pricesErr);
       }
       
       // STEP 2: Fetch admin-uploaded materials - ULTRA OPTIMIZED for performance
@@ -987,6 +1006,11 @@ export const MaterialsGrid = () => {
             const processedMaterials = allData.map((item: any, index: number) => {
               const supplierPrice = supplierPrices[item.id];
               
+              // Debug: Log when supplier price is found vs admin price
+              if (supplierPrice) {
+                console.log(`💰 Product "${item.name}" (${item.id}): Supplier price KES ${supplierPrice.price} (admin suggested: KES ${item.suggested_price})`);
+              }
+              
               // Get admin's variants as base
               let adminVariants: PriceVariant[] = [];
               try {
@@ -1002,6 +1026,9 @@ export const MaterialsGrid = () => {
                 console.log(`💰 Using supplier variant prices for ${item.name}:`, supplierPrice.variant_prices);
               }
               
+              // Final price: supplier price takes priority over admin suggested price
+              const finalPrice = supplierPrice?.price ?? item.suggested_price ?? 0;
+              
               return {
                 id: item.id,
                 // Use actual supplier_id from pricing if available, otherwise mark as admin-catalog
@@ -1010,7 +1037,7 @@ export const MaterialsGrid = () => {
                 category: item.category || 'Uncategorized',
                 description: supplierPrice?.description || item.description || '',
                 unit: (item.unit && item.unit.trim()) ? item.unit : 'unit',
-                unit_price: supplierPrice?.price || item.suggested_price || 0,
+                unit_price: finalPrice,
                 // First batch has images, rest will be loaded on-demand
                 image_url: index < FIRST_BATCH_WITH_IMAGES ? (item.image_url || '') : '',
                 additional_images: [],
