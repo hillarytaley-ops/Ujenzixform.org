@@ -631,9 +631,52 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                       </div>
                     </div>
                     
-                    <div className="flex items-center gap-4">
-                      {/* Progress Bar */}
-                      <div className="hidden md:block w-32">
+                    <div className="flex items-center gap-3">
+                      {/* Mini Status Timeline - Always Visible */}
+                      <div className="hidden sm:flex items-center gap-1">
+                        {/* Confirmed */}
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                          ['confirmed', 'dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status)
+                            ? 'bg-green-500 text-white'
+                            : 'bg-gray-200 text-gray-400'
+                        }`}>✓</div>
+                        <div className={`w-4 h-0.5 ${
+                          ['dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status)
+                            ? 'bg-green-500'
+                            : 'bg-gray-200'
+                        }`} />
+                        {/* Dispatched */}
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                          ['dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status)
+                            ? 'bg-orange-500 text-white'
+                            : 'bg-gray-200 text-gray-400'
+                        }`}>📦</div>
+                        <div className={`w-4 h-0.5 ${
+                          ['in_transit', 'delivered', 'received', 'verified'].includes(order.status)
+                            ? 'bg-green-500'
+                            : 'bg-gray-200'
+                        }`} />
+                        {/* In Transit */}
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                          ['in_transit', 'delivered', 'received', 'verified'].includes(order.status)
+                            ? 'bg-purple-500 text-white'
+                            : 'bg-gray-200 text-gray-400'
+                        }`}>🚚</div>
+                        <div className={`w-4 h-0.5 ${
+                          ['delivered', 'received', 'verified'].includes(order.status)
+                            ? 'bg-green-500'
+                            : 'bg-gray-200'
+                        }`} />
+                        {/* Delivered */}
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                          ['delivered', 'received', 'verified'].includes(order.status)
+                            ? 'bg-green-600 text-white'
+                            : 'bg-gray-200 text-gray-400'
+                        }`}>✅</div>
+                      </div>
+                      
+                      {/* Progress Bar - Hidden on mobile */}
+                      <div className="hidden lg:block w-24">
                         <div className="flex items-center justify-between text-xs mb-1">
                           <span className="text-gray-500">Progress</span>
                           <span className="font-medium">{progress}%</span>
@@ -646,7 +689,8 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                         </div>
                       </div>
                       
-                      <Badge className={`${getStatusColor(order.status)} px-3 py-1`}>
+                      {/* Status Badge */}
+                      <Badge className={`${getStatusColor(order.status)} px-3 py-1 whitespace-nowrap`}>
                         {getStatusIcon(order.status)}
                         <span className="ml-1">{getStatusLabel(order.status)}</span>
                       </Badge>
