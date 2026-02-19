@@ -1284,10 +1284,10 @@ const SupplierDashboard = () => {
                       Quote Requests from Professional Builders
                     </CardTitle>
                     <CardDescription className={mutedText}>
-                      Review and respond to quote requests from professional builders
+                      Review and respond to quote requests. Once you send a quote and the client accepts, it becomes an ORDER.
                     </CardDescription>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <Button
                       variant="outline"
                       size="sm"
@@ -1305,9 +1305,32 @@ const SupplierDashboard = () => {
                     <Badge className="bg-amber-100 text-amber-700 border border-amber-300">
                       {quoteRequests.filter(q => q.status === 'pending').length} Pending
                     </Badge>
-                    <Badge className="bg-green-100 text-green-700 border border-green-300">
-                      {quoteRequests.filter(q => q.status === 'quoted').length} Quoted
+                    <Badge className="bg-blue-100 text-blue-700 border border-blue-300">
+                      {quoteRequests.filter(q => q.status === 'quoted').length} Quoted (Awaiting Client)
                     </Badge>
+                    <Badge className="bg-green-100 text-green-700 border border-green-300">
+                      {quoteRequests.filter(q => q.status === 'confirmed' || q.status === 'accepted').length} ✓ Confirmed Orders
+                    </Badge>
+                  </div>
+                </div>
+                
+                {/* Quote-to-Order Flow Explanation */}
+                <div className={`mt-4 p-3 rounded-lg ${isDarkMode ? 'bg-slate-700/50' : 'bg-blue-50'} border ${isDarkMode ? 'border-slate-600' : 'border-blue-200'}`}>
+                  <div className="flex items-center gap-4 text-sm">
+                    <div className="flex items-center gap-1">
+                      <span className="w-3 h-3 rounded-full bg-amber-500"></span>
+                      <span className={mutedText}>1. Quote Request</span>
+                    </div>
+                    <span className={mutedText}>→</span>
+                    <div className="flex items-center gap-1">
+                      <span className="w-3 h-3 rounded-full bg-blue-500"></span>
+                      <span className={mutedText}>2. You Send Price</span>
+                    </div>
+                    <span className={mutedText}>→</span>
+                    <div className="flex items-center gap-1">
+                      <span className="w-3 h-3 rounded-full bg-green-500"></span>
+                      <span className={`font-medium ${isDarkMode ? 'text-green-400' : 'text-green-700'}`}>3. Client Accepts = ORDER ✓</span>
+                    </div>
                   </div>
                 </div>
               </CardHeader>
@@ -1318,7 +1341,17 @@ const SupplierDashboard = () => {
                       <div 
                         key={quote.id} 
                         className={`border rounded-lg p-4 transition-colors ${
-                          isDarkMode ? 'border-slate-600 hover:bg-slate-700/50' : 'hover:bg-gray-50'
+                          quote.status === 'confirmed' || quote.status === 'accepted'
+                            ? isDarkMode 
+                              ? 'border-green-500 bg-green-900/20 hover:bg-green-900/30' 
+                              : 'border-green-300 bg-green-50 hover:bg-green-100'
+                            : quote.status === 'quoted'
+                              ? isDarkMode
+                                ? 'border-blue-500 bg-blue-900/20 hover:bg-blue-900/30'
+                                : 'border-blue-300 bg-blue-50 hover:bg-blue-100'
+                              : isDarkMode 
+                                ? 'border-slate-600 hover:bg-slate-700/50' 
+                                : 'hover:bg-gray-50'
                         }`}
                       >
                         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
@@ -1326,12 +1359,16 @@ const SupplierDashboard = () => {
                           <div className="flex-1">
                             <div className="flex items-start gap-3">
                               <div className={`p-2 rounded-lg ${
+                                quote.status === 'confirmed' || quote.status === 'accepted' 
+                                  ? 'bg-green-500 text-white' :
                                 quote.status === 'pending' ? 'bg-amber-100 text-amber-600' :
-                                quote.status === 'quoted' ? 'bg-green-100 text-green-600' :
-                                quote.status === 'accepted' ? 'bg-blue-100 text-blue-600' :
+                                quote.status === 'quoted' ? 'bg-blue-100 text-blue-600' :
                                 'bg-red-100 text-red-600'
                               }`}>
-                                <Package className="h-5 w-5" />
+                                {quote.status === 'confirmed' || quote.status === 'accepted' 
+                                  ? <CheckCircle className="h-5 w-5" />
+                                  : <Package className="h-5 w-5" />
+                                }
                               </div>
                               <div className="flex-1">
                                 <h4 className={`font-semibold ${textColor}`}>
@@ -1398,25 +1435,33 @@ const SupplierDashboard = () => {
 
                           {/* Status & Actions */}
                           <div className="flex flex-col items-end gap-3">
-                            <Badge className={`${
-                              quote.status === 'pending' ? 'bg-amber-100 text-amber-700 border-amber-300' :
-                              quote.status === 'quoted' ? 'bg-green-100 text-green-700 border-green-300' :
-                              quote.status === 'accepted' ? 'bg-blue-100 text-blue-700 border-blue-300' :
-                              'bg-red-100 text-red-700 border-red-300'
-                            }`}>
-                              {quote.status === 'pending' && <Clock className="h-3 w-3 mr-1" />}
-                              {quote.status === 'quoted' && <CheckCircle className="h-3 w-3 mr-1" />}
-                              {quote.status === 'accepted' && <CheckCircle className="h-3 w-3 mr-1" />}
-                              {quote.status === 'rejected' && <XCircle className="h-3 w-3 mr-1" />}
-                              {(quote.status || 'pending').charAt(0).toUpperCase() + (quote.status || 'pending').slice(1)}
-                            </Badge>
+                            {/* Status Badge - Different for each stage */}
+                            {quote.status === 'confirmed' || quote.status === 'accepted' ? (
+                              <Badge className="bg-green-500 text-white border-green-600 px-3 py-1">
+                                <CheckCircle className="h-4 w-4 mr-1" />
+                                ✓ CONFIRMED ORDER
+                              </Badge>
+                            ) : (
+                              <Badge className={`${
+                                quote.status === 'pending' ? 'bg-amber-100 text-amber-700 border-amber-300' :
+                                quote.status === 'quoted' ? 'bg-blue-100 text-blue-700 border-blue-300' :
+                                'bg-red-100 text-red-700 border-red-300'
+                              }`}>
+                                {quote.status === 'pending' && <Clock className="h-3 w-3 mr-1" />}
+                                {quote.status === 'quoted' && <Clock className="h-3 w-3 mr-1" />}
+                                {quote.status === 'rejected' && <XCircle className="h-3 w-3 mr-1" />}
+                                {quote.status === 'pending' ? 'Awaiting Your Response' :
+                                 quote.status === 'quoted' ? 'Awaiting Client Acceptance' :
+                                 (quote.status || 'pending').charAt(0).toUpperCase() + (quote.status || 'pending').slice(1)}
+                              </Badge>
+                            )}
 
                             {quote.quote_amount != null && (
                               <div className="text-right">
                                 <p className={`text-lg font-bold ${textColor}`}>
                                   KES {Number(quote.quote_amount || 0).toLocaleString()}
                                 </p>
-                                {quote.quote_valid_until && (
+                                {quote.quote_valid_until && quote.status === 'quoted' && (
                                   <p className={`text-xs ${mutedText}`}>
                                     Valid until: {new Date(quote.quote_valid_until).toLocaleDateString()}
                                   </p>
@@ -1424,6 +1469,7 @@ const SupplierDashboard = () => {
                               </div>
                             )}
 
+                            {/* Actions based on status */}
                             {quote.status === 'pending' && (
                               <div className="flex gap-2">
                                 <Button
@@ -1432,7 +1478,7 @@ const SupplierDashboard = () => {
                                   onClick={() => openQuoteDialog(quote)}
                                 >
                                   <CheckCircle className="h-4 w-4 mr-1" />
-                                  Respond
+                                  Send Quote
                                 </Button>
                                 <Button
                                   size="sm"
@@ -1444,20 +1490,41 @@ const SupplierDashboard = () => {
                                   }}
                                 >
                                   <XCircle className="h-4 w-4 mr-1" />
-                                  Reject
+                                  Decline
                                 </Button>
                               </div>
                             )}
 
                             {quote.status === 'quoted' && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => openQuoteDialog(quote)}
-                              >
-                                <Edit className="h-4 w-4 mr-1" />
-                                Edit Quote
-                              </Button>
+                              <div className="flex flex-col gap-2">
+                                <p className={`text-xs ${mutedText} text-center`}>
+                                  Waiting for client to accept...
+                                </p>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => openQuoteDialog(quote)}
+                                >
+                                  <Edit className="h-4 w-4 mr-1" />
+                                  Edit Quote
+                                </Button>
+                              </div>
+                            )}
+
+                            {(quote.status === 'confirmed' || quote.status === 'accepted') && (
+                              <div className="flex flex-col gap-2">
+                                <p className={`text-xs text-green-600 font-medium text-center`}>
+                                  🎉 Client accepted! This is now an order.
+                                </p>
+                                <Button
+                                  size="sm"
+                                  className="bg-orange-500 hover:bg-orange-600"
+                                  onClick={() => setActiveTab('orders')}
+                                >
+                                  <Package className="h-4 w-4 mr-1" />
+                                  View in Orders
+                                </Button>
+                              </div>
                             )}
                           </div>
                         </div>
