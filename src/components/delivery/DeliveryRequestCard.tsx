@@ -16,7 +16,7 @@ import {
   Truck, Package, MapPin, Clock, DollarSign, Users, Phone,
   CheckCircle, XCircle, AlertCircle, Navigation as NavigationIcon,
   Timer, Route, Camera, MessageSquare, ThumbsUp, ThumbsDown,
-  Loader2, AlertTriangle
+  Loader2, AlertTriangle, Calendar
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -37,6 +37,10 @@ interface DeliveryRequest {
   urgency?: 'normal' | 'urgent' | 'emergency';
   special_instructions?: string;
   created_at?: string;
+  // Date-based scheduling fields
+  pickup_date?: string;
+  delivery_date?: string;
+  expected_delivery_date?: string;
 }
 
 interface DeliveryRequestCardProps {
@@ -338,6 +342,49 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* Expected Delivery Date - IMPORTANT for scheduling */}
+              {(delivery.delivery_date || delivery.expected_delivery_date || delivery.pickup_date) && (
+                <div className={`mt-3 p-2 rounded-lg ${isDarkMode ? 'bg-blue-900/30' : 'bg-blue-50'} border ${isDarkMode ? 'border-blue-800' : 'border-blue-200'}`}>
+                  <div className="flex items-center gap-2">
+                    <Calendar className={`h-4 w-4 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`} />
+                    <span className={`text-sm font-medium ${isDarkMode ? 'text-blue-300' : 'text-blue-800'}`}>
+                      Expected Delivery: {(() => {
+                        const dateStr = delivery.delivery_date || delivery.expected_delivery_date || delivery.pickup_date;
+                        if (!dateStr) return 'Not specified';
+                        const date = new Date(dateStr);
+                        const today = new Date();
+                        const tomorrow = new Date(today);
+                        tomorrow.setDate(tomorrow.getDate() + 1);
+                        
+                        if (date.toDateString() === today.toDateString()) {
+                          return '📅 TODAY';
+                        } else if (date.toDateString() === tomorrow.toDateString()) {
+                          return '📅 TOMORROW';
+                        } else {
+                          return date.toLocaleDateString('en-US', { 
+                            weekday: 'short', 
+                            month: 'short', 
+                            day: 'numeric' 
+                          });
+                        }
+                      })()}
+                    </span>
+                    {(() => {
+                      const dateStr = delivery.delivery_date || delivery.expected_delivery_date || delivery.pickup_date;
+                      if (!dateStr) return null;
+                      const date = new Date(dateStr);
+                      const today = new Date();
+                      if (date.toDateString() === today.toDateString()) {
+                        return <Badge className="bg-green-500 text-white text-xs ml-2">Same Day</Badge>;
+                      } else if (date > today) {
+                        return <Badge className="bg-blue-500 text-white text-xs ml-2">Scheduled</Badge>;
+                      }
+                      return null;
+                    })()}
+                  </div>
+                </div>
+              )}
 
               {/* Special Instructions */}
               {delivery.special_instructions && (

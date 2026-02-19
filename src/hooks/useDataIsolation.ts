@@ -394,16 +394,26 @@ export const useDeliveryProviderData = () => {
       setActiveDeliveries(activeData || []);
 
       // Fetch completed deliveries for THIS provider only
+      // ORDER BY: Most recent deliveries first (completed_at or updated_at descending)
       const { data: historyData, error: historyError } = await supabase
         .from('delivery_requests')
         .select('*')
         .eq('provider_id', userId)
-        .eq('status', 'delivered')
-        .order('updated_at', { ascending: false })
-        .limit(50);
+        .in('status', ['delivered', 'completed', 'cancelled']) // Include all past statuses
+        .order('updated_at', { ascending: false }) // Most recent first
+        .limit(100); // Increased limit for better history view
 
       if (historyError) throw historyError;
-      setDeliveryHistory(historyData || []);
+      
+      // Sort by completed_at if available, otherwise by updated_at (most recent first)
+      const sortedHistory = (historyData || []).sort((a: any, b: any) => {
+        const dateA = new Date(a.completed_at || a.delivered_at || a.updated_at || a.created_at);
+        const dateB = new Date(b.completed_at || b.delivered_at || b.updated_at || b.created_at);
+        return dateB.getTime() - dateA.getTime(); // Descending (most recent first)
+      });
+      
+      console.log('📦 Delivery history loaded:', sortedHistory.length, 'items (most recent first)');
+      setDeliveryHistory(sortedHistory);
 
       // Fetch ALL pending requests from multiple tables for testing
       // All registered providers can see and accept any pending request

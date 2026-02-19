@@ -56,30 +56,71 @@ class TrackingNumberService {
    * Implements FIRST-COME-FIRST-SERVED: Only the first provider to accept gets the job.
    * Generates a tracking number (or reuses existing one) and notifies the builder.
    * 
-   * IMPORTANT: Provider can only accept ONE delivery at a time. Must complete current delivery first.
+   * DATE-BASED SCHEDULING (Updated Feb 19, 2026):
+   * - Provider CAN accept deliveries for FUTURE dates even if they have active deliveries TODAY
+   * - Provider can only have ONE active delivery per day
+   * - Example: If I accepted a delivery for tomorrow, I can still pick orders for today
    */
   async onProviderAcceptsDelivery(
     deliveryRequestId: string,
     providerId: string
   ): Promise<TrackingNumberResult | null> {
     try {
-      // CHECK: Does this provider already have an active delivery?
+      // First, get the delivery request to check its expected delivery date
+      const { data: requestToAccept, error: requestError } = await supabase
+        .from('delivery_requests')
+        .select('id, pickup_date, delivery_date, expected_delivery_date, status, provider_id')
+        .eq('id', deliveryRequestId)
+        .single();
+
+      if (requestError) {
+        console.error('Error fetching delivery request:', requestError);
+        throw requestError;
+      }
+
+      // Determine the delivery date for the request being accepted
+      // Priority: delivery_date > expected_delivery_date > pickup_date > today
+      const requestDeliveryDate = requestToAccept.delivery_date 
+        || requestToAccept.expected_delivery_date 
+        || requestToAccept.pickup_date 
+        || new Date().toISOString().split('T')[0];
+      
+      const requestDateStr = new Date(requestDeliveryDate).toISOString().split('T')[0];
+      const todayStr = new Date().toISOString().split('T')[0];
+      
+      console.log(`📅 Request delivery date: ${requestDateStr}, Today: ${todayStr}`);
+
+      // CHECK: Does this provider already have an active delivery FOR THE SAME DATE?
+      // Provider CAN accept future deliveries while having active deliveries for today
       const { data: activeDeliveries, error: activeError } = await supabase
         .from('delivery_requests')
-        .select('id, status, tracking_number')
+        .select('id, status, tracking_number, pickup_date, delivery_date, expected_delivery_date')
         .eq('provider_id', providerId)
         .in('status', ['accepted', 'picked_up', 'in_transit', 'assigned'])
-        .neq('id', deliveryRequestId) // Exclude the current request (in case of re-acceptance)
-        .limit(1);
+        .neq('id', deliveryRequestId); // Exclude the current request
 
       if (activeError) {
         console.error('Error checking active deliveries:', activeError);
       }
 
+      // Check if any active delivery conflicts with the same date
       if (activeDeliveries && activeDeliveries.length > 0) {
-        const activeDelivery = activeDeliveries[0];
-        console.log(`Provider ${providerId} already has active delivery: ${activeDelivery.id}`);
-        throw new Error(`You already have an active delivery in progress (${activeDelivery.tracking_number || 'ID: ' + activeDelivery.id.slice(0, 8)}). Please complete it before accepting a new one.`);
+        for (const activeDelivery of activeDeliveries) {
+          const activeDeliveryDate = activeDelivery.delivery_date 
+            || activeDelivery.expected_delivery_date 
+            || activeDelivery.pickup_date 
+            || todayStr;
+          const activeDateStr = new Date(activeDeliveryDate).toISOString().split('T')[0];
+          
+          // Only block if the dates are the same
+          if (activeDateStr === requestDateStr) {
+            console.log(`Provider ${providerId} already has active delivery for ${requestDateStr}: ${activeDelivery.id}`);
+            throw new Error(`You already have an active delivery scheduled for ${requestDateStr} (${activeDelivery.tracking_number || 'ID: ' + activeDelivery.id.slice(0, 8)}). Complete it first or accept deliveries for a different date.`);
+          }
+        }
+        
+        // Provider has active deliveries but for different dates - allow acceptance
+        console.log(`✅ Provider has ${activeDeliveries.length} active deliveries but none for ${requestDateStr} - allowing acceptance`);
       }
 
       // First, check if this delivery request is still available (FIRST-COME-FIRST-SERVED check)

@@ -845,7 +845,11 @@ const DeliveryDashboard = () => {
                           distance: request.distance_km || 0,
                           urgency: request.priority_level || request.urgency || 'normal',
                           special_instructions: request.special_instructions,
-                          created_at: request.created_at
+                          created_at: request.created_at,
+                          // Date-based scheduling - shows expected delivery date
+                          pickup_date: request.pickup_date,
+                          delivery_date: request.delivery_date,
+                          expected_delivery_date: request.expected_delivery_date
                         }}
                         isDarkMode={isDarkMode}
                         onAccept={async (id) => {
@@ -985,50 +989,99 @@ const DeliveryDashboard = () => {
             />
           </TabsContent>
 
-          {/* History Tab */}
+          {/* History Tab - Shows past deliveries with most recent first */}
           <TabsContent value="history">
             <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : ''}>
               <CardHeader>
                 <div className="flex justify-between items-center">
                   <div>
                     <CardTitle className={isDarkMode ? 'text-white' : ''}>Delivery History</CardTitle>
-                    <CardDescription className={isDarkMode ? 'text-gray-400' : ''}>Your completed deliveries</CardDescription>
+                    <CardDescription className={isDarkMode ? 'text-gray-400' : ''}>
+                      Your past deliveries • Most recent first • {deliveryHistory.length} total
+                    </CardDescription>
                   </div>
-                  <Button variant="outline" size="sm">
-                    Export Report
+                  <Button variant="outline" size="sm" onClick={() => refetchData()}>
+                    <Clock className="h-4 w-4 mr-2" />
+                    Refresh
                   </Button>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {deliveryHistory.map((delivery) => (
-                    <div key={delivery.id} className={`flex items-center justify-between p-4 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg hover:${isDarkMode ? 'bg-gray-600' : 'bg-gray-100'} transition-colors`}>
-                      <div className="flex items-center gap-4">
-                        <div className={`p-2 ${isDarkMode ? 'bg-gray-600' : 'bg-white'} rounded-lg shadow-sm`}>
-                          <CheckCircle className="h-8 w-8 text-green-500" />
-                        </div>
-                        <div>
-                          <p className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{delivery.material_type}</p>
-                          <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                            {delivery.pickup_location} → {delivery.delivery_location}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{formatCurrency(delivery.price)}</p>
-                          <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                            {new Date(delivery.completed_at).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Star className="h-4 w-4 text-amber-400 fill-amber-400" />
-                          <span className={`font-medium ${isDarkMode ? 'text-white' : ''}`}>{delivery.rating}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                {deliveryHistory.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Package className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                    <p className={`text-lg font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                      No delivery history yet
+                    </p>
+                    <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                      Your completed deliveries will appear here
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Sort by completed_at descending (most recent first) */}
+                    {[...deliveryHistory]
+                      .sort((a, b) => new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime())
+                      .map((delivery, index) => {
+                        const completedDate = new Date(delivery.completed_at);
+                        const isToday = completedDate.toDateString() === new Date().toDateString();
+                        const isYesterday = completedDate.toDateString() === new Date(Date.now() - 86400000).toDateString();
+                        
+                        return (
+                          <div key={delivery.id} className={`flex items-center justify-between p-4 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg hover:${isDarkMode ? 'bg-gray-600' : 'bg-gray-100'} transition-colors border-l-4 ${index === 0 ? 'border-l-green-500' : 'border-l-gray-300'}`}>
+                            <div className="flex items-center gap-4">
+                              <div className={`p-2 ${isDarkMode ? 'bg-gray-600' : 'bg-white'} rounded-lg shadow-sm`}>
+                                <CheckCircle className="h-8 w-8 text-green-500" />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <p className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{delivery.material_type}</p>
+                                  {index === 0 && (
+                                    <Badge className="bg-green-100 text-green-700 text-xs">Most Recent</Badge>
+                                  )}
+                                </div>
+                                <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                  <MapPin className="h-3 w-3 inline mr-1" />
+                                  {delivery.pickup_location} → {delivery.delivery_location}
+                                </p>
+                                <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-400'} mt-1`}>
+                                  <Calendar className="h-3 w-3 inline mr-1" />
+                                  {isToday ? 'Today' : isYesterday ? 'Yesterday' : completedDate.toLocaleDateString('en-US', { 
+                                    weekday: 'short', 
+                                    month: 'short', 
+                                    day: 'numeric',
+                                    year: completedDate.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+                                  })}
+                                  {' at '}
+                                  {completedDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <div className="text-right">
+                                <p className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{formatCurrency(delivery.price)}</p>
+                                <Badge variant="outline" className={`text-xs ${
+                                  delivery.status === 'delivered' || delivery.status === 'completed' 
+                                    ? 'border-green-300 text-green-600' 
+                                    : delivery.status === 'cancelled' 
+                                      ? 'border-red-300 text-red-600' 
+                                      : 'border-gray-300 text-gray-600'
+                                }`}>
+                                  {delivery.status === 'delivered' || delivery.status === 'completed' ? '✓ Completed' : delivery.status}
+                                </Badge>
+                              </div>
+                              {delivery.rating > 0 && (
+                                <div className="flex items-center gap-1 bg-amber-50 px-2 py-1 rounded">
+                                  <Star className="h-4 w-4 text-amber-400 fill-amber-400" />
+                                  <span className={`font-medium text-amber-700`}>{delivery.rating.toFixed(1)}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
