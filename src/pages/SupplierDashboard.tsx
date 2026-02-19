@@ -59,8 +59,9 @@ import { OrderManagement } from "@/components/supplier/OrderManagement";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { SupplierAnalyticsDashboard } from "@/components/suppliers/SupplierAnalyticsDashboard";
 import { SupplierProductManager } from "@/components/suppliers/SupplierProductManager";
-import { MessageSquare, QrCode, Boxes, BarChart3 as BarChartIcon } from "lucide-react";
+import { MessageSquare, QrCode, Boxes, BarChart3 as BarChartIcon, User } from "lucide-react";
 import { EnhancedQRCodeManager } from "@/components/qr/EnhancedQRCodeManager";
+import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
 import { InventoryManager } from "@/components/supplier/InventoryManager";
 import { OrderHistory } from "@/components/orders/OrderHistory";
 import { ReviewsList, SupplierRatingSummary } from "@/components/reviews/ReviewSystem";
@@ -131,6 +132,7 @@ const SupplierDashboard = () => {
   });
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [activeTab, setActiveTab] = useState('overview');
+  const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [quoteRequests, setQuoteRequests] = useState<any[]>([]);
   const [selectedQuote, setSelectedQuote] = useState<any>(null);
   const [quoteDialogOpen, setQuoteDialogOpen] = useState(false);
@@ -987,6 +989,14 @@ const SupplierDashboard = () => {
                 <Bell className="h-4 w-4 mr-2" />
                 {t('supplier.dashboard.notifications')}
               </Button>
+              <Button 
+                variant="outline" 
+                className="bg-white/10 border-white/30 text-white hover:bg-white/20"
+                onClick={() => setShowProfileEdit(true)}
+              >
+                <User className="h-4 w-4 mr-2" />
+                Edit Profile
+              </Button>
               <Button variant="outline" className="bg-white/10 border-white/30 text-white hover:bg-white/20">
                 <Settings className="h-4 w-4 mr-2" />
                 {t('supplier.dashboard.settings')}
@@ -1766,6 +1776,17 @@ const SupplierDashboard = () => {
       </main>
 
       <Footer />
+
+      {/* Profile Edit Dialog */}
+      <ProfileEditDialog
+        isOpen={showProfileEdit}
+        onClose={() => setShowProfileEdit(false)}
+        onSave={() => {
+          // Refresh data after profile save
+          refetchData();
+        }}
+        userRole="supplier"
+      />
     </div>
   );
 };

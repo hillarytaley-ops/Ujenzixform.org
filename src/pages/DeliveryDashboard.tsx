@@ -52,8 +52,9 @@ import { DeliveryRequestCard } from "@/components/delivery/DeliveryRequestCard";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
 import { useDeliveryProviderData, logDataAccessAttempt } from "@/hooks/useDataIsolation";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, User } from "lucide-react";
 import { InAppCommunication } from "@/components/communication/InAppCommunication";
+import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
 
 interface DashboardStats {
   totalDeliveries: number;
@@ -132,6 +133,7 @@ const DeliveryDashboard = () => {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [showProofCapture, setShowProofCapture] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("active");
+  const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [notificationCount, setNotificationCount] = useState(0);
   const [pendingNotificationCount, setPendingNotificationCount] = useState(0);
 
@@ -630,6 +632,14 @@ const DeliveryDashboard = () => {
               <Button variant="outline" className="bg-white/10 border-white/30 text-white hover:bg-white/20">
                 <Bell className="h-4 w-4 mr-2" />
                 Notifications
+              </Button>
+              <Button 
+                variant="outline" 
+                className="bg-white/10 border-white/30 text-white hover:bg-white/20"
+                onClick={() => setShowProfileEdit(true)}
+              >
+                <User className="h-4 w-4 mr-2" />
+                Edit Profile
               </Button>
               <Button variant="outline" className="bg-white/10 border-white/30 text-white hover:bg-white/20">
                 <Settings className="h-4 w-4 mr-2" />
@@ -1191,6 +1201,17 @@ const DeliveryDashboard = () => {
       </main>
 
       <Footer />
+
+      {/* Profile Edit Dialog */}
+      <ProfileEditDialog
+        isOpen={showProfileEdit}
+        onClose={() => setShowProfileEdit(false)}
+        onSave={() => {
+          // Refresh data after profile save
+          refetchData();
+        }}
+        userRole="delivery_provider"
+      />
     </div>
   );
 };

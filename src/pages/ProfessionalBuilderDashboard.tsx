@@ -62,7 +62,8 @@ import { PendingQuoteRequests } from "@/components/builders/PendingQuoteRequests
 import DeliveryRequest from "@/components/DeliveryRequest";
 import { InAppCommunication } from "@/components/communication/InAppCommunication";
 import { TrackingTab } from "@/components/tracking/TrackingTab";
-import { Navigation as NavigationIcon } from "lucide-react";
+import { Navigation as NavigationIcon, Settings } from "lucide-react";
+import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
 
 const ProfessionalBuilderDashboardPage = () => {
   // Use AuthContext for reliable user data
@@ -70,6 +71,7 @@ const ProfessionalBuilderDashboardPage = () => {
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [stats, setStats] = useState({
     activeProjects: 0,
     pendingOrders: 0,
@@ -904,16 +906,24 @@ const ProfessionalBuilderDashboardPage = () => {
                 <p className="text-blue-100">Professional Builder Dashboard</p>
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Link to="/suppliers">
                 <Button className="bg-white text-blue-700 hover:bg-blue-50">
                   <ShoppingCart className="h-4 w-4 mr-2" />
                   Order Materials
                 </Button>
               </Link>
+              <Button 
+                variant="outline" 
+                className="border-white/30 text-white hover:bg-white/10"
+                onClick={() => setShowProfileEdit(true)}
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Edit Profile</span>
+              </Button>
               <Button variant="outline" className="border-white/30 text-white hover:bg-white/10" onClick={handleSignOut}>
                 <LogOut className="h-4 w-4 mr-2" />
-                Sign Out
+                <span className="hidden sm:inline">Sign Out</span>
               </Button>
             </div>
           </div>
@@ -2100,6 +2110,17 @@ const ProfessionalBuilderDashboardPage = () => {
       </div>
 
       <Footer />
+
+      {/* Profile Edit Dialog */}
+      <ProfileEditDialog
+        isOpen={showProfileEdit}
+        onClose={() => setShowProfileEdit(false)}
+        onSave={() => {
+          // Refresh profile data after save
+          checkAuth();
+        }}
+        userRole="professional_builder"
+      />
     </div>
   );
 };

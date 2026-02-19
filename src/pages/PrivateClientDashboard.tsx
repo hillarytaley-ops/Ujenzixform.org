@@ -50,7 +50,8 @@ import { DeliveryPromptDialog } from "@/components/builders/DeliveryPromptDialog
 import { MonitoringServicePrompt } from "@/components/builders/MonitoringServicePrompt";
 import { TrackingTab } from "@/components/tracking/TrackingTab";
 import { BuilderOrdersTracker } from "@/components/builders/BuilderOrdersTracker";
-import { Navigation as NavigationIcon, QrCode } from "lucide-react";
+import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
+import { Navigation as NavigationIcon, QrCode, Settings } from "lucide-react";
 
 interface Order {
   id: string;
@@ -85,6 +86,7 @@ const PrivateClientDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<Order[]>([]);
   const [deliveries, setDeliveries] = useState<DeliveryRequest[]>([]);
+  const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [stats, setStats] = useState({
     totalOrders: 0,
     pendingOrders: 0,
@@ -655,16 +657,24 @@ const PrivateClientDashboard = () => {
                 <p className="text-green-100">Private Builder Dashboard</p>
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Link to="/suppliers">
                 <Button className="bg-white text-green-700 hover:bg-green-50">
                   <ShoppingCart className="h-4 w-4 mr-2" />
                   Shop Materials
                 </Button>
               </Link>
+              <Button 
+                variant="outline" 
+                className="border-white/30 text-white hover:bg-white/10"
+                onClick={() => setShowProfileEdit(true)}
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Edit Profile</span>
+              </Button>
               <Button variant="outline" className="border-white/30 text-white hover:bg-white/10" onClick={handleSignOut}>
                 <LogOut className="h-4 w-4 mr-2" />
-                Sign Out
+                <span className="hidden sm:inline">Sign Out</span>
               </Button>
             </div>
           </div>
@@ -1785,6 +1795,17 @@ const PrivateClientDashboard = () => {
           }}
         />
       )}
+
+      {/* Profile Edit Dialog */}
+      <ProfileEditDialog
+        isOpen={showProfileEdit}
+        onClose={() => setShowProfileEdit(false)}
+        onSave={() => {
+          // Refresh profile data after save
+          checkAuth();
+        }}
+        userRole="private_client"
+      />
     </div>
   );
 };
