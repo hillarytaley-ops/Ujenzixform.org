@@ -895,52 +895,44 @@ export const MaterialsGrid = () => {
         
         if (pricesResponse.ok) {
           const pricesData = await pricesResponse.json();
-          console.log(`💰 Supplier prices loaded: ${pricesData?.length || 0} entries at ${new Date().toISOString()}`);
+          console.log(`💰 Supplier prices loaded: ${pricesData?.length || 0} entries`);
           
-          // DEBUG: Show raw response
           if (pricesData && pricesData.length > 0) {
-            console.log('💰 RAW supplier_product_prices from DB (first 10):', pricesData.slice(0, 10));
-            // Log all prices for debugging
-            console.log('💰 All supplier prices from DB:', pricesData.map((p: any) => ({ 
-              product_id: p.product_id, 
-              price: p.price, 
-              supplier_id: p.supplier_id,
-              updated_at: p.updated_at 
-            })));
-          } else {
-            console.warn('⚠️ NO supplier prices found in database! Check if supplier_product_prices table has data.');
-          }
+            // DEBUG: Show raw response
+            console.log('💰 RAW supplier_product_prices (first 5):', pricesData.slice(0, 5));
             
             // Create a map of product_id -> price info
-            // If multiple suppliers have prices, use the MOST RECENT price (not lowest)
             // Sort by updated_at descending to get most recent first
             const sortedPrices = [...pricesData].sort((a: any, b: any) => {
               const dateA = new Date(a.updated_at || 0).getTime();
               const dateB = new Date(b.updated_at || 0).getTime();
-              return dateB - dateA; // Most recent first
+              return dateB - dateA;
             });
             
             sortedPrices.forEach((item: any) => {
-              // Only set if not already set (first one is most recent)
               if (!supplierPrices[item.product_id]) {
                 supplierPrices[item.product_id] = {
                   price: item.price,
                   in_stock: item.in_stock,
                   supplier_id: item.supplier_id,
                   description: item.description || '',
-                  variant_prices: item.variant_prices || [] // Include supplier variant prices
+                  variant_prices: item.variant_prices || []
                 };
               }
             });
-            console.log(`💰 Supplier prices mapped (most recent): ${Object.keys(supplierPrices).length} products with prices`);
-            console.log('💰 Mapped prices:', Object.entries(supplierPrices).map(([id, p]) => ({ id, price: (p as any).price })));
+            
+            console.log(`💰 Mapped ${Object.keys(supplierPrices).length} supplier prices`);
+          } else {
+            console.warn('⚠️ supplier_product_prices table is EMPTY - showing admin prices');
           }
         } else {
-          console.log(`❌ Failed to load supplier prices: ${pricesResponse.status}`);
+          console.error(`❌ Failed to load supplier prices: ${pricesResponse.status}`);
         }
       } catch (pricesErr: any) {
-        console.log('Supplier prices table not available:', pricesErr);
+        console.error('❌ Error fetching supplier prices:', pricesErr);
       }
+      
+      console.log(`📊 Supplier prices ready: ${Object.keys(supplierPrices).length} products`);
       
       // STEP 2: Fetch admin-uploaded materials - ULTRA OPTIMIZED for performance
       // ✅ PERFORMANCE: Fetch first batch WITH images, rest with metadata only
