@@ -317,20 +317,21 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
         throw new Error('No access token found. Please log out and log back in.');
       }
 
-      // Prepare update data
+      // Prepare update data - include all editable fields
       const updateData: Record<string, any> = {
-        full_name: profile.full_name,
+        full_name: profile.full_name || '',
+        phone: profile.phone || null,
+        location: profile.location || null,
+        company_name: profile.company_name || null,
+        store_name: profile.store_name || null,
+        bio: profile.bio || null,
+        website: profile.website || null,
+        address: profile.address || null,
+        avatar_url: profile.avatar_url || null,
         updated_at: new Date().toISOString()
       };
 
-      // Add optional fields
-      if (profile.phone) updateData.phone = profile.phone;
-      if (profile.location) updateData.location = profile.location;
-      if (profile.company_name) updateData.company_name = profile.company_name;
-      if (profile.store_name) updateData.store_name = profile.store_name;
-      if (profile.bio) updateData.bio = profile.bio;
-      if (profile.website) updateData.website = profile.website;
-      if (profile.address) updateData.address = profile.address;
+      // Add coordinates if available
       if (profile.latitude) updateData.latitude = profile.latitude;
       if (profile.longitude) updateData.longitude = profile.longitude;
 
@@ -357,8 +358,21 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
       }
 
       // Also update supplier record if user is a supplier
-      if (userRole === 'supplier' && profile.store_name) {
+      if (userRole === 'supplier') {
         try {
+          const supplierUpdateData: Record<string, any> = {
+            updated_at: new Date().toISOString()
+          };
+          
+          if (profile.store_name || profile.company_name) {
+            supplierUpdateData.company_name = profile.store_name || profile.company_name;
+          }
+          if (profile.location) supplierUpdateData.location = profile.location;
+          if (profile.latitude) supplierUpdateData.latitude = profile.latitude;
+          if (profile.longitude) supplierUpdateData.longitude = profile.longitude;
+          if (profile.phone) supplierUpdateData.phone = profile.phone;
+          if (profile.avatar_url) supplierUpdateData.logo_url = profile.avatar_url;
+          
           const supplierResponse = await fetch(
             `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${profile.user_id}`,
             {
@@ -369,13 +383,7 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
                 'Authorization': `Bearer ${accessToken}`,
                 'Prefer': 'return=minimal'
               },
-              body: JSON.stringify({
-                company_name: profile.store_name,
-                location: profile.location,
-                latitude: profile.latitude,
-                longitude: profile.longitude,
-                updated_at: new Date().toISOString()
-              })
+              body: JSON.stringify(supplierUpdateData)
             }
           );
           
@@ -390,6 +398,18 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
       // Update delivery provider record if applicable
       if (userRole === 'delivery' || userRole === 'delivery_provider') {
         try {
+          const deliveryUpdateData: Record<string, any> = {
+            updated_at: new Date().toISOString()
+          };
+          
+          if (profile.full_name) deliveryUpdateData.full_name = profile.full_name;
+          if (profile.phone) deliveryUpdateData.phone = profile.phone;
+          if (profile.location) deliveryUpdateData.location = profile.location;
+          if (profile.latitude) deliveryUpdateData.latitude = profile.latitude;
+          if (profile.longitude) deliveryUpdateData.longitude = profile.longitude;
+          if (profile.avatar_url) deliveryUpdateData.avatar_url = profile.avatar_url;
+          if (profile.company_name) deliveryUpdateData.company_name = profile.company_name;
+          
           const deliveryResponse = await fetch(
             `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${profile.user_id}`,
             {
@@ -400,14 +420,7 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
                 'Authorization': `Bearer ${accessToken}`,
                 'Prefer': 'return=minimal'
               },
-              body: JSON.stringify({
-                full_name: profile.full_name,
-                phone: profile.phone,
-                location: profile.location,
-                latitude: profile.latitude,
-                longitude: profile.longitude,
-                updated_at: new Date().toISOString()
-              })
+              body: JSON.stringify(deliveryUpdateData)
             }
           );
           
@@ -416,6 +429,44 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
           }
         } catch (e) {
           console.log('📝 ProfileEditDialog: Delivery provider update skipped');
+        }
+      }
+
+      // Update builder record if applicable
+      if (userRole === 'professional_builder' || userRole === 'private_client') {
+        try {
+          const builderUpdateData: Record<string, any> = {
+            updated_at: new Date().toISOString()
+          };
+          
+          if (profile.full_name) builderUpdateData.full_name = profile.full_name;
+          if (profile.phone) builderUpdateData.phone = profile.phone;
+          if (profile.location) builderUpdateData.location = profile.location;
+          if (profile.latitude) builderUpdateData.latitude = profile.latitude;
+          if (profile.longitude) builderUpdateData.longitude = profile.longitude;
+          if (profile.avatar_url) builderUpdateData.avatar_url = profile.avatar_url;
+          if (profile.company_name) builderUpdateData.company_name = profile.company_name;
+          if (profile.bio) builderUpdateData.bio = profile.bio;
+          
+          const builderResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/builders?user_id=eq.${profile.user_id}`,
+            {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken}`,
+                'Prefer': 'return=minimal'
+              },
+              body: JSON.stringify(builderUpdateData)
+            }
+          );
+          
+          if (builderResponse.ok) {
+            console.log('✅ ProfileEditDialog: Builder record updated');
+          }
+        } catch (e) {
+          console.log('📝 ProfileEditDialog: Builder update skipped');
         }
       }
 
@@ -443,32 +494,87 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
     const file = e.target.files?.[0];
     if (!file || !profile) return;
 
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: 'File Too Large',
+        description: 'Please select an image under 5MB',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: 'Invalid File Type',
+        description: 'Please select an image file (JPG, PNG, etc.)',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     setUploading(true);
     try {
-      const fileExt = file.name.split('.').pop();
+      const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
       const fileName = `${profile.user_id}/avatar-${Date.now()}.${fileExt}`;
 
-      const { error: uploadError } = await supabase.storage
+      console.log('📸 Uploading avatar:', fileName);
+
+      // Try uploading to avatars bucket first
+      let uploadResult = await supabase.storage
         .from('avatars')
         .upload(fileName, file, { upsert: true });
 
-      if (uploadError) throw uploadError;
+      // If avatars bucket doesn't exist, try profile-images or public bucket
+      if (uploadResult.error) {
+        console.log('📸 Avatars bucket failed, trying profile-images...');
+        uploadResult = await supabase.storage
+          .from('profile-images')
+          .upload(fileName, file, { upsert: true });
+      }
 
-      const { data } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(fileName);
+      if (uploadResult.error) {
+        console.log('📸 Profile-images bucket failed, trying public...');
+        uploadResult = await supabase.storage
+          .from('public')
+          .upload(`avatars/${fileName}`, file, { upsert: true });
+      }
 
-      setProfile({ ...profile, avatar_url: data.publicUrl });
+      if (uploadResult.error) {
+        throw uploadResult.error;
+      }
+
+      // Get the public URL from the successful bucket
+      let publicUrl = '';
+      const buckets = ['avatars', 'profile-images', 'public'];
+      
+      for (const bucket of buckets) {
+        const path = bucket === 'public' ? `avatars/${fileName}` : fileName;
+        const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+        if (data?.publicUrl) {
+          // Check if this is the correct bucket by verifying the URL works
+          publicUrl = data.publicUrl;
+          break;
+        }
+      }
+
+      if (!publicUrl) {
+        throw new Error('Could not get public URL for uploaded image');
+      }
+
+      console.log('📸 Avatar uploaded successfully:', publicUrl);
+      setProfile({ ...profile, avatar_url: publicUrl });
 
       toast({
-        title: 'Photo Uploaded!',
-        description: 'Your profile photo has been updated'
+        title: '📸 Photo Uploaded!',
+        description: 'Your profile photo has been updated. Click Save Changes to keep it.'
       });
     } catch (error: any) {
-      console.error('Error uploading avatar:', error);
+      console.error('📸 Error uploading avatar:', error);
       toast({
         title: 'Upload Failed',
-        description: 'Failed to upload photo. Please try again.',
+        description: error.message || 'Failed to upload photo. Please try again.',
         variant: 'destructive'
       });
     } finally {
