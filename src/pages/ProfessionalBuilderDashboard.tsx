@@ -1023,7 +1023,7 @@ const ProfessionalBuilderDashboardPage = () => {
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Link to="/suppliers">
+              <Link to="/suppliers?from=dashboard">
                 <Button className="bg-white text-blue-700 hover:bg-blue-50">
                   <ShoppingCart className="h-4 w-4 mr-2" />
                   Order Materials
@@ -2367,7 +2367,7 @@ const ProfessionalBuilderDashboardPage = () => {
                   <Badge className="bg-white/20 text-white">Dedicated Support</Badge>
                 </div>
               </div>
-              <Link to="/suppliers">
+              <Link to="/suppliers?from=dashboard">
                 <Button className="bg-white text-blue-700 hover:bg-blue-50">
                   Start Ordering
                 </Button>

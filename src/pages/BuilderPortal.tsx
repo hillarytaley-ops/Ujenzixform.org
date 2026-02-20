@@ -123,7 +123,7 @@ const BuilderPortal = () => {
             {/* Browse Materials */}
             <Card 
               className="cursor-pointer hover:shadow-lg transition-shadow border-2 border-blue-200 hover:border-blue-400"
-              onClick={() => navigate('/suppliers')}
+              onClick={() => navigate('/suppliers?from=dashboard')}
             >
               <CardContent className="p-6">
                 <Store className="h-10 w-10 text-blue-600 mb-3" />
@@ -287,7 +287,7 @@ const BuilderPortal = () => {
             <Button 
               size="lg" 
               className={isPrivateClient ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'}
-              onClick={() => navigate('/suppliers')}
+              onClick={() => navigate('/suppliers?from=dashboard')}
             >
               <Store className="h-5 w-5 mr-2" />
               Browse Materials Marketplace

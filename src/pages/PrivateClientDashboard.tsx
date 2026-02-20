@@ -674,7 +674,7 @@ const PrivateClientDashboard = () => {
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Link to="/suppliers">
+              <Link to="/suppliers?from=dashboard">
                 <Button className="bg-white text-green-700 hover:bg-green-50">
                   <ShoppingCart className="h-4 w-4 mr-2" />
                   Shop Materials
@@ -851,7 +851,7 @@ const PrivateClientDashboard = () => {
                     <ShoppingBag className="h-16 w-16 mx-auto mb-4 text-gray-300" />
                     <p className="text-lg font-medium">No orders yet</p>
                     <p className="text-sm mb-4">Start shopping for construction materials</p>
-                    <Link to="/suppliers">
+                    <Link to="/suppliers?from=dashboard">
                       <Button className="bg-green-600 hover:bg-green-700">
                         <ShoppingCart className="h-4 w-4 mr-2" />
                         Browse Materials
@@ -1210,7 +1210,7 @@ const PrivateClientDashboard = () => {
                   <Heart className="h-16 w-16 mx-auto mb-4 text-gray-300" />
                   <p className="text-lg font-medium">Your wishlist is empty</p>
                   <p className="text-sm mb-4">Save products you're interested in</p>
-                  <Link to="/suppliers">
+                  <Link to="/suppliers?from=dashboard">
                     <Button className="bg-green-600 hover:bg-green-700">
                       <ShoppingCart className="h-4 w-4 mr-2" />
                       Explore Products

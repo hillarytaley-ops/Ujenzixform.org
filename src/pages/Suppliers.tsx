@@ -13,7 +13,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { 
@@ -25,7 +25,8 @@ import {
   Truck,
   Package,
   Star,
-  ChevronRight
+  ChevronRight,
+  ArrowLeft
 } from "lucide-react";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
@@ -42,7 +43,11 @@ const Suppliers = () => {
   const [loading, setLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
+  
+  // Check if user is coming from a dashboard (hide hero section)
+  const isFromDashboard = searchParams.get('from') === 'dashboard';
 
   // Detect mobile device
   useEffect(() => {
@@ -151,13 +156,49 @@ const Suppliers = () => {
     }
   };
 
+  // Get dashboard path based on user role
+  const getDashboardPath = () => {
+    if (userRole === 'professional_builder') return '/professional-builder-dashboard';
+    if (userRole === 'private_client') return '/builder-dashboard';
+    if (userRole === 'supplier') return '/supplier-dashboard';
+    return '/builder-dashboard';
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <CartSidebar />
       <FloatingCartButton />
       <Navigation />
 
-      {/* Hero Section - Responsive Design */}
+      {/* Dashboard Header - Show when coming from dashboard */}
+      {isFromDashboard && isLoggedInBuilder && (
+        <section className="bg-gradient-to-r from-slate-800 via-emerald-800 to-slate-800 py-4 border-b border-emerald-600/30">
+          <div className="container mx-auto px-4">
+            <div className="flex items-center justify-between">
+              <Button 
+                variant="outline"
+                onClick={() => navigate(getDashboardPath())}
+                className="bg-white/10 border-white/30 text-white hover:bg-white/20"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Dashboard
+              </Button>
+              <div className="text-center flex-1">
+                <h1 className="text-xl md:text-2xl font-bold text-white">
+                  Materials Marketplace
+                </h1>
+                <p className="text-sm text-white/70">
+                  {userRole === 'professional_builder' ? 'Request quotes for bulk orders' : 'Browse and purchase materials'}
+                </p>
+              </div>
+              <div className="w-[140px]" /> {/* Spacer for centering */}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Hero Section - Hide when coming from dashboard */}
+      {!isFromDashboard && (
       <section className="text-white py-12 md:py-20 relative overflow-hidden">
         {/* Background Image */}
         <div 
@@ -305,8 +346,10 @@ const Suppliers = () => {
           )}
         </div>
       </section>
+      )}
 
-      {/* Trust Indicators */}
+      {/* Trust Indicators - Hide when coming from dashboard */}
+      {!isFromDashboard && (
       <section className="py-6 md:py-8 bg-white border-b">
         <div className="container mx-auto px-4">
           <div className="flex flex-wrap justify-center items-center gap-4 md:gap-8 text-gray-600">
@@ -329,6 +372,7 @@ const Suppliers = () => {
           </div>
         </div>
       </section>
+      )}
 
       {/* Materials Grid Section */}
       <section id="materials-section" className="py-8 md:py-12 bg-gray-50">
