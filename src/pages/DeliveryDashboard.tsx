@@ -40,7 +40,8 @@ import {
   Trophy,
   Map,
   Zap,
-  Headphones
+  Headphones,
+  LogOut
 } from "lucide-react";
 import { DeliveryCharts } from "@/components/delivery/DeliveryCharts";
 import { DeliveryMap } from "@/components/delivery/DeliveryMap";
@@ -584,6 +585,34 @@ const DeliveryDashboard = () => {
     return status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
   };
 
+  // Full sign out function - clears all auth data and redirects to login
+  const handleSignOut = async () => {
+    console.log('🚪 Sign Out: Starting full sign out process...');
+    
+    // Clear ALL localStorage auth data FIRST (synchronous)
+    localStorage.removeItem('user_role');
+    localStorage.removeItem('user_role_id');
+    localStorage.removeItem('user_role_verified');
+    localStorage.removeItem('user_email');
+    localStorage.removeItem('user_name');
+    localStorage.removeItem('user_id');
+    localStorage.removeItem('admin_authenticated');
+    localStorage.removeItem('admin_login_time');
+    localStorage.removeItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+    
+    // Clear session storage
+    sessionStorage.clear();
+    
+    console.log('🚪 Sign Out: Auth data cleared, redirecting to login...');
+    
+    // IMMEDIATELY redirect - don't wait for Supabase signOut which can hang
+    // Use replace() to prevent back button returning to dashboard
+    window.location.replace('/auth');
+    
+    // Sign out from Supabase in background (page is already redirecting)
+    await supabase.auth.signOut();
+  };
+
   if (loading) {
     return <DashboardLoader type="delivery" />;
   }
@@ -644,6 +673,14 @@ const DeliveryDashboard = () => {
               <Button variant="outline" className="bg-white/10 border-white/30 text-white hover:bg-white/20">
                 <Settings className="h-4 w-4 mr-2" />
                 Settings
+              </Button>
+              <Button 
+                variant="outline" 
+                className="bg-red-500/20 border-red-400/50 text-white hover:bg-red-500/40"
+                onClick={handleSignOut}
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign Out
               </Button>
             </div>
           </div>

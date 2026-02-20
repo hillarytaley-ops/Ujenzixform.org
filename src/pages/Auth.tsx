@@ -1,4 +1,4 @@
-// Auth Page - Build v8 - Fix session caching issue
+// Auth Page - Build v9 - Auto-redirect users with roles to their dashboards
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,7 +23,26 @@ import {
 } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 
-console.log('🔐 Auth.tsx BUILD v8 - Fix session caching Feb 20 2026');
+console.log('🔐 Auth.tsx BUILD v9 - Auto-redirect users with roles Feb 20 2026');
+
+// Helper function to get dashboard path based on role
+const getDashboardForRole = (role: string): string => {
+  switch (role) {
+    case 'admin':
+      return '/admin-dashboard';
+    case 'supplier':
+      return '/supplier-dashboard';
+    case 'delivery':
+    case 'delivery_provider':
+      return '/delivery-dashboard';
+    case 'professional_builder':
+      return '/professional-builder-dashboard';
+    case 'private_client':
+      return '/private-client-dashboard';
+    default:
+      return '/home';
+  }
+};
 
 const Auth = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -56,8 +75,7 @@ const Auth = () => {
     }
   }, [shouldRedirect]);
 
-  // Check for existing session on mount - but DON'T auto-redirect
-  // This allows users to sign in as a different account
+  // Check for existing session on mount - AUTO-REDIRECT users with roles to their dashboards
   useEffect(() => {
     const checkExistingSession = async () => {
       // If force logout requested, sign out first
@@ -75,6 +93,31 @@ const Auth = () => {
         console.log('🔐 Existing session found:', session.user.email);
         setExistingSession(session);
         setUser(session.user);
+        
+        // Check if user has a role and auto-redirect to their dashboard
+        try {
+          const { data: roleData, error: roleError } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', session.user.id)
+            .limit(1)
+            .maybeSingle();
+          
+          if (!roleError && roleData?.role) {
+            const dashboardPath = getDashboardForRole(roleData.role);
+            console.log('🔐 User has role:', roleData.role, '- Redirecting to:', dashboardPath);
+            // Save role to localStorage for instant access
+            localStorage.setItem('user_role', roleData.role);
+            localStorage.setItem('user_role_id', session.user.id);
+            // Redirect to appropriate dashboard
+            window.location.href = dashboardPath;
+            return;
+          } else {
+            console.log('🔐 No role found for user, staying on auth page');
+          }
+        } catch (error) {
+          console.error('🔐 Error checking user role:', error);
+        }
       }
       setCheckingSession(false);
     };
@@ -215,21 +258,31 @@ const Auth = () => {
     e.preventDefault();
     setLoading(true);
     
-    // Safety timeout - reset loading after 5 seconds no matter what
-    const safetyTimeout = setTimeout(() => setLoading(false), 5000);
+    // Safety timeout - reset loading after 3 seconds no matter what
+    const safetyTimeout = setTimeout(() => {
+      console.log('🔐 Safety timeout triggered - resetting loading state');
+      setLoading(false);
+    }, 3000);
 
     const formData = new FormData(e.currentTarget);
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
 
     try {
+      console.log('🔐 Attempting', isSignUp ? 'signup' : 'signin', 'for:', email);
+      
       const result = isSignUp 
         ? await signUp(email, password)
         : await signIn(email, password);
 
+      clearTimeout(safetyTimeout);
+
       if (result.error) {
         setLoading(false); // Reset loading on error
+        hasSignedIn.current = false;
         const error = result.error;
+        console.error('🔐 Auth error:', error.message);
+        
         if (error.message.includes("User already registered")) {
           toast({
             variant: "destructive",
@@ -258,6 +311,8 @@ const Auth = () => {
         return;
       }
       
+      console.log('🔐 Auth successful!');
+      
       if (isSignUp) {
         setLoading(false); // Reset loading after signup
         if ('needsConfirmation' in result && result.needsConfirmation) {
@@ -270,34 +325,52 @@ const Auth = () => {
             title: "✅ Account created!",
             description: "Welcome to UjenziXform! Taking you to home...",
           });
-          setTimeout(() => {
-            const returnTo = sessionStorage.getItem('returnTo');
-            if (returnTo) {
-              sessionStorage.removeItem('returnTo');
-              window.location.href = returnTo;
-            } else {
-              window.location.href = '/home';
-            }
-          }, 1500);
+          // Redirect immediately for signup
+          const target = redirectTo || '/home';
+          console.log('🔐 REDIRECTING after signup to:', target);
+          window.location.href = target;
         }
         return;
       }
       
-      // ✅ Successful sign in - redirect IMMEDIATELY
+      // ✅ Successful sign in - check for role and redirect to appropriate dashboard
       toast({ title: "✅ Welcome back!", description: "Redirecting..." });
-      clearTimeout(safetyTimeout);
       setLoading(false);
       
-      // Redirect NOW - don't wait for anything else
+      // Check if user has a role and redirect to their dashboard
+      try {
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (currentUser) {
+          const { data: roleData } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', currentUser.id)
+            .limit(1)
+            .maybeSingle();
+          
+          if (roleData?.role) {
+            const dashboardPath = getDashboardForRole(roleData.role);
+            console.log('🔐 User has role:', roleData.role, '- Redirecting to:', dashboardPath);
+            localStorage.setItem('user_role', roleData.role);
+            localStorage.setItem('user_role_id', currentUser.id);
+            window.location.href = redirectTo || dashboardPath;
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('🔐 Error checking role on sign in:', error);
+      }
+      
+      // Fallback: Redirect to home if no role found
       const target = redirectTo || '/home';
       console.log('🔐 REDIRECTING NOW to:', target);
       window.location.href = target;
-      return; // Stop execution
       
     } catch (error: any) {
-      console.error('Auth error:', error);
+      console.error('🔐 Auth exception:', error);
       clearTimeout(safetyTimeout);
       setLoading(false);
+      hasSignedIn.current = false;
       toast({
         variant: "destructive",
         title: "Error",
