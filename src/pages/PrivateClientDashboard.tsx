@@ -669,7 +669,7 @@ const PrivateClientDashboard = () => {
               </div>
               <div>
                 <h1 className="text-2xl md:text-3xl font-bold">
-                  Welcome, {profile?.full_name || user?.email?.split('@')[0]}!
+                  Welcome, {profile?.full_name || 'Builder'}!
                 </h1>
                 <p className="text-green-100">Private Builder Dashboard</p>
               </div>

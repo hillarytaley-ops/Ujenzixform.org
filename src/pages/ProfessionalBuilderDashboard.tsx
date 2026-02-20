@@ -1018,7 +1018,7 @@ const ProfessionalBuilderDashboardPage = () => {
               </div>
               <div>
                 <h1 className="text-2xl md:text-3xl font-bold">
-                  Welcome, {profile?.full_name || profile?.company_name || user?.email?.split('@')[0]}!
+                  Welcome, {profile?.full_name || profile?.company_name || 'Builder'}!
                 </h1>
                 <p className="text-blue-100">Professional Builder Dashboard</p>
               </div>

@@ -220,7 +220,7 @@ const SuppliersMobileOptimized = () => {
                     <div className="flex-1">
                       <h3 className="font-bold text-lg mb-2 flex items-center gap-2">
                         <span className="text-green-600">✅</span>
-                        Welcome back, {user.email}!
+                        Welcome back!
                       </h3>
                       {(userRole === 'builder' || userRole === 'professional_builder') && (
                         <div className="space-y-2">

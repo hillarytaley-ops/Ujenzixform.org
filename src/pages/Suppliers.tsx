@@ -319,7 +319,7 @@ const Suppliers = () => {
                     <ShoppingCart className="h-5 w-5 text-emerald-400" />
                   </div>
                   <h3 className="text-xl font-bold text-white">
-                    Welcome back, {userRole === 'professional_builder' ? 'Professional Builder' : userRole === 'supplier' ? 'Supplier' : 'Builder'}!
+                    Welcome back, {userRole === 'professional_builder' ? 'Professional Builder' : userRole === 'private_client' ? 'Builder' : 'there'}!
                   </h3>
                 </div>
                 <p className="text-white/70 text-sm mb-4">

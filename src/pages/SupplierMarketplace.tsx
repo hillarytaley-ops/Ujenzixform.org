@@ -394,7 +394,7 @@ const SupplierMarketplace = () => {
             ) : user && isBuilder ? (
               <div className="inline-flex items-center gap-2 bg-green-500/30 backdrop-blur px-6 py-3 rounded-lg border border-green-400/50">
                 <CheckCircle className="h-5 w-5 text-green-300" />
-                <span>Welcome back, {userRole === 'private_client' ? 'Private Builder' : 'Professional Builder'}! You're ready to shop.</span>
+                <span>Welcome back! You're ready to shop.</span>
               </div>
             ) : (
               <div className="space-y-4">

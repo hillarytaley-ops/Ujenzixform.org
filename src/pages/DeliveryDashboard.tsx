@@ -611,7 +611,7 @@ const DeliveryDashboard = () => {
                 Delivery Dashboard
               </h1>
               <p className="text-teal-100 mt-1">
-                Welcome back, {providerProfile?.full_name || providerProfile?.company_name || user?.email}
+                Welcome back, {providerProfile?.full_name || providerProfile?.company_name || 'Driver'}
               </p>
             </div>
             <div className="flex flex-wrap gap-3 items-center">

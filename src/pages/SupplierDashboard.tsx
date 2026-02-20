@@ -980,7 +980,7 @@ const SupplierDashboard = () => {
                 {t('supplier.dashboard.title')}
               </h1>
               <p className="text-orange-100 mt-1">
-                {t('supplier.dashboard.welcome')}, {supplierProfile?.full_name || supplierProfile?.company_name || user?.email}
+                {t('supplier.dashboard.welcome')}, {supplierProfile?.company_name || supplierProfile?.store_name || supplierProfile?.full_name || 'Supplier'}
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
