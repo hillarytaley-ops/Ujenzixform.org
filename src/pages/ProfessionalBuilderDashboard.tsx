@@ -1032,36 +1032,35 @@ const ProfessionalBuilderDashboardPage = () => {
                 </Button>
               </Link>
               <Link to="/delivery">
-                <Button variant="outline" className="border-white/30 text-white hover:bg-white/10">
+                <Button className="bg-white/90 text-blue-700 hover:bg-white">
                   <Truck className="h-4 w-4 mr-2" />
-                  <span className="hidden sm:inline">Delivery</span>
+                  Delivery
                 </Button>
               </Link>
               <Link to="/scanners">
-                <Button variant="outline" className="border-white/30 text-white hover:bg-white/10">
+                <Button className="bg-white/90 text-blue-700 hover:bg-white">
                   <QrCode className="h-4 w-4 mr-2" />
-                  <span className="hidden sm:inline">Scanners</span>
+                  Scanners
                 </Button>
               </Link>
               <Link to="/tracking">
-                <Button variant="outline" className="border-white/30 text-white hover:bg-white/10">
+                <Button className="bg-white/90 text-blue-700 hover:bg-white">
                   <NavigationIcon className="h-4 w-4 mr-2" />
-                  <span className="hidden sm:inline">Tracking</span>
+                  Tracking
                 </Button>
               </Link>
               <Link to="/monitoring">
-                <Button variant="outline" className="border-white/30 text-white hover:bg-white/10">
+                <Button className="bg-white/90 text-blue-700 hover:bg-white">
                   <Video className="h-4 w-4 mr-2" />
-                  <span className="hidden sm:inline">Monitoring</span>
+                  Monitoring
                 </Button>
               </Link>
               <Button 
-                variant="outline" 
-                className="border-white/30 text-white hover:bg-white/10"
+                className="bg-white/90 text-blue-700 hover:bg-white"
                 onClick={() => setShowProfileView(true)}
               >
                 <User className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Profile</span>
+                Profile
               </Button>
             </div>
           </div>
