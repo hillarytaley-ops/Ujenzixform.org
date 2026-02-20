@@ -4,26 +4,24 @@
  * ║   💰 CART PRICE COMPARISON ALL - Compare prices for ALL items in cart                ║
  * ║                                                                                      ║
  * ║   CREATED: February 4, 2026                                                          ║
- * ║   UPDATED: February 19, 2026 - Added supplier selection for both builders            ║
+ * ║   UPDATED: February 21, 2026 - Full table view with suppliers as columns             ║
  * ║   FEATURES:                                                                          ║
- * ║   1. Shows price comparisons for ALL cart items in one view                          ║
- * ║   2. Groups by supplier to find best overall deal                                    ║
- * ║   3. Highlights total potential savings                                              ║
- * ║   4. ALLOWS BOTH Private Clients & Professional Builders to SELECT suppliers         ║
+ * ║   1. Shows ALL suppliers as columns in a table                                       ║
+ * ║   2. Shows ALL cart items as rows                                                    ║
+ * ║   3. Total per supplier at the bottom                                                ║
+ * ║   4. Click to select supplier for each item                                          ║
+ * ║   5. Highlights best prices in green                                                 ║
  * ║                                                                                      ║
  * ╚══════════════════════════════════════════════════════════════════════════════════════╝
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
 import { Card, CardContent } from '@/components/ui/card';
 import { useCart, CartItem } from '@/contexts/CartContext';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 import { 
   Scale, 
   Store, 
@@ -34,10 +32,10 @@ import {
   Loader2,
   Package,
   Check,
-  ChevronDown,
-  ChevronUp,
   CheckCircle2,
-  ArrowRight
+  ArrowRight,
+  Building2,
+  X
 } from 'lucide-react';
 
 interface SupplierPrice {
@@ -51,13 +49,21 @@ interface ProductComparison {
   product_id: string;
   product_name: string;
   category: string;
+  unit: string;
   quantity: number;
   current_price: number;
   current_supplier: string;
+  current_supplier_id?: string;
   alternatives: SupplierPrice[];
   best_price: number;
   best_supplier: string;
   savings: number;
+}
+
+interface SupplierColumn {
+  id: string;
+  name: string;
+  rating?: number;
 }
 
 interface CartPriceComparisonAllProps {
@@ -73,9 +79,9 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
   const { toast } = useToast();
   const [comparisons, setComparisons] = useState<ProductComparison[]>([]);
   const [loading, setLoading] = useState(false);
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
-  // Track selected suppliers for each product
-  const [selectedSuppliers, setSelectedSuppliers] = useState<Map<string, SupplierPrice>>(new Map());
+  const [allSuppliers, setAllSuppliers] = useState<SupplierColumn[]>([]);
+  // Track selected suppliers for each product: productId -> supplierId
+  const [selectedSuppliers, setSelectedSuppliers] = useState<Map<string, string>>(new Map());
 
   // Fetch prices for all cart items when modal opens
   useEffect(() => {
@@ -84,6 +90,7 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
     } else if (isOpen && items.length === 0) {
       setLoading(false);
       setComparisons([]);
+      setAllSuppliers([]);
     }
   }, [isOpen]);
 
@@ -100,9 +107,11 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
       product_id: item.id,
       product_name: item.name,
       category: item.category,
+      unit: item.unit || 'unit',
       quantity: item.quantity,
       current_price: item.unit_price,
       current_supplier: item.supplier_name || 'Current Supplier',
+      current_supplier_id: item.supplier_id,
       alternatives: [],
       best_price: item.unit_price,
       best_supplier: item.supplier_name || 'Current',
@@ -175,7 +184,27 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
         return;
       }
 
-      // 4. Build comparison data for each cart item
+      // 4. Collect all unique suppliers from the prices data
+      const uniqueSupplierIds = new Set<string>();
+      pricesData.forEach((p: any) => uniqueSupplierIds.add(p.supplier_id));
+      
+      // Also add current suppliers from cart items
+      items.forEach(item => {
+        if (item.supplier_id) uniqueSupplierIds.add(item.supplier_id);
+      });
+
+      const supplierColumns: SupplierColumn[] = Array.from(uniqueSupplierIds).map(id => {
+        const supplier = suppliersMap.get(id);
+        return {
+          id,
+          name: supplier?.company_name || 'Unknown Supplier',
+          rating: supplier?.rating
+        };
+      });
+
+      setAllSuppliers(supplierColumns);
+
+      // 5. Build comparison data for each cart item
       const comparisonResults: ProductComparison[] = items.map(item => {
         // Find all prices for this product
         const productPrices = pricesData.filter((p: any) => p.product_id === item.id);
@@ -200,9 +229,11 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
           product_id: item.id,
           product_name: item.name,
           category: item.category,
+          unit: item.unit || 'unit',
           quantity: item.quantity,
           current_price: item.unit_price,
           current_supplier: item.supplier_name || 'Current Supplier',
+          current_supplier_id: item.supplier_id,
           alternatives,
           best_price: bestPrice,
           best_supplier: bestAlt?.supplier_name || item.supplier_name || 'Current',
@@ -212,6 +243,16 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
 
       console.log('✅ Comparison results:', comparisonResults);
       setComparisons(comparisonResults);
+      
+      // Initialize selected suppliers with current selections
+      const initialSelections = new Map<string, string>();
+      items.forEach(item => {
+        if (item.supplier_id) {
+          initialSelections.set(item.id, item.supplier_id);
+        }
+      });
+      setSelectedSuppliers(initialSelections);
+      
     } catch (error: any) {
       console.error('❌ Error fetching prices:', error);
       
@@ -227,28 +268,11 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
     }
   };
 
-  const toggleExpand = (productId: string) => {
-    setExpandedItems(prev => {
-      const next = new Set(prev);
-      if (next.has(productId)) {
-        next.delete(productId);
-      } else {
-        next.add(productId);
-      }
-      return next;
-    });
-  };
-
   // Handle supplier selection for an item
-  const handleSelectSupplier = (productId: string, supplier: SupplierPrice) => {
+  const handleSelectSupplier = (productId: string, supplierId: string, price: number, supplierName: string) => {
     setSelectedSuppliers(prev => {
       const next = new Map(prev);
-      // If already selected, deselect
-      if (next.get(productId)?.supplier_id === supplier.supplier_id) {
-        next.delete(productId);
-      } else {
-        next.set(productId, supplier);
-      }
+      next.set(productId, supplierId);
       return next;
     });
     
@@ -257,295 +281,451 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
       if (comp.product_id === productId) {
         return {
           ...comp,
-          current_price: supplier.price,
-          current_supplier: supplier.supplier_name
+          current_price: price,
+          current_supplier: supplierName,
+          current_supplier_id: supplierId
         };
       }
       return comp;
     }));
   };
 
+  // Get price for a product from a specific supplier
+  const getPriceForSupplier = (comparison: ProductComparison, supplierId: string): SupplierPrice | null => {
+    return comparison.alternatives.find(a => a.supplier_id === supplierId) || null;
+  };
+
+  // Calculate totals per supplier
+  const supplierTotals = useMemo(() => {
+    const totals = new Map<string, { total: number; itemCount: number; hasAllItems: boolean }>();
+    
+    allSuppliers.forEach(supplier => {
+      let total = 0;
+      let itemCount = 0;
+      
+      comparisons.forEach(comp => {
+        const price = getPriceForSupplier(comp, supplier.id);
+        if (price && price.in_stock) {
+          total += price.price * comp.quantity;
+          itemCount++;
+        }
+      });
+      
+      totals.set(supplier.id, {
+        total,
+        itemCount,
+        hasAllItems: itemCount === comparisons.length
+      });
+    });
+    
+    return totals;
+  }, [allSuppliers, comparisons]);
+
+  // Find cheapest supplier with all items
+  const cheapestSupplier = useMemo(() => {
+    let cheapest: { id: string; total: number } | null = null;
+    
+    supplierTotals.forEach((data, supplierId) => {
+      if (data.hasAllItems && data.total > 0) {
+        if (!cheapest || data.total < cheapest.total) {
+          cheapest = { id: supplierId, total: data.total };
+        }
+      }
+    });
+    
+    // If no supplier has all items, find the one with most items and lowest total
+    if (!cheapest) {
+      let maxItems = 0;
+      supplierTotals.forEach((data, supplierId) => {
+        if (data.itemCount > maxItems || (data.itemCount === maxItems && (!cheapest || data.total < cheapest.total))) {
+          maxItems = data.itemCount;
+          cheapest = { id: supplierId, total: data.total };
+        }
+      });
+    }
+    
+    return cheapest;
+  }, [supplierTotals]);
+
   // Apply all selected suppliers to cart
   const handleApplySelections = () => {
-    if (selectedSuppliers.size === 0) {
-      toast({
-        title: '⚠️ No Suppliers Selected',
-        description: 'Click on a supplier to select them for your items.',
-      });
-      return;
-    }
-
     let updatedCount = 0;
     
-    selectedSuppliers.forEach((supplier, productId) => {
+    selectedSuppliers.forEach((supplierId, productId) => {
       const item = items.find(i => i.id === productId);
-      if (item && updateCartItem) {
+      const comparison = comparisons.find(c => c.product_id === productId);
+      const supplierPrice = comparison?.alternatives.find(a => a.supplier_id === supplierId);
+      
+      if (item && updateCartItem && supplierPrice) {
         updateCartItem(productId, {
-          unit_price: supplier.price,
-          supplier_name: supplier.supplier_name,
-          supplier_id: supplier.supplier_id
+          unit_price: supplierPrice.price,
+          supplier_name: supplierPrice.supplier_name,
+          supplier_id: supplierPrice.supplier_id
         });
         updatedCount++;
       }
     });
 
-    toast({
-      title: '✅ Cart Updated!',
-      description: `${updatedCount} item${updatedCount !== 1 ? 's' : ''} updated with selected suppliers.`,
-    });
+    if (updatedCount > 0) {
+      toast({
+        title: '✅ Cart Updated!',
+        description: `${updatedCount} item${updatedCount !== 1 ? 's' : ''} updated with selected suppliers.`,
+      });
+    }
 
-    // Clear selections and close
-    setSelectedSuppliers(new Map());
     onClose();
   };
 
-  // Calculate totals
+  // Select all items from one supplier
+  const handleSelectAllFromSupplier = (supplierId: string) => {
+    const supplier = allSuppliers.find(s => s.id === supplierId);
+    if (!supplier) return;
+
+    const newSelections = new Map(selectedSuppliers);
+    let count = 0;
+    
+    comparisons.forEach(comp => {
+      const price = getPriceForSupplier(comp, supplierId);
+      if (price && price.in_stock) {
+        newSelections.set(comp.product_id, supplierId);
+        count++;
+      }
+    });
+    
+    setSelectedSuppliers(newSelections);
+    
+    // Update comparisons with new prices
+    setComparisons(prev => prev.map(comp => {
+      const price = getPriceForSupplier(comp, supplierId);
+      if (price && price.in_stock) {
+        return {
+          ...comp,
+          current_price: price.price,
+          current_supplier: supplier.name,
+          current_supplier_id: supplierId
+        };
+      }
+      return comp;
+    }));
+    
+    toast({
+      title: `✅ Selected ${supplier.name}`,
+      description: `${count} item${count !== 1 ? 's' : ''} selected from this supplier.`,
+    });
+  };
+
+  // Calculate current total based on selections
   const currentTotal = comparisons.reduce((sum, c) => sum + (c.current_price * c.quantity), 0);
-  const bestTotal = comparisons.reduce((sum, c) => sum + (c.best_price * c.quantity), 0);
-  const totalSavings = currentTotal - bestTotal;
-  const itemsWithSavings = comparisons.filter(c => c.savings > 0).length;
+
+  // Find the lowest price for each material
+  const getLowestPriceForProduct = (comparison: ProductComparison): number => {
+    const prices = comparison.alternatives.filter(a => a.in_stock).map(a => a.price);
+    if (prices.length === 0) return comparison.current_price;
+    return Math.min(...prices);
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Scale className="h-5 w-5 text-purple-600" />
-            Compare Prices for All Items
-          </DialogTitle>
-          <DialogDescription>
-            Find the best prices for your {items.length} cart item{items.length !== 1 ? 's' : ''} across all suppliers
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="max-w-[95vw] w-full max-h-[90vh] overflow-hidden flex flex-col p-0">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white p-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="bg-white/20 p-2 rounded-lg">
+                <Scale className="h-6 w-6" />
+              </div>
+              <div>
+                <DialogTitle className="text-white text-xl font-bold">
+                  Compare Prices Across Suppliers
+                </DialogTitle>
+                <DialogDescription className="text-white/80 text-sm mt-0.5">
+                  {items.length} item{items.length !== 1 ? 's' : ''} · {allSuppliers.length} supplier{allSuppliers.length !== 1 ? 's' : ''} · Click on a price to select that supplier
+                </DialogDescription>
+              </div>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={onClose}
+              className="text-white hover:bg-white/20"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+        </div>
 
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-12">
-            <Loader2 className="h-10 w-10 animate-spin text-purple-600 mb-4" />
-            <p className="text-gray-500">Comparing prices across suppliers...</p>
+          <div className="flex flex-col items-center justify-center py-16">
+            <Loader2 className="h-12 w-12 animate-spin text-purple-600 mb-4" />
+            <p className="text-gray-500 text-lg">Comparing prices across suppliers...</p>
+            <p className="text-gray-400 text-sm mt-1">This may take a few seconds</p>
+          </div>
+        ) : comparisons.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16">
+            <Package className="h-16 w-16 text-gray-300 mb-4" />
+            <p className="text-gray-500 text-lg">Your cart is empty</p>
+            <p className="text-gray-400 text-sm mt-1">Add items to compare prices</p>
           </div>
         ) : (
           <>
-            {/* Savings Summary */}
-            {totalSavings > 0 && (
-              <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-green-100 rounded-full">
-                        <TrendingDown className="h-5 w-5 text-green-600" />
-                      </div>
-                      <div>
-                        <p className="font-semibold text-green-800">Potential Savings Found!</p>
-                        <p className="text-sm text-green-600">
-                          {itemsWithSavings} item{itemsWithSavings !== 1 ? 's' : ''} with better prices available
-                        </p>
-                      </div>
+            {/* Best Deal Banner */}
+            {cheapestSupplier && (
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-b border-green-200 p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-green-500 text-white p-2.5 rounded-full">
+                      <Trophy className="h-5 w-5" />
                     </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-bold text-green-600">
-                        KES {totalSavings.toLocaleString()}
+                    <div>
+                      <p className="font-bold text-green-800 text-lg">
+                        Best Deal: {allSuppliers.find(s => s.id === cheapestSupplier.id)?.name}
                       </p>
-                      <p className="text-xs text-green-600">total savings</p>
+                      <p className="text-sm text-green-700">
+                        Total: <span className="font-bold">KES {cheapestSupplier.total.toLocaleString()}</span>
+                        {supplierTotals.get(cheapestSupplier.id)?.hasAllItems && (
+                          <span className="ml-2 text-green-600">· Has all {comparisons.length} items</span>
+                        )}
+                      </p>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                  <Button 
+                    className="bg-green-600 hover:bg-green-700 shadow-lg"
+                    onClick={() => handleSelectAllFromSupplier(cheapestSupplier.id)}
+                  >
+                    <ShoppingCart className="h-4 w-4 mr-2" />
+                    Select All from This Supplier
+                  </Button>
+                </div>
+              </div>
             )}
 
-            {/* Price Comparison Table */}
-            <ScrollArea className="flex-1 pr-4">
-              <div className="space-y-3">
-                {comparisons.map((item) => {
-                  const isExpanded = expandedItems.has(item.product_id);
-                  const hasBetterPrice = item.savings > 0;
-                  
-                  return (
-                    <Card 
-                      key={item.product_id} 
-                      className={`overflow-hidden ${hasBetterPrice ? 'border-green-200 bg-green-50/30' : ''}`}
-                    >
-                      <CardContent className="p-3">
-                        {/* Product Header */}
-                        <div 
-                          className="flex items-center justify-between cursor-pointer"
-                          onClick={() => toggleExpand(item.product_id)}
+            {/* Comparison Table */}
+            <div className="flex-1 overflow-auto">
+              <table className="w-full border-collapse min-w-[800px]">
+                <thead className="sticky top-0 z-10">
+                  <tr className="bg-gray-100">
+                    <th className="text-left p-4 font-semibold text-gray-700 border-b-2 border-r border-gray-200 min-w-[250px] bg-gray-100 sticky left-0 z-20">
+                      <div className="flex items-center gap-2">
+                        <Package className="h-4 w-4 text-gray-500" />
+                        Material / Qty
+                      </div>
+                    </th>
+                    {allSuppliers.map((supplier) => {
+                      const isCheapest = cheapestSupplier?.id === supplier.id;
+                      const totals = supplierTotals.get(supplier.id);
+                      return (
+                        <th 
+                          key={supplier.id} 
+                          className={`text-center p-3 font-semibold border-b-2 border-r min-w-[160px] ${
+                            isCheapest 
+                              ? 'bg-green-100 border-green-300 text-green-800' 
+                              : 'bg-gray-100 border-gray-200 text-gray-700'
+                          }`}
                         >
-                          <div className="flex-1 min-w-0">
+                          <div className="flex flex-col items-center gap-1">
                             <div className="flex items-center gap-2">
-                              <p className="font-medium text-gray-900 truncate">{item.product_name}</p>
-                              {hasBetterPrice && (
-                                <Badge className="bg-green-100 text-green-700 text-xs">
-                                  Save KES {item.savings.toLocaleString()}
-                                </Badge>
-                              )}
+                              <Building2 className={`h-4 w-4 ${isCheapest ? 'text-green-600' : 'text-gray-500'}`} />
+                              <span className="truncate max-w-[100px] text-sm">{supplier.name}</span>
                             </div>
-                            <div className="flex items-center gap-2 text-sm text-gray-500">
-                              <span>{item.category}</span>
-                              <span>•</span>
-                              <span>Qty: {item.quantity}</span>
+                            {isCheapest && (
+                              <Badge className="bg-green-500 text-[10px] px-1.5">BEST DEAL</Badge>
+                            )}
+                            {supplier.rating && (
+                              <div className="flex items-center gap-1 text-yellow-600 text-xs">
+                                <Star className="h-3 w-3 fill-current" />
+                                {supplier.rating.toFixed(1)}
+                              </div>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className={`text-xs h-6 px-2 ${isCheapest ? 'text-green-700 hover:bg-green-200' : 'text-blue-600 hover:bg-blue-100'}`}
+                              onClick={() => handleSelectAllFromSupplier(supplier.id)}
+                            >
+                              Select All
+                            </Button>
+                          </div>
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {comparisons.map((comp, rowIdx) => {
+                    const lowestPrice = getLowestPriceForProduct(comp);
+                    
+                    return (
+                      <tr 
+                        key={comp.product_id} 
+                        className={`${rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50/50 transition-colors`}
+                      >
+                        {/* Material Name - Sticky */}
+                        <td className={`p-3 border-b border-r border-gray-200 sticky left-0 z-10 ${rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                              <Package className="h-5 w-5 text-gray-400" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-medium text-gray-900 text-sm line-clamp-2">{comp.product_name}</p>
+                              <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
+                                <span className="bg-gray-100 px-1.5 py-0.5 rounded">{comp.category}</span>
+                                <span>Qty: <strong>{comp.quantity}</strong></span>
+                              </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-3">
-                            <div className="text-right">
-                              <p className="font-semibold">
-                                KES {(item.current_price * item.quantity).toLocaleString()}
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                @ KES {item.current_price.toLocaleString()}/unit
-                              </p>
-                            </div>
-                            {item.alternatives.length > 0 && (
-                              isExpanded ? 
-                                <ChevronUp className="h-5 w-5 text-gray-400" /> : 
-                                <ChevronDown className="h-5 w-5 text-gray-400" />
+                        </td>
+                        
+                        {/* Price cells for each supplier */}
+                        {allSuppliers.map((supplier) => {
+                          const price = getPriceForSupplier(comp, supplier.id);
+                          const isCheapestSupplier = cheapestSupplier?.id === supplier.id;
+                          const isLowestPrice = price && price.price === lowestPrice;
+                          const isSelected = selectedSuppliers.get(comp.product_id) === supplier.id;
+                          
+                          return (
+                            <td 
+                              key={`${comp.product_id}-${supplier.id}`}
+                              className={`p-2 border-b border-r text-center transition-all ${
+                                isSelected 
+                                  ? 'bg-blue-100 border-blue-300' 
+                                  : isCheapestSupplier 
+                                    ? 'bg-green-50/50 border-green-200' 
+                                    : 'border-gray-200'
+                              }`}
+                            >
+                              {price ? (
+                                <button
+                                  onClick={() => price.in_stock && handleSelectSupplier(comp.product_id, supplier.id, price.price, supplier.name)}
+                                  disabled={!price.in_stock}
+                                  className={`w-full p-2 rounded-lg transition-all ${
+                                    isSelected 
+                                      ? 'bg-blue-500 text-white shadow-md' 
+                                      : isLowestPrice
+                                        ? 'bg-green-100 hover:bg-green-200 border border-green-300'
+                                        : 'bg-white hover:bg-gray-100 border border-gray-200'
+                                  } ${!price.in_stock ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-md'}`}
+                                >
+                                  <div className="flex flex-col items-center gap-1">
+                                    {isSelected && (
+                                      <CheckCircle2 className="h-4 w-4 text-white" />
+                                    )}
+                                    {isLowestPrice && !isSelected && (
+                                      <TrendingDown className="h-4 w-4 text-green-600" />
+                                    )}
+                                    <span className={`font-bold text-sm ${
+                                      isSelected 
+                                        ? 'text-white' 
+                                        : isLowestPrice 
+                                          ? 'text-green-700' 
+                                          : 'text-gray-800'
+                                    }`}>
+                                      KES {price.price.toLocaleString()}
+                                    </span>
+                                    <span className={`text-[10px] ${isSelected ? 'text-blue-100' : 'text-gray-500'}`}>
+                                      per {comp.unit}
+                                    </span>
+                                    {!price.in_stock && (
+                                      <Badge variant="outline" className="text-[9px] text-red-500 border-red-200">
+                                        Out of Stock
+                                      </Badge>
+                                    )}
+                                    <span className={`text-[10px] font-medium ${isSelected ? 'text-blue-100' : 'text-gray-600'}`}>
+                                      Total: KES {(price.price * comp.quantity).toLocaleString()}
+                                    </span>
+                                  </div>
+                                </button>
+                              ) : (
+                                <div className="text-gray-400 text-sm p-2">
+                                  <span className="block text-lg">—</span>
+                                  <span className="text-xs">Not available</span>
+                                </div>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                
+                {/* Totals Row */}
+                <tfoot className="sticky bottom-0">
+                  <tr className="bg-gray-800 text-white font-bold">
+                    <td className="p-4 border-t-2 border-r border-gray-600 sticky left-0 bg-gray-800 z-20">
+                      <div className="flex items-center gap-2">
+                        <Scale className="h-5 w-5 text-gray-300" />
+                        <span className="text-lg">SUPPLIER TOTALS</span>
+                      </div>
+                      <p className="text-xs text-gray-400 font-normal mt-1">
+                        ({comparisons.length} items)
+                      </p>
+                    </td>
+                    {allSuppliers.map((supplier) => {
+                      const totals = supplierTotals.get(supplier.id);
+                      const isCheapest = cheapestSupplier?.id === supplier.id;
+                      
+                      return (
+                        <td 
+                          key={`total-${supplier.id}`}
+                          className={`p-3 text-center border-t-2 border-r ${
+                            isCheapest ? 'bg-green-700 border-green-500' : 'border-gray-600'
+                          }`}
+                        >
+                          <div className="flex flex-col items-center gap-1">
+                            <span className={`text-lg ${isCheapest ? 'text-green-100' : 'text-white'}`}>
+                              KES {totals?.total.toLocaleString() || '0'}
+                            </span>
+                            <span className="text-xs text-gray-300">
+                              {totals?.itemCount || 0}/{comparisons.length} items
+                            </span>
+                            {isCheapest && totals?.hasAllItems && (
+                              <Badge className="bg-green-500 text-white text-[10px]">
+                                <Check className="h-3 w-3 mr-1" />
+                                LOWEST
+                              </Badge>
+                            )}
+                            {!totals?.hasAllItems && totals && totals.itemCount > 0 && (
+                              <span className="text-[10px] text-yellow-300">
+                                Missing {comparisons.length - totals.itemCount} item{comparisons.length - totals.itemCount !== 1 ? 's' : ''}
+                              </span>
                             )}
                           </div>
-                        </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
 
-                        {/* Expanded Alternatives - SELECTABLE */}
-                        {isExpanded && item.alternatives.length > 0 && (
-                          <div className="mt-3 pt-3 border-t border-gray-100 space-y-2">
-                            <p className="text-xs font-medium text-gray-500 uppercase">
-                              Click to select a supplier ({item.alternatives.length} available)
-                            </p>
-                            {item.alternatives
-                              .sort((a, b) => a.price - b.price)
-                              .map((alt, idx) => {
-                                const isBest = alt.price === item.best_price && alt.price < item.current_price;
-                                const originalPrice = items.find(i => i.id === item.product_id)?.unit_price || item.current_price;
-                                const savings = (originalPrice - alt.price) * item.quantity;
-                                const isSelected = selectedSuppliers.get(item.product_id)?.supplier_id === alt.supplier_id;
-                                
-                                return (
-                                  <div 
-                                    key={alt.supplier_id}
-                                    onClick={() => alt.in_stock && handleSelectSupplier(item.product_id, alt)}
-                                    className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all ${
-                                      isSelected 
-                                        ? 'bg-blue-100 border-2 border-blue-500 shadow-md' 
-                                        : isBest 
-                                          ? 'bg-green-100 border border-green-200 hover:border-green-400' 
-                                          : 'bg-gray-50 border border-transparent hover:border-gray-300'
-                                    } ${!alt.in_stock ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                  >
-                                    <div className="flex items-center gap-2">
-                                      {isSelected ? (
-                                        <CheckCircle2 className="h-5 w-5 text-blue-600" />
-                                      ) : isBest ? (
-                                        <Trophy className="h-4 w-4 text-amber-500" />
-                                      ) : (
-                                        <Store className="h-4 w-4 text-gray-400" />
-                                      )}
-                                      <span className={`text-sm font-medium ${isSelected ? 'text-blue-800' : ''}`}>
-                                        {alt.supplier_name}
-                                      </span>
-                                      {isBest && !isSelected && (
-                                        <Badge className="bg-amber-100 text-amber-700 text-xs">
-                                          Best Price
-                                        </Badge>
-                                      )}
-                                      {!alt.in_stock && (
-                                        <Badge variant="outline" className="text-xs text-red-500 border-red-200">
-                                          Out of Stock
-                                        </Badge>
-                                      )}
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                      <div className="text-right">
-                                        <p className={`font-semibold ${isSelected ? 'text-blue-700' : isBest ? 'text-green-700' : ''}`}>
-                                          KES {alt.price.toLocaleString()}/unit
-                                        </p>
-                                        {savings > 0 && (
-                                          <p className="text-xs text-green-600">
-                                            Save KES {savings.toLocaleString()}
-                                          </p>
-                                        )}
-                                      </div>
-                                      {!isSelected && alt.in_stock && (
-                                        <Button 
-                                          size="sm" 
-                                          variant="outline"
-                                          className="h-7 text-xs border-blue-300 text-blue-600 hover:bg-blue-50"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleSelectSupplier(item.product_id, alt);
-                                          }}
-                                        >
-                                          Select
-                                        </Button>
-                                      )}
-                                      {isSelected && (
-                                        <Badge className="bg-blue-600 text-white">
-                                          Selected
-                                        </Badge>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                          </div>
-                        )}
-
-                        {/* No alternatives message */}
-                        {isExpanded && item.alternatives.length === 0 && (
-                          <div className="mt-3 pt-3 border-t border-gray-100">
-                            <p className="text-sm text-gray-500 text-center py-2">
-                              No alternative prices found for this item
-                            </p>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            </ScrollArea>
-
-            {/* Summary Footer */}
-            <div className="pt-4 border-t space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600">Current Cart Total:</span>
-                <span className="font-semibold">KES {currentTotal.toLocaleString()}</span>
-              </div>
-              {totalSavings > 0 && (
-                <div className="flex justify-between items-center text-green-600">
-                  <span>Best Possible Total:</span>
-                  <span className="font-bold text-lg">KES {bestTotal.toLocaleString()}</span>
+            {/* Footer */}
+            <div className="border-t p-4 bg-gray-50">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">
+                    <span className="font-medium">Your Selection Total:</span>{' '}
+                    <span className="text-lg font-bold text-gray-900">KES {currentTotal.toLocaleString()}</span>
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1 flex items-center gap-2">
+                    <TrendingDown className="h-3 w-3 text-green-500" />
+                    Green prices = lowest price for that item
+                    <span className="mx-1">·</span>
+                    <CheckCircle2 className="h-3 w-3 text-blue-500" />
+                    Blue = your selection
+                  </p>
                 </div>
-              )}
-              
-              {/* Show selected suppliers count */}
-              {selectedSuppliers.size > 0 && (
-                <div className="flex justify-between items-center bg-blue-50 p-2 rounded-lg border border-blue-200">
-                  <span className="text-blue-700 font-medium">
-                    {selectedSuppliers.size} supplier{selectedSuppliers.size !== 1 ? 's' : ''} selected
-                  </span>
-                  <span className="text-blue-600 text-sm">
-                    New Total: KES {comparisons.reduce((sum, c) => sum + (c.current_price * c.quantity), 0).toLocaleString()}
-                  </span>
-                </div>
-              )}
-              
-              <div className="flex gap-2">
-                {selectedSuppliers.size > 0 ? (
-                  <>
-                    <Button variant="outline" onClick={onClose} className="flex-1">
-                      Cancel
-                    </Button>
-                    <Button 
-                      onClick={handleApplySelections} 
-                      className="flex-1 bg-blue-600 hover:bg-blue-700"
-                    >
-                      <ArrowRight className="h-4 w-4 mr-2" />
-                      Apply Selected Suppliers
-                    </Button>
-                  </>
-                ) : (
-                  <Button onClick={onClose} className="w-full">
-                    <Check className="h-4 w-4 mr-2" />
-                    Done
+                <div className="flex items-center gap-3">
+                  <Button variant="outline" onClick={onClose}>
+                    Cancel
                   </Button>
-                )}
+                  <Button 
+                    onClick={handleApplySelections}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    <ArrowRight className="h-4 w-4 mr-2" />
+                    Apply Selections
+                  </Button>
+                </div>
               </div>
             </div>
           </>
