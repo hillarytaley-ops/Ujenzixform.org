@@ -1839,13 +1839,7 @@ const PrivateClientDashboard = () => {
         isOpen={showProfileView}
         onClose={() => setShowProfileView(false)}
         onEditProfile={() => setShowProfileEdit(true)}
-        onSignOut={() => {
-          // Full sign out from app
-          localStorage.clear();
-          sessionStorage.clear();
-          supabase.auth.signOut();
-          navigate('/auth');
-        }}
+        onExitDashboard={() => navigate('/home')}
       />
 
       {/* Profile Edit Dialog */}

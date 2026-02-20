@@ -30,14 +30,14 @@ interface ProfileViewDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onEditProfile?: () => void;
-  onSignOut: () => void;
+  onExitDashboard: () => void;
 }
 
 export const ProfileViewDialog: React.FC<ProfileViewDialogProps> = ({
   isOpen,
   onClose,
   onEditProfile,
-  onSignOut
+  onExitDashboard
 }) => {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -228,12 +228,15 @@ export const ProfileViewDialog: React.FC<ProfileViewDialogProps> = ({
                 </Button>
               )}
               <Button 
-                variant="destructive" 
-                className="flex-1"
-                onClick={onSignOut}
+                variant="outline" 
+                className="flex-1 border-orange-300 text-orange-600 hover:bg-orange-50"
+                onClick={() => {
+                  onClose();
+                  onExitDashboard();
+                }}
               >
                 <LogOut className="h-4 w-4 mr-2" />
-                Sign Out
+                Exit Dashboard
               </Button>
             </div>
           </div>
