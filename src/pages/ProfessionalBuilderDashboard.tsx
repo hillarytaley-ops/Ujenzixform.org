@@ -62,8 +62,9 @@ import { PendingQuoteRequests } from "@/components/builders/PendingQuoteRequests
 import DeliveryRequest from "@/components/DeliveryRequest";
 import { InAppCommunication } from "@/components/communication/InAppCommunication";
 import { TrackingTab } from "@/components/tracking/TrackingTab";
-import { Navigation as NavigationIcon, Settings } from "lucide-react";
+import { Navigation as NavigationIcon, Settings, QrCode } from "lucide-react";
 import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
+import { ProfileViewDialog } from "@/components/profile/ProfileViewDialog";
 import { ProjectDetails } from "@/components/projects/ProjectDetails";
 
 const ProfessionalBuilderDashboardPage = () => {
@@ -73,6 +74,7 @@ const ProfessionalBuilderDashboardPage = () => {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showProfileEdit, setShowProfileEdit] = useState(false);
+  const [showProfileView, setShowProfileView] = useState(false);
   const [stats, setStats] = useState({
     activeProjects: 0,
     pendingOrders: 0,
@@ -1029,17 +1031,37 @@ const ProfessionalBuilderDashboardPage = () => {
                   Order Materials
                 </Button>
               </Link>
+              <Link to="/delivery">
+                <Button variant="outline" className="border-white/30 text-white hover:bg-white/10">
+                  <Truck className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">Delivery</span>
+                </Button>
+              </Link>
+              <Link to="/scanners">
+                <Button variant="outline" className="border-white/30 text-white hover:bg-white/10">
+                  <QrCode className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">Scanners</span>
+                </Button>
+              </Link>
+              <Link to="/tracking">
+                <Button variant="outline" className="border-white/30 text-white hover:bg-white/10">
+                  <NavigationIcon className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">Tracking</span>
+                </Button>
+              </Link>
+              <Link to="/monitoring">
+                <Button variant="outline" className="border-white/30 text-white hover:bg-white/10">
+                  <Video className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">Monitoring</span>
+                </Button>
+              </Link>
               <Button 
                 variant="outline" 
                 className="border-white/30 text-white hover:bg-white/10"
-                onClick={() => setShowProfileEdit(true)}
+                onClick={() => setShowProfileView(true)}
               >
-                <Settings className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Edit Profile</span>
-              </Button>
-              <Button variant="outline" className="border-white/30 text-white hover:bg-white/10" onClick={handleExitDashboard}>
-                <LogOut className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Exit Dashboard</span>
+                <User className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Profile</span>
               </Button>
             </div>
           </div>
@@ -2378,6 +2400,20 @@ const ProfessionalBuilderDashboardPage = () => {
       </div>
 
       <Footer />
+
+      {/* Profile View Dialog */}
+      <ProfileViewDialog
+        isOpen={showProfileView}
+        onClose={() => setShowProfileView(false)}
+        onEditProfile={() => setShowProfileEdit(true)}
+        onSignOut={() => {
+          // Full sign out from app
+          localStorage.clear();
+          sessionStorage.clear();
+          supabase.auth.signOut();
+          navigate('/auth');
+        }}
+      />
 
       {/* Profile Edit Dialog */}
       <ProfileEditDialog

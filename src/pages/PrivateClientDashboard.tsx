@@ -51,6 +51,7 @@ import { MonitoringServicePrompt } from "@/components/builders/MonitoringService
 import { TrackingTab } from "@/components/tracking/TrackingTab";
 import { BuilderOrdersTracker } from "@/components/builders/BuilderOrdersTracker";
 import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
+import { ProfileViewDialog } from "@/components/profile/ProfileViewDialog";
 import { Navigation as NavigationIcon, QrCode, Settings } from "lucide-react";
 
 interface Order {
@@ -87,6 +88,7 @@ const PrivateClientDashboard = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [deliveries, setDeliveries] = useState<DeliveryRequest[]>([]);
   const [showProfileEdit, setShowProfileEdit] = useState(false);
+  const [showProfileView, setShowProfileView] = useState(false);
   const [stats, setStats] = useState({
     totalOrders: 0,
     pendingOrders: 0,
@@ -680,21 +682,37 @@ const PrivateClientDashboard = () => {
                   Shop Materials
                 </Button>
               </Link>
+              <Link to="/delivery">
+                <Button variant="outline" className="bg-white/20 border-white text-white hover:bg-white/30">
+                  <Truck className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">Delivery</span>
+                </Button>
+              </Link>
+              <Link to="/scanners">
+                <Button variant="outline" className="bg-white/20 border-white text-white hover:bg-white/30">
+                  <QrCode className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">Scanners</span>
+                </Button>
+              </Link>
+              <Link to="/tracking">
+                <Button variant="outline" className="bg-white/20 border-white text-white hover:bg-white/30">
+                  <NavigationIcon className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">Tracking</span>
+                </Button>
+              </Link>
+              <Link to="/monitoring">
+                <Button variant="outline" className="bg-white/20 border-white text-white hover:bg-white/30">
+                  <Video className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">Monitoring</span>
+                </Button>
+              </Link>
               <Button 
                 variant="outline" 
                 className="bg-white/20 border-white text-white hover:bg-white/30 font-medium"
-                onClick={() => setShowProfileEdit(true)}
+                onClick={() => setShowProfileView(true)}
               >
-                <Settings className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Edit Profile</span>
-              </Button>
-              <Button 
-                variant="outline" 
-                className="bg-white/20 border-white text-white hover:bg-white/30 font-medium"
-                onClick={handleExitDashboard}
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Exit Dashboard</span>
+                <User className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Profile</span>
               </Button>
             </div>
           </div>
@@ -1815,6 +1833,20 @@ const PrivateClientDashboard = () => {
           }}
         />
       )}
+
+      {/* Profile View Dialog */}
+      <ProfileViewDialog
+        isOpen={showProfileView}
+        onClose={() => setShowProfileView(false)}
+        onEditProfile={() => setShowProfileEdit(true)}
+        onSignOut={() => {
+          // Full sign out from app
+          localStorage.clear();
+          sessionStorage.clear();
+          supabase.auth.signOut();
+          navigate('/auth');
+        }}
+      />
 
       {/* Profile Edit Dialog */}
       <ProfileEditDialog
