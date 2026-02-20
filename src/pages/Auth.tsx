@@ -1,4 +1,4 @@
-// Auth Page - Build v11 - Auto-redirect users with roles to their dashboards
+// Auth Page - Build v14 - iPhone Safari fix for form clearing + controlled inputs
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 
-console.log('🔐 Auth.tsx BUILD v12 - Mobile-friendly with safety timeouts Feb 21 2026');
+console.log('🔐 Auth.tsx BUILD v14 - iPhone Safari fix with controlled inputs Feb 21 2026');
 
 // Helper function to get dashboard path based on role
 const getDashboardForRole = (role: string): string => {
@@ -54,7 +54,15 @@ const Auth = () => {
   const [shouldRedirect, setShouldRedirect] = useState<string | null>(null);
   const [existingSession, setExistingSession] = useState<Session | null>(null);
   const [checkingSession, setCheckingSession] = useState(true);
+  
+  // Controlled form inputs - prevents Safari from clearing form on state changes
+  const [signInEmail, setSignInEmail] = useState("");
+  const [signInPassword, setSignInPassword] = useState("");
+  const [signUpEmail, setSignUpEmail] = useState("");
+  const [signUpPassword, setSignUpPassword] = useState("");
+  
   const hasSignedIn = useRef(false); // Track if user explicitly signed in this session
+  const isSubmitting = useRef(false); // Prevent double submissions on iOS
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -308,17 +316,38 @@ const Auth = () => {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>, isSignUp: boolean) => {
     e.preventDefault();
+    
+    // Prevent double submissions on iOS Safari
+    if (isSubmitting.current) {
+      console.log('🔐 Already submitting, ignoring duplicate');
+      return;
+    }
+    isSubmitting.current = true;
     setLoading(true);
     
-    // Safety timeout - reset loading after 3 seconds no matter what
+    // Use controlled state values instead of FormData (fixes iOS Safari form clearing)
+    const email = isSignUp ? signUpEmail : signInEmail;
+    const password = isSignUp ? signUpPassword : signInPassword;
+    
+    // Validate before proceeding
+    if (!email || !password) {
+      console.log('🔐 Missing email or password');
+      setLoading(false);
+      isSubmitting.current = false;
+      toast({
+        variant: "destructive",
+        title: "Missing credentials",
+        description: "Please enter both email and password."
+      });
+      return;
+    }
+    
+    // Safety timeout - reset loading after 8 seconds (longer for slow mobile connections)
     const safetyTimeout = setTimeout(() => {
       console.log('🔐 Safety timeout triggered - resetting loading state');
       setLoading(false);
-    }, 3000);
-
-    const formData = new FormData(e.currentTarget);
-    const email = formData.get("email") as string;
-    const password = formData.get("password") as string;
+      isSubmitting.current = false;
+    }, 8000);
 
     try {
       console.log('🔐 Attempting', isSignUp ? 'signup' : 'signin', 'for:', email);
@@ -331,6 +360,7 @@ const Auth = () => {
 
       if (result.error) {
         setLoading(false); // Reset loading on error
+        isSubmitting.current = false;
         hasSignedIn.current = false;
         const error = result.error;
         console.error('🔐 Auth error:', error.message);
@@ -367,6 +397,7 @@ const Auth = () => {
       
       if (isSignUp) {
         setLoading(false); // Reset loading after signup
+        isSubmitting.current = false;
         if ('needsConfirmation' in result && result.needsConfirmation) {
           toast({
             title: "📧 Check your email",
@@ -377,7 +408,9 @@ const Auth = () => {
             title: "✅ Account created!",
             description: "Welcome to UjenziXform! Taking you to home...",
           });
-          // Redirect immediately for signup
+          // Clear form and redirect immediately for signup
+          setSignUpEmail("");
+          setSignUpPassword("");
           const target = redirectTo || '/home';
           console.log('🔐 REDIRECTING after signup to:', target);
           window.location.href = target;
@@ -388,6 +421,11 @@ const Auth = () => {
       // ✅ Successful sign in - check for role and redirect to appropriate dashboard
       toast({ title: "✅ Welcome back!", description: "Redirecting..." });
       setLoading(false);
+      isSubmitting.current = false;
+      
+      // Clear form after successful sign in
+      setSignInEmail("");
+      setSignInPassword("");
       
       // Set a fallback redirect timeout - don't hang on slow connections
       const redirectTimeout = setTimeout(() => {
@@ -433,6 +471,7 @@ const Auth = () => {
       console.error('🔐 Auth exception:', error);
       clearTimeout(safetyTimeout);
       setLoading(false);
+      isSubmitting.current = false;
       hasSignedIn.current = false;
       toast({
         variant: "destructive",
@@ -561,7 +600,11 @@ const Auth = () => {
                       name="email"
                       type="email"
                       placeholder="Enter your email"
+                      value={signInEmail}
+                      onChange={(e) => setSignInEmail(e.target.value)}
+                      autoComplete="email"
                       required
+                      disabled={loading}
                     />
                   </div>
                   <div className="space-y-2">
@@ -571,12 +614,20 @@ const Auth = () => {
                       name="password"
                       type="password"
                       placeholder="Enter your password"
+                      value={signInPassword}
+                      onChange={(e) => setSignInPassword(e.target.value)}
                       autoComplete="current-password"
                       required
+                      disabled={loading}
                     />
                   </div>
-                  <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? "Signing in..." : "Sign In"}
+                  <Button type="submit" className="w-full" disabled={loading || !signInEmail || !signInPassword}>
+                    {loading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Signing in...
+                      </>
+                    ) : "Sign In"}
                   </Button>
                 </form>
                 
@@ -643,10 +694,12 @@ const Auth = () => {
                       name="email"
                       type="email"
                       placeholder="john@example.com"
+                      value={signUpEmail}
+                      onChange={(e) => setSignUpEmail(e.target.value)}
                       required
-                      autoFocus
                       autoComplete="email"
                       className="h-14 text-lg"
+                      disabled={loading}
                     />
                   </div>
                   
@@ -657,10 +710,13 @@ const Auth = () => {
                       name="password"
                       type="password"
                       placeholder="At least 8 characters"
+                      value={signUpPassword}
+                      onChange={(e) => setSignUpPassword(e.target.value)}
                       required
                       minLength={8}
                       autoComplete="new-password"
                       className="h-14 text-lg"
+                      disabled={loading}
                     />
                   </div>
 
@@ -677,7 +733,7 @@ const Auth = () => {
                   <Button 
                     type="submit" 
                     className="w-full h-16 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold text-lg shadow-xl" 
-                    disabled={loading}
+                    disabled={loading || !signUpEmail || !signUpPassword || signUpPassword.length < 8}
                   >
                     {loading ? (
                       <>
