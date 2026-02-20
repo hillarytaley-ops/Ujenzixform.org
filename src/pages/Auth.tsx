@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 
-console.log('🔐 Auth.tsx BUILD v9 - Auto-redirect users with roles Feb 20 2026');
+console.log('🔐 Auth.tsx BUILD v10 - Auto-redirect users with roles to dashboards Feb 20 2026');
 
 // Helper function to get dashboard path based on role
 const getDashboardForRole = (role: string): string => {
