@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 
-console.log('🔐 Auth.tsx BUILD v14 - iPhone Safari fix with controlled inputs Feb 21 2026');
+console.log('🔐 Auth.tsx BUILD v15 - Users with roles ALWAYS go to dashboards Feb 21 2026');
 
 // Helper function to get dashboard path based on role
 const getDashboardForRole = (role: string): string => {
@@ -163,9 +163,17 @@ const Auth = () => {
       // This prevents auto-redirect when user wants to sign in as different account
       if (hasSignedIn.current && session?.user && event === 'SIGNED_IN') {
         // Set a timeout for role check - don't hang on slow connections
+        // Try to use cached role from localStorage if available
         const roleCheckTimeout = setTimeout(() => {
-          console.log('🔐 Role check timeout - redirecting to home');
-          window.location.href = redirectTo || '/home';
+          const cachedRole = localStorage.getItem('user_role');
+          if (cachedRole) {
+            const dashboardPath = getDashboardForRole(cachedRole);
+            console.log('🔐 Role check timeout - using cached role:', cachedRole, '- Redirecting to:', dashboardPath);
+            window.location.href = dashboardPath;
+          } else {
+            console.log('🔐 Role check timeout - no cached role, redirecting to home');
+            window.location.href = '/home';
+          }
         }, 5000);
         
         // Check if user has a role and redirect to their dashboard
@@ -181,10 +189,11 @@ const Auth = () => {
           
           if (roleData?.role) {
             const dashboardPath = getDashboardForRole(roleData.role);
-            console.log('🔐 Auth event: User has role:', roleData.role, '- Redirecting to:', dashboardPath);
+            console.log('🔐 Auth event: User has role:', roleData.role, '- Redirecting to dashboard:', dashboardPath);
             localStorage.setItem('user_role', roleData.role);
             localStorage.setItem('user_role_id', session.user.id);
-            window.location.href = redirectTo || dashboardPath;
+            // ALWAYS redirect to dashboard if user has a role (ignore redirectTo)
+            window.location.href = dashboardPath;
             return;
           }
         } catch (error) {
@@ -192,9 +201,9 @@ const Auth = () => {
           clearTimeout(roleCheckTimeout);
         }
         
-        // Fallback to home if no role found
+        // Fallback to home if no role found (use redirectTo only for users without roles)
         const target = redirectTo || '/home';
-        console.log('🔐 REDIRECTING after explicit sign-in to:', target);
+        console.log('🔐 No role found - REDIRECTING to:', target);
         window.location.href = target;
       }
     });
@@ -428,9 +437,17 @@ const Auth = () => {
       setSignInPassword("");
       
       // Set a fallback redirect timeout - don't hang on slow connections
+      // Try to use cached role from localStorage if available
       const redirectTimeout = setTimeout(() => {
-        console.log('🔐 Role check timeout - redirecting to home');
-        window.location.href = redirectTo || '/home';
+        const cachedRole = localStorage.getItem('user_role');
+        if (cachedRole) {
+          const dashboardPath = getDashboardForRole(cachedRole);
+          console.log('🔐 Role check timeout - using cached role:', cachedRole, '- Redirecting to:', dashboardPath);
+          window.location.href = dashboardPath;
+        } else {
+          console.log('🔐 Role check timeout - no cached role, redirecting to home');
+          window.location.href = '/home';
+        }
       }, 5000);
       
       // Check if user has a role and redirect to their dashboard
@@ -448,10 +465,11 @@ const Auth = () => {
           
           if (roleData?.role) {
             const dashboardPath = getDashboardForRole(roleData.role);
-            console.log('🔐 User has role:', roleData.role, '- Redirecting to:', dashboardPath);
+            console.log('🔐 User has role:', roleData.role, '- Redirecting to dashboard:', dashboardPath);
             localStorage.setItem('user_role', roleData.role);
             localStorage.setItem('user_role_id', currentUser.id);
-            window.location.href = redirectTo || dashboardPath;
+            // ALWAYS redirect to dashboard if user has a role (ignore redirectTo)
+            window.location.href = dashboardPath;
             return;
           }
         } else {
@@ -462,9 +480,9 @@ const Auth = () => {
         clearTimeout(redirectTimeout);
       }
       
-      // Fallback: Redirect to home if no role found
+      // Fallback: Redirect to home if no role found (use redirectTo only for users without roles)
       const target = redirectTo || '/home';
-      console.log('🔐 REDIRECTING NOW to:', target);
+      console.log('🔐 No role found - REDIRECTING to:', target);
       window.location.href = target;
       
     } catch (error: any) {
