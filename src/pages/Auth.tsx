@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 
-console.log('🔐 Auth.tsx BUILD v11 - Auto-redirect users with roles to dashboards Feb 21 2026');
+console.log('🔐 Auth.tsx BUILD v12 - Mobile-friendly with safety timeouts Feb 21 2026');
 
 // Helper function to get dashboard path based on role
 const getDashboardForRole = (role: string): string => {
@@ -77,52 +77,73 @@ const Auth = () => {
 
   // Check for existing session on mount - AUTO-REDIRECT users with roles to their dashboards
   useEffect(() => {
+    // Safety timeout - ensure checkingSession is set to false after 3 seconds max
+    // This prevents the page from hanging on slow mobile connections
+    const safetyTimeout = setTimeout(() => {
+      console.log('🔐 Safety timeout - showing auth form');
+      setCheckingSession(false);
+    }, 3000);
+
     const checkExistingSession = async () => {
       // If force logout requested, sign out first
       if (forceLogout) {
         console.log('🔐 Force logout requested');
-        await supabase.auth.signOut();
+        try {
+          await supabase.auth.signOut();
+        } catch (e) {
+          console.log('🔐 Sign out error (ignored):', e);
+        }
         // Remove the logout param from URL
         window.history.replaceState({}, '', window.location.pathname);
+        clearTimeout(safetyTimeout);
         setCheckingSession(false);
         return;
       }
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        console.log('🔐 Existing session found:', session.user.email);
-        setExistingSession(session);
-        setUser(session.user);
-        
-        // Check if user has a role and auto-redirect to their dashboard
-        try {
-          const { data: roleData, error: roleError } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', session.user.id)
-            .limit(1)
-            .maybeSingle();
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          console.log('🔐 Existing session found:', session.user.email);
+          setExistingSession(session);
+          setUser(session.user);
           
-          if (!roleError && roleData?.role) {
-            const dashboardPath = getDashboardForRole(roleData.role);
-            console.log('🔐 User has role:', roleData.role, '- Redirecting to:', dashboardPath);
-            // Save role to localStorage for instant access
-            localStorage.setItem('user_role', roleData.role);
-            localStorage.setItem('user_role_id', session.user.id);
-            // Redirect to appropriate dashboard
-            window.location.href = dashboardPath;
-            return;
-          } else {
-            console.log('🔐 No role found for user, staying on auth page');
+          // Check if user has a role and auto-redirect to their dashboard
+          try {
+            const { data: roleData, error: roleError } = await supabase
+              .from('user_roles')
+              .select('role')
+              .eq('user_id', session.user.id)
+              .limit(1)
+              .maybeSingle();
+            
+            if (!roleError && roleData?.role) {
+              const dashboardPath = getDashboardForRole(roleData.role);
+              console.log('🔐 User has role:', roleData.role, '- Redirecting to:', dashboardPath);
+              // Save role to localStorage for instant access
+              localStorage.setItem('user_role', roleData.role);
+              localStorage.setItem('user_role_id', session.user.id);
+              // Redirect to appropriate dashboard
+              clearTimeout(safetyTimeout);
+              window.location.href = dashboardPath;
+              return;
+            } else {
+              console.log('🔐 No role found for user, staying on auth page');
+            }
+          } catch (error) {
+            console.error('🔐 Error checking user role:', error);
           }
-        } catch (error) {
-          console.error('🔐 Error checking user role:', error);
         }
+      } catch (sessionError) {
+        console.error('🔐 Error getting session:', sessionError);
       }
+      
+      clearTimeout(safetyTimeout);
       setCheckingSession(false);
     };
     
     checkExistingSession();
+    
+    return () => clearTimeout(safetyTimeout);
   }, [forceLogout]);
 
   // Listen for auth state changes - ONLY redirect on explicit SIGNED_IN event
@@ -133,6 +154,12 @@ const Auth = () => {
       // ONLY redirect on explicit sign-in, NOT on INITIAL_SESSION
       // This prevents auto-redirect when user wants to sign in as different account
       if (hasSignedIn.current && session?.user && event === 'SIGNED_IN') {
+        // Set a timeout for role check - don't hang on slow connections
+        const roleCheckTimeout = setTimeout(() => {
+          console.log('🔐 Role check timeout - redirecting to home');
+          window.location.href = redirectTo || '/home';
+        }, 5000);
+        
         // Check if user has a role and redirect to their dashboard
         try {
           const { data: roleData } = await supabase
@@ -141,6 +168,8 @@ const Auth = () => {
             .eq('user_id', session.user.id)
             .limit(1)
             .maybeSingle();
+          
+          clearTimeout(roleCheckTimeout);
           
           if (roleData?.role) {
             const dashboardPath = getDashboardForRole(roleData.role);
@@ -152,6 +181,7 @@ const Auth = () => {
           }
         } catch (error) {
           console.error('🔐 Auth event: Error checking role:', error);
+          clearTimeout(roleCheckTimeout);
         }
         
         // Fallback to home if no role found
@@ -359,6 +389,12 @@ const Auth = () => {
       toast({ title: "✅ Welcome back!", description: "Redirecting..." });
       setLoading(false);
       
+      // Set a fallback redirect timeout - don't hang on slow connections
+      const redirectTimeout = setTimeout(() => {
+        console.log('🔐 Role check timeout - redirecting to home');
+        window.location.href = redirectTo || '/home';
+      }, 5000);
+      
       // Check if user has a role and redirect to their dashboard
       try {
         const { data: { user: currentUser } } = await supabase.auth.getUser();
@@ -370,6 +406,8 @@ const Auth = () => {
             .limit(1)
             .maybeSingle();
           
+          clearTimeout(redirectTimeout);
+          
           if (roleData?.role) {
             const dashboardPath = getDashboardForRole(roleData.role);
             console.log('🔐 User has role:', roleData.role, '- Redirecting to:', dashboardPath);
@@ -378,9 +416,12 @@ const Auth = () => {
             window.location.href = redirectTo || dashboardPath;
             return;
           }
+        } else {
+          clearTimeout(redirectTimeout);
         }
       } catch (error) {
         console.error('🔐 Error checking role on sign in:', error);
+        clearTimeout(redirectTimeout);
       }
       
       // Fallback: Redirect to home if no role found
