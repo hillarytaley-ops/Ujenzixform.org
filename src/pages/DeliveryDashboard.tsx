@@ -56,7 +56,6 @@ import { MessageSquare, User, QrCode, Scan } from "lucide-react";
 import { InAppCommunication } from "@/components/communication/InAppCommunication";
 import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
 import { ProfileViewDialog } from "@/components/profile/ProfileViewDialog";
-import { DispatchScanner } from "@/components/qr/DispatchScanner";
 import { ReceivingScanner } from "@/components/qr/ReceivingScanner";
 
 interface DashboardStats {
@@ -1159,64 +1158,58 @@ const DeliveryDashboard = () => {
               <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'}>
                 <CardHeader>
                   <CardTitle className={`flex items-center gap-2 ${isDarkMode ? 'text-white' : ''}`}>
-                    <QrCode className="h-5 w-5 text-cyan-500" />
-                    Material Scanning
+                    <QrCode className="h-5 w-5 text-green-500" />
+                    Delivery Receiving Scanner
                   </CardTitle>
                   <CardDescription className={isDarkMode ? 'text-gray-400' : ''}>
-                    Scan QR codes when picking up and delivering materials to verify and track orders
+                    Scan QR codes when receiving materials from suppliers and delivering to customers
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid md:grid-cols-2 gap-6">
-                    {/* Receiving Scanner - When picking up from supplier */}
-                    <div className={`p-4 rounded-lg border-2 ${isDarkMode ? 'border-green-800 bg-green-900/20' : 'border-green-200 bg-green-50'}`}>
-                      <div className="flex items-center gap-2 mb-3">
-                        <div className="p-2 bg-green-500 rounded-lg">
-                          <Scan className="h-5 w-5 text-white" />
-                        </div>
-                        <div>
-                          <h3 className={`font-semibold ${isDarkMode ? 'text-white' : ''}`}>Pickup Scanner</h3>
-                          <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Scan when collecting from supplier</p>
-                        </div>
+                  {/* Receiving Scanner - For delivery providers */}
+                  <div className={`p-4 rounded-lg border-2 ${isDarkMode ? 'border-green-800 bg-green-900/20' : 'border-green-200 bg-green-50'}`}>
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="p-2 bg-green-500 rounded-lg">
+                        <Scan className="h-5 w-5 text-white" />
                       </div>
-                      <ReceivingScanner />
-                    </div>
-
-                    {/* Dispatch Scanner - When delivering to customer */}
-                    <div className={`p-4 rounded-lg border-2 ${isDarkMode ? 'border-cyan-800 bg-cyan-900/20' : 'border-cyan-200 bg-cyan-50'}`}>
-                      <div className="flex items-center gap-2 mb-3">
-                        <div className="p-2 bg-cyan-500 rounded-lg">
-                          <QrCode className="h-5 w-5 text-white" />
-                        </div>
-                        <div>
-                          <h3 className={`font-semibold ${isDarkMode ? 'text-white' : ''}`}>Delivery Scanner</h3>
-                          <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Scan when delivering to customer</p>
-                        </div>
+                      <div>
+                        <h3 className={`font-semibold ${isDarkMode ? 'text-white' : ''}`}>Receiving Scanner</h3>
+                        <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                          Scan to confirm material pickup and delivery
+                        </p>
                       </div>
-                      <DispatchScanner />
                     </div>
+                    <ReceivingScanner />
                   </div>
 
                   {/* Scanning Instructions */}
                   <div className={`mt-6 p-4 rounded-lg ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
-                    <h4 className={`font-semibold mb-3 ${isDarkMode ? 'text-white' : ''}`}>📋 How to Scan</h4>
-                    <div className="grid md:grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <p className={`font-medium text-green-600 mb-1`}>Pickup (Receiving):</p>
+                    <h4 className={`font-semibold mb-3 ${isDarkMode ? 'text-white' : ''}`}>📋 How to Use the Scanner</h4>
+                    <div className="grid md:grid-cols-2 gap-6 text-sm">
+                      <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-green-900/30' : 'bg-green-50'}`}>
+                        <p className={`font-medium text-green-600 mb-2 flex items-center gap-2`}>
+                          <Package className="h-4 w-4" />
+                          When Picking Up from Supplier:
+                        </p>
                         <ol className={`list-decimal list-inside space-y-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
                           <li>Arrive at supplier location</li>
-                          <li>Verify materials match order</li>
+                          <li>Verify materials match the order</li>
                           <li>Scan QR code on package/invoice</li>
+                          <li>Check material condition</li>
                           <li>Confirm pickup in app</li>
                         </ol>
                       </div>
-                      <div>
-                        <p className={`font-medium text-cyan-600 mb-1`}>Delivery (Dispatch):</p>
+                      <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-teal-900/30' : 'bg-teal-50'}`}>
+                        <p className={`font-medium text-teal-600 mb-2 flex items-center gap-2`}>
+                          <Truck className="h-4 w-4" />
+                          When Delivering to Customer:
+                        </p>
                         <ol className={`list-decimal list-inside space-y-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                          <li>Arrive at customer location</li>
+                          <li>Arrive at delivery location</li>
                           <li>Hand over materials to customer</li>
                           <li>Scan QR code for delivery proof</li>
                           <li>Get customer signature if needed</li>
+                          <li>Take photo proof of delivery</li>
                         </ol>
                       </div>
                     </div>
