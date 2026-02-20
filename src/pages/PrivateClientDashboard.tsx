@@ -6,7 +6,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { 
   ShoppingBag, 
@@ -658,7 +657,7 @@ const PrivateClientDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50">
-      <Navigation />
+      {/* Navigation hidden in dashboard - use Exit Dashboard to access main navigation */}
       
       {/* Header */}
       <div className="bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 text-white py-8 px-4">

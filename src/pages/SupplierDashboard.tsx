@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
-import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -967,7 +966,7 @@ const SupplierDashboard = () => {
 
   return (
     <div className={`min-h-screen ${bgMain}`}>
-      <Navigation />
+      {/* Navigation hidden in dashboard - use Exit Dashboard to access main navigation */}
 
       {/* Hero Section */}
       <section className="bg-gradient-to-r from-orange-600 to-amber-600 text-white py-8">

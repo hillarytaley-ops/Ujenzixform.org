@@ -7,7 +7,6 @@ import { useNavigate, Link } from "react-router-dom";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { 
   HardHat, 
@@ -1007,7 +1006,7 @@ const ProfessionalBuilderDashboardPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-slate-50">
-      <Navigation />
+      {/* Navigation hidden in dashboard - use Exit Dashboard to access main navigation */}
       
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-slate-700 text-white py-8 px-4">
