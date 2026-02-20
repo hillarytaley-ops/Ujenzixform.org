@@ -52,10 +52,12 @@ import { DeliveryRequestCard } from "@/components/delivery/DeliveryRequestCard";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
 import { useDeliveryProviderData, logDataAccessAttempt } from "@/hooks/useDataIsolation";
-import { MessageSquare, User } from "lucide-react";
+import { MessageSquare, User, QrCode, Scan } from "lucide-react";
 import { InAppCommunication } from "@/components/communication/InAppCommunication";
 import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
 import { ProfileViewDialog } from "@/components/profile/ProfileViewDialog";
+import { DispatchScanner } from "@/components/qr/DispatchScanner";
+import { ReceivingScanner } from "@/components/qr/ReceivingScanner";
 
 interface DashboardStats {
   totalDeliveries: number;
@@ -755,11 +757,21 @@ const DeliveryDashboard = () => {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid md:grid-cols-5 gap-4 mb-8">
+        <div className="grid md:grid-cols-6 gap-4 mb-8">
           <Button className="h-auto py-4 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600">
             <div className="flex flex-col items-center gap-2">
               <NavigationIcon className="h-6 w-6" />
               <span>Start Navigation</span>
+            </div>
+          </Button>
+          <Button 
+            variant="outline" 
+            className={`h-auto py-4 border-2 ${isDarkMode ? 'border-cyan-600 bg-cyan-900/20 hover:bg-cyan-900/40' : 'border-cyan-300 bg-cyan-50 hover:bg-cyan-100'}`}
+            onClick={() => setActiveTab('scanning')}
+          >
+            <div className="flex flex-col items-center gap-2">
+              <Scan className="h-6 w-6 text-cyan-600" />
+              <span>Scan QR</span>
             </div>
           </Button>
           <Button variant="outline" className={`h-auto py-4 border-2 ${isDarkMode ? 'border-gray-600 hover:bg-gray-800' : 'hover:bg-teal-50'}`}>
@@ -827,6 +839,10 @@ const DeliveryDashboard = () => {
                   {pendingNotificationCount > 0 ? pendingNotificationCount : notificationCount}
                 </Badge>
               )}
+            </TabsTrigger>
+            <TabsTrigger value="scanning" className="data-[state=active]:bg-cyan-500 data-[state=active]:text-white">
+              <Scan className="h-4 w-4 mr-1" />
+              Scanning
             </TabsTrigger>
             <TabsTrigger value="support" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white">
               <Headphones className="h-4 w-4 mr-1" />
@@ -1135,6 +1151,79 @@ const DeliveryDashboard = () => {
               userId={user?.id || ''}
               onNotificationClick={(notification) => console.log('Notification clicked:', notification)}
             />
+          </TabsContent>
+
+          {/* Scanning Tab */}
+          <TabsContent value="scanning">
+            <div className="space-y-6">
+              <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'}>
+                <CardHeader>
+                  <CardTitle className={`flex items-center gap-2 ${isDarkMode ? 'text-white' : ''}`}>
+                    <QrCode className="h-5 w-5 text-cyan-500" />
+                    Material Scanning
+                  </CardTitle>
+                  <CardDescription className={isDarkMode ? 'text-gray-400' : ''}>
+                    Scan QR codes when picking up and delivering materials to verify and track orders
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid md:grid-cols-2 gap-6">
+                    {/* Receiving Scanner - When picking up from supplier */}
+                    <div className={`p-4 rounded-lg border-2 ${isDarkMode ? 'border-green-800 bg-green-900/20' : 'border-green-200 bg-green-50'}`}>
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="p-2 bg-green-500 rounded-lg">
+                          <Scan className="h-5 w-5 text-white" />
+                        </div>
+                        <div>
+                          <h3 className={`font-semibold ${isDarkMode ? 'text-white' : ''}`}>Pickup Scanner</h3>
+                          <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Scan when collecting from supplier</p>
+                        </div>
+                      </div>
+                      <ReceivingScanner />
+                    </div>
+
+                    {/* Dispatch Scanner - When delivering to customer */}
+                    <div className={`p-4 rounded-lg border-2 ${isDarkMode ? 'border-cyan-800 bg-cyan-900/20' : 'border-cyan-200 bg-cyan-50'}`}>
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="p-2 bg-cyan-500 rounded-lg">
+                          <QrCode className="h-5 w-5 text-white" />
+                        </div>
+                        <div>
+                          <h3 className={`font-semibold ${isDarkMode ? 'text-white' : ''}`}>Delivery Scanner</h3>
+                          <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Scan when delivering to customer</p>
+                        </div>
+                      </div>
+                      <DispatchScanner />
+                    </div>
+                  </div>
+
+                  {/* Scanning Instructions */}
+                  <div className={`mt-6 p-4 rounded-lg ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                    <h4 className={`font-semibold mb-3 ${isDarkMode ? 'text-white' : ''}`}>📋 How to Scan</h4>
+                    <div className="grid md:grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className={`font-medium text-green-600 mb-1`}>Pickup (Receiving):</p>
+                        <ol className={`list-decimal list-inside space-y-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                          <li>Arrive at supplier location</li>
+                          <li>Verify materials match order</li>
+                          <li>Scan QR code on package/invoice</li>
+                          <li>Confirm pickup in app</li>
+                        </ol>
+                      </div>
+                      <div>
+                        <p className={`font-medium text-cyan-600 mb-1`}>Delivery (Dispatch):</p>
+                        <ol className={`list-decimal list-inside space-y-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                          <li>Arrive at customer location</li>
+                          <li>Hand over materials to customer</li>
+                          <li>Scan QR code for delivery proof</li>
+                          <li>Get customer signature if needed</li>
+                        </ol>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           {/* Support Tab */}
