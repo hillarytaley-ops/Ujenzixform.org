@@ -703,13 +703,17 @@ const PrivateClientDashboard = () => {
               </Link>
               <Button 
                 variant="outline" 
-                className="border-white/30 text-white hover:bg-white/10"
+                className="bg-white/20 border-white text-white hover:bg-white/30 font-medium"
                 onClick={() => setShowProfileEdit(true)}
               >
                 <Settings className="h-4 w-4 mr-2" />
                 <span className="hidden sm:inline">Edit Profile</span>
               </Button>
-              <Button variant="outline" className="border-white/30 text-white hover:bg-white/10" onClick={handleSignOut}>
+              <Button 
+                variant="outline" 
+                className="bg-red-500/80 border-red-400 text-white hover:bg-red-600 font-medium"
+                onClick={handleSignOut}
+              >
                 <LogOut className="h-4 w-4 mr-2" />
                 <span className="hidden sm:inline">Sign Out</span>
               </Button>
