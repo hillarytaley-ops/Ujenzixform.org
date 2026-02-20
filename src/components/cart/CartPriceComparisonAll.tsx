@@ -1,21 +1,23 @@
 /**
  * ╔══════════════════════════════════════════════════════════════════════════════════════╗
  * ║                                                                                      ║
- * ║   💰 CART PRICE COMPARISON - SIMPLE & CLEAN VERSION                                  ║
+ * ║   💰 UNIFIED PRICE COMPARISON & QUOTE REQUEST                                        ║
  * ║                                                                                      ║
- * ║   UPDATED: February 21, 2026 - Simplified for better UX                              ║
- * ║   - Clean table with clear prices                                                    ║
- * ║   - Easy to read and compare                                                         ║
- * ║   - One-click supplier selection                                                     ║
+ * ║   UPDATED: February 21, 2026 - Combined Compare + Quote Request into ONE dialog     ║
+ * ║   - Shows prices from all suppliers in a simple table                               ║
+ * ║   - Professional Builders: Select suppliers → Request Quotes                        ║
+ * ║   - Private Clients: Select supplier → Update cart with their prices                ║
  * ║                                                                                      ║
  * ╚══════════════════════════════════════════════════════════════════════════════════════╝
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useCart } from '@/contexts/CartContext';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
+import { useCart, CartItem } from '@/contexts/CartContext';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Scale, 
@@ -24,7 +26,9 @@ import {
   Trophy,
   Loader2,
   Check,
-  X
+  X,
+  Send,
+  Store
 } from 'lucide-react';
 
 interface SupplierPrice {
@@ -45,29 +49,41 @@ interface ProductComparison {
 
 interface SupplierColumn {
   id: string;
+  user_id?: string;
   name: string;
   rating?: number;
+  location?: string;
 }
 
 interface CartPriceComparisonAllProps {
   isOpen: boolean;
   onClose: () => void;
+  onQuotesSent?: () => void;
 }
 
 export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
   isOpen,
-  onClose
+  onClose,
+  onQuotesSent
 }) => {
-  const { items, updateCartItem } = useCart();
+  const { items, updateCartItem, clearCart } = useCart();
   const { toast } = useToast();
   const [comparisons, setComparisons] = useState<ProductComparison[]>([]);
   const [loading, setLoading] = useState(false);
   const [allSuppliers, setAllSuppliers] = useState<SupplierColumn[]>([]);
-  const [selectedSupplier, setSelectedSupplier] = useState<string | null>(null);
+  const [selectedSuppliers, setSelectedSuppliers] = useState<Set<string>>(new Set());
+  const [sending, setSending] = useState(false);
+  const [notes, setNotes] = useState('');
+  
+  // Get user role
+  const userRole = localStorage.getItem('user_role');
+  const isProfessionalBuilder = userRole === 'professional_builder' || userRole === 'admin';
 
   useEffect(() => {
     if (isOpen && items.length > 0) {
       fetchAllPrices();
+      setSelectedSuppliers(new Set());
+      setNotes('');
     } else if (isOpen && items.length === 0) {
       setLoading(false);
       setComparisons([]);
@@ -86,7 +102,7 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
       let suppliersData: any[] = [];
       try {
         const suppliersResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/suppliers?select=id,user_id,company_name,rating&limit=100`,
+          `${SUPABASE_URL}/rest/v1/suppliers?select=id,user_id,company_name,rating,location&order=rating.desc.nullslast&limit=50`,
           { headers: { 'apikey': apiKey }, cache: 'no-store' }
         );
         if (suppliersResponse.ok) {
@@ -119,21 +135,28 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
         console.warn('Prices fetch failed');
       }
 
-      // Collect unique suppliers
+      // Collect unique suppliers from prices AND all suppliers for quote requests
       const uniqueSupplierIds = new Set<string>();
       pricesData.forEach((p: any) => uniqueSupplierIds.add(p.supplier_id));
       items.forEach(item => {
         if (item.supplier_id) uniqueSupplierIds.add(item.supplier_id);
       });
+      
+      // For professional builders, also show all suppliers (even without prices)
+      if (isProfessionalBuilder) {
+        suppliersData.forEach(s => uniqueSupplierIds.add(s.id));
+      }
 
       const supplierColumns: SupplierColumn[] = Array.from(uniqueSupplierIds).map(id => {
         const supplier = suppliersMap.get(id);
         return {
           id,
+          user_id: supplier?.user_id,
           name: supplier?.company_name || 'Supplier',
-          rating: supplier?.rating
+          rating: supplier?.rating,
+          location: supplier?.location
         };
-      });
+      }).sort((a, b) => (b.rating || 0) - (a.rating || 0));
 
       setAllSuppliers(supplierColumns);
 
@@ -208,7 +231,25 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
     return cheapest;
   }, [allSuppliers, comparisons]);
 
-  // Apply selected supplier to cart
+  // Toggle supplier selection (for quote requests)
+  const toggleSupplier = (supplierId: string) => {
+    setSelectedSuppliers(prev => {
+      const next = new Set(prev);
+      if (next.has(supplierId)) {
+        next.delete(supplierId);
+      } else {
+        next.add(supplierId);
+      }
+      return next;
+    });
+  };
+
+  // Select all suppliers
+  const selectAllSuppliers = () => {
+    setSelectedSuppliers(new Set(allSuppliers.map(s => s.id)));
+  };
+
+  // Apply selected supplier to cart (for Private Clients)
   const handleSelectSupplier = (supplierId: string) => {
     const supplier = allSuppliers.find(s => s.id === supplierId);
     if (!supplier) return;
@@ -235,26 +276,148 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
     onClose();
   };
 
+  // Send quote requests (for Professional Builders)
+  const handleSendQuotes = async () => {
+    if (selectedSuppliers.size === 0) {
+      toast({
+        title: 'Select Suppliers',
+        description: 'Please select at least one supplier to request quotes from.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setSending(true);
+    
+    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+    const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+    
+    let userId: string | null = null;
+    let accessToken: string | null = null;
+    
+    try {
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        userId = parsed.user?.id;
+        accessToken = parsed.access_token;
+      }
+    } catch (e) {
+      console.warn('Could not parse stored session');
+    }
+    
+    if (!userId || !accessToken) {
+      toast({
+        title: 'Sign in required',
+        description: 'Please sign in to request quotes.',
+        variant: 'destructive',
+      });
+      setSending(false);
+      return;
+    }
+
+    let successCount = 0;
+
+    try {
+      for (const supplierId of selectedSuppliers) {
+        const supplier = allSuppliers.find(s => s.id === supplierId);
+        const poNumber = `QR-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+        const totalAmount = items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
+
+        const quotePayload = {
+          po_number: poNumber,
+          buyer_id: userId,
+          supplier_id: supplierId,
+          total_amount: totalAmount,
+          delivery_address: 'To be provided',
+          delivery_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          project_name: `Quote Request - ${new Date().toLocaleDateString()}`,
+          status: 'pending',
+          items: items.map(item => ({
+            material_id: item.id,
+            material_name: item.name,
+            category: item.category,
+            quantity: item.quantity,
+            unit: item.unit,
+            unit_price: item.unit_price,
+            image_url: item.image_url,
+            notes: notes || undefined,
+          })),
+          created_at: new Date().toISOString(),
+        };
+
+        try {
+          const response = await fetch(`${SUPABASE_URL}/rest/v1/purchase_orders`, {
+            method: 'POST',
+            headers: {
+              'apikey': apiKey,
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify(quotePayload),
+          });
+
+          if (response.ok) {
+            successCount++;
+          }
+        } catch (e) {
+          console.error('Quote request failed for supplier:', supplierId);
+        }
+      }
+
+      if (successCount > 0) {
+        toast({
+          title: '✅ Quote Requests Sent!',
+          description: `Sent to ${successCount} supplier${successCount !== 1 ? 's' : ''}. Check your dashboard for responses.`,
+        });
+        
+        clearCart();
+        onQuotesSent?.();
+        onClose();
+      } else {
+        toast({
+          title: 'Failed to send quotes',
+          description: 'Please try again.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error sending quotes:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to send quote requests.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSending(false);
+    }
+  };
+
   // Find lowest price for a material
   const getLowestPrice = (comp: ProductComparison): number => {
     const prices = comp.alternatives.filter(a => a.in_stock).map(a => a.price);
     return prices.length > 0 ? Math.min(...prices) : 0;
   };
 
+  // Get total items in cart
+  const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
+  const totalValue = items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col p-0">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col p-0">
         {/* Header */}
-        <div className="bg-emerald-600 text-white p-4">
+        <div className={`${isProfessionalBuilder ? 'bg-blue-600' : 'bg-emerald-600'} text-white p-4`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Scale className="h-6 w-6" />
               <div>
                 <DialogTitle className="text-white text-lg font-bold">
-                  Compare Prices
+                  {isProfessionalBuilder ? 'Compare & Request Quotes' : 'Compare Prices'}
                 </DialogTitle>
                 <DialogDescription className="text-white/80 text-sm">
-                  {items.length} item{items.length !== 1 ? 's' : ''} · {allSuppliers.length} supplier{allSuppliers.length !== 1 ? 's' : ''}
+                  {items.length} item{items.length !== 1 ? 's' : ''} ({totalItems} units) · KES {totalValue.toLocaleString()}
                 </DialogDescription>
               </div>
             </div>
@@ -271,7 +434,7 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
 
         {loading ? (
           <div className="flex flex-col items-center justify-center py-16">
-            <Loader2 className="h-10 w-10 animate-spin text-emerald-600 mb-4" />
+            <Loader2 className="h-10 w-10 animate-spin text-blue-600 mb-4" />
             <p className="text-gray-500">Loading prices...</p>
           </div>
         ) : comparisons.length === 0 ? (
@@ -281,149 +444,219 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
           </div>
         ) : (
           <>
-            {/* Simple Table */}
+            {/* Instructions */}
+            <div className={`px-4 py-3 ${isProfessionalBuilder ? 'bg-blue-50 border-b border-blue-100' : 'bg-green-50 border-b border-green-100'}`}>
+              <p className="text-sm">
+                {isProfessionalBuilder ? (
+                  <>
+                    <strong>✓ Select suppliers</strong> you want to request quotes from, then click <strong>"Send Quote Requests"</strong>
+                  </>
+                ) : (
+                  <>
+                    <strong>✓ Click "Select"</strong> on a supplier to buy all items from them at their prices
+                  </>
+                )}
+              </p>
+            </div>
+
+            {/* Table */}
             <div className="flex-1 overflow-auto">
               <table className="w-full">
-                {/* Header Row - Suppliers */}
-                <thead className="sticky top-0 bg-gray-50 z-10">
+                <thead className="sticky top-0 bg-gray-100 z-10">
                   <tr>
-                    <th className="text-left p-3 font-medium text-gray-600 border-b min-w-[200px]">
-                      Material
+                    {/* Checkbox column for Professional Builders */}
+                    {isProfessionalBuilder && (
+                      <th className="w-12 p-2 border-b">
+                        <Checkbox 
+                          checked={selectedSuppliers.size === allSuppliers.length}
+                          onCheckedChange={(checked) => checked ? selectAllSuppliers() : setSelectedSuppliers(new Set())}
+                        />
+                      </th>
+                    )}
+                    <th className="text-left p-3 font-semibold text-gray-700 border-b min-w-[180px]">
+                      Supplier
                     </th>
-                    {allSuppliers.map((supplier) => {
-                      const { total, itemCount } = getSupplierTotal(supplier.id);
-                      const isCheapest = cheapestSupplier?.id === supplier.id;
-                      const hasAllItems = itemCount === comparisons.length;
-                      
-                      return (
-                        <th 
-                          key={supplier.id} 
-                          className={`text-center p-3 border-b min-w-[140px] ${
-                            isCheapest ? 'bg-green-50' : ''
-                          }`}
-                        >
-                          <div className="flex flex-col items-center gap-1">
-                            <span className="font-semibold text-gray-800 text-sm">
-                              {supplier.name}
-                            </span>
-                            {supplier.rating && (
-                              <div className="flex items-center gap-1 text-yellow-500 text-xs">
-                                <Star className="h-3 w-3 fill-current" />
-                                {supplier.rating.toFixed(1)}
-                              </div>
-                            )}
-                            {isCheapest && (
-                              <Badge className="bg-green-500 text-[10px]">
-                                <Trophy className="h-3 w-3 mr-1" />
-                                BEST
-                              </Badge>
-                            )}
-                          </div>
-                        </th>
-                      );
-                    })}
+                    {comparisons.map((comp) => (
+                      <th key={comp.product_id} className="text-center p-2 border-b min-w-[120px]">
+                        <div className="text-xs font-medium text-gray-600 line-clamp-2">
+                          {comp.product_name}
+                        </div>
+                        <div className="text-[10px] text-gray-400">
+                          Qty: {comp.quantity}
+                        </div>
+                      </th>
+                    ))}
+                    <th className="text-center p-3 font-semibold text-gray-700 border-b min-w-[120px] bg-gray-200">
+                      TOTAL
+                    </th>
+                    {!isProfessionalBuilder && (
+                      <th className="w-20 p-2 border-b"></th>
+                    )}
                   </tr>
                 </thead>
                 
-                {/* Body - Materials */}
                 <tbody>
-                  {comparisons.map((comp, idx) => {
-                    const lowestPrice = getLowestPrice(comp);
+                  {allSuppliers.map((supplier, idx) => {
+                    const { total, itemCount } = getSupplierTotal(supplier.id);
+                    const isCheapest = cheapestSupplier?.id === supplier.id;
+                    const hasAllItems = itemCount === comparisons.length;
+                    const isSelected = selectedSuppliers.has(supplier.id);
                     
                     return (
-                      <tr key={comp.product_id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                        {/* Material Name */}
+                      <tr 
+                        key={supplier.id} 
+                        className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${isSelected ? 'bg-blue-50' : ''} ${isCheapest ? 'bg-green-50' : ''}`}
+                      >
+                        {/* Checkbox for Professional Builders */}
+                        {isProfessionalBuilder && (
+                          <td className="p-2 border-b text-center">
+                            <Checkbox 
+                              checked={isSelected}
+                              onCheckedChange={() => toggleSupplier(supplier.id)}
+                            />
+                          </td>
+                        )}
+                        
+                        {/* Supplier Info */}
                         <td className="p-3 border-b">
-                          <div>
-                            <p className="font-medium text-gray-900 text-sm">{comp.product_name}</p>
-                            <p className="text-xs text-gray-500">Qty: {comp.quantity}</p>
+                          <div className="flex items-center gap-2">
+                            <Store className="h-4 w-4 text-gray-400" />
+                            <div>
+                              <div className="font-medium text-gray-900 text-sm flex items-center gap-2">
+                                {supplier.name}
+                                {isCheapest && (
+                                  <Badge className="bg-green-500 text-[9px] px-1">
+                                    <Trophy className="h-2 w-2 mr-0.5" />
+                                    BEST
+                                  </Badge>
+                                )}
+                              </div>
+                              {supplier.rating && (
+                                <div className="flex items-center gap-1 text-yellow-500 text-xs">
+                                  <Star className="h-3 w-3 fill-current" />
+                                  {supplier.rating.toFixed(1)}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </td>
                         
-                        {/* Prices */}
-                        {allSuppliers.map((supplier) => {
+                        {/* Prices for each material */}
+                        {comparisons.map((comp) => {
                           const price = getPrice(comp, supplier.id);
-                          const isCheapest = cheapestSupplier?.id === supplier.id;
+                          const lowestPrice = getLowestPrice(comp);
                           const isLowest = price !== null && price === lowestPrice;
                           
                           return (
                             <td 
-                              key={`${comp.product_id}-${supplier.id}`}
-                              className={`p-3 border-b text-center ${isCheapest ? 'bg-green-50' : ''}`}
+                              key={`${supplier.id}-${comp.product_id}`}
+                              className={`p-2 border-b text-center ${isLowest ? 'bg-green-100' : ''}`}
                             >
                               {price !== null ? (
-                                <div className={`font-semibold ${isLowest ? 'text-green-600' : 'text-gray-800'}`}>
+                                <span className={`font-medium ${isLowest ? 'text-green-700' : 'text-gray-800'}`}>
                                   KES {price.toLocaleString()}
-                                  {isLowest && (
-                                    <span className="block text-[10px] text-green-500 font-normal">
-                                      Lowest
-                                    </span>
-                                  )}
-                                </div>
+                                </span>
                               ) : (
-                                <span className="text-gray-400">—</span>
+                                <span className="text-gray-300">—</span>
                               )}
                             </td>
                           );
                         })}
+                        
+                        {/* Total */}
+                        <td className={`p-3 border-b text-center font-bold bg-gray-100 ${isCheapest ? 'bg-green-200 text-green-800' : ''}`}>
+                          {total > 0 ? (
+                            <>
+                              <div>KES {total.toLocaleString()}</div>
+                              {!hasAllItems && (
+                                <div className="text-[10px] font-normal text-orange-600">
+                                  {itemCount}/{comparisons.length} items
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
+                        </td>
+                        
+                        {/* Select button for Private Clients */}
+                        {!isProfessionalBuilder && (
+                          <td className="p-2 border-b text-center">
+                            {total > 0 && (
+                              <Button
+                                size="sm"
+                                variant={isCheapest ? "default" : "outline"}
+                                className={`text-xs ${isCheapest ? 'bg-green-600 hover:bg-green-700' : ''}`}
+                                onClick={() => handleSelectSupplier(supplier.id)}
+                              >
+                                <Check className="h-3 w-3 mr-1" />
+                                Select
+                              </Button>
+                            )}
+                          </td>
+                        )}
                       </tr>
                     );
                   })}
                 </tbody>
-                
-                {/* Footer - Totals */}
-                <tfoot className="sticky bottom-0 bg-gray-800 text-white">
-                  <tr>
-                    <td className="p-3 font-bold">
-                      TOTAL
-                    </td>
-                    {allSuppliers.map((supplier) => {
-                      const { total, itemCount } = getSupplierTotal(supplier.id);
-                      const isCheapest = cheapestSupplier?.id === supplier.id;
-                      const hasAllItems = itemCount === comparisons.length;
-                      
-                      return (
-                        <td 
-                          key={`total-${supplier.id}`}
-                          className={`p-3 text-center ${isCheapest ? 'bg-green-700' : ''}`}
-                        >
-                          <div className="font-bold text-lg">
-                            KES {total.toLocaleString()}
-                          </div>
-                          {!hasAllItems && (
-                            <div className="text-xs text-gray-300">
-                              {itemCount}/{comparisons.length} items
-                            </div>
-                          )}
-                          <Button
-                            size="sm"
-                            className={`mt-2 ${
-                              isCheapest 
-                                ? 'bg-white text-green-700 hover:bg-green-50' 
-                                : 'bg-gray-600 hover:bg-gray-500'
-                            }`}
-                            onClick={() => handleSelectSupplier(supplier.id)}
-                            disabled={itemCount === 0}
-                          >
-                            <Check className="h-3 w-3 mr-1" />
-                            Select
-                          </Button>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                </tfoot>
               </table>
             </div>
 
             {/* Footer */}
-            <div className="border-t p-4 bg-white flex justify-between items-center">
-              <p className="text-sm text-gray-500">
-                Click <strong>Select</strong> to buy all items from that supplier
-              </p>
-              <Button variant="outline" onClick={onClose}>
-                Close
-              </Button>
+            <div className="border-t p-4 bg-gray-50">
+              {isProfessionalBuilder ? (
+                <div className="space-y-3">
+                  {/* Notes for Professional Builders */}
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-1 block">
+                      Additional Notes (Optional)
+                    </label>
+                    <Textarea
+                      placeholder="Any special requirements or instructions..."
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      className="h-16 text-sm"
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-gray-600">
+                      {selectedSuppliers.size} supplier{selectedSuppliers.size !== 1 ? 's' : ''} selected
+                    </p>
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={onClose}>
+                        Cancel
+                      </Button>
+                      <Button 
+                        onClick={handleSendQuotes}
+                        disabled={selectedSuppliers.size === 0 || sending}
+                        className="bg-blue-600 hover:bg-blue-700"
+                      >
+                        {sending ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Sending...
+                          </>
+                        ) : (
+                          <>
+                            <Send className="h-4 w-4 mr-2" />
+                            Send to {selectedSuppliers.size} Supplier{selectedSuppliers.size !== 1 ? 's' : ''}
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-gray-500">
+                    Click <strong>Select</strong> to buy all items from that supplier
+                  </p>
+                  <Button variant="outline" onClick={onClose}>
+                    Close
+                  </Button>
+                </div>
+              )}
             </div>
           </>
         )}

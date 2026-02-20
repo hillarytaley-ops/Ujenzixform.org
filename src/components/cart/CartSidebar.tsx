@@ -691,16 +691,6 @@ export const CartSidebar: React.FC = () => {
 
             {/* Cart Summary */}
             <div className="space-y-3 pt-2">
-              {/* Compare All Prices Button */}
-              <Button
-                variant="outline"
-                className="w-full text-purple-600 border-purple-200 hover:bg-purple-50 hover:border-purple-300 h-10"
-                onClick={() => setShowCompareAll(true)}
-              >
-                <Scale className="h-4 w-4 mr-2" />
-                Compare All Prices ({items.length} items)
-              </Button>
-
               <div className="bg-gray-50 rounded-lg p-3 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Items ({getTotalItems()})</span>
@@ -726,31 +716,39 @@ export const CartSidebar: React.FC = () => {
               {(() => {
                 const effectiveRole = userRole || localStorage.getItem('user_role');
                 
-                // PROFESSIONAL BUILDER: Only Request Quote
+                // PROFESSIONAL BUILDER: Compare & Request Quote (unified)
                 if (effectiveRole === 'professional_builder') {
                   return (
                     <>
                       <Button 
-                        className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 h-14 flex items-center justify-center gap-3"
-                        onClick={() => setShowMultiSupplierQuote(true)}
+                        className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 h-14 flex items-center justify-center gap-3"
+                        onClick={() => setShowCompareAll(true)}
                       >
-                        <Users className="h-5 w-5" />
+                        <Scale className="h-5 w-5" />
                         <div className="text-left">
-                          <span className="text-sm font-semibold">Request Quotes from Multiple Suppliers</span>
-                          <p className="text-[10px] opacity-80">Compare prices & get the best deal</p>
+                          <span className="text-sm font-semibold">Compare Prices & Request Quotes</span>
+                          <p className="text-[10px] opacity-80">Select suppliers to send quote requests</p>
                         </div>
                       </Button>
                       <p className="text-[10px] text-center text-blue-600 font-medium">
-                        🏗️ Professional Builder: Send your list to multiple suppliers and compare their quotes!
+                        🏗️ Professional Builder: Compare prices, select suppliers, and request quotes!
                       </p>
                     </>
                   );
                 }
                 
-                // PRIVATE CLIENT: Only Buy Now
+                // PRIVATE CLIENT: Compare Prices + Buy Now
                 if (effectiveRole === 'private_client') {
                   return (
                     <>
+                      <Button 
+                        variant="outline"
+                        className="w-full border-emerald-300 text-emerald-700 hover:bg-emerald-50 h-10 mb-2"
+                        onClick={() => setShowCompareAll(true)}
+                      >
+                        <Scale className="h-4 w-4 mr-2" />
+                        Compare Prices Across Suppliers
+                      </Button>
                       <Button 
                         className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 h-14 flex items-center justify-center gap-3"
                         onClick={handleBuyNow}
@@ -772,7 +770,7 @@ export const CartSidebar: React.FC = () => {
                         )}
                       </Button>
                       <p className="text-[10px] text-center text-green-600 font-medium">
-                        🏠 Private Client: Purchase directly from suppliers at listed prices!
+                        🏠 Private Client: Compare prices or buy directly!
                       </p>
                     </>
                   );
@@ -863,10 +861,13 @@ export const CartSidebar: React.FC = () => {
           }}
         />
 
-        {/* Compare All Prices Dialog */}
+        {/* Unified Compare & Quote Dialog */}
         <CartPriceComparisonAll
           isOpen={showCompareAll}
           onClose={() => setShowCompareAll(false)}
+          onQuotesSent={() => {
+            setIsCartOpen(false);
+          }}
         />
       </SheetContent>
     </Sheet>
