@@ -55,6 +55,7 @@ import { useDeliveryProviderData, logDataAccessAttempt } from "@/hooks/useDataIs
 import { MessageSquare, User } from "lucide-react";
 import { InAppCommunication } from "@/components/communication/InAppCommunication";
 import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
+import { ProfileViewDialog } from "@/components/profile/ProfileViewDialog";
 
 interface DashboardStats {
   totalDeliveries: number;
@@ -134,6 +135,7 @@ const DeliveryDashboard = () => {
   const [showProofCapture, setShowProofCapture] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("active");
   const [showProfileEdit, setShowProfileEdit] = useState(false);
+  const [showProfileView, setShowProfileView] = useState(false);
   const [notificationCount, setNotificationCount] = useState(0);
   const [pendingNotificationCount, setPendingNotificationCount] = useState(0);
 
@@ -642,10 +644,10 @@ const DeliveryDashboard = () => {
               <Button 
                 variant="outline" 
                 className="bg-white/10 border-white/30 text-white hover:bg-white/20"
-                onClick={() => setShowProfileEdit(true)}
+                onClick={() => setShowProfileView(true)}
               >
                 <User className="h-4 w-4 mr-2" />
-                Edit Profile
+                Profile
               </Button>
               <Button variant="outline" className="bg-white/10 border-white/30 text-white hover:bg-white/20">
                 <Settings className="h-4 w-4 mr-2" />
@@ -1215,6 +1217,18 @@ const DeliveryDashboard = () => {
       </main>
 
       <Footer />
+
+      {/* Profile View Dialog */}
+      <ProfileViewDialog
+        isOpen={showProfileView}
+        onClose={() => setShowProfileView(false)}
+        onEditProfile={() => {
+          setShowProfileView(false);
+          setShowProfileEdit(true);
+        }}
+        onExitDashboard={handleExitDashboard}
+        userRole="delivery_provider"
+      />
 
       {/* Profile Edit Dialog */}
       <ProfileEditDialog
