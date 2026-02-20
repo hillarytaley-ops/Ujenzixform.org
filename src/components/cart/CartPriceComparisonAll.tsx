@@ -3,8 +3,10 @@
  * ║                                                                                      ║
  * ║   💰 UNIFIED PRICE COMPARISON & QUOTE REQUEST                                        ║
  * ║                                                                                      ║
- * ║   UPDATED: February 21, 2026 - Combined Compare + Quote Request into ONE dialog     ║
- * ║   - Shows prices from all suppliers in a simple table                               ║
+ * ║   UPDATED: February 21, 2026 - Suppliers as COLUMNS, Materials as ROWS              ║
+ * ║   - Better layout for long lists of materials                                       ║
+ * ║   - Suppliers displayed horizontally at top                                         ║
+ * ║   - Materials listed vertically with totals at bottom                               ║
  * ║   - Professional Builders: Select suppliers → Request Quotes                        ║
  * ║   - Private Clients: Select supplier → Update cart with their prices                ║
  * ║                                                                                      ║
@@ -459,134 +461,159 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
               </p>
             </div>
 
-            {/* Table */}
+            {/* Table - Materials as ROWS, Suppliers as COLUMNS */}
             <div className="flex-1 overflow-auto">
-              <table className="w-full">
-                <thead className="sticky top-0 bg-gray-100 z-10">
-                  <tr>
-                    {/* Checkbox column for Professional Builders */}
-                    {isProfessionalBuilder && (
-                      <th className="w-12 p-2 border-b">
-                        <Checkbox 
-                          checked={selectedSuppliers.size === allSuppliers.length}
-                          onCheckedChange={(checked) => checked ? selectAllSuppliers() : setSelectedSuppliers(new Set())}
-                        />
-                      </th>
-                    )}
-                    <th className="text-left p-3 font-semibold text-gray-700 border-b min-w-[180px]">
-                      Supplier
+              <table className="w-full border-collapse">
+                {/* Header Row - Suppliers as columns */}
+                <thead className="sticky top-0 z-10">
+                  <tr className="bg-gray-100">
+                    {/* Material column header */}
+                    <th className="text-left p-3 font-semibold text-gray-700 border-b border-r bg-gray-100 min-w-[200px] sticky left-0">
+                      Material
                     </th>
-                    {comparisons.map((comp) => (
-                      <th key={comp.product_id} className="text-center p-2 border-b min-w-[120px]">
-                        <div className="text-xs font-medium text-gray-600 line-clamp-2">
-                          {comp.product_name}
-                        </div>
-                        <div className="text-[10px] text-gray-400">
-                          Qty: {comp.quantity}
-                        </div>
-                      </th>
-                    ))}
-                    <th className="text-center p-3 font-semibold text-gray-700 border-b min-w-[120px] bg-gray-200">
-                      TOTAL
+                    {/* Qty column */}
+                    <th className="text-center p-2 font-semibold text-gray-600 border-b border-r bg-gray-100 w-16">
+                      Qty
                     </th>
-                    {!isProfessionalBuilder && (
-                      <th className="w-20 p-2 border-b"></th>
-                    )}
+                    {/* Supplier columns */}
+                    {allSuppliers.map((supplier) => {
+                      const { total } = getSupplierTotal(supplier.id);
+                      const isCheapest = cheapestSupplier?.id === supplier.id;
+                      const isSelected = selectedSuppliers.has(supplier.id);
+                      
+                      return (
+                        <th 
+                          key={supplier.id} 
+                          className={`text-center p-2 border-b border-r min-w-[130px] ${isCheapest ? 'bg-green-100' : 'bg-gray-50'} ${isSelected ? 'bg-blue-100' : ''}`}
+                        >
+                          <div className="flex flex-col items-center gap-1">
+                            {/* Checkbox for Professional Builders */}
+                            {isProfessionalBuilder && (
+                              <Checkbox 
+                                checked={isSelected}
+                                onCheckedChange={() => toggleSupplier(supplier.id)}
+                                className="mb-1"
+                              />
+                            )}
+                            <div className="flex items-center gap-1">
+                              <Store className="h-3 w-3 text-gray-400" />
+                              <span className="font-medium text-xs text-gray-800 line-clamp-1">
+                                {supplier.name}
+                              </span>
+                            </div>
+                            {isCheapest && (
+                              <Badge className="bg-green-500 text-[9px] px-1.5 py-0">
+                                <Trophy className="h-2 w-2 mr-0.5" />
+                                BEST
+                              </Badge>
+                            )}
+                            {supplier.rating && (
+                              <div className="flex items-center gap-0.5 text-yellow-500 text-[10px]">
+                                <Star className="h-2.5 w-2.5 fill-current" />
+                                {supplier.rating.toFixed(1)}
+                              </div>
+                            )}
+                          </div>
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
                 
                 <tbody>
-                  {allSuppliers.map((supplier, idx) => {
-                    const { total, itemCount } = getSupplierTotal(supplier.id);
-                    const isCheapest = cheapestSupplier?.id === supplier.id;
-                    const hasAllItems = itemCount === comparisons.length;
-                    const isSelected = selectedSuppliers.has(supplier.id);
-                    
-                    return (
-                      <tr 
-                        key={supplier.id} 
-                        className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${isSelected ? 'bg-blue-50' : ''} ${isCheapest ? 'bg-green-50' : ''}`}
-                      >
-                        {/* Checkbox for Professional Builders */}
-                        {isProfessionalBuilder && (
-                          <td className="p-2 border-b text-center">
-                            <Checkbox 
-                              checked={isSelected}
-                              onCheckedChange={() => toggleSupplier(supplier.id)}
-                            />
-                          </td>
-                        )}
+                  {/* Material rows */}
+                  {comparisons.map((comp, idx) => (
+                    <tr key={comp.product_id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                      {/* Material name */}
+                      <td className="p-3 border-b border-r bg-white sticky left-0">
+                        <div className="font-medium text-gray-900 text-sm">
+                          {comp.product_name}
+                        </div>
+                        <div className="text-[10px] text-gray-400">
+                          {comp.category} · {comp.unit}
+                        </div>
+                      </td>
+                      {/* Quantity */}
+                      <td className="p-2 border-b border-r text-center text-sm font-medium text-gray-600">
+                        {comp.quantity}
+                      </td>
+                      {/* Prices from each supplier */}
+                      {allSuppliers.map((supplier) => {
+                        const price = getPrice(comp, supplier.id);
+                        const lowestPrice = getLowestPrice(comp);
+                        const isLowest = price !== null && price === lowestPrice;
+                        const isSelected = selectedSuppliers.has(supplier.id);
                         
-                        {/* Supplier Info */}
-                        <td className="p-3 border-b">
-                          <div className="flex items-center gap-2">
-                            <Store className="h-4 w-4 text-gray-400" />
+                        return (
+                          <td 
+                            key={`${comp.product_id}-${supplier.id}`}
+                            className={`p-2 border-b border-r text-center ${isLowest ? 'bg-green-100' : ''} ${isSelected ? 'bg-blue-50' : ''}`}
+                          >
+                            {price !== null ? (
+                              <span className={`font-medium text-sm ${isLowest ? 'text-green-700' : 'text-gray-800'}`}>
+                                KES {price.toLocaleString()}
+                              </span>
+                            ) : (
+                              <span className="text-gray-300">—</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                  
+                  {/* TOTALS Row */}
+                  <tr className="bg-gray-200 font-bold sticky bottom-0">
+                    <td className="p-3 border-t-2 border-gray-400 bg-gray-200 sticky left-0 text-gray-800">
+                      TOTAL
+                    </td>
+                    <td className="p-2 border-t-2 border-gray-400 text-center text-gray-600">
+                      {comparisons.reduce((sum, c) => sum + c.quantity, 0)}
+                    </td>
+                    {allSuppliers.map((supplier) => {
+                      const { total, itemCount } = getSupplierTotal(supplier.id);
+                      const isCheapest = cheapestSupplier?.id === supplier.id;
+                      const hasAllItems = itemCount === comparisons.length;
+                      const isSelected = selectedSuppliers.has(supplier.id);
+                      
+                      return (
+                        <td 
+                          key={`total-${supplier.id}`}
+                          className={`p-3 border-t-2 border-gray-400 text-center ${isCheapest ? 'bg-green-200 text-green-800' : 'bg-gray-100'} ${isSelected ? 'bg-blue-100' : ''}`}
+                        >
+                          {total > 0 ? (
                             <div>
-                              <div className="font-medium text-gray-900 text-sm flex items-center gap-2">
-                                {supplier.name}
-                                {isCheapest && (
-                                  <Badge className="bg-green-500 text-[9px] px-1">
-                                    <Trophy className="h-2 w-2 mr-0.5" />
-                                    BEST
-                                  </Badge>
-                                )}
-                              </div>
-                              {supplier.rating && (
-                                <div className="flex items-center gap-1 text-yellow-500 text-xs">
-                                  <Star className="h-3 w-3 fill-current" />
-                                  {supplier.rating.toFixed(1)}
+                              <div className="text-sm">KES {total.toLocaleString()}</div>
+                              {!hasAllItems && (
+                                <div className="text-[10px] font-normal text-orange-600">
+                                  ({itemCount}/{comparisons.length} items)
                                 </div>
                               )}
                             </div>
-                          </div>
-                        </td>
-                        
-                        {/* Prices for each material */}
-                        {comparisons.map((comp) => {
-                          const price = getPrice(comp, supplier.id);
-                          const lowestPrice = getLowestPrice(comp);
-                          const isLowest = price !== null && price === lowestPrice;
-                          
-                          return (
-                            <td 
-                              key={`${supplier.id}-${comp.product_id}`}
-                              className={`p-2 border-b text-center ${isLowest ? 'bg-green-100' : ''}`}
-                            >
-                              {price !== null ? (
-                                <span className={`font-medium ${isLowest ? 'text-green-700' : 'text-gray-800'}`}>
-                                  KES {price.toLocaleString()}
-                                </span>
-                              ) : (
-                                <span className="text-gray-300">—</span>
-                              )}
-                            </td>
-                          );
-                        })}
-                        
-                        {/* Total */}
-                        <td className={`p-3 border-b text-center font-bold bg-gray-100 ${isCheapest ? 'bg-green-200 text-green-800' : ''}`}>
-                          {total > 0 ? (
-                            <>
-                              <div>KES {total.toLocaleString()}</div>
-                              {!hasAllItems && (
-                                <div className="text-[10px] font-normal text-orange-600">
-                                  {itemCount}/{comparisons.length} items
-                                </div>
-                              )}
-                            </>
                           ) : (
                             <span className="text-gray-400">—</span>
                           )}
                         </td>
+                      );
+                    })}
+                  </tr>
+                  
+                  {/* Action Row for Private Clients - Select buttons */}
+                  {!isProfessionalBuilder && (
+                    <tr className="bg-white">
+                      <td className="p-2 border-t bg-white sticky left-0"></td>
+                      <td className="p-2 border-t"></td>
+                      {allSuppliers.map((supplier) => {
+                        const { total } = getSupplierTotal(supplier.id);
+                        const isCheapest = cheapestSupplier?.id === supplier.id;
                         
-                        {/* Select button for Private Clients */}
-                        {!isProfessionalBuilder && (
-                          <td className="p-2 border-b text-center">
+                        return (
+                          <td key={`action-${supplier.id}`} className="p-2 border-t text-center">
                             {total > 0 && (
                               <Button
                                 size="sm"
                                 variant={isCheapest ? "default" : "outline"}
-                                className={`text-xs ${isCheapest ? 'bg-green-600 hover:bg-green-700' : ''}`}
+                                className={`text-xs w-full ${isCheapest ? 'bg-green-600 hover:bg-green-700' : ''}`}
                                 onClick={() => handleSelectSupplier(supplier.id)}
                               >
                                 <Check className="h-3 w-3 mr-1" />
@@ -594,10 +621,10 @@ export const CartPriceComparisonAll: React.FC<CartPriceComparisonAllProps> = ({
                               </Button>
                             )}
                           </td>
-                        )}
-                      </tr>
-                    );
-                  })}
+                        );
+                      })}
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
