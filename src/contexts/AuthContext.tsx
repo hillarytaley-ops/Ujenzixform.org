@@ -217,7 +217,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.removeItem('user_role');
       localStorage.removeItem('user_role_id');
       localStorage.removeItem('user_role_verified');
+      localStorage.removeItem('user_security_key');
       localStorage.removeItem('user_email');
+      localStorage.removeItem('user_name');
+      localStorage.removeItem('user_id');
       localStorage.removeItem('admin_authenticated');
       localStorage.removeItem('admin_login_time');
       await supabase.auth.signOut();
@@ -229,7 +232,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.removeItem('user_role');
       localStorage.removeItem('user_role_id');
       localStorage.removeItem('user_role_verified');
+      localStorage.removeItem('user_security_key');
       localStorage.removeItem('user_email');
+      localStorage.removeItem('user_name');
+      localStorage.removeItem('user_id');
       localStorage.removeItem('admin_authenticated');
       localStorage.removeItem('admin_login_time');
     }

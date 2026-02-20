@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 
-console.log('🔐 Auth.tsx BUILD v16 - FAST + SECURE role verification Feb 21 2026');
+console.log('🔐 Auth.tsx BUILD v17 - SIMPLE FAST login Feb 21 2026');
 
 // Helper function to get dashboard path based on role
 const getDashboardForRole = (role: string): string => {
@@ -127,10 +127,7 @@ const Auth = () => {
             if (!roleError && roleData?.role) {
               const dashboardPath = getDashboardForRole(roleData.role);
               console.log('🔐 User has role:', roleData.role, '- Redirecting to:', dashboardPath);
-              // Save role with security key for FAST + SECURE access
-              const securityKey = `${session.user.id}_${session.access_token.substring(0, 8)}`;
               localStorage.setItem('user_role', roleData.role);
-              localStorage.setItem('user_security_key', securityKey);
               // Redirect to appropriate dashboard
               clearTimeout(safetyTimeout);
               window.location.href = dashboardPath;
@@ -191,11 +188,8 @@ const Auth = () => {
           if (roleData?.role) {
             const dashboardPath = getDashboardForRole(roleData.role);
             console.log('🔐 Auth event: User has role:', roleData.role, '- Redirecting to dashboard:', dashboardPath);
-            // Save role with security key for FAST + SECURE access
-            const securityKey = `${session.user.id}_${session.access_token.substring(0, 8)}`;
             localStorage.setItem('user_role', roleData.role);
-            localStorage.setItem('user_security_key', securityKey);
-            // ALWAYS redirect to dashboard if user has a role (ignore redirectTo)
+            // ALWAYS redirect to dashboard if user has a role
             window.location.href = dashboardPath;
             return;
           }
@@ -469,11 +463,8 @@ const Auth = () => {
           if (roleData?.role) {
             const dashboardPath = getDashboardForRole(roleData.role);
             console.log('🔐 User has role:', roleData.role, '- Redirecting to dashboard:', dashboardPath);
-            // Save role with security key for FAST + SECURE access
-            const securityKey = `${currentSession.user.id}_${currentSession.access_token.substring(0, 8)}`;
             localStorage.setItem('user_role', roleData.role);
-            localStorage.setItem('user_security_key', securityKey);
-            // ALWAYS redirect to dashboard if user has a role (ignore redirectTo)
+            // ALWAYS redirect to dashboard if user has a role
             window.location.href = dashboardPath;
             return;
           }
