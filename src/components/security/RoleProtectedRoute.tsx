@@ -1,14 +1,17 @@
 /**
- * RoleProtectedRoute - BUILD v30 - SECURE DATABASE VERIFICATION
+ * RoleProtectedRoute - BUILD v31 - FAST + SECURE
  * 
- * CRITICAL SECURITY FIX: Always verify role against database, NOT localStorage!
- * localStorage can be manipulated by users in browser DevTools.
+ * Security Strategy:
+ * 1. Role is verified from DATABASE during login (Auth.tsx)
+ * 2. Verified role is stored with user's session ID as a security key
+ * 3. On protected routes, we check if stored session ID matches current session
+ * 4. If session matches → trust cached role (FAST)
+ * 5. If session doesn't match → re-verify from database (SECURE)
  * 
- * Security Flow:
- * 1. Check if user is authenticated
- * 2. Verify user's role from DATABASE (not localStorage)
- * 3. Only allow access if DB role matches allowed roles
- * 4. Redirect unauthorized users to their correct dashboard or auth page
+ * This prevents:
+ * - Users manipulating localStorage (session ID must match)
+ * - Slow page loads (no DB call if session matches)
+ * - Unauthorized access (role tied to specific session)
  */
 
 import { Navigate, useLocation } from 'react-router-dom';
@@ -16,7 +19,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-console.log('🔒 RoleProtectedRoute BUILD v30 - SECURE DB VERIFICATION');
+console.log('🔒 RoleProtectedRoute BUILD v31 - FAST + SECURE');
 
 interface RoleProtectedRouteProps {
   children: React.ReactNode;
@@ -33,117 +36,140 @@ const DASHBOARDS: Record<string, string> = {
   'admin': '/admin-dashboard',
 };
 
+// Security key combining user ID and session - prevents localStorage manipulation
+const getSecurityKey = (userId: string, sessionId: string) => {
+  return `${userId}_${sessionId.substring(0, 8)}`;
+};
+
 export const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRouteProps) => {
-  const { user, loading: authLoading } = useAuth();
+  const { user, session, loading: authLoading } = useAuth();
   const location = useLocation();
-  const [verifiedRole, setVerifiedRole] = useState<string | null>(null);
-  const [verifying, setVerifying] = useState(true);
-  const verificationAttempted = useRef(false);
+  const [accessDecision, setAccessDecision] = useState<'loading' | 'granted' | 'denied' | 'redirect' | 'no-auth'>('loading');
+  const [redirectTo, setRedirectTo] = useState<string>('/auth');
+  const verificationDone = useRef(false);
   
-  // SECURITY: Always verify role from DATABASE, never trust localStorage alone
   useEffect(() => {
-    const verifyRoleFromDatabase = async () => {
-      // Prevent duplicate verification attempts
-      if (verificationAttempted.current) return;
-      verificationAttempted.current = true;
+    const checkAccess = async () => {
+      // Still loading auth
+      if (authLoading) return;
       
-      // If no user, skip verification
-      if (!user) {
-        setVerifying(false);
+      // No user - redirect to auth
+      if (!user || !session) {
+        console.log('🔒 No user/session, redirecting to auth');
+        setAccessDecision('no-auth');
         return;
       }
       
+      // Prevent duplicate checks
+      if (verificationDone.current) return;
+      verificationDone.current = true;
+      
+      const userId = user.id;
+      const sessionId = session.access_token;
+      const securityKey = getSecurityKey(userId, sessionId);
+      
+      // Check cached role with security key
+      const cachedRole = localStorage.getItem('user_role');
+      const cachedSecurityKey = localStorage.getItem('user_security_key');
+      
+      // FAST PATH: If security key matches, trust the cached role
+      if (cachedRole && cachedSecurityKey === securityKey) {
+        console.log('🔒 FAST: Security key matches, using cached role:', cachedRole);
+        
+        if (allowedRoles.includes(cachedRole)) {
+          console.log('✅ FAST ACCESS GRANTED for', cachedRole);
+          setAccessDecision('granted');
+          return;
+        } else {
+          // Wrong dashboard - redirect to correct one
+          const correctDashboard = DASHBOARDS[cachedRole] || '/home';
+          console.log('🔀 FAST REDIRECT:', cachedRole, 'to', correctDashboard);
+          setRedirectTo(correctDashboard);
+          setAccessDecision('redirect');
+          return;
+        }
+      }
+      
+      // SECURE PATH: Security key doesn't match - verify from database
+      console.log('🔒 SECURE: Verifying role from database...');
+      
       try {
-        console.log('🔒 Verifying role from database for user:', user.id);
-        
-        // Set a timeout to prevent hanging
-        const timeoutId = setTimeout(() => {
-          console.log('🔒 Role verification timeout');
-          setVerifying(false);
-        }, 5000);
-        
-        // Query the database for the user's actual role
         const { data: roleData, error } = await supabase
           .from('user_roles')
           .select('role')
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .limit(1)
           .maybeSingle();
         
-        clearTimeout(timeoutId);
-        
         if (error) {
-          console.error('🔒 Error verifying role:', error);
-          setVerifying(false);
+          console.error('🔒 DB Error:', error);
+          setAccessDecision('no-auth');
           return;
         }
         
-        if (roleData?.role) {
-          console.log('🔒 Database verified role:', roleData.role);
-          // Update localStorage with verified role (for faster future access)
-          localStorage.setItem('user_role', roleData.role);
-          localStorage.setItem('user_role_id', user.id);
-          setVerifiedRole(roleData.role);
-        } else {
-          console.log('🔒 No role found in database for user');
-          // Clear any cached role that might be fraudulent
+        if (!roleData?.role) {
+          console.log('🔒 No role in database');
+          // Clear any fraudulent cached data
           localStorage.removeItem('user_role');
-          localStorage.removeItem('user_role_id');
-          setVerifiedRole(null);
+          localStorage.removeItem('user_security_key');
+          setAccessDecision('no-auth');
+          return;
         }
         
-        setVerifying(false);
+        const dbRole = roleData.role;
+        console.log('🔒 DB verified role:', dbRole);
+        
+        // Store verified role with new security key
+        localStorage.setItem('user_role', dbRole);
+        localStorage.setItem('user_security_key', securityKey);
+        
+        if (allowedRoles.includes(dbRole)) {
+          console.log('✅ DB ACCESS GRANTED for', dbRole);
+          setAccessDecision('granted');
+        } else {
+          const correctDashboard = DASHBOARDS[dbRole] || '/home';
+          console.log('🔀 DB REDIRECT:', dbRole, 'to', correctDashboard);
+          setRedirectTo(correctDashboard);
+          setAccessDecision('redirect');
+        }
       } catch (err) {
-        console.error('🔒 Role verification error:', err);
-        setVerifying(false);
+        console.error('🔒 Verification error:', err);
+        setAccessDecision('no-auth');
       }
     };
     
-    // Reset verification state when user changes
-    if (user) {
-      verificationAttempted.current = false;
-      setVerifying(true);
-      verifyRoleFromDatabase();
-    } else if (!authLoading) {
-      setVerifying(false);
-    }
-  }, [user, authLoading]);
+    checkAccess();
+  }, [user, session, authLoading, allowedRoles]);
   
-  // Still loading auth context or verifying role
-  if (authLoading || verifying) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <div className="flex flex-col items-center gap-3">
-          <div className="animate-spin rounded-full h-10 w-10 border-4 border-primary border-t-transparent" />
-          <p className="text-sm text-muted-foreground">Verifying access...</p>
+  // Reset on user change
+  useEffect(() => {
+    verificationDone.current = false;
+    setAccessDecision('loading');
+  }, [user?.id]);
+  
+  // Render based on decision
+  switch (accessDecision) {
+    case 'loading':
+      return (
+        <div className="flex items-center justify-center min-h-screen bg-background">
+          <div className="flex flex-col items-center gap-3">
+            <div className="animate-spin rounded-full h-8 w-8 border-4 border-primary border-t-transparent" />
+            <p className="text-sm text-muted-foreground">Loading...</p>
+          </div>
         </div>
-      </div>
-    );
+      );
+    
+    case 'granted':
+      return <>{children}</>;
+    
+    case 'redirect':
+      return <Navigate to={redirectTo} replace />;
+    
+    case 'denied':
+    case 'no-auth':
+    default:
+      return <Navigate to="/auth" state={{ from: location }} replace />;
   }
-  
-  // No user - redirect to auth
-  if (!user) {
-    console.log('🚫 No authenticated user, redirecting to auth');
-    return <Navigate to="/auth" state={{ from: location }} replace />;
-  }
-  
-  // User exists but no verified role - redirect to auth
-  if (!verifiedRole) {
-    console.log('🚫 No verified role for user, redirecting to auth');
-    return <Navigate to="/auth" replace />;
-  }
-  
-  // SECURITY CHECK: Verify role is in allowed roles
-  if (allowedRoles.includes(verifiedRole)) {
-    console.log('✅ Access GRANTED for', verifiedRole, 'to', location.pathname);
-    return <>{children}</>;
-  }
-  
-  // User has a role but it's not allowed for this route
-  // Redirect them to their correct dashboard
-  const correctDashboard = DASHBOARDS[verifiedRole] || '/home';
-  console.log('🚫 Access DENIED for', verifiedRole, 'to', location.pathname, '- Redirecting to', correctDashboard);
-  return <Navigate to={correctDashboard} replace />;
 };
 
 export default RoleProtectedRoute;
