@@ -36,6 +36,7 @@ import { LazyImage } from '@/components/ui/LazyImage';
 import { useSearchParams } from 'react-router-dom';
 import { useCart } from '@/contexts/CartContext';
 import { PriceComparisonModal } from './PriceComparisonModal';
+import { PriceComparisonTable } from './PriceComparisonTable';
 import { QuoteCart, QuoteCartButton, QuoteCartItem } from './QuoteCart';
 import { MobileBookView } from './MobileBookView';
 import { FileText, BookOpen } from 'lucide-react';
@@ -2458,8 +2459,8 @@ export const MaterialsGrid = () => {
         </DialogContent>
       </Dialog>
       
-      {/* Price Comparison Modal */}
-      <PriceComparisonModal
+      {/* Price Comparison Table - Enhanced matrix view */}
+      <PriceComparisonTable
         isOpen={isCompareModalOpen}
         onClose={() => setIsCompareModalOpen(false)}
         selectedMaterials={getComparisonMaterials()}
