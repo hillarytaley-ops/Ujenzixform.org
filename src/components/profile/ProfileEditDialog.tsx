@@ -91,155 +91,97 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
   }, [isOpen]);
 
   const loadProfile = async () => {
-    setLoading(true);
     console.log('📝 ProfileEditDialog: Loading profile...');
-
-    // Safety timeout - don't let loading hang forever
-    const timeoutId = setTimeout(() => {
-      console.log('📝 ProfileEditDialog: Timeout reached, using default profile');
-      setLoading(false);
-    }, 8000);
-
+    
+    // Get user info from localStorage FIRST (instant)
+    let userId = '';
+    let userEmail = '';
+    
     try {
-      // Get user from localStorage (fastest)
-      let userId = '';
-      let userEmail = '';
-      
-      try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        if (storedSession) {
-          const parsed = JSON.parse(storedSession);
-          userId = parsed?.user?.id || '';
-          userEmail = parsed?.user?.email || '';
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        userId = parsed?.user?.id || '';
+        userEmail = parsed?.user?.email || '';
+      }
+    } catch (e) {
+      console.log('📝 ProfileEditDialog: localStorage session read failed');
+    }
+
+    // Fallback to other localStorage keys
+    if (!userId) {
+      userId = localStorage.getItem('user_id') || localStorage.getItem('user_role_id') || '';
+      userEmail = localStorage.getItem('user_email') || '';
+    }
+
+    console.log('📝 ProfileEditDialog: User ID:', userId, 'Email:', userEmail);
+
+    // If no user ID found, show error and close
+    if (!userId) {
+      toast({
+        title: 'Error',
+        description: 'You must be logged in to edit your profile',
+        variant: 'destructive'
+      });
+      setLoading(false);
+      onClose();
+      return;
+    }
+
+    // Set a default profile IMMEDIATELY so user sees something
+    const defaultProfile: ProfileData = {
+      id: userId,
+      user_id: userId,
+      full_name: userEmail?.split('@')[0] || 'User',
+      email: userEmail
+    };
+
+    // Show loading but with a very short timeout
+    setLoading(true);
+    
+    // Safety timeout - show default profile after 3 seconds max
+    const timeoutId = setTimeout(() => {
+      console.log('📝 ProfileEditDialog: Timeout - showing default profile');
+      setProfile(defaultProfile);
+      setLoading(false);
+    }, 3000);
+
+    // Try to fetch profile with short timeout
+    try {
+      const controller = new AbortController();
+      const fetchTimeout = setTimeout(() => controller.abort(), 2500);
+
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${userId}&select=*`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          },
+          signal: controller.signal
         }
-      } catch (e) {
-        console.log('📝 ProfileEditDialog: localStorage read failed');
-      }
+      );
+      clearTimeout(fetchTimeout);
 
-      if (!userId) {
-        // Fallback to Supabase with timeout
-        try {
-          const sessionPromise = supabase.auth.getSession();
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Session timeout')), 5000)
-          );
-          const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]) as any;
-          userId = session?.user?.id || '';
-          userEmail = session?.user?.email || '';
-        } catch (e) {
-          console.log('📝 ProfileEditDialog: Session fetch timeout');
-        }
-      }
-
-      if (!userId) {
-        // Last resort - check localStorage for cached user info
-        userId = localStorage.getItem('user_id') || localStorage.getItem('user_role_id') || '';
-        userEmail = localStorage.getItem('user_email') || '';
-      }
-
-      if (!userId) {
-        clearTimeout(timeoutId);
-        toast({
-          title: 'Error',
-          description: 'You must be logged in to edit your profile',
-          variant: 'destructive'
-        });
-        setLoading(false);
-        onClose();
-        return;
-      }
-
-      console.log('📝 ProfileEditDialog: User ID:', userId, 'Email:', userEmail);
-
-      // Fetch profile with timeout
-      try {
-        const controller = new AbortController();
-        const fetchTimeout = setTimeout(() => controller.abort(), 5000);
-
-        const response = await fetch(
-          `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${userId}&select=*`,
-          {
-            headers: {
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-            },
-            signal: controller.signal
-          }
-        );
-        clearTimeout(fetchTimeout);
-
-        if (response.ok) {
-          const profiles = await response.json();
-          if (profiles && profiles.length > 0) {
-            setProfile(profiles[0]);
-            console.log('✅ ProfileEditDialog: Profile loaded:', profiles[0].full_name);
-            clearTimeout(timeoutId);
-            setLoading(false);
-            return;
-          }
-        }
-      } catch (fetchError) {
-        console.log('📝 ProfileEditDialog: REST fetch failed, trying Supabase client');
-      }
-
-      // Fallback to Supabase client
-      try {
-        const { data: profileData, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('user_id', userId)
-          .maybeSingle();
-
-        if (error && error.code !== 'PGRST116') {
-          console.error('📝 ProfileEditDialog: Error fetching profile:', error);
-        }
-
-        if (profileData) {
-          setProfile(profileData);
-          console.log('✅ ProfileEditDialog: Profile loaded via client:', profileData.full_name);
+      if (response.ok) {
+        const profiles = await response.json();
+        if (profiles && profiles.length > 0) {
           clearTimeout(timeoutId);
+          setProfile(profiles[0]);
+          console.log('✅ ProfileEditDialog: Profile loaded:', profiles[0].full_name);
           setLoading(false);
           return;
         }
-      } catch (clientError) {
-        console.log('📝 ProfileEditDialog: Supabase client fetch failed');
       }
-
-      // Create default profile if nothing found
-      console.log('📝 ProfileEditDialog: No profile found, creating default');
-      setProfile({
-        id: userId,
-        user_id: userId,
-        full_name: userEmail?.split('@')[0] || 'User',
-        email: userEmail
-      });
-      
-      clearTimeout(timeoutId);
-      setLoading(false);
-    } catch (error) {
-      console.error('📝 ProfileEditDialog: Error:', error);
-      clearTimeout(timeoutId);
-      
-      // Even on error, try to show a default profile
-      const cachedEmail = localStorage.getItem('user_email') || '';
-      const cachedUserId = localStorage.getItem('user_id') || localStorage.getItem('user_role_id') || '';
-      
-      if (cachedUserId) {
-        setProfile({
-          id: cachedUserId,
-          user_id: cachedUserId,
-          full_name: cachedEmail?.split('@')[0] || 'User',
-          email: cachedEmail
-        });
-      } else {
-        toast({
-          title: 'Error',
-          description: 'Failed to load profile. Please try again.',
-          variant: 'destructive'
-        });
-      }
-      setLoading(false);
+    } catch (fetchError) {
+      console.log('📝 ProfileEditDialog: REST fetch failed');
     }
+
+    // If REST failed, use default profile
+    console.log('📝 ProfileEditDialog: Using default profile');
+    clearTimeout(timeoutId);
+    setProfile(defaultProfile);
+    setLoading(false);
   };
 
   const getCurrentLocation = async () => {
