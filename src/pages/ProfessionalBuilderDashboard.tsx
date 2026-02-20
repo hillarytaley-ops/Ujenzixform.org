@@ -989,31 +989,10 @@ const ProfessionalBuilderDashboardPage = () => {
     }
   };
 
-  const handleSignOut = async () => {
-    console.log('🚪 Sign Out: Starting full sign out process...');
-    
-    // Clear ALL localStorage auth data FIRST (synchronous)
-    localStorage.removeItem('user_role');
-    localStorage.removeItem('user_role_id');
-    localStorage.removeItem('user_role_verified');
-    localStorage.removeItem('user_email');
-    localStorage.removeItem('user_name');
-    localStorage.removeItem('user_id');
-    localStorage.removeItem('admin_authenticated');
-    localStorage.removeItem('admin_login_time');
-    localStorage.removeItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-    
-    // Clear session storage
-    sessionStorage.clear();
-    
-    console.log('🚪 Sign Out: Auth data cleared, redirecting to login...');
-    
-    // IMMEDIATELY redirect - don't wait for Supabase signOut which can hang
-    // Use replace() to prevent back button returning to dashboard
-    window.location.replace('/auth');
-    
-    // Sign out from Supabase in background (page is already redirecting)
-    await supabase.auth.signOut();
+  // Exit dashboard - goes back to home page, stays logged in
+  const handleExitDashboard = () => {
+    console.log('🚪 Exit Dashboard: Redirecting to home...');
+    navigate('/home');
   };
 
   if (loading) {
@@ -1058,9 +1037,9 @@ const ProfessionalBuilderDashboardPage = () => {
                 <Settings className="h-4 w-4 mr-2" />
                 <span className="hidden sm:inline">Edit Profile</span>
               </Button>
-              <Button variant="outline" className="border-white/30 text-white hover:bg-white/10" onClick={handleSignOut}>
+              <Button variant="outline" className="border-white/30 text-white hover:bg-white/10" onClick={handleExitDashboard}>
                 <LogOut className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Sign Out</span>
+                <span className="hidden sm:inline">Exit Dashboard</span>
               </Button>
             </div>
           </div>
