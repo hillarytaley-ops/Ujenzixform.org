@@ -1,4 +1,4 @@
-// Auth Page - Build v9 - Auto-redirect users with roles to their dashboards
+// Auth Page - Build v11 - Auto-redirect users with roles to their dashboards
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 
-console.log('🔐 Auth.tsx BUILD v10 - Auto-redirect users with roles to dashboards Feb 20 2026');
+console.log('🔐 Auth.tsx BUILD v11 - Auto-redirect users with roles to dashboards Feb 21 2026');
 
 // Helper function to get dashboard path based on role
 const getDashboardForRole = (role: string): string => {
@@ -127,12 +127,34 @@ const Auth = () => {
 
   // Listen for auth state changes - ONLY redirect on explicit SIGNED_IN event
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('🔐 Auth event:', event, session?.user?.email);
       
       // ONLY redirect on explicit sign-in, NOT on INITIAL_SESSION
       // This prevents auto-redirect when user wants to sign in as different account
       if (hasSignedIn.current && session?.user && event === 'SIGNED_IN') {
+        // Check if user has a role and redirect to their dashboard
+        try {
+          const { data: roleData } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', session.user.id)
+            .limit(1)
+            .maybeSingle();
+          
+          if (roleData?.role) {
+            const dashboardPath = getDashboardForRole(roleData.role);
+            console.log('🔐 Auth event: User has role:', roleData.role, '- Redirecting to:', dashboardPath);
+            localStorage.setItem('user_role', roleData.role);
+            localStorage.setItem('user_role_id', session.user.id);
+            window.location.href = redirectTo || dashboardPath;
+            return;
+          }
+        } catch (error) {
+          console.error('🔐 Auth event: Error checking role:', error);
+        }
+        
+        // Fallback to home if no role found
         const target = redirectTo || '/home';
         console.log('🔐 REDIRECTING after explicit sign-in to:', target);
         window.location.href = target;
