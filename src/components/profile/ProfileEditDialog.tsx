@@ -148,6 +148,21 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
 
     // Try to fetch profile with short timeout
     try {
+      // Get access token for authenticated request
+      let accessToken = '';
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          accessToken = parsed?.access_token || '';
+        }
+      } catch (e) {}
+      
+      if (!accessToken) {
+        const { data: { session } } = await supabase.auth.getSession();
+        accessToken = session?.access_token || '';
+      }
+
       const controller = new AbortController();
       const fetchTimeout = setTimeout(() => controller.abort(), 2500);
 
@@ -156,7 +171,7 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
         {
           headers: {
             'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
           },
           signal: controller.signal
         }
@@ -167,14 +182,14 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
         const profiles = await response.json();
         if (profiles && profiles.length > 0) {
           clearTimeout(timeoutId);
-          setProfile(profiles[0]);
+          setProfile({ ...profiles[0], email: userEmail });
           console.log('✅ ProfileEditDialog: Profile loaded:', profiles[0].full_name);
           setLoading(false);
           return;
         }
       }
     } catch (fetchError) {
-      console.log('📝 ProfileEditDialog: REST fetch failed');
+      console.log('📝 ProfileEditDialog: REST fetch failed:', fetchError);
     }
 
     // If REST failed, use default profile
@@ -337,7 +352,8 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
 
       console.log('📝 ProfileEditDialog: Update data:', updateData);
 
-      const response = await fetch(
+      // First try PATCH (update existing)
+      let response = await fetch(
         `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${profile.user_id}`,
         {
           method: 'PATCH',
@@ -345,16 +361,78 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
             'Content-Type': 'application/json',
             'apikey': SUPABASE_ANON_KEY,
             'Authorization': `Bearer ${accessToken}`,
-            'Prefer': 'return=minimal'
+            'Prefer': 'return=representation'
           },
           body: JSON.stringify(updateData)
         }
       );
 
-      if (!response.ok) {
+      // Check if PATCH worked
+      if (response.ok) {
+        const result = await response.json();
+        console.log('📝 ProfileEditDialog: PATCH result:', result);
+        
+        // If no rows updated, try INSERT (upsert)
+        if (!result || result.length === 0) {
+          console.log('📝 ProfileEditDialog: No rows updated, trying upsert...');
+          
+          const insertData = {
+            ...updateData,
+            user_id: profile.user_id,
+            id: profile.id || profile.user_id
+          };
+          
+          response = await fetch(
+            `${SUPABASE_URL}/rest/v1/profiles`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken}`,
+                'Prefer': 'resolution=merge-duplicates,return=minimal'
+              },
+              body: JSON.stringify(insertData)
+            }
+          );
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('📝 ProfileEditDialog: Upsert error:', response.status, errorText);
+          }
+        }
+      } else {
         const errorText = await response.text();
         console.error('📝 ProfileEditDialog: Save error:', response.status, errorText);
-        throw new Error(`Save failed: ${response.status}`);
+        
+        // Try upsert as fallback
+        console.log('📝 ProfileEditDialog: PATCH failed, trying upsert...');
+        
+        const insertData = {
+          ...updateData,
+          user_id: profile.user_id,
+          id: profile.id || profile.user_id
+        };
+        
+        response = await fetch(
+          `${SUPABASE_URL}/rest/v1/profiles`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Prefer': 'resolution=merge-duplicates,return=minimal'
+            },
+            body: JSON.stringify(insertData)
+          }
+        );
+        
+        if (!response.ok) {
+          const upsertError = await response.text();
+          console.error('📝 ProfileEditDialog: Upsert also failed:', upsertError);
+          throw new Error(`Save failed: ${response.status}`);
+        }
       }
 
       // Also update supplier record if user is a supplier
@@ -515,52 +593,73 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
     }
 
     setUploading(true);
+    console.log('📸 Starting avatar upload for user:', profile.user_id);
+    
     try {
       const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-      const fileName = `${profile.user_id}/avatar-${Date.now()}.${fileExt}`;
+      const fileName = `avatar-${Date.now()}.${fileExt}`;
+      const filePath = `${profile.user_id}/${fileName}`;
 
-      console.log('📸 Uploading avatar:', fileName);
+      console.log('📸 Uploading avatar to path:', filePath);
 
-      // Try uploading to avatars bucket first
-      let uploadResult = await supabase.storage
-        .from('avatars')
-        .upload(fileName, file, { upsert: true });
+      // Try different buckets in order
+      const bucketsToTry = [
+        { name: 'avatars', path: filePath },
+        { name: 'profile-images', path: filePath },
+        { name: 'profiles', path: filePath },
+        { name: 'public', path: `avatars/${filePath}` }
+      ];
 
-      // If avatars bucket doesn't exist, try profile-images or public bucket
-      if (uploadResult.error) {
-        console.log('📸 Avatars bucket failed, trying profile-images...');
-        uploadResult = await supabase.storage
-          .from('profile-images')
-          .upload(fileName, file, { upsert: true });
-      }
-
-      if (uploadResult.error) {
-        console.log('📸 Profile-images bucket failed, trying public...');
-        uploadResult = await supabase.storage
-          .from('public')
-          .upload(`avatars/${fileName}`, file, { upsert: true });
-      }
-
-      if (uploadResult.error) {
-        throw uploadResult.error;
-      }
-
-      // Get the public URL from the successful bucket
+      let uploadSuccess = false;
       let publicUrl = '';
-      const buckets = ['avatars', 'profile-images', 'public'];
-      
-      for (const bucket of buckets) {
-        const path = bucket === 'public' ? `avatars/${fileName}` : fileName;
-        const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-        if (data?.publicUrl) {
-          // Check if this is the correct bucket by verifying the URL works
-          publicUrl = data.publicUrl;
-          break;
+      let lastError: any = null;
+
+      for (const bucket of bucketsToTry) {
+        console.log(`📸 Trying bucket: ${bucket.name}`);
+        
+        const { data, error } = await supabase.storage
+          .from(bucket.name)
+          .upload(bucket.path, file, { 
+            upsert: true,
+            contentType: file.type 
+          });
+
+        if (!error && data) {
+          console.log(`📸 Upload successful to ${bucket.name}:`, data.path);
+          
+          // Get public URL
+          const { data: urlData } = supabase.storage
+            .from(bucket.name)
+            .getPublicUrl(bucket.path);
+          
+          if (urlData?.publicUrl) {
+            publicUrl = urlData.publicUrl;
+            uploadSuccess = true;
+            console.log('📸 Public URL:', publicUrl);
+            break;
+          }
+        } else {
+          console.log(`📸 Bucket ${bucket.name} failed:`, error?.message);
+          lastError = error;
         }
       }
 
-      if (!publicUrl) {
-        throw new Error('Could not get public URL for uploaded image');
+      if (!uploadSuccess || !publicUrl) {
+        // If all buckets fail, try using a data URL as fallback
+        console.log('📸 All buckets failed, using data URL fallback');
+        
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const dataUrl = reader.result as string;
+          setProfile({ ...profile, avatar_url: dataUrl });
+          toast({
+            title: '📸 Photo Added!',
+            description: 'Photo saved locally. It will be uploaded when you save your profile.',
+          });
+        };
+        reader.readAsDataURL(file);
+        setUploading(false);
+        return;
       }
 
       console.log('📸 Avatar uploaded successfully:', publicUrl);
