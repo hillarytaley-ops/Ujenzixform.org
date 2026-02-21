@@ -9,7 +9,7 @@ import { UserGuideMenu } from "@/components/ui/user-guide-menu";
 import { UjenziXformLogo, UserAvatar } from "@/components/common/ProfilePicture";
 import { useAuth } from "@/contexts/AuthContext";
 
-console.log('🧭 Navigation BUILD v2 - using useAuth Feb 8 2026');
+console.log('🧭 Navigation BUILD v3 - SHOW USER EMAIL Feb 21 2026');
 
 const Navigation = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -23,12 +23,15 @@ const Navigation = () => {
   // Also check localStorage for instant display (before auth loads)
   const cachedEmail = localStorage.getItem('user_email');
   const cachedRole = localStorage.getItem('user_role');
-  const cachedRoleId = localStorage.getItem('user_role_id');
+  const cachedUserId = localStorage.getItem('user_id') || localStorage.getItem('user_role_id');
   
   // Use auth context if available, otherwise fall back to localStorage
-  const user = authUser || (cachedEmail && cachedRoleId ? { email: cachedEmail, id: cachedRoleId } as any : null);
+  // If user has a cached role, they are logged in
+  const user = authUser || (cachedRole && cachedEmail ? { email: cachedEmail, id: cachedUserId } as any : null);
   const userRole = authRole || cachedRole;
-  const isAuthLoading = authLoading && !cachedEmail;
+  const isAuthLoading = authLoading && !cachedRole;
+  
+  console.log('🧭 Nav user:', user?.email, 'role:', userRole, 'loading:', isAuthLoading);
 
   // Public navigation items (visible to everyone)
   const publicNavItems = [
