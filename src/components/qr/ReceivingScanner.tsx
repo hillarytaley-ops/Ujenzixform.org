@@ -358,26 +358,31 @@ export const ReceivingScanner: React.FC = () => {
         // Handle specific error codes with appropriate messages
         const errorCode = scanData.error_code;
         let errorTitle = 'Scan Failed';
+        let errorDescription = scanData.error || 'Invalid QR code';
         
         switch (errorCode) {
           case 'ALREADY_RECEIVED':
-            errorTitle = '⚠️ Already Received';
+            errorTitle = '⚠️ Already Scanned';
+            errorDescription = 'This QR code has already been scanned and confirmed for delivery.';
             break;
           case 'NOT_DISPATCHED':
             errorTitle = '🚫 Not Dispatched Yet';
+            errorDescription = 'This item has not been dispatched by the supplier yet.';
             break;
           case 'QR_INVALIDATED':
             errorTitle = '🚫 QR Code Invalidated';
+            errorDescription = 'This QR code is no longer valid.';
             break;
           case 'QR_NOT_FOUND':
             errorTitle = '❓ QR Code Not Found';
+            errorDescription = 'This QR code is not registered in the system.';
             break;
           default:
             errorTitle = '❌ Scan Failed';
         }
         
         toast.error(errorTitle, {
-          description: scanData.error || 'Invalid QR code',
+          description: errorDescription,
           duration: 5000
         });
       }

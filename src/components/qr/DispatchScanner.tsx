@@ -360,26 +360,27 @@ export const DispatchScanner: React.FC = () => {
         // Handle specific error codes with appropriate messages
         const errorCode = scanData.error_code;
         let errorTitle = 'Scan Failed';
-        let errorIcon = '❌';
+        let errorDescription = scanData.error || 'Invalid QR code';
         
         switch (errorCode) {
           case 'ALREADY_DISPATCHED':
-            errorTitle = '⚠️ Already Dispatched';
-            errorIcon = '🔄';
+            errorTitle = '⚠️ Already Scanned';
+            errorDescription = 'This QR code has already been scanned and dispatched.';
             break;
           case 'QR_INVALIDATED':
             errorTitle = '🚫 QR Code Invalidated';
-            errorIcon = '✅';
+            errorDescription = 'This QR code is no longer valid.';
             break;
           case 'QR_NOT_FOUND':
             errorTitle = '❓ QR Code Not Found';
+            errorDescription = 'This QR code is not registered in the system.';
             break;
           default:
             errorTitle = '❌ Scan Failed';
         }
         
         toast.error(errorTitle, {
-          description: scanData.error || 'Invalid QR code',
+          description: errorDescription,
           duration: 5000
         });
       }
