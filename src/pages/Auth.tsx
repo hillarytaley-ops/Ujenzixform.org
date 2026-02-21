@@ -11,7 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import AnimatedSection from "@/components/AnimatedSection";
 import { Separator } from "@/components/ui/separator";
-import { Github, Mail, KeyRound, CheckCircle, Loader2 } from "lucide-react";
+import { Github, Mail, KeyRound, CheckCircle, Loader2, Shield } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 
@@ -409,6 +409,16 @@ const Auth = () => {
               <Link to="/terms" className="text-primary hover:underline">Terms of Service</Link>
               {" "}and{" "}
               <Link to="/privacy" className="text-primary hover:underline">Privacy Policy</Link>
+            </div>
+
+            {/* Staff Access Link */}
+            <div className="mt-4 pt-4 border-t">
+              <Link to="/admin-login">
+                <Button variant="outline" className="w-full bg-slate-800 text-white hover:bg-slate-700 border-slate-700">
+                  <Shield className="mr-2 h-4 w-4" />
+                  Staff Access
+                </Button>
+              </Link>
             </div>
           </CardContent>
         </Card>
