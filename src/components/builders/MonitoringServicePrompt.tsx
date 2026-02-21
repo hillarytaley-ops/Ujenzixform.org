@@ -48,7 +48,9 @@ import {
   Loader2,
   X,
   Star,
-  Zap
+  Zap,
+  Navigation,
+  Copy
 } from 'lucide-react';
 
 interface MonitoringServicePromptProps {
@@ -128,9 +130,79 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
     projectDescription: '',
     contactPhone: '',
     preferredStartDate: '',
-    specialRequirements: ''
+    specialRequirements: '',
+    gpsCoordinates: ''
   });
+  const [gettingLocation, setGettingLocation] = useState(false);
   const { toast } = useToast();
+
+  // Get GPS coordinates
+  const getGPSLocation = () => {
+    if (!navigator.geolocation) {
+      toast({
+        title: 'GPS Not Supported',
+        description: 'Your browser does not support GPS location.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setGettingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        const coords = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+        
+        setFormData(prev => ({ ...prev, gpsCoordinates: coords }));
+        
+        // Try to get address from coordinates (reverse geocoding)
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
+            { headers: { 'User-Agent': 'UjenziXform/1.0' } }
+          );
+          if (response.ok) {
+            const data = await response.json();
+            if (data.display_name && !formData.siteAddress) {
+              setFormData(prev => ({ 
+                ...prev, 
+                siteAddress: data.display_name.substring(0, 200)
+              }));
+            }
+          }
+        } catch (e) {
+          console.log('Reverse geocoding failed (non-critical)');
+        }
+        
+        setGettingLocation(false);
+        toast({
+          title: '📍 Location Captured',
+          description: `GPS: ${coords}`,
+        });
+      },
+      (error) => {
+        setGettingLocation(false);
+        let message = 'Could not get your location.';
+        if (error.code === 1) message = 'Location permission denied.';
+        if (error.code === 2) message = 'Location unavailable.';
+        if (error.code === 3) message = 'Location request timed out.';
+        toast({
+          title: 'GPS Error',
+          description: message,
+          variant: 'destructive'
+        });
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+  };
+
+  // Copy coordinates to clipboard
+  const copyCoordinates = () => {
+    if (formData.gpsCoordinates) {
+      navigator.clipboard.writeText(formData.gpsCoordinates);
+      toast({ title: 'Copied!', description: 'GPS coordinates copied to clipboard.' });
+    }
+  };
 
   // Auto-fill site address from delivery address when dialog opens or purchaseOrder changes
   React.useEffect(() => {
@@ -196,9 +268,10 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
         camera_count: 1,
         special_requirements: formData.specialRequirements || null,
         estimated_cost: selectedPkg?.price || 0,
-        additional_notes: `Package: ${selectedPkg?.name || selectedPackage}. Duration: ${selectedPkg?.duration || 'N/A'}`,
+        additional_notes: `Package: ${selectedPkg?.name || selectedPackage}. Duration: ${selectedPkg?.duration || 'N/A'}${formData.gpsCoordinates ? `. GPS: ${formData.gpsCoordinates}` : ''}`,
         status: 'pending',
-        urgency: 'normal'
+        urgency: 'normal',
+        gps_coordinates: formData.gpsCoordinates || null
       };
 
       console.log('📹 Creating monitoring request:', monitoringRequest);
@@ -488,6 +561,57 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
                   value={formData.siteAddress}
                   onChange={(e) => setFormData(prev => ({ ...prev, siteAddress: e.target.value }))}
                 />
+              </div>
+
+              {/* GPS Location */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1">
+                  <Navigation className="h-3 w-3" />
+                  GPS Coordinates
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Click 'Get GPS' to capture location"
+                    value={formData.gpsCoordinates}
+                    onChange={(e) => setFormData(prev => ({ ...prev, gpsCoordinates: e.target.value }))}
+                    className="flex-1"
+                    readOnly
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={getGPSLocation}
+                    disabled={gettingLocation}
+                    className="whitespace-nowrap"
+                  >
+                    {gettingLocation ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Navigation className="h-4 w-4 mr-1" />
+                        Get GPS
+                      </>
+                    )}
+                  </Button>
+                  {formData.gpsCoordinates && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={copyCoordinates}
+                      title="Copy coordinates"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                {formData.gpsCoordinates && (
+                  <p className="text-xs text-green-600 flex items-center gap-1">
+                    <CheckCircle className="h-3 w-3" />
+                    Location captured: {formData.gpsCoordinates}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
