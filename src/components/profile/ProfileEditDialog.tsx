@@ -358,21 +358,20 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
       
       console.log('📝 ProfileEditDialog: Got access token, proceeding with save...');
 
-      // Prepare update data - include all editable fields
+      // Prepare update data - include only fields that exist in profiles table
+      // NOTE: 'address' column does NOT exist in profiles table - don't include it!
       const updateData: Record<string, any> = {
         full_name: profile.full_name || '',
         phone: profile.phone || null,
         location: profile.location || null,
         company_name: profile.company_name || null,
-        store_name: profile.store_name || null,
         bio: profile.bio || null,
         website: profile.website || null,
-        address: profile.address || null,
         avatar_url: profile.avatar_url || null,
         updated_at: new Date().toISOString()
       };
 
-      // Add coordinates if available
+      // Add coordinates if available and if columns exist
       if (profile.latitude) updateData.latitude = profile.latitude;
       if (profile.longitude) updateData.longitude = profile.longitude;
 
@@ -402,10 +401,18 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
         if (!result || result.length === 0) {
           console.log('📝 ProfileEditDialog: No rows updated, trying upsert...');
           
+          // Use only the fields that exist in profiles table
           const insertData = {
-            ...updateData,
+            id: profile.id || profile.user_id,
             user_id: profile.user_id,
-            id: profile.id || profile.user_id
+            full_name: profile.full_name || '',
+            phone: profile.phone || null,
+            location: profile.location || null,
+            company_name: profile.company_name || null,
+            bio: profile.bio || null,
+            website: profile.website || null,
+            avatar_url: profile.avatar_url || null,
+            updated_at: new Date().toISOString()
           };
           
           response = await fetch(
@@ -434,10 +441,18 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
         // Try upsert as fallback
         console.log('📝 ProfileEditDialog: PATCH failed, trying upsert...');
         
+        // Use only the fields that exist in profiles table
         const insertData = {
-          ...updateData,
+          id: profile.id || profile.user_id,
           user_id: profile.user_id,
-          id: profile.id || profile.user_id
+          full_name: profile.full_name || '',
+          phone: profile.phone || null,
+          location: profile.location || null,
+          company_name: profile.company_name || null,
+          bio: profile.bio || null,
+          website: profile.website || null,
+          avatar_url: profile.avatar_url || null,
+          updated_at: new Date().toISOString()
         };
         
         response = await fetch(
