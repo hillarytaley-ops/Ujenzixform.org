@@ -113,17 +113,9 @@ const PrivateClientAuth: React.FC = () => {
       
       if (!dbRole) {
         // SECURITY: User has NO role - they must register first, NOT auto-assign!
-        console.log('🔐 SECURITY: No role found for user - rejecting sign-in');
-        // Sign out the user
-        try {
-          await fetch(`${SUPABASE_URL}/auth/v1/logout`, {
-            method: 'POST',
-            headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${authData.access_token}` },
-          });
-        } catch (e) { /* ignore */ }
-        localStorage.removeItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        localStorage.removeItem('user_role');
-        localStorage.removeItem('user_email');
+        console.log('🔐 SECURITY: No role found for user - needs to register');
+        // DON'T sign out the user or remove their email - just show error
+        localStorage.removeItem('user_role'); // Only remove role, keep email
         setIsLoading(false);
         redirecting.current = false;
         toast({ 
