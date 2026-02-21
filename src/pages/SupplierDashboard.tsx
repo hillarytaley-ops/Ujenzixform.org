@@ -189,13 +189,32 @@ const SupplierDashboard = () => {
 
   // Fetch quote requests function - using native fetch API for reliability
   const fetchQuoteRequests = async () => {
-    if (!user?.id) {
-      console.log('❌ Cannot fetch quotes - no user.id');
+    // Get user ID from multiple sources
+    let userId = user?.id;
+    let userEmail = user?.email;
+    
+    if (!userId) {
+      try {
+        const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          userId = parsed.user?.id;
+          userEmail = parsed.user?.email;
+        }
+      } catch (e) {}
+    }
+    if (!userId) {
+      userId = localStorage.getItem('user_id') || undefined;
+      userEmail = localStorage.getItem('user_email') || undefined;
+    }
+    
+    if (!userId) {
+      console.log('❌ Cannot fetch quotes - no user.id available');
       return;
     }
     
     setLoadingQuotes(true);
-    console.log('🔄 Fetching quotes for supplier user.id:', user.id, 'email:', user.email);
+    console.log('🔄 Fetching quotes for supplier userId:', userId, 'email:', userEmail);
     
     // Get auth token from localStorage for faster access
     const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
@@ -222,13 +241,13 @@ const SupplierDashboard = () => {
     
     try {
       // STEP 1: Find ALL supplier records that could belong to this user
-      // Check by user_id, email, and also by id (in case user.id IS the supplier.id)
-      const supplierIds = new Set<string>([user.id]); // Always include user.id
+      // Check by user_id, email, and also by id (in case userId IS the supplier.id)
+      const supplierIds = new Set<string>([userId]); // Always include userId
       
       // Try to find supplier by user_id
       try {
         const supplierResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${user.id}&select=id,user_id,company_name,email`,
+          `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${userId}&select=id,user_id,company_name,email`,
           { headers, cache: 'no-store' }
         );
         
@@ -246,10 +265,10 @@ const SupplierDashboard = () => {
       }
       
       // Also try to find supplier by email
-      if (user.email) {
+      if (userEmail) {
         try {
           const emailResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/suppliers?email=eq.${encodeURIComponent(user.email)}&select=id,user_id,company_name,email`,
+            `${SUPABASE_URL}/rest/v1/suppliers?email=eq.${encodeURIComponent(userEmail)}&select=id,user_id,company_name,email`,
             { headers, cache: 'no-store' }
           );
           
@@ -267,10 +286,10 @@ const SupplierDashboard = () => {
         }
       }
       
-      // Also check if user.id itself is a supplier.id (direct match)
+      // Also check if userId itself is a supplier.id (direct match)
       try {
         const directResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/suppliers?id=eq.${user.id}&select=id,user_id,company_name,email`,
+          `${SUPABASE_URL}/rest/v1/suppliers?id=eq.${userId}&select=id,user_id,company_name,email`,
           { headers, cache: 'no-store' }
         );
         
@@ -360,8 +379,28 @@ const SupplierDashboard = () => {
 
   // Fetch quote requests on mount and when user changes
   useEffect(() => {
-    if (user?.id) {
-      fetchQuoteRequests();
+    // Try to get user ID from multiple sources
+    let userId = user?.id;
+    if (!userId) {
+      try {
+        const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          userId = parsed.user?.id;
+        }
+      } catch (e) {}
+    }
+    if (!userId) {
+      userId = localStorage.getItem('user_id') || undefined;
+    }
+    
+    console.log('📋 Quote fetch trigger - user.id:', user?.id, 'fallback userId:', userId);
+    
+    if (userId) {
+      // Small delay to ensure component is ready
+      setTimeout(() => fetchQuoteRequests(), 500);
+    } else {
+      console.log('⚠️ No user ID available for quote fetch');
     }
     
     // Set up real-time subscription for new quote requests
