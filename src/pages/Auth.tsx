@@ -15,7 +15,7 @@ import { Github, Mail, KeyRound, CheckCircle, Loader2 } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 
-console.log('🔐 Auth.tsx BUILD v24 - FETCH ROLE DIRECTLY Feb 21 2026');
+console.log('🔐 Auth.tsx BUILD v25 - DETAILED LOGGING Feb 21 2026');
 
 // Dashboard paths
 const DASHBOARDS: Record<string, string> = {
@@ -41,37 +41,56 @@ const Auth = () => {
   // On mount: Check session and role, redirect if needed
   useEffect(() => {
     const checkAndRedirect = async () => {
-      console.log('🔐 Checking session...');
+      console.log('🔐 BUILD v25 - Checking session...');
       
       try {
         // Get current session
-        const { data: { session } } = await supabase.auth.getSession();
+        console.log('🔐 Calling getSession...');
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        console.log('🔐 getSession result:', { session: session?.user?.email, error: sessionError });
         
         if (session?.user) {
-          console.log('🔐 Session found:', session.user.email);
+          console.log('🔐 Session found:', session.user.email, 'ID:', session.user.id);
           
           // Fetch role from database
-          const { data: roleData } = await supabase
+          console.log('🔐 Fetching role from user_roles table...');
+          const { data: roleData, error: roleError } = await supabase
             .from('user_roles')
             .select('role')
             .eq('user_id', session.user.id)
             .limit(1)
             .maybeSingle();
           
-          console.log('🔐 Role data:', roleData);
+          console.log('🔐 Role query result:', { roleData, roleError });
           
-          if (roleData?.role && DASHBOARDS[roleData.role]) {
-            console.log('🔐 Redirecting to:', DASHBOARDS[roleData.role]);
-            localStorage.setItem('user_role', roleData.role);
-            window.location.replace(DASHBOARDS[roleData.role]);
-            return; // Don't set loading false, we're redirecting
+          if (roleError) {
+            console.error('🔐 Role fetch error:', roleError);
           }
+          
+          if (roleData?.role) {
+            const dashboard = DASHBOARDS[roleData.role];
+            console.log('🔐 Role:', roleData.role, '-> Dashboard:', dashboard);
+            
+            if (dashboard) {
+              console.log('🔐 REDIRECTING NOW to:', dashboard);
+              localStorage.setItem('user_role', roleData.role);
+              window.location.replace(dashboard);
+              return; // Don't set loading false, we're redirecting
+            } else {
+              console.log('🔐 No dashboard mapping for role:', roleData.role);
+            }
+          } else {
+            console.log('🔐 No role found in database for user');
+          }
+        } else {
+          console.log('🔐 No session found');
         }
       } catch (err) {
         console.error('🔐 Session check error:', err);
       }
       
       // No session or no role - show login form
+      console.log('🔐 Showing login form');
       setLoading(false);
     };
     
