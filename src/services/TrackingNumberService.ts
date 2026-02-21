@@ -65,6 +65,14 @@ class TrackingNumberService {
     deliveryRequestId: string,
     providerId: string
   ): Promise<TrackingNumberResult | null> {
+    // Validate inputs
+    if (!deliveryRequestId || !providerId || providerId === '') {
+      console.error('❌ onProviderAcceptsDelivery: Invalid parameters', { deliveryRequestId, providerId });
+      throw new Error('Invalid delivery request ID or provider ID');
+    }
+    
+    console.log('🚚 onProviderAcceptsDelivery called with:', { deliveryRequestId, providerId });
+    
     try {
       // First, get the delivery request to check its expected delivery date
       const { data: requestToAccept, error: requestError } = await supabase
@@ -163,6 +171,12 @@ class TrackingNumberService {
 
       // ATOMIC UPDATE: Use a conditional update to ensure first-come-first-served
       // Only update if the status is still 'pending' or 'assigned' OR if we're the same provider
+      // Build the OR clause safely - only include provider_id check if providerId is valid
+      const orConditions = ['status.eq.pending', 'status.eq.assigned'];
+      if (providerId && providerId.length > 10) {
+        orConditions.push(`provider_id.eq.${providerId}`);
+      }
+      
       const { data: updateResult, error: updateError } = await supabase
         .from('delivery_requests')
         .update({
@@ -174,7 +188,7 @@ class TrackingNumberService {
           updated_at: new Date().toISOString()
         })
         .eq('id', deliveryRequestId)
-        .or(`status.eq.pending,status.eq.assigned,provider_id.eq.${providerId}`)
+        .or(orConditions.join(','))
         .select();
 
       // Check if update was successful (row was actually updated)
