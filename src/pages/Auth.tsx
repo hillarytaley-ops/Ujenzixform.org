@@ -1,7 +1,8 @@
-// Auth Page - Build v22 - ULTRA SIMPLE
-import { useState, useRef } from "react";
+// Auth Page - Build v23 - IMMEDIATE REDIRECT IF SIGNED IN
+import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,9 +16,20 @@ import { Github, Mail, KeyRound, CheckCircle, Loader2 } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 
-console.log('🔐 Auth.tsx BUILD v22 - ULTRA SIMPLE Feb 21 2026');
+console.log('🔐 Auth.tsx BUILD v23 - IMMEDIATE REDIRECT Feb 21 2026');
+
+// Dashboard paths
+const DASHBOARDS: Record<string, string> = {
+  'admin': '/admin-dashboard',
+  'supplier': '/supplier-dashboard',
+  'delivery': '/delivery-dashboard',
+  'delivery_provider': '/delivery-dashboard',
+  'professional_builder': '/professional-builder-dashboard',
+  'private_client': '/private-client-dashboard',
+};
 
 const Auth = () => {
+  const { user, userRole, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [signInEmail, setSignInEmail] = useState("");
@@ -25,9 +37,43 @@ const Auth = () => {
   const [signUpEmail, setSignUpEmail] = useState("");
   const [signUpPassword, setSignUpPassword] = useState("");
   const isSubmitting = useRef(false);
+  const hasRedirected = useRef(false);
   const { toast } = useToast();
 
-  // SIMPLE SIGN IN - just authenticate and redirect
+  // IMMEDIATE REDIRECT if user is already signed in with a role
+  useEffect(() => {
+    if (hasRedirected.current) return;
+    
+    if (!authLoading && user && userRole) {
+      const dashboard = DASHBOARDS[userRole];
+      if (dashboard) {
+        hasRedirected.current = true;
+        console.log('🔐 Already signed in with role:', userRole, '- redirecting to:', dashboard);
+        window.location.replace(dashboard);
+      }
+    }
+  }, [authLoading, user, userRole]);
+
+  // Show loading while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // If user has role, show redirecting message
+  if (user && userRole && DASHBOARDS[userRole]) {
+    return (
+      <div className="min-h-screen flex items-center justify-center flex-col gap-4">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p>Redirecting to your dashboard...</p>
+      </div>
+    );
+  }
+
+  // SIGN IN
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting.current) return;
@@ -47,7 +93,7 @@ const Auth = () => {
         return;
       }
 
-      // SUCCESS - redirect to home, let the app figure out the dashboard
+      // Success - go to home, AuthContext will update and redirect
       toast({ title: "✅ Welcome back!" });
       window.location.href = '/home';
       
@@ -58,7 +104,7 @@ const Auth = () => {
     }
   };
 
-  // SIMPLE SIGN UP
+  // SIGN UP
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting.current) return;
