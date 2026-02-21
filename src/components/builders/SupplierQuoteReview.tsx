@@ -814,27 +814,21 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
       {/* Pending Quotes (Awaiting Supplier Response) */}
       {pendingQuotes.length > 0 && (
         <Card className={cardBg}>
-          <CardHeader>
-            <CardTitle className={`flex items-center gap-2 ${textColor}`}>
-              <Clock className="h-5 w-5 text-yellow-500" />
+          <CardHeader className="pb-2">
+            <CardTitle className={`flex items-center gap-2 text-sm ${textColor}`}>
+              <Clock className="h-4 w-4 text-yellow-500" />
               Awaiting Supplier Quotes ({pendingQuotes.length})
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-2">
             {pendingQuotes.map((quote) => (
-              <div key={quote.id} className={`p-3 rounded-lg border ${isDarkMode ? 'bg-slate-700 border-slate-600' : 'bg-gray-50'}`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Package className="h-4 w-4 text-gray-500" />
-                    <div>
-                      <p className={`font-medium ${textColor}`}>{quote.material_name}</p>
-                      <p className={`text-xs ${mutedText}`}>
-                        {quote.quantity} {quote.unit} • Sent to: {quote.supplier?.company_name || 'Supplier'}
-                      </p>
-                    </div>
-                  </div>
-                  {getStatusBadge(quote.status)}
+              <div key={quote.id} className={`p-2 rounded-lg border flex items-center justify-between ${isDarkMode ? 'bg-slate-700 border-slate-600' : 'bg-gray-50'}`}>
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <Package className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                  <span className={`font-medium truncate ${textColor}`}>{quote.material_name}</span>
+                  <span className={`text-xs ${mutedText}`}>×{quote.quantity}</span>
                 </div>
+                <Badge variant="outline" className="text-yellow-600 border-yellow-300 text-xs ml-2">⏳ Awaiting</Badge>
               </div>
             ))}
           </CardContent>
@@ -844,59 +838,51 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
       {/* Accepted Quotes */}
       {acceptedQuotes.length > 0 && (
         <Card className={cardBg}>
-          <CardHeader>
-            <CardTitle className={`flex items-center gap-2 ${textColor}`}>
-              <CheckCircle className="h-5 w-5 text-green-500" />
+          <CardHeader className="pb-2">
+            <CardTitle className={`flex items-center gap-2 text-sm ${textColor}`}>
+              <CheckCircle className="h-4 w-4 text-green-500" />
               Accepted Quotes ({acceptedQuotes.length})
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-2">
             {acceptedQuotes.map((quote) => (
-              <div key={quote.id} className={`p-3 rounded-lg border ${isDarkMode ? 'bg-slate-700 border-slate-600' : 'bg-green-50 border-green-200'}`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <QrCode className="h-4 w-4 text-green-600" />
-                    <div>
-                      <p className={`font-medium ${isDarkMode ? 'text-white' : 'text-green-800'}`}>
-                        {quote.material_name}
-                      </p>
-                      <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-green-600'}`}>
-                        {quote.supplier?.company_name} • {quote.quote_amount ? formatCurrency(quote.quote_amount) : 'N/A'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge className="bg-green-100 text-green-700">
-                      <QrCode className="h-3 w-3 mr-1" />
-                      QR Generated
-                    </Badge>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="border-blue-300 text-blue-600"
-                      onClick={() => {
-                        setAcceptedPurchaseOrder({
-                          id: quote.id,
-                          po_number: quote.purchase_order?.po_number,
-                          supplier_id: quote.supplier_id,
-                          supplier_name: quote.supplier?.company_name,
-                          supplier_address: quote.supplier?.address,
-                          total_amount: quote.quote_amount,
-                          delivery_address: quote.delivery_address,
-                          delivery_date: quote.preferred_delivery_date,
-                          items: [{
-                            material_name: quote.material_name,
-                            quantity: quote.quantity,
-                            unit: quote.unit
-                          }]
-                        });
-                        setShowDeliveryPrompt(true);
-                      }}
-                    >
-                      <Truck className="h-3 w-3 mr-1" />
-                      Request Delivery
-                    </Button>
-                  </div>
+              <div key={quote.id} className={`p-2 rounded-lg border flex items-center justify-between ${isDarkMode ? 'bg-slate-700 border-slate-600' : 'bg-green-50 border-green-200'}`}>
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <QrCode className="h-4 w-4 text-green-600 flex-shrink-0" />
+                  <span className={`font-medium truncate ${isDarkMode ? 'text-white' : 'text-green-800'}`}>
+                    {quote.material_name}
+                  </span>
+                  <span className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-green-600'}`}>
+                    {quote.quote_amount ? formatCurrency(quote.quote_amount) : ''}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 ml-2">
+                  <Badge className="bg-green-100 text-green-700 text-xs">✓ QR</Badge>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 text-blue-600 hover:bg-blue-50"
+                    onClick={() => {
+                      setAcceptedPurchaseOrder({
+                        id: quote.id,
+                        po_number: quote.purchase_order?.po_number,
+                        supplier_id: quote.supplier_id,
+                        supplier_name: quote.supplier?.company_name,
+                        supplier_address: quote.supplier?.address,
+                        total_amount: quote.quote_amount,
+                        delivery_address: quote.delivery_address,
+                        delivery_date: quote.preferred_delivery_date,
+                        items: [{
+                          material_name: quote.material_name,
+                          quantity: quote.quantity,
+                          unit: quote.unit
+                        }]
+                      });
+                      setShowDeliveryPrompt(true);
+                    }}
+                  >
+                    <Truck className="h-3 w-3" />
+                  </Button>
                 </div>
               </div>
             ))}
