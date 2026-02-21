@@ -67,53 +67,128 @@ interface MonitoringServicePromptProps {
   onDeclined?: () => void;
 }
 
-const MONITORING_PACKAGES = [
+// Professional Builder Packages (Full Price)
+const PROFESSIONAL_PACKAGES = [
   {
-    id: 'basic',
-    name: 'Basic Monitoring',
-    price: 5000,
+    id: 'pro-basic',
+    name: 'Basic',
+    priceMonthly: 8000,
     duration: '1 month',
     features: [
       'Weekly site visit reports',
-      'Photo documentation',
-      'Material verification',
-      'Basic quality checks'
+      'Photo & video documentation',
+      'Material QR code verification',
+      'GPS location tracking',
+      'Basic quality checks',
+      'Email support'
     ],
-    recommended: false
+    recommended: false,
+    icon: '📋'
   },
   {
-    id: 'standard',
-    name: 'Standard Monitoring',
-    price: 15000,
+    id: 'pro-standard',
+    name: 'Standard',
+    priceMonthly: 20000,
     duration: '3 months',
     features: [
       'Bi-weekly site visits',
-      'Detailed photo & video reports',
-      'Material quality verification',
-      'Progress tracking dashboard',
+      'Real-time progress dashboard',
+      'Material QR scanning & tracking',
+      'GPS coordinates logging',
+      'Supplier quote management',
+      'Delivery tracking integration',
       'Issue alerts & notifications',
-      'Monthly summary reports'
+      'Monthly summary reports',
+      'Phone & email support'
     ],
-    recommended: true
+    recommended: true,
+    icon: '⭐'
   },
   {
-    id: 'premium',
-    name: 'Premium Monitoring',
-    price: 35000,
+    id: 'pro-premium',
+    name: 'Premium',
+    priceMonthly: 40000,
     duration: '6 months',
     features: [
       'Weekly site visits',
       'Real-time progress updates',
-      'Comprehensive quality assurance',
+      'Full QR code tracking system',
+      'GPS & geofencing alerts',
       'Dedicated project manager',
       'Drone aerial photography',
       '24/7 issue reporting',
       'Contractor performance reviews',
-      'Final inspection & certification'
+      'Multi-supplier coordination',
+      'Delivery dispatch monitoring',
+      'Final inspection & certification',
+      'Priority 24/7 support'
     ],
-    recommended: false
+    recommended: false,
+    icon: '👑'
   }
 ];
+
+// Private Builder Packages (Half Price)
+const PRIVATE_PACKAGES = [
+  {
+    id: 'pvt-basic',
+    name: 'Basic',
+    priceMonthly: 4000,
+    duration: '1 month',
+    features: [
+      'Bi-weekly site visit reports',
+      'Photo documentation',
+      'Material verification',
+      'GPS location tracking',
+      'Basic quality checks',
+      'Email support'
+    ],
+    recommended: false,
+    icon: '📋'
+  },
+  {
+    id: 'pvt-standard',
+    name: 'Standard',
+    priceMonthly: 10000,
+    duration: '3 months',
+    features: [
+      'Weekly site visits',
+      'Photo & video reports',
+      'Material QR verification',
+      'GPS coordinates logging',
+      'Progress tracking dashboard',
+      'Delivery tracking',
+      'Issue alerts',
+      'Monthly reports',
+      'Phone support'
+    ],
+    recommended: true,
+    icon: '⭐'
+  },
+  {
+    id: 'pvt-premium',
+    name: 'Premium',
+    priceMonthly: 20000,
+    duration: '6 months',
+    features: [
+      'Weekly site visits',
+      'Real-time updates',
+      'Full QR tracking',
+      'GPS monitoring',
+      'Dedicated monitor',
+      'Drone photography',
+      '24/7 issue reporting',
+      'Quality assurance',
+      'Final inspection',
+      'Priority support'
+    ],
+    recommended: false,
+    icon: '👑'
+  }
+];
+
+// Legacy array for backward compatibility
+const MONITORING_PACKAGES = PROFESSIONAL_PACKAGES;
 
 export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = ({
   isOpen,
@@ -125,6 +200,11 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
   const [step, setStep] = useState<'intro' | 'packages' | 'details' | 'success'>('intro');
   const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  
+  // Detect user role for pricing
+  const userRole = localStorage.getItem('user_role') || 'private_client';
+  const isProfessional = userRole === 'professional_builder' || userRole === 'admin';
+  const packages = isProfessional ? PROFESSIONAL_PACKAGES : PRIVATE_PACKAGES;
   const [formData, setFormData] = useState({
     siteAddress: purchaseOrder?.delivery_address || '',
     projectDescription: '',
@@ -461,12 +541,22 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
                 Choose Your Monitoring Package
               </DialogTitle>
               <DialogDescription>
-                Select a package that fits your project needs
+                {isProfessional ? (
+                  <span className="flex items-center gap-1">
+                    <Badge className="bg-blue-600">Professional Builder</Badge>
+                    Full-featured packages for commercial projects
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1">
+                    <Badge className="bg-green-600">Private Builder</Badge>
+                    Affordable packages for home construction
+                  </span>
+                )}
               </DialogDescription>
             </DialogHeader>
 
-            <div className="py-4 space-y-4">
-              {MONITORING_PACKAGES.map((pkg) => (
+            <div className="py-4 space-y-3">
+              {packages.map((pkg) => (
                 <Card 
                   key={pkg.id}
                   className={`cursor-pointer transition-all ${
@@ -480,30 +570,35 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
+                          <span className="text-xl">{pkg.icon}</span>
                           <h3 className="font-bold text-lg">{pkg.name}</h3>
                           {pkg.recommended && (
                             <Badge className="bg-orange-500 text-white">
                               <Star className="h-3 w-3 mr-1" />
-                              Recommended
+                              Best Value
                             </Badge>
                           )}
                         </div>
                         <div className="flex items-baseline gap-2 mb-3">
                           <span className="text-2xl font-bold text-blue-600">
-                            {formatCurrency(pkg.price)}
+                            {formatCurrency(pkg.priceMonthly)}
                           </span>
-                          <span className="text-sm text-gray-500">/ {pkg.duration}</span>
+                          <span className="text-sm text-gray-500">/month</span>
+                          <span className="text-xs text-gray-400">• {pkg.duration} commitment</span>
                         </div>
-                        <ul className="space-y-1">
-                          {pkg.features.map((feature, idx) => (
-                            <li key={idx} className="flex items-center gap-2 text-sm text-gray-600">
-                              <CheckCircle className="h-4 w-4 text-green-500" />
-                              {feature}
-                            </li>
+                        <div className="grid grid-cols-2 gap-1">
+                          {pkg.features.slice(0, 6).map((feature, idx) => (
+                            <div key={idx} className="flex items-center gap-1 text-xs text-gray-600">
+                              <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
+                              <span className="truncate">{feature}</span>
+                            </div>
                           ))}
-                        </ul>
+                        </div>
+                        {pkg.features.length > 6 && (
+                          <p className="text-xs text-blue-600 mt-1">+{pkg.features.length - 6} more features</p>
+                        )}
                       </div>
-                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
                         selectedPackage === pkg.id 
                           ? 'border-blue-500 bg-blue-500' 
                           : 'border-gray-300'
@@ -516,6 +611,17 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
                   </CardContent>
                 </Card>
               ))}
+              
+              {/* Pricing Note */}
+              <Alert className="bg-gray-50 border-gray-200">
+                <AlertDescription className="text-xs text-gray-600">
+                  {isProfessional ? (
+                    <>💼 Professional Builder pricing includes advanced features for commercial projects.</>
+                  ) : (
+                    <>🏠 Private Builder pricing is <strong>50% off</strong> professional rates - perfect for home construction!</>
+                  )}
+                </AlertDescription>
+              </Alert>
             </div>
 
             <DialogFooter className="flex flex-col gap-2">
@@ -673,16 +779,23 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
                   <CardContent className="p-4">
                     <div className="flex justify-between items-center">
                       <div>
-                        <p className="font-medium text-blue-900">
-                          {MONITORING_PACKAGES.find(p => p.id === selectedPackage)?.name}
+                        <p className="font-medium text-blue-900 flex items-center gap-2">
+                          <span>{packages.find(p => p.id === selectedPackage)?.icon}</span>
+                          {packages.find(p => p.id === selectedPackage)?.name}
+                          <Badge variant="outline" className="text-xs">
+                            {isProfessional ? 'Professional' : 'Private'}
+                          </Badge>
                         </p>
                         <p className="text-sm text-blue-700">
-                          {MONITORING_PACKAGES.find(p => p.id === selectedPackage)?.duration}
+                          {packages.find(p => p.id === selectedPackage)?.duration} commitment
                         </p>
                       </div>
-                      <p className="text-xl font-bold text-blue-600">
-                        {formatCurrency(MONITORING_PACKAGES.find(p => p.id === selectedPackage)?.price || 0)}
-                      </p>
+                      <div className="text-right">
+                        <p className="text-xl font-bold text-blue-600">
+                          {formatCurrency(packages.find(p => p.id === selectedPackage)?.priceMonthly || 0)}
+                        </p>
+                        <p className="text-xs text-blue-500">/month</p>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
