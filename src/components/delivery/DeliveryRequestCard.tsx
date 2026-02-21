@@ -127,20 +127,30 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Get provider ID
+      // Get provider ID - try delivery_providers table first, fallback to user.id
+      let providerId = user.id;
       const { data: providerData } = await supabase
         .from('delivery_providers')
         .select('id')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
-      if (!providerData) throw new Error('Provider not found');
+      if (providerData?.id) {
+        providerId = providerData.id;
+      }
+      
+      // Validate providerId is not empty
+      if (!providerId) {
+        throw new Error('Provider ID not found');
+      }
+
+      console.log('🚚 Accepting delivery with provider ID:', providerId);
 
       // CHECK: Does this provider already have an active delivery?
       const { data: activeDeliveries, error: activeError } = await supabase
         .from('delivery_requests')
         .select('id, status, tracking_number')
-        .eq('provider_id', providerData.id)
+        .eq('provider_id', providerId)
         .in('status', ['accepted', 'picked_up', 'in_transit', 'assigned'])
         .limit(1);
 
@@ -163,7 +173,7 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
       // Use TrackingNumberService to handle acceptance and generate tracking number
       const result = await trackingNumberService.onProviderAcceptsDelivery(
         delivery.id,
-        providerData.id
+        providerId
       );
 
       if (!result) {
@@ -207,12 +217,17 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Get provider ID
+      // Get provider ID - try delivery_providers table first, fallback to user.id
+      let providerId = user.id;
       const { data: providerData } = await supabase
         .from('delivery_providers')
         .select('id')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
+
+      if (providerData?.id) {
+        providerId = providerData.id;
+      }
 
       // Check if this delivery was previously accepted (has tracking number)
       const { data: deliveryData } = await supabase
