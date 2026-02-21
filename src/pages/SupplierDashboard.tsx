@@ -221,101 +221,101 @@ const SupplierDashboard = () => {
     }
     
     try {
-      // First, try to find supplier record by user_id using fetch with timeout
-      const supplierController = new AbortController();
-      const supplierTimeout = setTimeout(() => supplierController.abort(), 5000);
+      // STEP 1: Find ALL supplier records that could belong to this user
+      // Check by user_id, email, and also by id (in case user.id IS the supplier.id)
+      const supplierIds = new Set<string>([user.id]); // Always include user.id
       
-      let supplierRecord = null;
-      
-      // Try by user_id first
-      const supplierResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${user.id}&select=id,user_id,company_name,email`,
-        { headers, signal: supplierController.signal, cache: 'no-store' }
-      );
-      clearTimeout(supplierTimeout);
-      
-      if (supplierResponse.ok) {
-        const supplierData = await supplierResponse.json();
-        supplierRecord = supplierData?.[0] || null;
-        console.log('📦 Supplier record by user_id:', supplierRecord);
-      }
-      
-      // If not found by user_id, try by email
-      if (!supplierRecord && user.email) {
-        const emailController = new AbortController();
-        const emailTimeout = setTimeout(() => emailController.abort(), 5000);
-        
-        const emailResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/suppliers?email=eq.${encodeURIComponent(user.email)}&select=id,user_id,company_name,email`,
-          { headers, signal: emailController.signal, cache: 'no-store' }
-        );
-        clearTimeout(emailTimeout);
-        
-        if (emailResponse.ok) {
-          const emailData = await emailResponse.json();
-          supplierRecord = emailData?.[0] || null;
-          console.log('📦 Supplier record by email:', supplierRecord);
-        }
-      }
-      
-      // Build list of IDs to check (user.id, suppliers.id, AND suppliers.user_id)
-      const supplierIds = [user.id];
-      if (supplierRecord?.id && !supplierIds.includes(supplierRecord.id)) {
-        supplierIds.push(supplierRecord.id);
-      }
-      if (supplierRecord?.user_id && !supplierIds.includes(supplierRecord.user_id)) {
-        supplierIds.push(supplierRecord.user_id);
-      }
-      
-      console.log('🔍 Looking for quotes with supplier_id in:', supplierIds);
-      console.log('📦 Final supplier record:', supplierRecord);
-      
-      // Store the supplier record ID for use by child components
-      if (supplierRecord?.id) {
-        setSupplierRecordId(supplierRecord.id);
-      }
-
-      // Fetch from purchase_orders where this supplier is the target
-      const quotesController = new AbortController();
-      const quotesTimeout = setTimeout(() => quotesController.abort(), 8000);
-      
-      const supplierIdsParam = supplierIds.join(',');
-      const quotesResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=in.(${supplierIdsParam})&status=in.(pending,quoted,rejected,confirmed)&order=created_at.desc`,
-        { headers, signal: quotesController.signal, cache: 'no-store' }
-      );
-      clearTimeout(quotesTimeout);
-      
-      let purchaseOrderQuotes: any[] = [];
-      if (quotesResponse.ok) {
-        purchaseOrderQuotes = await quotesResponse.json();
-        console.log('📋 Raw purchase_orders query result:', purchaseOrderQuotes.length, 'quotes');
-      } else {
-        console.error('Error fetching purchase order quotes:', quotesResponse.status);
-      }
-      
-      // DEBUG: Fetch all recent quotes to show what's in the system
-      const debugController = new AbortController();
-      const debugTimeout = setTimeout(() => debugController.abort(), 5000);
-      
+      // Try to find supplier by user_id
       try {
-        const debugResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/purchase_orders?status=in.(pending,quoted,confirmed)&order=created_at.desc&limit=20&select=id,supplier_id,buyer_id,status,po_number,created_at`,
-          { headers, signal: debugController.signal, cache: 'no-store' }
+        const supplierResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${user.id}&select=id,user_id,company_name,email`,
+          { headers, cache: 'no-store' }
         );
-        clearTimeout(debugTimeout);
         
-        if (debugResponse.ok) {
-          const allPendingQuotes = await debugResponse.json();
-          console.log('🔎 DEBUG - All recent quotes in system:', allPendingQuotes?.length || 0);
-          allPendingQuotes?.forEach((q: any) => {
-            const matches = supplierIds.includes(q.supplier_id);
-            console.log(`   Quote ${q.po_number}: supplier_id=${q.supplier_id}, matches=${matches ? '✓' : '✗'}`);
-          });
+        if (supplierResponse.ok) {
+          const supplierData = await supplierResponse.json();
+          if (supplierData?.[0]) {
+            supplierIds.add(supplierData[0].id);
+            if (supplierData[0].user_id) supplierIds.add(supplierData[0].user_id);
+            console.log('📦 Found supplier by user_id:', supplierData[0]);
+            setSupplierRecordId(supplierData[0].id);
+          }
         }
-      } catch (debugErr) {
-        console.log('Debug query skipped due to timeout');
+      } catch (e) {
+        console.warn('Supplier lookup by user_id failed');
       }
+      
+      // Also try to find supplier by email
+      if (user.email) {
+        try {
+          const emailResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/suppliers?email=eq.${encodeURIComponent(user.email)}&select=id,user_id,company_name,email`,
+            { headers, cache: 'no-store' }
+          );
+          
+          if (emailResponse.ok) {
+            const emailData = await emailResponse.json();
+            if (emailData?.[0]) {
+              supplierIds.add(emailData[0].id);
+              if (emailData[0].user_id) supplierIds.add(emailData[0].user_id);
+              console.log('📦 Found supplier by email:', emailData[0]);
+              if (!supplierRecordId) setSupplierRecordId(emailData[0].id);
+            }
+          }
+        } catch (e) {
+          console.warn('Supplier lookup by email failed');
+        }
+      }
+      
+      // Also check if user.id itself is a supplier.id (direct match)
+      try {
+        const directResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/suppliers?id=eq.${user.id}&select=id,user_id,company_name,email`,
+          { headers, cache: 'no-store' }
+        );
+        
+        if (directResponse.ok) {
+          const directData = await directResponse.json();
+          if (directData?.[0]) {
+            supplierIds.add(directData[0].id);
+            if (directData[0].user_id) supplierIds.add(directData[0].user_id);
+            console.log('📦 Found supplier by direct id match:', directData[0]);
+          }
+        }
+      } catch (e) {
+        console.warn('Supplier lookup by direct id failed');
+      }
+      
+      const supplierIdsArray = Array.from(supplierIds);
+      console.log('🔍 Looking for quotes with supplier_id in:', supplierIdsArray);
+
+      // STEP 2: Fetch ALL pending/quoted purchase_orders and filter client-side
+      // This ensures we don't miss any due to ID mismatches
+      let allQuotes: any[] = [];
+      try {
+        const quotesResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/purchase_orders?status=in.(pending,quoted,rejected,confirmed)&order=created_at.desc&limit=100`,
+          { headers, cache: 'no-store' }
+        );
+        
+        if (quotesResponse.ok) {
+          allQuotes = await quotesResponse.json();
+          console.log('📋 Total quotes in system:', allQuotes.length);
+        }
+      } catch (e) {
+        console.error('Failed to fetch quotes');
+      }
+      
+      // Filter quotes that match any of our supplier IDs
+      const purchaseOrderQuotes = allQuotes.filter(q => supplierIdsArray.includes(q.supplier_id));
+      console.log('📋 Quotes matching this supplier:', purchaseOrderQuotes.length);
+      
+      // DEBUG: Show all quotes and their supplier_ids
+      console.log('🔎 DEBUG - All quotes breakdown:');
+      allQuotes.forEach((q: any) => {
+        const matches = supplierIdsArray.includes(q.supplier_id);
+        console.log(`   ${q.po_number}: supplier_id=${q.supplier_id} ${matches ? '✓ MATCH' : '✗'}`);
+      });
 
       // Transform purchase_orders to match quote display format
       const transformedPOQuotes = (purchaseOrderQuotes || []).map(po => ({
