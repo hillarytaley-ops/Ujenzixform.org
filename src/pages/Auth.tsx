@@ -1,8 +1,7 @@
-// Auth Page - Build v23 - IMMEDIATE REDIRECT IF SIGNED IN
+// Auth Page - Build v24 - FETCH ROLE DIRECTLY
 import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +15,7 @@ import { Github, Mail, KeyRound, CheckCircle, Loader2 } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 
-console.log('🔐 Auth.tsx BUILD v23 - IMMEDIATE REDIRECT Feb 21 2026');
+console.log('🔐 Auth.tsx BUILD v24 - FETCH ROLE DIRECTLY Feb 21 2026');
 
 // Dashboard paths
 const DASHBOARDS: Record<string, string> = {
@@ -29,46 +28,64 @@ const DASHBOARDS: Record<string, string> = {
 };
 
 const Auth = () => {
-  const { user, userRole, loading: authLoading } = useAuth();
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Start with loading true
+  const [formLoading, setFormLoading] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [signInEmail, setSignInEmail] = useState("");
   const [signInPassword, setSignInPassword] = useState("");
   const [signUpEmail, setSignUpEmail] = useState("");
   const [signUpPassword, setSignUpPassword] = useState("");
   const isSubmitting = useRef(false);
-  const hasRedirected = useRef(false);
   const { toast } = useToast();
 
-  // IMMEDIATE REDIRECT if user is already signed in with a role
+  // On mount: Check session and role, redirect if needed
   useEffect(() => {
-    if (hasRedirected.current) return;
-    
-    if (!authLoading && user && userRole) {
-      const dashboard = DASHBOARDS[userRole];
-      if (dashboard) {
-        hasRedirected.current = true;
-        console.log('🔐 Already signed in with role:', userRole, '- redirecting to:', dashboard);
-        window.location.replace(dashboard);
+    const checkAndRedirect = async () => {
+      console.log('🔐 Checking session...');
+      
+      try {
+        // Get current session
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user) {
+          console.log('🔐 Session found:', session.user.email);
+          
+          // Fetch role from database
+          const { data: roleData } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', session.user.id)
+            .limit(1)
+            .maybeSingle();
+          
+          console.log('🔐 Role data:', roleData);
+          
+          if (roleData?.role && DASHBOARDS[roleData.role]) {
+            console.log('🔐 Redirecting to:', DASHBOARDS[roleData.role]);
+            localStorage.setItem('user_role', roleData.role);
+            window.location.replace(DASHBOARDS[roleData.role]);
+            return; // Don't set loading false, we're redirecting
+          }
+        }
+      } catch (err) {
+        console.error('🔐 Session check error:', err);
       }
-    }
-  }, [authLoading, user, userRole]);
+      
+      // No session or no role - show login form
+      setLoading(false);
+    };
+    
+    checkAndRedirect();
+  }, []);
 
-  // Show loading while checking auth
-  if (authLoading) {
+  // Show loading while checking session
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  // If user has role, show redirecting message
-  if (user && userRole && DASHBOARDS[userRole]) {
-    return (
-      <div className="min-h-screen flex items-center justify-center flex-col gap-4">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p>Redirecting to your dashboard...</p>
+      <div className="min-h-screen flex items-center justify-center bg-slate-100">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
       </div>
     );
   }
@@ -78,28 +95,53 @@ const Auth = () => {
     e.preventDefault();
     if (isSubmitting.current) return;
     isSubmitting.current = true;
-    setLoading(true);
+    setFormLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      console.log('🔐 Signing in:', signInEmail);
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: signInEmail,
         password: signInPassword
       });
 
       if (error) {
+        console.error('🔐 Sign in error:', error.message);
         toast({ variant: "destructive", title: "Sign in failed", description: error.message });
-        setLoading(false);
+        setFormLoading(false);
         isSubmitting.current = false;
         return;
       }
 
-      // Success - go to home, AuthContext will update and redirect
-      toast({ title: "✅ Welcome back!" });
-      window.location.href = '/home';
+      if (data.user) {
+        console.log('🔐 Sign in success, fetching role...');
+        
+        // Fetch role
+        const { data: roleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', data.user.id)
+          .limit(1)
+          .maybeSingle();
+        
+        console.log('🔐 Role:', roleData?.role);
+        
+        if (roleData?.role && DASHBOARDS[roleData.role]) {
+          localStorage.setItem('user_role', roleData.role);
+          toast({ title: "✅ Welcome back!" });
+          window.location.replace(DASHBOARDS[roleData.role]);
+          return;
+        }
+        
+        // No role - go to home
+        toast({ title: "✅ Signed in!" });
+        window.location.replace('/home');
+      }
       
     } catch (err: any) {
+      console.error('🔐 Sign in exception:', err);
       toast({ variant: "destructive", title: "Error", description: err.message });
-      setLoading(false);
+      setFormLoading(false);
       isSubmitting.current = false;
     }
   };
@@ -109,7 +151,7 @@ const Auth = () => {
     e.preventDefault();
     if (isSubmitting.current) return;
     isSubmitting.current = true;
-    setLoading(true);
+    setFormLoading(true);
 
     try {
       const { data, error } = await supabase.auth.signUp({
@@ -119,24 +161,24 @@ const Auth = () => {
 
       if (error) {
         toast({ variant: "destructive", title: "Sign up failed", description: error.message });
-        setLoading(false);
+        setFormLoading(false);
         isSubmitting.current = false;
         return;
       }
 
       if (data.user && !data.session) {
         toast({ title: "📧 Check your email", description: "Click the confirmation link." });
-        setLoading(false);
+        setFormLoading(false);
         isSubmitting.current = false;
         return;
       }
 
       toast({ title: "✅ Account created!" });
-      window.location.href = '/home';
+      window.location.replace('/home');
       
     } catch (err: any) {
       toast({ variant: "destructive", title: "Error", description: err.message });
-      setLoading(false);
+      setFormLoading(false);
       isSubmitting.current = false;
     }
   };
@@ -177,10 +219,10 @@ const Auth = () => {
               <TabsContent value="signin">
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-                    <Button variant="outline" onClick={() => signInWithProvider('google')} disabled={loading}>
+                    <Button variant="outline" onClick={() => signInWithProvider('google')} disabled={formLoading}>
                       <Mail className="mr-2 h-4 w-4" /> Google
                     </Button>
-                    <Button variant="outline" onClick={() => signInWithProvider('github')} disabled={loading}>
+                    <Button variant="outline" onClick={() => signInWithProvider('github')} disabled={formLoading}>
                       <Github className="mr-2 h-4 w-4" /> GitHub
                     </Button>
                   </div>
@@ -202,7 +244,7 @@ const Auth = () => {
                         value={signInEmail}
                         onChange={(e) => setSignInEmail(e.target.value)}
                         autoComplete="email"
-                        disabled={loading}
+                        disabled={formLoading}
                         required
                       />
                     </div>
@@ -215,12 +257,12 @@ const Auth = () => {
                         value={signInPassword}
                         onChange={(e) => setSignInPassword(e.target.value)}
                         autoComplete="current-password"
-                        disabled={loading}
+                        disabled={formLoading}
                         required
                       />
                     </div>
-                    <Button type="submit" className="w-full" disabled={loading || !signInEmail || !signInPassword}>
-                      {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Signing in...</> : "Sign In"}
+                    <Button type="submit" className="w-full" disabled={formLoading || !signInEmail || !signInPassword}>
+                      {formLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Signing in...</> : "Sign In"}
                     </Button>
                   </form>
                   
@@ -238,10 +280,10 @@ const Auth = () => {
               <TabsContent value="signup">
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-                    <Button variant="outline" onClick={() => signInWithProvider('google')} disabled={loading}>
+                    <Button variant="outline" onClick={() => signInWithProvider('google')} disabled={formLoading}>
                       <Mail className="mr-2 h-4 w-4" /> Google
                     </Button>
-                    <Button variant="outline" onClick={() => signInWithProvider('github')} disabled={loading}>
+                    <Button variant="outline" onClick={() => signInWithProvider('github')} disabled={formLoading}>
                       <Github className="mr-2 h-4 w-4" /> GitHub
                     </Button>
                   </div>
@@ -263,7 +305,7 @@ const Auth = () => {
                         value={signUpEmail}
                         onChange={(e) => setSignUpEmail(e.target.value)}
                         autoComplete="email"
-                        disabled={loading}
+                        disabled={formLoading}
                         className="h-14 text-lg"
                         required
                       />
@@ -279,7 +321,7 @@ const Auth = () => {
                         onChange={(e) => setSignUpPassword(e.target.value)}
                         autoComplete="new-password"
                         minLength={8}
-                        disabled={loading}
+                        disabled={formLoading}
                         className="h-14 text-lg"
                         required
                       />
@@ -296,9 +338,9 @@ const Auth = () => {
                     <Button 
                       type="submit" 
                       className="w-full h-16 bg-green-600 hover:bg-green-700 text-white font-bold text-lg" 
-                      disabled={loading || !signUpEmail || !signUpPassword || signUpPassword.length < 8}
+                      disabled={formLoading || !signUpEmail || !signUpPassword || signUpPassword.length < 8}
                     >
-                      {loading ? <><Loader2 className="h-6 w-6 mr-2 animate-spin" /> Creating...</> : <>Get Started Free! 🚀</>}
+                      {formLoading ? <><Loader2 className="h-6 w-6 mr-2 animate-spin" /> Creating...</> : <>Get Started Free! 🚀</>}
                     </Button>
                   </form>
                 </div>
