@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 
-console.log('🔐 Auth.tsx BUILD v20 - FIX STUCK LOADING Feb 21 2026');
+console.log('🔐 Auth.tsx BUILD v21 - TIMEOUT ALL SUPABASE CALLS Feb 21 2026');
 
 // Get dashboard path for a role
 const getDashboardForRole = (role: string): string => {
@@ -117,7 +117,7 @@ const Auth = () => {
     return () => clearTimeout(timeout);
   }, []);
 
-  // SIGN IN
+  // SIGN IN - with timeouts to prevent hanging
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting.current || !signInEmail || !signInPassword) return;
@@ -126,24 +126,65 @@ const Auth = () => {
     setLoading(true);
     console.log('🔐 Starting sign in for:', signInEmail);
     
-    try {
-      // First check if already signed in
-      const { data: { session: existingSession } } = await supabase.auth.getSession();
-      
-      let userId: string;
-      
-      if (existingSession?.user) {
-        // Already signed in - just redirect
-        console.log('🔐 Already signed in as:', existingSession.user.email);
-        userId = existingSession.user.id;
-      } else {
-        // Not signed in - do the sign in
-        console.log('🔐 Calling signInWithPassword...');
+    // Safety timeout - if nothing happens in 5 seconds, reset and try direct sign in
+    const safetyTimeout = setTimeout(() => {
+      console.log('🔐 Safety timeout triggered - forcing sign in');
+      forceSignIn();
+    }, 5000);
+    
+    const forceSignIn = async () => {
+      try {
+        console.log('🔐 Force sign in attempt...');
         const { data, error } = await supabase.auth.signInWithPassword({
           email: signInEmail,
           password: signInPassword
         });
         
+        if (error) {
+          toast({ variant: "destructive", title: "Sign in failed", description: error.message });
+          setLoading(false);
+          isSubmitting.current = false;
+          return;
+        }
+        
+        if (data?.user) {
+          console.log('🔐 Force sign in successful, redirecting...');
+          const redirected = await redirectToDashboard(data.user.id);
+          if (!redirected) window.location.replace('/home');
+        }
+      } catch (err: any) {
+        console.error('🔐 Force sign in error:', err);
+        setLoading(false);
+        isSubmitting.current = false;
+      }
+    };
+    
+    try {
+      // Quick check for existing session with 2 second timeout
+      console.log('🔐 Checking existing session...');
+      
+      let userId: string | null = null;
+      
+      // Try to get session with timeout
+      const sessionPromise = supabase.auth.getSession();
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000));
+      
+      const result = await Promise.race([sessionPromise, timeoutPromise]);
+      
+      if (result && 'data' in result && result.data.session?.user) {
+        console.log('🔐 Existing session found:', result.data.session.user.email);
+        userId = result.data.session.user.id;
+        clearTimeout(safetyTimeout);
+      } else {
+        // No session or timeout - do fresh sign in
+        console.log('🔐 No session, calling signInWithPassword...');
+        
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: signInEmail,
+          password: signInPassword
+        });
+        
+        clearTimeout(safetyTimeout);
         console.log('🔐 Sign in result:', { user: data?.user?.email, error: error?.message });
         
         if (error) {
@@ -153,7 +194,7 @@ const Auth = () => {
           return;
         }
         
-        if (!data.user) {
+        if (!data?.user) {
           toast({ variant: "destructive", title: "Sign in failed", description: "No user returned" });
           setLoading(false);
           isSubmitting.current = false;
@@ -163,18 +204,17 @@ const Auth = () => {
         userId = data.user.id;
       }
       
-      console.log('🔐 Checking role for user:', userId);
-      
-      // Check role and redirect to dashboard
-      const redirected = await redirectToDashboard(userId);
-      
-      if (!redirected) {
-        console.log('🔐 No role found, redirecting to /home');
-        window.location.replace('/home');
+      if (userId) {
+        console.log('🔐 Checking role for user:', userId);
+        const redirected = await redirectToDashboard(userId);
+        if (!redirected) {
+          console.log('🔐 No role found, redirecting to /home');
+          window.location.replace('/home');
+        }
       }
-      // Don't reset loading - we're navigating away
       
     } catch (err: any) {
+      clearTimeout(safetyTimeout);
       console.error('🔐 Sign in exception:', err);
       toast({ variant: "destructive", title: "Error", description: err.message });
       setLoading(false);
