@@ -307,10 +307,30 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
   };
 
   const handleSave = async () => {
-    if (!profile) return;
+    console.log('📝 ProfileEditDialog: handleSave called, profile:', profile);
+    
+    if (!profile) {
+      console.error('📝 ProfileEditDialog: No profile to save!');
+      toast({
+        title: 'Error',
+        description: 'No profile data to save. Please refresh and try again.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    if (!profile.user_id) {
+      console.error('📝 ProfileEditDialog: No user_id in profile!');
+      toast({
+        title: 'Error',
+        description: 'User ID missing. Please log out and log back in.',
+        variant: 'destructive'
+      });
+      return;
+    }
 
     setSaving(true);
-    console.log('📝 ProfileEditDialog: Saving profile...');
+    console.log('📝 ProfileEditDialog: Saving profile for user:', profile.user_id);
 
     try {
       // Get access token
@@ -321,16 +341,22 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
           const parsed = JSON.parse(storedSession);
           accessToken = parsed?.access_token || '';
         }
-      } catch (e) {}
+      } catch (e) {
+        console.log('📝 ProfileEditDialog: Failed to parse session from localStorage');
+      }
 
       if (!accessToken) {
+        console.log('📝 ProfileEditDialog: No token in localStorage, trying supabase.auth.getSession()');
         const { data: { session } } = await supabase.auth.getSession();
         accessToken = session?.access_token || '';
       }
 
       if (!accessToken) {
+        console.error('📝 ProfileEditDialog: No access token found!');
         throw new Error('No access token found. Please log out and log back in.');
       }
+      
+      console.log('📝 ProfileEditDialog: Got access token, proceeding with save...');
 
       // Prepare update data - include all editable fields
       const updateData: Record<string, any> = {
@@ -570,7 +596,22 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !profile) return;
+    console.log('📸 handleAvatarUpload called, file:', file?.name, 'profile:', !!profile);
+    
+    if (!file) {
+      console.log('📸 No file selected');
+      return;
+    }
+    
+    if (!profile) {
+      console.log('📸 No profile loaded');
+      toast({
+        title: 'Error',
+        description: 'Profile not loaded. Please wait and try again.',
+        variant: 'destructive'
+      });
+      return;
+    }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
@@ -596,87 +637,67 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
     console.log('📸 Starting avatar upload for user:', profile.user_id);
     
     try {
+      // ALWAYS use data URL first - it's the most reliable
+      // This ensures the user sees their photo immediately
+      const reader = new FileReader();
+      
+      reader.onloadend = () => {
+        const dataUrl = reader.result as string;
+        console.log('📸 Data URL created, length:', dataUrl.length);
+        setProfile(prev => prev ? { ...prev, avatar_url: dataUrl } : null);
+        toast({
+          title: '📸 Photo Added!',
+          description: 'Photo preview ready. Click "Save Changes" to save your profile.',
+        });
+        setUploading(false);
+      };
+      
+      reader.onerror = () => {
+        console.error('📸 FileReader error');
+        toast({
+          title: 'Error',
+          description: 'Failed to read image file. Please try again.',
+          variant: 'destructive'
+        });
+        setUploading(false);
+      };
+      
+      reader.readAsDataURL(file);
+      
+      // Also try to upload to storage in background (don't block UI)
       const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
       const fileName = `avatar-${Date.now()}.${fileExt}`;
       const filePath = `${profile.user_id}/${fileName}`;
 
-      console.log('📸 Uploading avatar to path:', filePath);
+      console.log('📸 Attempting background upload to path:', filePath);
 
-      // Try different buckets in order
-      const bucketsToTry = [
-        { name: 'avatars', path: filePath },
-        { name: 'profile-images', path: filePath },
-        { name: 'profiles', path: filePath },
-        { name: 'public', path: `avatars/${filePath}` }
-      ];
-
-      let uploadSuccess = false;
-      let publicUrl = '';
-      let lastError: any = null;
-
-      for (const bucket of bucketsToTry) {
-        console.log(`📸 Trying bucket: ${bucket.name}`);
-        
-        const { data, error } = await supabase.storage
-          .from(bucket.name)
-          .upload(bucket.path, file, { 
-            upsert: true,
-            contentType: file.type 
-          });
-
-        if (!error && data) {
-          console.log(`📸 Upload successful to ${bucket.name}:`, data.path);
-          
-          // Get public URL
-          const { data: urlData } = supabase.storage
-            .from(bucket.name)
-            .getPublicUrl(bucket.path);
-          
-          if (urlData?.publicUrl) {
-            publicUrl = urlData.publicUrl;
-            uploadSuccess = true;
-            console.log('📸 Public URL:', publicUrl);
-            break;
+      // Try upload to storage in background
+      supabase.storage
+        .from('avatars')
+        .upload(filePath, file, { upsert: true, contentType: file.type })
+        .then(({ data, error }) => {
+          if (!error && data) {
+            const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
+            if (urlData?.publicUrl) {
+              console.log('📸 Background upload successful:', urlData.publicUrl);
+              // Update to use the actual URL instead of data URL
+              setProfile(prev => prev ? { ...prev, avatar_url: urlData.publicUrl } : null);
+            }
+          } else {
+            console.log('📸 Background upload failed (using data URL):', error?.message);
           }
-        } else {
-          console.log(`📸 Bucket ${bucket.name} failed:`, error?.message);
-          lastError = error;
-        }
-      }
-
-      if (!uploadSuccess || !publicUrl) {
-        // If all buckets fail, try using a data URL as fallback
-        console.log('📸 All buckets failed, using data URL fallback');
+        })
+        .catch(err => {
+          console.log('📸 Background upload error (using data URL):', err);
+        });
         
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const dataUrl = reader.result as string;
-          setProfile({ ...profile, avatar_url: dataUrl });
-          toast({
-            title: '📸 Photo Added!',
-            description: 'Photo saved locally. It will be uploaded when you save your profile.',
-          });
-        };
-        reader.readAsDataURL(file);
-        setUploading(false);
-        return;
-      }
-
-      console.log('📸 Avatar uploaded successfully:', publicUrl);
-      setProfile({ ...profile, avatar_url: publicUrl });
-
-      toast({
-        title: '📸 Photo Uploaded!',
-        description: 'Your profile photo has been updated. Click Save Changes to keep it.'
-      });
     } catch (error: any) {
-      console.error('📸 Error uploading avatar:', error);
+      console.error('📸 Error in avatar upload:', error);
       toast({
         title: 'Upload Failed',
-        description: error.message || 'Failed to upload photo. Please try again.',
+        description: error.message || 'Failed to process photo. Please try again.',
         variant: 'destructive'
       });
-    } finally {
       setUploading(false);
     }
   };
