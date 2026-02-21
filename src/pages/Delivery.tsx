@@ -272,16 +272,6 @@ const Delivery = () => {
               <Truck className="h-5 w-5 mr-2" />
               Request Delivery
             </Button>
-            
-            <Link to="/tracking">
-              <Button 
-                size="lg"
-                className="h-14 px-8 bg-blue-600 hover:bg-blue-700 text-white font-bold text-lg shadow-2xl"
-              >
-                <MapPin className="h-5 w-5 mr-2" />
-                Track Deliveries
-              </Button>
-            </Link>
           </div>
 
           {/* Portal Cards - Role-aware Quick Access */}

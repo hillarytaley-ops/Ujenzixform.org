@@ -1042,12 +1042,6 @@ const ProfessionalBuilderDashboardPage = () => {
                   Scanners
                 </Button>
               </Link>
-              <Link to="/tracking">
-                <Button className="bg-white/90 text-blue-700 hover:bg-white">
-                  <NavigationIcon className="h-4 w-4 mr-2" />
-                  Tracking
-                </Button>
-              </Link>
               <Link to="/monitoring">
                 <Button className="bg-white/90 text-blue-700 hover:bg-white">
                   <Video className="h-4 w-4 mr-2" />

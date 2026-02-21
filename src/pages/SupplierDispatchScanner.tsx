@@ -272,11 +272,6 @@ const SupplierDispatchScanner = () => {
                 Go to Dashboard
               </Button>
             </Link>
-            <Link to="/tracking">
-              <Button variant="outline" className="border-white text-white hover:bg-white/10 font-semibold">
-                Track Deliveries
-              </Button>
-            </Link>
           </div>
         </div>
       </section>

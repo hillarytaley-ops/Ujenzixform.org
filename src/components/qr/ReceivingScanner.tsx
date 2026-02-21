@@ -424,15 +424,8 @@ export const ReceivingScanner: React.FC = () => {
             </p>
             <div className="flex flex-col sm:flex-row gap-2 justify-center">
               <a 
-                href="/tracking" 
-                className="inline-flex items-center justify-center px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
-              >
-                <Truck className="h-4 w-4 mr-2" />
-                Track My Deliveries
-              </a>
-              <a 
                 href="/builder-dashboard" 
-                className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                className="inline-flex items-center justify-center px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
               >
                 <ArrowRight className="h-4 w-4 mr-2" />
                 Go to Dashboard

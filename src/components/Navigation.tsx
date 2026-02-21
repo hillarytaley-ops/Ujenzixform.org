@@ -68,13 +68,13 @@ const Navigation = () => {
   console.log('🧭 Nav state - email:', displayEmail, 'role:', displayRole, 'loggedIn:', isLoggedIn);
 
   // Public navigation items (visible to everyone)
+  // NOTE: Tracking is only accessible from within dashboards (for clients and suppliers)
   const publicNavItems = [
     { path: "/home", label: "Home" },
     { path: "/builders", label: "Builders" },
     { path: "/suppliers", label: "Suppliers" },
     { path: "/delivery", label: "Delivery" },
     { path: "/scanners", label: "Scanners" },
-    { path: "/tracking", label: "Tracking" },
     { path: "/monitoring", label: "Monitoring" },
     { path: "/about", label: "About" },
     { path: "/contact", label: "Contact" },

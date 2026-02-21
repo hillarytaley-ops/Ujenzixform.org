@@ -58,13 +58,11 @@ const Index = () => {
   // Determine scanner link based on user role
   // - Suppliers: Dispatch Scanner
   // - Delivery: Receiving Scanner
-  // - Builders: No scanner (link to tracking instead)
-  // - Others: General scanners page
+  // - Builders/Others: General scanners page (tracking is only in dashboards)
   const getScannerLink = useMemo(() => {
     if (userRole === 'supplier') return '/supplier-dispatch-scanner';
     if (userRole === 'delivery') return '/delivery-receiving-scanner';
-    if (userRole === 'builder') return '/tracking'; // Builders can't access scanners
-    return '/scanners'; // Admin and unauthenticated see general page
+    return '/scanners'; // Everyone else sees general page
   }, [userRole]);
 
   const platformFeatures = [
@@ -104,13 +102,6 @@ const Index = () => {
       description: "Live camera feeds and drone surveillance for your construction sites",
       color: "from-indigo-500 to-blue-600",
       link: "/monitoring"
-    },
-    {
-      icon: MapPin,
-      title: "Real-Time Tracking",
-      description: "Track all your deliveries and materials in one dashboard",
-      color: "from-teal-500 to-cyan-600",
-      link: "/tracking"
     }
   ];
 
@@ -298,9 +289,9 @@ const Index = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
             {[
               { icon: "🚚", label: "Request Delivery", link: "/delivery" },
-              { icon: "📍", label: "Track Materials", link: "/tracking" },
+              { icon: "🏪", label: "Find Suppliers", link: "/suppliers" },
               { icon: "🎥", label: "Site Monitoring", link: "/monitoring" },
-              { icon: "📦", label: userRole === 'builder' ? "Track Deliveries" : "QR Scanner", link: userRole === 'builder' ? "/tracking" : getScannerLink }
+              { icon: "📦", label: "QR Scanner", link: getScannerLink }
             ].map((item, index) => (
               <Link to={item.link} key={index}>
                 <Card className="hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer border-2 border-transparent hover:border-primary/20">

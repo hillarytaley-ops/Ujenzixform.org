@@ -69,6 +69,8 @@ import { ReviewsList, SupplierRatingSummary } from "@/components/reviews/ReviewS
 import { UserAnalyticsDashboard } from "@/components/analytics/UserAnalyticsDashboard";
 import { InAppCommunication } from "@/components/communication/InAppCommunication";
 import { DispatchScanner } from "@/components/qr/DispatchScanner";
+import { TrackingTab } from "@/components/tracking/TrackingTab";
+import { Navigation as NavigationIcon } from "lucide-react";
 
 interface DashboardStats {
   totalProducts: number;
@@ -1258,6 +1260,10 @@ const SupplierDashboard = () => {
               <BarChartIcon className="h-4 w-4 mr-1" />
               My Analytics
             </TabsTrigger>
+            <TabsTrigger value="tracking" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
+              <NavigationIcon className="h-4 w-4 mr-1" />
+              Tracking
+            </TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -1868,6 +1874,28 @@ const SupplierDashboard = () => {
               </CardHeader>
               <CardContent>
                 {user && <UserAnalyticsDashboard userId={user.id} userRole="supplier" />}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Tracking Tab */}
+          <TabsContent value="tracking">
+            <Card className={cardBg}>
+              <CardHeader>
+                <CardTitle className={`${textColor} flex items-center gap-2`}>
+                  <NavigationIcon className="h-5 w-5 text-blue-600" />
+                  Delivery Tracking
+                </CardTitle>
+                <CardDescription className={mutedText}>
+                  Track your material deliveries to customers in real-time
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <TrackingTab
+                  userId={user?.id || localStorage.getItem('user_id') || ''}
+                  userRole="supplier"
+                  userName={supplierProfile?.company_name || supplierProfile?.full_name || user?.email?.split('@')[0] || 'Supplier'}
+                />
               </CardContent>
             </Card>
           </TabsContent>
