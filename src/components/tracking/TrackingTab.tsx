@@ -64,7 +64,7 @@ interface TrackingNumber {
 
 interface TrackingTabProps {
   userId: string;
-  userRole: 'admin' | 'professional_builder' | 'private_client' | 'delivery_provider';
+  userRole: 'admin' | 'professional_builder' | 'private_client' | 'delivery_provider' | 'supplier' | 'delivery';
   userName?: string;
 }
 
@@ -166,13 +166,38 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
       if (userRole === 'admin') {
         // Admin sees all tracking numbers - no filter needed
         console.log('📦 Admin mode: fetching ALL tracking numbers');
-      } else if (userRole === 'delivery_provider') {
+      } else if (userRole === 'delivery_provider' || userRole === 'delivery') {
         // Delivery provider sees their assigned deliveries
         url += `&delivery_provider_id=eq.${userId}`;
         console.log('📦 Delivery provider mode: filtering by provider_id');
+      } else if (userRole === 'supplier') {
+        // Suppliers see tracking numbers for their orders (where they are the supplier)
+        // First try to get supplier record ID
+        let supplierId = userId;
+        try {
+          const supplierResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${userId}&select=id`,
+            {
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+              }
+            }
+          );
+          if (supplierResponse.ok) {
+            const suppliers = await supplierResponse.json();
+            if (suppliers && suppliers.length > 0) {
+              supplierId = suppliers[0].id;
+              console.log('📦 Got supplier ID:', supplierId);
+            }
+          }
+        } catch (e) {
+          console.log('📦 Could not fetch supplier, using userId');
+        }
+        url += `&or=(supplier_id.eq.${userId},supplier_id.eq.${supplierId})`;
+        console.log('📦 Supplier mode: filtering by userId:', userId, 'and supplierId:', supplierId);
       } else {
         // Builders see their own tracking numbers - check both user_id and profile_id
-        // Also check if builder_id is null (for testing)
         url += `&or=(builder_id.eq.${userId},builder_id.eq.${profileId})`;
         console.log('📦 Builder mode: filtering by userId:', userId, 'and profileId:', profileId);
       }
