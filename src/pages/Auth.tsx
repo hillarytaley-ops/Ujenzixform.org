@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 
-console.log('🔐 Auth.tsx BUILD v19 - FAST REDIRECT Feb 21 2026');
+console.log('🔐 Auth.tsx BUILD v20 - FIX STUCK LOADING Feb 21 2026');
 
 // Get dashboard path for a role
 const getDashboardForRole = (role: string): string => {
@@ -127,33 +127,53 @@ const Auth = () => {
     console.log('🔐 Starting sign in for:', signInEmail);
     
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: signInEmail,
-        password: signInPassword
-      });
+      // First check if already signed in
+      const { data: { session: existingSession } } = await supabase.auth.getSession();
       
-      console.log('🔐 Sign in result:', { user: data?.user?.email, error: error?.message });
+      let userId: string;
       
-      if (error) {
-        toast({ variant: "destructive", title: "Sign in failed", description: error.message });
-        setLoading(false);
-        isSubmitting.current = false;
-        return;
-      }
-      
-      if (data.user) {
-        console.log('🔐 Sign in successful, checking role...');
+      if (existingSession?.user) {
+        // Already signed in - just redirect
+        console.log('🔐 Already signed in as:', existingSession.user.email);
+        userId = existingSession.user.id;
+      } else {
+        // Not signed in - do the sign in
+        console.log('🔐 Calling signInWithPassword...');
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: signInEmail,
+          password: signInPassword
+        });
         
-        // IMMEDIATELY check role and redirect to dashboard
-        const redirected = await redirectToDashboard(data.user.id);
+        console.log('🔐 Sign in result:', { user: data?.user?.email, error: error?.message });
         
-        if (!redirected) {
-          // No role - go to home
-          console.log('🔐 No role found, redirecting to /home');
-          window.location.replace('/home');
+        if (error) {
+          toast({ variant: "destructive", title: "Sign in failed", description: error.message });
+          setLoading(false);
+          isSubmitting.current = false;
+          return;
         }
-        // Don't reset loading - we're navigating away
+        
+        if (!data.user) {
+          toast({ variant: "destructive", title: "Sign in failed", description: "No user returned" });
+          setLoading(false);
+          isSubmitting.current = false;
+          return;
+        }
+        
+        userId = data.user.id;
       }
+      
+      console.log('🔐 Checking role for user:', userId);
+      
+      // Check role and redirect to dashboard
+      const redirected = await redirectToDashboard(userId);
+      
+      if (!redirected) {
+        console.log('🔐 No role found, redirecting to /home');
+        window.location.replace('/home');
+      }
+      // Don't reset loading - we're navigating away
+      
     } catch (err: any) {
       console.error('🔐 Sign in exception:', err);
       toast({ variant: "destructive", title: "Error", description: err.message });
