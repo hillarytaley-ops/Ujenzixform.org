@@ -550,110 +550,73 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
       <DialogContent className="max-w-lg">
         {step === 'prompt' && (
           <>
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-xl">
-                <Truck className="h-6 w-6 text-green-600" />
-                🚚 Delivery Providers Notified!
+            <DialogHeader className="pb-2">
+              <DialogTitle className="flex items-center gap-2">
+                <Truck className="h-5 w-5 text-green-600" />
+                Delivery Providers Notified
               </DialogTitle>
-              <DialogDescription>
-                Nearby delivery providers have been automatically alerted. First provider to accept will be assigned.
+              <DialogDescription className="text-xs">
+                First provider to accept will be assigned
               </DialogDescription>
             </DialogHeader>
 
-            <div className="py-4 space-y-4">
-              {/* Order Summary */}
-              <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    <Package className="h-5 w-5 text-green-600 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="font-semibold text-green-900">
-                        {purchaseOrder.po_number}
-                      </p>
-                      <p className="text-sm text-green-700">
-                        {purchaseOrder.items?.length || 0} item(s) • {formatCurrency(purchaseOrder.total_amount)}
-                      </p>
-                      {purchaseOrder.project_name && (
-                        <p className="text-xs text-green-600 mt-1">
-                          Project: {purchaseOrder.project_name}
-                        </p>
-                      )}
+            <div className="py-3 space-y-3">
+              {/* Order Summary - Compact */}
+              <Card className="bg-green-50 border-green-200">
+                <CardContent className="p-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-semibold text-green-900 text-sm">{purchaseOrder.po_number}</p>
+                      <p className="text-xs text-green-700">{purchaseOrder.items?.length || 0} items • {formatCurrency(purchaseOrder.total_amount)}</p>
                     </div>
+                    <Package className="h-8 w-8 text-green-400" />
                   </div>
                 </CardContent>
               </Card>
 
-              {/* First-come-first-served notice */}
-              <Alert className="bg-blue-50 border-blue-200">
-                <Clock className="h-4 w-4 text-blue-600" />
-                <AlertDescription className="text-blue-800 text-sm">
-                  <strong>First-Come-First-Served:</strong> The first delivery provider to accept your request will be assigned. You'll receive a notification when matched.
-                </AlertDescription>
-              </Alert>
-
-              {/* Delivery details */}
-              <div className="space-y-2 p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-2 text-sm">
-                  <MapPin className="h-4 w-4 text-gray-500" />
-                  <span className="text-gray-600">Delivery to:</span>
-                  <span className="font-medium">{purchaseOrder.delivery_address || 'Address pending'}</span>
+              {/* Delivery details - Compact */}
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="flex items-center gap-1 p-2 bg-gray-50 rounded">
+                  <MapPin className="h-3 w-3 text-gray-400" />
+                  <span className="truncate">{purchaseOrder.delivery_address || 'To be provided'}</span>
                 </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Calendar className="h-4 w-4 text-gray-500" />
-                  <span className="text-gray-600">Expected:</span>
-                  <span className="font-medium">{purchaseOrder.delivery_date ? new Date(purchaseOrder.delivery_date).toLocaleDateString() : 'Date pending'}</span>
+                <div className="flex items-center gap-1 p-2 bg-gray-50 rounded">
+                  <Calendar className="h-3 w-3 text-gray-400" />
+                  <span>{purchaseOrder.delivery_date ? new Date(purchaseOrder.delivery_date).toLocaleDateString() : 'TBD'}</span>
                 </div>
               </div>
 
-              {/* Delivery vs Pickup info */}
-              <div className="space-y-2">
-                <Alert className="bg-green-50 border-green-200">
-                  <Truck className="h-4 w-4 text-green-600" />
-                  <AlertDescription className="text-green-800 text-xs">
-                    <strong>🚚 Delivery Option:</strong>
-                    <ul className="mt-1 ml-4 list-disc">
-                      <li>QR codes generated for tracking</li>
-                      <li>Delivery provider picks up from supplier</li>
-                      <li>Materials delivered to your location</li>
-                      <li>Scan QR codes on receipt to verify</li>
-                    </ul>
-                  </AlertDescription>
-                </Alert>
-                
-                <Alert className="bg-blue-50 border-blue-200">
-                  <Package className="h-4 w-4 text-blue-600" />
-                  <AlertDescription className="text-blue-800 text-xs">
-                    <strong>📦 Pickup Option:</strong>
-                    <ul className="mt-1 ml-4 list-disc">
-                      <li>No QR codes needed</li>
-                      <li>Collect materials directly from supplier</li>
-                      <li>Show your order number at pickup</li>
-                      <li>No additional delivery charges</li>
-                    </ul>
-                  </AlertDescription>
-                </Alert>
+              {/* Options - Compact */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="p-2 bg-green-50 border border-green-200 rounded text-xs">
+                  <p className="font-medium text-green-800">🚚 Delivery</p>
+                  <p className="text-green-600">QR tracking included</p>
+                </div>
+                <div className="p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+                  <p className="font-medium text-blue-800">📦 Pickup</p>
+                  <p className="text-blue-600">No delivery charge</p>
+                </div>
               </div>
             </div>
 
-            <DialogFooter className="flex flex-col gap-2">
-              {/* Primary action - Go to form to enter delivery location */}
+            <DialogFooter className="flex flex-col gap-2 pt-2">
               <Button 
                 onClick={() => setStep('form')}
-                className="w-full bg-green-600 hover:bg-green-700"
+                className="w-full bg-green-600 hover:bg-green-700 h-9"
+                size="sm"
               >
-                <Truck className="h-4 w-4 mr-2" />
-                🚚 Yes, I Need Delivery
+                <Truck className="h-4 w-4 mr-1" />
+                Yes, I Need Delivery
               </Button>
-              
-              {/* Pickup option - No delivery, no QR codes */}
               <Button 
                 variant="outline" 
                 onClick={handlePickup}
                 disabled={submitting}
-                className="w-full border-blue-300 text-blue-700 hover:bg-blue-50"
+                className="w-full h-9"
+                size="sm"
               >
-                <Package className="h-4 w-4 mr-2" />
-                📦 I'll Pick Up Myself (No QR Code)
+                <Package className="h-4 w-4 mr-1" />
+                I'll Pick Up Myself
               </Button>
             </DialogFooter>
           </>
@@ -661,111 +624,63 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
 
         {step === 'form' && (
           <>
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Truck className="h-5 w-5 text-blue-600" />
-                Update Delivery Details
+            <DialogHeader className="pb-2">
+              <DialogTitle className="flex items-center gap-2 text-base">
+                <MapPinned className="h-4 w-4 text-blue-600" />
+                Delivery Location
               </DialogTitle>
-              <DialogDescription>
-                Modify delivery details if needed - providers will be updated
-              </DialogDescription>
             </DialogHeader>
 
-            <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto">
-              {/* Location Section */}
-              <Card className="border-2 border-dashed border-blue-200 bg-blue-50/50">
-                <CardContent className="p-4 space-y-4">
-                  <div className="flex items-center gap-2 text-blue-700 font-medium">
-                    <MapPinned className="h-5 w-5" />
-                    Delivery Location
-                  </div>
+            <div className="py-2 space-y-3 max-h-[55vh] overflow-y-auto">
+              {/* GPS Button - Compact */}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={getCurrentLocation}
+                disabled={gettingLocation}
+                className="w-full h-10 border-green-300 bg-green-50 hover:bg-green-100 text-green-700"
+              >
+                {gettingLocation ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Navigation className="h-4 w-4 mr-2" />
+                )}
+                {gettingLocation ? 'Getting Location...' : '📍 Get My GPS Location'}
+              </Button>
 
-                  {/* GPS Location Button - Easy one-tap */}
-                  <div className="space-y-2">
-                    <Label className="text-sm text-gray-600">📍 Quick Location (Recommended)</Label>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={getCurrentLocation}
-                      disabled={gettingLocation}
-                      className="w-full h-14 border-2 border-green-300 bg-green-50 hover:bg-green-100 text-green-700 font-medium"
-                    >
-                      {gettingLocation ? (
-                        <>
-                          <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                          Getting Your Location...
-                        </>
-                      ) : (
-                        <>
-                          <Navigation className="h-5 w-5 mr-2" />
-                          📍 Use My Current Location (GPS)
-                        </>
-                      )}
+              {/* GPS Coordinates Display */}
+              {deliveryData.deliveryCoordinates && (
+                <div className="flex items-center justify-between p-2 bg-green-100 border border-green-300 rounded text-xs">
+                  <div>
+                    <span className="text-green-600">✓ GPS: </span>
+                    <span className="font-mono text-green-800">{deliveryData.deliveryCoordinates}</span>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button type="button" variant="ghost" size="sm" onClick={copyCoordinates} className="h-6 w-6 p-0">
+                      <Copy className="h-3 w-3" />
                     </Button>
-                    <p className="text-xs text-gray-500 text-center">
-                      Tap to automatically capture your GPS coordinates
-                    </p>
+                    <Button type="button" variant="ghost" size="sm" onClick={openInMaps} className="h-6 w-6 p-0">
+                      <Eye className="h-3 w-3" />
+                    </Button>
                   </div>
+                </div>
+              )}
 
-                  {/* Display captured coordinates */}
-                  {deliveryData.deliveryCoordinates && (
-                    <div className="p-3 bg-green-100 border border-green-300 rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-xs text-green-600 font-medium">GPS Coordinates Captured ✓</p>
-                          <p className="font-mono text-sm text-green-800">{deliveryData.deliveryCoordinates}</p>
-                        </div>
-                        <div className="flex gap-1">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={copyCoordinates}
-                            className="h-8 w-8 p-0"
-                            title="Copy coordinates"
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={openInMaps}
-                            className="h-8 w-8 p-0"
-                            title="View in Google Maps"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+              {/* Manual coordinates */}
+              <div className="space-y-1">
+                <Label className="text-xs text-gray-500">Or enter coordinates</Label>
+                <Input
+                  placeholder="-1.286389, 36.817223"
+                  value={deliveryData.deliveryCoordinates}
+                  onChange={(e) => setDeliveryData(prev => ({ ...prev, deliveryCoordinates: e.target.value }))}
+                  className="font-mono text-xs h-8"
+                />
+              </div>
 
-                  {/* Manual coordinates input */}
-                  <div className="space-y-2">
-                    <Label htmlFor="deliveryCoordinates" className="text-sm text-gray-600">
-                      Or Enter Coordinates Manually
-                    </Label>
-                    <Input
-                      id="deliveryCoordinates"
-                      placeholder="e.g., -1.286389, 36.817223"
-                      value={deliveryData.deliveryCoordinates}
-                      onChange={(e) => setDeliveryData(prev => ({ ...prev, deliveryCoordinates: e.target.value }))}
-                      className="font-mono text-sm"
-                    />
-                    <p className="text-xs text-gray-400">
-                      Format: latitude, longitude (e.g., -1.286389, 36.817223 for Nairobi)
-                    </p>
-                  </div>
-
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <span className="w-full border-t" />
-                    </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                      <span className="bg-blue-50 px-2 text-gray-500">or provide address</span>
-                    </div>
-                  </div>
+              <div className="relative py-1">
+                <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+                <div className="relative flex justify-center text-xs"><span className="bg-white px-2 text-gray-400">or address</span></div>
+              </div>
 
                   {/* Delivery Address - Text */}
                   <div className="space-y-2">
@@ -782,155 +697,96 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
                   </div>
 
                   {/* Validation message */}
-                  {!deliveryData.deliveryAddress && !deliveryData.deliveryCoordinates && (
-                    <Alert className="bg-amber-50 border-amber-200">
-                      <AlertCircle className="h-4 w-4 text-amber-600" />
-                      <AlertDescription className="text-amber-700 text-xs">
-                        Please provide either GPS coordinates or a delivery address
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                </CardContent>
-              </Card>
+              {/* Address field */}
+              <div className="space-y-1">
+                <Label className="text-xs text-gray-500">Delivery Address</Label>
+                <Input
+                  placeholder="Street address, landmark..."
+                  value={deliveryData.deliveryAddress}
+                  onChange={(e) => setDeliveryData(prev => ({ ...prev, deliveryAddress: e.target.value }))}
+                  className="text-xs h-8"
+                />
+              </div>
 
-              {/* Date and Time */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="preferredDate" className="flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />
-                    Delivery Date *
-                  </Label>
+              {/* Date, Time, Budget - Compact Grid */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-xs text-gray-500">Date *</Label>
                   <Input
-                    id="preferredDate"
                     type="date"
                     value={deliveryData.preferredDate}
                     onChange={(e) => setDeliveryData(prev => ({ ...prev, preferredDate: e.target.value }))}
                     min={new Date().toISOString().split('T')[0]}
+                    className="text-xs h-8"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="preferredTime" className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    Preferred Time
-                  </Label>
-                  <Select
-                    value={deliveryData.preferredTime}
-                    onValueChange={(value) => setDeliveryData(prev => ({ ...prev, preferredTime: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Any time" />
-                    </SelectTrigger>
+                <div className="space-y-1">
+                  <Label className="text-xs text-gray-500">Time</Label>
+                  <Select value={deliveryData.preferredTime} onValueChange={(value) => setDeliveryData(prev => ({ ...prev, preferredTime: value }))}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Any" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="anytime">Any time</SelectItem>
-                      <SelectItem value="morning">Morning (8AM - 12PM)</SelectItem>
-                      <SelectItem value="afternoon">Afternoon (12PM - 4PM)</SelectItem>
-                      <SelectItem value="evening">Evening (4PM - 6PM)</SelectItem>
+                      <SelectItem value="anytime">Any</SelectItem>
+                      <SelectItem value="morning">AM</SelectItem>
+                      <SelectItem value="afternoon">PM</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-
-              {/* Material Type and Weight */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="materialType">Material Type</Label>
-                  <Select
-                    value={deliveryData.materialType}
-                    onValueChange={(value) => setDeliveryData(prev => ({ ...prev, materialType: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                <div className="space-y-1">
+                  <Label className="text-xs text-gray-500">Budget</Label>
+                  <Select value={deliveryData.budgetRange} onValueChange={(value) => setDeliveryData(prev => ({ ...prev, budgetRange: value }))}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {MATERIAL_TYPES.map(type => (
-                        <SelectItem key={type} value={type}>
-                          {type.charAt(0).toUpperCase() + type.slice(1)}
-                        </SelectItem>
+                      {BUDGET_RANGES.map(range => (
+                        <SelectItem key={range.value} value={range.value} className="text-xs">{range.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="totalWeight">Est. Weight (kg)</Label>
+              </div>
+
+              {/* Material & Weight - Compact */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-xs text-gray-500">Material</Label>
+                  <Select value={deliveryData.materialType} onValueChange={(value) => setDeliveryData(prev => ({ ...prev, materialType: value }))}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {MATERIAL_TYPES.map(type => (
+                        <SelectItem key={type} value={type} className="text-xs">{type}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-gray-500">Weight (kg)</Label>
                   <Input
-                    id="totalWeight"
                     type="number"
-                    placeholder="e.g., 500"
+                    placeholder="500"
                     value={deliveryData.totalWeight}
                     onChange={(e) => setDeliveryData(prev => ({ ...prev, totalWeight: e.target.value }))}
+                    className="text-xs h-8"
                   />
                 </div>
               </div>
 
-              {/* Budget Range */}
-              <div className="space-y-2">
-                <Label htmlFor="budgetRange" className="flex items-center gap-1">
-                  <DollarSign className="h-3 w-3" />
-                  Delivery Budget
-                </Label>
-                <Select
-                  value={deliveryData.budgetRange}
-                  onValueChange={(value) => setDeliveryData(prev => ({ ...prev, budgetRange: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {BUDGET_RANGES.map(range => (
-                      <SelectItem key={range.value} value={range.value}>
-                        {range.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Special Instructions */}
-              <div className="space-y-2">
-                <Label htmlFor="specialInstructions">Special Instructions</Label>
-                <Textarea
-                  id="specialInstructions"
-                  placeholder="Any special delivery requirements..."
+              {/* Notes - Compact */}
+              <div className="space-y-1">
+                <Label className="text-xs text-gray-500">Notes (optional)</Label>
+                <Input
+                  placeholder="Special instructions..."
                   value={deliveryData.specialInstructions}
                   onChange={(e) => setDeliveryData(prev => ({ ...prev, specialInstructions: e.target.value }))}
-                  rows={2}
+                  className="text-xs h-8"
                 />
               </div>
-
-              {/* Info Alert */}
-              <Alert className="bg-amber-50 border-amber-200">
-                <AlertCircle className="h-4 w-4 text-amber-600" />
-                <AlertDescription className="text-amber-800 text-xs">
-                  <strong>First-Come-First-Served:</strong> Your request will be sent to nearby delivery providers. 
-                  The first provider to accept will be assigned to your delivery.
-                </AlertDescription>
-              </Alert>
             </div>
 
-            <DialogFooter className="flex gap-2 sm:gap-2">
-              <Button 
-                variant="outline" 
-                onClick={() => setStep('prompt')}
-                disabled={submitting}
-              >
+            <DialogFooter className="flex gap-2 pt-2">
+              <Button variant="outline" onClick={() => setStep('prompt')} disabled={submitting} size="sm" className="h-8">
                 Back
               </Button>
-              <Button 
-                onClick={handleRequestDelivery}
-                disabled={submitting}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                {submitting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Sending...
-                  </>
-                ) : (
-                  <>
-                    <Truck className="h-4 w-4 mr-2" />
-                    Request Delivery
-                  </>
-                )}
+              <Button onClick={handleRequestDelivery} disabled={submitting} className="bg-blue-600 hover:bg-blue-700 h-8" size="sm">
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Truck className="h-4 w-4 mr-1" />Send Request</>}
               </Button>
             </DialogFooter>
           </>
