@@ -59,7 +59,7 @@ import { OrderManagement } from "@/components/supplier/OrderManagement";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { SupplierAnalyticsDashboard } from "@/components/suppliers/SupplierAnalyticsDashboard";
 import { SupplierProductManager } from "@/components/suppliers/SupplierProductManager";
-import { MessageSquare, QrCode, Boxes, BarChart3 as BarChartIcon, User } from "lucide-react";
+import { MessageSquare, QrCode, Boxes, BarChart3 as BarChartIcon, User, Scan } from "lucide-react";
 import { EnhancedQRCodeManager } from "@/components/qr/EnhancedQRCodeManager";
 import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
 import { ProfileViewDialog } from "@/components/profile/ProfileViewDialog";
@@ -68,6 +68,7 @@ import { OrderHistory } from "@/components/orders/OrderHistory";
 import { ReviewsList, SupplierRatingSummary } from "@/components/reviews/ReviewSystem";
 import { UserAnalyticsDashboard } from "@/components/analytics/UserAnalyticsDashboard";
 import { InAppCommunication } from "@/components/communication/InAppCommunication";
+import { DispatchScanner } from "@/components/qr/DispatchScanner";
 
 interface DashboardStats {
   totalProducts: number;
@@ -1111,7 +1112,7 @@ const SupplierDashboard = () => {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid md:grid-cols-4 gap-4 mb-8">
+        <div className="grid md:grid-cols-5 gap-4 mb-8">
           <Button 
             className="h-auto py-4 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600"
             onClick={() => setActiveTab('products')}
@@ -1129,6 +1130,15 @@ const SupplierDashboard = () => {
             <div className="flex flex-col items-center gap-2">
               <Eye className={`h-6 w-6 ${isDarkMode ? 'text-orange-400' : 'text-orange-600'}`} />
               <span className={textColor}>{t('supplier.actions.viewOrders')}</span>
+            </div>
+          </Button>
+          <Button 
+            className="h-auto py-4 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600"
+            onClick={() => setActiveTab('scanning')}
+          >
+            <div className="flex flex-col items-center gap-2">
+              <Scan className="h-6 w-6" />
+              <span>Scan QR</span>
             </div>
           </Button>
           <Button 
@@ -1184,6 +1194,10 @@ const SupplierDashboard = () => {
             <TabsTrigger value="qr-codes" className="data-[state=active]:bg-cyan-500 data-[state=active]:text-white">
               <QrCode className="h-4 w-4 mr-1" />
               QR Codes
+            </TabsTrigger>
+            <TabsTrigger value="scanning" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
+              <Scan className="h-4 w-4 mr-1" />
+              Dispatch Scan
             </TabsTrigger>
             <TabsTrigger value="support" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white">
               <Headphones className="h-4 w-4 mr-1" />
@@ -1677,6 +1691,36 @@ const SupplierDashboard = () => {
             </Card>
           </TabsContent>
 
+          {/* Dispatch Scanning Tab */}
+          <TabsContent value="scanning">
+            <Card className={cardBg}>
+              <CardHeader>
+                <CardTitle className={`flex items-center gap-2 ${textColor}`}>
+                  <Scan className="h-5 w-5 text-teal-500" />
+                  Dispatch Scanner
+                </CardTitle>
+                <CardDescription className={mutedText}>
+                  Scan QR codes on materials before loading them onto delivery vehicles. This ensures all ordered items are properly released for transit.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Alert className="mb-4 bg-teal-50 border-teal-200">
+                  <Truck className="h-4 w-4 text-teal-600" />
+                  <AlertTitle className="text-teal-800">Dispatch Workflow</AlertTitle>
+                  <AlertDescription className="text-teal-700 text-sm">
+                    <ol className="list-decimal list-inside space-y-1 mt-2">
+                      <li>Prepare materials for the order</li>
+                      <li>Attach the generated QR code to each material/package</li>
+                      <li>When delivery vehicle arrives, scan each QR code below</li>
+                      <li>Confirm all items are loaded before releasing the vehicle</li>
+                    </ol>
+                  </AlertDescription>
+                </Alert>
+                
+                <DispatchScanner />
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           {/* Support Tab */}
           <TabsContent value="support">
