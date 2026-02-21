@@ -4,34 +4,68 @@ import { Menu, X, BookOpen } from "lucide-react";
 import { useLocation, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { User, Session } from '@supabase/supabase-js';
 import { UserGuideMenu } from "@/components/ui/user-guide-menu";
-import { UjenziXformLogo, UserAvatar } from "@/components/common/ProfilePicture";
 import { useAuth } from "@/contexts/AuthContext";
 
-console.log('🧭 Navigation BUILD v3 - SHOW USER EMAIL Feb 21 2026');
+console.log('🧭 Navigation BUILD v4 - FIX EMAIL DISPLAY Feb 21 2026');
 
 const Navigation = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userRoleState, setUserRoleState] = useState<string | null>(null);
   const location = useLocation();
   const { toast } = useToast();
   
-  // Use AuthContext for user state - single source of truth
+  // Use AuthContext for user state
   const { user: authUser, userRole: authRole, loading: authLoading } = useAuth();
+
+  // Check for user on mount and when auth changes
+  useEffect(() => {
+    const checkUser = async () => {
+      // First check AuthContext
+      if (authUser?.email) {
+        console.log('🧭 Got email from AuthContext:', authUser.email);
+        setUserEmail(authUser.email);
+        localStorage.setItem('user_email', authUser.email);
+      }
+      if (authRole) {
+        setUserRoleState(authRole);
+      }
+      
+      // Also check localStorage
+      const cachedEmail = localStorage.getItem('user_email');
+      const cachedRole = localStorage.getItem('user_role');
+      
+      if (cachedEmail && !userEmail) {
+        console.log('🧭 Got email from localStorage:', cachedEmail);
+        setUserEmail(cachedEmail);
+      }
+      if (cachedRole && !userRoleState) {
+        setUserRoleState(cachedRole);
+      }
+      
+      // If no email yet, try to get from Supabase session
+      if (!authUser?.email && !cachedEmail) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.email) {
+          console.log('🧭 Got email from Supabase session:', session.user.email);
+          setUserEmail(session.user.email);
+          localStorage.setItem('user_email', session.user.email);
+          localStorage.setItem('user_id', session.user.id);
+        }
+      }
+    };
+    
+    checkUser();
+  }, [authUser, authRole]);
+
+  // Determine if user is logged in
+  const isLoggedIn = !!(authUser || userEmail || userRoleState);
+  const displayEmail = authUser?.email || userEmail;
+  const displayRole = authRole || userRoleState;
   
-  // Also check localStorage for instant display (before auth loads)
-  const cachedEmail = localStorage.getItem('user_email');
-  const cachedRole = localStorage.getItem('user_role');
-  const cachedUserId = localStorage.getItem('user_id') || localStorage.getItem('user_role_id');
-  
-  // Use auth context if available, otherwise fall back to localStorage
-  // If user has a cached role, they are logged in
-  const user = authUser || (cachedRole && cachedEmail ? { email: cachedEmail, id: cachedUserId } as any : null);
-  const userRole = authRole || cachedRole;
-  const isAuthLoading = authLoading && !cachedRole;
-  
-  console.log('🧭 Nav user:', user?.email, 'role:', userRole, 'loading:', isAuthLoading);
+  console.log('🧭 Nav state - email:', displayEmail, 'role:', displayRole, 'loggedIn:', isLoggedIn);
 
   // Public navigation items (visible to everyone)
   const publicNavItems = [
@@ -54,27 +88,20 @@ const Navigation = () => {
   ];
 
   // Combine nav items based on user role
-  const navItems = userRole === 'admin' 
+  const navItems = displayRole === 'admin' 
     ? [...publicNavItems, ...adminNavItems] 
     : publicNavItems;
 
   const isActive = (path: string) => location.pathname === path;
 
   const handleSignOut = async () => {
-    // Set signing out state FIRST to prevent UI flash
     setIsSigningOut(true);
-    
-    // Redirect IMMEDIATELY before any async operations
-    // This ensures user sees auth page instantly
     window.location.href = '/auth';
-    
-    // Then clear everything in background (page is already redirecting)
     localStorage.clear();
     sessionStorage.clear();
     await supabase.auth.signOut();
   };
 
-  // Show full-screen signing out overlay to prevent any UI flash
   if (isSigningOut) {
     return (
       <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
@@ -89,7 +116,7 @@ const Navigation = () => {
   return (
     <header className="shadow-sm border-b sticky top-0 z-50 bg-gradient-primary relative">
       <div className="w-full px-4 py-3 flex items-center justify-between gap-2">
-        {/* Logo - Fixed width */}
+        {/* Logo */}
         <Link to="/home" className="flex items-center group flex-shrink-0">
           <div className="relative flex-shrink-0" style={{ width: '48px', height: '48px' }}>
             <img 
@@ -106,7 +133,6 @@ const Navigation = () => {
               }}
               className="shadow-lg border-2 border-white"
               onError={(e) => {
-                // Fallback to SVG if PNG fails
                 const target = e.currentTarget;
                 target.src = '/ujenzixform-logo-circular.svg';
                 target.style.objectFit = 'contain';
@@ -115,7 +141,7 @@ const Navigation = () => {
           </div>
         </Link>
 
-        {/* Desktop Navigation - Scrollable if needed */}
+        {/* Desktop Navigation */}
         <nav className="hidden lg:flex items-center gap-3 xl:gap-5 flex-1 justify-center overflow-x-auto">
           {navItems.map((item) => (
             <Link
@@ -130,7 +156,7 @@ const Navigation = () => {
           ))}
         </nav>
 
-        {/* Right Section - User/Auth - Fixed width, never shrinks */}
+        {/* Right Section - User/Auth */}
         <div className="hidden lg:flex items-center gap-2 flex-shrink-0" style={{ minWidth: 'fit-content' }}>
           <UserGuideMenu 
             trigger={
@@ -139,10 +165,10 @@ const Navigation = () => {
               </Button>
             }
           />
-          {user ? (
+          {isLoggedIn ? (
             <div className="flex items-center gap-2">
-              <span className="text-white text-xs font-medium bg-white/20 px-3 py-1.5 rounded-md">
-                {user.email || 'User'}
+              <span className="text-white text-xs font-medium bg-white/20 px-3 py-1.5 rounded-md max-w-[200px] truncate">
+                {displayEmail || 'User'}
               </span>
               <Button 
                 type="button"
@@ -154,8 +180,7 @@ const Navigation = () => {
                 LOG OUT
               </Button>
             </div>
-          ) : isAuthLoading ? (
-            // Show loading placeholder while checking auth - prevents flash of Sign In buttons
+          ) : authLoading ? (
             <div className="flex items-center gap-2">
               <div className="w-20 h-8 bg-white/20 rounded animate-pulse"></div>
             </div>
@@ -184,7 +209,7 @@ const Navigation = () => {
         </button>
       </div>
 
-        {/* Mobile Navigation */}
+      {/* Mobile Navigation */}
       {isMenuOpen && (
         <div className="lg:hidden bg-background border-t shadow-lg z-50 absolute top-full left-0 right-0">
           <nav className="px-4 py-4 space-y-1">
@@ -201,10 +226,10 @@ const Navigation = () => {
               </Link>
             ))}
             <div className="pt-4 space-y-2">
-              {user ? (
+              {isLoggedIn ? (
                 <div className="space-y-4">
-                  <p className="text-gray-700 text-center font-medium">
-                    {user.email?.split('@')[0] || 'User'}
+                  <p className="text-gray-700 text-center font-medium truncate px-2">
+                    {displayEmail || 'User'}
                   </p>
                   <button 
                     type="button"
@@ -214,7 +239,7 @@ const Navigation = () => {
                     LOG OUT
                   </button>
                 </div>
-              ) : isAuthLoading ? (
+              ) : authLoading ? (
                 <div className="space-y-4">
                   <div className="w-full h-10 bg-gray-200 rounded animate-pulse"></div>
                 </div>
