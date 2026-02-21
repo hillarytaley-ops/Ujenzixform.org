@@ -61,46 +61,56 @@ const Auth = () => {
         return;
       }
 
+      console.log('🔐 signInWithPassword returned:', { user: data.user?.email, session: !!data.session });
+      
       if (data.user && data.session) {
-        console.log('🔐 Sign in success! Fetching role...');
+        console.log('🔐 Sign in success! User:', data.user.id);
         
-        // Fetch role from database
+        // Fetch role from database using REST API
+        console.log('🔐 Fetching role via REST API...');
+        const roleUrl = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${data.user.id}&select=role&limit=1`;
+        console.log('🔐 Role URL:', roleUrl);
+        
         try {
-          const response = await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${data.user.id}&select=role&limit=1`,
-            {
-              headers: {
-                'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${data.session.access_token}`,
-                'Content-Type': 'application/json'
-              }
+          const response = await fetch(roleUrl, {
+            headers: {
+              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${data.session.access_token}`,
+              'Content-Type': 'application/json'
             }
-          );
+          });
           
-          if (response.ok) {
-            const roleData = await response.json();
-            console.log('🔐 Role data:', roleData);
+          console.log('🔐 Role response status:', response.status);
+          const roleData = await response.json();
+          console.log('🔐 Role data:', roleData);
+          
+          if (roleData && roleData[0]?.role) {
+            const role = roleData[0].role;
+            console.log('🔐 Found role:', role);
+            localStorage.setItem('user_role', role);
             
-            if (roleData && roleData[0]?.role) {
-              const role = roleData[0].role;
-              localStorage.setItem('user_role', role);
-              
-              if (DASHBOARDS[role]) {
-                toast({ title: "✅ Welcome back!" });
-                console.log('🔐 Redirecting to dashboard:', DASHBOARDS[role]);
-                window.location.href = DASHBOARDS[role];
-                return;
-              }
+            if (DASHBOARDS[role]) {
+              console.log('🔐 REDIRECTING to dashboard:', DASHBOARDS[role]);
+              toast({ title: "✅ Welcome back!" });
+              window.location.href = DASHBOARDS[role];
+              return;
+            } else {
+              console.log('🔐 No dashboard mapping for role:', role);
             }
+          } else {
+            console.log('🔐 No role in response');
           }
         } catch (roleErr) {
           console.error('🔐 Role fetch error:', roleErr);
         }
         
         // No role found - go to home page
+        console.log('🔐 Going to home page (no role)');
         toast({ title: "✅ Signed in!" });
-        console.log('🔐 No role, going to home');
         window.location.href = '/home';
+        return;
+      } else {
+        console.log('🔐 No user or session in response');
       }
       
     } catch (err: any) {
