@@ -1147,7 +1147,7 @@ const DeliveryDashboard = () => {
           {/* Notifications Tab */}
           <TabsContent value="notifications">
             <DeliveryNotifications 
-              userId={user?.id || ''}
+              userId={user?.id || localStorage.getItem('user_id') || ''}
               onNotificationClick={(notification) => console.log('Notification clicked:', notification)}
             />
           </TabsContent>

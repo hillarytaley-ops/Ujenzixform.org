@@ -532,6 +532,31 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
 
   // Accept a delivery request
   const handleAcceptDelivery = async (requestId: string) => {
+    // Validate userId before making request
+    let providerId = userId;
+    if (!providerId || providerId === '') {
+      // Try to get from localStorage as fallback
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          providerId = parsed.user?.id || '';
+        }
+      } catch (e) {}
+    }
+    
+    if (!providerId || providerId === '') {
+      console.error('❌ handleAcceptDelivery: No valid userId available');
+      toast({
+        title: 'Error',
+        description: 'User not authenticated. Please refresh the page.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    console.log('🚚 handleAcceptDelivery: Accepting with providerId:', providerId);
+    
     setAcceptingId(requestId);
     try {
       const { url, headers } = getAuthHeaders();
@@ -543,7 +568,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           method: 'PATCH',
           headers: { ...headers, 'Prefer': 'return=representation' },
           body: JSON.stringify({
-            provider_id: userId,
+            provider_id: providerId,
             status: 'assigned',
             updated_at: new Date().toISOString()
           })
