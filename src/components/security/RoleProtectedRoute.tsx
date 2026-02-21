@@ -10,7 +10,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 
-console.log('🔒 RoleProtectedRoute BUILD v33 - WAIT FOR SESSION');
+console.log('🔒 RoleProtectedRoute BUILD v34 - WITH TIMEOUT');
 
 interface RoleProtectedRouteProps {
   children: React.ReactNode;
@@ -36,42 +36,78 @@ export const RoleProtectedRoute = ({ children, allowedRoles }: RoleProtectedRout
   
   // Check session directly from Supabase
   useEffect(() => {
+    let mounted = true;
+    
     const checkSession = async () => {
       console.log('🔒 Checking session directly...');
       
+      // Safety timeout - don't wait forever
+      const safetyTimeout = setTimeout(() => {
+        console.log('🔒 Session check timeout - using localStorage');
+        if (mounted) {
+          // Try localStorage as fallback
+          const cachedRole = localStorage.getItem('user_role');
+          if (cachedRole) {
+            console.log('🔒 Using cached role:', cachedRole);
+            setSessionRole(cachedRole);
+            setSessionUser({ id: 'cached' }); // Placeholder
+          }
+          setChecking(false);
+        }
+      }, 2000);
+      
       try {
         const { data: { session } } = await supabase.auth.getSession();
+        clearTimeout(safetyTimeout);
+        
+        if (!mounted) return;
         
         if (session?.user) {
           console.log('🔒 Session found:', session.user.email);
           setSessionUser(session.user);
           
-          // Fetch role
-          const { data: roleData } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', session.user.id)
-            .limit(1)
-            .maybeSingle();
-          
-          if (roleData?.role) {
-            console.log('🔒 Role found:', roleData.role);
-            setSessionRole(roleData.role);
-            localStorage.setItem('user_role', roleData.role);
+          // Fetch role with timeout
+          try {
+            const rolePromise = supabase
+              .from('user_roles')
+              .select('role')
+              .eq('user_id', session.user.id)
+              .limit(1)
+              .maybeSingle();
+            
+            const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Role fetch timeout')), 2000)
+            );
+            
+            const { data: roleData } = await Promise.race([rolePromise, timeoutPromise]) as any;
+            
+            if (roleData?.role && mounted) {
+              console.log('🔒 Role found:', roleData.role);
+              setSessionRole(roleData.role);
+              localStorage.setItem('user_role', roleData.role);
+            }
+          } catch (roleErr) {
+            console.log('🔒 Role fetch failed, using localStorage');
+            const cachedRole = localStorage.getItem('user_role');
+            if (cachedRole && mounted) {
+              setSessionRole(cachedRole);
+            }
           }
         } else {
           console.log('🔒 No session found');
         }
       } catch (err) {
+        clearTimeout(safetyTimeout);
         console.error('🔒 Session check error:', err);
       }
       
-      setChecking(false);
+      if (mounted) setChecking(false);
     };
     
-    // Give a small delay for Supabase to restore session
-    const timeout = setTimeout(checkSession, 100);
-    return () => clearTimeout(timeout);
+    // Start check immediately
+    checkSession();
+    
+    return () => { mounted = false; };
   }, []);
   
   // Use AuthContext values if available, otherwise use our direct check
