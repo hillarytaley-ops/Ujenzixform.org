@@ -65,7 +65,6 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
   const [isAccepting, setIsAccepting] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
-  const [showAcceptDialog, setShowAcceptDialog] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const { toast } = useToast();
 
@@ -166,7 +165,6 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
           variant: "destructive"
         });
         setIsAccepting(false);
-        setShowAcceptDialog(false);
         return;
       }
 
@@ -188,7 +186,6 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
       });
 
       onAccept?.(delivery.id);
-      setShowAcceptDialog(false);
     } catch (error: any) {
       console.error('Error accepting delivery:', error);
       toast({
@@ -431,20 +428,31 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
 
               {/* Action Buttons */}
               <div className="flex flex-col gap-2 w-full">
-                {/* Accept/Reject Buttons for Pending Requests */}
+                {/* Accept/Reject Buttons for Pending Requests - SINGLE CLICK */}
                 {isPendingRequest && (
                   <div className="flex gap-2 w-full">
                     <Button 
                       className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                      onClick={() => setShowAcceptDialog(true)}
+                      onClick={handleAccept}
+                      disabled={isAccepting}
                     >
-                      <ThumbsUp className="h-4 w-4 mr-1" />
-                      Accept
+                      {isAccepting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          Accepting...
+                        </>
+                      ) : (
+                        <>
+                          <ThumbsUp className="h-4 w-4 mr-1" />
+                          Accept
+                        </>
+                      )}
                     </Button>
                     <Button 
                       variant="outline"
                       className="flex-1 border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700"
                       onClick={() => setShowRejectDialog(true)}
+                      disabled={isAccepting}
                     >
                       <ThumbsDown className="h-4 w-4 mr-1" />
                       Reject
@@ -487,62 +495,7 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
         </CardContent>
       </Card>
 
-      {/* Accept Confirmation Dialog */}
-      <Dialog open={showAcceptDialog} onOpenChange={setShowAcceptDialog}>
-        <DialogContent className={isDarkMode ? 'bg-gray-800 text-white' : ''}>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <CheckCircle className="h-5 w-5 text-green-500" />
-              Accept Delivery Request?
-            </DialogTitle>
-            <DialogDescription className={isDarkMode ? 'text-gray-400' : ''}>
-              You are about to accept this delivery request. Once accepted, you should proceed to the pickup location.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Material:</span>
-                <span className={`font-medium ${isDarkMode ? 'text-white' : ''}`}>{delivery.material_type}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Distance:</span>
-                <span className={`font-medium ${isDarkMode ? 'text-white' : ''}`}>{delivery.distance} km</span>
-              </div>
-              <div className="flex justify-between">
-                <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Earnings:</span>
-                <span className="font-medium text-green-600">{formatCurrency(delivery.price)}</span>
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAcceptDialog(false)}>
-              Cancel
-            </Button>
-            <Button 
-              className="bg-green-600 hover:bg-green-700"
-              onClick={handleAccept}
-              disabled={isAccepting}
-            >
-              {isAccepting ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Accepting...
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Accept Delivery
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Reject Confirmation Dialog */}
+      {/* Reject Confirmation Dialog - Only reject needs confirmation for reason */}
       <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
         <DialogContent className={isDarkMode ? 'bg-gray-800 text-white' : ''}>
           <DialogHeader>
