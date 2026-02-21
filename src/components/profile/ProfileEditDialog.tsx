@@ -464,117 +464,73 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
         }
       }
 
-      // Also update supplier record if user is a supplier
+      // Also update supplier record if user is a supplier (non-blocking)
       if (userRole === 'supplier') {
-        try {
-          const supplierUpdateData: Record<string, any> = {
-            updated_at: new Date().toISOString()
-          };
-          
-          if (profile.store_name || profile.company_name) {
-            supplierUpdateData.company_name = profile.store_name || profile.company_name;
+        // Fire and forget - don't block profile save
+        fetch(
+          `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${profile.user_id}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify({
+              phone: profile.phone || null,
+              location: profile.location || null,
+              updated_at: new Date().toISOString()
+            })
           }
-          if (profile.location) supplierUpdateData.location = profile.location;
-          if (profile.latitude) supplierUpdateData.latitude = profile.latitude;
-          if (profile.longitude) supplierUpdateData.longitude = profile.longitude;
-          if (profile.phone) supplierUpdateData.phone = profile.phone;
-          if (profile.avatar_url) supplierUpdateData.logo_url = profile.avatar_url;
-          
-          const supplierResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${profile.user_id}`,
-            {
-              method: 'PATCH',
-              headers: {
-                'Content-Type': 'application/json',
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${accessToken}`,
-                'Prefer': 'return=minimal'
-              },
-              body: JSON.stringify(supplierUpdateData)
-            }
-          );
-          
-          if (supplierResponse.ok) {
-            console.log('✅ ProfileEditDialog: Supplier record updated');
-          }
-        } catch (e) {
-          console.log('📝 ProfileEditDialog: Supplier update skipped (may not exist)');
-        }
+        ).then(r => r.ok && console.log('✅ Supplier record updated'))
+         .catch(() => console.log('📝 Supplier update skipped'));
       }
 
-      // Update delivery provider record if applicable
+      // Update delivery provider record if applicable (non-blocking)
       if (userRole === 'delivery' || userRole === 'delivery_provider') {
-        try {
-          const deliveryUpdateData: Record<string, any> = {
-            updated_at: new Date().toISOString()
-          };
-          
-          if (profile.full_name) deliveryUpdateData.full_name = profile.full_name;
-          if (profile.phone) deliveryUpdateData.phone = profile.phone;
-          if (profile.location) deliveryUpdateData.location = profile.location;
-          if (profile.latitude) deliveryUpdateData.latitude = profile.latitude;
-          if (profile.longitude) deliveryUpdateData.longitude = profile.longitude;
-          if (profile.avatar_url) deliveryUpdateData.avatar_url = profile.avatar_url;
-          if (profile.company_name) deliveryUpdateData.company_name = profile.company_name;
-          
-          const deliveryResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${profile.user_id}`,
-            {
-              method: 'PATCH',
-              headers: {
-                'Content-Type': 'application/json',
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${accessToken}`,
-                'Prefer': 'return=minimal'
-              },
-              body: JSON.stringify(deliveryUpdateData)
-            }
-          );
-          
-          if (deliveryResponse.ok) {
-            console.log('✅ ProfileEditDialog: Delivery provider record updated');
+        // Fire and forget - don't block profile save
+        fetch(
+          `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${profile.user_id}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify({
+              phone: profile.phone || null,
+              location: profile.location || null,
+              updated_at: new Date().toISOString()
+            })
           }
-        } catch (e) {
-          console.log('📝 ProfileEditDialog: Delivery provider update skipped');
-        }
+        ).then(r => r.ok && console.log('✅ Delivery provider record updated'))
+         .catch(() => console.log('📝 Delivery provider update skipped'));
       }
 
-      // Update builder record if applicable
+      // Update builder record if applicable (non-blocking)
       if (userRole === 'professional_builder' || userRole === 'private_client') {
-        try {
-          const builderUpdateData: Record<string, any> = {
-            updated_at: new Date().toISOString()
-          };
-          
-          if (profile.full_name) builderUpdateData.full_name = profile.full_name;
-          if (profile.phone) builderUpdateData.phone = profile.phone;
-          if (profile.location) builderUpdateData.location = profile.location;
-          if (profile.latitude) builderUpdateData.latitude = profile.latitude;
-          if (profile.longitude) builderUpdateData.longitude = profile.longitude;
-          if (profile.avatar_url) builderUpdateData.avatar_url = profile.avatar_url;
-          if (profile.company_name) builderUpdateData.company_name = profile.company_name;
-          if (profile.bio) builderUpdateData.bio = profile.bio;
-          
-          const builderResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/builders?user_id=eq.${profile.user_id}`,
-            {
-              method: 'PATCH',
-              headers: {
-                'Content-Type': 'application/json',
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${accessToken}`,
-                'Prefer': 'return=minimal'
-              },
-              body: JSON.stringify(builderUpdateData)
-            }
-          );
-          
-          if (builderResponse.ok) {
-            console.log('✅ ProfileEditDialog: Builder record updated');
+        // Fire and forget - don't block profile save
+        fetch(
+          `${SUPABASE_URL}/rest/v1/builders?user_id=eq.${profile.user_id}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify({
+              phone: profile.phone || null,
+              location: profile.location || null,
+              updated_at: new Date().toISOString()
+            })
           }
-        } catch (e) {
-          console.log('📝 ProfileEditDialog: Builder update skipped');
-        }
+        ).then(r => r.ok && console.log('✅ Builder record updated'))
+         .catch(() => console.log('📝 Builder update skipped'));
       }
 
       console.log('✅ ProfileEditDialog: Profile saved successfully');
