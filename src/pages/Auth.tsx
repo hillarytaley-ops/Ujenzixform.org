@@ -49,6 +49,12 @@ const Auth = () => {
         isRedirecting.current = true;
         console.log('🔐 SIGNED_IN detected, fetching role...');
         
+        // Save user email and ID to localStorage for Navigation display
+        if (session.user.email) {
+          localStorage.setItem('user_email', session.user.email);
+        }
+        localStorage.setItem('user_id', session.user.id);
+        
         // Fetch role and redirect
         try {
           const response = await fetch(

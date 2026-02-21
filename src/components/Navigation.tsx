@@ -141,8 +141,8 @@ const Navigation = () => {
           />
           {user ? (
             <div className="flex items-center gap-2">
-              <span className="text-white text-xs font-medium hidden xl:inline">
-                {user.email?.split('@')[0] || 'User'}
+              <span className="text-white text-xs font-medium bg-white/20 px-3 py-1.5 rounded-md">
+                {user.email || 'User'}
               </span>
               <Button 
                 type="button"
