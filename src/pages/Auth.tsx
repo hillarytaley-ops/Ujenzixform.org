@@ -1,5 +1,5 @@
-// Auth Page - Build v19 - FAST REDIRECT with timeout
-import { useState, useEffect, useRef } from "react";
+// Auth Page - Build v22 - ULTRA SIMPLE
+import { useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -12,250 +12,82 @@ import { useToast } from "@/hooks/use-toast";
 import AnimatedSection from "@/components/AnimatedSection";
 import { Separator } from "@/components/ui/separator";
 import { Github, Mail, KeyRound, CheckCircle, Loader2 } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 
-console.log('🔐 Auth.tsx BUILD v21 - TIMEOUT ALL SUPABASE CALLS Feb 21 2026');
-
-// Get dashboard path for a role
-const getDashboardForRole = (role: string): string => {
-  const dashboards: Record<string, string> = {
-    'admin': '/admin-dashboard',
-    'supplier': '/supplier-dashboard',
-    'delivery': '/delivery-dashboard',
-    'delivery_provider': '/delivery-dashboard',
-    'professional_builder': '/professional-builder-dashboard',
-    'private_client': '/private-client-dashboard',
-  };
-  return dashboards[role] || '/home';
-};
-
-// Fetch role and redirect to dashboard - with 3 second timeout
-const redirectToDashboard = async (userId: string): Promise<boolean> => {
-  console.log('🔐 Fetching role for user:', userId);
-  
-  // Create a promise that rejects after 3 seconds
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error('Role fetch timeout')), 3000);
-  });
-  
-  // Create the actual fetch promise
-  const fetchPromise = (async () => {
-    const { data, error } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId)
-      .limit(1)
-      .maybeSingle();
-    
-    console.log('🔐 Role query result:', { data, error });
-    
-    if (!error && data?.role) {
-      return data.role;
-    }
-    return null;
-  })();
-  
-  try {
-    // Race between fetch and timeout
-    const role = await Promise.race([fetchPromise, timeoutPromise]);
-    
-    if (role) {
-      const dashboard = getDashboardForRole(role);
-      console.log('🔐 REDIRECTING NOW to:', dashboard, 'for role:', role);
-      localStorage.setItem('user_role', role);
-      // Use replace to prevent back button returning to auth
-      window.location.replace(dashboard);
-      return true;
-    }
-  } catch (e) {
-    console.error('🔐 Role fetch error or timeout:', e);
-  }
-  
-  return false;
-};
+console.log('🔐 Auth.tsx BUILD v22 - ULTRA SIMPLE Feb 21 2026');
 
 const Auth = () => {
   const [loading, setLoading] = useState(false);
-  const [checkingSession, setCheckingSession] = useState(true);
   const [showResetDialog, setShowResetDialog] = useState(false);
-  
-  // Controlled form inputs
   const [signInEmail, setSignInEmail] = useState("");
   const [signInPassword, setSignInPassword] = useState("");
   const [signUpEmail, setSignUpEmail] = useState("");
   const [signUpPassword, setSignUpPassword] = useState("");
-  
   const isSubmitting = useRef(false);
   const { toast } = useToast();
 
-  // ON PAGE LOAD: Check if user has session + role, redirect to dashboard
-  useEffect(() => {
-    const checkAndRedirect = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (session?.user) {
-          console.log('🔐 Session found for:', session.user.email);
-          const redirected = await redirectToDashboard(session.user.id);
-          if (redirected) return; // User redirected to dashboard
-        }
-      } catch (e) {
-        console.error('🔐 Session check error:', e);
-      }
-      
-      // No session or no role - show login form
-      setCheckingSession(false);
-    };
-    
-    // Safety timeout
-    const timeout = setTimeout(() => setCheckingSession(false), 3000);
-    checkAndRedirect();
-    return () => clearTimeout(timeout);
-  }, []);
-
-  // SIGN IN - with timeouts to prevent hanging
+  // SIMPLE SIGN IN - just authenticate and redirect
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitting.current || !signInEmail || !signInPassword) return;
-    
+    if (isSubmitting.current) return;
     isSubmitting.current = true;
     setLoading(true);
-    console.log('🔐 Starting sign in for:', signInEmail);
-    
-    // Safety timeout - if nothing happens in 5 seconds, reset and try direct sign in
-    const safetyTimeout = setTimeout(() => {
-      console.log('🔐 Safety timeout triggered - forcing sign in');
-      forceSignIn();
-    }, 5000);
-    
-    const forceSignIn = async () => {
-      try {
-        console.log('🔐 Force sign in attempt...');
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: signInEmail,
-          password: signInPassword
-        });
-        
-        if (error) {
-          toast({ variant: "destructive", title: "Sign in failed", description: error.message });
-          setLoading(false);
-          isSubmitting.current = false;
-          return;
-        }
-        
-        if (data?.user) {
-          console.log('🔐 Force sign in successful, redirecting...');
-          const redirected = await redirectToDashboard(data.user.id);
-          if (!redirected) window.location.replace('/home');
-        }
-      } catch (err: any) {
-        console.error('🔐 Force sign in error:', err);
+
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: signInEmail,
+        password: signInPassword
+      });
+
+      if (error) {
+        toast({ variant: "destructive", title: "Sign in failed", description: error.message });
         setLoading(false);
         isSubmitting.current = false;
+        return;
       }
-    };
-    
-    try {
-      // Quick check for existing session with 2 second timeout
-      console.log('🔐 Checking existing session...');
-      
-      let userId: string | null = null;
-      
-      // Try to get session with timeout
-      const sessionPromise = supabase.auth.getSession();
-      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000));
-      
-      const result = await Promise.race([sessionPromise, timeoutPromise]);
-      
-      if (result && 'data' in result && result.data.session?.user) {
-        console.log('🔐 Existing session found:', result.data.session.user.email);
-        userId = result.data.session.user.id;
-        clearTimeout(safetyTimeout);
-      } else {
-        // No session or timeout - do fresh sign in
-        console.log('🔐 No session, calling signInWithPassword...');
-        
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: signInEmail,
-          password: signInPassword
-        });
-        
-        clearTimeout(safetyTimeout);
-        console.log('🔐 Sign in result:', { user: data?.user?.email, error: error?.message });
-        
-        if (error) {
-          toast({ variant: "destructive", title: "Sign in failed", description: error.message });
-          setLoading(false);
-          isSubmitting.current = false;
-          return;
-        }
-        
-        if (!data?.user) {
-          toast({ variant: "destructive", title: "Sign in failed", description: "No user returned" });
-          setLoading(false);
-          isSubmitting.current = false;
-          return;
-        }
-        
-        userId = data.user.id;
-      }
-      
-      if (userId) {
-        console.log('🔐 Checking role for user:', userId);
-        const redirected = await redirectToDashboard(userId);
-        if (!redirected) {
-          console.log('🔐 No role found, redirecting to /home');
-          window.location.replace('/home');
-        }
-      }
+
+      // SUCCESS - redirect to home, let the app figure out the dashboard
+      toast({ title: "✅ Welcome back!" });
+      window.location.href = '/home';
       
     } catch (err: any) {
-      clearTimeout(safetyTimeout);
-      console.error('🔐 Sign in exception:', err);
       toast({ variant: "destructive", title: "Error", description: err.message });
       setLoading(false);
       isSubmitting.current = false;
     }
   };
 
-  // SIGN UP
+  // SIMPLE SIGN UP
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitting.current || !signUpEmail || !signUpPassword) return;
-    
+    if (isSubmitting.current) return;
     isSubmitting.current = true;
     setLoading(true);
-    
+
     try {
       const { data, error } = await supabase.auth.signUp({
         email: signUpEmail,
         password: signUpPassword,
       });
-      
+
       if (error) {
         toast({ variant: "destructive", title: "Sign up failed", description: error.message });
         setLoading(false);
         isSubmitting.current = false;
         return;
       }
-      
+
       if (data.user && !data.session) {
-        // Email confirmation required
-        toast({ title: "📧 Check your email", description: "Click the confirmation link to complete signup." });
+        toast({ title: "📧 Check your email", description: "Click the confirmation link." });
         setLoading(false);
         isSubmitting.current = false;
         return;
       }
+
+      toast({ title: "✅ Account created!" });
+      window.location.href = '/home';
       
-      if (data.user) {
-        toast({ title: "✅ Account created!" });
-        // New user - go to home to register for a role
-        window.location.href = '/home';
-      }
     } catch (err: any) {
       toast({ variant: "destructive", title: "Error", description: err.message });
       setLoading(false);
@@ -263,31 +95,12 @@ const Auth = () => {
     }
   };
 
-  // OAuth sign in
   const signInWithProvider = async (provider: 'google' | 'github') => {
-    setLoading(true);
-    try {
-      await supabase.auth.signInWithOAuth({
-        provider,
-        options: { redirectTo: `${window.location.origin}/auth` }
-      });
-    } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: "OAuth sign in failed" });
-      setLoading(false);
-    }
+    await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: `${window.location.origin}/home` }
+    });
   };
-
-  // Show loading while checking session
-  if (checkingSession) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-3">
-          <div className="animate-spin rounded-full h-10 w-10 border-4 border-primary border-t-transparent" />
-          <p className="text-muted-foreground">Checking session...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden">
@@ -315,7 +128,6 @@ const Auth = () => {
                 <TabsTrigger value="signup">Sign Up</TabsTrigger>
               </TabsList>
               
-              {/* SIGN IN TAB */}
               <TabsContent value="signin">
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
@@ -343,6 +155,7 @@ const Auth = () => {
                         placeholder="Enter your email"
                         value={signInEmail}
                         onChange={(e) => setSignInEmail(e.target.value)}
+                        autoComplete="email"
                         disabled={loading}
                         required
                       />
@@ -355,6 +168,7 @@ const Auth = () => {
                         placeholder="Enter your password"
                         value={signInPassword}
                         onChange={(e) => setSignInPassword(e.target.value)}
+                        autoComplete="current-password"
                         disabled={loading}
                         required
                       />
@@ -375,7 +189,6 @@ const Auth = () => {
                 </div>
               </TabsContent>
               
-              {/* SIGN UP TAB */}
               <TabsContent value="signup">
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
@@ -403,6 +216,7 @@ const Auth = () => {
                         placeholder="john@example.com"
                         value={signUpEmail}
                         onChange={(e) => setSignUpEmail(e.target.value)}
+                        autoComplete="email"
                         disabled={loading}
                         className="h-14 text-lg"
                         required
@@ -417,6 +231,7 @@ const Auth = () => {
                         placeholder="At least 8 characters"
                         value={signUpPassword}
                         onChange={(e) => setSignUpPassword(e.target.value)}
+                        autoComplete="new-password"
                         minLength={8}
                         disabled={loading}
                         className="h-14 text-lg"
@@ -437,7 +252,7 @@ const Auth = () => {
                       className="w-full h-16 bg-green-600 hover:bg-green-700 text-white font-bold text-lg" 
                       disabled={loading || !signUpEmail || !signUpPassword || signUpPassword.length < 8}
                     >
-                      {loading ? <><Loader2 className="h-6 w-6 mr-2 animate-spin" /> Creating Account...</> : <>Get Started - It's Free! 🚀</>}
+                      {loading ? <><Loader2 className="h-6 w-6 mr-2 animate-spin" /> Creating...</> : <>Get Started Free! 🚀</>}
                     </Button>
                   </form>
                 </div>
@@ -446,7 +261,6 @@ const Auth = () => {
           </CardContent>
         </Card>
         
-        {/* Admin Access */}
         <Card className="mt-4 max-w-xs mx-auto bg-slate-900 border-slate-700">
           <CardContent className="p-4 text-center">
             <div className="flex flex-col items-center gap-2">

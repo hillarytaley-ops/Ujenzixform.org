@@ -1,4 +1,4 @@
-import React, { memo, useMemo } from "react";
+import React, { memo, useMemo, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,8 +34,26 @@ import Footer from "@/components/Footer";
 import AnimatedSection from "@/components/AnimatedSection";
 import VideoSection from "@/components/VideoSection";
 
+// Dashboard paths for each role
+const DASHBOARDS: Record<string, string> = {
+  'admin': '/admin-dashboard',
+  'supplier': '/supplier-dashboard',
+  'delivery': '/delivery-dashboard',
+  'delivery_provider': '/delivery-dashboard',
+  'professional_builder': '/professional-builder-dashboard',
+  'private_client': '/private-client-dashboard',
+};
+
 const Index = () => {
-  const { userRole } = useAuth();
+  const { userRole, user, loading } = useAuth();
+  
+  // AUTO-REDIRECT: Users with roles go to their dashboards
+  useEffect(() => {
+    if (!loading && user && userRole && DASHBOARDS[userRole]) {
+      console.log('🏠 Index: User has role', userRole, '- redirecting to dashboard');
+      window.location.href = DASHBOARDS[userRole];
+    }
+  }, [loading, user, userRole]);
   
   // Determine scanner link based on user role
   // - Suppliers: Dispatch Scanner
