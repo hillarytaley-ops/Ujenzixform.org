@@ -18,19 +18,21 @@ FOR SELECT USING (
     EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin')
 );
 
--- 3. Update existing tracking numbers to include supplier_id from delivery_requests
-UPDATE public.tracking_numbers tn
-SET supplier_id = dr.supplier_id
-FROM delivery_requests dr
-WHERE tn.delivery_request_id = dr.id
-AND tn.supplier_id IS NULL
-AND dr.supplier_id IS NOT NULL;
-
--- 4. Also try to get supplier_id from purchase_orders
+-- 3. Update existing tracking numbers to include supplier_id from purchase_orders
+-- (delivery_requests doesn't have supplier_id, but purchase_orders does)
 UPDATE public.tracking_numbers tn
 SET supplier_id = po.supplier_id
 FROM purchase_orders po
 WHERE tn.purchase_order_id = po.id
+AND tn.supplier_id IS NULL
+AND po.supplier_id IS NOT NULL;
+
+-- 4. Also try to get supplier_id via delivery_requests -> purchase_orders link
+UPDATE public.tracking_numbers tn
+SET supplier_id = po.supplier_id
+FROM delivery_requests dr
+JOIN purchase_orders po ON dr.purchase_order_id = po.id
+WHERE tn.delivery_request_id = dr.id
 AND tn.supplier_id IS NULL
 AND po.supplier_id IS NOT NULL;
 
@@ -69,12 +71,16 @@ BEGIN
             v_provider_phone := NULL;
         END;
         
-        -- Get supplier_id from the delivery request or related purchase order
-        v_supplier_id := NEW.supplier_id;
-        IF v_supplier_id IS NULL AND NEW.purchase_order_id IS NOT NULL THEN
-            SELECT supplier_id INTO v_supplier_id
-            FROM purchase_orders
-            WHERE id = NEW.purchase_order_id;
+        -- Get supplier_id from the related purchase order (if exists)
+        v_supplier_id := NULL;
+        IF NEW.purchase_order_id IS NOT NULL THEN
+            BEGIN
+                SELECT supplier_id INTO v_supplier_id
+                FROM purchase_orders
+                WHERE id = NEW.purchase_order_id;
+            EXCEPTION WHEN OTHERS THEN
+                v_supplier_id := NULL;
+            END;
         END IF;
         
         -- Get delivery address (try multiple column names)
