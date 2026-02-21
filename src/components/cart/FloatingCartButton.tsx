@@ -23,10 +23,11 @@ export const FloatingCartButton: React.FC = () => {
   const totalItems = getTotalItems();
 
   // Always show the cart button so users know where to find their cart
+  // Position above the chat button (bottom-24) to avoid overlap
   return (
     <Button
       onClick={() => setIsCartOpen(true)}
-      className={`fixed bottom-6 right-6 z-50 h-14 px-4 shadow-lg rounded-full flex items-center gap-2 ${
+      className={`fixed bottom-24 right-6 z-50 h-12 px-3 shadow-lg rounded-full flex items-center gap-2 ${
         totalItems > 0 
           ? 'bg-green-600 hover:bg-green-700 animate-in slide-in-from-bottom-4' 
           : 'bg-gray-600 hover:bg-gray-700'
