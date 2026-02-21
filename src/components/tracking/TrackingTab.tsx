@@ -64,7 +64,7 @@ interface TrackingNumber {
 
 interface TrackingTabProps {
   userId: string;
-  userRole: 'admin' | 'professional_builder' | 'private_client' | 'delivery_provider' | 'supplier' | 'delivery';
+  userRole: 'admin' | 'professional_builder' | 'private_client' | 'supplier';
   userName?: string;
 }
 
@@ -161,15 +161,12 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
       }
       
       // Build query based on user role
+      // NOTE: Delivery providers don't need tracking numbers - they have their own delivery management
       let url = `${SUPABASE_URL}/rest/v1/tracking_numbers?order=created_at.desc&select=*`;
       
       if (userRole === 'admin') {
         // Admin sees all tracking numbers - no filter needed
         console.log('📦 Admin mode: fetching ALL tracking numbers');
-      } else if (userRole === 'delivery_provider' || userRole === 'delivery') {
-        // Delivery provider sees their assigned deliveries
-        url += `&delivery_provider_id=eq.${userId}`;
-        console.log('📦 Delivery provider mode: filtering by provider_id');
       } else if (userRole === 'supplier') {
         // Suppliers see tracking numbers for their orders (where they are the supplier)
         // First try to get supplier record ID
