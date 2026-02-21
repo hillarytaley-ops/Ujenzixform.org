@@ -1,6 +1,6 @@
-// Auth Page - Build v28 - SIMPLE AUTH PAGE
-import { useState, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+// Auth Page - Build v30 - USE AUTH STATE CHANGE FOR REDIRECT
+import { useState, useRef, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,7 @@ import { Github, Mail, KeyRound, CheckCircle, Loader2, Shield } from "lucide-rea
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 
-console.log('🔐 Auth.tsx BUILD v28 - SIMPLE AUTH PAGE Feb 21 2026');
+console.log('🔐 Auth.tsx BUILD v30 - AUTH STATE REDIRECT Feb 21 2026');
 
 // Dashboard paths
 const DASHBOARDS: Record<string, string> = {
@@ -35,90 +35,80 @@ const Auth = () => {
   const [signUpEmail, setSignUpEmail] = useState("");
   const [signUpPassword, setSignUpPassword] = useState("");
   const isSubmitting = useRef(false);
+  const isRedirecting = useRef(false);
   const { toast } = useToast();
-  const navigate = useNavigate();
 
-  // SIGN IN
+  // Listen for auth state changes and redirect
+  useEffect(() => {
+    console.log('🔐 Setting up auth listener...');
+    
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('🔐 Auth event:', event, session?.user?.email);
+      
+      if (event === 'SIGNED_IN' && session?.user && !isRedirecting.current) {
+        isRedirecting.current = true;
+        console.log('🔐 SIGNED_IN detected, fetching role...');
+        
+        // Fetch role and redirect
+        try {
+          const response = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${session.user.id}&select=role&limit=1`,
+            {
+              headers: {
+                'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+          
+          console.log('🔐 Role fetch status:', response.status);
+          const roleData = await response.json();
+          console.log('🔐 Role data:', roleData);
+          
+          if (roleData?.[0]?.role && DASHBOARDS[roleData[0].role]) {
+            const role = roleData[0].role;
+            localStorage.setItem('user_role', role);
+            console.log('🔐 Redirecting to:', DASHBOARDS[role]);
+            toast({ title: "✅ Welcome back!" });
+            window.location.href = DASHBOARDS[role];
+            return;
+          }
+        } catch (err) {
+          console.error('🔐 Role fetch error:', err);
+        }
+        
+        // No role - go to home
+        console.log('🔐 No role, going to home');
+        toast({ title: "✅ Signed in!" });
+        window.location.href = '/home';
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [toast]);
+
+  // SIGN IN - just trigger the sign in, let auth listener handle redirect
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting.current || formLoading) return;
     isSubmitting.current = true;
     setFormLoading(true);
 
-    try {
-      console.log('🔐 Signing in:', signInEmail);
-      
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: signInEmail,
-        password: signInPassword
-      });
+    console.log('🔐 Starting sign in for:', signInEmail);
 
-      if (error) {
-        console.error('🔐 Sign in error:', error.message);
-        toast({ variant: "destructive", title: "Sign in failed", description: error.message });
-        setFormLoading(false);
-        isSubmitting.current = false;
-        return;
-      }
+    const { error } = await supabase.auth.signInWithPassword({
+      email: signInEmail,
+      password: signInPassword
+    });
 
-      console.log('🔐 signInWithPassword returned:', { user: data.user?.email, session: !!data.session });
-      
-      if (data.user && data.session) {
-        console.log('🔐 Sign in success! User:', data.user.id);
-        
-        // Fetch role from database using REST API
-        console.log('🔐 Fetching role via REST API...');
-        const roleUrl = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${data.user.id}&select=role&limit=1`;
-        console.log('🔐 Role URL:', roleUrl);
-        
-        try {
-          const response = await fetch(roleUrl, {
-            headers: {
-              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${data.session.access_token}`,
-              'Content-Type': 'application/json'
-            }
-          });
-          
-          console.log('🔐 Role response status:', response.status);
-          const roleData = await response.json();
-          console.log('🔐 Role data:', roleData);
-          
-          if (roleData && roleData[0]?.role) {
-            const role = roleData[0].role;
-            console.log('🔐 Found role:', role);
-            localStorage.setItem('user_role', role);
-            
-            if (DASHBOARDS[role]) {
-              console.log('🔐 REDIRECTING to dashboard:', DASHBOARDS[role]);
-              toast({ title: "✅ Welcome back!" });
-              window.location.href = DASHBOARDS[role];
-              return;
-            } else {
-              console.log('🔐 No dashboard mapping for role:', role);
-            }
-          } else {
-            console.log('🔐 No role in response');
-          }
-        } catch (roleErr) {
-          console.error('🔐 Role fetch error:', roleErr);
-        }
-        
-        // No role found - go to home page
-        console.log('🔐 Going to home page (no role)');
-        toast({ title: "✅ Signed in!" });
-        window.location.href = '/home';
-        return;
-      } else {
-        console.log('🔐 No user or session in response');
-      }
-      
-    } catch (err: any) {
-      console.error('🔐 Sign in exception:', err);
-      toast({ variant: "destructive", title: "Error", description: err.message });
+    if (error) {
+      console.error('🔐 Sign in error:', error.message);
+      toast({ variant: "destructive", title: "Sign in failed", description: error.message });
       setFormLoading(false);
       isSubmitting.current = false;
     }
+    // Don't reset loading - auth listener will handle redirect
   };
 
   // SIGN UP
@@ -148,9 +138,7 @@ const Auth = () => {
         return;
       }
 
-      toast({ title: "✅ Account created!" });
-      window.location.href = '/home';
-      
+      // If auto-confirmed, auth listener will handle redirect
     } catch (err: any) {
       toast({ variant: "destructive", title: "Error", description: err.message });
       setFormLoading(false);
