@@ -1,4 +1,4 @@
-// Auth Page - Build v18 - DIRECT DASHBOARD REDIRECT
+// Auth Page - Build v19 - FAST REDIRECT with timeout
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 
-console.log('🔐 Auth.tsx BUILD v18 - DIRECT DASHBOARD REDIRECT Feb 21 2026');
+console.log('🔐 Auth.tsx BUILD v19 - FAST REDIRECT Feb 21 2026');
 
 // Get dashboard path for a role
 const getDashboardForRole = (role: string): string => {
@@ -33,9 +33,17 @@ const getDashboardForRole = (role: string): string => {
   return dashboards[role] || '/home';
 };
 
-// Fetch role and redirect to dashboard
-const redirectToDashboard = async (userId: string) => {
-  try {
+// Fetch role and redirect to dashboard - with 3 second timeout
+const redirectToDashboard = async (userId: string): Promise<boolean> => {
+  console.log('🔐 Fetching role for user:', userId);
+  
+  // Create a promise that rejects after 3 seconds
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error('Role fetch timeout')), 3000);
+  });
+  
+  // Create the actual fetch promise
+  const fetchPromise = (async () => {
     const { data, error } = await supabase
       .from('user_roles')
       .select('role')
@@ -43,16 +51,30 @@ const redirectToDashboard = async (userId: string) => {
       .limit(1)
       .maybeSingle();
     
+    console.log('🔐 Role query result:', { data, error });
+    
     if (!error && data?.role) {
-      const dashboard = getDashboardForRole(data.role);
-      console.log('🔐 REDIRECTING to dashboard:', dashboard, 'for role:', data.role);
-      localStorage.setItem('user_role', data.role);
-      window.location.href = dashboard;
+      return data.role;
+    }
+    return null;
+  })();
+  
+  try {
+    // Race between fetch and timeout
+    const role = await Promise.race([fetchPromise, timeoutPromise]);
+    
+    if (role) {
+      const dashboard = getDashboardForRole(role);
+      console.log('🔐 REDIRECTING NOW to:', dashboard, 'for role:', role);
+      localStorage.setItem('user_role', role);
+      // Use replace to prevent back button returning to auth
+      window.location.replace(dashboard);
       return true;
     }
   } catch (e) {
-    console.error('🔐 Error fetching role:', e);
+    console.error('🔐 Role fetch error or timeout:', e);
   }
+  
   return false;
 };
 
@@ -102,12 +124,15 @@ const Auth = () => {
     
     isSubmitting.current = true;
     setLoading(true);
+    console.log('🔐 Starting sign in for:', signInEmail);
     
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email: signInEmail,
         password: signInPassword
       });
+      
+      console.log('🔐 Sign in result:', { user: data?.user?.email, error: error?.message });
       
       if (error) {
         toast({ variant: "destructive", title: "Sign in failed", description: error.message });
@@ -117,18 +142,20 @@ const Auth = () => {
       }
       
       if (data.user) {
-        toast({ title: "✅ Welcome back!" });
+        console.log('🔐 Sign in successful, checking role...');
         
         // IMMEDIATELY check role and redirect to dashboard
         const redirected = await redirectToDashboard(data.user.id);
         
         if (!redirected) {
           // No role - go to home
-          console.log('🔐 No role found, going to /home');
-          window.location.href = '/home';
+          console.log('🔐 No role found, redirecting to /home');
+          window.location.replace('/home');
         }
+        // Don't reset loading - we're navigating away
       }
     } catch (err: any) {
+      console.error('🔐 Sign in exception:', err);
       toast({ variant: "destructive", title: "Error", description: err.message });
       setLoading(false);
       isSubmitting.current = false;
