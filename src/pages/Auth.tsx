@@ -15,7 +15,7 @@ import { Github, Mail, KeyRound, CheckCircle, Loader2, Shield } from "lucide-rea
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 
-console.log('🔐 Auth.tsx BUILD v30 - AUTH STATE REDIRECT Feb 21 2026');
+console.log('🔐 Auth.tsx BUILD v31 - SAVE EMAIL TO LOCALSTORAGE Feb 21 2026');
 
 // Dashboard paths
 const DASHBOARDS: Record<string, string> = {
