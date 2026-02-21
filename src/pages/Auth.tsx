@@ -1,6 +1,6 @@
-// Auth Page - Build v27 - TIMEOUT ON ROLE QUERY
-import { useState, useRef, useEffect } from "react";
-import { Link } from "react-router-dom";
+// Auth Page - Build v28 - SIMPLE AUTH PAGE
+import { useState, useRef } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,7 @@ import { Github, Mail, KeyRound, CheckCircle, Loader2, Shield } from "lucide-rea
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { SimplePasswordReset } from "@/components/SimplePasswordReset";
 
-console.log('🔐 Auth.tsx BUILD v27 - TIMEOUT ON ROLE QUERY Feb 21 2026');
+console.log('🔐 Auth.tsx BUILD v28 - SIMPLE AUTH PAGE Feb 21 2026');
 
 // Dashboard paths
 const DASHBOARDS: Record<string, string> = {
@@ -27,58 +27,7 @@ const DASHBOARDS: Record<string, string> = {
   'private_client': '/private-client-dashboard',
 };
 
-// Fetch role with timeout
-const fetchRoleWithTimeout = async (userId: string, accessToken: string): Promise<string | null> => {
-  console.log('🔐 Fetching role with timeout for:', userId);
-  
-  return new Promise(async (resolve) => {
-    // 2 second timeout
-    const timeout = setTimeout(() => {
-      console.log('🔐 Role fetch timeout - checking localStorage');
-      const cachedRole = localStorage.getItem('user_role');
-      resolve(cachedRole);
-    }, 2000);
-    
-    try {
-      // Use REST API directly - more reliable
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${userId}&select=role&limit=1`,
-        {
-          headers: {
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-      
-      clearTimeout(timeout);
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('🔐 REST API role result:', data);
-        if (data && data[0]?.role) {
-          resolve(data[0].role);
-          return;
-        }
-      }
-      
-      // Fallback to localStorage
-      const cachedRole = localStorage.getItem('user_role');
-      console.log('🔐 Using cached role:', cachedRole);
-      resolve(cachedRole);
-      
-    } catch (err) {
-      clearTimeout(timeout);
-      console.error('🔐 Role fetch error:', err);
-      const cachedRole = localStorage.getItem('user_role');
-      resolve(cachedRole);
-    }
-  });
-};
-
 const Auth = () => {
-  const [loading, setLoading] = useState(true);
   const [formLoading, setFormLoading] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [signInEmail, setSignInEmail] = useState("");
@@ -86,84 +35,18 @@ const Auth = () => {
   const [signUpEmail, setSignUpEmail] = useState("");
   const [signUpPassword, setSignUpPassword] = useState("");
   const isSubmitting = useRef(false);
-  const hasRedirected = useRef(false);
   const { toast } = useToast();
-
-  useEffect(() => {
-    console.log('🔐 Auth page mounted');
-    
-    // Safety timeout - never wait more than 2 seconds
-    const safetyTimeout = setTimeout(() => {
-      if (!hasRedirected.current) {
-        console.log('🔐 Safety timeout - showing form');
-        setLoading(false);
-      }
-    }, 2000);
-
-    // Check session immediately
-    const checkSession = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        console.log('🔐 Session check:', session?.user?.email);
-        
-        if (session?.user && session.access_token && !hasRedirected.current) {
-          const role = await fetchRoleWithTimeout(session.user.id, session.access_token);
-          console.log('🔐 Role:', role);
-          
-          if (role && DASHBOARDS[role]) {
-            hasRedirected.current = true;
-            clearTimeout(safetyTimeout);
-            localStorage.setItem('user_role', role);
-            console.log('🔐 Redirecting to:', DASHBOARDS[role]);
-            window.location.replace(DASHBOARDS[role]);
-            return;
-          }
-        }
-        
-        // No session or no role
-        clearTimeout(safetyTimeout);
-        setLoading(false);
-        
-      } catch (err) {
-        console.error('🔐 Session check error:', err);
-        clearTimeout(safetyTimeout);
-        setLoading(false);
-      }
-    };
-    
-    checkSession();
-
-    return () => clearTimeout(safetyTimeout);
-  }, []);
-
-  // Show loading while checking session
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-100">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-10 w-10 animate-spin text-primary" />
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
-  }
+  const navigate = useNavigate();
 
   // SIGN IN
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitting.current) return;
+    if (isSubmitting.current || formLoading) return;
     isSubmitting.current = true;
     setFormLoading(true);
 
     try {
       console.log('🔐 Signing in:', signInEmail);
-      
-      // Set a timeout for the entire sign-in process
-      const signInTimeout = setTimeout(() => {
-        console.log('🔐 Sign-in timeout - going to home');
-        toast({ title: "✅ Signed in!" });
-        window.location.replace('/home');
-      }, 5000);
       
       const { data, error } = await supabase.auth.signInWithPassword({
         email: signInEmail,
@@ -171,7 +54,6 @@ const Auth = () => {
       });
 
       if (error) {
-        clearTimeout(signInTimeout);
         console.error('🔐 Sign in error:', error.message);
         toast({ variant: "destructive", title: "Sign in failed", description: error.message });
         setFormLoading(false);
@@ -180,23 +62,45 @@ const Auth = () => {
       }
 
       if (data.user && data.session) {
-        console.log('🔐 Sign in success, fetching role...');
+        console.log('🔐 Sign in success! Fetching role...');
         
-        const role = await fetchRoleWithTimeout(data.user.id, data.session.access_token);
-        clearTimeout(signInTimeout);
-        
-        console.log('🔐 Role after sign in:', role);
-        
-        if (role && DASHBOARDS[role]) {
-          localStorage.setItem('user_role', role);
-          toast({ title: "✅ Welcome back!" });
-          window.location.replace(DASHBOARDS[role]);
-          return;
+        // Fetch role from database
+        try {
+          const response = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/user_roles?user_id=eq.${data.user.id}&select=role&limit=1`,
+            {
+              headers: {
+                'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${data.session.access_token}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+          
+          if (response.ok) {
+            const roleData = await response.json();
+            console.log('🔐 Role data:', roleData);
+            
+            if (roleData && roleData[0]?.role) {
+              const role = roleData[0].role;
+              localStorage.setItem('user_role', role);
+              
+              if (DASHBOARDS[role]) {
+                toast({ title: "✅ Welcome back!" });
+                console.log('🔐 Redirecting to dashboard:', DASHBOARDS[role]);
+                window.location.href = DASHBOARDS[role];
+                return;
+              }
+            }
+          }
+        } catch (roleErr) {
+          console.error('🔐 Role fetch error:', roleErr);
         }
         
-        // No role - go to home
+        // No role found - go to home page
         toast({ title: "✅ Signed in!" });
-        window.location.replace('/home');
+        console.log('🔐 No role, going to home');
+        window.location.href = '/home';
       }
       
     } catch (err: any) {
@@ -210,7 +114,7 @@ const Auth = () => {
   // SIGN UP
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitting.current) return;
+    if (isSubmitting.current || formLoading) return;
     isSubmitting.current = true;
     setFormLoading(true);
 
@@ -235,7 +139,7 @@ const Auth = () => {
       }
 
       toast({ title: "✅ Account created!" });
-      window.location.replace('/home');
+      window.location.href = '/home';
       
     } catch (err: any) {
       toast({ variant: "destructive", title: "Error", description: err.message });
