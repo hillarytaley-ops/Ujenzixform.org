@@ -358,22 +358,16 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
       
       console.log('📝 ProfileEditDialog: Got access token, proceeding with save...');
 
-      // Prepare update data - include only fields that exist in profiles table
-      // NOTE: 'address' column does NOT exist in profiles table - don't include it!
+      // Prepare update data - ONLY include fields that ACTUALLY exist in profiles table
+      // Based on error logs, profiles table has: id, user_id, full_name, phone, location, avatar_url, updated_at
+      // Does NOT have: address, bio, website, company_name, store_name, latitude, longitude
       const updateData: Record<string, any> = {
         full_name: profile.full_name || '',
         phone: profile.phone || null,
         location: profile.location || null,
-        company_name: profile.company_name || null,
-        bio: profile.bio || null,
-        website: profile.website || null,
         avatar_url: profile.avatar_url || null,
         updated_at: new Date().toISOString()
       };
-
-      // Add coordinates if available and if columns exist
-      if (profile.latitude) updateData.latitude = profile.latitude;
-      if (profile.longitude) updateData.longitude = profile.longitude;
 
       console.log('📝 ProfileEditDialog: Update data:', updateData);
 
@@ -401,16 +395,13 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
         if (!result || result.length === 0) {
           console.log('📝 ProfileEditDialog: No rows updated, trying upsert...');
           
-          // Use only the fields that exist in profiles table
+          // Use ONLY the fields that ACTUALLY exist in profiles table
           const insertData = {
             id: profile.id || profile.user_id,
             user_id: profile.user_id,
             full_name: profile.full_name || '',
             phone: profile.phone || null,
             location: profile.location || null,
-            company_name: profile.company_name || null,
-            bio: profile.bio || null,
-            website: profile.website || null,
             avatar_url: profile.avatar_url || null,
             updated_at: new Date().toISOString()
           };
@@ -441,16 +432,13 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
         // Try upsert as fallback
         console.log('📝 ProfileEditDialog: PATCH failed, trying upsert...');
         
-        // Use only the fields that exist in profiles table
+        // Use ONLY the fields that ACTUALLY exist in profiles table
         const insertData = {
           id: profile.id || profile.user_id,
           user_id: profile.user_id,
           full_name: profile.full_name || '',
           phone: profile.phone || null,
           location: profile.location || null,
-          company_name: profile.company_name || null,
-          bio: profile.bio || null,
-          website: profile.website || null,
           avatar_url: profile.avatar_url || null,
           updated_at: new Date().toISOString()
         };
