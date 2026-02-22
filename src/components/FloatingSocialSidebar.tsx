@@ -57,14 +57,12 @@ const HIDDEN_ON_PAGES = [
 // Social links configuration
 const SOCIAL_LINKS = [
   { name: 'WhatsApp', href: 'https://wa.me/254712345678', icon: WhatsAppIcon, bg: 'bg-[#25D366]', hoverBg: 'hover:bg-[#20BD5A]' },
-  { name: 'Phone', href: 'tel:+254700000000', icon: PhoneIcon, bg: 'bg-green-500', hoverBg: 'hover:bg-green-600' },
   { name: 'Facebook', href: 'https://www.facebook.com/profile.php?id=61588491484665', icon: FacebookIcon, bg: 'bg-[#1877F2]', hoverBg: 'hover:bg-[#166FE5]' },
   { name: 'Twitter', href: 'https://twitter.com/mradipro', icon: TwitterIcon, bg: 'bg-black', hoverBg: 'hover:bg-gray-800' },
   { name: 'Instagram', href: 'https://instagram.com/mradipro', icon: InstagramIcon, bg: 'bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400', hoverBg: '' },
   { name: 'TikTok', href: 'https://tiktok.com/@mradipro', icon: TikTokIcon, bg: 'bg-black', hoverBg: 'hover:bg-gray-800' },
   { name: 'LinkedIn', href: 'https://www.linkedin.com/company/ujenzixform/', icon: LinkedInIcon, bg: 'bg-[#0A66C2]', hoverBg: 'hover:bg-[#0958A8]' },
   { name: 'YouTube', href: 'https://www.youtube.com/@ujenziXform', icon: YouTubeIcon, bg: 'bg-[#FF0000]', hoverBg: 'hover:bg-[#E60000]' },
-  { name: 'Email', href: 'mailto:support@mradipro.co.ke', icon: EmailIcon, bg: 'bg-red-500', hoverBg: 'hover:bg-red-600' },
 ];
 
 export const FloatingSocialSidebar: React.FC = () => {
@@ -165,7 +163,7 @@ export const FloatingSocialSidebar: React.FC = () => {
         {/* Badge indicator */}
         {!isOpen && (
           <span className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white border-2 border-white shadow">
-            9
+            7
           </span>
         )}
       </button>
