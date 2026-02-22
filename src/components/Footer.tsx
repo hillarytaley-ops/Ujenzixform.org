@@ -69,7 +69,7 @@ const Footer = () => {
                 <TikTokIcon size={18} className="text-white" />
               </a>
               <a
-                href="https://www.linkedin.com/company/ujenzixform/"
+                href="https://www.linkedin.com/company/ujenzixform/?viewAsMember=true"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="p-2 bg-gray-800 rounded-lg hover:bg-[#0A66C2] transition-all duration-300 hover:scale-110"

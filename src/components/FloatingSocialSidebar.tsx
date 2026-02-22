@@ -61,7 +61,7 @@ const SOCIAL_LINKS = [
   { name: 'Twitter', href: 'https://twitter.com/mradipro', icon: TwitterIcon, bg: 'bg-black', hoverBg: 'hover:bg-gray-800' },
   { name: 'Instagram', href: 'https://instagram.com/mradipro', icon: InstagramIcon, bg: 'bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400', hoverBg: '' },
   { name: 'TikTok', href: 'https://tiktok.com/@mradipro', icon: TikTokIcon, bg: 'bg-black', hoverBg: 'hover:bg-gray-800' },
-  { name: 'LinkedIn', href: 'https://www.linkedin.com/company/ujenzixform/', icon: LinkedInIcon, bg: 'bg-[#0A66C2]', hoverBg: 'hover:bg-[#0958A8]' },
+  { name: 'LinkedIn', href: 'https://www.linkedin.com/company/ujenzixform/?viewAsMember=true', icon: LinkedInIcon, bg: 'bg-[#0A66C2]', hoverBg: 'hover:bg-[#0958A8]' },
   { name: 'YouTube', href: 'https://www.youtube.com/@ujenziXform', icon: YouTubeIcon, bg: 'bg-[#FF0000]', hoverBg: 'hover:bg-[#E60000]' },
 ];
 
