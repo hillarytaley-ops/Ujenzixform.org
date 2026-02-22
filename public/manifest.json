@@ -11,55 +11,55 @@
   "scope": "/",
   "icons": [
     {
-      "src": "/mradipro-logo.png",
+      "src": "/ujenzixform-logo.png",
       "sizes": "72x72",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/mradipro-logo.png",
+      "src": "/ujenzixform-logo.png",
       "sizes": "96x96",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/mradipro-logo.png",
+      "src": "/ujenzixform-logo.png",
       "sizes": "128x128",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/mradipro-logo.png",
+      "src": "/ujenzixform-logo.png",
       "sizes": "144x144",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/mradipro-logo.png",
+      "src": "/ujenzixform-logo.png",
       "sizes": "152x152",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/mradipro-logo.png",
+      "src": "/ujenzixform-logo.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/mradipro-logo.png",
+      "src": "/ujenzixform-logo.png",
       "sizes": "384x384",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/mradipro-logo.png",
+      "src": "/ujenzixform-logo.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/mradipro-logo-circular.svg",
+      "src": "/ujenzixform-logo-circular.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
@@ -71,21 +71,21 @@
       "short_name": "Materials",
       "description": "Browse construction materials from verified suppliers",
       "url": "/supplier-marketplace",
-      "icons": [{ "src": "/mradipro-logo.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/ujenzixform-logo.png", "sizes": "192x192" }]
     },
     {
       "name": "Track Delivery",
       "short_name": "Track",
       "description": "Track your material deliveries in real-time",
       "url": "/tracking",
-      "icons": [{ "src": "/mradipro-logo.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/ujenzixform-logo.png", "sizes": "192x192" }]
     },
     {
       "name": "My Orders",
       "short_name": "Orders",
       "description": "View your order history and status",
       "url": "/builder-dashboard",
-      "icons": [{ "src": "/mradipro-logo.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/ujenzixform-logo.png", "sizes": "192x192" }]
     }
   ],
   "categories": ["business", "construction", "productivity", "shopping"],
