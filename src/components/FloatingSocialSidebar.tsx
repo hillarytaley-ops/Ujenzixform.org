@@ -58,7 +58,7 @@ const HIDDEN_ON_PAGES = [
 const SOCIAL_LINKS = [
   { name: 'WhatsApp', href: 'https://wa.me/254712345678', icon: WhatsAppIcon, bg: 'bg-[#25D366]', hoverBg: 'hover:bg-[#20BD5A]' },
   { name: 'Phone', href: 'tel:+254700000000', icon: PhoneIcon, bg: 'bg-green-500', hoverBg: 'hover:bg-green-600' },
-  { name: 'Facebook', href: 'https://facebook.com/mradipro', icon: FacebookIcon, bg: 'bg-[#1877F2]', hoverBg: 'hover:bg-[#166FE5]' },
+  { name: 'Facebook', href: 'https://www.facebook.com/profile.php?id=61588491484665', icon: FacebookIcon, bg: 'bg-[#1877F2]', hoverBg: 'hover:bg-[#166FE5]' },
   { name: 'Twitter', href: 'https://twitter.com/mradipro', icon: TwitterIcon, bg: 'bg-black', hoverBg: 'hover:bg-gray-800' },
   { name: 'Instagram', href: 'https://instagram.com/mradipro', icon: InstagramIcon, bg: 'bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400', hoverBg: '' },
   { name: 'TikTok', href: 'https://tiktok.com/@mradipro', icon: TikTokIcon, bg: 'bg-black', hoverBg: 'hover:bg-gray-800' },
