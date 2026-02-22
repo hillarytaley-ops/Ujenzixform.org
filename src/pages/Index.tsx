@@ -516,7 +516,7 @@ const Index = () => {
             <VideoSection 
               videoId="YC0e8kEmen4"
               useYouTube={true}
-              thumbnail="https://img.youtube.com/vi/pedwSxiDpCs/maxresdefault.jpg"
+              thumbnail="https://img.youtube.com/vi/YC0e8kEmen4/maxresdefault.jpg"
               title="UjenziXform Complete Platform Demo"
               description="See all features in action"
             />
