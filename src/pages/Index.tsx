@@ -514,7 +514,7 @@ const Index = () => {
 
           <div className="max-w-4xl mx-auto">
             <VideoSection 
-              videoId="pedwSxiDpCs"
+              videoId="YC0e8kEmen4"
               useYouTube={true}
               thumbnail="https://img.youtube.com/vi/pedwSxiDpCs/maxresdefault.jpg"
               title="UjenziXform Complete Platform Demo"

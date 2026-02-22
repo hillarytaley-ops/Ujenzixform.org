@@ -72,7 +72,7 @@ const PROFESSIONAL_PACKAGES = [
   {
     id: 'pro-basic',
     name: 'Basic',
-    priceMonthly: 8000,
+    priceMonthly: 15000,
     duration: '1 month',
     features: [
       'Weekly site visit reports',
@@ -88,13 +88,14 @@ const PROFESSIONAL_PACKAGES = [
   {
     id: 'pro-standard',
     name: 'Standard',
-    priceMonthly: 20000,
+    priceMonthly: 35000,
     duration: '3 months',
     features: [
       'Bi-weekly site visits',
       'Real-time progress dashboard',
       'Material QR scanning & tracking',
       'GPS coordinates logging',
+      '🚁 Monthly drone aerial surveys',
       'Supplier quote management',
       'Delivery tracking integration',
       'Issue alerts & notifications',
@@ -107,15 +108,17 @@ const PROFESSIONAL_PACKAGES = [
   {
     id: 'pro-premium',
     name: 'Premium',
-    priceMonthly: 40000,
+    priceMonthly: 65000,
     duration: '6 months',
     features: [
       'Weekly site visits',
       'Real-time progress updates',
       'Full QR code tracking system',
       'GPS & geofencing alerts',
+      '🚁 Weekly drone aerial surveys',
+      '🤖 AI camera monitoring (24/7)',
+      '📹 Live video feed access',
       'Dedicated project manager',
-      'Drone aerial photography',
       '24/7 issue reporting',
       'Contractor performance reviews',
       'Multi-supplier coordination',
@@ -125,6 +128,30 @@ const PROFESSIONAL_PACKAGES = [
     ],
     recommended: false,
     icon: '👑'
+  },
+  {
+    id: 'pro-enterprise',
+    name: 'Enterprise',
+    priceMonthly: 120000,
+    duration: '12 months',
+    features: [
+      'Daily site monitoring',
+      'Live GPS dashboard',
+      'Complete QR ecosystem',
+      '🚁 Daily drone surveillance',
+      '🤖 AI camera network (multiple sites)',
+      '📹 24/7 live video monitoring',
+      '🔍 AI progress analysis & reporting',
+      'On-site supervisor',
+      'Custom reporting dashboard',
+      'Multi-site management',
+      'Safety violation detection',
+      'Unauthorized access alerts',
+      'Priority 24/7 support',
+      'Dedicated account manager'
+    ],
+    recommended: false,
+    icon: '🏢'
   }
 ];
 
@@ -133,7 +160,7 @@ const PRIVATE_PACKAGES = [
   {
     id: 'pvt-basic',
     name: 'Basic',
-    priceMonthly: 4000,
+    priceMonthly: 7500,
     duration: '1 month',
     features: [
       'Bi-weekly site visit reports',
@@ -149,13 +176,14 @@ const PRIVATE_PACKAGES = [
   {
     id: 'pvt-standard',
     name: 'Standard',
-    priceMonthly: 10000,
+    priceMonthly: 17500,
     duration: '3 months',
     features: [
       'Weekly site visits',
       'Photo & video reports',
       'Material QR verification',
       'GPS coordinates logging',
+      '🚁 Monthly drone aerial surveys',
       'Progress tracking dashboard',
       'Delivery tracking',
       'Issue alerts',
@@ -168,15 +196,17 @@ const PRIVATE_PACKAGES = [
   {
     id: 'pvt-premium',
     name: 'Premium',
-    priceMonthly: 20000,
+    priceMonthly: 32500,
     duration: '6 months',
     features: [
       'Weekly site visits',
       'Real-time updates',
       'Full QR tracking',
       'GPS monitoring',
+      '🚁 Weekly drone surveys',
+      '🤖 AI camera monitoring',
+      '📹 Live video feed access',
       'Dedicated monitor',
-      'Drone photography',
       '24/7 issue reporting',
       'Quality assurance',
       'Final inspection',
@@ -184,6 +214,28 @@ const PRIVATE_PACKAGES = [
     ],
     recommended: false,
     icon: '👑'
+  },
+  {
+    id: 'pvt-enterprise',
+    name: 'Enterprise',
+    priceMonthly: 60000,
+    duration: '12 months',
+    features: [
+      'Daily site monitoring',
+      'Live GPS dashboard',
+      'Complete QR ecosystem',
+      '🚁 Daily drone surveillance',
+      '🤖 AI camera network',
+      '📹 24/7 live video monitoring',
+      '🔍 AI progress analysis',
+      'On-site supervisor',
+      'Custom reporting',
+      'Safety violation detection',
+      'Unauthorized access alerts',
+      'Priority 24/7 support'
+    ],
+    recommended: false,
+    icon: '🏢'
   }
 ];
 
