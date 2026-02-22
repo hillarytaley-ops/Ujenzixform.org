@@ -33,7 +33,7 @@ const Footer = () => {
             {/* Social Media Icons */}
             <div className="flex flex-wrap gap-2 mt-4">
               <a
-                href="https://www.facebook.com/me/"
+                href="https://www.facebook.com/profile.php?id=61588491484665"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="p-2 bg-gray-800 rounded-lg hover:bg-[#1877F2] transition-all duration-300 hover:scale-110"
@@ -160,7 +160,7 @@ const Footer = () => {
             
             {/* Bottom Social Icons - Mobile Only */}
             <div className="flex gap-3 md:hidden">
-              <a href="https://www.facebook.com/me/" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white">
+              <a href="https://www.facebook.com/profile.php?id=61588491484665" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white">
                 <FacebookIcon size={20} />
               </a>
               <a href="https://twitter.com/mradipro" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white">
