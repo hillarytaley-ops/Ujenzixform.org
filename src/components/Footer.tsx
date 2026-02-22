@@ -163,7 +163,7 @@ const Footer = () => {
               <a href="https://www.facebook.com/profile.php?id=61588491484665" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white">
                 <FacebookIcon size={20} />
               </a>
-              <a href="https://twitter.com/mradipro" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white">
+              <a href="https://x.com/UjenziXform" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white">
                 <TwitterIcon size={20} />
               </a>
               <a href="https://instagram.com/mradipro" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white">
