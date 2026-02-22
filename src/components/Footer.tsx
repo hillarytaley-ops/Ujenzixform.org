@@ -78,7 +78,7 @@ const Footer = () => {
                 <LinkedInIcon size={18} className="text-white" />
               </a>
               <a
-                href="https://youtube.com/@ujenzixform"
+                href="https://www.youtube.com/@ujenziXform"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="p-2 bg-gray-800 rounded-lg hover:bg-[#FF0000] transition-all duration-300 hover:scale-110"
