@@ -20,7 +20,6 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { trackingNumberService } from '@/services/TrackingNumberService';
 
 interface DeliveryRequest {
   id: string;
@@ -120,23 +119,17 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
   };
 
   const handleAccept = async () => {
+    // Prevent double-click
+    if (isAccepting) return;
+    
     setIsAccepting(true);
     try {
       // Get current user (delivery provider)
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Get provider ID - try delivery_providers table first, fallback to user.id
-      let providerId = user.id;
-      const { data: providerData } = await supabase
-        .from('delivery_providers')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (providerData?.id) {
-        providerId = providerData.id;
-      }
+      // Use user.id directly as provider ID
+      const providerId = user.id;
       
       // Validate providerId is not empty
       if (!providerId) {
@@ -145,44 +138,36 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
 
       console.log('🚚 Accepting delivery with provider ID:', providerId);
 
-      // CHECK: Does this provider already have an active delivery?
-      const { data: activeDeliveries, error: activeError } = await supabase
+      // Generate tracking number
+      const trackingNumber = 'TRK-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + 
+        Math.random().toString(36).substring(2, 7).toUpperCase();
+
+      // Direct update - single database call
+      const { data: updateResult, error: updateError } = await supabase
         .from('delivery_requests')
-        .select('id, status, tracking_number')
-        .eq('provider_id', providerId)
-        .in('status', ['accepted', 'picked_up', 'in_transit', 'assigned'])
-        .limit(1);
+        .update({
+          provider_id: providerId,
+          status: 'accepted',
+          tracking_number: trackingNumber,
+          provider_response: 'accepted',
+          response_date: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', delivery.id)
+        .select();
 
-      if (activeError) {
-        console.error('Error checking active deliveries:', activeError);
+      if (updateError) {
+        console.error('Update error:', updateError);
+        throw new Error(updateError.message || 'Failed to accept delivery');
       }
 
-      if (activeDeliveries && activeDeliveries.length > 0) {
-        const activeDelivery = activeDeliveries[0];
-        toast({
-          title: "⚠️ Active Delivery In Progress",
-          description: `You already have an active delivery (${activeDelivery.tracking_number || 'No tracking #'}). Please complete or cancel it before accepting a new one.`,
-          variant: "destructive"
-        });
-        setIsAccepting(false);
-        return;
-      }
-
-      // Use TrackingNumberService to handle acceptance and generate tracking number
-      const result = await trackingNumberService.onProviderAcceptsDelivery(
-        delivery.id,
-        providerId
-      );
-
-      if (!result) {
-        throw new Error('Failed to generate tracking number');
+      if (!updateResult || updateResult.length === 0) {
+        throw new Error('Delivery may have been accepted by another provider');
       }
 
       toast({
         title: "✅ Delivery Accepted!",
-        description: result.isNew 
-          ? `Tracking number ${result.trackingNumber} generated and sent to builder. Start navigation to pickup!`
-          : `Using existing tracking number ${result.trackingNumber}. Start navigation to pickup!`,
+        description: `Tracking: ${trackingNumber}. Navigate to pickup location!`,
       });
 
       onAccept?.(delivery.id);

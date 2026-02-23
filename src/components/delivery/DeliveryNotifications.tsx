@@ -530,8 +530,14 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     }
   };
 
-  // Accept a delivery request
+  // Accept a delivery request - SINGLE CLICK
   const handleAcceptDelivery = async (requestId: string) => {
+    // Prevent double-click
+    if (acceptingId) {
+      console.log('Already processing an accept request');
+      return;
+    }
+    
     // Validate userId before making request
     let providerId = userId;
     if (!providerId || providerId === '') {
@@ -557,11 +563,22 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     
     console.log('🚚 handleAcceptDelivery: Accepting with providerId:', providerId);
     
+    // Set accepting state IMMEDIATELY to disable button
     setAcceptingId(requestId);
+    
+    // Optimistically remove from list for instant UI feedback
+    const previousNotifications = [...notifications];
+    setNotifications(prev => prev.filter(n => n.id !== requestId));
+    setUnreadCount(prev => Math.max(0, prev - 1));
+    
     try {
       const { url, headers } = getAuthHeaders();
       
-      // Update the delivery request to assign this provider
+      // Generate tracking number
+      const trackingNumber = 'TRK-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + 
+        Math.random().toString(36).substring(2, 7).toUpperCase();
+      
+      // Update the delivery request to assign this provider - use 'accepted' status
       const response = await fetch(
         `${url}/rest/v1/delivery_requests?id=eq.${requestId}`,
         {
@@ -569,7 +586,10 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           headers: { ...headers, 'Prefer': 'return=representation' },
           body: JSON.stringify({
             provider_id: providerId,
-            status: 'assigned',
+            status: 'accepted',
+            tracking_number: trackingNumber,
+            provider_response: 'accepted',
+            response_date: new Date().toISOString(),
             updated_at: new Date().toISOString()
           })
         }
@@ -578,20 +598,25 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       if (response.ok) {
         toast({
           title: '✅ Delivery Accepted!',
-          description: 'You have been assigned to this delivery. Check Active tab for details.',
+          description: `Tracking: ${trackingNumber}. Check Active tab for details.`,
         });
-        
-        // Remove from notifications list
-        setNotifications(prev => prev.filter(n => n.id !== requestId));
-        setUnreadCount(prev => Math.max(0, prev - 1));
         
         // Call parent callback if provided
         if (onAcceptDelivery) onAcceptDelivery(requestId);
       } else {
+        // Restore notifications on failure
+        setNotifications(previousNotifications);
+        setUnreadCount(previousNotifications.filter(n => !n.read).length);
+        
         const errorData = await response.json().catch(() => ({}));
+        console.error('Accept failed:', errorData);
         throw new Error(errorData.message || 'Failed to accept delivery');
       }
     } catch (error: any) {
+      // Restore notifications on error
+      setNotifications(previousNotifications);
+      setUnreadCount(previousNotifications.filter(n => !n.read).length);
+      
       console.error('Error accepting delivery:', error);
       toast({
         title: 'Error',
