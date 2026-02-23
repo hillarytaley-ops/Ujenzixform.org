@@ -178,8 +178,8 @@ export const FloatingSocialSidebar: React.FC = () => {
         )}
       </div>
 
-      {/* Mobile: ORANGE SOCIAL - above BLUE chatbot (75 + 44 + 10 = 129) */}
-      <div className="sm:hidden fixed z-[9998]" style={{ bottom: '129px', right: '16px' }}>
+      {/* Mobile: ORANGE SOCIAL - LEFT side, same level as BLUE chatbot (75px) */}
+      <div className="sm:hidden fixed z-[9998]" style={{ bottom: '75px', left: '16px' }}>
         {/* Backdrop overlay when open */}
         {isOpen && (
           <div 
@@ -219,7 +219,7 @@ export const FloatingSocialSidebar: React.FC = () => {
           })}
         </div>
         
-        {/* Main toggle button - smaller 44px */}
+        {/* Main toggle button - 44px same as chatbot */}
         <button
           onClick={() => setIsOpen(!isOpen)}
           className={`relative flex items-center justify-center rounded-full shadow-lg hover:shadow-xl transition-all duration-300 ${
