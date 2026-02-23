@@ -94,12 +94,13 @@ BEGIN
             NEW.tracking_number := v_tracking_num;
             
             RAISE NOTICE 'Created tracking number: % for delivery request: % with supplier: %', v_tracking_num, NEW.id, v_supplier_id;
-        EXCEPTION WHEN unique_violation THEN
-            -- Tracking number already exists, skip
-            RAISE NOTICE 'Tracking number already exists for delivery request: %', NEW.id;
-        EXCEPTION WHEN OTHERS THEN
-            -- Log error but don't fail the update
-            RAISE WARNING 'Could not create tracking number: %', SQLERRM;
+        EXCEPTION 
+            WHEN unique_violation THEN
+                -- Tracking number already exists, skip
+                RAISE NOTICE 'Tracking number already exists for delivery request: %', NEW.id;
+            WHEN OTHERS THEN
+                -- Log error but don't fail the update
+                RAISE WARNING 'Could not create tracking number: %', SQLERRM;
         END;
     END IF;
     
