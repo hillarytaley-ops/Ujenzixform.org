@@ -31,8 +31,23 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { CartItem } from '@/contexts/CartContext';
-import { PaystackPayment, PaystackSuccessResponse } from './PaystackPayment';
+// import { PaystackPayment, PaystackSuccessResponse } from './PaystackPayment'; // Uncomment for production
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
+
+// ============================================================
+// TEST MODE: Set to false to enable real Paystack payments
+// ============================================================
+const TEST_MODE = true;
+
+// Type for Paystack response (needed even in test mode)
+interface PaystackSuccessResponse {
+  reference: string;
+  trans: string;
+  status: string;
+  message: string;
+  transaction: string;
+  trxref: string;
+}
 
 interface CheckoutDialogProps {
   isOpen: boolean;
@@ -495,23 +510,132 @@ export const CheckoutDialog: React.FC<CheckoutDialogProps> = ({
           {/* Step 2: Payment */}
           {step === 'payment' && orderId && (
             <div className="py-4">
-              <PaystackPayment
-                amount={totalAmount}
-                email={customerDetails.email}
-                firstName={customerDetails.firstName}
-                lastName={customerDetails.lastName}
-                phone={customerDetails.phone}
-                orderId={orderId}
-                orderDescription={`UjenziPro Order ${poNumber}`}
-                onSuccess={handlePaymentSuccess}
-                onClose={handlePaymentClose}
-                metadata={{
-                  po_number: poNumber,
-                  delivery_address: customerDetails.deliveryAddress,
-                  delivery_date: customerDetails.deliveryDate,
-                  items_count: items.length
-                }}
-              />
+              {TEST_MODE ? (
+                // ============================================================
+                // TEST MODE: Simulated Payment UI
+                // ============================================================
+                <div className="space-y-6">
+                  <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4 text-center">
+                    <Badge className="bg-yellow-500 text-white mb-2">🧪 TEST MODE</Badge>
+                    <p className="text-yellow-800 font-medium">
+                      Paystack is disabled for testing. Click below to simulate payment.
+                    </p>
+                  </div>
+
+                  {/* Order Summary */}
+                  <div className="bg-gray-50 rounded-xl p-4 border">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-muted-foreground">Order ID</span>
+                      <span className="font-mono text-sm">{orderId.slice(0, 8)}...</span>
+                    </div>
+                    <Separator className="my-3" />
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold">Total Amount</span>
+                      <span className="text-2xl font-bold text-green-600">
+                        KES {totalAmount.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Simulated Payment Methods */}
+                  <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+                    <h4 className="font-semibold text-sm mb-3 flex items-center gap-2">
+                      <CreditCard className="h-4 w-4" />
+                      Select Payment Method (Simulated)
+                    </h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="flex items-center gap-2 text-sm p-2 bg-white rounded border">
+                        <CreditCard className="h-4 w-4 text-blue-600" />
+                        <span>Card</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm p-2 bg-white rounded border">
+                        <Smartphone className="h-4 w-4 text-green-600" />
+                        <span>M-Pesa</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm p-2 bg-white rounded border">
+                        <Building2 className="h-4 w-4 text-purple-600" />
+                        <span>Bank Transfer</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm p-2 bg-white rounded border">
+                        <Banknote className="h-4 w-4 text-orange-600" />
+                        <span>USSD</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Simulate Payment Button */}
+                  <Button
+                    className="w-full py-6 text-lg font-semibold bg-green-600 hover:bg-green-700"
+                    onClick={async () => {
+                      setIsProcessing(true);
+                      
+                      // Simulate payment processing delay
+                      await new Promise(resolve => setTimeout(resolve, 2000));
+                      
+                      // Generate fake payment reference
+                      const fakeReference = `TEST-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+                      
+                      // Call the success handler with simulated response
+                      handlePaymentSuccess({
+                        reference: fakeReference,
+                        trans: `TXN-${Date.now()}`,
+                        status: 'success',
+                        message: 'Test payment approved',
+                        transaction: `TXN-${Date.now()}`,
+                        trxref: fakeReference
+                      });
+                      
+                      setIsProcessing(false);
+                    }}
+                    disabled={isProcessing}
+                  >
+                    {isProcessing ? (
+                      <>
+                        <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                        Processing Test Payment...
+                      </>
+                    ) : (
+                      <>
+                        <Lock className="h-5 w-5 mr-2" />
+                        Simulate Payment - KES {totalAmount.toLocaleString()}
+                      </>
+                    )}
+                  </Button>
+
+                  {/* Security Note */}
+                  <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
+                    <Shield className="h-4 w-4" />
+                    <span>Test Mode - No real payment will be processed</span>
+                  </div>
+                </div>
+              ) : (
+                // ============================================================
+                // PRODUCTION MODE: Real Paystack Payment
+                // Uncomment PaystackPayment import at top of file
+                // ============================================================
+                <div className="text-center py-8">
+                  <p className="text-gray-500">Paystack integration disabled. Set TEST_MODE to false.</p>
+                </div>
+                /* 
+                <PaystackPayment
+                  amount={totalAmount}
+                  email={customerDetails.email}
+                  firstName={customerDetails.firstName}
+                  lastName={customerDetails.lastName}
+                  phone={customerDetails.phone}
+                  orderId={orderId}
+                  orderDescription={`UjenziPro Order ${poNumber}`}
+                  onSuccess={handlePaymentSuccess}
+                  onClose={handlePaymentClose}
+                  metadata={{
+                    po_number: poNumber,
+                    delivery_address: customerDetails.deliveryAddress,
+                    delivery_date: customerDetails.deliveryDate,
+                    items_count: items.length
+                  }}
+                />
+                */
+              )}
               
               <div className="mt-4 text-center">
                 <Button
