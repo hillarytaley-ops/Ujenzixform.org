@@ -149,8 +149,8 @@ export const SimpleChatButton = () => {
   if (!isOpen) {
     return (
       <div 
-        className="fixed bottom-6 right-6 z-[9999]"
-        style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 9999 }}
+        className="fixed bottom-20 sm:bottom-6 right-3 sm:right-6 z-[9999]"
+        style={{ position: 'fixed', zIndex: 9999 }}
       >
         <Button
           onClick={() => setIsOpen(true)}
@@ -165,10 +165,10 @@ export const SimpleChatButton = () => {
 
   return (
     <div 
-      className="fixed bottom-6 right-6 z-[9999] max-w-[calc(100vw-48px)]"
-      style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 9999 }}
+      className="fixed bottom-2 sm:bottom-6 right-2 sm:right-6 z-[9999] max-w-[calc(100vw-16px)] sm:max-w-[calc(100vw-48px)]"
+      style={{ position: 'fixed', zIndex: 9999 }}
     >
-      <Card className="w-96 max-w-[calc(100vw-48px)] shadow-2xl">
+      <Card className="w-full sm:w-96 max-w-[calc(100vw-16px)] sm:max-w-[calc(100vw-48px)] shadow-2xl">
         <div className="bg-blue-600 text-white p-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Bot className="h-5 w-5" />
