@@ -574,24 +574,32 @@ export function LiveChatWidget({ position = 'bottom-right' }: LiveChatWidgetProp
 
   return (
     <>
-      {/* Chat Button - Round with Radiating Animation */}
+      {/* Chat Button - BLUE icon at 150px to clear menu */}
       {!isOpen && (
-        <div className={cn("fixed bottom-6 z-[9999]", positionClasses)} style={{ bottom: '24px' }}>
-          {/* Main button - Blue, matches FloatingSocialSidebar size (56px) */}
+        <div className="sm:hidden fixed z-[9999]" style={{ bottom: '150px', right: '16px' }}>
+          {/* Mobile: BLUE chatbot - 44px, above menu */}
           <button
             onClick={() => setIsOpen(true)}
-            className={cn(
-              "relative w-14 h-14 rounded-full",
-              "bg-blue-600 hover:bg-blue-700",
-              "text-white shadow-lg",
-              "hover:shadow-xl hover:scale-110",
-              "transition-all duration-300 flex items-center justify-center"
-            )}
+            className="relative rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center"
+            style={{ width: '44px', height: '44px' }}
+            title="Live Chat"
+          >
+            <MessageCircle className="w-5 h-5" />
+            <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow-md">
+              <span className="absolute inset-0 rounded-full bg-green-400 animate-ping opacity-75" />
+            </span>
+          </button>
+        </div>
+      )}
+      {!isOpen && (
+        <div className="hidden sm:block fixed z-[9999]" style={{ bottom: '24px', right: '24px' }}>
+          {/* Desktop: BLUE chatbot - 56px */}
+          <button
+            onClick={() => setIsOpen(true)}
+            className="relative w-14 h-14 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300 flex items-center justify-center"
             title="Live Chat"
           >
             <MessageCircle className="w-6 h-6" />
-            
-            {/* Online indicator dot */}
             <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full border-2 border-white shadow-md">
               <span className="absolute inset-0 rounded-full bg-green-400 animate-ping opacity-75" />
             </span>
