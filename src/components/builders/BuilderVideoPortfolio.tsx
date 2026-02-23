@@ -266,7 +266,7 @@ export function BuilderVideoPortfolio({ builderId, isOwner = false }: BuilderVid
             title: uploadForm.title,
             description: uploadForm.description || '',
             video_url: publicUrl,
-            is_published: false // Requires admin approval before showing publicly
+            is_published: true // Auto-publish for immediate visibility to visitors
           })
         }
       );

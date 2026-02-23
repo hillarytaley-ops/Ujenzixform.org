@@ -774,8 +774,8 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         if (videoUrl) postType = 'video';
         else if (imageUrl) postType = 'image';
         
-        // Videos require admin approval, text/image posts are immediately visible
-        const postStatus = videoUrl ? 'pending' : 'active';
+        // All posts are immediately visible to visitors
+        const postStatus = 'active';
         
         const postPayload = {
           builder_id: postUserId,
@@ -879,11 +879,11 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
       setIsCreatingPost(false);
 
       console.log('📤 Showing success toast...');
-      // Different message for video posts (pending approval) vs other posts (immediate)
+      // All posts are now immediately visible
       if (videoUrl) {
         toast({
-          title: '📹 Video Submitted!',
-          description: 'Your video is pending admin approval before it goes live.'
+          title: '🎬 Video Posted!',
+          description: 'Your video is now live and visible to all visitors!'
         });
       } else {
         toast({

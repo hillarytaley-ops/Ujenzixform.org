@@ -121,7 +121,7 @@ export function MobileVideoUpload({ builderId, onUploadComplete }: MobileVideoUp
           title: title.trim(),
           description: description.trim(),
           video_url: urlData.publicUrl,
-          status: 'pending'
+          is_published: true // Auto-publish for immediate visibility
         });
 
       if (dbError) throw dbError;
@@ -129,8 +129,8 @@ export function MobileVideoUpload({ builderId, onUploadComplete }: MobileVideoUp
       setUploadProgress(100);
 
       toast({
-        title: "Video Uploaded!",
-        description: "Your video has been submitted for review",
+        title: "🎬 Video Uploaded!",
+        description: "Your video is now live and visible to all visitors!",
       });
 
       // Reset form
