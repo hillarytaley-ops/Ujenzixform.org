@@ -1149,6 +1149,36 @@ const DeliveryDashboard = () => {
             <DeliveryNotifications 
               userId={user?.id || localStorage.getItem('user_id') || ''}
               onNotificationClick={(notification) => console.log('Notification clicked:', notification)}
+              onAcceptDelivery={async (requestId) => {
+                console.log('🔔 Delivery accepted, refreshing counts...');
+                // Refresh notification counts immediately
+                try {
+                  const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+                  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+                  let accessToken = SUPABASE_ANON_KEY;
+                  try {
+                    const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+                    if (storedSession) {
+                      const parsed = JSON.parse(storedSession);
+                      if (parsed.access_token) accessToken = parsed.access_token;
+                    }
+                  } catch (e) {}
+                  
+                  const headers = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}` };
+                  const response = await fetch(`${SUPABASE_URL}/rest/v1/delivery_requests?select=id,status&limit=100`, { headers });
+                  if (response.ok) {
+                    const data = await response.json();
+                    const pendingCount = data?.filter((r: any) => r.status === 'pending')?.length || 0;
+                    setPendingNotificationCount(pendingCount);
+                    setNotificationCount(data?.length || 0);
+                    console.log('🔔 Updated counts:', { total: data?.length, pending: pendingCount });
+                  }
+                } catch (e) {
+                  console.error('Error refreshing counts:', e);
+                }
+                // Also refresh main data
+                refetchData();
+              }}
             />
           </TabsContent>
 
