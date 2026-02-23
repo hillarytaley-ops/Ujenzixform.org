@@ -1,6 +1,6 @@
 /**
- * CHATBOT BUTTON - v6.0 - Feb 23 2026
- * Mobile: BLUE icon 44px SAME as orange social
+ * CHATBOT BUTTON - v7.0 - Feb 23 2026
+ * Mobile: BLUE chatbot at 120px to clear menu
  */
 import React, { useState } from 'react';
 import { MessageCircle, X, Send, Bot, User, Sparkles } from 'lucide-react';
@@ -153,13 +153,13 @@ export const SimpleChatButton = () => {
   if (!isOpen) {
     return (
       <>
-        {/* Mobile: BLUE CHATBOT - 44px SAME SIZE as orange social */}
+        {/* Mobile: BLUE CHATBOT - at 120px to clear menu */}
         <button
           type="button"
           onClick={() => setIsOpen(true)}
           className="sm:hidden fixed z-[9999] rounded-full bg-blue-600 hover:bg-blue-700 shadow-lg flex items-center justify-center"
           style={{ 
-            bottom: '70px', 
+            bottom: '120px', 
             right: '16px',
             width: '44px', 
             height: '44px',

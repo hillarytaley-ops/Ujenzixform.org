@@ -42,11 +42,11 @@ export const FloatingCartButton: React.FC = () => {
   );
 
   // Position:
-  // - Mobile: RIGHT side, TOP of stack (bottom: 166px)
+  // - Mobile: RIGHT side, TOP of stack (bottom: 216px)
   // - Desktop: RIGHT side, above chatbot (bottom: 100px)
   return (
     <>
-      {/* Mobile CART - TOP of stack (118 + 44 + 4 = 166) */}
+      {/* Mobile CART - TOP of stack (168 + 44 + 4 = 216) */}
       <Button
         onClick={() => setIsCartOpen(true)}
         className={`sm:hidden fixed z-50 shadow-lg rounded-full flex items-center gap-1 h-10 px-2
@@ -55,7 +55,7 @@ export const FloatingCartButton: React.FC = () => {
             : 'bg-gray-600 hover:bg-gray-700'
           }`}
         style={{ 
-          bottom: '166px',
+          bottom: '216px',
           right: '16px'
         }}
       >
