@@ -1,6 +1,6 @@
 /**
- * CHATBOT BUTTON - v7.0 - Feb 23 2026
- * Mobile: BLUE chatbot at 120px to clear menu
+ * CHATBOT BUTTON - v8.0 - Feb 23 2026 8:00pm
+ * Mobile: BLUE chatbot at 150px to clear menu
  */
 import React, { useState } from 'react';
 import { MessageCircle, X, Send, Bot, User, Sparkles } from 'lucide-react';
@@ -153,13 +153,13 @@ export const SimpleChatButton = () => {
   if (!isOpen) {
     return (
       <>
-        {/* Mobile: BLUE CHATBOT - at 120px to clear menu */}
+        {/* Mobile: BLUE CHATBOT - at 150px to clear menu - UPDATED Feb 23 2026 8pm */}
         <button
           type="button"
           onClick={() => setIsOpen(true)}
           className="sm:hidden fixed z-[9999] rounded-full bg-blue-600 hover:bg-blue-700 shadow-lg flex items-center justify-center"
           style={{ 
-            bottom: '120px', 
+            bottom: '150px', 
             right: '16px',
             width: '44px', 
             height: '44px',
