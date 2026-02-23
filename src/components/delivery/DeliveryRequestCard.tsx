@@ -123,62 +123,57 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
     if (isAccepting) return;
     
     setIsAccepting(true);
-    try {
-      // Get current user (delivery provider)
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-
-      // Use user.id directly as provider ID
-      const providerId = user.id;
-      
-      // Validate providerId is not empty
-      if (!providerId) {
-        throw new Error('Provider ID not found');
+    console.log('🔘 DeliveryRequestCard: Accept clicked for:', delivery.id);
+    
+    // Just call the parent callback - let the parent handle the database update
+    // This prevents double database updates
+    if (onAccept) {
+      try {
+        await onAccept(delivery.id);
+      } catch (error: any) {
+        console.error('Error in onAccept callback:', error);
+        toast({
+          title: "Error",
+          description: error.message || "Failed to accept delivery. Please try again.",
+          variant: "destructive"
+        });
       }
+    } else {
+      // Fallback: If no onAccept callback, do direct update
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
 
-      console.log('🚚 Accepting delivery with provider ID:', providerId);
+        const trackingNumber = 'TRK-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + 
+          Math.random().toString(36).substring(2, 7).toUpperCase();
 
-      // Generate tracking number
-      const trackingNumber = 'TRK-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + 
-        Math.random().toString(36).substring(2, 7).toUpperCase();
+        const { error: updateError } = await supabase
+          .from('delivery_requests')
+          .update({
+            provider_id: user.id,
+            status: 'accepted',
+            tracking_number: trackingNumber,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', delivery.id);
 
-      // Direct update - single database call
-      const { data: updateResult, error: updateError } = await supabase
-        .from('delivery_requests')
-        .update({
-          provider_id: providerId,
-          status: 'accepted',
-          tracking_number: trackingNumber,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', delivery.id)
-        .select();
+        if (updateError) throw updateError;
 
-      if (updateError) {
-        console.error('Update error:', updateError);
-        throw new Error(updateError.message || 'Failed to accept delivery');
+        toast({
+          title: "✅ Delivery Accepted!",
+          description: `Tracking: ${trackingNumber}. Navigate to pickup location!`,
+        });
+      } catch (error: any) {
+        console.error('Error accepting delivery:', error);
+        toast({
+          title: "Error",
+          description: error.message || "Failed to accept delivery.",
+          variant: "destructive"
+        });
       }
-
-      if (!updateResult || updateResult.length === 0) {
-        throw new Error('Delivery may have been accepted by another provider');
-      }
-
-      toast({
-        title: "✅ Delivery Accepted!",
-        description: `Tracking: ${trackingNumber}. Navigate to pickup location!`,
-      });
-
-      onAccept?.(delivery.id);
-    } catch (error: any) {
-      console.error('Error accepting delivery:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to accept delivery. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsAccepting(false);
     }
+    
+    setIsAccepting(false);
   };
 
   const handleReject = async () => {
