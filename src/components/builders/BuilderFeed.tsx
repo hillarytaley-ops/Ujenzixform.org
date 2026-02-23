@@ -214,6 +214,10 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
     storedRole === 'admin';
   const [posts, setPosts] = useState<Omit<BuilderVideoPostProps, 'onLike' | 'onComment' | 'onShare' | 'onViewProfile'>[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMorePosts, setHasMorePosts] = useState(true);
+  const [postsOffset, setPostsOffset] = useState(0);
+  const POSTS_PER_PAGE = 10;
   const [newPostText, setNewPostText] = useState('');
   const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
@@ -235,12 +239,18 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
 
   // Fetch posts from database on mount
   useEffect(() => {
-    fetchPosts();
+    fetchPosts(0, true);
   }, []);
 
-  const fetchPosts = async () => {
-    setLoadingPosts(true);
-    console.log('📥 Fetching posts from database...');
+  const fetchPosts = async (offset: number = 0, isInitialLoad: boolean = false) => {
+    if (isInitialLoad) {
+      setLoadingPosts(true);
+      setPostsOffset(0);
+      setHasMorePosts(true);
+    } else {
+      setLoadingMore(true);
+    }
+    console.log('📥 Fetching posts from database... offset:', offset);
     try {
       // Fetch posts from builder_posts table using fetch API (bypass Supabase client)
       const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
@@ -267,12 +277,14 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
 
       // Fetch posts - include both active posts and user's own posts (any status)
       // Using OR filter: status=active OR builder_id=currentUserId
-      let postsUrl = `${SUPABASE_URL}/rest/v1/builder_posts?order=created_at.desc&limit=50`;
+      // Add pagination with offset and limit
+      const limitPlusOne = POSTS_PER_PAGE + 1; // Fetch one extra to check if there are more
+      let postsUrl = `${SUPABASE_URL}/rest/v1/builder_posts?order=created_at.desc&limit=${limitPlusOne}&offset=${offset}`;
       if (currentUserId) {
         // Show active posts OR user's own posts (any status except deleted)
-        postsUrl = `${SUPABASE_URL}/rest/v1/builder_posts?or=(status.eq.active,builder_id.eq.${currentUserId})&status=neq.deleted&order=created_at.desc&limit=50`;
+        postsUrl = `${SUPABASE_URL}/rest/v1/builder_posts?or=(status.eq.active,builder_id.eq.${currentUserId})&status=neq.deleted&order=created_at.desc&limit=${limitPlusOne}&offset=${offset}`;
       } else {
-        postsUrl = `${SUPABASE_URL}/rest/v1/builder_posts?status=eq.active&order=created_at.desc&limit=50`;
+        postsUrl = `${SUPABASE_URL}/rest/v1/builder_posts?status=eq.active&order=created_at.desc&limit=${limitPlusOne}&offset=${offset}`;
       }
       
       const postsRes = await fetch(
@@ -291,15 +303,26 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
       if (!postsRes.ok || postsData?.error) {
         console.log('📥 Error fetching posts:', postsData?.message || postsData?.error);
         // Don't show demo posts - only show real builder posts
-        setPosts([]);
+        if (isInitialLoad) {
+          setPosts([]);
+        }
+        setHasMorePosts(false);
         setLoadingPosts(false);
+        setLoadingMore(false);
         return;
       }
 
-      if (postsData && postsData.length > 0) {
-        console.log('📥 First post:', postsData[0]?.id, postsData[0]?.video_url ? 'has video' : 'no video');
+      // Check if there are more posts
+      const hasMore = postsData && postsData.length > POSTS_PER_PAGE;
+      setHasMorePosts(hasMore);
+      
+      // Only use POSTS_PER_PAGE posts (remove the extra one we fetched to check)
+      const postsToProcess = hasMore ? postsData.slice(0, POSTS_PER_PAGE) : postsData;
+
+      if (postsToProcess && postsToProcess.length > 0) {
+        console.log('📥 First post:', postsToProcess[0]?.id, postsToProcess[0]?.video_url ? 'has video' : 'no video');
         // Get unique builder IDs (user_id from auth.users)
-        const builderIds = [...new Set(postsData.map((p: any) => p.builder_id))];
+        const builderIds = [...new Set(postsToProcess.map((p: any) => p.builder_id))];
         
         // Fetch profiles for these builders using fetch API
         let profilesData: any[] = [];
@@ -323,7 +346,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         const profilesMap = new Map((profilesData || []).map((p: any) => [p.user_id, p]));
 
         // Fetch comments for each post (optional, don't fail if table doesn't exist)
-        const postIds = postsData.map((p: any) => p.id);
+        const postIds = postsToProcess.map((p: any) => p.id);
         let commentsData: any[] = [];
         try {
           const commentsRes = await fetch(
@@ -390,7 +413,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         }
 
         // Transform posts to match component format
-        const transformedPosts = postsData.map((post: any) => {
+        const transformedPosts = postsToProcess.map((post: any) => {
           const profile = profilesMap.get(post.builder_id);
           const postComments = (commentsData || [])
             .filter((c: any) => c.post_id === post.id)
@@ -433,23 +456,38 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
           };
         });
 
-        // Combine real posts with demo posts if we have few real posts
-        if (transformedPosts.length < 3) {
-          // Only show real builder posts - no demo data
+        // Update posts state - append for load more, replace for initial load
+        if (isInitialLoad) {
           setPosts(transformedPosts);
         } else {
-          setPosts(transformedPosts);
+          setPosts(prev => [...prev, ...transformedPosts]);
         }
+        
+        // Update offset for next load
+        setPostsOffset(offset + transformedPosts.length);
       } else {
         // No posts from registered builders yet
-        setPosts([]);
+        if (isInitialLoad) {
+          setPosts([]);
+        }
+        setHasMorePosts(false);
       }
     } catch (error) {
       console.error('Error fetching posts:', error);
       // Don't show demo posts - only real builder content
-      setPosts([]);
+      if (isInitialLoad) {
+        setPosts([]);
+      }
     } finally {
       setLoadingPosts(false);
+      setLoadingMore(false);
+    }
+  };
+
+  // Load more posts handler
+  const handleLoadMore = () => {
+    if (!loadingMore && hasMorePosts) {
+      fetchPosts(postsOffset, false);
     }
   };
 
@@ -1683,12 +1721,31 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         ))}
       </div>
 
-      {/* Load More - only show if we have posts */}
-      {!loadingPosts && filteredPosts.length > 0 && (
+      {/* Load More - only show if we have posts and more to load */}
+      {!loadingPosts && filteredPosts.length > 0 && hasMorePosts && (
         <div className="text-center py-4">
-          <Button variant="outline" className="w-full max-w-xs rounded-full">
-            Load More Posts
+          <Button 
+            variant="outline" 
+            className="w-full max-w-xs rounded-full"
+            onClick={handleLoadMore}
+            disabled={loadingMore}
+          >
+            {loadingMore ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Loading...
+              </>
+            ) : (
+              'Load More Posts'
+            )}
           </Button>
+        </div>
+      )}
+      
+      {/* No more posts message */}
+      {!loadingPosts && filteredPosts.length > 0 && !hasMorePosts && (
+        <div className="text-center py-4 text-gray-500">
+          <p className="text-sm">You've seen all posts! 🎉</p>
         </div>
       )}
     </div>
