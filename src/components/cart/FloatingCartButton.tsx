@@ -22,21 +22,8 @@ export const FloatingCartButton: React.FC = () => {
   const { getTotalItems, setIsCartOpen, getTotalPrice } = useCart();
   const totalItems = getTotalItems();
 
-  // Position:
-  // - Mobile: LEFT side, ABOVE social icons (bottom: 88px = 16px + 56px + 16px gap)
-  // - Desktop: RIGHT side, above chatbot (bottom-24, right-6)
-  return (
-    <Button
-      onClick={() => setIsCartOpen(true)}
-      className={`fixed z-50 shadow-lg rounded-full flex items-center gap-2
-        left-4 h-12 px-3
-        sm:left-auto sm:right-6 sm:h-12 sm:px-4
-        ${totalItems > 0 
-          ? 'bg-green-600 hover:bg-green-700 animate-in slide-in-from-bottom-4' 
-          : 'bg-gray-600 hover:bg-gray-700'
-        }`}
-      style={{ bottom: '88px' }}
-    >
+  const cartContent = (
+    <>
       <div className="relative">
         <ShoppingCart className="h-5 w-5" />
         {totalItems > 0 && (
@@ -51,7 +38,49 @@ export const FloatingCartButton: React.FC = () => {
           <span className="text-[10px] opacity-90">KES {getTotalPrice().toLocaleString()}</span>
         )}
       </div>
-    </Button>
+    </>
+  );
+
+  // Position:
+  // - Mobile: RIGHT side, TOP of stack (bottom: 160px)
+  // - Desktop: RIGHT side, above chatbot (bottom: 100px)
+  return (
+    <>
+      {/* Mobile Cart - top of right stack */}
+      <Button
+        onClick={() => setIsCartOpen(true)}
+        className={`sm:hidden fixed z-50 shadow-lg rounded-full flex items-center gap-2 h-12 px-3
+          ${totalItems > 0 
+            ? 'bg-green-600 hover:bg-green-700 animate-in slide-in-from-bottom-4' 
+            : 'bg-gray-600 hover:bg-gray-700'
+          }`}
+        style={{ 
+          position: 'fixed',
+          right: '16px',
+          bottom: '160px',
+          zIndex: 50
+        }}
+      >
+        {cartContent}
+      </Button>
+
+      {/* Desktop Cart - above chatbot on right */}
+      <Button
+        onClick={() => setIsCartOpen(true)}
+        className={`hidden sm:flex fixed z-50 shadow-lg rounded-full items-center gap-2 h-12 px-4
+          ${totalItems > 0 
+            ? 'bg-green-600 hover:bg-green-700 animate-in slide-in-from-bottom-4' 
+            : 'bg-gray-600 hover:bg-gray-700'
+          }`}
+        style={{ 
+          position: 'fixed',
+          right: '24px',
+          bottom: '100px',
+          zIndex: 50
+        }}
+      >
+        {cartContent}
+      </Button>
+    </>
   );
 };
-

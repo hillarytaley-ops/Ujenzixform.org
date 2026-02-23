@@ -148,18 +148,33 @@ export const SimpleChatButton = () => {
 
   if (!isOpen) {
     return (
-      <div 
-        className="z-[9999]"
-        style={{ position: 'fixed', bottom: '16px', right: '16px', zIndex: 9999 }}
-      >
-        <Button
-          onClick={() => setIsOpen(true)}
-          className="rounded-full bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300 p-0"
-          style={{ borderRadius: '50%', width: '56px', height: '56px' }}
+      <>
+        {/* Mobile: Bottom of stack on RIGHT side */}
+        <div 
+          className="sm:hidden"
+          style={{ position: 'fixed', bottom: '16px', right: '16px', zIndex: 9999 }}
         >
-          <MessageCircle className="h-6 w-6 text-white" />
-        </Button>
-      </div>
+          <Button
+            onClick={() => setIsOpen(true)}
+            className="rounded-full bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300 p-0"
+            style={{ borderRadius: '50%', width: '56px', height: '56px' }}
+          >
+            <MessageCircle className="h-6 w-6 text-white" />
+          </Button>
+        </div>
+        {/* Desktop: Same level as social (left), on RIGHT side */}
+        <div 
+          className="hidden sm:block fixed right-6 bottom-6 z-[9999]"
+        >
+          <Button
+            onClick={() => setIsOpen(true)}
+            className="rounded-full bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300 p-0"
+            style={{ borderRadius: '50%', width: '56px', height: '56px' }}
+          >
+            <MessageCircle className="h-6 w-6 text-white" />
+          </Button>
+        </div>
+      </>
     );
   }
 
