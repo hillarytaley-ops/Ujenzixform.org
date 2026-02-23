@@ -402,8 +402,7 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
         estimated_cost: selectedPkg?.price || 0,
         additional_notes: `Package: ${selectedPkg?.name || selectedPackage}. Duration: ${selectedPkg?.duration || 'N/A'}${formData.gpsCoordinates ? `. GPS: ${formData.gpsCoordinates}` : ''}`,
         status: 'pending',
-        urgency: 'normal',
-        gps_coordinates: formData.gpsCoordinates || null
+        urgency: 'normal'
       };
 
       console.log('📹 Creating monitoring request:', monitoringRequest);
