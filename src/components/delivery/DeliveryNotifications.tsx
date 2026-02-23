@@ -532,9 +532,9 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
 
   // Accept a delivery request - SINGLE CLICK
   const handleAcceptDelivery = async (requestId: string) => {
-    // Prevent double-click
+    // Prevent double-click - check if already accepting ANY request
     if (acceptingId) {
-      console.log('Already processing an accept request');
+      console.log('🛑 Already processing an accept request, ignoring click');
       return;
     }
     
@@ -561,24 +561,21 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       return;
     }
     
-    console.log('🚚 handleAcceptDelivery: Accepting with providerId:', providerId);
+    console.log('🚚 handleAcceptDelivery: START - Accepting with providerId:', providerId, 'requestId:', requestId);
     
     // Set accepting state IMMEDIATELY to disable button
     setAcceptingId(requestId);
     
-    // Optimistically remove from list for instant UI feedback
-    const previousNotifications = [...notifications];
-    setNotifications(prev => prev.filter(n => n.id !== requestId));
-    setUnreadCount(prev => Math.max(0, prev - 1));
+    // Generate tracking number upfront
+    const trackingNumber = 'TRK-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + 
+      Math.random().toString(36).substring(2, 7).toUpperCase();
     
     try {
       const { url, headers } = getAuthHeaders();
       
-      // Generate tracking number
-      const trackingNumber = 'TRK-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + 
-        Math.random().toString(36).substring(2, 7).toUpperCase();
+      console.log('🚚 Making PATCH request to update delivery_requests...');
       
-      // Update the delivery request to assign this provider - use 'accepted' status
+      // Update the delivery request to assign this provider
       const response = await fetch(
         `${url}/rest/v1/delivery_requests?id=eq.${requestId}`,
         {
@@ -593,7 +590,16 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         }
       );
       
+      console.log('🚚 PATCH response status:', response.status);
+      
       if (response.ok) {
+        const result = await response.json().catch(() => []);
+        console.log('✅ Delivery accepted successfully:', result);
+        
+        // NOW remove from notifications list (after confirmed success)
+        setNotifications(prev => prev.filter(n => n.id !== requestId));
+        setUnreadCount(prev => Math.max(0, prev - 1));
+        
         toast({
           title: '✅ Delivery Accepted!',
           description: `Tracking: ${trackingNumber}. Check Active tab for details.`,
@@ -602,26 +608,19 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         // Call parent callback if provided
         if (onAcceptDelivery) onAcceptDelivery(requestId);
       } else {
-        // Restore notifications on failure
-        setNotifications(previousNotifications);
-        setUnreadCount(previousNotifications.filter(n => !n.read).length);
-        
         const errorData = await response.json().catch(() => ({}));
-        console.error('Accept failed:', errorData);
-        throw new Error(errorData.message || 'Failed to accept delivery');
+        console.error('❌ Accept failed:', response.status, errorData);
+        throw new Error(errorData.message || errorData.details || `Server error: ${response.status}`);
       }
     } catch (error: any) {
-      // Restore notifications on error
-      setNotifications(previousNotifications);
-      setUnreadCount(previousNotifications.filter(n => !n.read).length);
-      
-      console.error('Error accepting delivery:', error);
+      console.error('❌ Error accepting delivery:', error);
       toast({
         title: 'Error',
         description: error.message || 'Could not accept delivery. Please try again.',
         variant: 'destructive'
       });
     } finally {
+      console.log('🚚 handleAcceptDelivery: END - clearing acceptingId');
       setAcceptingId(null);
     }
   };
@@ -1028,14 +1027,23 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                     className="w-full mt-3 bg-green-600 hover:bg-green-700 text-white font-medium"
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleAcceptDelivery(notification.id);
+                      e.preventDefault();
+                      console.log('🔘 Accept button clicked for:', notification.id, 'acceptingId:', acceptingId);
+                      if (!acceptingId) {
+                        handleAcceptDelivery(notification.id);
+                      }
                     }}
-                    disabled={acceptingId === notification.id}
+                    disabled={!!acceptingId}
                   >
                     {acceptingId === notification.id ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Accepting Delivery...
+                        Accepting...
+                      </>
+                    ) : acceptingId ? (
+                      <>
+                        <Clock className="h-4 w-4 mr-2" />
+                        Please Wait...
                       </>
                     ) : (
                       <>
