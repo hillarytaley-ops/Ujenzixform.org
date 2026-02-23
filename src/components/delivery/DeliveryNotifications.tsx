@@ -588,8 +588,6 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             provider_id: providerId,
             status: 'accepted',
             tracking_number: trackingNumber,
-            provider_response: 'accepted',
-            response_date: new Date().toISOString(),
             updated_at: new Date().toISOString()
           })
         }
