@@ -231,30 +231,9 @@ const PrivateClientDashboard = () => {
         console.log('🚚 DIRECT: Fetching deliveries for user:', userId);
         let allDeliveries: any[] = [];
         
-        // Approach 1: Query by user_id
+        // Query by builder_id (delivery_requests table uses builder_id, not user_id)
         try {
-          const deliveryResponse1 = await fetch(
-            `${SUPABASE_URL}/rest/v1/delivery_requests?user_id=eq.${userId}&order=created_at.desc`,
-            {
-              headers: {
-                'apikey': ANON_KEY,
-                'Authorization': `Bearer ${accessToken || ANON_KEY}`,
-              }
-            }
-          );
-          
-          if (deliveryResponse1.ok) {
-            const data1 = await deliveryResponse1.json();
-            console.log('🚚 DIRECT: By user_id:', data1?.length || 0);
-            allDeliveries = [...(data1 || [])];
-          }
-        } catch (e1) {
-          console.log('🚚 DIRECT: user_id query failed');
-        }
-        
-        // Approach 2: Query by builder_id (same as user_id for most cases)
-        try {
-          const deliveryResponse2 = await fetch(
+          const deliveryResponse = await fetch(
             `${SUPABASE_URL}/rest/v1/delivery_requests?builder_id=eq.${userId}&order=created_at.desc`,
             {
               headers: {
@@ -264,18 +243,12 @@ const PrivateClientDashboard = () => {
             }
           );
           
-          if (deliveryResponse2.ok) {
-            const data2 = await deliveryResponse2.json();
-            console.log('🚚 DIRECT: By builder_id:', data2?.length || 0);
-            // Merge without duplicates
-            const existingIds = new Set(allDeliveries.map(d => d.id));
-            (data2 || []).forEach((d: any) => {
-              if (!existingIds.has(d.id)) {
-                allDeliveries.push(d);
-              }
-            });
+          if (deliveryResponse.ok) {
+            const data = await deliveryResponse.json();
+            console.log('🚚 DIRECT: By builder_id:', data?.length || 0);
+            allDeliveries = [...(data || [])];
           }
-        } catch (e2) {
+        } catch (e) {
           console.log('🚚 DIRECT: builder_id query failed');
         }
         
@@ -431,39 +404,15 @@ const PrivateClientDashboard = () => {
       }
 
       // Fetch delivery requests for this user using direct REST API
-      // Try multiple query approaches: user_id and builder_id
+      // Query by builder_id (delivery_requests table uses builder_id, not user_id)
       console.log('🚚 Fetching deliveries for user:', user.id);
       
       try {
         let allDeliveries: any[] = [];
         
-        // Approach 1: Query by user_id
+        // Query by builder_id
         try {
-          const deliveryResponse1 = await fetch(
-            `${SUPABASE_URL}/rest/v1/delivery_requests?user_id=eq.${user.id}&order=created_at.desc`,
-            {
-              headers: {
-                'apikey': ANON_KEY,
-                'Authorization': `Bearer ${accessToken || ANON_KEY}`,
-                'Content-Type': 'application/json',
-              }
-            }
-          );
-
-          if (deliveryResponse1.ok) {
-            const data1 = await deliveryResponse1.json();
-            console.log('🚚 Deliveries by user_id:', data1?.length || 0);
-            allDeliveries = [...(data1 || [])];
-          } else {
-            console.log('🚚 user_id query status:', deliveryResponse1.status);
-          }
-        } catch (e1) {
-          console.log('🚚 user_id query error:', e1);
-        }
-
-        // Approach 2: Query by builder_id (same as user.id for most cases)
-        try {
-          const deliveryResponse2 = await fetch(
+          const deliveryResponse = await fetch(
             `${SUPABASE_URL}/rest/v1/delivery_requests?builder_id=eq.${user.id}&order=created_at.desc`,
             {
               headers: {
@@ -474,21 +423,15 @@ const PrivateClientDashboard = () => {
             }
           );
 
-          if (deliveryResponse2.ok) {
-            const data2 = await deliveryResponse2.json();
-            console.log('🚚 Deliveries by builder_id:', data2?.length || 0);
-            // Merge without duplicates
-            const existingIds = new Set(allDeliveries.map(d => d.id));
-            (data2 || []).forEach((d: any) => {
-              if (!existingIds.has(d.id)) {
-                allDeliveries.push(d);
-              }
-            });
+          if (deliveryResponse.ok) {
+            const data = await deliveryResponse.json();
+            console.log('🚚 Deliveries by builder_id:', data?.length || 0);
+            allDeliveries = [...(data || [])];
           } else {
-            console.log('🚚 builder_id query status:', deliveryResponse2.status);
+            console.log('🚚 builder_id query status:', deliveryResponse.status);
           }
-        } catch (e2) {
-          console.log('🚚 builder_id query error:', e2);
+        } catch (e) {
+          console.log('🚚 builder_id query error:', e);
         }
 
         // Sort by created_at descending
