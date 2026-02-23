@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -320,54 +320,69 @@ const DeliveryDashboard = () => {
     };
   }, [user, refetchData, toast]);
 
+  // Function to load notification counts
+  const loadNotificationCounts = useCallback(async () => {
+    try {
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      
+      let accessToken = SUPABASE_ANON_KEY;
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          if (parsed.access_token) accessToken = parsed.access_token;
+        }
+      } catch (e) {}
+
+      const headers = {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${accessToken}`
+      };
+
+      // Count only PENDING delivery requests
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/delivery_requests?select=id,status&status=eq.pending`,
+        { headers, cache: 'no-store' }
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        const pendingCount = data?.length || 0;
+        
+        setNotificationCount(pendingCount);
+        setPendingNotificationCount(pendingCount);
+        console.log('🔔 Notification counts loaded:', { pending: pendingCount });
+      }
+    } catch (error) {
+      console.error('Error loading notification counts:', error);
+    }
+  }, []);
+
   // Load notification counts for the Alerts tab badge
   useEffect(() => {
-    const loadNotificationCounts = async () => {
-      try {
-        // Get auth headers
-        const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-        
-        let accessToken = SUPABASE_ANON_KEY;
-        try {
-          const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-          if (storedSession) {
-            const parsed = JSON.parse(storedSession);
-            if (parsed.access_token) accessToken = parsed.access_token;
-          }
-        } catch (e) {}
-
-        const headers = {
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${accessToken}`
-        };
-
-        // Count all delivery requests
-        const allResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/delivery_requests?select=id,status&limit=100`,
-          { headers }
-        );
-        
-        if (allResponse.ok) {
-          const allData = await allResponse.json();
-          const totalCount = allData?.length || 0;
-          const pendingCount = allData?.filter((r: any) => r.status === 'pending')?.length || 0;
-          
-          setNotificationCount(totalCount);
-          setPendingNotificationCount(pendingCount);
-          console.log('🔔 Notification counts loaded:', { total: totalCount, pending: pendingCount });
-        }
-      } catch (error) {
-        console.error('Error loading notification counts:', error);
-      }
-    };
-
     loadNotificationCounts();
     
-    // Refresh counts every 30 seconds
+    // Set up real-time subscription to update counts when delivery_requests change
+    const subscription = supabase
+      .channel('alerts-count-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'delivery_requests' },
+        () => {
+          console.log('🔔 delivery_requests changed, refreshing counts...');
+          loadNotificationCounts();
+        }
+      )
+      .subscribe();
+    
+    // Also refresh every 30 seconds as backup
     const interval = setInterval(loadNotificationCounts, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    
+    return () => {
+      subscription.unsubscribe();
+      clearInterval(interval);
+    };
+  }, [loadNotificationCounts]);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -1149,33 +1164,10 @@ const DeliveryDashboard = () => {
             <DeliveryNotifications 
               userId={user?.id || localStorage.getItem('user_id') || ''}
               onNotificationClick={(notification) => console.log('Notification clicked:', notification)}
-              onAcceptDelivery={async (requestId) => {
+              onAcceptDelivery={(requestId) => {
                 console.log('🔔 Delivery accepted, refreshing counts...');
                 // Refresh notification counts immediately
-                try {
-                  const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-                  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-                  let accessToken = SUPABASE_ANON_KEY;
-                  try {
-                    const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-                    if (storedSession) {
-                      const parsed = JSON.parse(storedSession);
-                      if (parsed.access_token) accessToken = parsed.access_token;
-                    }
-                  } catch (e) {}
-                  
-                  const headers = { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}` };
-                  const response = await fetch(`${SUPABASE_URL}/rest/v1/delivery_requests?select=id,status&limit=100`, { headers });
-                  if (response.ok) {
-                    const data = await response.json();
-                    const pendingCount = data?.filter((r: any) => r.status === 'pending')?.length || 0;
-                    setPendingNotificationCount(pendingCount);
-                    setNotificationCount(data?.length || 0);
-                    console.log('🔔 Updated counts:', { total: data?.length, pending: pendingCount });
-                  }
-                } catch (e) {
-                  console.error('Error refreshing counts:', e);
-                }
+                loadNotificationCounts();
                 // Also refresh main data
                 refetchData();
               }}
