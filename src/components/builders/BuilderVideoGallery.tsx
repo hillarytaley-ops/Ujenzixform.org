@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Play, 
@@ -14,9 +15,16 @@ import {
   DollarSign,
   Star,
   Trash2,
-  Edit
+  Edit,
+  Share2,
+  ThumbsUp,
+  MoreHorizontal,
+  Globe,
+  CheckCircle2,
+  Loader2
 } from "lucide-react";
 import { VideoPlayer } from "./VideoPlayer";
+import { formatDistanceToNow } from "date-fns";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -326,220 +334,222 @@ export const BuilderVideoGallery = ({
   if (loading) {
     return (
       <div className="flex justify-center items-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        <span className="ml-3 text-gray-600">Loading project videos...</span>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header with Filters */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            Project Showcase
-          </h2>
-          <p className="text-gray-600 mt-1">
-            {videos.length} {videos.length === 1 ? 'project' : 'projects'} showcased
-          </p>
-        </div>
-
-        {/* Filter Buttons */}
-        <div className="flex flex-wrap gap-2">
-          {projectTypes.map((type) => (
-            <Button
-              key={type.value}
-              variant={filterType === type.value ? "default" : "outline"}
-              size="sm"
-              onClick={() => setFilterType(type.value)}
-              className={filterType === type.value ? "bg-blue-600" : ""}
-            >
-              {type.label}
-            </Button>
-          ))}
-        </div>
+    <div className="space-y-4">
+      {/* Filter Pills - Compact */}
+      <div className="flex flex-wrap gap-2 pb-2 border-b">
+        {projectTypes.map((type) => (
+          <button
+            key={type.value}
+            onClick={() => setFilterType(type.value)}
+            className={`px-3 py-1.5 text-sm rounded-full transition-all ${
+              filterType === type.value 
+                ? "bg-blue-600 text-white shadow-md" 
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            }`}
+          >
+            {type.label}
+          </button>
+        ))}
       </div>
 
-      {/* Video Grid */}
+      {/* Social Feed Style Video List */}
       {videos.length === 0 ? (
-        <Card className="p-12 text-center bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-blue-200">
-          <div className="bg-blue-100 rounded-full p-6 w-24 h-24 mx-auto mb-6 flex items-center justify-center">
-            <Play className="h-12 w-12 text-blue-600" />
+        <Card className="p-8 text-center bg-gradient-to-br from-blue-50 to-purple-50 border border-blue-200">
+          <div className="bg-blue-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+            <Play className="h-8 w-8 text-blue-600" />
           </div>
-          <h3 className="text-2xl font-bold text-gray-800 mb-3">
-            🎥 Project Video Showcase
+          <h3 className="text-xl font-bold text-gray-800 mb-2">
+            No Project Videos Yet
           </h3>
-          <p className="text-gray-600 mb-4 max-w-md mx-auto">
-            {builderId 
-              ? "Start showcasing your completed projects by uploading videos. Let clients see your quality work!" 
-              : "Our builders will soon share amazing project videos showcasing their work across Kenya!"}
+          <p className="text-gray-600 text-sm">
+            Professional builders will share their project videos here soon!
           </p>
-          <div className="mt-6 text-sm text-gray-500">
-            <p className="mb-2">✨ <strong>Coming Soon:</strong></p>
-            <ul className="text-left max-w-sm mx-auto space-y-1">
-              <li>• Before & After transformations</li>
-              <li>• 3D walkthroughs of completed homes</li>
-              <li>• Construction timelapse videos</li>
-              <li>• Builder testimonials & reviews</li>
-            </ul>
-          </div>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="space-y-4">
           {videos.map((video) => (
             <Card 
               key={video.id}
-              className="overflow-hidden hover:shadow-xl transition-shadow duration-300 group"
+              className="overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow"
             >
-              {/* Video Thumbnail/Preview - Instagram Reels Style */}
-              <div 
-                className="relative aspect-video bg-gradient-to-br from-gray-900 via-gray-800 to-black cursor-pointer overflow-hidden"
-                onClick={() => handleVideoClick(video)}
-              >
-                {/* Video with poster/thumbnail */}
-                <video
-                  src={video.video_url}
-                  poster={video.thumbnail_url || undefined}
-                  className="w-full h-full object-cover"
-                  preload="metadata"
-                />
-                
-                {/* Gradient overlays for depth */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30" />
-                <div className="absolute inset-0 bg-black/30 group-hover:bg-black/10 transition-all duration-300" />
-                
-                {/* Play button - Modern glass style */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="bg-white/20 backdrop-blur-sm rounded-full p-5 transform group-hover:scale-110 group-hover:bg-white/30 transition-all duration-300 shadow-2xl border border-white/30">
-                    <Play className="h-10 w-10 text-white drop-shadow-lg" fill="white" />
+              {/* Post Header - Facebook Style */}
+              <div className="p-4 pb-2">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-11 w-11 ring-2 ring-blue-500 ring-offset-1">
+                      {video.builder_profile?.avatar_url ? (
+                        <AvatarImage src={video.builder_profile.avatar_url} />
+                      ) : null}
+                      <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-bold">
+                        {(video.builder_profile?.company_name || video.builder_profile?.full_name || 'U').charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-semibold text-gray-900">
+                          {video.builder_profile?.company_name || video.builder_profile?.full_name || 'UjenziXform Builder'}
+                        </span>
+                        <CheckCircle2 className="h-4 w-4 text-blue-500" fill="currentColor" />
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-gray-500">
+                        <span>{formatDistanceToNow(new Date(video.created_at), { addSuffix: true })}</span>
+                        <span>•</span>
+                        <Globe className="h-3 w-3" />
+                        {video.project_location && (
+                          <>
+                            <span>•</span>
+                            <span className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              {video.project_location}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
                   </div>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-500">
+                    <MoreHorizontal className="h-5 w-5" />
+                  </Button>
                 </div>
                 
-                {/* Featured Badge */}
-                {video.is_featured && (
-                  <Badge className="absolute top-3 left-3 bg-gradient-to-r from-yellow-500 to-orange-500 shadow-lg border-0">
-                    <Star className="h-3 w-3 mr-1" fill="white" />
-                    Featured
-                  </Badge>
-                )}
-                
-                {/* Project Type Badge */}
-                {video.project_type && (
-                  <Badge className="absolute top-3 right-3 bg-blue-600/90 backdrop-blur-sm shadow-lg border-0">
-                    {video.project_type}
-                  </Badge>
-                )}
-                
-                {/* Builder info overlay at bottom */}
-                <div className="absolute bottom-0 left-0 right-0 p-3 z-10">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold shadow-lg border-2 border-white/50">
-                        {(video.builder_profile?.company_name || video.builder_profile?.full_name || 'U').charAt(0).toUpperCase()}
-                      </div>
-                      <span className="text-white text-sm font-medium drop-shadow-lg truncate max-w-[120px]">
-                        {video.builder_profile?.company_name || video.builder_profile?.full_name || 'Builder'}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 text-white/90 text-xs">
-                      <span className="flex items-center gap-1">
-                        <Eye className="h-3.5 w-3.5" />
-                        {video.views_count || 0}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Heart className="h-3.5 w-3.5" />
-                        {video.likes_count || 0}
-                      </span>
-                    </div>
+                {/* Caption/Description */}
+                <div className="mt-3">
+                  <h3 className="font-semibold text-gray-900 text-lg">{video.title}</h3>
+                  {video.description && (
+                    <p className="text-gray-700 text-sm mt-1 line-clamp-2">{video.description}</p>
+                  )}
+                  
+                  {/* Project Tags */}
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {video.project_type && (
+                      <Badge variant="secondary" className="bg-blue-100 text-blue-700 text-xs">
+                        {video.project_type}
+                      </Badge>
+                    )}
+                    {video.is_featured && (
+                      <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white text-xs">
+                        <Star className="h-3 w-3 mr-1" fill="white" />
+                        Featured
+                      </Badge>
+                    )}
+                    {video.project_duration && (
+                      <Badge variant="outline" className="text-xs">
+                        <Clock className="h-3 w-3 mr-1" />
+                        {video.project_duration}
+                      </Badge>
+                    )}
+                    {video.project_cost_range && (
+                      <Badge variant="outline" className="text-xs">
+                        <DollarSign className="h-3 w-3 mr-1" />
+                        {video.project_cost_range}
+                      </Badge>
+                    )}
                   </div>
                 </div>
               </div>
 
-              {/* Video Info */}
-              <CardHeader>
-                <CardTitle className="line-clamp-2 text-lg">
-                  {video.title}
-                </CardTitle>
-                <CardDescription className="line-clamp-2">
-                  {video.description || "No description provided"}
-                </CardDescription>
-              </CardHeader>
-
-              <CardContent className="space-y-3">
-                {/* Builder Info */}
-                {video.builder_profile && !builderId && (
-                  <div className="text-sm text-gray-600">
-                    By: <span className="font-semibold">
-                      {video.builder_profile.company_name || video.builder_profile.full_name}
-                    </span>
-                  </div>
-                )}
-
-                {/* Project Details */}
-                <div className="space-y-2 text-sm text-gray-600">
-                  {video.project_location && (
-                    <div className="flex items-center">
-                      <MapPin className="h-4 w-4 mr-2 text-blue-600" />
-                      {video.project_location}
-                    </div>
-                  )}
-                  {video.project_duration && (
-                    <div className="flex items-center">
-                      <Clock className="h-4 w-4 mr-2 text-green-600" />
-                      {video.project_duration}
-                    </div>
-                  )}
-                  {video.project_cost_range && (
-                    <div className="flex items-center">
-                      <DollarSign className="h-4 w-4 mr-2 text-purple-600" />
-                      {video.project_cost_range}
-                    </div>
-                  )}
-                </div>
-
-                {/* Stats */}
-                <div className="flex items-center justify-between pt-2 border-t">
-                  <div className="flex items-center space-x-4 text-sm text-gray-500">
-                    <div className="flex items-center">
-                      <Eye className="h-4 w-4 mr-1" />
-                      {video.views_count}
-                    </div>
-                    <div className="flex items-center">
-                      <Heart className="h-4 w-4 mr-1" />
-                      {video.likes_count}
-                    </div>
-                    <div className="flex items-center">
-                      <MessageCircle className="h-4 w-4 mr-1" />
-                      {video.comments_count}
-                    </div>
+              {/* Video Player Area - Click to Play */}
+              <div 
+                className="relative aspect-video bg-black cursor-pointer group"
+                onClick={() => handleVideoClick(video)}
+              >
+                <video
+                  src={video.video_url}
+                  poster={video.thumbnail_url || undefined}
+                  className="w-full h-full object-contain"
+                  preload="metadata"
+                />
+                
+                {/* Play Overlay */}
+                <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-all flex items-center justify-center">
+                  <div className="bg-white/90 rounded-full p-4 shadow-xl transform group-hover:scale-110 transition-transform">
+                    <Play className="h-10 w-10 text-blue-600" fill="currentColor" />
                   </div>
                 </div>
-              </CardContent>
+                
+                {/* Duration/Views overlay */}
+                <div className="absolute bottom-3 right-3 bg-black/70 text-white text-xs px-2 py-1 rounded flex items-center gap-2">
+                  <Eye className="h-3 w-3" />
+                  {video.views_count || 0} views
+                </div>
+              </div>
+
+              {/* Engagement Stats */}
+              <div className="px-4 py-2 border-b flex items-center justify-between text-sm text-gray-500">
+                <div className="flex items-center gap-1">
+                  <span className="bg-blue-500 text-white rounded-full p-0.5">
+                    <ThumbsUp className="h-3 w-3" />
+                  </span>
+                  <span className="bg-red-500 text-white rounded-full p-0.5">
+                    <Heart className="h-3 w-3" />
+                  </span>
+                  <span className="ml-1">{video.likes_count || 0}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span>{video.comments_count || 0} comments</span>
+                </div>
+              </div>
+
+              {/* Action Buttons - Facebook Style */}
+              <div className="px-2 py-1 flex items-center justify-around border-b">
+                <Button 
+                  variant="ghost" 
+                  className="flex-1 text-gray-600 hover:bg-gray-100 gap-2"
+                  onClick={() => handleVideoClick(video)}
+                >
+                  <ThumbsUp className="h-5 w-5" />
+                  <span className="hidden sm:inline">Like</span>
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  className="flex-1 text-gray-600 hover:bg-gray-100 gap-2"
+                  onClick={() => handleVideoClick(video)}
+                >
+                  <MessageCircle className="h-5 w-5" />
+                  <span className="hidden sm:inline">Comment</span>
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  className="flex-1 text-gray-600 hover:bg-gray-100 gap-2"
+                  onClick={() => {
+                    navigator.clipboard.writeText(window.location.href);
+                    toast({ title: "Link copied!", description: "Share this video with others" });
+                  }}
+                >
+                  <Share2 className="h-5 w-5" />
+                  <span className="hidden sm:inline">Share</span>
+                </Button>
+              </div>
 
               {/* Owner Actions */}
               {isOwner && (
-                <CardFooter className="border-t pt-4">
-                  <div className="flex space-x-2 w-full">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => toast({ title: "Edit coming soon" })}
-                    >
-                      <Edit className="h-4 w-4 mr-1" />
-                      Edit
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => setVideoToDelete(video.id)}
-                    >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      Delete
-                    </Button>
-                  </div>
-                </CardFooter>
+                <div className="px-4 py-2 bg-gray-50 flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => toast({ title: "Edit coming soon" })}
+                  >
+                    <Edit className="h-4 w-4 mr-1" />
+                    Edit
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setVideoToDelete(video.id)}
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Delete
+                  </Button>
+                </div>
               )}
             </Card>
           ))}
