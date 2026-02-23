@@ -320,9 +320,9 @@ export const BuilderFacebookLayout: React.FC<BuilderFacebookLayoutProps> = ({
       )}
 
       {/* Main Content */}
-      <div className="flex gap-6 max-w-[1400px] mx-auto pb-20 lg:pb-0">
+      <div className="flex gap-4 lg:gap-6 max-w-[1400px] mx-auto pb-20 lg:pb-0 px-2 sm:px-4 lg:px-0">
         {/* Left Sidebar - Builder Profiles (Facebook Style) - Desktop Only */}
-        <div className="hidden lg:block w-80 flex-shrink-0">
+        <div className="hidden lg:block w-72 xl:w-80 flex-shrink-0">
         <div className="sticky top-24 space-y-4">
           {/* Search Builders */}
           <Card className="bg-white dark:bg-gray-900 shadow-md">

@@ -1217,7 +1217,7 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
   });
 
   return (
-    <div className="w-full max-w-2xl mx-auto space-y-4">
+    <div className="w-full max-w-2xl mx-auto space-y-3 sm:space-y-4 px-2 sm:px-0">
       {/* Stories Section */}
       <BuilderStories
         currentUserName={effectiveUserName}
@@ -1532,52 +1532,53 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
 
       {/* Feed Navigation & Filters */}
       <Card className="bg-white dark:bg-gray-900 shadow-md rounded-xl overflow-hidden">
-        {/* Feed Type Tabs */}
-        <div className="flex items-center border-b">
+        {/* Feed Type Tabs - Compact on mobile */}
+        <div className="flex items-center border-b overflow-x-auto">
           <button
             onClick={() => setFeedType('all')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 font-medium transition-all border-b-2 ${
+            className={`flex items-center justify-center gap-1.5 py-2.5 px-3 sm:px-4 font-medium transition-all border-b-2 whitespace-nowrap text-sm ${
               feedType === 'all'
                 ? 'text-blue-600 border-blue-600 bg-blue-50/50'
                 : 'text-gray-500 border-transparent hover:bg-gray-50'
             }`}
           >
             <Sparkles className="h-4 w-4" />
-            For You
+            <span className="hidden sm:inline">For You</span>
+            <span className="sm:hidden">For You</span>
           </button>
           <button
             onClick={() => setFeedType('following')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 font-medium transition-all border-b-2 ${
+            className={`flex items-center justify-center gap-1.5 py-2.5 px-3 sm:px-4 font-medium transition-all border-b-2 whitespace-nowrap text-sm ${
               feedType === 'following'
                 ? 'text-blue-600 border-blue-600 bg-blue-50/50'
                 : 'text-gray-500 border-transparent hover:bg-gray-50'
             }`}
           >
             <Users className="h-4 w-4" />
-            Following
+            <span>Following</span>
           </button>
           <button
             onClick={() => setFeedType('live')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 font-medium transition-all border-b-2 ${
+            className={`flex items-center justify-center gap-1.5 py-2.5 px-3 sm:px-4 font-medium transition-all border-b-2 whitespace-nowrap text-sm ${
               feedType === 'live'
                 ? 'text-red-600 border-red-600 bg-red-50/50'
                 : 'text-gray-500 border-transparent hover:bg-gray-50'
             }`}
           >
             <Radio className="h-4 w-4" />
-            Live
-            <span className="relative flex h-2 w-2">
+            <span>Live</span>
+            <span className="relative flex h-2 w-2 ml-0.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
             </span>
           </button>
         </div>
 
-        {/* Filters Row */}
-        <div className="p-3 flex items-center gap-2 flex-wrap">
+        {/* Filters Row - Scrollable on mobile */}
+        <div className="p-2 sm:p-3 flex items-center gap-2 overflow-x-auto">
           {/* Sort Dropdown */}
           <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
-            <SelectTrigger className="w-[130px] h-9 rounded-full bg-gray-100 dark:bg-gray-800 border-0">
+            <SelectTrigger className="w-[110px] sm:w-[130px] h-8 sm:h-9 rounded-full bg-gray-100 dark:bg-gray-800 border-0 text-xs sm:text-sm flex-shrink-0">
               <SelectValue placeholder="Sort by" />
             </SelectTrigger>
             <SelectContent>
@@ -1587,10 +1588,10 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
             </SelectContent>
           </Select>
 
-          {/* Location Filter */}
+          {/* Location Filter - Hidden on very small screens */}
           <Select value={locationFilter} onValueChange={setLocationFilter}>
-            <SelectTrigger className="w-[140px] h-9 rounded-full bg-gray-100 dark:bg-gray-800 border-0">
-              <MapPin className="h-3.5 w-3.5 mr-1 text-gray-500" />
+            <SelectTrigger className="w-[120px] sm:w-[140px] h-8 sm:h-9 rounded-full bg-gray-100 dark:bg-gray-800 border-0 text-xs sm:text-sm flex-shrink-0">
+              <MapPin className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1 text-gray-500" />
               <SelectValue placeholder="Location" />
             </SelectTrigger>
             <SelectContent>
@@ -1600,32 +1601,34 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
             </SelectContent>
           </Select>
 
-          {/* Specialty Filter */}
-          <Select value={specialtyFilter} onValueChange={setSpecialtyFilter}>
-            <SelectTrigger className="w-[150px] h-9 rounded-full bg-gray-100 dark:bg-gray-800 border-0">
-              <SelectValue placeholder="Specialty" />
-            </SelectTrigger>
-            <SelectContent>
-              {SPECIALTIES.map(spec => (
-                <SelectItem key={spec} value={spec}>{spec}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {/* Specialty Filter - Hidden on mobile */}
+          <div className="hidden sm:block">
+            <Select value={specialtyFilter} onValueChange={setSpecialtyFilter}>
+              <SelectTrigger className="w-[150px] h-9 rounded-full bg-gray-100 dark:bg-gray-800 border-0">
+                <SelectValue placeholder="Specialty" />
+              </SelectTrigger>
+              <SelectContent>
+                {SPECIALTIES.map(spec => (
+                  <SelectItem key={spec} value={spec}>{spec}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
           {/* Clear Filters */}
           {(locationFilter !== 'All Locations' || specialtyFilter !== 'All Specialties' || sortBy !== 'recent') && (
             <Button
               variant="ghost"
               size="sm"
-              className="h-9 px-3 text-gray-500 hover:text-gray-700"
+              className="h-8 sm:h-9 px-2 sm:px-3 text-gray-500 hover:text-gray-700 flex-shrink-0"
               onClick={() => {
                 setLocationFilter('All Locations');
                 setSpecialtyFilter('All Specialties');
                 setSortBy('recent');
               }}
             >
-              <X className="h-4 w-4 mr-1" />
-              Clear
+              <X className="h-4 w-4" />
+              <span className="hidden sm:inline ml-1">Clear</span>
             </Button>
           )}
 
@@ -1633,10 +1636,11 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
           <Button
             variant="ghost"
             size="sm"
-            className={`h-9 px-3 ml-auto rounded-full ${savedPosts.size > 0 ? 'text-blue-600' : 'text-gray-500'}`}
+            className={`h-8 sm:h-9 px-2 sm:px-3 ml-auto rounded-full flex-shrink-0 ${savedPosts.size > 0 ? 'text-blue-600' : 'text-gray-500'}`}
           >
-            <Bookmark className="h-4 w-4 mr-1" />
-            Saved ({savedPosts.size})
+            <Bookmark className="h-4 w-4" />
+            <span className="hidden sm:inline ml-1">Saved ({savedPosts.size})</span>
+            <span className="sm:hidden ml-1">{savedPosts.size}</span>
           </Button>
         </div>
       </Card>
