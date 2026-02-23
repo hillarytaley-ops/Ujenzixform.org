@@ -1,3 +1,7 @@
+/**
+ * CHATBOT BUTTON - v2.5 - Feb 23 2026
+ * Mobile: bottom 110px to clear menu tab
+ */
 import React, { useState } from 'react';
 import { MessageCircle, X, Send, Bot, User, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
