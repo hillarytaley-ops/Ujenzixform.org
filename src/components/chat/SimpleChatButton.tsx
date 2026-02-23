@@ -149,15 +149,15 @@ export const SimpleChatButton = () => {
   if (!isOpen) {
     return (
       <div 
-        className="fixed bottom-20 sm:bottom-6 right-3 sm:right-6 z-[9999]"
+        className="fixed bottom-4 right-4 z-[9999]"
         style={{ position: 'fixed', zIndex: 9999 }}
       >
         <Button
           onClick={() => setIsOpen(true)}
-          className="rounded-full h-14 w-14 bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300 p-0"
-          style={{ borderRadius: '50%', width: '56px', height: '56px' }}
+          className="rounded-full h-12 w-12 sm:h-14 sm:w-14 bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300 p-0"
+          style={{ borderRadius: '50%' }}
         >
-          <MessageCircle className="h-6 w-6 text-white" />
+          <MessageCircle className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
         </Button>
       </div>
     );
@@ -165,10 +165,10 @@ export const SimpleChatButton = () => {
 
   return (
     <div 
-      className="fixed bottom-2 sm:bottom-6 right-2 sm:right-6 z-[9999] max-w-[calc(100vw-16px)] sm:max-w-[calc(100vw-48px)]"
+      className="fixed bottom-4 right-4 z-[9999]"
       style={{ position: 'fixed', zIndex: 9999 }}
     >
-      <Card className="w-full sm:w-96 max-w-[calc(100vw-16px)] sm:max-w-[calc(100vw-48px)] shadow-2xl">
+      <Card className="w-[calc(100vw-32px)] sm:w-96 max-w-[400px] shadow-2xl">
         <div className="bg-blue-600 text-white p-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Bot className="h-5 w-5" />
