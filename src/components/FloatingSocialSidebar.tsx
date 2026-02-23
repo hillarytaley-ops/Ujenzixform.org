@@ -178,8 +178,8 @@ export const FloatingSocialSidebar: React.FC = () => {
         )}
       </div>
 
-      {/* Mobile: Fixed RIGHT side - ABOVE chatbot (75 + 56 + 8 = 139) */}
-      <div className="sm:hidden fixed z-[9998]" style={{ bottom: '139px', right: '16px' }}>
+      {/* Mobile: Fixed RIGHT side - ABOVE chatbot (85 + 56 + 8 = 149) */}
+      <div className="sm:hidden fixed z-[9998]" style={{ bottom: '149px', right: '16px' }}>
         {/* Backdrop overlay when open */}
         {isOpen && (
           <div 

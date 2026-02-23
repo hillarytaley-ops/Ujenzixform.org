@@ -149,10 +149,10 @@ export const SimpleChatButton = () => {
   if (!isOpen) {
     return (
       <>
-        {/* Mobile: BOTTOM icon - above menu tab (menu is ~70px) */}
+        {/* Mobile: BOTTOM icon - above menu tab */}
         <div 
           className="sm:hidden fixed z-[9999]"
-          style={{ bottom: '75px', right: '16px' }}
+          style={{ bottom: '85px', right: '16px' }}
         >
           <Button
             onClick={() => setIsOpen(true)}
