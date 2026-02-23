@@ -22,16 +22,19 @@ export const FloatingCartButton: React.FC = () => {
   const { getTotalItems, setIsCartOpen, getTotalPrice } = useCart();
   const totalItems = getTotalItems();
 
-  // Always show the cart button so users know where to find their cart
-  // Position above the chat button (bottom-24) to avoid overlap
+  // Position:
+  // - Mobile: LEFT side, ABOVE social icons (bottom-20, left-4)
+  // - Desktop: RIGHT side, above chatbot (bottom-24, right-6)
   return (
     <Button
       onClick={() => setIsCartOpen(true)}
-      className={`fixed bottom-24 right-6 z-50 h-12 px-3 shadow-lg rounded-full flex items-center gap-2 ${
-        totalItems > 0 
+      className={`fixed z-50 shadow-lg rounded-full flex items-center gap-2
+        bottom-20 left-4 h-12 px-3
+        sm:bottom-24 sm:right-6 sm:left-auto sm:h-12 sm:px-4
+        ${totalItems > 0 
           ? 'bg-green-600 hover:bg-green-700 animate-in slide-in-from-bottom-4' 
           : 'bg-gray-600 hover:bg-gray-700'
-      }`}
+        }`}
     >
       <div className="relative">
         <ShoppingCart className="h-5 w-5" />

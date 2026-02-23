@@ -149,7 +149,7 @@ export const SimpleChatButton = () => {
   if (!isOpen) {
     return (
       <div 
-        className="fixed bottom-4 right-4 z-[9999]"
+        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[9999]"
         style={{ position: 'fixed', zIndex: 9999 }}
       >
         <Button
@@ -165,7 +165,7 @@ export const SimpleChatButton = () => {
 
   return (
     <div 
-      className="fixed bottom-4 right-4 z-[9999]"
+      className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[9999]"
       style={{ position: 'fixed', zIndex: 9999 }}
     >
       <Card className="w-[calc(100vw-32px)] sm:w-96 max-w-[400px] shadow-2xl">
