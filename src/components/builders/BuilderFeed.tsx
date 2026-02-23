@@ -275,17 +275,12 @@ export const BuilderFeed: React.FC<BuilderFeedProps> = ({
         }
       } catch (e) {}
 
-      // Fetch posts - include both active posts and user's own posts (any status)
-      // Using OR filter: status=active OR builder_id=currentUserId
+      // Fetch posts - show all posts that aren't deleted
+      // This ensures visitors can see all builder content
       // Add pagination with offset and limit
       const limitPlusOne = POSTS_PER_PAGE + 1; // Fetch one extra to check if there are more
-      let postsUrl = `${SUPABASE_URL}/rest/v1/builder_posts?order=created_at.desc&limit=${limitPlusOne}&offset=${offset}`;
-      if (currentUserId) {
-        // Show active posts OR user's own posts (any status except deleted)
-        postsUrl = `${SUPABASE_URL}/rest/v1/builder_posts?or=(status.eq.active,builder_id.eq.${currentUserId})&status=neq.deleted&order=created_at.desc&limit=${limitPlusOne}&offset=${offset}`;
-      } else {
-        postsUrl = `${SUPABASE_URL}/rest/v1/builder_posts?status=eq.active&order=created_at.desc&limit=${limitPlusOne}&offset=${offset}`;
-      }
+      // Show all posts except deleted ones (active, pending, or null status)
+      let postsUrl = `${SUPABASE_URL}/rest/v1/builder_posts?status=neq.deleted&order=created_at.desc&limit=${limitPlusOne}&offset=${offset}`;
       
       const postsRes = await fetch(
         postsUrl,

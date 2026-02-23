@@ -92,8 +92,8 @@ export const BuilderVideoGallery = ({
       setLoading(true);
       console.log('🎬 Fetching builder videos via REST API...');
       
-      // Build query params
-      let queryParams = 'is_published=eq.true&order=created_at.desc';
+      // Build query params - show all videos (published or not) so visitors can see all content
+      let queryParams = 'order=created_at.desc';
       
       // Filter by builder if specified
       if (builderId) {
