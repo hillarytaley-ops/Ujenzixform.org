@@ -149,8 +149,8 @@ export const SimpleChatButton = () => {
   if (!isOpen) {
     return (
       <div 
-        className="fixed right-4 sm:right-6 z-[9999]"
-        style={{ position: 'fixed', bottom: '16px', zIndex: 9999 }}
+        className="z-[9999]"
+        style={{ position: 'fixed', bottom: '16px', right: '16px', zIndex: 9999 }}
       >
         <Button
           onClick={() => setIsOpen(true)}
