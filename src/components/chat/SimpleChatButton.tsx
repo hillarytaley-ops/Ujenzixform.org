@@ -1,6 +1,6 @@
 /**
- * CHATBOT BUTTON - v5.0 - Feb 23 2026
- * Mobile: smaller 44px icon, bottom 70px
+ * CHATBOT BUTTON - v6.0 - Feb 23 2026
+ * Mobile: BLUE icon 44px SAME as orange social
  */
 import React, { useState } from 'react';
 import { MessageCircle, X, Send, Bot, User, Sparkles } from 'lucide-react';
@@ -153,19 +153,25 @@ export const SimpleChatButton = () => {
   if (!isOpen) {
     return (
       <>
-        {/* Mobile: BLUE CHATBOT - smaller 44px, bottom 70px */}
-        <div 
-          className="sm:hidden fixed z-[9999]"
-          style={{ bottom: '70px', right: '16px' }}
+        {/* Mobile: BLUE CHATBOT - 44px SAME SIZE as orange social */}
+        <button
+          type="button"
+          onClick={() => setIsOpen(true)}
+          className="sm:hidden fixed z-[9999] rounded-full bg-blue-600 hover:bg-blue-700 shadow-lg flex items-center justify-center"
+          style={{ 
+            bottom: '70px', 
+            right: '16px',
+            width: '44px', 
+            height: '44px',
+            minWidth: '44px',
+            minHeight: '44px',
+            maxWidth: '44px',
+            maxHeight: '44px',
+            padding: 0
+          }}
         >
-          <Button
-            onClick={() => setIsOpen(true)}
-            className="rounded-full bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300 p-0"
-            style={{ borderRadius: '50%', width: '44px', height: '44px' }}
-          >
-            <MessageCircle className="h-5 w-5 text-white" />
-          </Button>
-        </div>
+          <MessageCircle className="h-5 w-5 text-white" />
+        </button>
         {/* Desktop: Same level as social (left), on RIGHT side */}
         <div 
           className="hidden sm:block fixed right-6 bottom-6 z-[9999]"
