@@ -274,104 +274,9 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         console.error('❌ Error fetching delivery_requests:', e.message);
       }
 
-      // Fetch from deliveries table using REST API
-      try {
-        const delResponse = await fetch(
-          `${url}/rest/v1/deliveries?order=created_at.desc&limit=50`,
-          { headers, cache: 'no-store' }
-        );
-        
-        if (delResponse.ok) {
-          const deliveries = await delResponse.json();
-          console.log('📦 deliveries query result:', { data: deliveries, count: deliveries?.length });
-
-          if (deliveries && deliveries.length > 0) {
-            deliveries.forEach((del: any) => {
-              // Avoid duplicates
-              if (!allNotifications.find(n => n.id === del.id)) {
-                let pickupAddr = del.pickup_address || del.pickup_location || '';
-                if (del.supplier_id && supplierAddressCache[del.supplier_id]) {
-                  pickupAddr = supplierAddressCache[del.supplier_id];
-                }
-
-                allNotifications.push({
-                  id: del.id,
-                  type: del.status === 'pending' ? 'new_delivery' : 'status_update',
-                  title: del.status === 'pending' ? '🚚 New Delivery Request!' : `Delivery ${del.status?.replace('_', ' ') || 'update'}`,
-                  message: `${del.material_type || 'Materials'} to ${del.delivery_address || 'Unknown'}`,
-                  timestamp: new Date(del.created_at),
-                  read: del.status !== 'pending',
-                  priority: del.urgency === 'urgent' || del.status === 'pending' ? 'high' : 'medium',
-                  actionUrl: `/delivery-dashboard?delivery=${del.id}`,
-                  status: del.status,
-                  pickupAddress: pickupAddr,
-                  deliveryAddress: del.delivery_address || del.delivery_location || '',
-                  materialType: del.material_type || '',
-                  quantity: del.quantity || '',
-                  estimatedCost: del.estimated_cost || 0
-                });
-              }
-            });
-            console.log(`✅ Loaded ${deliveries.length} deliveries`);
-          } else {
-            console.log('⚠️ No deliveries found');
-          }
-        } else {
-          console.error('❌ deliveries fetch failed:', delResponse.status, delResponse.statusText);
-        }
-      } catch (e: any) {
-        console.error('❌ Error fetching deliveries:', e.message);
-      }
-
-      // Fetch from delivery_notifications table using REST API
-      try {
-        const notifResponse = await fetch(
-          `${url}/rest/v1/delivery_notifications?order=created_at.desc&limit=50`,
-          { headers, cache: 'no-store' }
-        );
-        
-        if (notifResponse.ok) {
-          const notifications = await notifResponse.json();
-          console.log('📦 delivery_notifications query result:', { data: notifications, count: notifications?.length });
-
-          if (notifications && notifications.length > 0) {
-            notifications.forEach((notif: any) => {
-              // Avoid duplicates
-              if (!allNotifications.find(n => n.id === notif.id || n.id === notif.request_id)) {
-                const materials = notif.material_details || [];
-                let pickupAddr = notif.pickup_address || notif.pickup_location || '';
-                if (notif.supplier_id && supplierAddressCache[notif.supplier_id]) {
-                  pickupAddr = supplierAddressCache[notif.supplier_id];
-                }
-
-                allNotifications.push({
-                  id: notif.id,
-                  type: 'new_delivery',
-                  title: notif.status === 'pending' ? '🚚 New Delivery Request!' : `Delivery ${notif.status?.replace('_', ' ') || 'update'}`,
-                  message: `${materials[0]?.name || notif.material_type || 'Materials'} to ${notif.delivery_address || 'Unknown'}`,
-                  timestamp: new Date(notif.created_at),
-                  read: notif.status !== 'pending',
-                  priority: notif.priority_level === 'urgent' || notif.status === 'pending' ? 'high' : 'medium',
-                  actionUrl: `/delivery-dashboard?notification=${notif.id}`,
-                  status: notif.status,
-                  pickupAddress: pickupAddr,
-                  deliveryAddress: notif.delivery_address || notif.delivery_location || '',
-                  materialType: materials[0]?.name || notif.material_type || '',
-                  quantity: notif.quantity || '',
-                  estimatedCost: notif.estimated_cost || 0
-                });
-              }
-            });
-            console.log(`✅ Loaded ${notifications.length} delivery_notifications`);
-          } else {
-            console.log('⚠️ No delivery_notifications found');
-          }
-        } else {
-          console.error('❌ delivery_notifications fetch failed:', notifResponse.status, notifResponse.statusText);
-        }
-      } catch (e: any) {
-        console.error('❌ Error fetching delivery_notifications:', e.message);
-      }
+      // NOTE: We only use delivery_requests as the source of truth
+      // The deliveries and delivery_notifications tables are redundant and cause duplicates
+      // Skipping those tables to prevent duplicate notifications
 
       // Sort by timestamp descending
       allNotifications.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
@@ -433,57 +338,8 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           }
         }
       )
-      .on('postgres_changes', 
-        { event: 'INSERT', schema: 'public', table: 'deliveries' }, 
-        (payload: any) => {
-          console.log('🔔 New delivery received:', payload.new);
-          const newNotification: Notification = {
-            id: payload.new.id,
-            type: 'new_delivery',
-            title: '🚚 New Delivery Request!',
-            message: `${payload.new.material_type || 'Materials'} to ${payload.new.delivery_address || 'Unknown'}`,
-            timestamp: new Date(payload.new.created_at || Date.now()),
-            read: false,
-            priority: payload.new.urgency === 'urgent' ? 'high' : 'medium',
-            actionUrl: `/delivery-dashboard?delivery=${payload.new.id}`
-          };
-          
-          setNotifications(prev => [newNotification, ...prev]);
-          setUnreadCount(prev => prev + 1);
-          
-          toast({
-            title: '🚚 New Delivery Request!',
-            description: newNotification.message,
-            duration: 10000,
-          });
-        }
-      )
-      .on('postgres_changes', 
-        { event: 'INSERT', schema: 'public', table: 'delivery_notifications' }, 
-        (payload: any) => {
-          console.log('🔔 New delivery notification received:', payload.new);
-          const materials = payload.new.material_details || [];
-          const newNotification: Notification = {
-            id: payload.new.id,
-            type: 'new_delivery',
-            title: '🚚 New Delivery Request!',
-            message: `${materials[0]?.name || 'Materials'} to ${payload.new.delivery_address || 'Unknown'}`,
-            timestamp: new Date(payload.new.created_at || Date.now()),
-            read: false,
-            priority: payload.new.priority_level === 'urgent' ? 'high' : 'medium',
-            actionUrl: `/delivery-dashboard?notification=${payload.new.id}`
-          };
-          
-          setNotifications(prev => [newNotification, ...prev]);
-          setUnreadCount(prev => prev + 1);
-          
-          toast({
-            title: '🚚 New Delivery Request!',
-            description: newNotification.message,
-            duration: 10000,
-          });
-        }
-      )
+      // NOTE: Only listening to delivery_requests to prevent duplicate notifications
+      // The deliveries and delivery_notifications tables are redundant
       .subscribe();
 
     return () => {
