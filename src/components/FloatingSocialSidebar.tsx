@@ -99,88 +99,88 @@ export const FloatingSocialSidebar: React.FC = () => {
   }
 
   return (
-    <>
-      {/* Desktop: Fixed left sidebar */}
-      <div ref={containerRef} className="hidden sm:block fixed left-6 bottom-6 z-[9998]" style={{ position: 'fixed', zIndex: 9998 }}>
-        {/* Backdrop overlay when open */}
-        {isOpen && (
-          <div 
-            className="fixed inset-0 bg-black/20 backdrop-blur-[2px] -z-10"
-            onClick={() => setIsOpen(false)}
-          />
-        )}
-        
-        {/* Expanded social links - vertical stack */}
-        <div className={`absolute bottom-16 left-0 flex flex-col gap-2 transition-all duration-300 ease-out ${
-          isOpen 
-            ? 'opacity-100 translate-y-0 pointer-events-auto' 
-            : 'opacity-0 translate-y-8 pointer-events-none'
-        }`}>
-          {SOCIAL_LINKS.map((link, index) => {
-            const IconComponent = link.icon;
-            return (
-              <a
-                key={link.name}
-                href={link.href}
-                target={link.href.startsWith('http') ? '_blank' : undefined}
-                rel={link.href.startsWith('http') ? 'noopener noreferrer' : undefined}
-                className={`group relative flex items-center justify-center w-11 h-11 ${link.bg} ${link.hoverBg} rounded-full shadow-lg hover:scale-110 transition-all duration-200`}
-                style={{ 
-                  transitionDelay: isOpen ? `${index * 40}ms` : '0ms',
-                  transform: isOpen ? 'scale(1)' : 'scale(0.5)',
-                }}
-                title={link.name}
-              >
-                <IconComponent size={20} className="text-white" />
-                {/* Tooltip - positioned to the right */}
-                <span className="absolute left-full ml-3 bg-gray-900 text-white text-xs px-2.5 py-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg">
-                  {link.name}
-                </span>
-              </a>
-            );
-          })}
-        </div>
-        
-        {/* Main toggle button */}
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className={`relative flex items-center justify-center w-14 h-14 rounded-full shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300 ${
-            isOpen 
-              ? 'bg-gray-800 rotate-180' 
-              : 'bg-gradient-to-br from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700'
-          }`}
-          aria-label={isOpen ? 'Close social links' : 'Open social links'}
-        >
-          {isOpen ? (
-            <X size={24} className="text-white" />
-          ) : (
-            <Share2 size={24} className="text-white" />
-          )}
-          
-          {/* Pulse animation when closed */}
-          {!isOpen && (
-            <span className="absolute inset-0 rounded-full bg-orange-500 animate-ping opacity-30" />
-          )}
-          
-          {/* Badge indicator */}
-          {!isOpen && (
-            <span className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white border-2 border-white shadow">
-              7
-            </span>
-          )}
-        </button>
-        
-        {/* Label text when closed */}
-        {!isOpen && (
-          <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-900/90 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
-            Connect with us
-          </div>
-        )}
+    <div ref={containerRef} className="fixed left-4 bottom-4 z-[9998]" style={{ position: 'fixed', zIndex: 9998 }}>
+      {/* Backdrop overlay when open */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/20 backdrop-blur-[2px] -z-10"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+      
+      {/* Expanded social links - vertical stack */}
+      <div className={`absolute bottom-14 left-0 flex flex-col gap-2 transition-all duration-300 ease-out ${
+        isOpen 
+          ? 'opacity-100 translate-y-0 pointer-events-auto' 
+          : 'opacity-0 translate-y-8 pointer-events-none'
+      }`}>
+        {SOCIAL_LINKS.map((link, index) => {
+          const IconComponent = link.icon;
+          return (
+            <a
+              key={link.name}
+              href={link.href}
+              target={link.href.startsWith('http') ? '_blank' : undefined}
+              rel={link.href.startsWith('http') ? 'noopener noreferrer' : undefined}
+              className={`group relative flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 ${link.bg} ${link.hoverBg} rounded-full shadow-lg hover:scale-110 transition-all duration-200`}
+              style={{ 
+                transitionDelay: isOpen ? `${index * 40}ms` : '0ms',
+                transform: isOpen ? 'scale(1)' : 'scale(0.5)',
+              }}
+              title={link.name}
+            >
+              <IconComponent size={18} className="text-white sm:hidden" />
+              <IconComponent size={20} className="text-white hidden sm:block" />
+              {/* Tooltip - positioned to the right, hidden on mobile */}
+              <span className="absolute left-full ml-3 bg-gray-900 text-white text-xs px-2.5 py-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-lg hidden sm:block">
+                {link.name}
+              </span>
+            </a>
+          );
+        })}
       </div>
-
-      {/* Mobile: Compact horizontal bar at bottom - HIDDEN to reduce clutter */}
-      {/* Social links are available in the footer on mobile */}
-    </>
+      
+      {/* Main toggle button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={`relative flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-full shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300 ${
+          isOpen 
+            ? 'bg-gray-800 rotate-180' 
+            : 'bg-gradient-to-br from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700'
+        }`}
+        aria-label={isOpen ? 'Close social links' : 'Open social links'}
+      >
+        {isOpen ? (
+          <X size={20} className="text-white sm:hidden" />
+        ) : (
+          <Share2 size={20} className="text-white sm:hidden" />
+        )}
+        {isOpen ? (
+          <X size={24} className="text-white hidden sm:block" />
+        ) : (
+          <Share2 size={24} className="text-white hidden sm:block" />
+        )}
+        
+        {/* Pulse animation when closed */}
+        {!isOpen && (
+          <span className="absolute inset-0 rounded-full bg-orange-500 animate-ping opacity-30" />
+        )}
+        
+        {/* Badge indicator */}
+        {!isOpen && (
+          <span className="absolute -top-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 bg-green-500 rounded-full flex items-center justify-center text-[9px] sm:text-[10px] font-bold text-white border-2 border-white shadow">
+            7
+          </span>
+        )}
+      </button>
+      
+      {/* Label text when closed - hidden on mobile */}
+      {!isOpen && (
+        <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-900/90 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 hover:opacity-100 transition-opacity pointer-events-none hidden sm:block">
+          Connect with us
+        </div>
+      )}
+    </div>
   );
 };
 
