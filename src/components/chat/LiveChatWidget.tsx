@@ -574,10 +574,10 @@ export function LiveChatWidget({ position = 'bottom-right' }: LiveChatWidgetProp
 
   return (
     <>
-      {/* Chat Button - BLUE icon at 150px to clear menu */}
+      {/* Chat Button - BLUE icon at 75px - closer to menu */}
       {!isOpen && (
-        <div className="sm:hidden fixed z-[9999]" style={{ bottom: '150px', right: '16px' }}>
-          {/* Mobile: BLUE chatbot - 44px, above menu */}
+        <div className="sm:hidden fixed z-[9999]" style={{ bottom: '75px', right: '16px' }}>
+          {/* Mobile: BLUE chatbot - 44px, just above menu */}
           <button
             onClick={() => setIsOpen(true)}
             className="relative rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center"
