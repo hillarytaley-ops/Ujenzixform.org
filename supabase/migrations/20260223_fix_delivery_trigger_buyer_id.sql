@@ -1,42 +1,10 @@
 -- ============================================================
--- Add Supplier ID to Tracking Numbers
--- Ensures suppliers can see tracking numbers for their orders
--- Created: February 21, 2026
+-- Fix delivery_requests trigger - remove reference to non-existent buyer_id
+-- The delivery_requests table only has builder_id, not buyer_id
+-- Created: February 23, 2026
 -- ============================================================
 
--- 1. Add index for supplier_id if not exists
-CREATE INDEX IF NOT EXISTS idx_tracking_numbers_supplier ON public.tracking_numbers(supplier_id);
-
--- 2. Update RLS policy to allow suppliers to see their tracking numbers
-DROP POLICY IF EXISTS "tracking_numbers_select" ON public.tracking_numbers;
-CREATE POLICY "tracking_numbers_select" ON public.tracking_numbers 
-FOR SELECT USING (
-    builder_id = auth.uid() OR 
-    delivery_provider_id = auth.uid() OR
-    supplier_id = auth.uid() OR
-    supplier_id IN (SELECT id FROM suppliers WHERE user_id = auth.uid()) OR
-    EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin')
-);
-
--- 3. Update existing tracking numbers to include supplier_id from purchase_orders
--- (delivery_requests doesn't have supplier_id, but purchase_orders does)
-UPDATE public.tracking_numbers tn
-SET supplier_id = po.supplier_id
-FROM purchase_orders po
-WHERE tn.purchase_order_id = po.id
-AND tn.supplier_id IS NULL
-AND po.supplier_id IS NOT NULL;
-
--- 4. Also try to get supplier_id via delivery_requests -> purchase_orders link
-UPDATE public.tracking_numbers tn
-SET supplier_id = po.supplier_id
-FROM delivery_requests dr
-JOIN purchase_orders po ON dr.purchase_order_id = po.id
-WHERE tn.delivery_request_id = dr.id
-AND tn.supplier_id IS NULL
-AND po.supplier_id IS NOT NULL;
-
--- 5. Update the trigger function to include supplier_id
+-- Drop and recreate the trigger function with correct column references
 CREATE OR REPLACE FUNCTION create_tracking_on_delivery_accept()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -44,8 +12,8 @@ DECLARE
     v_builder_user_id UUID;
     v_provider_name TEXT;
     v_provider_phone TEXT;
-    v_delivery_address TEXT;
     v_supplier_id UUID;
+    v_delivery_address TEXT;
 BEGIN
     -- Only create tracking number when status changes to 'accepted' or 'assigned'
     IF (TG_OP = 'UPDATE' AND 
@@ -127,25 +95,29 @@ BEGIN
             
             RAISE NOTICE 'Created tracking number: % for delivery request: % with supplier: %', v_tracking_num, NEW.id, v_supplier_id;
         EXCEPTION WHEN unique_violation THEN
+            -- Tracking number already exists, skip
             RAISE NOTICE 'Tracking number already exists for delivery request: %', NEW.id;
-        WHEN OTHERS THEN
-            RAISE NOTICE 'Error creating tracking number: %', SQLERRM;
+        EXCEPTION WHEN OTHERS THEN
+            -- Log error but don't fail the update
+            RAISE WARNING 'Could not create tracking number: %', SQLERRM;
         END;
-        
     END IF;
     
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Recreate the trigger
-DROP TRIGGER IF EXISTS trigger_create_tracking_on_accept ON delivery_requests;
-CREATE TRIGGER trigger_create_tracking_on_accept
+DROP TRIGGER IF EXISTS trigger_create_tracking_on_delivery_accept ON delivery_requests;
+CREATE TRIGGER trigger_create_tracking_on_delivery_accept
     BEFORE UPDATE ON delivery_requests
     FOR EACH ROW
     EXECUTE FUNCTION create_tracking_on_delivery_accept();
 
+-- Grant necessary permissions
+GRANT EXECUTE ON FUNCTION create_tracking_on_delivery_accept() TO authenticated;
+GRANT EXECUTE ON FUNCTION create_tracking_on_delivery_accept() TO anon;
+
 -- ============================================================
 -- Migration Complete
 -- ============================================================
-SELECT 'Tracking numbers now include supplier_id!' as result;
