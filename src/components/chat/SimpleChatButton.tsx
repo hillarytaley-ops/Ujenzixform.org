@@ -1,6 +1,6 @@
 /**
- * CHATBOT BUTTON - v2.5 - Feb 23 2026
- * Mobile: bottom 110px to clear menu tab
+ * CHATBOT BUTTON - v3.0 - Feb 23 2026
+ * Mobile: bottom 150px to DEFINITELY clear menu tab
  */
 import React, { useState } from 'react';
 import { MessageCircle, X, Send, Bot, User, Sparkles } from 'lucide-react';
@@ -153,10 +153,10 @@ export const SimpleChatButton = () => {
   if (!isOpen) {
     return (
       <>
-        {/* Mobile: BOTTOM icon - well above menu tab */}
+        {/* Mobile: BOTTOM icon - 150px above bottom to clear menu */}
         <div 
           className="sm:hidden fixed z-[9999]"
-          style={{ bottom: '110px', right: '16px' }}
+          style={{ bottom: '150px', right: '16px' }}
         >
           <Button
             onClick={() => setIsOpen(true)}
