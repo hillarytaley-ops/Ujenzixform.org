@@ -878,13 +878,15 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                 
                 {/* Single Accept Button - Show for pending delivery requests */}
                 {notification.status === 'pending' && (
-                  <Button
-                    size="sm"
-                    className="w-full mt-3 bg-green-600 hover:bg-green-700 text-white font-medium"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      console.log('🔘 Accept button clicked for:', notification.id, 'acceptingId:', acceptingId);
+                  <button
+                    type="button"
+                    className={`w-full mt-3 py-2 px-4 rounded-md text-white font-medium flex items-center justify-center gap-2 transition-colors ${
+                      acceptingId 
+                        ? 'bg-gray-400 cursor-not-allowed' 
+                        : 'bg-green-600 hover:bg-green-700 active:bg-green-800'
+                    }`}
+                    onClick={() => {
+                      console.log('🔘 NATIVE BUTTON clicked for:', notification.id, 'acceptingId:', acceptingId);
                       if (!acceptingId) {
                         handleAcceptDelivery(notification.id);
                       }
@@ -893,21 +895,21 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                   >
                     {acceptingId === notification.id ? (
                       <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        <Loader2 className="h-4 w-4 animate-spin" />
                         Accepting...
                       </>
                     ) : acceptingId ? (
                       <>
-                        <Clock className="h-4 w-4 mr-2" />
+                        <Clock className="h-4 w-4" />
                         Please Wait...
                       </>
                     ) : (
                       <>
-                        <CheckCircle className="h-4 w-4 mr-2" />
+                        <CheckCircle className="h-4 w-4" />
                         Accept This Delivery
                       </>
                     )}
-                  </Button>
+                  </button>
                 )}
                 
                 {/* Status indicator for non-pending deliveries */}
