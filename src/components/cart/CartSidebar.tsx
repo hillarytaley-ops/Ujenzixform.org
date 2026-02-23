@@ -31,6 +31,7 @@ import { CartPriceComparisonAll } from './CartPriceComparisonAll';
 import { MultiSupplierQuoteDialog } from './MultiSupplierQuoteDialog';
 import { DeliveryPromptDialog } from '@/components/builders/DeliveryPromptDialog';
 import { MonitoringServicePrompt } from '@/components/builders/MonitoringServicePrompt';
+import { CheckoutDialog } from '@/components/payment/CheckoutDialog';
 
 // Helper for fetch with timeout
 const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs: number = 10000) => {
@@ -71,6 +72,7 @@ export const CartSidebar: React.FC = () => {
   const [showMonitoringPrompt, setShowMonitoringPrompt] = useState(false);
   const [lastOrderId, setLastOrderId] = useState<string | null>(null);
   const [lastOrderTotal, setLastOrderTotal] = useState<number>(0);
+  const [showCheckoutDialog, setShowCheckoutDialog] = useState(false);
 
   // Check user role on mount and when cart opens - use localStorage FIRST for instant access
   useEffect(() => {
@@ -737,7 +739,7 @@ export const CartSidebar: React.FC = () => {
                   );
                 }
                 
-                // PRIVATE CLIENT: Compare Prices + Buy Now
+                // PRIVATE CLIENT: Compare Prices + Buy Now with Paystack
                 if (effectiveRole === 'private_client') {
                   return (
                     <>
@@ -751,7 +753,7 @@ export const CartSidebar: React.FC = () => {
                       </Button>
                       <Button 
                         className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 h-14 flex items-center justify-center gap-3"
-                        onClick={handleBuyNow}
+                        onClick={() => setShowCheckoutDialog(true)}
                         disabled={isProcessing}
                       >
                         {isProcessing ? (
@@ -763,14 +765,14 @@ export const CartSidebar: React.FC = () => {
                           <>
                             <CreditCard className="h-5 w-5" />
                             <div className="text-left">
-                              <span className="text-sm font-semibold">Buy Now - KES {getTotalPrice().toLocaleString()}</span>
-                              <p className="text-[10px] opacity-80">Complete your purchase instantly</p>
+                              <span className="text-sm font-semibold">Checkout - KES {getTotalPrice().toLocaleString()}</span>
+                              <p className="text-[10px] opacity-80">Pay securely with Paystack</p>
                             </div>
                           </>
                         )}
                       </Button>
                       <p className="text-[10px] text-center text-green-600 font-medium">
-                        🏠 Private Client: Compare prices or buy directly!
+                        🏠 Private Client: Compare prices or checkout with Paystack!
                       </p>
                     </>
                   );
@@ -933,6 +935,27 @@ export const CartSidebar: React.FC = () => {
         setShowMonitoringPrompt(false);
         setLastOrderId(null);
         setLastOrderTotal(0);
+      }}
+    />
+
+    {/* Paystack Checkout Dialog - OUTSIDE Sheet so it persists */}
+    <CheckoutDialog
+      isOpen={showCheckoutDialog}
+      onClose={() => setShowCheckoutDialog(false)}
+      items={items}
+      totalAmount={getTotalPrice()}
+      onOrderComplete={(orderId, paymentReference) => {
+        console.log('✅ Order completed:', orderId, paymentReference);
+        setLastOrderId(orderId);
+        setLastOrderTotal(getTotalPrice());
+        clearCart();
+        setShowCheckoutDialog(false);
+        setIsCartOpen(false);
+        
+        // Show delivery prompt after successful payment
+        setTimeout(() => {
+          setShowDeliveryPrompt(true);
+        }, 500);
       }}
     />
     </>
