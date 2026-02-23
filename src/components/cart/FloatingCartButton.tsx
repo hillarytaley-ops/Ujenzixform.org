@@ -47,7 +47,7 @@ export const FloatingCartButton: React.FC = () => {
   return (
     <>
       {/* Mobile Cart - top of right stack */}
-      {/* Position: bottom = 144px (social) + 56px (social height) + 8px (small gap) = 208px */}
+      {/* Position: bottom = 131px (social) + 56px (social height) + 10px (gap) = 197px */}
       <Button
         onClick={() => setIsCartOpen(true)}
         className={`sm:hidden fixed z-50 shadow-lg rounded-full flex items-center gap-2 h-12 px-3
@@ -58,7 +58,7 @@ export const FloatingCartButton: React.FC = () => {
         style={{ 
           position: 'fixed',
           right: '16px',
-          bottom: '208px',
+          bottom: '197px',
           zIndex: 50
         }}
       >
