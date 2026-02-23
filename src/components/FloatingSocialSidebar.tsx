@@ -178,8 +178,8 @@ export const FloatingSocialSidebar: React.FC = () => {
         )}
       </div>
 
-      {/* Mobile: Fixed LEFT side - SAME level as chatbot on opposite side */}
-      <div className="sm:hidden fixed left-4 bottom-4 z-[9998]" style={{ position: 'fixed', zIndex: 9998 }}>
+      {/* Mobile: Fixed LEFT side - EXACTLY same level and size as chatbot */}
+      <div className="sm:hidden fixed left-4 z-[9998]" style={{ position: 'fixed', bottom: '16px', zIndex: 9998 }}>
         {/* Backdrop overlay when open */}
         {isOpen && (
           <div 
@@ -189,11 +189,13 @@ export const FloatingSocialSidebar: React.FC = () => {
         )}
         
         {/* Expanded social links - vertical stack going UP */}
-        <div className={`absolute bottom-14 left-0 flex flex-col gap-2 transition-all duration-300 ease-out ${
+        <div className={`absolute left-0 flex flex-col gap-2 transition-all duration-300 ease-out ${
           isOpen 
             ? 'opacity-100 translate-y-0 pointer-events-auto' 
             : 'opacity-0 translate-y-4 pointer-events-none'
-        }`}>
+        }`}
+        style={{ bottom: '64px' }}
+        >
           {SOCIAL_LINKS.map((link, index) => {
             const IconComponent = link.icon;
             return (
@@ -202,8 +204,10 @@ export const FloatingSocialSidebar: React.FC = () => {
                 href={link.href}
                 target={link.href.startsWith('http') ? '_blank' : undefined}
                 rel={link.href.startsWith('http') ? 'noopener noreferrer' : undefined}
-                className={`flex items-center justify-center w-11 h-11 ${link.bg} ${link.hoverBg} rounded-full shadow-lg transition-all duration-200`}
+                className={`flex items-center justify-center ${link.bg} ${link.hoverBg} rounded-full shadow-lg transition-all duration-200`}
                 style={{ 
+                  width: '44px',
+                  height: '44px',
                   transitionDelay: isOpen ? `${index * 30}ms` : '0ms',
                   transform: isOpen ? 'scale(1)' : 'scale(0.5)',
                 }}
@@ -215,20 +219,21 @@ export const FloatingSocialSidebar: React.FC = () => {
           })}
         </div>
         
-        {/* Main toggle button - SAME SIZE as chatbot (48px = w-12 h-12) */}
+        {/* Main toggle button - EXACTLY 56px like chatbot */}
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className={`relative flex items-center justify-center w-12 h-12 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 ${
+          className={`relative flex items-center justify-center rounded-full shadow-lg hover:shadow-xl transition-all duration-300 ${
             isOpen 
               ? 'bg-gray-800' 
               : 'bg-gradient-to-br from-orange-500 to-red-600'
           }`}
+          style={{ width: '56px', height: '56px' }}
           aria-label={isOpen ? 'Close social links' : 'Open social links'}
         >
           {isOpen ? (
-            <X size={22} className="text-white" />
+            <X size={24} className="text-white" />
           ) : (
-            <Share2 size={22} className="text-white" />
+            <Share2 size={24} className="text-white" />
           )}
           
           {/* Pulse animation when closed */}

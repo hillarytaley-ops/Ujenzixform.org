@@ -149,15 +149,15 @@ export const SimpleChatButton = () => {
   if (!isOpen) {
     return (
       <div 
-        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[9999]"
-        style={{ position: 'fixed', zIndex: 9999 }}
+        className="fixed right-4 sm:right-6 z-[9999]"
+        style={{ position: 'fixed', bottom: '16px', zIndex: 9999 }}
       >
         <Button
           onClick={() => setIsOpen(true)}
-          className="rounded-full h-12 w-12 sm:h-14 sm:w-14 bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300 p-0"
-          style={{ borderRadius: '50%' }}
+          className="rounded-full bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300 p-0"
+          style={{ borderRadius: '50%', width: '56px', height: '56px' }}
         >
-          <MessageCircle className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+          <MessageCircle className="h-6 w-6 text-white" />
         </Button>
       </div>
     );

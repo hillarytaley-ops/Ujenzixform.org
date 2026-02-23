@@ -23,18 +23,19 @@ export const FloatingCartButton: React.FC = () => {
   const totalItems = getTotalItems();
 
   // Position:
-  // - Mobile: LEFT side, ABOVE social icons (bottom-20, left-4)
+  // - Mobile: LEFT side, ABOVE social icons (bottom: 88px = 16px + 56px + 16px gap)
   // - Desktop: RIGHT side, above chatbot (bottom-24, right-6)
   return (
     <Button
       onClick={() => setIsCartOpen(true)}
       className={`fixed z-50 shadow-lg rounded-full flex items-center gap-2
-        bottom-20 left-4 h-12 px-3
-        sm:bottom-24 sm:right-6 sm:left-auto sm:h-12 sm:px-4
+        left-4 h-12 px-3
+        sm:left-auto sm:right-6 sm:h-12 sm:px-4
         ${totalItems > 0 
           ? 'bg-green-600 hover:bg-green-700 animate-in slide-in-from-bottom-4' 
           : 'bg-gray-600 hover:bg-gray-700'
         }`}
+      style={{ bottom: '88px' }}
     >
       <div className="relative">
         <ShoppingCart className="h-5 w-5" />
