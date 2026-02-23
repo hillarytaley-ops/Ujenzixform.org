@@ -1,6 +1,6 @@
 /**
- * CHATBOT BUTTON - v4.0 - Feb 23 2026
- * Mobile: bottom 180px - BLUE chatbot must clear menu
+ * CHATBOT BUTTON - v5.0 - Feb 23 2026
+ * Mobile: smaller 44px icon, bottom 70px
  */
 import React, { useState } from 'react';
 import { MessageCircle, X, Send, Bot, User, Sparkles } from 'lucide-react';
@@ -153,17 +153,17 @@ export const SimpleChatButton = () => {
   if (!isOpen) {
     return (
       <>
-        {/* Mobile: BLUE CHATBOT - 180px above bottom to clear menu */}
+        {/* Mobile: BLUE CHATBOT - smaller 44px, bottom 70px */}
         <div 
           className="sm:hidden fixed z-[9999]"
-          style={{ bottom: '180px', right: '16px' }}
+          style={{ bottom: '70px', right: '16px' }}
         >
           <Button
             onClick={() => setIsOpen(true)}
             className="rounded-full bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300 p-0"
-            style={{ borderRadius: '50%', width: '56px', height: '56px' }}
+            style={{ borderRadius: '50%', width: '44px', height: '44px' }}
           >
-            <MessageCircle className="h-6 w-6 text-white" />
+            <MessageCircle className="h-5 w-5 text-white" />
           </Button>
         </div>
         {/* Desktop: Same level as social (left), on RIGHT side */}

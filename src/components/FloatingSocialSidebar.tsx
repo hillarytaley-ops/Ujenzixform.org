@@ -178,8 +178,8 @@ export const FloatingSocialSidebar: React.FC = () => {
         )}
       </div>
 
-      {/* Mobile: ORANGE SOCIAL - ABOVE blue chatbot (180 + 56 + 8 = 244) */}
-      <div className="sm:hidden fixed z-[9998]" style={{ bottom: '244px', right: '16px' }}>
+      {/* Mobile: ORANGE SOCIAL - smaller 44px, bottom 118px (70 + 44 + 4 gap) */}
+      <div className="sm:hidden fixed z-[9998]" style={{ bottom: '118px', right: '16px' }}>
         {/* Backdrop overlay when open */}
         {isOpen && (
           <div 
@@ -194,7 +194,7 @@ export const FloatingSocialSidebar: React.FC = () => {
             ? 'opacity-100 translate-y-0 pointer-events-auto' 
             : 'opacity-0 translate-y-4 pointer-events-none'
         }`}
-        style={{ bottom: '64px' }}
+        style={{ bottom: '48px' }}
         >
           {SOCIAL_LINKS.map((link, index) => {
             const IconComponent = link.icon;
@@ -206,20 +206,20 @@ export const FloatingSocialSidebar: React.FC = () => {
                 rel={link.href.startsWith('http') ? 'noopener noreferrer' : undefined}
                 className={`flex items-center justify-center ${link.bg} ${link.hoverBg} rounded-full shadow-lg transition-all duration-200`}
                 style={{ 
-                  width: '44px',
-                  height: '44px',
+                  width: '40px',
+                  height: '40px',
                   transitionDelay: isOpen ? `${index * 30}ms` : '0ms',
                   transform: isOpen ? 'scale(1)' : 'scale(0.5)',
                 }}
                 title={link.name}
               >
-                <IconComponent size={20} className="text-white" />
+                <IconComponent size={18} className="text-white" />
               </a>
             );
           })}
         </div>
         
-        {/* Main toggle button - EXACTLY 56px like chatbot */}
+        {/* Main toggle button - smaller 44px */}
         <button
           onClick={() => setIsOpen(!isOpen)}
           className={`relative flex items-center justify-center rounded-full shadow-lg hover:shadow-xl transition-all duration-300 ${
@@ -227,13 +227,13 @@ export const FloatingSocialSidebar: React.FC = () => {
               ? 'bg-gray-800' 
               : 'bg-gradient-to-br from-orange-500 to-red-600'
           }`}
-          style={{ width: '56px', height: '56px' }}
+          style={{ width: '44px', height: '44px' }}
           aria-label={isOpen ? 'Close social links' : 'Open social links'}
         >
           {isOpen ? (
-            <X size={24} className="text-white" />
+            <X size={20} className="text-white" />
           ) : (
-            <Share2 size={24} className="text-white" />
+            <Share2 size={20} className="text-white" />
           )}
           
           {/* Pulse animation when closed */}
@@ -243,7 +243,7 @@ export const FloatingSocialSidebar: React.FC = () => {
           
           {/* Badge indicator */}
           {!isOpen && (
-            <span className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center text-[9px] font-bold text-white border-2 border-white shadow">
+            <span className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center text-[8px] font-bold text-white border-2 border-white shadow">
               7
             </span>
           )}
