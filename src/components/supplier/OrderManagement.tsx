@@ -262,17 +262,9 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
         };
       });
 
-        setOrders(realOrders);
-        console.log(`✅ Loaded ${realOrders.length} orders`);
+      setOrders(realOrders);
+      console.log(`✅ Loaded ${realOrders.length} orders`);
 
-      } catch (fetchError: any) {
-        if (fetchError.name === 'AbortError') {
-          console.log('Orders fetch timed out (4s)');
-        } else {
-          console.error('Orders fetch error:', fetchError);
-        }
-        setOrders([]);
-      }
     } catch (error) {
       console.error('Error loading orders:', error);
       setOrders([]);
