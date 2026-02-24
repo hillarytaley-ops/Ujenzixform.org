@@ -38,7 +38,8 @@ import {
   Send,
   MapPin,
   Building2,
-  LogOut
+  LogOut,
+  RefreshCw
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -90,6 +91,395 @@ interface RecentOrder {
   status: string;
   created_at: string;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// QUOTES MANAGEMENT CONTENT COMPONENT - Extracted for reuse in sub-tabs
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+interface QuotesManagementContentProps {
+  quoteRequests: any[];
+  loadingQuotes: boolean;
+  isDarkMode: boolean;
+  textColor: string;
+  mutedText: string;
+  cardBg: string;
+  openQuoteDialog: (quote: any) => void;
+  handleQuoteAction: (action: string) => void;
+  setSelectedQuote: (quote: any) => void;
+  setActiveTab: (tab: string) => void;
+  fetchQuoteRequests: () => void;
+}
+
+const QuotesManagementContent: React.FC<QuotesManagementContentProps> = ({
+  quoteRequests,
+  loadingQuotes,
+  isDarkMode,
+  textColor,
+  mutedText,
+  openQuoteDialog,
+  handleQuoteAction,
+  setSelectedQuote,
+  setActiveTab,
+  fetchQuoteRequests
+}) => {
+  const pendingQuotes = quoteRequests.filter(q => q.status === 'pending');
+  const quotedQuotes = quoteRequests.filter(q => q.status === 'quoted');
+  const confirmedQuotes = quoteRequests.filter(q => q.status === 'confirmed' || q.status === 'accepted');
+
+  return (
+    <div className="space-y-4">
+      {/* Quick Stats */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-amber-900/20' : 'bg-amber-50'} border ${isDarkMode ? 'border-amber-800' : 'border-amber-200'}`}>
+          <div className="flex items-center gap-2">
+            <Clock className="h-5 w-5 text-amber-500" />
+            <span className={`font-semibold ${textColor}`}>{pendingQuotes.length}</span>
+          </div>
+          <p className={`text-xs ${mutedText}`}>Pending Response</p>
+        </div>
+        <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-blue-900/20' : 'bg-blue-50'} border ${isDarkMode ? 'border-blue-800' : 'border-blue-200'}`}>
+          <div className="flex items-center gap-2">
+            <FileCheck className="h-5 w-5 text-blue-500" />
+            <span className={`font-semibold ${textColor}`}>{quotedQuotes.length}</span>
+          </div>
+          <p className={`text-xs ${mutedText}`}>Awaiting Client</p>
+        </div>
+        <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-green-900/20' : 'bg-green-50'} border ${isDarkMode ? 'border-green-800' : 'border-green-200'}`}>
+          <div className="flex items-center gap-2">
+            <CheckCircle className="h-5 w-5 text-green-500" />
+            <span className={`font-semibold ${textColor}`}>{confirmedQuotes.length}</span>
+          </div>
+          <p className={`text-xs ${mutedText}`}>Confirmed Orders</p>
+        </div>
+      </div>
+
+      {/* Refresh Button */}
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" onClick={fetchQuoteRequests} disabled={loadingQuotes}>
+          <RefreshCw className={`h-4 w-4 mr-1 ${loadingQuotes ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
+
+      {/* Quote Requests List */}
+      {loadingQuotes ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent"></div>
+        </div>
+      ) : quoteRequests.length > 0 ? (
+        <div className="space-y-4">
+          {quoteRequests.map((quote) => (
+            <div
+              key={quote.id}
+              className={`p-4 rounded-lg border ${
+                quote.status === 'pending' 
+                  ? isDarkMode ? 'border-amber-600 bg-amber-900/10' : 'border-amber-300 bg-amber-50'
+                  : quote.status === 'confirmed' || quote.status === 'accepted'
+                  ? isDarkMode ? 'border-green-600 bg-green-900/10' : 'border-green-300 bg-green-50'
+                  : isDarkMode ? 'border-slate-600 bg-slate-800' : 'border-gray-200 bg-white'
+              }`}
+            >
+              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                <div className="flex-1">
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2 rounded-lg ${isDarkMode ? 'bg-slate-700' : 'bg-white'} shadow-sm`}>
+                      <Building2 className="h-6 w-6 text-blue-500" />
+                    </div>
+                    <div>
+                      <h4 className={`font-semibold ${textColor}`}>{quote.builder_name || 'Professional Builder'}</h4>
+                      <p className={`text-sm font-medium text-blue-600`}>{quote.material_name}</p>
+                      <p className={`text-sm ${mutedText}`}>Qty: {quote.quantity} {quote.unit}</p>
+                      {quote.delivery_address && (
+                        <p className={`text-xs mt-1 ${mutedText}`}>
+                          <MapPin className="h-3 w-3 inline mr-1" />
+                          {quote.delivery_address}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col items-end gap-2">
+                  <Badge className={`${
+                    quote.status === 'pending' ? 'bg-amber-100 text-amber-700' :
+                    quote.status === 'quoted' ? 'bg-blue-100 text-blue-700' :
+                    quote.status === 'confirmed' || quote.status === 'accepted' ? 'bg-green-100 text-green-700' :
+                    'bg-red-100 text-red-700'
+                  }`}>
+                    {quote.status === 'pending' ? 'Awaiting Response' :
+                     quote.status === 'quoted' ? 'Awaiting Client' :
+                     quote.status === 'confirmed' || quote.status === 'accepted' ? 'Confirmed' :
+                     quote.status}
+                  </Badge>
+
+                  {quote.quote_amount && (
+                    <p className={`font-bold ${textColor}`}>KES {Number(quote.quote_amount).toLocaleString()}</p>
+                  )}
+
+                  {quote.status === 'pending' && (
+                    <div className="flex gap-2">
+                      <Button size="sm" className="bg-green-500 hover:bg-green-600" onClick={() => openQuoteDialog(quote)}>
+                        <CheckCircle className="h-4 w-4 mr-1" />
+                        Quote
+                      </Button>
+                      <Button size="sm" variant="outline" className="border-red-300 text-red-600" onClick={() => {
+                        setSelectedQuote(quote);
+                        handleQuoteAction('reject');
+                      }}>
+                        <XCircle className="h-4 w-4 mr-1" />
+                        Decline
+                      </Button>
+                    </div>
+                  )}
+
+                  {(quote.status === 'confirmed' || quote.status === 'accepted') && (
+                    <Button size="sm" className="bg-orange-500 hover:bg-orange-600" onClick={() => setActiveTab('view-orders')}>
+                      <Package className="h-4 w-4 mr-1" />
+                      View Order
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-12">
+          <FileCheck className={`h-16 w-16 mx-auto mb-4 ${isDarkMode ? 'text-slate-600' : 'text-gray-300'}`} />
+          <p className={`text-lg font-medium ${textColor}`}>No Quote Requests Yet</p>
+          <p className={mutedText}>Quote requests from professional builders will appear here</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// SUPPLIER REPORTS TAB COMPONENT - Generates real reports from data
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+interface SupplierReportsTabProps {
+  supplierId: string;
+  isDarkMode: boolean;
+  textColor: string;
+  mutedText: string;
+  cardBg: string;
+  stats: DashboardStats;
+  recentOrders: RecentOrder[];
+  quoteRequests: any[];
+}
+
+const SupplierReportsTab: React.FC<SupplierReportsTabProps> = ({
+  supplierId,
+  isDarkMode,
+  textColor,
+  mutedText,
+  cardBg,
+  stats,
+  recentOrders,
+  quoteRequests
+}) => {
+  const [reportType, setReportType] = useState<string>('sales');
+  const [dateRange, setDateRange] = useState<string>('30days');
+  const [generating, setGenerating] = useState(false);
+
+  // Calculate report data
+  const completedOrders = recentOrders.filter(o => o.status === 'delivered' || o.status === 'completed');
+  const pendingOrders = recentOrders.filter(o => o.status === 'pending' || o.status === 'processing');
+  const totalRevenue = completedOrders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
+  const averageOrderValue = completedOrders.length > 0 ? totalRevenue / completedOrders.length : 0;
+  
+  const quoteConversionRate = quoteRequests.length > 0 
+    ? (quoteRequests.filter(q => q.status === 'confirmed' || q.status === 'accepted').length / quoteRequests.length) * 100 
+    : 0;
+
+  const handleGenerateReport = async () => {
+    setGenerating(true);
+    // Simulate report generation
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    setGenerating(false);
+    
+    // Generate CSV content
+    let csvContent = '';
+    const today = new Date().toLocaleDateString();
+    
+    if (reportType === 'sales') {
+      csvContent = `Sales Report - Generated ${today}\n\n`;
+      csvContent += `Total Revenue,KES ${totalRevenue.toLocaleString()}\n`;
+      csvContent += `Total Orders,${stats.totalOrders}\n`;
+      csvContent += `Completed Orders,${completedOrders.length}\n`;
+      csvContent += `Pending Orders,${pendingOrders.length}\n`;
+      csvContent += `Average Order Value,KES ${averageOrderValue.toFixed(2)}\n\n`;
+      csvContent += `Order ID,Customer,Product,Quantity,Amount,Status,Date\n`;
+      recentOrders.forEach(order => {
+        csvContent += `${order.id},${order.customer_name},${order.product_name},${order.quantity},${order.total_amount},${order.status},${order.created_at}\n`;
+      });
+    } else if (reportType === 'quotes') {
+      csvContent = `Quote Report - Generated ${today}\n\n`;
+      csvContent += `Total Quotes,${quoteRequests.length}\n`;
+      csvContent += `Conversion Rate,${quoteConversionRate.toFixed(1)}%\n`;
+      csvContent += `Pending Quotes,${quoteRequests.filter(q => q.status === 'pending').length}\n`;
+      csvContent += `Confirmed Quotes,${quoteRequests.filter(q => q.status === 'confirmed' || q.status === 'accepted').length}\n\n`;
+      csvContent += `Quote ID,Builder,Material,Quantity,Quote Amount,Status,Date\n`;
+      quoteRequests.forEach(quote => {
+        csvContent += `${quote.id},${quote.builder_name || 'N/A'},${quote.material_name},${quote.quantity},${quote.quote_amount || 'N/A'},${quote.status},${quote.created_at}\n`;
+      });
+    } else if (reportType === 'inventory') {
+      csvContent = `Inventory Report - Generated ${today}\n\n`;
+      csvContent += `Total Products,${stats.totalProducts}\n`;
+      csvContent += `Note: Detailed inventory data requires database query\n`;
+    }
+
+    // Download the CSV
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${reportType}_report_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  };
+
+  return (
+    <Card className={cardBg}>
+      <CardHeader>
+        <CardTitle className={`flex items-center gap-2 ${textColor}`}>
+          <FileText className="h-5 w-5 text-green-600" />
+          Reports & Data Export
+        </CardTitle>
+        <CardDescription className={mutedText}>
+          Generate and download reports based on your sales, quotes, and inventory data
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Report Summary Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-green-900/20' : 'bg-green-50'} border ${isDarkMode ? 'border-green-800' : 'border-green-200'}`}>
+            <DollarSign className="h-6 w-6 text-green-500 mb-2" />
+            <p className={`text-2xl font-bold ${textColor}`}>KES {totalRevenue.toLocaleString()}</p>
+            <p className={`text-xs ${mutedText}`}>Total Revenue</p>
+          </div>
+          <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-blue-900/20' : 'bg-blue-50'} border ${isDarkMode ? 'border-blue-800' : 'border-blue-200'}`}>
+            <ShoppingCart className="h-6 w-6 text-blue-500 mb-2" />
+            <p className={`text-2xl font-bold ${textColor}`}>{stats.totalOrders}</p>
+            <p className={`text-xs ${mutedText}`}>Total Orders</p>
+          </div>
+          <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-purple-900/20' : 'bg-purple-50'} border ${isDarkMode ? 'border-purple-800' : 'border-purple-200'}`}>
+            <TrendingUp className="h-6 w-6 text-purple-500 mb-2" />
+            <p className={`text-2xl font-bold ${textColor}`}>{quoteConversionRate.toFixed(1)}%</p>
+            <p className={`text-xs ${mutedText}`}>Quote Conversion</p>
+          </div>
+          <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-orange-900/20' : 'bg-orange-50'} border ${isDarkMode ? 'border-orange-800' : 'border-orange-200'}`}>
+            <Package className="h-6 w-6 text-orange-500 mb-2" />
+            <p className={`text-2xl font-bold ${textColor}`}>{stats.totalProducts}</p>
+            <p className={`text-xs ${mutedText}`}>Total Products</p>
+          </div>
+        </div>
+
+        {/* Report Generator */}
+        <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-slate-700' : 'bg-gray-50'} border ${isDarkMode ? 'border-slate-600' : 'border-gray-200'}`}>
+          <h4 className={`font-semibold mb-4 ${textColor}`}>Generate Report</h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <Label className={mutedText}>Report Type</Label>
+              <select 
+                className={`w-full mt-1 p-2 rounded-md border ${isDarkMode ? 'bg-slate-800 border-slate-600 text-white' : 'bg-white border-gray-300'}`}
+                value={reportType}
+                onChange={(e) => setReportType(e.target.value)}
+              >
+                <option value="sales">Sales Report</option>
+                <option value="quotes">Quote Report</option>
+                <option value="inventory">Inventory Report</option>
+              </select>
+            </div>
+            <div>
+              <Label className={mutedText}>Date Range</Label>
+              <select 
+                className={`w-full mt-1 p-2 rounded-md border ${isDarkMode ? 'bg-slate-800 border-slate-600 text-white' : 'bg-white border-gray-300'}`}
+                value={dateRange}
+                onChange={(e) => setDateRange(e.target.value)}
+              >
+                <option value="7days">Last 7 Days</option>
+                <option value="30days">Last 30 Days</option>
+                <option value="90days">Last 90 Days</option>
+                <option value="all">All Time</option>
+              </select>
+            </div>
+            <div className="flex items-end">
+              <Button 
+                className="w-full bg-green-600 hover:bg-green-700"
+                onClick={handleGenerateReport}
+                disabled={generating}
+              >
+                {generating ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Download CSV
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Recent Activity Summary */}
+        <div>
+          <h4 className={`font-semibold mb-4 ${textColor}`}>Recent Activity Summary</h4>
+          <div className={`overflow-x-auto rounded-lg border ${isDarkMode ? 'border-slate-600' : 'border-gray-200'}`}>
+            <table className="w-full">
+              <thead className={isDarkMode ? 'bg-slate-700' : 'bg-gray-50'}>
+                <tr>
+                  <th className={`px-4 py-3 text-left text-xs font-medium ${mutedText} uppercase tracking-wider`}>Metric</th>
+                  <th className={`px-4 py-3 text-left text-xs font-medium ${mutedText} uppercase tracking-wider`}>This Period</th>
+                  <th className={`px-4 py-3 text-left text-xs font-medium ${mutedText} uppercase tracking-wider`}>Status</th>
+                </tr>
+              </thead>
+              <tbody className={`divide-y ${isDarkMode ? 'divide-slate-600' : 'divide-gray-200'}`}>
+                <tr className={isDarkMode ? 'bg-slate-800' : 'bg-white'}>
+                  <td className={`px-4 py-3 ${textColor}`}>Orders Received</td>
+                  <td className={`px-4 py-3 font-semibold ${textColor}`}>{stats.totalOrders}</td>
+                  <td className="px-4 py-3">
+                    <Badge className="bg-green-100 text-green-700">Active</Badge>
+                  </td>
+                </tr>
+                <tr className={isDarkMode ? 'bg-slate-800' : 'bg-white'}>
+                  <td className={`px-4 py-3 ${textColor}`}>Pending Orders</td>
+                  <td className={`px-4 py-3 font-semibold ${textColor}`}>{stats.pendingOrders}</td>
+                  <td className="px-4 py-3">
+                    <Badge className={stats.pendingOrders > 5 ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}>
+                      {stats.pendingOrders > 5 ? 'Needs Attention' : 'On Track'}
+                    </Badge>
+                  </td>
+                </tr>
+                <tr className={isDarkMode ? 'bg-slate-800' : 'bg-white'}>
+                  <td className={`px-4 py-3 ${textColor}`}>Quote Requests</td>
+                  <td className={`px-4 py-3 font-semibold ${textColor}`}>{quoteRequests.length}</td>
+                  <td className="px-4 py-3">
+                    <Badge className="bg-blue-100 text-blue-700">Active</Badge>
+                  </td>
+                </tr>
+                <tr className={isDarkMode ? 'bg-slate-800' : 'bg-white'}>
+                  <td className={`px-4 py-3 ${textColor}`}>Customer Rating</td>
+                  <td className={`px-4 py-3 font-semibold ${textColor}`}>{stats.averageRating.toFixed(1)} / 5.0</td>
+                  <td className="px-4 py-3">
+                    <Badge className={stats.averageRating >= 4 ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}>
+                      {stats.averageRating >= 4 ? 'Excellent' : 'Good'}
+                    </Badge>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
 
 const SupplierDashboard = () => {
   const { user, userRole } = useAuth();
@@ -1152,94 +1542,102 @@ const SupplierDashboard = () => {
           </Card>
         </div>
 
-        {/* Quick Actions */}
-        <div className="grid md:grid-cols-5 gap-4 mb-8">
+        {/* Quick Actions - Updated to match new tab structure */}
+        <div className="grid grid-cols-3 md:grid-cols-6 gap-3 mb-8">
           <Button 
             className="h-auto py-4 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600"
-            onClick={() => setActiveTab('products')}
+            onClick={() => setActiveTab('materials')}
           >
             <div className="flex flex-col items-center gap-2">
-              <Plus className="h-6 w-6" />
-              <span>{t('supplier.actions.addProduct')}</span>
+              <Boxes className="h-6 w-6" />
+              <span className="text-xs sm:text-sm">My Materials</span>
             </div>
           </Button>
           <Button 
             variant="outline" 
             className={`h-auto py-4 border-2 ${isDarkMode ? 'border-slate-600 hover:bg-slate-700' : 'hover:bg-orange-50'}`}
-            onClick={() => setActiveTab('orders')}
+            onClick={() => setActiveTab('view-orders')}
           >
             <div className="flex flex-col items-center gap-2">
               <Eye className={`h-6 w-6 ${isDarkMode ? 'text-orange-400' : 'text-orange-600'}`} />
-              <span className={textColor}>{t('supplier.actions.viewOrders')}</span>
+              <span className={`text-xs sm:text-sm ${textColor}`}>View Orders</span>
             </div>
           </Button>
           <Button 
             className="h-auto py-4 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600"
-            onClick={() => setActiveTab('scanning')}
+            onClick={() => setActiveTab('scan-qr')}
           >
             <div className="flex flex-col items-center gap-2">
               <Scan className="h-6 w-6" />
-              <span>Scan QR</span>
+              <span className="text-xs sm:text-sm">Scan QR</span>
             </div>
           </Button>
           <Button 
             variant="outline" 
-            className={`h-auto py-4 border-2 ${isDarkMode ? 'border-slate-600 hover:bg-slate-700' : 'hover:bg-orange-50'}`}
+            className={`h-auto py-4 border-2 ${isDarkMode ? 'border-slate-600 hover:bg-slate-700' : 'hover:bg-purple-50'}`}
+            onClick={() => setActiveTab('extra')}
+          >
+            <div className="flex flex-col items-center gap-2">
+              <Settings className={`h-6 w-6 ${isDarkMode ? 'text-purple-400' : 'text-purple-600'}`} />
+              <span className={`text-xs sm:text-sm ${textColor}`}>Extra</span>
+            </div>
+          </Button>
+          <Button 
+            variant="outline" 
+            className={`h-auto py-4 border-2 ${isDarkMode ? 'border-slate-600 hover:bg-slate-700' : 'hover:bg-blue-50'}`}
             onClick={() => setActiveTab('analytics')}
           >
             <div className="flex flex-col items-center gap-2">
-              <BarChart3 className={`h-6 w-6 ${isDarkMode ? 'text-orange-400' : 'text-orange-600'}`} />
-              <span className={textColor}>{t('supplier.actions.analytics')}</span>
+              <BarChart3 className={`h-6 w-6 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`} />
+              <span className={`text-xs sm:text-sm ${textColor}`}>Analytics</span>
             </div>
           </Button>
           <Button 
             variant="outline" 
-            className={`h-auto py-4 border-2 ${isDarkMode ? 'border-slate-600 hover:bg-slate-700' : 'hover:bg-orange-50'}`}
+            className={`h-auto py-4 border-2 ${isDarkMode ? 'border-slate-600 hover:bg-slate-700' : 'hover:bg-green-50'}`}
+            onClick={() => setActiveTab('reports')}
           >
             <div className="flex flex-col items-center gap-2">
-              <FileText className={`h-6 w-6 ${isDarkMode ? 'text-orange-400' : 'text-orange-600'}`} />
-              <span className={textColor}>{t('supplier.actions.reports')}</span>
+              <FileText className={`h-6 w-6 ${isDarkMode ? 'text-green-400' : 'text-green-600'}`} />
+              <span className={`text-xs sm:text-sm ${textColor}`}>Reports</span>
             </div>
           </Button>
         </div>
 
-        {/* Main Content Tabs - Simplified Navigation */}
+        {/* Main Content Tabs - Reorganized Navigation */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className={`${isDarkMode ? 'bg-slate-800' : 'bg-white'} shadow-md p-1 rounded-lg flex-wrap h-auto gap-1`}>
             <TabsTrigger value="overview" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
               Overview
             </TabsTrigger>
-            <TabsTrigger value="orders" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
-              {t('supplier.tabs.orders')}
+            <TabsTrigger value="materials" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
+              <Boxes className="h-4 w-4 mr-1" />
+              My Materials
             </TabsTrigger>
-            <TabsTrigger value="products" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
-              Products
-            </TabsTrigger>
-            <TabsTrigger value="quotes" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
-              Quotes
+            <TabsTrigger value="view-orders" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
+              <ShoppingCart className="h-4 w-4 mr-1" />
+              View Orders
               {quoteRequests.filter(q => q.status === 'pending').length > 0 && (
                 <span className="ml-1 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5">
                   {quoteRequests.filter(q => q.status === 'pending').length}
                 </span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="qr-codes" className="data-[state=active]:bg-cyan-500 data-[state=active]:text-white">
-              QR Codes
+            <TabsTrigger value="scan-qr" className="data-[state=active]:bg-cyan-500 data-[state=active]:text-white">
+              <QrCode className="h-4 w-4 mr-1" />
+              Scan QR
             </TabsTrigger>
-            <TabsTrigger value="scanning" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
-              Dispatch
+            <TabsTrigger value="extra" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white">
+              <Settings className="h-4 w-4 mr-1" />
+              Extra
             </TabsTrigger>
-            <TabsTrigger value="inventory" className="data-[state=active]:bg-emerald-500 data-[state=active]:text-white">
-              Inventory
+            <TabsTrigger value="analytics" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+              <BarChart3 className="h-4 w-4 mr-1" />
+              Analytics
             </TabsTrigger>
-            <TabsTrigger value="tracking" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
-              Tracking
-            </TabsTrigger>
-            <TabsTrigger value="reviews" className="data-[state=active]:bg-yellow-500 data-[state=active]:text-white">
-              Reviews
-            </TabsTrigger>
-            <TabsTrigger value="support" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white">
-              Support
+            <TabsTrigger value="reports" className="data-[state=active]:bg-green-600 data-[state=active]:text-white">
+              <FileText className="h-4 w-4 mr-1" />
+              Reports
             </TabsTrigger>
           </TabsList>
 
@@ -1305,382 +1703,149 @@ const SupplierDashboard = () => {
             </div>
           </TabsContent>
 
-          {/* Orders Tab */}
-          <TabsContent value="orders">
-            <OrderManagement supplierId={supplierRecordId || user?.id || ''} isDarkMode={isDarkMode} />
-          </TabsContent>
-
-          {/* Products Tab - Combined Products & My Uploads */}
-          <TabsContent value="products">
-            <div className="space-y-6">
-              {/* Product Management - Admin Catalog with Pricing */}
-              <ProductManagement supplierId={supplierRecordId || user?.id || ''} isDarkMode={isDarkMode} />
-              
-              {/* My Uploaded Products */}
-              <Card className={cardBg}>
-                <CardHeader>
-                  <CardTitle className={textColor}>My Uploaded Products</CardTitle>
-                  <CardDescription className={mutedText}>
-                    Manage your own products - add new products, update images, prices, and variants.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <SupplierProductManager supplierId={supplierRecordId || user?.id || ''} />
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* Quote Requests Tab */}
-          <TabsContent value="quotes">
+          {/* ═══════════════════════════════════════════════════════════════════════════════════ */}
+          {/* MY MATERIALS TAB - Contains: Add Products, My Products, View Inventory */}
+          {/* ═══════════════════════════════════════════════════════════════════════════════════ */}
+          <TabsContent value="materials">
             <Card className={cardBg}>
               <CardHeader>
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                  <div>
-                    <CardTitle className={`flex items-center gap-2 ${textColor}`}>
-                      <FileCheck className="h-5 w-5 text-blue-500" />
-                      Quote Requests from Professional Builders
-                    </CardTitle>
-                    <CardDescription className={mutedText}>
-                      Review and respond to quote requests. Once you send a quote and the client accepts, it becomes an ORDER.
-                    </CardDescription>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={fetchQuoteRequests}
-                      disabled={loadingQuotes}
-                      className="mr-2"
-                    >
-                      {loadingQuotes ? (
-                        <Clock className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Bell className="h-4 w-4" />
-                      )}
-                      <span className="ml-1">Refresh</span>
-                    </Button>
-                    <Badge className="bg-amber-100 text-amber-700 border border-amber-300">
-                      {quoteRequests.filter(q => q.status === 'pending').length} Pending
-                    </Badge>
-                    <Badge className="bg-blue-100 text-blue-700 border border-blue-300">
-                      {quoteRequests.filter(q => q.status === 'quoted').length} Quoted (Awaiting Client)
-                    </Badge>
-                    <Badge className="bg-green-100 text-green-700 border border-green-300">
-                      {quoteRequests.filter(q => q.status === 'confirmed' || q.status === 'accepted').length} ✓ Confirmed Orders
-                    </Badge>
-                  </div>
-                </div>
-                
-                {/* Quote-to-Order Flow Explanation */}
-                <div className={`mt-4 p-3 rounded-lg ${isDarkMode ? 'bg-slate-700/50' : 'bg-blue-50'} border ${isDarkMode ? 'border-slate-600' : 'border-blue-200'}`}>
-                  <div className="flex items-center gap-4 text-sm">
-                    <div className="flex items-center gap-1">
-                      <span className="w-3 h-3 rounded-full bg-amber-500"></span>
-                      <span className={mutedText}>1. Quote Request</span>
-                    </div>
-                    <span className={mutedText}>→</span>
-                    <div className="flex items-center gap-1">
-                      <span className="w-3 h-3 rounded-full bg-blue-500"></span>
-                      <span className={mutedText}>2. You Send Price</span>
-                    </div>
-                    <span className={mutedText}>→</span>
-                    <div className="flex items-center gap-1">
-                      <span className="w-3 h-3 rounded-full bg-green-500"></span>
-                      <span className={`font-medium ${isDarkMode ? 'text-green-400' : 'text-green-700'}`}>3. Client Accepts = ORDER ✓</span>
-                    </div>
-                  </div>
-                </div>
+                <CardTitle className={`flex items-center gap-2 ${textColor}`}>
+                  <Boxes className="h-5 w-5 text-orange-500" />
+                  My Materials Management
+                </CardTitle>
+                <CardDescription className={mutedText}>
+                  Manage your products, inventory, and material catalog
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                {quoteRequests.length > 0 ? (
-                  <div className="space-y-4">
-                    {quoteRequests.map((quote) => (
-                      <div 
-                        key={quote.id} 
-                        className={`border rounded-lg p-4 transition-colors ${
-                          quote.status === 'confirmed' || quote.status === 'accepted'
-                            ? isDarkMode 
-                              ? 'border-green-500 bg-green-900/20 hover:bg-green-900/30' 
-                              : 'border-green-300 bg-green-50 hover:bg-green-100'
-                            : quote.status === 'quoted'
-                              ? isDarkMode
-                                ? 'border-blue-500 bg-blue-900/20 hover:bg-blue-900/30'
-                                : 'border-blue-300 bg-blue-50 hover:bg-blue-100'
-                              : isDarkMode 
-                                ? 'border-slate-600 hover:bg-slate-700/50' 
-                                : 'hover:bg-gray-50'
-                        }`}
-                      >
-                        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-                          {/* Quote Details */}
-                          <div className="flex-1">
-                            <div className="flex items-start gap-3">
-                              <div className={`p-2 rounded-lg ${
-                                quote.status === 'confirmed' || quote.status === 'accepted' 
-                                  ? 'bg-green-500 text-white' :
-                                quote.status === 'pending' ? 'bg-amber-100 text-amber-600' :
-                                quote.status === 'quoted' ? 'bg-blue-100 text-blue-600' :
-                                'bg-red-100 text-red-600'
-                              }`}>
-                                {quote.status === 'confirmed' || quote.status === 'accepted' 
-                                  ? <CheckCircle className="h-5 w-5" />
-                                  : <Package className="h-5 w-5" />
-                                }
-                              </div>
-                              <div className="flex-1">
-                                <h4 className={`font-semibold ${textColor}`}>
-                                  {quote.po_number || quote.material_name}
-                                </h4>
-                                
-                                {/* Show all items if available */}
-                                {quote.items && quote.items.length > 0 ? (
-                                  <div className={`mt-2 space-y-1 text-sm ${mutedText}`}>
-                                    <strong>Items ({quote.items.length}):</strong>
-                                    <ul className="list-disc list-inside ml-2 space-y-0.5">
-                                      {quote.items.slice(0, 5).map((item: any, idx: number) => (
-                                        <li key={idx} className="text-xs">
-                                          {item.material_name || item.name} - Qty: {item.quantity} {item.unit}
-                                        </li>
-                                      ))}
-                                      {quote.items.length > 5 && (
-                                        <li className="text-xs text-blue-500">
-                                          +{quote.items.length - 5} more items...
-                                        </li>
-                                      )}
-                                    </ul>
-                                  </div>
-                                ) : (
-                                  <div className="flex flex-wrap items-center gap-3 mt-1 text-sm">
-                                    <span className={mutedText}>
-                                      <strong>Qty:</strong> {quote.quantity} {quote.unit}
-                                    </span>
-                                  </div>
-                                )}
-                                
-                                <div className={`flex items-center gap-1 mt-2 text-sm ${mutedText}`}>
-                                  <MapPin className="h-3 w-3" />
-                                  {quote.delivery_address}
-                                </div>
-                                
-                                {quote.total_amount != null && (
-                                  <p className={`text-sm mt-1 ${mutedText}`}>
-                                    <strong>Estimated Total:</strong> KES {Number(quote.total_amount || 0).toLocaleString()}
-                                  </p>
-                                )}
-                                
-                                {quote.project_description && (
-                                  <p className={`text-sm mt-2 ${mutedText}`}>
-                                    <strong>Project:</strong> {quote.project_description}
-                                  </p>
-                                )}
-                                {quote.special_requirements && (
-                                  <p className={`text-sm mt-1 ${mutedText}`}>
-                                    <strong>Requirements:</strong> {quote.special_requirements}
-                                  </p>
-                                )}
-                                {quote.preferred_delivery_date && (
-                                  <p className={`text-sm mt-1 ${mutedText}`}>
-                                    <strong>Preferred Delivery:</strong> {new Date(quote.preferred_delivery_date).toLocaleDateString()}
-                                  </p>
-                                )}
-                                <p className={`text-xs mt-2 ${mutedText}`}>
-                                  Requested: {quote.created_at ? new Date(quote.created_at).toLocaleString() : 'N/A'}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
+                <Tabs defaultValue="add-products" className="space-y-4">
+                  <TabsList className={`${isDarkMode ? 'bg-slate-700' : 'bg-gray-100'} p-1 rounded-lg`}>
+                    <TabsTrigger value="add-products" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Products
+                    </TabsTrigger>
+                    <TabsTrigger value="my-products" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
+                      <Package className="h-4 w-4 mr-1" />
+                      My Products
+                    </TabsTrigger>
+                    <TabsTrigger value="view-inventory" className="data-[state=active]:bg-emerald-500 data-[state=active]:text-white">
+                      <Boxes className="h-4 w-4 mr-1" />
+                      View Inventory
+                    </TabsTrigger>
+                  </TabsList>
 
-                          {/* Status & Actions */}
-                          <div className="flex flex-col items-end gap-3">
-                            {/* Status Badge - Different for each stage */}
-                            {quote.status === 'confirmed' || quote.status === 'accepted' ? (
-                              <Badge className="bg-green-500 text-white border-green-600 px-3 py-1">
-                                <CheckCircle className="h-4 w-4 mr-1" />
-                                ✓ CONFIRMED ORDER
-                              </Badge>
-                            ) : (
-                              <Badge className={`${
-                                quote.status === 'pending' ? 'bg-amber-100 text-amber-700 border-amber-300' :
-                                quote.status === 'quoted' ? 'bg-blue-100 text-blue-700 border-blue-300' :
-                                'bg-red-100 text-red-700 border-red-300'
-                              }`}>
-                                {quote.status === 'pending' && <Clock className="h-3 w-3 mr-1" />}
-                                {quote.status === 'quoted' && <Clock className="h-3 w-3 mr-1" />}
-                                {quote.status === 'rejected' && <XCircle className="h-3 w-3 mr-1" />}
-                                {quote.status === 'pending' ? 'Awaiting Your Response' :
-                                 quote.status === 'quoted' ? 'Awaiting Client Acceptance' :
-                                 (quote.status || 'pending').charAt(0).toUpperCase() + (quote.status || 'pending').slice(1)}
-                              </Badge>
-                            )}
+                  {/* Add Products Sub-Tab */}
+                  <TabsContent value="add-products">
+                    <ProductManagement supplierId={supplierRecordId || user?.id || ''} isDarkMode={isDarkMode} />
+                  </TabsContent>
 
-                            {quote.quote_amount != null && (
-                              <div className="text-right">
-                                <p className={`text-lg font-bold ${textColor}`}>
-                                  KES {Number(quote.quote_amount || 0).toLocaleString()}
-                                </p>
-                                {quote.quote_valid_until && quote.status === 'quoted' && (
-                                  <p className={`text-xs ${mutedText}`}>
-                                    Valid until: {new Date(quote.quote_valid_until).toLocaleDateString()}
-                                  </p>
-                                )}
-                              </div>
-                            )}
-
-                            {/* Actions based on status */}
-                            {quote.status === 'pending' && (
-                              <div className="flex gap-2">
-                                <Button
-                                  size="sm"
-                                  className="bg-green-500 hover:bg-green-600"
-                                  onClick={() => openQuoteDialog(quote)}
-                                >
-                                  <CheckCircle className="h-4 w-4 mr-1" />
-                                  Send Quote
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="border-red-300 text-red-600 hover:bg-red-50"
-                                  onClick={() => {
-                                    setSelectedQuote(quote);
-                                    handleQuoteAction('reject');
-                                  }}
-                                >
-                                  <XCircle className="h-4 w-4 mr-1" />
-                                  Decline
-                                </Button>
-                              </div>
-                            )}
-
-                            {quote.status === 'quoted' && (
-                              <div className="flex flex-col gap-2">
-                                <p className={`text-xs ${mutedText} text-center`}>
-                                  Waiting for client to accept...
-                                </p>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => openQuoteDialog(quote)}
-                                >
-                                  <Edit className="h-4 w-4 mr-1" />
-                                  Edit Quote
-                                </Button>
-                              </div>
-                            )}
-
-                            {(quote.status === 'confirmed' || quote.status === 'accepted') && (
-                              <div className="flex flex-col gap-2">
-                                <p className={`text-xs text-green-600 font-medium text-center`}>
-                                  🎉 Client accepted! This is now an order.
-                                </p>
-                                <Button
-                                  size="sm"
-                                  className="bg-orange-500 hover:bg-orange-600"
-                                  onClick={() => setActiveTab('orders')}
-                                >
-                                  <Package className="h-4 w-4 mr-1" />
-                                  View in Orders
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {quote.supplier_notes && quote.status !== 'pending' && (
-                          <div className={`mt-3 pt-3 border-t ${isDarkMode ? 'border-slate-600' : 'border-gray-200'}`}>
-                            <p className={`text-sm ${mutedText}`}>
-                              <strong>Your Response:</strong> {quote.supplier_notes}
-                            </p>
-                          </div>
-                        )}
+                  {/* My Products Sub-Tab */}
+                  <TabsContent value="my-products">
+                    <div className="space-y-4">
+                      <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-slate-700' : 'bg-orange-50'} border ${isDarkMode ? 'border-slate-600' : 'border-orange-200'}`}>
+                        <h4 className={`font-semibold mb-2 ${textColor}`}>My Uploaded Products</h4>
+                        <p className={`text-sm ${mutedText}`}>
+                          Manage your own products - add new products, update images, prices, and variants.
+                        </p>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <FileCheck className={`h-16 w-16 mx-auto mb-4 ${isDarkMode ? 'text-slate-600' : 'text-gray-300'}`} />
-                    <p className={`text-lg font-medium ${textColor}`}>No Quote Requests Yet</p>
-                    <p className={mutedText}>Quote requests from professional builders will appear here</p>
-                  </div>
-                )}
+                      <SupplierProductManager supplierId={supplierRecordId || user?.id || ''} />
+                    </div>
+                  </TabsContent>
+
+                  {/* View Inventory Sub-Tab */}
+                  <TabsContent value="view-inventory">
+                    {user && <InventoryManager supplierId={supplierRecordId || user.id} />}
+                  </TabsContent>
+                </Tabs>
               </CardContent>
             </Card>
-
-            {/* Quote Response Dialog */}
-            <Dialog open={quoteDialogOpen} onOpenChange={setQuoteDialogOpen}>
-              <DialogContent className="sm:max-w-[500px]">
-                <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2">
-                    <FileCheck className="h-5 w-5 text-blue-500" />
-                    Respond to Quote Request
-                  </DialogTitle>
-                  <DialogDescription>
-                    {selectedQuote && (
-                      <span>
-                        Provide your quote for <strong>{selectedQuote.material_name}</strong> ({selectedQuote.quantity} {selectedQuote.unit})
-                      </span>
-                    )}
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="quoteAmount">Quote Amount (KES) *</Label>
-                    <Input
-                      id="quoteAmount"
-                      type="number"
-                      placeholder="Enter your quote amount"
-                      value={quoteResponse.quoteAmount}
-                      onChange={(e) => setQuoteResponse(prev => ({ ...prev, quoteAmount: e.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="validUntil">Quote Valid Until</Label>
-                    <Input
-                      id="validUntil"
-                      type="date"
-                      value={quoteResponse.validUntil}
-                      onChange={(e) => setQuoteResponse(prev => ({ ...prev, validUntil: e.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="supplierNotes">Notes to Builder</Label>
-                    <Textarea
-                      id="supplierNotes"
-                      placeholder="Add any notes about pricing, delivery terms, etc."
-                      value={quoteResponse.supplierNotes}
-                      onChange={(e) => setQuoteResponse(prev => ({ ...prev, supplierNotes: e.target.value }))}
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setQuoteDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button 
-                    onClick={() => handleQuoteAction('approve')}
-                    disabled={processingQuote}
-                    className="bg-green-500 hover:bg-green-600"
-                  >
-                    {processingQuote ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        <Send className="h-4 w-4 mr-2" />
-                        Send Quote
-                      </>
-                    )}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
           </TabsContent>
 
-          {/* QR Codes Tab - View and download QR codes for confirmed orders */}
-          <TabsContent value="qr-codes">
+          {/* ═══════════════════════════════════════════════════════════════════════════════════ */}
+          {/* VIEW ORDERS TAB - Contains: Orders, Quotes, Dispatch */}
+          {/* ═══════════════════════════════════════════════════════════════════════════════════ */}
+          <TabsContent value="view-orders">
+            <Card className={cardBg}>
+              <CardHeader>
+                <CardTitle className={`flex items-center gap-2 ${textColor}`}>
+                  <ShoppingCart className="h-5 w-5 text-blue-500" />
+                  Orders & Quotes Management
+                </CardTitle>
+                <CardDescription className={mutedText}>
+                  View and manage all your orders, quotes, and dispatch operations
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Tabs defaultValue="orders" className="space-y-4">
+                  <TabsList className={`${isDarkMode ? 'bg-slate-700' : 'bg-gray-100'} p-1 rounded-lg`}>
+                    <TabsTrigger value="orders" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
+                      <Package className="h-4 w-4 mr-1" />
+                      Orders
+                    </TabsTrigger>
+                    <TabsTrigger value="quotes" className="data-[state=active]:bg-amber-500 data-[state=active]:text-white">
+                      <FileCheck className="h-4 w-4 mr-1" />
+                      Quotes
+                      {quoteRequests.filter(q => q.status === 'pending').length > 0 && (
+                        <span className="ml-1 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5">
+                          {quoteRequests.filter(q => q.status === 'pending').length}
+                        </span>
+                      )}
+                    </TabsTrigger>
+                    <TabsTrigger value="dispatch" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
+                      <Truck className="h-4 w-4 mr-1" />
+                      Dispatch
+                    </TabsTrigger>
+                  </TabsList>
+
+                  {/* Orders Sub-Tab */}
+                  <TabsContent value="orders">
+                    <OrderManagement supplierId={supplierRecordId || user?.id || ''} isDarkMode={isDarkMode} />
+                  </TabsContent>
+
+                  {/* Quotes Sub-Tab */}
+                  <TabsContent value="quotes">
+                    <QuotesManagementContent 
+                      quoteRequests={quoteRequests}
+                      loadingQuotes={loadingQuotes}
+                      isDarkMode={isDarkMode}
+                      textColor={textColor}
+                      mutedText={mutedText}
+                      cardBg={cardBg}
+                      openQuoteDialog={openQuoteDialog}
+                      handleQuoteAction={handleQuoteAction}
+                      setSelectedQuote={setSelectedQuote}
+                      setActiveTab={setActiveTab}
+                      fetchQuoteRequests={fetchQuoteRequests}
+                    />
+                  </TabsContent>
+
+                  {/* Dispatch Sub-Tab */}
+                  <TabsContent value="dispatch">
+                    <div className="space-y-4">
+                      <Alert className="bg-teal-50 border-teal-200">
+                        <Truck className="h-4 w-4 text-teal-600" />
+                        <AlertTitle className="text-teal-800">Dispatch Workflow</AlertTitle>
+                        <AlertDescription className="text-teal-700 text-sm">
+                          <ol className="list-decimal list-inside space-y-1 mt-2">
+                            <li>Prepare materials for the order</li>
+                            <li>Attach the generated QR code to each material/package</li>
+                            <li>When delivery vehicle arrives, scan each QR code below</li>
+                            <li>Confirm all items are loaded before releasing the vehicle</li>
+                          </ol>
+                        </AlertDescription>
+                      </Alert>
+                      <DispatchScanner />
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ═══════════════════════════════════════════════════════════════════════════════════ */}
+          {/* SCAN QR TAB - Contains: QR Codes */}
+          {/* ═══════════════════════════════════════════════════════════════════════════════════ */}
+          <TabsContent value="scan-qr">
             <Card className={cardBg}>
               <CardHeader>
                 <CardTitle className={`flex items-center gap-2 ${textColor}`}>
@@ -1709,139 +1874,158 @@ const SupplierDashboard = () => {
             </Card>
           </TabsContent>
 
-          {/* Dispatch Scanning Tab */}
-          <TabsContent value="scanning">
+          {/* ═══════════════════════════════════════════════════════════════════════════════════ */}
+          {/* EXTRA TAB - Contains: Tracking, Reviews, Support */}
+          {/* ═══════════════════════════════════════════════════════════════════════════════════ */}
+          <TabsContent value="extra">
             <Card className={cardBg}>
               <CardHeader>
                 <CardTitle className={`flex items-center gap-2 ${textColor}`}>
-                  <Scan className="h-5 w-5 text-teal-500" />
-                  Dispatch Scanner
+                  <Settings className="h-5 w-5 text-purple-500" />
+                  Additional Features
                 </CardTitle>
                 <CardDescription className={mutedText}>
-                  Scan QR codes on materials before loading them onto delivery vehicles. This ensures all ordered items are properly released for transit.
+                  Tracking, reviews, and support services
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Alert className="mb-4 bg-teal-50 border-teal-200">
-                  <Truck className="h-4 w-4 text-teal-600" />
-                  <AlertTitle className="text-teal-800">Dispatch Workflow</AlertTitle>
-                  <AlertDescription className="text-teal-700 text-sm">
-                    <ol className="list-decimal list-inside space-y-1 mt-2">
-                      <li>Prepare materials for the order</li>
-                      <li>Attach the generated QR code to each material/package</li>
-                      <li>When delivery vehicle arrives, scan each QR code below</li>
-                      <li>Confirm all items are loaded before releasing the vehicle</li>
-                    </ol>
-                  </AlertDescription>
-                </Alert>
-                
-                <DispatchScanner />
+                <Tabs defaultValue="tracking" className="space-y-4">
+                  <TabsList className={`${isDarkMode ? 'bg-slate-700' : 'bg-gray-100'} p-1 rounded-lg`}>
+                    <TabsTrigger value="tracking" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
+                      <NavigationIcon className="h-4 w-4 mr-1" />
+                      Tracking
+                    </TabsTrigger>
+                    <TabsTrigger value="reviews" className="data-[state=active]:bg-yellow-500 data-[state=active]:text-white">
+                      <Star className="h-4 w-4 mr-1" />
+                      Reviews
+                    </TabsTrigger>
+                    <TabsTrigger value="support" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white">
+                      <Headphones className="h-4 w-4 mr-1" />
+                      Support
+                    </TabsTrigger>
+                  </TabsList>
+
+                  {/* Tracking Sub-Tab */}
+                  <TabsContent value="tracking">
+                    <div className="space-y-4">
+                      <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-blue-900/20' : 'bg-blue-50'} border ${isDarkMode ? 'border-blue-800' : 'border-blue-200'}`}>
+                        <h4 className={`font-semibold mb-2 flex items-center gap-2 ${textColor}`}>
+                          <NavigationIcon className="h-4 w-4 text-blue-600" />
+                          Delivery Tracking
+                        </h4>
+                        <p className={`text-sm ${mutedText}`}>
+                          Track your material deliveries to customers in real-time
+                        </p>
+                      </div>
+                      <TrackingTab
+                        userId={user?.id || localStorage.getItem('user_id') || ''}
+                        userRole="supplier"
+                        userName={supplierProfile?.company_name || supplierProfile?.full_name || user?.email?.split('@')[0] || 'Supplier'}
+                      />
+                    </div>
+                  </TabsContent>
+
+                  {/* Reviews Sub-Tab */}
+                  <TabsContent value="reviews">
+                    <div className="space-y-6">
+                      {/* Rating Summary */}
+                      {user && <SupplierRatingSummary supplierId={supplierRecordId || user.id} />}
+                      
+                      {/* Reviews List */}
+                      <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-yellow-900/20' : 'bg-yellow-50'} border ${isDarkMode ? 'border-yellow-800' : 'border-yellow-200'}`}>
+                        <h4 className={`font-semibold mb-2 flex items-center gap-2 ${textColor}`}>
+                          <Star className="h-4 w-4 text-yellow-600" />
+                          Customer Reviews
+                        </h4>
+                        <p className={`text-sm ${mutedText}`}>
+                          See what your customers are saying
+                        </p>
+                      </div>
+                      {user && <ReviewsList supplierId={supplierRecordId || user.id} />}
+                    </div>
+                  </TabsContent>
+
+                  {/* Support Sub-Tab */}
+                  <TabsContent value="support">
+                    <div className="space-y-6">
+                      {/* In-App Communication */}
+                      {user && (
+                        <InAppCommunication
+                          userId={user.id}
+                          userName={supplierProfile?.company_name || supplierProfile?.full_name || user.email || 'Supplier'}
+                          userRole="supplier"
+                          isDarkMode={isDarkMode}
+                        />
+                      )}
+
+                      {/* Quick Contact Info */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-orange-900/20' : 'bg-orange-50'} border ${isDarkMode ? 'border-orange-800' : 'border-orange-200'}`}>
+                          <h4 className={`font-semibold mb-2 flex items-center gap-2 ${textColor}`}>
+                            <Clock className="h-4 w-4 text-orange-500" />
+                            Support Hours
+                          </h4>
+                          <p className={`text-sm ${mutedText}`}>
+                            Mon - Fri: 8AM - 6PM<br />
+                            Saturday: 9AM - 4PM<br />
+                            Sunday: Closed
+                          </p>
+                        </div>
+                        <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-purple-900/20' : 'bg-purple-50'} border ${isDarkMode ? 'border-purple-800' : 'border-purple-200'}`}>
+                          <h4 className={`font-semibold mb-2 flex items-center gap-2 ${textColor}`}>
+                            <AlertCircle className="h-4 w-4 text-purple-500" />
+                            Supplier Hotline
+                          </h4>
+                          <p className={`text-sm ${mutedText}`}>
+                            Call: +254 700 000 000<br />
+                            Email: suppliers@UjenziXform.co.ke
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </TabsContent>
+                </Tabs>
               </CardContent>
             </Card>
           </TabsContent>
 
-          {/* Support Tab */}
-          <TabsContent value="support">
-            <div className="space-y-6">
-              {/* In-App Communication */}
-              {user && (
-                <InAppCommunication
-                  userId={user.id}
-                  userName={supplierProfile?.company_name || supplierProfile?.full_name || user.email || 'Supplier'}
-                  userRole="supplier"
-                  isDarkMode={isDarkMode}
-                />
-              )}
-
-              {/* Quick Contact Info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card className={isDarkMode ? 'bg-orange-900/20 border-orange-800' : 'bg-orange-50 border-orange-200'}>
-                  <CardContent className="p-4">
-                    <h4 className={`font-semibold mb-2 flex items-center gap-2 ${textColor}`}>
-                      <Clock className="h-4 w-4 text-orange-500" />
-                      Support Hours
-                    </h4>
-                    <p className={`text-sm ${mutedText}`}>
-                      Mon - Fri: 8AM - 6PM<br />
-                      Saturday: 9AM - 4PM<br />
-                      Sunday: Closed
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card className={isDarkMode ? 'bg-purple-900/20 border-purple-800' : 'bg-purple-50 border-purple-200'}>
-                  <CardContent className="p-4">
-                    <h4 className={`font-semibold mb-2 flex items-center gap-2 ${textColor}`}>
-                      <AlertCircle className="h-4 w-4 text-purple-500" />
-                      Supplier Hotline
-                    </h4>
-                    <p className={`text-sm ${mutedText}`}>
-                      Call: +254 700 000 000<br />
-                      Email: suppliers@UjenziXform.co.ke
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          </TabsContent>
-
-          {/* Inventory Management Tab */}
-          <TabsContent value="inventory">
+          {/* ═══════════════════════════════════════════════════════════════════════════════════ */}
+          {/* ANALYTICS TAB - Real-time analytics with actual data */}
+          {/* ═══════════════════════════════════════════════════════════════════════════════════ */}
+          <TabsContent value="analytics">
             <Card className={cardBg}>
               <CardHeader>
-                <CardTitle className={textColor}>Inventory Management</CardTitle>
-                <CardDescription className={mutedText}>
-                  Track stock levels, set alerts, and manage your inventory
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {/* Use supplier record ID if available, fallback to user.id */}
-                {user && <InventoryManager supplierId={supplierRecordId || user.id} />}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Reviews Tab */}
-          <TabsContent value="reviews">
-            <div className="space-y-6">
-              {/* Rating Summary */}
-              {user && <SupplierRatingSummary supplierId={supplierRecordId || user.id} />}
-              
-              {/* Reviews List */}
-              <Card className={cardBg}>
-                <CardHeader>
-                  <CardTitle className={textColor}>Customer Reviews</CardTitle>
-                  <CardDescription className={mutedText}>
-                    See what your customers are saying
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {user && <ReviewsList supplierId={supplierRecordId || user.id} />}
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* Tracking Tab */}
-          <TabsContent value="tracking">
-            <Card className={cardBg}>
-              <CardHeader>
-                <CardTitle className={`${textColor} flex items-center gap-2`}>
-                  <NavigationIcon className="h-5 w-5 text-blue-600" />
-                  Delivery Tracking
+                <CardTitle className={`flex items-center gap-2 ${textColor}`}>
+                  <BarChart3 className="h-5 w-5 text-blue-600" />
+                  Analytics Dashboard
                 </CardTitle>
                 <CardDescription className={mutedText}>
-                  Track your material deliveries to customers in real-time
+                  Real-time sales metrics, performance insights, and business analytics
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <TrackingTab
-                  userId={user?.id || localStorage.getItem('user_id') || ''}
-                  userRole="supplier"
-                  userName={supplierProfile?.company_name || supplierProfile?.full_name || user?.email?.split('@')[0] || 'Supplier'}
-                />
+                {user && <SupplierAnalyticsDashboard supplierId={supplierRecordId || user.id} />}
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* ═══════════════════════════════════════════════════════════════════════════════════ */}
+          {/* REPORTS TAB - Generate and download reports */}
+          {/* ═══════════════════════════════════════════════════════════════════════════════════ */}
+          <TabsContent value="reports">
+            <SupplierReportsTab 
+              supplierId={supplierRecordId || user?.id || ''} 
+              isDarkMode={isDarkMode}
+              textColor={textColor}
+              mutedText={mutedText}
+              cardBg={cardBg}
+              stats={stats}
+              recentOrders={recentOrders}
+              quoteRequests={quoteRequests}
+            />
+          </TabsContent>
+
+
         </Tabs>
       </main>
 
@@ -1869,6 +2053,77 @@ const SupplierDashboard = () => {
         }}
         userRole="supplier"
       />
+
+      {/* Quote Response Dialog - Used by QuotesManagementContent */}
+      <Dialog open={quoteDialogOpen} onOpenChange={setQuoteDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileCheck className="h-5 w-5 text-blue-500" />
+              Respond to Quote Request
+            </DialogTitle>
+            <DialogDescription>
+              {selectedQuote && (
+                <span>
+                  Provide your quote for <strong>{selectedQuote.material_name}</strong> ({selectedQuote.quantity} {selectedQuote.unit})
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="quoteAmount">Quote Amount (KES) *</Label>
+              <Input
+                id="quoteAmount"
+                type="number"
+                placeholder="Enter your quote amount"
+                value={quoteResponse.quoteAmount}
+                onChange={(e) => setQuoteResponse(prev => ({ ...prev, quoteAmount: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="validUntil">Quote Valid Until</Label>
+              <Input
+                id="validUntil"
+                type="date"
+                value={quoteResponse.validUntil}
+                onChange={(e) => setQuoteResponse(prev => ({ ...prev, validUntil: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="supplierNotes">Notes to Builder</Label>
+              <Textarea
+                id="supplierNotes"
+                placeholder="Add any notes about pricing, delivery terms, etc."
+                value={quoteResponse.supplierNotes}
+                onChange={(e) => setQuoteResponse(prev => ({ ...prev, supplierNotes: e.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setQuoteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => handleQuoteAction('approve')}
+              disabled={processingQuote}
+              className="bg-green-500 hover:bg-green-600"
+            >
+              {processingQuote ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4 mr-2" />
+                  Send Quote
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
