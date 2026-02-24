@@ -1033,7 +1033,7 @@ export const DispatchScanner: React.FC = () => {
                   Stop Scanner
                 </Button>
                 {availableCameras.length > 1 && (
-                  <Button onClick={switchCamera} variant="outline" size="lg">
+                  <Button onClick={toggleCamera} variant="outline" size="lg">
                     <RotateCcw className="h-5 w-5 mr-2" />
                     Switch Camera
                   </Button>
