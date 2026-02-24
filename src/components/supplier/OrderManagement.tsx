@@ -116,24 +116,20 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
 
   useEffect(() => {
     loadOrders();
-    // Safety timeout - force loading to false after 20 seconds (increased from 10)
+    // Safety timeout - force loading to false after 5 seconds (reduced from 20)
     const safetyTimeout = setTimeout(() => {
       setLoading(false);
-      console.log('⏱️ Orders safety timeout - forcing loading false after 20s');
-    }, 20000);
+      console.log('⏱️ Orders safety timeout - forcing loading false after 5s');
+    }, 5000);
     return () => clearTimeout(safetyTimeout);
   }, [supplierId]);
 
   const loadOrders = async () => {
-    // Helper function to add timeout to any promise
-    const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
-      return Promise.race([
-        promise,
-        new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Timeout')), ms))
-      ]);
-    };
-
-    // Helper to get user ID from localStorage as fallback
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // FAST LOADING - Optimized for speed
+    // ═══════════════════════════════════════════════════════════════════════════════
+    
+    // Get user ID from localStorage immediately (no async wait)
     const getUserIdFromStorage = (): string | null => {
       try {
         const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
@@ -142,7 +138,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
           return parsed.user?.id || null;
         }
       } catch (e) {
-        console.warn('Could not get user ID from localStorage');
+        return null;
       }
       return null;
     };
@@ -150,259 +146,113 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
     try {
       setLoading(true);
       
-      // Get current user with timeout (reduced to 3s)
-      let userId: string | null = null;
-      try {
-        const { data } = await withTimeout(supabase.auth.getUser(), 3000);
-        userId = data?.user?.id || null;
-        console.log('✅ Got user from auth:', userId);
-      } catch {
-        console.log('Auth timeout (3s), trying localStorage...');
-        userId = getUserIdFromStorage();
-        console.log('📦 Got user from localStorage:', userId);
-      }
-      
-      // Use supplierId prop, userId, or localStorage fallback
+      // Use localStorage first (instant), fallback to prop
+      const userId = getUserIdFromStorage();
       const effectiveSupplierId = supplierId && supplierId.trim() !== '' ? supplierId : userId;
       
       if (!effectiveSupplierId) {
-        console.log('❌ No user authenticated and no supplierId prop');
+        console.log('❌ No supplier ID available');
         setOrders([]);
+        setLoading(false);
         return;
       }
-      
-      console.log('🔑 Effective supplier ID:', effectiveSupplierId);
 
-      const supplierIds = [effectiveSupplierId];
-      if (userId && userId !== effectiveSupplierId) supplierIds.push(userId);
+      // Single fast query using Supabase client with short timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
 
-      // Get supplier record with timeout (reduced to 3s, skip if it hangs)
       try {
-        const { data: supplierData } = await withTimeout(
-          supabase
-            .from('suppliers')
-            .select('id, user_id')
-            .or(`user_id.eq.${effectiveSupplierId},id.eq.${effectiveSupplierId}`)
-            .maybeSingle(),
-          3000
-        );
-        if (supplierData?.id) supplierIds.push(supplierData.id);
-        if (supplierData?.user_id) supplierIds.push(supplierData.user_id);
-        console.log('📋 Supplier record found:', supplierData);
-      } catch {
-        console.log('Supplier lookup timeout (3s), continuing with available IDs');
-      }
+        // Direct Supabase query - much simpler and faster
+        const { data: purchaseOrders, error } = await supabase
+          .from('purchase_orders')
+          .select('*')
+          .or(`supplier_id.eq.${effectiveSupplierId},supplier_id.eq.${userId || effectiveSupplierId}`)
+          .order('created_at', { ascending: false })
+          .limit(50);
 
-      // Log supplier IDs being queried
-      const uniqueSupplierIds = [...new Set(supplierIds)];
-      console.log('🔍 Querying orders for supplier IDs:', uniqueSupplierIds);
-
-      // Use native fetch API to avoid Supabase client hanging
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-      
-      // Get access token from localStorage for RLS
-      let accessToken = '';
-      try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        if (storedSession) {
-          const parsed = JSON.parse(storedSession);
-          accessToken = parsed.access_token || '';
-        }
-      } catch (e) {
-        console.warn('Could not get access token from localStorage');
-      }
-      
-      // Build headers with Authorization for RLS
-      const authHeaders: Record<string, string> = { 
-        'apikey': apiKey,
-        'Content-Type': 'application/json'
-      };
-      if (accessToken) {
-        authHeaders['Authorization'] = `Bearer ${accessToken}`;
-        console.log('🔑 Using auth token for RLS');
-      } else {
-        console.warn('⚠️ No auth token - RLS may block queries');
-      }
-
-      // Fetch ALL recent orders first for debugging
-      let allOrders: any[] = [];
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
-        
-        const allOrdersResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/purchase_orders?select=id,po_number,supplier_id,status,created_at&order=created_at.desc&limit=20`,
-          {
-            headers: authHeaders,
-            signal: controller.signal
-          }
-        );
-        clearTimeout(timeoutId);
-        
-        if (allOrdersResponse.ok) {
-          allOrders = await allOrdersResponse.json();
-          console.log('📋 ALL recent orders in system:', allOrders.length);
-          allOrders.forEach(o => {
-            const matches = uniqueSupplierIds.includes(o.supplier_id);
-            console.log(`   ${o.po_number}: supplier_id=${o.supplier_id?.substring(0,8)}... ${matches ? '✅ MATCHES' : '❌ no match'}`);
-          });
-        }
-      } catch (e) {
-        console.log('All orders debug fetch failed');
-      }
-
-      // Fetch orders for THIS supplier
-      let purchaseOrders: any[] = [];
-      try {
-        // Supabase REST API in.() filter expects comma-separated values WITHOUT quotes for UUIDs
-        const supplierIdsParam = uniqueSupplierIds.join(',');
-        console.log('🔗 Fetching orders URL:', `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=in.(${supplierIdsParam})&order=created_at.desc`);
-        
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
-        
-        const ordersResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=in.(${supplierIdsParam})&order=created_at.desc`,
-          {
-            headers: authHeaders,
-            signal: controller.signal,
-            cache: 'no-store'
-          }
-        );
         clearTimeout(timeoutId);
 
-        if (ordersResponse.ok) {
-          purchaseOrders = await ordersResponse.json();
-          console.log('✅ Orders fetched successfully:', purchaseOrders.length);
+        if (error) {
+          console.error('Error fetching orders:', error);
+          setOrders([]);
+          return;
+        }
+
+        if (!purchaseOrders || purchaseOrders.length === 0) {
+          console.log('No orders found for supplier');
+          setOrders([]);
+          return;
+        }
+
+        // Get unique buyer IDs for profile lookup
+        const buyerIds = [...new Set(purchaseOrders.map(po => po.buyer_id).filter(Boolean))];
+        
+        // Fetch buyer profiles in parallel (non-blocking)
+        let buyerProfiles: Record<string, any> = {};
+        if (buyerIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('user_id, full_name, email, phone')
+            .in('user_id', buyerIds);
+          
+          if (profiles) {
+            profiles.forEach(p => { buyerProfiles[p.user_id] = p; });
+          }
+        }
+
+        // Map orders quickly
+        const realOrders: Order[] = purchaseOrders.map((po: any, index: number) => {
+          const buyer = buyerProfiles[po.buyer_id] || {};
+          const items = Array.isArray(po.items) ? po.items : [];
+          const isQuoteRequest = po.po_number?.startsWith('QR-') || po.status === 'pending' || po.status === 'quoted';
+          
+          return {
+            id: po.id,
+            order_number: po.po_number || `ORD-${String(index + 1).padStart(4, '0')}`,
+            customer_name: buyer.full_name || po.project_name || 'Customer',
+            customer_email: buyer.email || '',
+            customer_phone: buyer.phone || '',
+            delivery_address: po.delivery_address || '',
+            items: items.map((item: any) => ({
+              name: item.material_name || item.name || 'Item',
+              quantity: item.quantity || 1,
+              price: item.unit_price || item.price || 0
+            })),
+            total_amount: po.total_amount || 0,
+            status: (po.status || 'pending') as Order['status'],
+            payment_status: 'paid' as const,
+            notes: po.special_instructions || po.delivery_notes || '',
+            created_at: po.created_at,
+            updated_at: po.updated_at || po.created_at,
+            order_type: isQuoteRequest ? 'quote_request' : 'direct_purchase',
+            buyer_role: po.buyer_role || 'unknown',
+            // Delivery provider fields
+            delivery_provider_id: po.delivery_provider_id || undefined,
+            delivery_provider_name: po.delivery_provider_name || undefined,
+            delivery_provider_phone: po.delivery_provider_phone || undefined,
+            delivery_vehicle_info: po.delivery_vehicle_info || undefined,
+            delivery_status: po.delivery_status || undefined,
+            delivery_assigned_at: po.delivery_assigned_at || undefined,
+            delivery_accepted_at: po.delivery_accepted_at || undefined,
+            estimated_delivery_time: po.estimated_delivery_time || undefined
+          };
+        });
+
+        setOrders(realOrders);
+        console.log(`✅ Loaded ${realOrders.length} orders`);
+
+      } catch (fetchError: any) {
+        if (fetchError.name === 'AbortError') {
+          console.log('Orders fetch timed out (4s)');
         } else {
-          const errorText = await ordersResponse.text();
-          console.error('❌ Error fetching orders:', ordersResponse.status, errorText);
+          console.error('Orders fetch error:', fetchError);
         }
-      } catch (e: any) {
-        console.log('Orders fetch timeout/error:', e.message);
+        setOrders([]);
       }
-
-      console.log('📦 Orders for this supplier:', purchaseOrders.length);
-
-      // Fetch buyer profiles using native fetch
-      const buyerIds = [...new Set(purchaseOrders.map(po => po.buyer_id).filter(Boolean))];
-      let buyerProfiles: Record<string, any> = {};
-      let buyerRoles: Record<string, string> = {};
-      
-      if (buyerIds.length > 0) {
-        try {
-          // Supabase REST API in.() filter expects comma-separated values WITHOUT quotes for UUIDs
-          const buyerIdsParam = buyerIds.join(',');
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 5000);
-          
-          const profilesResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/profiles?user_id=in.(${buyerIdsParam})&select=id,user_id,full_name,phone,email,role`,
-            {
-              headers: authHeaders,
-              signal: controller.signal,
-              cache: 'no-store'
-            }
-          );
-          clearTimeout(timeoutId);
-          
-          if (profilesResponse.ok) {
-            const profiles = await profilesResponse.json();
-            buyerProfiles = Object.fromEntries(profiles.map((p: any) => [p.user_id, p]));
-            buyerRoles = Object.fromEntries(profiles.map((p: any) => [p.user_id, p.role || 'unknown']));
-            console.log('👥 Buyer profiles loaded:', profiles.length);
-          }
-        } catch {
-          console.log('Profiles fetch timeout');
-        }
-        
-        // Also check user_roles table for more accurate role info
-        try {
-          const rolesController = new AbortController();
-          const rolesTimeoutId = setTimeout(() => rolesController.abort(), 3000);
-          
-          const rolesResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/user_roles?user_id=in.(${buyerIdsParam})&select=user_id,role`,
-            {
-              headers: authHeaders,
-              signal: rolesController.signal,
-              cache: 'no-store'
-            }
-          );
-          clearTimeout(rolesTimeoutId);
-          
-          if (rolesResponse.ok) {
-            const roles = await rolesResponse.json();
-            roles.forEach((r: any) => {
-              buyerRoles[r.user_id] = r.role;
-            });
-            console.log('👤 Buyer roles loaded:', roles.length);
-          }
-        } catch {
-          console.log('Roles fetch timeout');
-        }
-      }
-
-      // Transform purchase_orders to Order format
-      const realOrders: Order[] = (purchaseOrders || []).map((po, index) => {
-        const buyer = buyerProfiles[po.buyer_id] || {};
-        const buyerRole = buyerRoles[po.buyer_id] || buyer.role || 'unknown';
-        const items = Array.isArray(po.items) ? po.items : [];
-        
-        // Determine order type based on PO number prefix and status
-        // QR- prefix = quote request from Professional Builder
-        // PO- prefix = direct purchase from Private Client
-        const isQuoteRequest = po.po_number?.startsWith('QR-') || po.status === 'pending' || po.status === 'quoted';
-        const orderType: 'quote_request' | 'direct_purchase' = isQuoteRequest ? 'quote_request' : 'direct_purchase';
-        
-        return {
-          id: po.id,
-          order_number: po.po_number || `ORD-${String(index + 1).padStart(4, '0')}`,
-          customer_name: buyer.full_name || po.project_name || 'Customer',
-          customer_email: buyer.email || '',
-          customer_phone: buyer.phone || '',
-          delivery_address: po.delivery_address || '',
-          items: items.map((item: any) => ({
-            name: item.material_name || item.name || 'Item',
-            quantity: item.quantity || 1,
-            price: item.unit_price || item.price || 0
-          })),
-          total_amount: po.total_amount || 0,
-          status: (po.status || 'pending') as Order['status'],
-          payment_status: 'paid' as const, // Default to paid for now
-          notes: po.special_instructions || po.delivery_notes || '',
-          created_at: po.created_at,
-          updated_at: po.updated_at || po.created_at,
-          order_type: orderType,
-          buyer_role: buyerRole,
-          // Delivery provider fields
-          delivery_provider_id: po.delivery_provider_id || undefined,
-          delivery_provider_name: po.delivery_provider_name || undefined,
-          delivery_provider_phone: po.delivery_provider_phone || undefined,
-          delivery_vehicle_info: po.delivery_vehicle_info || undefined,
-          delivery_status: po.delivery_status || undefined,
-          delivery_assigned_at: po.delivery_assigned_at || undefined,
-          delivery_accepted_at: po.delivery_accepted_at || undefined,
-          estimated_delivery_time: po.estimated_delivery_time || undefined
-        };
-      });
-
-      if (realOrders.length === 0) {
-        console.log('No real orders found, showing empty state');
-      }
-
-      setOrders(realOrders);
     } catch (error) {
       console.error('Error loading orders:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load orders',
-        variant: 'destructive'
-      });
       setOrders([]);
     } finally {
-      console.log('✅ Orders loadOrders finally - setting loading false');
       setLoading(false);
     }
   };
