@@ -405,13 +405,16 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
       );
     }
 
-    // Helper to get delivery status badge
+    // Helper to get delivery status badge - Shows "To be delivered by [provider name]"
     const getDeliveryStatusBadge = (order: Order) => {
       if (!order.delivery_provider_id && !order.delivery_provider_name) {
         return (
-          <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200 text-xs">
-            🚚 No delivery assigned
-          </Badge>
+          <div className="text-xs">
+            <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200 text-xs">
+              🚚 No delivery assigned
+            </Badge>
+            <p className={`${mutedText} mt-1 text-[10px]`}>Awaiting assignment</p>
+          </div>
         );
       }
       
@@ -426,33 +429,35 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
         cancelled: 'bg-red-100 text-red-700 border-red-300'
       };
       
-      const statusLabels: Record<string, string> = {
-        pending: '⏳ Pending',
-        requested: '📤 Requested',
-        assigned: '📋 Assigned',
-        accepted: '✅ Accepted',
-        picked_up: '📦 Picked Up',
-        in_transit: '🚚 In Transit',
-        delivered: '✓ Delivered',
-        cancelled: '✗ Cancelled'
-      };
-      
       const status = order.delivery_status || 'assigned';
+      const isAccepted = status === 'accepted' || status === 'picked_up' || status === 'in_transit' || status === 'delivered';
       
       return (
-        <div className="space-y-1">
-          <Badge variant="outline" className={`${deliveryStatusColors[status] || deliveryStatusColors.assigned} text-xs`}>
-            {statusLabels[status] || 'Assigned'}
-          </Badge>
-          <div className="text-xs">
-            <p className="font-medium text-blue-700">🚚 {order.delivery_provider_name}</p>
+        <div className="space-y-1 min-w-[140px]">
+          {/* Show "To be delivered by" with provider name */}
+          <div className={`text-xs p-2 rounded ${isAccepted ? 'bg-green-50 border border-green-200' : 'bg-blue-50 border border-blue-200'}`}>
+            <p className={`font-semibold ${isAccepted ? 'text-green-700' : 'text-blue-700'}`}>
+              {isAccepted ? '✅ Accepted' : '📋 Assigned'}
+            </p>
+            <p className="font-medium text-gray-800 mt-1">
+              🚚 To be delivered by:
+            </p>
+            <p className="font-bold text-blue-600">{order.delivery_provider_name}</p>
             {order.delivery_provider_phone && (
-              <p className={mutedText}>{order.delivery_provider_phone}</p>
-            )}
-            {order.delivery_vehicle_info && (
-              <p className={`${mutedText} text-[10px]`}>{order.delivery_vehicle_info}</p>
+              <p className="text-gray-500 text-[10px]">📞 {order.delivery_provider_phone}</p>
             )}
           </div>
+          {/* Status badge */}
+          <Badge variant="outline" className={`${deliveryStatusColors[status] || deliveryStatusColors.assigned} text-[10px]`}>
+            {status === 'pending' && '⏳ Pending'}
+            {status === 'requested' && '📤 Requested'}
+            {status === 'assigned' && '📋 Assigned'}
+            {status === 'accepted' && '✅ Accepted'}
+            {status === 'picked_up' && '📦 Picked Up'}
+            {status === 'in_transit' && '🚚 In Transit'}
+            {status === 'delivered' && '✓ Delivered'}
+            {status === 'cancelled' && '✗ Cancelled'}
+          </Badge>
         </div>
       );
     };
