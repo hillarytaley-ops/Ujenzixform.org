@@ -110,8 +110,17 @@ export const DispatchScanner: React.FC = () => {
     detectDeviceInfo();
     listAvailableCameras();
     
+    // Safety timeout - stop loading after 15 seconds
+    const safetyTimeout = setTimeout(() => {
+      if (loadingOrders) {
+        console.log('⏱️ Dispatch Scanner safety timeout - forcing loading false');
+        setLoadingOrders(false);
+      }
+    }, 15000);
+    
     return () => {
       stopScanning();
+      clearTimeout(safetyTimeout);
     };
   }, []);
 
@@ -138,78 +147,186 @@ export const DispatchScanner: React.FC = () => {
   // ─────────────────────────────────────────────────────────────────────────────
   // AUTH & DATA FETCHING
   // ─────────────────────────────────────────────────────────────────────────────
+  
+  // Helper to add timeout to promises
+  const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Timeout')), ms))
+    ]);
+  };
+
+  // Helper to get user from localStorage
+  const getUserFromStorage = (): { id: string; accessToken: string } | null => {
+    try {
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        if (parsed.user?.id && parsed.access_token) {
+          return { id: parsed.user.id, accessToken: parsed.access_token };
+        }
+      }
+    } catch (e) {
+      console.warn('Could not get user from localStorage');
+    }
+    return null;
+  };
+
   const checkAuth = async () => {
+    console.log('🔐 Dispatch Scanner: Starting auth check...');
+    
     try {
       const localRole = localStorage.getItem('user_role');
       if (localRole) {
         setUserRole(localRole);
+        console.log('📋 Role from localStorage:', localRole);
       }
       
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      // Try to get user with timeout
+      let userId: string | null = null;
+      try {
+        const { data: { user } } = await withTimeout(supabase.auth.getUser(), 3000);
+        userId = user?.id || null;
+        console.log('✅ Got user from auth:', userId);
+      } catch {
+        console.log('⚠️ Auth timeout, trying localStorage...');
+        const stored = getUserFromStorage();
+        if (stored) {
+          userId = stored.id;
+          console.log('📦 Got user from localStorage:', userId);
+        }
+      }
+      
+      if (!userId) {
+        console.log('❌ No user found');
+        setLoadingOrders(false);
+        return;
+      }
 
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .maybeSingle();
+      // Get role with timeout
+      let role = localRole;
+      if (!role) {
+        try {
+          const { data: roleData } = await withTimeout(
+            supabase.from('user_roles').select('role').eq('user_id', userId).maybeSingle(),
+            3000
+          );
+          role = roleData?.role || null;
+          console.log('🔑 Role from database:', role);
+        } catch {
+          console.log('⚠️ Role lookup timeout');
+        }
+      }
 
-      setUserRole(roleData?.role || localRole || null);
+      setUserRole(role || null);
 
-      // Get supplier ID
-      if (roleData?.role === 'supplier' || localRole === 'supplier') {
-        // Try to get supplier ID from profile chain
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('user_id', user.id)
-          .maybeSingle();
+      // Get supplier ID if user is supplier
+      if (role === 'supplier') {
+        let foundSupplierId: string | null = null;
+        
+        // Try profile chain with timeout
+        try {
+          const { data: profileData } = await withTimeout(
+            supabase.from('profiles').select('id').eq('user_id', userId).maybeSingle(),
+            3000
+          );
+          console.log('📋 Profile lookup:', profileData);
 
-        if (profileData) {
-          const { data: supplierData } = await supabase
-            .from('suppliers')
-            .select('id')
-            .eq('user_id', profileData.id)
-            .maybeSingle();
-
-          if (supplierData) {
-            setSupplierId(supplierData.id);
+          if (profileData) {
+            const { data: supplierData } = await withTimeout(
+              supabase.from('suppliers').select('id').eq('user_id', profileData.id).maybeSingle(),
+              3000
+            );
+            console.log('📦 Supplier by profile.id:', supplierData);
+            if (supplierData) {
+              foundSupplierId = supplierData.id;
+            }
           }
+        } catch {
+          console.log('⚠️ Profile/supplier lookup timeout');
         }
 
         // Fallback: Try direct user_id match
-        if (!supplierId) {
-          const { data: supplierByUserId } = await supabase
-            .from('suppliers')
-            .select('id')
-            .eq('user_id', user.id)
-            .maybeSingle();
-
-          if (supplierByUserId) {
-            setSupplierId(supplierByUserId.id);
+        if (!foundSupplierId) {
+          try {
+            const { data: supplierByUserId } = await withTimeout(
+              supabase.from('suppliers').select('id').eq('user_id', userId).maybeSingle(),
+              3000
+            );
+            console.log('📦 Supplier by auth.uid:', supplierByUserId);
+            if (supplierByUserId) {
+              foundSupplierId = supplierByUserId.id;
+            }
+          } catch {
+            console.log('⚠️ Direct supplier lookup timeout');
           }
         }
+
+        // Final fallback: Use userId as supplier ID
+        if (!foundSupplierId) {
+          console.log('📦 Using userId as supplier ID fallback:', userId);
+          foundSupplierId = userId;
+        }
+
+        console.log('✅ Final supplier ID:', foundSupplierId);
+        setSupplierId(foundSupplierId);
+      } else {
+        console.log('⚠️ User is not a supplier, role:', role);
+        setLoadingOrders(false);
       }
     } catch (err) {
-      console.error('Auth check failed (non-fatal):', err);
+      console.error('Auth check failed:', err);
       const localRole = localStorage.getItem('user_role');
       setUserRole(localRole || null);
+      setLoadingOrders(false);
     }
   };
 
   const fetchOrders = async () => {
-    if (!supplierId) return;
+    if (!supplierId) {
+      console.log('❌ No supplierId, cannot fetch orders');
+      setLoadingOrders(false);
+      return;
+    }
     
+    console.log('📦 Fetching orders for supplier:', supplierId);
     setLoadingOrders(true);
+    
     try {
-      // Fetch material items for this supplier, grouped by order
-      const { data: itemsData, error } = await supabase
-        .from('material_items')
-        .select('*')
-        .eq('supplier_id', supplierId)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      // Use native fetch with timeout to avoid Supabase client hanging
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      
+      // Get access token
+      let accessToken = ANON_KEY;
+      const stored = getUserFromStorage();
+      if (stored?.accessToken) {
+        accessToken = stored.accessToken;
+      }
+      
+      const headers: Record<string, string> = {
+        'apikey': ANON_KEY,
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      };
+      
+      // Fetch material items with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/material_items?supplier_id=eq.${supplierId}&order=created_at.desc`,
+        { headers, signal: controller.signal, cache: 'no-store' }
+      );
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        console.error('❌ Failed to fetch material items:', response.status);
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
+      const itemsData = await response.json();
+      console.log('✅ Material items fetched:', itemsData?.length || 0);
 
       // Group items by purchase_order_id
       const orderMap: Record<string, Order> = {};
