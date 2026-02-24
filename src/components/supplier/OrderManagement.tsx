@@ -584,69 +584,41 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
   const deliveredOrders = filteredOrders.filter(o => o.status === 'delivered');
 
   return (
-    <div className="space-y-6">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className={cardBg}>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className={`text-sm ${mutedText}`}>Total Orders</p>
-                <p className={`text-2xl font-bold ${textColor}`}>{stats.total}</p>
-              </div>
-              <Package className="h-8 w-8 text-orange-500 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card 
-          className={`${cardBg} cursor-pointer transition-all hover:ring-2 hover:ring-amber-400 ${activeOrderTab === 'not_dispatched' ? 'ring-2 ring-amber-500' : ''}`}
-          onClick={() => setActiveOrderTab('not_dispatched')}
-        >
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className={`text-sm ${mutedText}`}>📦 Not Dispatched</p>
-                <p className="text-2xl font-bold text-amber-600">{notDispatchedOrders.length}</p>
-                <p className={`text-[10px] ${mutedText}`}>Awaiting dispatch</p>
-              </div>
-              <Clock className="h-8 w-8 text-amber-500 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card 
-          className={`${cardBg} cursor-pointer transition-all hover:ring-2 hover:ring-purple-400 ${activeOrderTab === 'shipped' ? 'ring-2 ring-purple-500' : ''}`}
-          onClick={() => setActiveOrderTab('shipped')}
-        >
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className={`text-sm ${mutedText}`}>🚚 Shipped</p>
-                <p className="text-2xl font-bold text-purple-600">{shippedOrders.length}</p>
-                <p className={`text-[10px] ${mutedText}`}>In transit</p>
-              </div>
-              <Truck className="h-8 w-8 text-purple-500 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card 
-          className={`${cardBg} cursor-pointer transition-all hover:ring-2 hover:ring-green-400 ${activeOrderTab === 'delivered' ? 'ring-2 ring-green-500' : ''}`}
-          onClick={() => setActiveOrderTab('delivered')}
-        >
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className={`text-sm ${mutedText}`}>✅ Delivered</p>
-                <p className="text-2xl font-bold text-green-600">{deliveredOrders.length}</p>
-                <p className={`text-[10px] ${mutedText}`}>Confirmed arrival</p>
-              </div>
-              <CheckCircle className="h-8 w-8 text-green-500 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Order Status Tabs */}
+    <div className="space-y-4">
+      {/* Order Status Tabs - Clean and Simple */}
       <Tabs value={activeOrderTab} onValueChange={(v) => setActiveOrderTab(v as any)} className="w-full">
+        {/* Search and Filter Bar */}
+        <div className="flex flex-col sm:flex-row gap-3 mb-4">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search orders..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Select value={orderTypeFilter} onValueChange={setOrderTypeFilter}>
+            <SelectTrigger className="w-full sm:w-[150px]">
+              <SelectValue placeholder="All Types" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="direct_purchase">🛒 Direct</SelectItem>
+              <SelectItem value="quote_request">📋 Quote</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="outline" size="sm" onClick={loadOrders}>
+            <RefreshCw className="h-4 w-4 mr-1" />
+            Refresh
+          </Button>
+          <Button variant="outline" size="sm">
+            <Download className="h-4 w-4 mr-1" />
+            Export
+          </Button>
+        </div>
+
+        {/* Tab Buttons */}
         <TabsList className="grid w-full grid-cols-3 mb-4">
           <TabsTrigger 
             value="not_dispatched" 
@@ -671,54 +643,10 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
           </TabsTrigger>
         </TabsList>
 
-        {/* Filters */}
-        <Card className={`${cardBg} mb-4`}>
-          <CardContent className="pt-6">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search orders..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              <Select value={orderTypeFilter} onValueChange={setOrderTypeFilter}>
-                <SelectTrigger className="w-full sm:w-[180px]">
-                  <SelectValue placeholder="Order type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="direct_purchase">🛒 Direct Purchases</SelectItem>
-                  <SelectItem value="quote_request">📋 Quote Requests</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button variant="outline" onClick={loadOrders}>
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh
-              </Button>
-              <Button variant="outline">
-                <Download className="h-4 w-4 mr-2" />
-                Export
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Not Dispatched Orders Tab */}
         <TabsContent value="not_dispatched">
           <Card className={cardBg}>
-            <CardHeader>
-              <CardTitle className={`${textColor} flex items-center gap-2`}>
-                <Clock className="h-5 w-5 text-amber-500" />
-                Orders Not Yet Dispatched ({notDispatchedOrders.length})
-              </CardTitle>
-              <CardDescription className={mutedText}>
-                Orders awaiting processing and dispatch. Print QR codes and scan to dispatch.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+            <CardContent className="pt-4">
               {renderOrdersTable(notDispatchedOrders, 'not_dispatched')}
             </CardContent>
           </Card>
@@ -727,16 +655,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
         {/* Shipped Orders Tab */}
         <TabsContent value="shipped">
           <Card className={cardBg}>
-            <CardHeader>
-              <CardTitle className={`${textColor} flex items-center gap-2`}>
-                <Truck className="h-5 w-5 text-purple-500" />
-                Shipped Orders ({shippedOrders.length})
-              </CardTitle>
-              <CardDescription className={mutedText}>
-                Orders that have been dispatched and are in transit to the construction site.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+            <CardContent className="pt-4">
               {renderOrdersTable(shippedOrders, 'shipped')}
             </CardContent>
           </Card>
@@ -745,16 +664,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
         {/* Delivered Orders Tab */}
         <TabsContent value="delivered">
           <Card className={cardBg}>
-            <CardHeader>
-              <CardTitle className={`${textColor} flex items-center gap-2`}>
-                <CheckCircle className="h-5 w-5 text-green-500" />
-                Delivered Orders ({deliveredOrders.length})
-              </CardTitle>
-              <CardDescription className={mutedText}>
-                Orders confirmed to have arrived at the construction site.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+            <CardContent className="pt-4">
               {renderOrdersTable(deliveredOrders, 'delivered')}
             </CardContent>
           </Card>

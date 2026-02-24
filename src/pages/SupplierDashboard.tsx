@@ -1203,9 +1203,9 @@ const SupplierDashboard = () => {
           </Button>
         </div>
 
-        {/* Main Content Tabs */}
+        {/* Main Content Tabs - Simplified Navigation */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className={`${isDarkMode ? 'bg-slate-800' : 'bg-white'} shadow-md p-1 rounded-lg flex-wrap h-auto`}>
+          <TabsList className={`${isDarkMode ? 'bg-slate-800' : 'bg-white'} shadow-md p-1 rounded-lg flex-wrap h-auto gap-1`}>
             <TabsTrigger value="overview" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
               Overview
             </TabsTrigger>
@@ -1213,19 +1213,10 @@ const SupplierDashboard = () => {
               {t('supplier.tabs.orders')}
             </TabsTrigger>
             <TabsTrigger value="products" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
-              <Store className="h-4 w-4 mr-1" />
-              Products & Prices
-            </TabsTrigger>
-            <TabsTrigger value="my-products" className="data-[state=active]:bg-green-500 data-[state=active]:text-white">
-              <Plus className="h-4 w-4 mr-1" />
-              My Uploads
-            </TabsTrigger>
-            <TabsTrigger value="analytics" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
-              {t('supplier.tabs.analytics')}
+              Products
             </TabsTrigger>
             <TabsTrigger value="quotes" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
-              <FileCheck className="h-4 w-4 mr-1" />
-              Quote Requests
+              Quotes
               {quoteRequests.filter(q => q.status === 'pending').length > 0 && (
                 <span className="ml-1 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5">
                   {quoteRequests.filter(q => q.status === 'pending').length}
@@ -1233,36 +1224,22 @@ const SupplierDashboard = () => {
               )}
             </TabsTrigger>
             <TabsTrigger value="qr-codes" className="data-[state=active]:bg-cyan-500 data-[state=active]:text-white">
-              <QrCode className="h-4 w-4 mr-1" />
               QR Codes
             </TabsTrigger>
             <TabsTrigger value="scanning" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
-              <Scan className="h-4 w-4 mr-1" />
-              Dispatch Scan
-            </TabsTrigger>
-            <TabsTrigger value="support" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white">
-              <Headphones className="h-4 w-4 mr-1" />
-              Support
+              Dispatch
             </TabsTrigger>
             <TabsTrigger value="inventory" className="data-[state=active]:bg-emerald-500 data-[state=active]:text-white">
-              <Boxes className="h-4 w-4 mr-1" />
               Inventory
             </TabsTrigger>
-            <TabsTrigger value="order-history" className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white">
-              <FileText className="h-4 w-4 mr-1" />
-              Order History
+            <TabsTrigger value="tracking" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
+              Tracking
             </TabsTrigger>
             <TabsTrigger value="reviews" className="data-[state=active]:bg-yellow-500 data-[state=active]:text-white">
-              <Star className="h-4 w-4 mr-1" />
               Reviews
             </TabsTrigger>
-            <TabsTrigger value="my-analytics" className="data-[state=active]:bg-pink-500 data-[state=active]:text-white">
-              <BarChartIcon className="h-4 w-4 mr-1" />
-              My Analytics
-            </TabsTrigger>
-            <TabsTrigger value="tracking" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
-              <NavigationIcon className="h-4 w-4 mr-1" />
-              Tracking
+            <TabsTrigger value="support" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white">
+              Support
             </TabsTrigger>
           </TabsList>
 
@@ -1333,29 +1310,25 @@ const SupplierDashboard = () => {
             <OrderManagement supplierId={supplierRecordId || user?.id || ''} isDarkMode={isDarkMode} />
           </TabsContent>
 
-          {/* Products Tab - Admin Catalog with Pricing */}
+          {/* Products Tab - Combined Products & My Uploads */}
           <TabsContent value="products">
-            <ProductManagement supplierId={supplierRecordId || user?.id || ''} isDarkMode={isDarkMode} />
-          </TabsContent>
-          
-          {/* My Products Tab - Supplier's Own Products with Full Edit Capabilities */}
-          <TabsContent value="my-products">
-            <Card className={cardBg}>
-              <CardHeader>
-                <CardTitle className={textColor}>My Uploaded Products</CardTitle>
-                <CardDescription className={mutedText}>
-                  Manage your own products - add new products, update images, prices, and variants. Products require admin approval before appearing in the marketplace.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <SupplierProductManager supplierId={supplierRecordId || user?.id || ''} />
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Analytics Tab - Enhanced Dashboard */}
-          <TabsContent value="analytics">
-            <SupplierAnalyticsDashboard supplierId={supplierRecordId || user?.id || ''} />
+            <div className="space-y-6">
+              {/* Product Management - Admin Catalog with Pricing */}
+              <ProductManagement supplierId={supplierRecordId || user?.id || ''} isDarkMode={isDarkMode} />
+              
+              {/* My Uploaded Products */}
+              <Card className={cardBg}>
+                <CardHeader>
+                  <CardTitle className={textColor}>My Uploaded Products</CardTitle>
+                  <CardDescription className={mutedText}>
+                    Manage your own products - add new products, update images, prices, and variants.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <SupplierProductManager supplierId={supplierRecordId || user?.id || ''} />
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           {/* Quote Requests Tab */}
@@ -1827,21 +1800,6 @@ const SupplierDashboard = () => {
             </Card>
           </TabsContent>
 
-          {/* Order History Tab */}
-          <TabsContent value="order-history">
-            <Card className={cardBg}>
-              <CardHeader>
-                <CardTitle className={textColor}>Order History</CardTitle>
-                <CardDescription className={mutedText}>
-                  View all orders and download invoices
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {user && <OrderHistory userId={user.id} userRole="supplier" />}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
           {/* Reviews Tab */}
           <TabsContent value="reviews">
             <div className="space-y-6">
@@ -1861,21 +1819,6 @@ const SupplierDashboard = () => {
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
-
-          {/* My Analytics Tab */}
-          <TabsContent value="my-analytics">
-            <Card className={cardBg}>
-              <CardHeader>
-                <CardTitle className={textColor}>Sales Analytics</CardTitle>
-                <CardDescription className={mutedText}>
-                  Track your sales performance and trends
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {user && <UserAnalyticsDashboard userId={user.id} userRole="supplier" />}
-              </CardContent>
-            </Card>
           </TabsContent>
 
           {/* Tracking Tab */}
