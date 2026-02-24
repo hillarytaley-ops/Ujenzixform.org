@@ -102,6 +102,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
   const [orderTypeFilter, setOrderTypeFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null); // Track which order is being updated
+  const [activeOrderTab, setActiveOrderTab] = useState<'not_dispatched' | 'shipped' | 'delivered'>('not_dispatched');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -666,8 +667,6 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
   );
   const shippedOrders = filteredOrders.filter(o => o.status === 'shipped');
   const deliveredOrders = filteredOrders.filter(o => o.status === 'delivered');
-
-  const [activeOrderTab, setActiveOrderTab] = useState<'not_dispatched' | 'shipped' | 'delivered'>('not_dispatched');
 
   return (
     <div className="space-y-6">
