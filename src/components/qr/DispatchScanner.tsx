@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -7,11 +7,46 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Truck, Scan, CheckCircle, AlertCircle, Camera, Lock, ArrowRight, RotateCcw, Smartphone, Flashlight, ZoomIn } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { 
+  Truck, Scan, CheckCircle, AlertCircle, Camera, Lock, ArrowRight, RotateCcw, 
+  Smartphone, Package, User, Clock, ArrowLeft, PartyPopper, QrCode, X, 
+  CheckCircle2, Circle, RefreshCw, Mail, Phone
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Html5Qrcode, Html5QrcodeScannerState, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// INTERFACES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface OrderItem {
+  id: string;
+  qr_code: string;
+  material_type: string;
+  category: string;
+  quantity: number;
+  unit: string;
+  item_sequence: number;
+  dispatch_scanned: boolean;
+  dispatch_scanned_at?: string;
+  status: string;
+}
+
+interface Order {
+  id: string;
+  order_number: string;
+  buyer_id: string;
+  buyer_name: string;
+  buyer_email: string;
+  buyer_phone: string;
+  total_items: number;
+  dispatched_items: number;
+  pending_items: number;
+  created_at: string;
+  items: OrderItem[];
+}
 
 interface ScanResult {
   qr_code: string;
@@ -23,7 +58,23 @@ interface ScanResult {
   timestamp: Date;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ═══════════════════════════════════════════════════════════════════════════════
+
 export const DispatchScanner: React.FC = () => {
+  // ─────────────────────────────────────────────────────────────────────────────
+  // STATE - Order Selection
+  // ─────────────────────────────────────────────────────────────────────────────
+  const [step, setStep] = useState<'select-order' | 'scanning'>('select-order');
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [loadingOrders, setLoadingOrders] = useState(true);
+  const [supplierId, setSupplierId] = useState<string | null>(null);
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // STATE - Scanner
+  // ─────────────────────────────────────────────────────────────────────────────
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannerContainerId = 'dispatch-qr-scanner';
   const [isScanning, setIsScanning] = useState(false);
@@ -41,11 +92,19 @@ export const DispatchScanner: React.FC = () => {
   const [deviceInfo, setDeviceInfo] = useState<string>('');
   const CAMERA_CONSENT_KEY = 'scanner_camera_consent';
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  // STATE - Completion
+  // ─────────────────────────────────────────────────────────────────────────────
+  const [allItemsScanned, setAllItemsScanned] = useState(false);
+
   // Detect device type
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
   const isAndroid = /Android/i.test(navigator.userAgent);
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  // EFFECTS
+  // ─────────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     checkAuth();
     detectDeviceInfo();
@@ -56,6 +115,170 @@ export const DispatchScanner: React.FC = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (supplierId) {
+      fetchOrders();
+    }
+  }, [supplierId]);
+
+  // Check if all items are scanned when selectedOrder changes
+  useEffect(() => {
+    if (selectedOrder) {
+      const allScanned = selectedOrder.items.every(item => item.dispatch_scanned);
+      if (allScanned && selectedOrder.items.length > 0 && !allItemsScanned) {
+        setAllItemsScanned(true);
+        toast.success('🎉 All items dispatched!', {
+          description: `Order #${selectedOrder.order_number} is ready for delivery!`,
+          duration: 8000
+        });
+      }
+    }
+  }, [selectedOrder]);
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // AUTH & DATA FETCHING
+  // ─────────────────────────────────────────────────────────────────────────────
+  const checkAuth = async () => {
+    try {
+      const localRole = localStorage.getItem('user_role');
+      if (localRole) {
+        setUserRole(localRole);
+      }
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      setUserRole(roleData?.role || localRole || null);
+
+      // Get supplier ID
+      if (roleData?.role === 'supplier' || localRole === 'supplier') {
+        // Try to get supplier ID from profile chain
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (profileData) {
+          const { data: supplierData } = await supabase
+            .from('suppliers')
+            .select('id')
+            .eq('user_id', profileData.id)
+            .maybeSingle();
+
+          if (supplierData) {
+            setSupplierId(supplierData.id);
+          }
+        }
+
+        // Fallback: Try direct user_id match
+        if (!supplierId) {
+          const { data: supplierByUserId } = await supabase
+            .from('suppliers')
+            .select('id')
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+          if (supplierByUserId) {
+            setSupplierId(supplierByUserId.id);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Auth check failed (non-fatal):', err);
+      const localRole = localStorage.getItem('user_role');
+      setUserRole(localRole || null);
+    }
+  };
+
+  const fetchOrders = async () => {
+    if (!supplierId) return;
+    
+    setLoadingOrders(true);
+    try {
+      // Fetch material items for this supplier, grouped by order
+      const { data: itemsData, error } = await supabase
+        .from('material_items')
+        .select('*')
+        .eq('supplier_id', supplierId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Group items by purchase_order_id
+      const orderMap: Record<string, Order> = {};
+      
+      (itemsData || []).forEach((item: any) => {
+        const orderId = item.purchase_order_id || 'unknown';
+        
+        if (!orderMap[orderId]) {
+          orderMap[orderId] = {
+            id: orderId,
+            order_number: orderId.slice(0, 8).toUpperCase(),
+            buyer_id: item.buyer_id || 'unknown',
+            buyer_name: item.buyer_name || 'Unknown Client',
+            buyer_email: item.buyer_email || '',
+            buyer_phone: item.buyer_phone || '',
+            total_items: 0,
+            dispatched_items: 0,
+            pending_items: 0,
+            created_at: item.created_at || '',
+            items: []
+          };
+        }
+
+        const orderItem: OrderItem = {
+          id: item.id,
+          qr_code: item.qr_code,
+          material_type: item.material_type,
+          category: item.category,
+          quantity: item.quantity,
+          unit: item.unit,
+          item_sequence: item.item_sequence,
+          dispatch_scanned: item.dispatch_scanned || false,
+          dispatch_scanned_at: item.dispatch_scanned_at,
+          status: item.status
+        };
+
+        orderMap[orderId].items.push(orderItem);
+        orderMap[orderId].total_items++;
+        
+        if (item.dispatch_scanned) {
+          orderMap[orderId].dispatched_items++;
+        } else {
+          orderMap[orderId].pending_items++;
+        }
+      });
+
+      // Convert to array and sort by pending items (orders with pending items first)
+      const ordersArray = Object.values(orderMap)
+        .sort((a, b) => {
+          // First, prioritize orders with pending items
+          if (a.pending_items > 0 && b.pending_items === 0) return -1;
+          if (a.pending_items === 0 && b.pending_items > 0) return 1;
+          // Then sort by date
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        });
+
+      setOrders(ordersArray);
+      console.log('📦 Fetched orders:', ordersArray.length);
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      toast.error('Failed to load orders');
+    } finally {
+      setLoadingOrders(false);
+    }
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // CAMERA FUNCTIONS
+  // ─────────────────────────────────────────────────────────────────────────────
   const detectDeviceInfo = () => {
     if (isIOS) {
       setDeviceInfo('iOS Device');
@@ -85,37 +308,11 @@ export const DispatchScanner: React.FC = () => {
         if (backCamera) {
           setSelectedCameraId(backCamera.id);
         } else {
-          // On mobile, usually the last camera is the back camera
           setSelectedCameraId(isMobile && cameraList.length > 1 ? cameraList[cameraList.length - 1].id : cameraList[0].id);
         }
       }
     } catch (error) {
       console.error('Error listing cameras:', error);
-      // Don't show error - cameras will be requested when scanning starts
-    }
-  };
-
-  const checkAuth = async () => {
-    try {
-      const localRole = localStorage.getItem('user_role');
-      if (localRole) {
-        setUserRole(localRole);
-      }
-      
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      setUserRole(roleData?.role || localRole || null);
-    } catch (err) {
-      console.error('Auth check failed (non-fatal):', err);
-      const localRole = localStorage.getItem('user_role');
-      setUserRole(localRole || null);
     }
   };
 
@@ -123,31 +320,23 @@ export const DispatchScanner: React.FC = () => {
     setCameraError(null);
 
     try {
-      // Check for secure context (HTTPS or localhost)
       if (!window.isSecureContext && !['localhost', '127.0.0.1'].includes(window.location.hostname)) {
         setCameraError('Camera requires HTTPS connection. Please use a secure URL.');
         toast.error('Camera requires HTTPS or localhost');
         return;
       }
 
-      // Stop any existing scanner
       await stopScanning();
-      
-      // Small delay to ensure cleanup is complete
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      // Create new scanner instance
       console.log('🎥 Creating Html5Qrcode instance for container:', scannerContainerId);
       scannerRef.current = new Html5Qrcode(scannerContainerId, { verbose: true });
       
-      // Use facingMode for mobile, or specific camera ID if selected
       let cameraConfig: any;
       if (selectedCameraId) {
         cameraConfig = selectedCameraId;
-        console.log('📷 Using selected camera ID:', selectedCameraId);
       } else {
         cameraConfig = { facingMode: facing };
-        console.log('📷 Using facing mode:', facing);
       }
 
       const scannerConfig = {
@@ -158,27 +347,18 @@ export const DispatchScanner: React.FC = () => {
         formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
       };
 
-      console.log('🎥 Starting scanner with config:', scannerConfig);
-
       await scannerRef.current.start(
         cameraConfig,
         scannerConfig,
         (decodedText, decodedResult) => {
           const now = Date.now();
           
-          console.log('🎯 QR DETECTED! Raw text:', decodedText);
-          console.log('🎯 Decoded result:', decodedResult);
-          
-          // Debounce: prevent scanning same code within 3 seconds
           if (decodedText === lastScannedRef.current && now - lastScanTimeRef.current < 3000) {
-            console.log('🔄 Debounced duplicate scan:', decodedText);
             return;
           }
           
           lastScannedRef.current = decodedText;
           lastScanTimeRef.current = now;
-          
-          console.log('✅ Processing QR Code:', decodedText);
           
           // Vibrate on successful scan (mobile)
           if (navigator.vibrate) {
@@ -197,14 +377,11 @@ export const DispatchScanner: React.FC = () => {
             gainNode.gain.value = 0.3;
             oscillator.start();
             setTimeout(() => oscillator.stop(), 150);
-          } catch (e) {
-            // Audio not supported
-          }
+          } catch (e) {}
           
           processQRScan(decodedText, 'mobile_camera');
         },
         (errorMessage) => {
-          // Only log actual errors, not "QR code not found" messages
           if (!errorMessage.includes('No QR code found') && !errorMessage.includes('NotFoundException')) {
             console.log('📷 Scanner message:', errorMessage);
           }
@@ -214,26 +391,19 @@ export const DispatchScanner: React.FC = () => {
       setIsScanning(true);
       localStorage.setItem(CAMERA_CONSENT_KEY, 'true');
       toast.success('📷 Camera ready! Point at QR code to scan.');
-      console.log('✅ Scanner started successfully');
 
     } catch (error: any) {
       console.error('❌ Camera error:', error);
-      console.error('Error details:', { name: error.name, message: error.message, stack: error.stack });
       setIsScanning(false);
       
-      // Provide helpful error messages
       if (error.message?.includes('Permission') || error.name === 'NotAllowedError') {
         setCameraError('Camera permission denied. Please allow camera access in your browser settings.');
-        toast.error('Camera permission denied');
       } else if (error.message?.includes('not found') || error.name === 'NotFoundError') {
         setCameraError('No camera found on this device.');
-        toast.error('No camera found');
       } else if (error.message?.includes('in use') || error.name === 'NotReadableError') {
-        setCameraError('Camera is in use by another application. Please close other apps using the camera.');
-        toast.error('Camera is busy');
+        setCameraError('Camera is in use by another application.');
       } else {
         setCameraError(`Camera error: ${error.message || 'Unknown error'}`);
-        toast.error(`Failed to access camera: ${error.message}`);
       }
     }
   };
@@ -258,11 +428,9 @@ export const DispatchScanner: React.FC = () => {
 
   const toggleCamera = async () => {
     if (availableCameras.length <= 1) {
-      // If only one camera, toggle facing mode
       const next = facing === 'environment' ? 'user' : 'environment';
       setFacing(next);
     } else {
-      // Cycle through available cameras
       const currentIndex = availableCameras.findIndex(c => c.id === selectedCameraId);
       const nextIndex = (currentIndex + 1) % availableCameras.length;
       setSelectedCameraId(availableCameras[nextIndex].id);
@@ -274,16 +442,55 @@ export const DispatchScanner: React.FC = () => {
     }
   };
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  // QR SCAN PROCESSING
+  // ─────────────────────────────────────────────────────────────────────────────
   const processQRScan = async (qrCode: string, scannerType: 'mobile_camera' | 'physical_scanner' | 'web_scanner') => {
+    if (!selectedOrder) {
+      toast.error('No order selected');
+      return;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // VALIDATE: Check if this QR code belongs to the selected order
+    // ═══════════════════════════════════════════════════════════════════════════
+    const matchingItem = selectedOrder.items.find(item => item.qr_code === qrCode);
+    
+    if (!matchingItem) {
+      // Play error sound
+      try {
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        oscillator.frequency.value = 300; // Lower frequency for error
+        oscillator.type = 'sine';
+        gainNode.gain.value = 0.3;
+        oscillator.start();
+        setTimeout(() => oscillator.stop(), 300);
+      } catch (e) {}
+
+      toast.error('❌ Wrong Order!', {
+        description: `This QR code does not belong to Order #${selectedOrder.order_number}. Please scan items from the correct order.`,
+        duration: 5000
+      });
+      return;
+    }
+
+    // Check if already scanned
+    if (matchingItem.dispatch_scanned) {
+      toast.warning('⚠️ Already Scanned', {
+        description: `${matchingItem.material_type} (Item #${matchingItem.item_sequence}) has already been dispatched.`,
+        duration: 4000
+      });
+      return;
+    }
+
     try {
       console.log('🔍 Processing QR scan for DISPATCH:', qrCode);
-      console.log('📱 Scanner type:', scannerType);
-      console.log('📦 Material condition:', materialCondition);
-      
-      // Show immediate feedback
       toast.info('Processing scan...', { duration: 2000 });
       
-      // Get auth token
       const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
       const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
       
@@ -296,9 +503,6 @@ export const DispatchScanner: React.FC = () => {
         }
       } catch (e) {}
       
-      console.log('🔐 Using access token:', accessToken ? 'Found' : 'Using anon key');
-      
-      // Call the record_qr_scan function via REST API
       const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/record_qr_scan`, {
         method: 'POST',
         headers: {
@@ -316,10 +520,7 @@ export const DispatchScanner: React.FC = () => {
         })
       });
 
-      console.log('📊 RPC Response status:', response.status);
-      
       const data = await response.json();
-      console.log('📊 RPC Response data:', data);
 
       if (!response.ok) {
         console.error('❌ Dispatch scan error:', data);
@@ -330,6 +531,26 @@ export const DispatchScanner: React.FC = () => {
       const scanData = data as any;
 
       if (scanData.success) {
+        // Update local state immediately
+        setSelectedOrder(prev => {
+          if (!prev) return prev;
+          
+          const updatedItems = prev.items.map(item => 
+            item.qr_code === qrCode 
+              ? { ...item, dispatch_scanned: true, dispatch_scanned_at: new Date().toISOString(), status: 'dispatched' }
+              : item
+          );
+          
+          const dispatchedCount = updatedItems.filter(i => i.dispatch_scanned).length;
+          
+          return {
+            ...prev,
+            items: updatedItems,
+            dispatched_items: dispatchedCount,
+            pending_items: prev.total_items - dispatchedCount
+          };
+        });
+
         const scanResult: ScanResult = {
           qr_code: scanData.qr_code,
           material_type: scanData.material_type,
@@ -342,22 +563,25 @@ export const DispatchScanner: React.FC = () => {
 
         setScanResults(prev => [scanResult, ...prev.slice(0, 9)]);
         
-        // Show success with invalidation notice if applicable
-        if (scanData.is_invalidated) {
-          toast.success('✅ Item Dispatched & Completed', {
-            description: `${scanData.material_type} - QR code has been invalidated (both dispatch & receive done)`
+        // Calculate remaining items
+        const remainingItems = selectedOrder.items.filter(i => !i.dispatch_scanned && i.qr_code !== qrCode).length;
+        
+        if (remainingItems === 0) {
+          // All items scanned!
+          toast.success('🎉 ALL ITEMS DISPATCHED!', {
+            description: `Order #${selectedOrder.order_number} is complete and ready for delivery!`,
+            duration: 8000
           });
         } else {
-          toast.success('🚚 Item Dispatched', {
-            description: `${scanData.material_type} - ${scanData.quantity} ${scanData.unit}. Awaiting receiving scan.`
+          toast.success('✅ Item Dispatched', {
+            description: `${scanData.material_type} (Item #${matchingItem.item_sequence}) • ${remainingItems} item${remainingItems > 1 ? 's' : ''} remaining`,
+            duration: 3000
           });
         }
 
-        // Reset form
         setManualQRCode('');
         setNotes('');
       } else {
-        // Handle specific error codes with appropriate messages
         const errorCode = scanData.error_code;
         let errorTitle = 'Scan Failed';
         let errorDescription = scanData.error || 'Invalid QR code';
@@ -375,14 +599,9 @@ export const DispatchScanner: React.FC = () => {
             errorTitle = '❓ QR Code Not Found';
             errorDescription = 'This QR code is not registered in the system.';
             break;
-          default:
-            errorTitle = '❌ Scan Failed';
         }
         
-        toast.error(errorTitle, {
-          description: errorDescription,
-          duration: 5000
-        });
+        toast.error(errorTitle, { description: errorDescription, duration: 5000 });
       }
     } catch (error) {
       console.error('Scan processing error:', error);
@@ -398,13 +617,31 @@ export const DispatchScanner: React.FC = () => {
     processQRScan(manualQRCode, 'physical_scanner');
   };
 
-  // Only suppliers and admins can access the dispatch scanner
-  // Builders are completely blocked - no camera access at all
+  // ─────────────────────────────────────────────────────────────────────────────
+  // ORDER SELECTION
+  // ─────────────────────────────────────────────────────────────────────────────
+  const selectOrder = (order: Order) => {
+    setSelectedOrder(order);
+    setScanResults([]);
+    setAllItemsScanned(order.pending_items === 0);
+    setStep('scanning');
+  };
+
+  const goBackToOrderSelection = async () => {
+    await stopScanning();
+    setSelectedOrder(null);
+    setScanResults([]);
+    setAllItemsScanned(false);
+    setStep('select-order');
+    fetchOrders(); // Refresh orders
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // ACCESS CONTROL
+  // ─────────────────────────────────────────────────────────────────────────────
   const isBuilder = userRole === 'builder';
   const allowAccess = ['supplier', 'admin'].includes(userRole || '');
-  const canScan = allowAccess;
 
-  // BLOCK builders from accessing any camera functionality
   if (isBuilder) {
     return (
       <div className="space-y-6">
@@ -420,258 +657,397 @@ export const DispatchScanner: React.FC = () => {
               As a <strong>Builder</strong>, you cannot access the dispatch scanner. 
               Only registered <strong>Suppliers</strong> can dispatch materials.
             </p>
-            <div className="flex flex-col sm:flex-row gap-2 justify-center">
-              <a 
-                href="/builder-dashboard" 
-                className="inline-flex items-center justify-center px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
-              >
-                <ArrowRight className="h-4 w-4 mr-2" />
-                Go to Dashboard
-              </a>
-            </div>
+            <a 
+              href="/builder-dashboard" 
+              className="inline-flex items-center justify-center px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+            >
+              <ArrowRight className="h-4 w-4 mr-2" />
+              Go to Dashboard
+            </a>
           </CardContent>
         </Card>
       </div>
     );
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // STEP 1: ORDER SELECTION
+  // ═══════════════════════════════════════════════════════════════════════════════
+  if (step === 'select-order') {
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              <Truck className="h-7 w-7 text-blue-600" />
+              Dispatch Scanner
+            </h2>
+            <p className="text-muted-foreground mt-1">
+              Select an order to dispatch its materials
+            </p>
+          </div>
+          <Button variant="outline" onClick={fetchOrders} disabled={loadingOrders}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loadingOrders ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
+
+        {/* Orders List */}
+        {loadingOrders ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <RefreshCw className="h-8 w-8 animate-spin mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">Loading orders...</p>
+            </CardContent>
+          </Card>
+        ) : orders.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <Package className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No Orders Found</h3>
+              <p className="text-muted-foreground">
+                You don't have any orders with materials to dispatch yet.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {/* Pending Orders Section */}
+            {orders.filter(o => o.pending_items > 0).length > 0 && (
+              <div className="space-y-3">
+                <h3 className="font-semibold text-amber-700 flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  Pending Dispatch ({orders.filter(o => o.pending_items > 0).length} orders)
+                </h3>
+                {orders.filter(o => o.pending_items > 0).map(order => (
+                  <OrderCard key={order.id} order={order} onSelect={selectOrder} />
+                ))}
+              </div>
+            )}
+
+            {/* Completed Orders Section */}
+            {orders.filter(o => o.pending_items === 0).length > 0 && (
+              <div className="space-y-3 mt-6">
+                <h3 className="font-semibold text-green-700 flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5" />
+                  Fully Dispatched ({orders.filter(o => o.pending_items === 0).length} orders)
+                </h3>
+                {orders.filter(o => o.pending_items === 0).map(order => (
+                  <OrderCard key={order.id} order={order} onSelect={selectOrder} isComplete />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // STEP 2: SCANNING
+  // ═══════════════════════════════════════════════════════════════════════════════
+  if (!selectedOrder) return null;
+
+  const progressPercent = (selectedOrder.dispatched_items / selectedOrder.total_items) * 100;
+
   return (
     <div className="space-y-6">
+      {/* Back Button & Order Info Header */}
+      <div className="flex items-start justify-between gap-4">
+        <Button variant="ghost" onClick={goBackToOrderSelection} className="shrink-0">
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Orders
+        </Button>
+        
+        <div className="flex-1 text-right">
+          <h2 className="text-xl font-bold">Order #{selectedOrder.order_number}</h2>
+          <p className="text-sm text-muted-foreground">{selectedOrder.buyer_name}</p>
+        </div>
+      </div>
 
-      {/* Device Info Banner */}
-      {isMobile && (
-        <Alert className="bg-blue-50 border-blue-200">
-          <Smartphone className="h-4 w-4 text-blue-600" />
-          <AlertDescription className="text-blue-800 text-sm">
-            <strong>Mobile Device Detected:</strong> {deviceInfo}. 
-            For best results, hold your phone steady and ensure good lighting.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Camera Scanner */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
+      {/* Progress Card */}
+      <Card className={allItemsScanned ? 'border-green-400 bg-green-50' : 'border-amber-200'}>
+        <CardContent className="py-4">
+          <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <Truck className="h-5 w-5" />
-              Dispatch Scanner - Supplier
+              {allItemsScanned ? (
+                <PartyPopper className="h-6 w-6 text-green-600" />
+              ) : (
+                <Package className="h-6 w-6 text-amber-600" />
+              )}
+              <span className="font-semibold">
+                {allItemsScanned ? 'All Items Dispatched!' : 'Dispatch Progress'}
+              </span>
             </div>
-            {availableCameras.length > 0 && (
-              <Badge variant="outline" className="text-xs">
-                {availableCameras.length} camera{availableCameras.length > 1 ? 's' : ''} available
-              </Badge>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {!allowAccess && (
-            <div className="p-3 rounded-md bg-yellow-50 text-yellow-700 text-sm">
-              Access restricted. Sign in as supplier or admin to record scans.
-            </div>
-          )}
-
-          {/* Camera Error Display */}
-          {cameraError && (
-            <Alert className="bg-red-50 border-red-200">
-              <AlertCircle className="h-4 w-4 text-red-600" />
-              <AlertDescription className="text-red-800 text-sm">
-                {cameraError}
-                <Button 
-                  variant="link" 
-                  className="text-red-700 p-0 h-auto ml-2"
-                  onClick={() => {
-                    setCameraError(null);
-                    listAvailableCameras();
-                  }}
-                >
-                  Try Again
-                </Button>
-              </AlertDescription>
-            </Alert>
-          )}
-          
-          {/* Camera View - html5-qrcode creates its own video element */}
-          <div className="relative bg-black rounded-lg overflow-hidden min-h-[300px]">
-            {/* Scanner container - html5-qrcode will render here */}
-            <div 
-              id={scannerContainerId} 
-              className="w-full"
-              style={{ minHeight: '300px' }}
-            />
-            
-            {/* Not scanning overlay */}
-            {!isScanning && !cameraError && (
-              <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80">
-                <div className="text-center text-white">
-                  <Camera className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm opacity-70">Camera not active</p>
-                  <p className="text-xs opacity-50">Tap "Start Scanner" to begin</p>
-                </div>
-              </div>
-            )}
-            
-            {/* Scanning indicator */}
-            {isScanning && (
-              <div className="absolute bottom-4 left-0 right-0 text-center pointer-events-none">
-                <span className="bg-green-600 text-white text-sm px-3 py-1 rounded-full animate-pulse">
-                  🔍 Scanning for QR codes...
-                </span>
-              </div>
-            )}
+            <Badge className={allItemsScanned ? 'bg-green-600' : 'bg-amber-600'}>
+              {selectedOrder.dispatched_items} / {selectedOrder.total_items} items
+            </Badge>
           </div>
-
-          {/* Camera Controls */}
-          <div className="flex flex-wrap gap-2">
-            {!isScanning ? (
-              <Button onClick={startCameraScanning} className="flex-1 sm:flex-none" size="lg">
-                <Camera className="h-5 w-5 mr-2" />
-                Start Scanner
-              </Button>
-            ) : (
-              <Button onClick={() => { stopScanning(); toast.info('Scanner stopped'); }} variant="destructive" className="flex-1 sm:flex-none" size="lg">
-                <RotateCcw className="h-5 w-5 mr-2" />
-                Stop Scanner
-              </Button>
-            )}
-            
-            {availableCameras.length > 1 && (
-              <Button 
-                onClick={toggleCamera} 
-                variant="outline" 
-                size="lg"
-                title="Switch between cameras"
-              >
-                <RotateCcw className="h-5 w-5 mr-2" />
-                {isMobile ? 'Flip' : 'Switch Camera'}
-              </Button>
-            )}
-          </div>
-
-          {/* Camera Selection (for devices with multiple cameras) */}
-          {availableCameras.length > 1 && (
-            <div className="space-y-2">
-              <Label className="text-sm text-muted-foreground">Select Camera</Label>
-              <Select value={selectedCameraId} onValueChange={async (value) => {
-                setSelectedCameraId(value);
-                if (isScanning) {
-                  await stopScanning();
-                  setTimeout(() => startCameraScanning(), 300);
-                }
-              }}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose camera" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableCameras.map((camera, index) => (
-                    <SelectItem key={camera.id} value={camera.id}>
-                      {camera.label || `Camera ${index + 1}`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {/* Mobile Tips */}
-          {isMobile && isScanning && (
-            <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3">
-              <p className="font-medium mb-1">📱 Mobile Scanning Tips:</p>
-              <ul className="list-disc list-inside space-y-0.5">
-                <li>Hold phone 6-12 inches from QR code</li>
-                <li>Ensure QR code is well-lit</li>
-                <li>Keep phone steady while scanning</li>
-                <li>Use flash in low light conditions</li>
-              </ul>
-            </div>
+          <Progress value={progressPercent} className="h-3" />
+          {!allItemsScanned && (
+            <p className="text-sm text-muted-foreground mt-2">
+              {selectedOrder.pending_items} item{selectedOrder.pending_items !== 1 ? 's' : ''} remaining to scan
+            </p>
           )}
         </CardContent>
       </Card>
 
-      {/* Manual Entry / Physical Scanner */}
-      {(
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Scan className="h-5 w-5" />
-              Physical Scanner Input
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="qr-code">QR Code (from physical scanner)</Label>
-              <Input
-                id="qr-code"
-                value={manualQRCode}
-                onChange={(e) => setManualQRCode(e.target.value)}
-                placeholder="Scan or enter QR code"
-                className="font-mono"
-                onKeyDown={(e) => e.key === 'Enter' && handleManualScan()}
-              />
-            </div>
+      {/* Items List */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <QrCode className="h-5 w-5" />
+            Items to Dispatch
+          </CardTitle>
+          <CardDescription>
+            Scan QR codes for items marked with ○
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {selectedOrder.items
+              .sort((a, b) => a.item_sequence - b.item_sequence)
+              .map(item => (
+                <div 
+                  key={item.id}
+                  className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
+                    item.dispatch_scanned 
+                      ? 'bg-green-50 border-green-200' 
+                      : 'bg-white border-gray-200 hover:border-amber-300'
+                  }`}
+                >
+                  {item.dispatch_scanned ? (
+                    <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
+                  ) : (
+                    <Circle className="h-5 w-5 text-gray-400 shrink-0" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className={`font-medium text-sm truncate ${item.dispatch_scanned ? 'text-green-700' : ''}`}>
+                      #{item.item_sequence} - {item.material_type}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {item.quantity} {item.unit} • {item.category}
+                    </p>
+                  </div>
+                  {item.dispatch_scanned && (
+                    <Badge variant="outline" className="text-green-600 border-green-300 text-xs shrink-0">
+                      ✓
+                    </Badge>
+                  )}
+                </div>
+              ))}
+          </div>
+        </CardContent>
+      </Card>
 
-            <div className="space-y-2">
-              <Label htmlFor="condition">Material Condition</Label>
-              <Select value={materialCondition} onValueChange={setMaterialCondition}>
-                <SelectTrigger id="condition">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="good">Good Condition</SelectItem>
-                  <SelectItem value="minor_damage">Minor Damage</SelectItem>
-                  <SelectItem value="damaged">Damaged</SelectItem>
-                  <SelectItem value="excellent">Excellent</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+      {/* Scanner Section - Only show if not all items scanned */}
+      {!allItemsScanned && (
+        <>
+          {/* Mobile Device Banner */}
+          {isMobile && (
+            <Alert className="bg-blue-50 border-blue-200">
+              <Smartphone className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-blue-800 text-sm">
+                <strong>Mobile Device:</strong> {deviceInfo}. Hold steady and ensure good lighting.
+              </AlertDescription>
+            </Alert>
+          )}
 
-            <div className="space-y-2">
-              <Label htmlFor="notes">Dispatch Notes</Label>
-              <Textarea
-                id="notes"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Optional notes about this dispatch"
-                rows={3}
-              />
-            </div>
+          {/* Camera Scanner */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Camera className="h-5 w-5" />
+                  Scan QR Codes
+                </div>
+                {availableCameras.length > 0 && (
+                  <Badge variant="outline" className="text-xs">
+                    {availableCameras.length} camera{availableCameras.length > 1 ? 's' : ''}
+                  </Badge>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Camera Error */}
+              {cameraError && (
+                <Alert className="bg-red-50 border-red-200">
+                  <AlertCircle className="h-4 w-4 text-red-600" />
+                  <AlertDescription className="text-red-800 text-sm">
+                    {cameraError}
+                    <Button 
+                      variant="link" 
+                      className="text-red-700 p-0 h-auto ml-2"
+                      onClick={() => {
+                        setCameraError(null);
+                        listAvailableCameras();
+                      }}
+                    >
+                      Try Again
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              )}
+              
+              {/* Camera View */}
+              <div className="relative bg-black rounded-lg overflow-hidden min-h-[300px]">
+                <div 
+                  id={scannerContainerId} 
+                  className="w-full"
+                  style={{ minHeight: '300px' }}
+                />
+                
+                {!isScanning && !cameraError && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80">
+                    <div className="text-center text-white">
+                      <Camera className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm opacity-70">Camera not active</p>
+                      <p className="text-xs opacity-50">Tap "Start Scanner" to begin</p>
+                    </div>
+                  </div>
+                )}
+                
+                {isScanning && (
+                  <div className="absolute bottom-4 left-0 right-0 text-center pointer-events-none">
+                    <span className="bg-green-600 text-white text-sm px-3 py-1 rounded-full animate-pulse">
+                      🔍 Scanning for QR codes...
+                    </span>
+                  </div>
+                )}
+              </div>
 
-            <Button onClick={handleManualScan} className="w-full" disabled={!canScan}>
-              <Scan className="h-4 w-4 mr-2" />
-              Record Dispatch Scan
+              {/* Camera Controls */}
+              <div className="flex flex-wrap gap-2">
+                {!isScanning ? (
+                  <Button onClick={startCameraScanning} className="flex-1 sm:flex-none" size="lg">
+                    <Camera className="h-5 w-5 mr-2" />
+                    Start Scanner
+                  </Button>
+                ) : (
+                  <Button onClick={() => { stopScanning(); toast.info('Scanner stopped'); }} variant="destructive" className="flex-1 sm:flex-none" size="lg">
+                    <RotateCcw className="h-5 w-5 mr-2" />
+                    Stop Scanner
+                  </Button>
+                )}
+                
+                {availableCameras.length > 1 && (
+                  <Button onClick={toggleCamera} variant="outline" size="lg">
+                    <RotateCcw className="h-5 w-5 mr-2" />
+                    {isMobile ? 'Flip' : 'Switch Camera'}
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Manual Entry */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Scan className="h-5 w-5" />
+                Manual / Physical Scanner
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="qr-code">QR Code</Label>
+                <Input
+                  id="qr-code"
+                  value={manualQRCode}
+                  onChange={(e) => setManualQRCode(e.target.value)}
+                  placeholder="Scan or enter QR code"
+                  className="font-mono"
+                  onKeyDown={(e) => e.key === 'Enter' && handleManualScan()}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="condition">Condition</Label>
+                  <Select value={materialCondition} onValueChange={setMaterialCondition}>
+                    <SelectTrigger id="condition">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="good">Good</SelectItem>
+                      <SelectItem value="minor_damage">Minor Damage</SelectItem>
+                      <SelectItem value="damaged">Damaged</SelectItem>
+                      <SelectItem value="excellent">Excellent</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="notes">Notes</Label>
+                  <Input
+                    id="notes"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Optional notes"
+                  />
+                </div>
+              </div>
+
+              <Button onClick={handleManualScan} className="w-full" disabled={!allowAccess}>
+                <Scan className="h-4 w-4 mr-2" />
+                Record Dispatch Scan
+              </Button>
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      {/* Completion Card */}
+      {allItemsScanned && (
+        <Card className="border-green-400 bg-gradient-to-br from-green-50 to-emerald-50">
+          <CardContent className="py-8 text-center">
+            <div className="bg-green-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <PartyPopper className="h-10 w-10 text-green-600" />
+            </div>
+            <h3 className="text-2xl font-bold text-green-800 mb-2">
+              Order Complete! 🎉
+            </h3>
+            <p className="text-green-700 mb-4">
+              All {selectedOrder.total_items} items have been dispatched for Order #{selectedOrder.order_number}
+            </p>
+            <p className="text-sm text-green-600 mb-6">
+              Client: {selectedOrder.buyer_name}
+              {selectedOrder.buyer_email && ` • ${selectedOrder.buyer_email}`}
+            </p>
+            <Button onClick={goBackToOrderSelection} size="lg">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Dispatch Another Order
             </Button>
           </CardContent>
         </Card>
       )}
 
-      {/* Scan Results */}
+      {/* Recent Scans */}
       {scanResults.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <CheckCircle className="h-5 w-5 text-green-500" />
-              Dispatched Items ({scanResults.length})
+              Recently Dispatched ({scanResults.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
+            <div className="space-y-2">
               {scanResults.map((result, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                <div key={index} className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
                   <div>
-                    <p className="font-medium">{result.material_type}</p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="font-medium text-green-800">{result.material_type}</p>
+                    <p className="text-sm text-green-600">
                       {result.quantity} {result.unit} • {result.category}
-                    </p>
-                    <p className="text-xs text-muted-foreground font-mono">
-                      {result.qr_code}
                     </p>
                   </div>
                   <div className="text-right">
-                    <Badge className="bg-blue-500 text-white">
+                    <Badge className="bg-green-600 text-white">
                       <Truck className="h-3 w-3 mr-1" />
                       Dispatched
                     </Badge>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-xs text-green-600 mt-1">
                       {result.timestamp.toLocaleTimeString()}
                     </p>
                   </div>
@@ -682,5 +1058,73 @@ export const DispatchScanner: React.FC = () => {
         </Card>
       )}
     </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ORDER CARD COMPONENT
+// ═══════════════════════════════════════════════════════════════════════════════
+const OrderCard: React.FC<{
+  order: Order;
+  onSelect: (order: Order) => void;
+  isComplete?: boolean;
+}> = ({ order, onSelect, isComplete }) => {
+  const orderDate = order.created_at ? new Date(order.created_at) : null;
+  
+  return (
+    <Card 
+      className={`cursor-pointer transition-all hover:shadow-md ${
+        isComplete 
+          ? 'border-green-200 bg-green-50/50 hover:border-green-300' 
+          : 'border-amber-200 hover:border-amber-400'
+      }`}
+      onClick={() => onSelect(order)}
+    >
+      <CardContent className="py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+              isComplete ? 'bg-green-100' : 'bg-amber-100'
+            }`}>
+              {isComplete ? (
+                <CheckCircle className="h-6 w-6 text-green-600" />
+              ) : (
+                <Package className="h-6 w-6 text-amber-600" />
+              )}
+            </div>
+            <div>
+              <p className="font-bold text-lg">Order #{order.order_number}</p>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <User className="h-3 w-3" />
+                <span>{order.buyer_name}</span>
+                {orderDate && (
+                  <>
+                    <span>•</span>
+                    <Clock className="h-3 w-3" />
+                    <span>{orderDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <p className="text-sm font-medium">
+                {order.dispatched_items}/{order.total_items} dispatched
+              </p>
+              <Progress 
+                value={(order.dispatched_items / order.total_items) * 100} 
+                className="h-2 w-24 mt-1"
+              />
+            </div>
+            <Badge className={isComplete ? 'bg-green-600' : 'bg-amber-600'}>
+              {isComplete ? 'Complete' : `${order.pending_items} pending`}
+            </Badge>
+            <ArrowRight className="h-5 w-5 text-muted-foreground" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
