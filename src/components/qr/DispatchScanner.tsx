@@ -137,12 +137,40 @@ export const DispatchScanner: React.FC = () => {
       if (allScanned && selectedOrder.items.length > 0 && !allItemsScanned) {
         setAllItemsScanned(true);
         toast.success('🎉 All items dispatched!', {
-          description: `Order #${selectedOrder.order_number} is ready for delivery!`,
+          description: `Order #${selectedOrder.order_number} is now shipped and ready for delivery!`,
           duration: 8000
         });
+        
+        // Ensure the order status is updated to 'shipped' in the database
+        const updateOrderToShipped = async () => {
+          try {
+            const { error } = await supabase
+              .from('purchase_orders')
+              .update({ 
+                status: 'shipped',
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', selectedOrder.id)
+              .in('status', ['pending', 'confirmed', 'processing']);
+            
+            if (error) {
+              console.error('Error updating order status to shipped:', error);
+            } else {
+              console.log(`✅ Order #${selectedOrder.order_number} status updated to 'shipped'`);
+              toast.info('📦 Order moved to Shipped', {
+                description: 'The order is now visible in the Shipped tab',
+                duration: 5000
+              });
+            }
+          } catch (err) {
+            console.error('Failed to update order status:', err);
+          }
+        };
+        
+        updateOrderToShipped();
       }
     }
-  }, [selectedOrder]);
+  }, [selectedOrder, allItemsScanned]);
 
   // ─────────────────────────────────────────────────────────────────────────────
   // AUTH & DATA FETCHING
