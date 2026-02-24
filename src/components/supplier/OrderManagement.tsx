@@ -126,7 +126,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
 
   const loadOrders = async () => {
     // ═══════════════════════════════════════════════════════════════════════════════
-    // FAST LOADING - Optimized for speed
+    // FAST LOADING - Optimized for speed but keeping original query logic
     // ═══════════════════════════════════════════════════════════════════════════════
     
     // Get user ID from localStorage immediately (no async wait)
@@ -157,54 +157,78 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
         return;
       }
 
-      // Single fast query using Supabase client with short timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      console.log('🔍 Loading orders for supplier:', effectiveSupplierId);
 
+      // Build list of supplier IDs to check
+      const supplierIds: string[] = [effectiveSupplierId];
+      if (userId && userId !== effectiveSupplierId) {
+        supplierIds.push(userId);
+      }
+
+      // Also get supplier record ID if different from user_id
       try {
-        // Direct Supabase query - much simpler and faster
-        const { data: purchaseOrders, error } = await supabase
-          .from('purchase_orders')
-          .select('*')
-          .or(`supplier_id.eq.${effectiveSupplierId},supplier_id.eq.${userId || effectiveSupplierId}`)
-          .order('created_at', { ascending: false })
-          .limit(50);
-
-        clearTimeout(timeoutId);
-
-        if (error) {
-          console.error('Error fetching orders:', error);
-          setOrders([]);
-          return;
-        }
-
-        if (!purchaseOrders || purchaseOrders.length === 0) {
-          console.log('No orders found for supplier');
-          setOrders([]);
-          return;
-        }
-
-        // Get unique buyer IDs for profile lookup
-        const buyerIds = [...new Set(purchaseOrders.map(po => po.buyer_id).filter(Boolean))];
+        const { data: supplierData } = await supabase
+          .from('suppliers')
+          .select('id, user_id')
+          .or(`user_id.eq.${effectiveSupplierId},id.eq.${effectiveSupplierId}`)
+          .maybeSingle();
         
-        // Fetch buyer profiles in parallel (non-blocking)
-        let buyerProfiles: Record<string, any> = {};
-        if (buyerIds.length > 0) {
-          const { data: profiles } = await supabase
-            .from('profiles')
-            .select('user_id, full_name, email, phone')
-            .in('user_id', buyerIds);
-          
-          if (profiles) {
-            profiles.forEach(p => { buyerProfiles[p.user_id] = p; });
-          }
+        if (supplierData?.id && !supplierIds.includes(supplierData.id)) {
+          supplierIds.push(supplierData.id);
         }
+        if (supplierData?.user_id && !supplierIds.includes(supplierData.user_id)) {
+          supplierIds.push(supplierData.user_id);
+        }
+      } catch (e) {
+        console.log('Supplier lookup skipped');
+      }
 
-        // Map orders quickly
-        const realOrders: Order[] = purchaseOrders.map((po: any, index: number) => {
-          const buyer = buyerProfiles[po.buyer_id] || {};
-          const items = Array.isArray(po.items) ? po.items : [];
-          const isQuoteRequest = po.po_number?.startsWith('QR-') || po.status === 'pending' || po.status === 'quoted';
+      const uniqueSupplierIds = [...new Set(supplierIds)];
+      console.log('🔑 Checking supplier IDs:', uniqueSupplierIds);
+
+      // Fetch orders using IN clause for multiple supplier IDs
+      const { data: purchaseOrders, error } = await supabase
+        .from('purchase_orders')
+        .select('*')
+        .in('supplier_id', uniqueSupplierIds)
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (error) {
+        console.error('❌ Error fetching orders:', error);
+        setOrders([]);
+        return;
+      }
+
+      console.log(`✅ Found ${purchaseOrders?.length || 0} orders`);
+
+      if (!purchaseOrders || purchaseOrders.length === 0) {
+        console.log('No orders found for supplier');
+        setOrders([]);
+        return;
+      }
+
+      // Get unique buyer IDs for profile lookup
+      const buyerIds = [...new Set(purchaseOrders.map(po => po.buyer_id).filter(Boolean))];
+      
+      // Fetch buyer profiles
+      let buyerProfiles: Record<string, any> = {};
+      if (buyerIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('user_id, full_name, email, phone')
+          .in('user_id', buyerIds);
+        
+        if (profiles) {
+          profiles.forEach(p => { buyerProfiles[p.user_id] = p; });
+        }
+      }
+
+      // Map orders
+      const realOrders: Order[] = purchaseOrders.map((po: any, index: number) => {
+        const buyer = buyerProfiles[po.buyer_id] || {};
+        const items = Array.isArray(po.items) ? po.items : [];
+        const isQuoteRequest = po.po_number?.startsWith('QR-') || po.status === 'pending' || po.status === 'quoted';
           
           return {
             id: po.id,
