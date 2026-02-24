@@ -1542,101 +1542,60 @@ const SupplierDashboard = () => {
           </Card>
         </div>
 
-        {/* Quick Actions - Updated to match new tab structure */}
-        <div className="grid grid-cols-3 md:grid-cols-6 gap-3 mb-8">
-          <Button 
-            className="h-auto py-4 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600"
-            onClick={() => setActiveTab('materials')}
-          >
-            <div className="flex flex-col items-center gap-2">
-              <Boxes className="h-6 w-6" />
-              <span className="text-xs sm:text-sm">My Materials</span>
-            </div>
-          </Button>
-          <Button 
-            variant="outline" 
-            className={`h-auto py-4 border-2 ${isDarkMode ? 'border-slate-600 hover:bg-slate-700' : 'hover:bg-orange-50'}`}
-            onClick={() => setActiveTab('view-orders')}
-          >
-            <div className="flex flex-col items-center gap-2">
-              <Eye className={`h-6 w-6 ${isDarkMode ? 'text-orange-400' : 'text-orange-600'}`} />
-              <span className={`text-xs sm:text-sm ${textColor}`}>View Orders</span>
-            </div>
-          </Button>
-          <Button 
-            className="h-auto py-4 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600"
-            onClick={() => setActiveTab('scan-qr')}
-          >
-            <div className="flex flex-col items-center gap-2">
-              <Scan className="h-6 w-6" />
-              <span className="text-xs sm:text-sm">Scan QR</span>
-            </div>
-          </Button>
-          <Button 
-            variant="outline" 
-            className={`h-auto py-4 border-2 ${isDarkMode ? 'border-slate-600 hover:bg-slate-700' : 'hover:bg-purple-50'}`}
-            onClick={() => setActiveTab('extra')}
-          >
-            <div className="flex flex-col items-center gap-2">
-              <Settings className={`h-6 w-6 ${isDarkMode ? 'text-purple-400' : 'text-purple-600'}`} />
-              <span className={`text-xs sm:text-sm ${textColor}`}>Extra</span>
-            </div>
-          </Button>
-          <Button 
-            variant="outline" 
-            className={`h-auto py-4 border-2 ${isDarkMode ? 'border-slate-600 hover:bg-slate-700' : 'hover:bg-blue-50'}`}
-            onClick={() => setActiveTab('analytics')}
-          >
-            <div className="flex flex-col items-center gap-2">
-              <BarChart3 className={`h-6 w-6 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`} />
-              <span className={`text-xs sm:text-sm ${textColor}`}>Analytics</span>
-            </div>
-          </Button>
-          <Button 
-            variant="outline" 
-            className={`h-auto py-4 border-2 ${isDarkMode ? 'border-slate-600 hover:bg-slate-700' : 'hover:bg-green-50'}`}
-            onClick={() => setActiveTab('reports')}
-          >
-            <div className="flex flex-col items-center gap-2">
-              <FileText className={`h-6 w-6 ${isDarkMode ? 'text-green-400' : 'text-green-600'}`} />
-              <span className={`text-xs sm:text-sm ${textColor}`}>Reports</span>
-            </div>
-          </Button>
-        </div>
-
-        {/* Main Content Tabs - Reorganized Navigation */}
+        {/* Main Content Tabs - Single Row Navigation */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className={`${isDarkMode ? 'bg-slate-800' : 'bg-white'} shadow-md p-1 rounded-lg flex-wrap h-auto gap-1`}>
-            <TabsTrigger value="overview" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
+          <TabsList className={`${isDarkMode ? 'bg-slate-800' : 'bg-white'} shadow-lg p-2 rounded-xl flex-wrap h-auto gap-2 w-full justify-start`}>
+            <TabsTrigger 
+              value="overview" 
+              className={`px-4 py-2.5 rounded-lg font-medium transition-all data-[state=active]:bg-orange-500 data-[state=active]:text-white data-[state=active]:shadow-md ${isDarkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-gray-600 hover:bg-gray-100'}`}
+            >
               Overview
             </TabsTrigger>
-            <TabsTrigger value="materials" className="data-[state=active]:bg-orange-500 data-[state=active]:text-white">
-              <Boxes className="h-4 w-4 mr-1" />
+            <TabsTrigger 
+              value="materials" 
+              className={`px-4 py-2.5 rounded-lg font-medium transition-all data-[state=active]:bg-orange-500 data-[state=active]:text-white data-[state=active]:shadow-md ${isDarkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-gray-600 hover:bg-gray-100'}`}
+            >
+              <Boxes className="h-4 w-4 mr-1.5" />
               My Materials
             </TabsTrigger>
-            <TabsTrigger value="view-orders" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
-              <ShoppingCart className="h-4 w-4 mr-1" />
+            <TabsTrigger 
+              value="view-orders" 
+              className={`px-4 py-2.5 rounded-lg font-medium transition-all data-[state=active]:bg-blue-500 data-[state=active]:text-white data-[state=active]:shadow-md ${isDarkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-gray-600 hover:bg-gray-100'}`}
+            >
+              <ShoppingCart className="h-4 w-4 mr-1.5" />
               View Orders
               {quoteRequests.filter(q => q.status === 'pending').length > 0 && (
-                <span className="ml-1 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5">
+                <span className="ml-1.5 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
                   {quoteRequests.filter(q => q.status === 'pending').length}
                 </span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="scan-qr" className="data-[state=active]:bg-cyan-500 data-[state=active]:text-white">
-              <QrCode className="h-4 w-4 mr-1" />
+            <TabsTrigger 
+              value="scan-qr" 
+              className={`px-4 py-2.5 rounded-lg font-medium transition-all data-[state=active]:bg-cyan-500 data-[state=active]:text-white data-[state=active]:shadow-md ${isDarkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-gray-600 hover:bg-gray-100'}`}
+            >
+              <QrCode className="h-4 w-4 mr-1.5" />
               Scan QR
             </TabsTrigger>
-            <TabsTrigger value="extra" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white">
-              <Settings className="h-4 w-4 mr-1" />
+            <TabsTrigger 
+              value="extra" 
+              className={`px-4 py-2.5 rounded-lg font-medium transition-all data-[state=active]:bg-purple-500 data-[state=active]:text-white data-[state=active]:shadow-md ${isDarkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-gray-600 hover:bg-gray-100'}`}
+            >
+              <Settings className="h-4 w-4 mr-1.5" />
               Extra
             </TabsTrigger>
-            <TabsTrigger value="analytics" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-              <BarChart3 className="h-4 w-4 mr-1" />
+            <TabsTrigger 
+              value="analytics" 
+              className={`px-4 py-2.5 rounded-lg font-medium transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md ${isDarkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-gray-600 hover:bg-gray-100'}`}
+            >
+              <BarChart3 className="h-4 w-4 mr-1.5" />
               Analytics
             </TabsTrigger>
-            <TabsTrigger value="reports" className="data-[state=active]:bg-green-600 data-[state=active]:text-white">
-              <FileText className="h-4 w-4 mr-1" />
+            <TabsTrigger 
+              value="reports" 
+              className={`px-4 py-2.5 rounded-lg font-medium transition-all data-[state=active]:bg-green-600 data-[state=active]:text-white data-[state=active]:shadow-md ${isDarkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-gray-600 hover:bg-gray-100'}`}
+            >
+              <FileText className="h-4 w-4 mr-1.5" />
               Reports
             </TabsTrigger>
           </TabsList>
