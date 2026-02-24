@@ -770,9 +770,12 @@ const DeliveryDashboard = () => {
           </Card>
         </div>
 
-        {/* Quick Actions */}
-        <div className="grid md:grid-cols-6 gap-4 mb-8">
-          <Button className="h-auto py-4 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600">
+        {/* Quick Actions - Simplified (removed duplicates) */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <Button 
+            className="h-auto py-4 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600"
+            onClick={() => setActiveTab('active')}
+          >
             <div className="flex flex-col items-center gap-2">
               <NavigationIcon className="h-6 w-6" />
               <span>Start Navigation</span>
@@ -788,25 +791,21 @@ const DeliveryDashboard = () => {
               <span>Scan QR</span>
             </div>
           </Button>
-          <Button variant="outline" className={`h-auto py-4 border-2 ${isDarkMode ? 'border-gray-600 hover:bg-gray-800' : 'hover:bg-teal-50'}`}>
-            <div className="flex flex-col items-center gap-2">
-              <Package className="h-6 w-6 text-teal-600" />
-              <span>View Deliveries</span>
-            </div>
-          </Button>
-          <Button variant="outline" className={`h-auto py-4 border-2 ${isDarkMode ? 'border-gray-600 hover:bg-gray-800' : 'hover:bg-teal-50'}`}>
+          <Button 
+            variant="outline" 
+            className={`h-auto py-4 border-2 ${isDarkMode ? 'border-gray-600 hover:bg-gray-800' : 'hover:bg-teal-50'}`}
+            onClick={() => setActiveTab('analytics')}
+          >
             <div className="flex flex-col items-center gap-2">
               <BarChart3 className="h-6 w-6 text-teal-600" />
-              <span>Earnings Report</span>
+              <span>Earnings</span>
             </div>
           </Button>
-          <Button variant="outline" className={`h-auto py-4 border-2 ${isDarkMode ? 'border-gray-600 hover:bg-gray-800' : 'hover:bg-teal-50'}`}>
-            <div className="flex flex-col items-center gap-2">
-              <Trophy className="h-6 w-6 text-teal-600" />
-              <span>Achievements</span>
-            </div>
-          </Button>
-          <Button variant="outline" className={`h-auto py-4 border-2 ${isDarkMode ? 'border-gray-600 hover:bg-gray-800' : 'hover:bg-teal-50'}`}>
+          <Button 
+            variant="outline" 
+            className={`h-auto py-4 border-2 ${isDarkMode ? 'border-gray-600 hover:bg-gray-800' : 'hover:bg-teal-50'}`}
+            onClick={() => setActiveTab('schedule')}
+          >
             <div className="flex flex-col items-center gap-2">
               <Calendar className="h-6 w-6 text-teal-600" />
               <span>Schedule</span>
@@ -814,30 +813,32 @@ const DeliveryDashboard = () => {
           </Button>
         </div>
 
-        {/* Main Content Tabs */}
+        {/* Main Content Tabs - Simplified & Uniform Styling */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} shadow-md p-1 rounded-lg flex-wrap h-auto`}>
+          <TabsList className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} shadow-md p-1 rounded-lg flex-wrap h-auto gap-1`}>
             <TabsTrigger value="active" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
+              <Truck className="h-4 w-4 mr-1" />
               Active ({activeDeliveries.length})
+            </TabsTrigger>
+            <TabsTrigger value="schedule" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
+              <Calendar className="h-4 w-4 mr-1" />
+              Schedule
             </TabsTrigger>
             <TabsTrigger value="map" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
               <Map className="h-4 w-4 mr-1" />
               Map
             </TabsTrigger>
-            <TabsTrigger value="route" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
-              <Route className="h-4 w-4 mr-1" />
-              Route
+            <TabsTrigger value="scanning" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
+              <Scan className="h-4 w-4 mr-1" />
+              Scanning
             </TabsTrigger>
             <TabsTrigger value="history" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
+              <Clock className="h-4 w-4 mr-1" />
               History
             </TabsTrigger>
             <TabsTrigger value="analytics" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
               <BarChart3 className="h-4 w-4 mr-1" />
               Analytics
-            </TabsTrigger>
-            <TabsTrigger value="achievements" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
-              <Trophy className="h-4 w-4 mr-1" />
-              Achievements
             </TabsTrigger>
             <TabsTrigger value="notifications" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white relative">
               <Bell className="h-4 w-4 mr-1" />
@@ -854,11 +855,7 @@ const DeliveryDashboard = () => {
                 </Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="scanning" className="data-[state=active]:bg-cyan-500 data-[state=active]:text-white">
-              <Scan className="h-4 w-4 mr-1" />
-              Scanning
-            </TabsTrigger>
-            <TabsTrigger value="support" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white">
+            <TabsTrigger value="support" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
               <Headphones className="h-4 w-4 mr-1" />
               Support
             </TabsTrigger>
@@ -1026,6 +1023,47 @@ const DeliveryDashboard = () => {
             </div>
           </TabsContent>
 
+          {/* Schedule Tab - Combines Today, Pending, and Route Planning */}
+          <TabsContent value="schedule">
+            <div className="space-y-6">
+              {/* Today's Summary */}
+              <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'}>
+                <CardHeader>
+                  <CardTitle className={`flex items-center gap-2 ${isDarkMode ? 'text-white' : ''}`}>
+                    <Calendar className="h-5 w-5 text-teal-500" />
+                    Today's Schedule
+                  </CardTitle>
+                  <CardDescription className={isDarkMode ? 'text-gray-400' : ''}>
+                    {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-3 gap-4 mb-6">
+                    <div className={`p-4 rounded-lg text-center ${isDarkMode ? 'bg-green-900/30' : 'bg-green-50'}`}>
+                      <p className={`text-2xl font-bold text-green-600`}>{stats.completedToday}</p>
+                      <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Completed Today</p>
+                    </div>
+                    <div className={`p-4 rounded-lg text-center ${isDarkMode ? 'bg-yellow-900/30' : 'bg-yellow-50'}`}>
+                      <p className={`text-2xl font-bold text-yellow-600`}>{stats.pendingDeliveries}</p>
+                      <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Pending</p>
+                    </div>
+                    <div className={`p-4 rounded-lg text-center ${isDarkMode ? 'bg-blue-900/30' : 'bg-blue-50'}`}>
+                      <p className={`text-2xl font-bold text-blue-600`}>{activeDeliveries.length}</p>
+                      <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Active</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Route Optimizer */}
+              <RouteOptimizer 
+                deliveries={routeDeliveries}
+                onRouteOptimized={(route) => console.log('Optimized route:', route)}
+                onStartNavigation={(stop) => console.log('Start navigation to:', stop)}
+              />
+            </div>
+          </TabsContent>
+
           {/* Map Tab */}
           <TabsContent value="map">
             <DeliveryMap 
@@ -1033,15 +1071,6 @@ const DeliveryDashboard = () => {
               driverLocation={{ lat: -1.2864, lng: 36.8172 }}
               onNavigate={(location) => console.log('Navigate to:', location)}
               onRefresh={() => console.log('Refresh map')}
-            />
-          </TabsContent>
-
-          {/* Route Optimizer Tab */}
-          <TabsContent value="route">
-            <RouteOptimizer 
-              deliveries={routeDeliveries}
-              onRouteOptimized={(route) => console.log('Optimized route:', route)}
-              onStartNavigation={(stop) => console.log('Start navigation to:', stop)}
             />
           </TabsContent>
 
@@ -1142,21 +1171,35 @@ const DeliveryDashboard = () => {
             </Card>
           </TabsContent>
 
-          {/* Analytics Tab */}
+          {/* Analytics Tab - Includes Earnings and Achievements */}
           <TabsContent value="analytics">
-            <DeliveryCharts 
-              deliveryTrends={deliveryTrends}
-              statusDistribution={statusDistribution}
-              earningsData={earningsData}
-            />
-          </TabsContent>
-
-          {/* Achievements Tab */}
-          <TabsContent value="achievements">
-            <DriverGamification 
-              driverId={user?.id || ''}
-              driverName={providerProfile?.full_name || user?.email?.split('@')[0] || 'Driver'}
-            />
+            <div className="space-y-6">
+              {/* Earnings Charts */}
+              <DeliveryCharts 
+                deliveryTrends={deliveryTrends}
+                statusDistribution={statusDistribution}
+                earningsData={earningsData}
+              />
+              
+              {/* Achievements Section */}
+              <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'}>
+                <CardHeader>
+                  <CardTitle className={`flex items-center gap-2 ${isDarkMode ? 'text-white' : ''}`}>
+                    <Trophy className="h-5 w-5 text-amber-500" />
+                    Achievements & Rewards
+                  </CardTitle>
+                  <CardDescription className={isDarkMode ? 'text-gray-400' : ''}>
+                    Track your progress and unlock rewards
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <DriverGamification 
+                    driverId={user?.id || ''}
+                    driverName={providerProfile?.full_name || user?.email?.split('@')[0] || 'Driver'}
+                  />
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           {/* Notifications Tab */}
