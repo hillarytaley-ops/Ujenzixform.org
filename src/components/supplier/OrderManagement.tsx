@@ -481,10 +481,198 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
   const textColor = isDarkMode ? 'text-white' : 'text-gray-900';
   const mutedText = isDarkMode ? 'text-gray-400' : 'text-gray-500';
 
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // RENDER ORDERS TABLE FUNCTION
+  // ═══════════════════════════════════════════════════════════════════════════════
+  const renderOrdersTable = (ordersList: Order[], tabType: 'not_dispatched' | 'shipped' | 'delivered') => {
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center py-12">
+          <RefreshCw className="h-8 w-8 animate-spin text-orange-500" />
+        </div>
+      );
+    }
+
+    if (ordersList.length === 0) {
+      const emptyMessages = {
+        not_dispatched: {
+          title: 'No orders awaiting dispatch',
+          description: 'New orders will appear here when customers place them'
+        },
+        shipped: {
+          title: 'No shipped orders',
+          description: 'Orders will appear here after you dispatch them using the QR scanner'
+        },
+        delivered: {
+          title: 'No delivered orders yet',
+          description: 'Orders will appear here after delivery is confirmed at the construction site'
+        }
+      };
+
+      return (
+        <div className="text-center py-12">
+          <Package className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+          <p className={textColor}>{emptyMessages[tabType].title}</p>
+          <p className={mutedText}>{emptyMessages[tabType].description}</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Order #</TableHead>
+              <TableHead>Customer</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Items</TableHead>
+              <TableHead>Total</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Date</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {ordersList.map((order) => {
+              const statusConfig = getStatusConfig(order.status);
+              const StatusIcon = statusConfig.icon;
+              const nextStatus = getNextStatus(order.status);
+              
+              return (
+                <TableRow key={order.id}>
+                  <TableCell className="font-medium">{order.order_number}</TableCell>
+                  <TableCell>
+                    <div>
+                      <p className="font-medium">{order.customer_name}</p>
+                      <p className={`text-xs ${mutedText}`}>{order.customer_phone}</p>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge 
+                      variant="outline" 
+                      className={order.order_type === 'direct_purchase' 
+                        ? 'bg-green-50 text-green-700 border-green-200' 
+                        : 'bg-blue-50 text-blue-700 border-blue-200'
+                      }
+                    >
+                      {order.order_type === 'direct_purchase' ? '🛒 Direct' : '📋 Quote'}
+                    </Badge>
+                    {order.buyer_role && (
+                      <p className={`text-[10px] mt-1 ${mutedText}`}>
+                        {order.buyer_role === 'private_client' ? 'Private Client' : 
+                         order.buyer_role === 'professional_builder' ? 'Pro Builder' : order.buyer_role}
+                      </p>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <p className="text-sm">{order.items.length} item(s)</p>
+                  </TableCell>
+                  <TableCell className="font-semibold">{formatCurrency(order.total_amount)}</TableCell>
+                  <TableCell>
+                    <Badge className={`${statusConfig.color} flex items-center gap-1 w-fit`}>
+                      <StatusIcon className="h-3 w-3" />
+                      {statusConfig.label}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className={`text-sm ${mutedText}`}>
+                    {format(new Date(order.created_at), 'MMM dd, HH:mm')}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
+                      <Button variant="ghost" size="sm" onClick={() => setSelectedOrder(order)}>
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      {/* For Direct Purchase orders (confirmed), show Process button */}
+                      {order.order_type === 'direct_purchase' && order.status === 'confirmed' && (
+                        <Button 
+                          size="sm" 
+                          onClick={() => updateOrderStatus(order.id, 'processing')}
+                          disabled={updatingOrderId === order.id}
+                          className="bg-green-600 hover:bg-green-700 text-xs"
+                        >
+                          {updatingOrderId === order.id ? '...' : '✅ Process'}
+                        </Button>
+                      )}
+                      {/* For Quote Requests (pending), show Confirm/Reject */}
+                      {order.order_type === 'quote_request' && order.status === 'pending' && (
+                        <>
+                          <Button 
+                            size="sm" 
+                            onClick={() => updateOrderStatus(order.id, 'confirmed')}
+                            disabled={updatingOrderId === order.id}
+                            className="bg-blue-600 hover:bg-blue-700 text-xs"
+                          >
+                            {updatingOrderId === order.id ? '...' : 'Accept'}
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="destructive"
+                            onClick={() => updateOrderStatus(order.id, 'cancelled')}
+                            disabled={updatingOrderId === order.id}
+                            className="text-xs"
+                          >
+                            Reject
+                          </Button>
+                        </>
+                      )}
+                      {/* Processing orders - show Ship button */}
+                      {order.status === 'processing' && (
+                        <Button 
+                          size="sm" 
+                          onClick={() => updateOrderStatus(order.id, 'shipped')}
+                          disabled={updatingOrderId === order.id}
+                          className="bg-purple-600 hover:bg-purple-700 text-xs"
+                        >
+                          {updatingOrderId === order.id ? '...' : '🚚 Ship'}
+                        </Button>
+                      )}
+                      {/* Shipped orders - show Mark Delivered button */}
+                      {order.status === 'shipped' && (
+                        <Button 
+                          size="sm" 
+                          onClick={() => updateOrderStatus(order.id, 'delivered')}
+                          disabled={updatingOrderId === order.id}
+                          className="bg-green-600 hover:bg-green-700 text-xs"
+                        >
+                          {updatingOrderId === order.id ? '...' : '✅ Delivered'}
+                        </Button>
+                      )}
+                      {/* Delivered orders - show completion badge */}
+                      {order.status === 'delivered' && (
+                        <Badge className="bg-green-100 text-green-800 border-green-300">
+                          ✓ Complete
+                        </Badge>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    );
+  };
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // GROUP ORDERS BY DISPATCH STATUS
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // Not Yet Dispatched: pending, confirmed, processing
+  // Shipped: shipped (dispatched but not delivered)
+  // Delivered: delivered (confirmed arrival at site)
+  const notDispatchedOrders = filteredOrders.filter(o => 
+    ['pending', 'confirmed', 'processing'].includes(o.status)
+  );
+  const shippedOrders = filteredOrders.filter(o => o.status === 'shipped');
+  const deliveredOrders = filteredOrders.filter(o => o.status === 'delivered');
+
+  const [activeOrderTab, setActiveOrderTab] = useState<'not_dispatched' | 'shipped' | 'delivered'>('not_dispatched');
+
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className={cardBg}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -496,281 +684,168 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
             </div>
           </CardContent>
         </Card>
-        <Card className={`${cardBg} ${stats.newDirectOrders > 0 ? 'ring-2 ring-green-500 animate-pulse' : ''}`}>
+        <Card 
+          className={`${cardBg} cursor-pointer transition-all hover:ring-2 hover:ring-amber-400 ${activeOrderTab === 'not_dispatched' ? 'ring-2 ring-amber-500' : ''}`}
+          onClick={() => setActiveOrderTab('not_dispatched')}
+        >
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className={`text-sm ${mutedText}`}>🛒 New Orders</p>
-                <p className="text-2xl font-bold text-green-600">{stats.newDirectOrders}</p>
-                <p className={`text-[10px] ${mutedText}`}>Direct purchases to process</p>
+                <p className={`text-sm ${mutedText}`}>📦 Not Dispatched</p>
+                <p className="text-2xl font-bold text-amber-600">{notDispatchedOrders.length}</p>
+                <p className={`text-[10px] ${mutedText}`}>Awaiting dispatch</p>
               </div>
-              <CheckCircle className="h-8 w-8 text-green-500 opacity-50" />
+              <Clock className="h-8 w-8 text-amber-500 opacity-50" />
             </div>
           </CardContent>
         </Card>
-        <Card className={cardBg}>
+        <Card 
+          className={`${cardBg} cursor-pointer transition-all hover:ring-2 hover:ring-purple-400 ${activeOrderTab === 'shipped' ? 'ring-2 ring-purple-500' : ''}`}
+          onClick={() => setActiveOrderTab('shipped')}
+        >
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className={`text-sm ${mutedText}`}>📋 Quotes</p>
-                <p className="text-2xl font-bold text-blue-600">{stats.pending}</p>
-                <p className={`text-[10px] ${mutedText}`}>Quote requests pending</p>
-              </div>
-              <Clock className="h-8 w-8 text-yellow-500 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className={cardBg}>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className={`text-sm ${mutedText}`}>Processing</p>
-                <p className="text-2xl font-bold text-indigo-600">{stats.processing}</p>
-              </div>
-              <Package className="h-8 w-8 text-indigo-500 opacity-50" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className={cardBg}>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className={`text-sm ${mutedText}`}>Shipped</p>
-                <p className="text-2xl font-bold text-purple-600">{stats.shipped}</p>
+                <p className={`text-sm ${mutedText}`}>🚚 Shipped</p>
+                <p className="text-2xl font-bold text-purple-600">{shippedOrders.length}</p>
+                <p className={`text-[10px] ${mutedText}`}>In transit</p>
               </div>
               <Truck className="h-8 w-8 text-purple-500 opacity-50" />
             </div>
           </CardContent>
         </Card>
-        <Card className={cardBg}>
+        <Card 
+          className={`${cardBg} cursor-pointer transition-all hover:ring-2 hover:ring-green-400 ${activeOrderTab === 'delivered' ? 'ring-2 ring-green-500' : ''}`}
+          onClick={() => setActiveOrderTab('delivered')}
+        >
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className={`text-sm ${mutedText}`}>Revenue</p>
-                <p className={`text-lg font-bold ${textColor}`}>{formatCurrency(stats.totalRevenue)}</p>
+                <p className={`text-sm ${mutedText}`}>✅ Delivered</p>
+                <p className="text-2xl font-bold text-green-600">{deliveredOrders.length}</p>
+                <p className={`text-[10px] ${mutedText}`}>Confirmed arrival</p>
               </div>
-              <DollarSign className="h-8 w-8 text-green-500 opacity-50" />
+              <CheckCircle className="h-8 w-8 text-green-500 opacity-50" />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Filters */}
-      <Card className={cardBg}>
-        <CardContent className="pt-6">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search orders..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={orderTypeFilter} onValueChange={setOrderTypeFilter}>
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Order type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="direct_purchase">🛒 Direct Purchases</SelectItem>
-                <SelectItem value="quote_request">📋 Quote Requests</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="confirmed">Confirmed</SelectItem>
-                <SelectItem value="processing">Processing</SelectItem>
-                <SelectItem value="shipped">Shipped</SelectItem>
-                <SelectItem value="delivered">Delivered</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button variant="outline" onClick={loadOrders}>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
-            </Button>
-            <Button variant="outline">
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Order Status Tabs */}
+      <Tabs value={activeOrderTab} onValueChange={(v) => setActiveOrderTab(v as any)} className="w-full">
+        <TabsList className="grid w-full grid-cols-3 mb-4">
+          <TabsTrigger 
+            value="not_dispatched" 
+            className="data-[state=active]:bg-amber-500 data-[state=active]:text-white"
+          >
+            <Clock className="h-4 w-4 mr-2" />
+            Not Dispatched ({notDispatchedOrders.length})
+          </TabsTrigger>
+          <TabsTrigger 
+            value="shipped" 
+            className="data-[state=active]:bg-purple-500 data-[state=active]:text-white"
+          >
+            <Truck className="h-4 w-4 mr-2" />
+            Shipped ({shippedOrders.length})
+          </TabsTrigger>
+          <TabsTrigger 
+            value="delivered" 
+            className="data-[state=active]:bg-green-500 data-[state=active]:text-white"
+          >
+            <CheckCircle className="h-4 w-4 mr-2" />
+            Delivered ({deliveredOrders.length})
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Orders Table */}
-      <Card className={cardBg}>
-        <CardHeader>
-          <CardTitle className={textColor}>Orders ({filteredOrders.length})</CardTitle>
-          <CardDescription className={mutedText}>
-            Manage and track customer orders
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <RefreshCw className="h-8 w-8 animate-spin text-orange-500" />
+        {/* Filters */}
+        <Card className={`${cardBg} mb-4`}>
+          <CardContent className="pt-6">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search orders..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Select value={orderTypeFilter} onValueChange={setOrderTypeFilter}>
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectValue placeholder="Order type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="direct_purchase">🛒 Direct Purchases</SelectItem>
+                  <SelectItem value="quote_request">📋 Quote Requests</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button variant="outline" onClick={loadOrders}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </Button>
+              <Button variant="outline">
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
             </div>
-          ) : filteredOrders.length === 0 ? (
-            <div className="text-center py-12">
-              <Package className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-              <p className={textColor}>No orders found</p>
-              <p className={mutedText}>Orders will appear here when customers place them</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Order #</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Items</TableHead>
-                    <TableHead>Total</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredOrders.map((order) => {
-                    const statusConfig = getStatusConfig(order.status);
-                    const StatusIcon = statusConfig.icon;
-                    const nextStatus = getNextStatus(order.status);
-                    
-                    return (
-                      <TableRow key={order.id}>
-                        <TableCell className="font-medium">{order.order_number}</TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{order.customer_name}</p>
-                            <p className={`text-xs ${mutedText}`}>{order.customer_phone}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge 
-                            variant="outline" 
-                            className={order.order_type === 'direct_purchase' 
-                              ? 'bg-green-50 text-green-700 border-green-200' 
-                              : 'bg-blue-50 text-blue-700 border-blue-200'
-                            }
-                          >
-                            {order.order_type === 'direct_purchase' ? '🛒 Direct' : '📋 Quote'}
-                          </Badge>
-                          {order.buyer_role && (
-                            <p className={`text-[10px] mt-1 ${mutedText}`}>
-                              {order.buyer_role === 'private_client' ? 'Private Client' : 
-                               order.buyer_role === 'professional_builder' ? 'Pro Builder' : order.buyer_role}
-                            </p>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <p className="text-sm">{order.items.length} item(s)</p>
-                        </TableCell>
-                        <TableCell className="font-semibold">{formatCurrency(order.total_amount)}</TableCell>
-                        <TableCell>
-                          <Badge className={`${statusConfig.color} flex items-center gap-1 w-fit`}>
-                            <StatusIcon className="h-3 w-3" />
-                            {statusConfig.label}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className={`text-sm ${mutedText}`}>
-                          {format(new Date(order.created_at), 'MMM dd, HH:mm')}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button variant="ghost" size="sm" onClick={() => setSelectedOrder(order)}>
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            {/* For Direct Purchase orders (confirmed), show Process button */}
-                            {order.order_type === 'direct_purchase' && order.status === 'confirmed' && (
-                              <Button 
-                                size="sm" 
-                                onClick={() => updateOrderStatus(order.id, 'processing')}
-                                disabled={updatingOrderId === order.id}
-                                className="bg-green-600 hover:bg-green-700 text-xs"
-                              >
-                                {updatingOrderId === order.id ? '...' : '✅ Process'}
-                              </Button>
-                            )}
-                            {/* For Quote Requests (pending), show Confirm/Reject */}
-                            {order.order_type === 'quote_request' && order.status === 'pending' && (
-                              <>
-                                <Button 
-                                  size="sm" 
-                                  onClick={() => updateOrderStatus(order.id, 'confirmed')}
-                                  disabled={updatingOrderId === order.id}
-                                  className="bg-blue-600 hover:bg-blue-700 text-xs"
-                                >
-                                  {updatingOrderId === order.id ? '...' : 'Accept'}
-                                </Button>
-                                <Button 
-                                  size="sm" 
-                                  variant="destructive"
-                                  onClick={() => updateOrderStatus(order.id, 'cancelled')}
-                                  disabled={updatingOrderId === order.id}
-                                  className="text-xs"
-                                >
-                                  Reject
-                                </Button>
-                              </>
-                            )}
-                            {/* Standard flow for other statuses */}
-                            {nextStatus && order.status !== 'confirmed' && order.status !== 'pending' && (
-                              <Button 
-                                size="sm" 
-                                onClick={() => updateOrderStatus(order.id, nextStatus)}
-                                disabled={updatingOrderId === order.id}
-                                className="bg-orange-500 hover:bg-orange-600 text-xs"
-                              >
-                                {updatingOrderId === order.id ? '...' : (
-                                  <>
-                                    {nextStatus === 'processing' && 'Process'}
-                                    {nextStatus === 'shipped' && 'Ship'}
-                                    {nextStatus === 'delivered' && 'Complete'}
-                                  </>
-                                )}
-                              </Button>
-                            )}
-                            {/* Processing orders - show Ship button */}
-                            {order.status === 'processing' && (
-                              <Button 
-                                size="sm" 
-                                onClick={() => updateOrderStatus(order.id, 'shipped')}
-                                disabled={updatingOrderId === order.id}
-                                className="bg-purple-600 hover:bg-purple-700 text-xs"
-                              >
-                                {updatingOrderId === order.id ? '...' : '🚚 Ship'}
-                              </Button>
-                            )}
-                            {/* Shipped orders - show Complete button */}
-                            {order.status === 'shipped' && (
-                              <Button 
-                                size="sm" 
-                                onClick={() => updateOrderStatus(order.id, 'delivered')}
-                                disabled={updatingOrderId === order.id}
-                                className="bg-green-600 hover:bg-green-700 text-xs"
-                              >
-                                {updatingOrderId === order.id ? '...' : '✅ Complete'}
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+
+        {/* Not Dispatched Orders Tab */}
+        <TabsContent value="not_dispatched">
+          <Card className={cardBg}>
+            <CardHeader>
+              <CardTitle className={`${textColor} flex items-center gap-2`}>
+                <Clock className="h-5 w-5 text-amber-500" />
+                Orders Not Yet Dispatched ({notDispatchedOrders.length})
+              </CardTitle>
+              <CardDescription className={mutedText}>
+                Orders awaiting processing and dispatch. Print QR codes and scan to dispatch.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {renderOrdersTable(notDispatchedOrders, 'not_dispatched')}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Shipped Orders Tab */}
+        <TabsContent value="shipped">
+          <Card className={cardBg}>
+            <CardHeader>
+              <CardTitle className={`${textColor} flex items-center gap-2`}>
+                <Truck className="h-5 w-5 text-purple-500" />
+                Shipped Orders ({shippedOrders.length})
+              </CardTitle>
+              <CardDescription className={mutedText}>
+                Orders that have been dispatched and are in transit to the construction site.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {renderOrdersTable(shippedOrders, 'shipped')}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Delivered Orders Tab */}
+        <TabsContent value="delivered">
+          <Card className={cardBg}>
+            <CardHeader>
+              <CardTitle className={`${textColor} flex items-center gap-2`}>
+                <CheckCircle className="h-5 w-5 text-green-500" />
+                Delivered Orders ({deliveredOrders.length})
+              </CardTitle>
+              <CardDescription className={mutedText}>
+                Orders confirmed to have arrived at the construction site.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {renderOrdersTable(deliveredOrders, 'delivered')}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Order Details Dialog */}
       <Dialog open={!!selectedOrder} onOpenChange={(open) => !open && setSelectedOrder(null)}>
