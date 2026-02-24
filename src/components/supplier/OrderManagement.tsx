@@ -125,74 +125,52 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
   }, [supplierId]);
 
   const loadOrders = async () => {
-    // ═══════════════════════════════════════════════════════════════════════════════
-    // FAST LOADING - Optimized for speed but keeping original query logic
-    // ═══════════════════════════════════════════════════════════════════════════════
-    
-    // Get user ID from localStorage immediately (no async wait)
-    const getUserIdFromStorage = (): string | null => {
-      try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        if (storedSession) {
-          const parsed = JSON.parse(storedSession);
-          return parsed.user?.id || null;
-        }
-      } catch (e) {
-        return null;
-      }
-      return null;
-    };
-
     try {
       setLoading(true);
+      console.log('🔍 Loading orders... supplierId prop:', supplierId);
+
+      // Step 1: Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id;
       
-      // Use localStorage first (instant), fallback to prop
-      const userId = getUserIdFromStorage();
-      const effectiveSupplierId = supplierId && supplierId.trim() !== '' ? supplierId : userId;
-      
-      if (!effectiveSupplierId) {
-        console.log('❌ No supplier ID available');
+      if (!userId && !supplierId) {
+        console.log('❌ No user or supplier ID');
         setOrders([]);
-        setLoading(false);
         return;
       }
 
-      console.log('🔍 Loading orders for supplier:', effectiveSupplierId);
+      // Step 2: Get supplier record to find all possible IDs
+      const effectiveId = supplierId || userId;
+      console.log('🔑 Looking up supplier with ID:', effectiveId);
 
-      // Build list of supplier IDs to check
-      const supplierIds: string[] = [effectiveSupplierId];
-      if (userId && userId !== effectiveSupplierId) {
-        supplierIds.push(userId);
+      const { data: supplierRecord } = await supabase
+        .from('suppliers')
+        .select('id, user_id')
+        .or(`id.eq.${effectiveId},user_id.eq.${effectiveId}`)
+        .maybeSingle();
+
+      // Build array of all possible supplier IDs
+      const allSupplierIds: string[] = [];
+      if (effectiveId) allSupplierIds.push(effectiveId);
+      if (userId && !allSupplierIds.includes(userId)) allSupplierIds.push(userId);
+      if (supplierRecord?.id && !allSupplierIds.includes(supplierRecord.id)) allSupplierIds.push(supplierRecord.id);
+      if (supplierRecord?.user_id && !allSupplierIds.includes(supplierRecord.user_id)) allSupplierIds.push(supplierRecord.user_id);
+
+      console.log('🔑 All supplier IDs to check:', allSupplierIds);
+
+      if (allSupplierIds.length === 0) {
+        console.log('❌ No supplier IDs found');
+        setOrders([]);
+        return;
       }
 
-      // Also get supplier record ID if different from user_id
-      try {
-        const { data: supplierData } = await supabase
-          .from('suppliers')
-          .select('id, user_id')
-          .or(`user_id.eq.${effectiveSupplierId},id.eq.${effectiveSupplierId}`)
-          .maybeSingle();
-        
-        if (supplierData?.id && !supplierIds.includes(supplierData.id)) {
-          supplierIds.push(supplierData.id);
-        }
-        if (supplierData?.user_id && !supplierIds.includes(supplierData.user_id)) {
-          supplierIds.push(supplierData.user_id);
-        }
-      } catch (e) {
-        console.log('Supplier lookup skipped');
-      }
-
-      const uniqueSupplierIds = [...new Set(supplierIds)];
-      console.log('🔑 Checking supplier IDs:', uniqueSupplierIds);
-
-      // Fetch orders using IN clause for multiple supplier IDs
+      // Step 3: Fetch orders for all supplier IDs
       const { data: purchaseOrders, error } = await supabase
         .from('purchase_orders')
         .select('*')
-        .in('supplier_id', uniqueSupplierIds)
+        .in('supplier_id', allSupplierIds)
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(200);
 
       if (error) {
         console.error('❌ Error fetching orders:', error);
@@ -203,16 +181,14 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
       console.log(`✅ Found ${purchaseOrders?.length || 0} orders`);
 
       if (!purchaseOrders || purchaseOrders.length === 0) {
-        console.log('No orders found for supplier');
         setOrders([]);
         return;
       }
 
-      // Get unique buyer IDs for profile lookup
+      // Step 4: Get buyer profiles in parallel
       const buyerIds = [...new Set(purchaseOrders.map(po => po.buyer_id).filter(Boolean))];
-      
-      // Fetch buyer profiles
       let buyerProfiles: Record<string, any> = {};
+      
       if (buyerIds.length > 0) {
         const { data: profiles } = await supabase
           .from('profiles')
@@ -224,7 +200,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
         }
       }
 
-      // Map orders
+      // Step 5: Map orders to UI format
       const realOrders: Order[] = purchaseOrders.map((po: any, index: number) => {
         const buyer = buyerProfiles[po.buyer_id] || {};
         const items = Array.isArray(po.items) ? po.items : [];
@@ -250,7 +226,6 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
           updated_at: po.updated_at || po.created_at,
           order_type: isQuoteRequest ? 'quote_request' : 'direct_purchase',
           buyer_role: po.buyer_role || 'unknown',
-          // Delivery provider fields
           delivery_provider_id: po.delivery_provider_id || undefined,
           delivery_provider_name: po.delivery_provider_name || undefined,
           delivery_provider_phone: po.delivery_provider_phone || undefined,
@@ -263,7 +238,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
       });
 
       setOrders(realOrders);
-      console.log(`✅ Loaded ${realOrders.length} orders`);
+      console.log(`✅ Loaded ${realOrders.length} orders successfully`);
 
     } catch (error) {
       console.error('Error loading orders:', error);
