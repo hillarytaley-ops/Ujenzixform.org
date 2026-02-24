@@ -1542,62 +1542,102 @@ const SupplierDashboard = () => {
           </Card>
         </div>
 
-        {/* Main Content Tabs - Single Row Navigation */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className={`${isDarkMode ? 'bg-slate-800' : 'bg-white'} shadow-lg p-2 rounded-xl flex-wrap h-auto gap-2 w-full justify-start`}>
-            <TabsTrigger 
-              value="overview" 
-              className={`px-4 py-2.5 rounded-lg font-medium transition-all data-[state=active]:bg-orange-500 data-[state=active]:text-white data-[state=active]:shadow-md ${isDarkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-gray-600 hover:bg-gray-100'}`}
-            >
-              Overview
-            </TabsTrigger>
-            <TabsTrigger 
-              value="materials" 
-              className={`px-4 py-2.5 rounded-lg font-medium transition-all data-[state=active]:bg-orange-500 data-[state=active]:text-white data-[state=active]:shadow-md ${isDarkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-gray-600 hover:bg-gray-100'}`}
-            >
-              <Boxes className="h-4 w-4 mr-1.5" />
-              My Materials
-            </TabsTrigger>
-            <TabsTrigger 
-              value="view-orders" 
-              className={`px-4 py-2.5 rounded-lg font-medium transition-all data-[state=active]:bg-blue-500 data-[state=active]:text-white data-[state=active]:shadow-md ${isDarkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-gray-600 hover:bg-gray-100'}`}
-            >
-              <ShoppingCart className="h-4 w-4 mr-1.5" />
-              View Orders
+        {/* Navigation Cards - Single Row */}
+        <div className="grid grid-cols-3 md:grid-cols-7 gap-3 mb-6">
+          <Button 
+            className={`h-auto py-4 transition-all ${activeTab === 'overview' 
+              ? 'bg-gradient-to-r from-slate-600 to-slate-700 ring-2 ring-slate-400 shadow-lg' 
+              : isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
+            onClick={() => setActiveTab('overview')}
+          >
+            <div className="flex flex-col items-center gap-2">
+              <Store className="h-6 w-6" />
+              <span className="text-xs sm:text-sm">Overview</span>
+            </div>
+          </Button>
+          <Button 
+            className={`h-auto py-4 transition-all ${activeTab === 'materials' 
+              ? 'bg-gradient-to-r from-orange-500 to-amber-500 ring-2 ring-orange-300 shadow-lg' 
+              : isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
+            onClick={() => setActiveTab('materials')}
+          >
+            <div className="flex flex-col items-center gap-2">
+              <Boxes className="h-6 w-6" />
+              <span className="text-xs sm:text-sm">My Materials</span>
+            </div>
+          </Button>
+          <Button 
+            className={`h-auto py-4 transition-all relative ${activeTab === 'view-orders' 
+              ? 'bg-gradient-to-r from-blue-500 to-blue-600 ring-2 ring-blue-300 shadow-lg' 
+              : isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
+            onClick={() => setActiveTab('view-orders')}
+          >
+            <div className="flex flex-col items-center gap-2">
+              <Eye className="h-6 w-6" />
+              <span className="text-xs sm:text-sm">View Orders</span>
               {quoteRequests.filter(q => q.status === 'pending').length > 0 && (
-                <span className="ml-1.5 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
                   {quoteRequests.filter(q => q.status === 'pending').length}
                 </span>
               )}
-            </TabsTrigger>
-            <TabsTrigger 
-              value="scan-qr" 
-              className={`px-4 py-2.5 rounded-lg font-medium transition-all data-[state=active]:bg-cyan-500 data-[state=active]:text-white data-[state=active]:shadow-md ${isDarkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-gray-600 hover:bg-gray-100'}`}
-            >
-              <QrCode className="h-4 w-4 mr-1.5" />
-              Scan QR
-            </TabsTrigger>
-            <TabsTrigger 
-              value="extra" 
-              className={`px-4 py-2.5 rounded-lg font-medium transition-all data-[state=active]:bg-purple-500 data-[state=active]:text-white data-[state=active]:shadow-md ${isDarkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-gray-600 hover:bg-gray-100'}`}
-            >
-              <Settings className="h-4 w-4 mr-1.5" />
-              Extra
-            </TabsTrigger>
-            <TabsTrigger 
-              value="analytics" 
-              className={`px-4 py-2.5 rounded-lg font-medium transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md ${isDarkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-gray-600 hover:bg-gray-100'}`}
-            >
-              <BarChart3 className="h-4 w-4 mr-1.5" />
-              Analytics
-            </TabsTrigger>
-            <TabsTrigger 
-              value="reports" 
-              className={`px-4 py-2.5 rounded-lg font-medium transition-all data-[state=active]:bg-green-600 data-[state=active]:text-white data-[state=active]:shadow-md ${isDarkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-gray-600 hover:bg-gray-100'}`}
-            >
-              <FileText className="h-4 w-4 mr-1.5" />
-              Reports
-            </TabsTrigger>
+            </div>
+          </Button>
+          <Button 
+            className={`h-auto py-4 transition-all ${activeTab === 'scan-qr' 
+              ? 'bg-gradient-to-r from-teal-500 to-cyan-500 ring-2 ring-cyan-300 shadow-lg' 
+              : isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
+            onClick={() => setActiveTab('scan-qr')}
+          >
+            <div className="flex flex-col items-center gap-2">
+              <Scan className="h-6 w-6" />
+              <span className="text-xs sm:text-sm">Scan QR</span>
+            </div>
+          </Button>
+          <Button 
+            className={`h-auto py-4 transition-all ${activeTab === 'extra' 
+              ? 'bg-gradient-to-r from-purple-500 to-purple-600 ring-2 ring-purple-300 shadow-lg' 
+              : isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
+            onClick={() => setActiveTab('extra')}
+          >
+            <div className="flex flex-col items-center gap-2">
+              <Settings className="h-6 w-6" />
+              <span className="text-xs sm:text-sm">Extra</span>
+            </div>
+          </Button>
+          <Button 
+            className={`h-auto py-4 transition-all ${activeTab === 'analytics' 
+              ? 'bg-gradient-to-r from-blue-600 to-indigo-600 ring-2 ring-blue-300 shadow-lg' 
+              : isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
+            onClick={() => setActiveTab('analytics')}
+          >
+            <div className="flex flex-col items-center gap-2">
+              <BarChart3 className="h-6 w-6" />
+              <span className="text-xs sm:text-sm">Analytics</span>
+            </div>
+          </Button>
+          <Button 
+            className={`h-auto py-4 transition-all ${activeTab === 'reports' 
+              ? 'bg-gradient-to-r from-green-500 to-emerald-600 ring-2 ring-green-300 shadow-lg' 
+              : isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}
+            onClick={() => setActiveTab('reports')}
+          >
+            <div className="flex flex-col items-center gap-2">
+              <FileText className="h-6 w-6" />
+              <span className="text-xs sm:text-sm">Reports</span>
+            </div>
+          </Button>
+        </div>
+
+        {/* Tab Content - Hidden TabsList, content controlled by cards above */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="hidden">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="materials">My Materials</TabsTrigger>
+            <TabsTrigger value="view-orders">View Orders</TabsTrigger>
+            <TabsTrigger value="scan-qr">Scan QR</TabsTrigger>
+            <TabsTrigger value="extra">Extra</TabsTrigger>
+            <TabsTrigger value="analytics">Analytics</TabsTrigger>
+            <TabsTrigger value="reports">Reports</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
