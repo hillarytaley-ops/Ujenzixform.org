@@ -1798,7 +1798,11 @@ const SupplierDashboard = () => {
 
                   {/* Orders Sub-Tab */}
                   <TabsContent value="orders">
-                    <OrderManagement supplierId={supplierRecordId || user?.id || ''} isDarkMode={isDarkMode} />
+                    <OrderManagement 
+                      supplierId={supplierRecordId || user?.id || ''} 
+                      isDarkMode={isDarkMode} 
+                      onNavigateToDispatch={() => setActiveTab('scan-qr')}
+                    />
                   </TabsContent>
 
                   {/* Quotes Sub-Tab */}

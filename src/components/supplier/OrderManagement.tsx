@@ -85,6 +85,7 @@ interface Order {
 interface OrderManagementProps {
   supplierId: string;
   isDarkMode?: boolean;
+  onNavigateToDispatch?: () => void;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
@@ -103,7 +104,7 @@ const getStatusConfig = (status: string) => {
   return STATUS_CONFIG[status] || STATUS_CONFIG.pending;
 };
 
-export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, isDarkMode = false }) => {
+export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, isDarkMode = false, onNavigateToDispatch }) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -531,15 +532,18 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
                       <Button variant="ghost" size="sm" onClick={() => setSelectedOrder(order)}>
                         <Eye className="h-4 w-4" />
                       </Button>
-                      {/* For Direct Purchase orders (confirmed), show Process button */}
+                      {/* For Direct Purchase orders (confirmed), show Dispatch button */}
                       {order.order_type === 'direct_purchase' && order.status === 'confirmed' && (
                         <Button 
                           size="sm" 
-                          onClick={() => updateOrderStatus(order.id, 'processing')}
-                          disabled={updatingOrderId === order.id}
+                          onClick={() => {
+                            if (onNavigateToDispatch) {
+                              onNavigateToDispatch();
+                            }
+                          }}
                           className="bg-green-600 hover:bg-green-700 text-xs"
                         >
-                          {updatingOrderId === order.id ? '...' : '✅ Process'}
+                          🚚 Dispatch
                         </Button>
                       )}
                       {/* For Quote Requests (pending), show Confirm/Reject */}
@@ -921,7 +925,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
                       {updatingOrderId === selectedOrder.id ? 'Updating...' : (
                         <>
                           {getNextStatus(selectedOrder.status) === 'confirmed' && 'Confirm Order'}
-                          {getNextStatus(selectedOrder.status) === 'processing' && 'Start Processing'}
+                          {getNextStatus(selectedOrder.status) === 'processing' && 'Go to Dispatch'}
                           {getNextStatus(selectedOrder.status) === 'shipped' && 'Mark as Shipped'}
                           {getNextStatus(selectedOrder.status) === 'delivered' && 'Mark as Delivered'}
                         </>
