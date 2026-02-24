@@ -1173,6 +1173,7 @@ export const DispatchScanner: React.FC = () => {
             </CardContent>
           </Card>
         </details>
+      )}
 
       {/* Completion Card */}
       {allItemsScanned && (
