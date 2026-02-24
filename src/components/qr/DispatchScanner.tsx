@@ -928,16 +928,31 @@ export const DispatchScanner: React.FC = () => {
               .map(item => (
                 <div 
                   key={item.id}
-                  className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
+                  onClick={() => {
+                    if (!item.dispatch_scanned) {
+                      // Copy QR code to clipboard and show toast
+                      navigator.clipboard.writeText(item.qr_code);
+                      toast.info(`QR Code copied: ${item.qr_code.slice(0, 12)}...`, {
+                        description: `You can paste this in the manual scanner below, or scan the physical QR code.`,
+                        duration: 4000
+                      });
+                    } else {
+                      toast.success(`Item #${item.item_sequence} already dispatched`, {
+                        description: `${item.material_type} was scanned at ${item.dispatch_scanned_at ? new Date(item.dispatch_scanned_at).toLocaleTimeString() : 'earlier'}`,
+                        duration: 3000
+                      });
+                    }
+                  }}
+                  className={`flex items-center gap-3 p-3 rounded-lg border transition-all cursor-pointer ${
                     item.dispatch_scanned 
-                      ? 'bg-green-50 border-green-200' 
-                      : 'bg-white border-gray-200 hover:border-amber-300'
+                      ? 'bg-green-50 border-green-200 hover:bg-green-100' 
+                      : 'bg-white border-gray-200 hover:border-amber-400 hover:bg-amber-50 active:bg-amber-100'
                   }`}
                 >
                   {item.dispatch_scanned ? (
                     <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
                   ) : (
-                    <Circle className="h-5 w-5 text-gray-400 shrink-0" />
+                    <Circle className="h-5 w-5 text-amber-500 shrink-0" />
                   )}
                   <div className="flex-1 min-w-0">
                     <p className={`font-medium text-sm truncate ${item.dispatch_scanned ? 'text-green-700' : ''}`}>
@@ -947,9 +962,13 @@ export const DispatchScanner: React.FC = () => {
                       {item.quantity} {item.unit} • {item.category}
                     </p>
                   </div>
-                  {item.dispatch_scanned && (
+                  {item.dispatch_scanned ? (
                     <Badge variant="outline" className="text-green-600 border-green-300 text-xs shrink-0">
                       ✓
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-amber-600 border-amber-300 text-xs shrink-0">
+                      Tap to copy QR
                     </Badge>
                   )}
                 </div>
@@ -1187,15 +1206,35 @@ const OrderCard: React.FC<{
   isComplete?: boolean;
 }> = ({ order, onSelect, isComplete }) => {
   const orderDate = order.created_at ? new Date(order.created_at) : null;
+  const [isPressed, setIsPressed] = React.useState(false);
+  
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsPressed(true);
+    toast.info(`Selecting Order #${order.order_number}...`, { duration: 1000 });
+    // Small delay for visual feedback
+    setTimeout(() => {
+      onSelect(order);
+    }, 100);
+  };
   
   return (
     <Card 
-      className={`cursor-pointer transition-all hover:shadow-md ${
+      className={`cursor-pointer transition-all hover:shadow-lg active:scale-[0.98] select-none ${
         isComplete 
-          ? 'border-green-200 bg-green-50/50 hover:border-green-300' 
-          : 'border-amber-200 hover:border-amber-400'
-      }`}
-      onClick={() => onSelect(order)}
+          ? 'border-green-200 bg-green-50/50 hover:border-green-300 hover:bg-green-100/50' 
+          : 'border-amber-200 hover:border-amber-400 hover:bg-amber-50'
+      } ${isPressed ? 'ring-2 ring-blue-500' : ''}`}
+      onClick={handleClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleClick(e as any);
+        }
+      }}
     >
       <CardContent className="py-4">
         <div className="flex items-center justify-between">
@@ -1235,9 +1274,12 @@ const OrderCard: React.FC<{
                 className="h-2 w-24 mt-1"
               />
             </div>
-            <Badge className={isComplete ? 'bg-green-600' : 'bg-amber-600'}>
-              {isComplete ? 'Complete' : `${order.pending_items} pending`}
-            </Badge>
+            <div className="flex flex-col items-end gap-1">
+              <Badge className={isComplete ? 'bg-green-600' : 'bg-amber-600'}>
+                {isComplete ? 'Complete' : `${order.pending_items} pending`}
+              </Badge>
+              <span className="text-xs text-blue-600 font-medium">Tap to select →</span>
+            </div>
             <ArrowRight className="h-5 w-5 text-muted-foreground" />
           </div>
         </div>
