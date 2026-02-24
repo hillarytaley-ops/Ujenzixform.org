@@ -1022,7 +1022,3 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
 };
 
 export default OrderManagement;
-
-
-
-
