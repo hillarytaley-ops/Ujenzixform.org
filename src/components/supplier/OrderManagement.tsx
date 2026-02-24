@@ -71,6 +71,15 @@ interface Order {
   // Additional fields for order type identification
   order_type?: 'quote_request' | 'direct_purchase';
   buyer_role?: string;
+  // Delivery provider fields
+  delivery_provider_id?: string;
+  delivery_provider_name?: string;
+  delivery_provider_phone?: string;
+  delivery_vehicle_info?: string;
+  delivery_status?: 'pending' | 'requested' | 'assigned' | 'accepted' | 'picked_up' | 'in_transit' | 'delivered' | 'cancelled';
+  delivery_assigned_at?: string;
+  delivery_accepted_at?: string;
+  estimated_delivery_time?: string;
 }
 
 interface OrderManagementProps {
@@ -366,7 +375,16 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
           created_at: po.created_at,
           updated_at: po.updated_at || po.created_at,
           order_type: orderType,
-          buyer_role: buyerRole
+          buyer_role: buyerRole,
+          // Delivery provider fields
+          delivery_provider_id: po.delivery_provider_id || undefined,
+          delivery_provider_name: po.delivery_provider_name || undefined,
+          delivery_provider_phone: po.delivery_provider_phone || undefined,
+          delivery_vehicle_info: po.delivery_vehicle_info || undefined,
+          delivery_status: po.delivery_status || undefined,
+          delivery_assigned_at: po.delivery_assigned_at || undefined,
+          delivery_accepted_at: po.delivery_accepted_at || undefined,
+          estimated_delivery_time: po.estimated_delivery_time || undefined
         };
       });
 
@@ -519,6 +537,58 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
       );
     }
 
+    // Helper to get delivery status badge
+    const getDeliveryStatusBadge = (order: Order) => {
+      if (!order.delivery_provider_id && !order.delivery_provider_name) {
+        return (
+          <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200 text-xs">
+            🚚 No delivery assigned
+          </Badge>
+        );
+      }
+      
+      const deliveryStatusColors: Record<string, string> = {
+        pending: 'bg-gray-100 text-gray-700 border-gray-300',
+        requested: 'bg-yellow-100 text-yellow-700 border-yellow-300',
+        assigned: 'bg-blue-100 text-blue-700 border-blue-300',
+        accepted: 'bg-green-100 text-green-700 border-green-300',
+        picked_up: 'bg-purple-100 text-purple-700 border-purple-300',
+        in_transit: 'bg-indigo-100 text-indigo-700 border-indigo-300',
+        delivered: 'bg-emerald-100 text-emerald-700 border-emerald-300',
+        cancelled: 'bg-red-100 text-red-700 border-red-300'
+      };
+      
+      const statusLabels: Record<string, string> = {
+        pending: '⏳ Pending',
+        requested: '📤 Requested',
+        assigned: '📋 Assigned',
+        accepted: '✅ Accepted',
+        picked_up: '📦 Picked Up',
+        in_transit: '🚚 In Transit',
+        delivered: '✓ Delivered',
+        cancelled: '✗ Cancelled'
+      };
+      
+      const status = order.delivery_status || 'assigned';
+      
+      return (
+        <div className="space-y-1">
+          <Badge variant="outline" className={`${deliveryStatusColors[status] || deliveryStatusColors.assigned} text-xs`}>
+            {statusLabels[status] || 'Assigned'}
+          </Badge>
+          <div className="text-xs">
+            <p className="font-medium text-blue-700">🚚 {order.delivery_provider_name}</p>
+            {order.delivery_provider_phone && (
+              <p className={mutedText}>{order.delivery_provider_phone}</p>
+            )}
+            {order.delivery_vehicle_info && (
+              <p className={`${mutedText} text-[10px]`}>{order.delivery_vehicle_info}</p>
+            )}
+          </div>
+        </div>
+      );
+    };
+
     return (
       <div className="overflow-x-auto">
         <Table>
@@ -529,6 +599,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
               <TableHead>Type</TableHead>
               <TableHead>Items</TableHead>
               <TableHead>Total</TableHead>
+              <TableHead>Delivery</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Date</TableHead>
               <TableHead>Actions</TableHead>
@@ -570,6 +641,9 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
                     <p className="text-sm">{order.items.length} item(s)</p>
                   </TableCell>
                   <TableCell className="font-semibold">{formatCurrency(order.total_amount)}</TableCell>
+                  <TableCell>
+                    {getDeliveryStatusBadge(order)}
+                  </TableCell>
                   <TableCell>
                     <Badge className={`${statusConfig.color} flex items-center gap-1 w-fit`}>
                       <StatusIcon className="h-3 w-3" />
@@ -949,6 +1023,76 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
                         </TableRow>
                       </TableBody>
                     </Table>
+                  </CardContent>
+                </Card>
+
+                {/* Delivery Provider Info */}
+                <Card className={selectedOrder.delivery_provider_name ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'}>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Truck className="h-4 w-4" />
+                      Delivery Information
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {selectedOrder.delivery_provider_name ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-semibold text-blue-800">
+                              🚚 To be delivered by: {selectedOrder.delivery_provider_name}
+                            </p>
+                            {selectedOrder.delivery_provider_phone && (
+                              <p className="text-sm text-blue-600 flex items-center gap-1 mt-1">
+                                <Phone className="h-3 w-3" />
+                                {selectedOrder.delivery_provider_phone}
+                              </p>
+                            )}
+                            {selectedOrder.delivery_vehicle_info && (
+                              <p className="text-xs text-blue-500 mt-1">
+                                Vehicle: {selectedOrder.delivery_vehicle_info}
+                              </p>
+                            )}
+                          </div>
+                          <Badge 
+                            variant="outline" 
+                            className={
+                              selectedOrder.delivery_status === 'accepted' 
+                                ? 'bg-green-100 text-green-700 border-green-300' 
+                                : selectedOrder.delivery_status === 'in_transit'
+                                ? 'bg-indigo-100 text-indigo-700 border-indigo-300'
+                                : 'bg-blue-100 text-blue-700 border-blue-300'
+                            }
+                          >
+                            {selectedOrder.delivery_status === 'accepted' && '✅ Accepted'}
+                            {selectedOrder.delivery_status === 'assigned' && '📋 Assigned'}
+                            {selectedOrder.delivery_status === 'picked_up' && '📦 Picked Up'}
+                            {selectedOrder.delivery_status === 'in_transit' && '🚚 In Transit'}
+                            {selectedOrder.delivery_status === 'delivered' && '✓ Delivered'}
+                            {!selectedOrder.delivery_status && '📋 Assigned'}
+                          </Badge>
+                        </div>
+                        {selectedOrder.estimated_delivery_time && (
+                          <p className="text-sm text-gray-600">
+                            <Calendar className="h-3 w-3 inline mr-1" />
+                            Estimated delivery: {format(new Date(selectedOrder.estimated_delivery_time), 'MMM dd, yyyy HH:mm')}
+                          </p>
+                        )}
+                        {selectedOrder.delivery_accepted_at && (
+                          <p className="text-xs text-green-600">
+                            ✓ Accepted on {format(new Date(selectedOrder.delivery_accepted_at), 'MMM dd, HH:mm')}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4">
+                        <Truck className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                        <p className="text-gray-500 text-sm">No delivery provider assigned yet</p>
+                        <p className="text-gray-400 text-xs mt-1">
+                          A delivery provider will be assigned once the order is processed
+                        </p>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 
