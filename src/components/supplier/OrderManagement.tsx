@@ -129,63 +129,100 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
       setLoading(true);
       console.log('🔍 Loading orders... supplierId prop:', supplierId);
 
-      // Step 1: Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id;
+      // Step 1: Get current user from multiple sources
+      let userId: string | undefined;
       
-      if (!userId && !supplierId) {
-        console.log('❌ No user or supplier ID');
+      // Try Supabase auth first
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        userId = user?.id;
+      } catch (e) {
+        console.log('Auth check failed, trying localStorage');
+      }
+      
+      // Fallback to localStorage
+      if (!userId) {
+        try {
+          const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            userId = parsed.user?.id;
+          }
+        } catch (e) {}
+      }
+      
+      const effectiveId = supplierId && supplierId.trim() !== '' ? supplierId : userId;
+      
+      if (!effectiveId) {
+        console.log('❌ No user or supplier ID available');
         setOrders([]);
         return;
       }
 
-      // Step 2: Get supplier record to find all possible IDs
-      const effectiveId = supplierId || userId;
-      console.log('🔑 Looking up supplier with ID:', effectiveId);
+      console.log('🔑 Effective ID:', effectiveId, 'userId:', userId, 'supplierId prop:', supplierId);
 
-      const { data: supplierRecord } = await supabase
-        .from('suppliers')
-        .select('id, user_id')
-        .or(`id.eq.${effectiveId},user_id.eq.${effectiveId}`)
-        .maybeSingle();
+      // Step 2: Build comprehensive list of supplier IDs
+      const allSupplierIds: string[] = [effectiveId];
+      if (userId && userId !== effectiveId) allSupplierIds.push(userId);
 
-      // Build array of all possible supplier IDs
-      const allSupplierIds: string[] = [];
-      if (effectiveId) allSupplierIds.push(effectiveId);
-      if (userId && !allSupplierIds.includes(userId)) allSupplierIds.push(userId);
-      if (supplierRecord?.id && !allSupplierIds.includes(supplierRecord.id)) allSupplierIds.push(supplierRecord.id);
-      if (supplierRecord?.user_id && !allSupplierIds.includes(supplierRecord.user_id)) allSupplierIds.push(supplierRecord.user_id);
+      // Look up supplier record
+      try {
+        const { data: supplierRecords } = await supabase
+          .from('suppliers')
+          .select('id, user_id')
+          .or(`id.eq.${effectiveId},user_id.eq.${effectiveId}${userId && userId !== effectiveId ? `,id.eq.${userId},user_id.eq.${userId}` : ''}`);
+
+        if (supplierRecords) {
+          supplierRecords.forEach(rec => {
+            if (rec.id && !allSupplierIds.includes(rec.id)) allSupplierIds.push(rec.id);
+            if (rec.user_id && !allSupplierIds.includes(rec.user_id)) allSupplierIds.push(rec.user_id);
+          });
+        }
+      } catch (e) {
+        console.log('Supplier lookup skipped');
+      }
 
       console.log('🔑 All supplier IDs to check:', allSupplierIds);
 
-      if (allSupplierIds.length === 0) {
-        console.log('❌ No supplier IDs found');
-        setOrders([]);
-        return;
-      }
-
-      // Step 3: Fetch orders for all supplier IDs
-      const { data: purchaseOrders, error } = await supabase
+      // Step 3: Fetch orders - try with IN clause first, then fallback to OR
+      let purchaseOrders: any[] = [];
+      
+      const { data: ordersData, error } = await supabase
         .from('purchase_orders')
         .select('*')
         .in('supplier_id', allSupplierIds)
         .order('created_at', { ascending: false })
-        .limit(200);
+        .limit(500);
 
       if (error) {
         console.error('❌ Error fetching orders:', error);
+        // Try alternative query
+        const orFilter = allSupplierIds.map(id => `supplier_id.eq.${id}`).join(',');
+        const { data: altData } = await supabase
+          .from('purchase_orders')
+          .select('*')
+          .or(orFilter)
+          .order('created_at', { ascending: false })
+          .limit(500);
+        purchaseOrders = altData || [];
+      } else {
+        purchaseOrders = ordersData || [];
+      }
+
+      console.log(`✅ Found ${purchaseOrders.length} orders`);
+
+      if (purchaseOrders.length === 0) {
+        // Debug: Check what supplier_ids exist in purchase_orders
+        const { data: debugOrders } = await supabase
+          .from('purchase_orders')
+          .select('id, supplier_id, po_number')
+          .limit(10);
+        console.log('🔍 DEBUG - Sample orders in DB:', debugOrders);
         setOrders([]);
         return;
       }
 
-      console.log(`✅ Found ${purchaseOrders?.length || 0} orders`);
-
-      if (!purchaseOrders || purchaseOrders.length === 0) {
-        setOrders([]);
-        return;
-      }
-
-      // Step 4: Get buyer profiles in parallel
+      // Step 4: Get buyer profiles
       const buyerIds = [...new Set(purchaseOrders.map(po => po.buyer_id).filter(Boolean))];
       let buyerProfiles: Record<string, any> = {};
       
