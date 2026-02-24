@@ -96,6 +96,7 @@ export const DispatchScanner: React.FC = () => {
   // STATE - Completion
   // ─────────────────────────────────────────────────────────────────────────────
   const [allItemsScanned, setAllItemsScanned] = useState(false);
+  const [showItemsList, setShowItemsList] = useState(false);
 
   // Detect device type
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -869,7 +870,7 @@ export const DispatchScanner: React.FC = () => {
   const progressPercent = (selectedOrder.dispatched_items / selectedOrder.total_items) * 100;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Back Button & Order Info Header */}
       <div className="flex items-start justify-between gap-4">
         <Button variant="ghost" onClick={goBackToOrderSelection} className="shrink-0">
@@ -883,256 +884,296 @@ export const DispatchScanner: React.FC = () => {
         </div>
       </div>
 
-      {/* Progress Card */}
-      <Card className={allItemsScanned ? 'border-green-400 bg-green-50' : 'border-amber-200'}>
-        <CardContent className="py-4">
-          <div className="flex items-center justify-between mb-3">
+      {/* Progress Card - Compact */}
+      <Card className={allItemsScanned ? 'border-green-400 bg-green-50' : 'border-blue-200 bg-blue-50'}>
+        <CardContent className="py-3">
+          <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               {allItemsScanned ? (
-                <PartyPopper className="h-6 w-6 text-green-600" />
+                <PartyPopper className="h-5 w-5 text-green-600" />
               ) : (
-                <Package className="h-6 w-6 text-amber-600" />
+                <Truck className="h-5 w-5 text-blue-600" />
               )}
-              <span className="font-semibold">
-                {allItemsScanned ? 'All Items Dispatched!' : 'Dispatch Progress'}
+              <span className="font-semibold text-sm">
+                {allItemsScanned ? '🎉 All Items Dispatched!' : 'Loading Progress'}
               </span>
             </div>
-            <Badge className={allItemsScanned ? 'bg-green-600' : 'bg-amber-600'}>
-              {selectedOrder.dispatched_items} / {selectedOrder.total_items} items
+            <Badge className={allItemsScanned ? 'bg-green-600' : 'bg-blue-600'}>
+              {selectedOrder.dispatched_items} / {selectedOrder.total_items}
             </Badge>
           </div>
-          <Progress value={progressPercent} className="h-3" />
+          <Progress value={progressPercent} className="h-2" />
           {!allItemsScanned && (
-            <p className="text-sm text-muted-foreground mt-2">
-              {selectedOrder.pending_items} item{selectedOrder.pending_items !== 1 ? 's' : ''} remaining to scan
+            <p className="text-xs text-blue-700 mt-1">
+              Scan {selectedOrder.pending_items} more QR code{selectedOrder.pending_items !== 1 ? 's' : ''} as you load items
             </p>
           )}
         </CardContent>
       </Card>
 
-      {/* Items List */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <QrCode className="h-5 w-5" />
-            Items to Dispatch
-          </CardTitle>
-          <CardDescription>
-            Scan QR codes for items marked with ○
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {selectedOrder.items
-              .sort((a, b) => a.item_sequence - b.item_sequence)
-              .map(item => (
-                <div 
-                  key={item.id}
-                  onClick={() => {
-                    if (!item.dispatch_scanned) {
-                      // Copy QR code to clipboard and show toast
-                      navigator.clipboard.writeText(item.qr_code);
-                      toast.info(`QR Code copied: ${item.qr_code.slice(0, 12)}...`, {
-                        description: `You can paste this in the manual scanner below, or scan the physical QR code.`,
-                        duration: 4000
-                      });
-                    } else {
-                      toast.success(`Item #${item.item_sequence} already dispatched`, {
-                        description: `${item.material_type} was scanned at ${item.dispatch_scanned_at ? new Date(item.dispatch_scanned_at).toLocaleTimeString() : 'earlier'}`,
-                        duration: 3000
-                      });
-                    }
-                  }}
-                  className={`flex items-center gap-3 p-3 rounded-lg border transition-all cursor-pointer ${
-                    item.dispatch_scanned 
-                      ? 'bg-green-50 border-green-200 hover:bg-green-100' 
-                      : 'bg-white border-gray-200 hover:border-amber-400 hover:bg-amber-50 active:bg-amber-100'
-                  }`}
-                >
-                  {item.dispatch_scanned ? (
-                    <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
-                  ) : (
-                    <Circle className="h-5 w-5 text-amber-500 shrink-0" />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className={`font-medium text-sm truncate ${item.dispatch_scanned ? 'text-green-700' : ''}`}>
-                      #{item.item_sequence} - {item.material_type}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {item.quantity} {item.unit} • {item.category}
-                    </p>
-                  </div>
-                  {item.dispatch_scanned ? (
-                    <Badge variant="outline" className="text-green-600 border-green-300 text-xs shrink-0">
-                      ✓
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline" className="text-amber-600 border-amber-300 text-xs shrink-0">
-                      Tap to copy QR
-                    </Badge>
-                  )}
-                </div>
-              ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Scanner Section - Only show if not all items scanned */}
+      {/* ════════════════════════════════════════════════════════════════════════════ */}
+      {/* PRIMARY: CAMERA SCANNER - Always visible and prominent when items remain */}
+      {/* ════════════════════════════════════════════════════════════════════════════ */}
       {!allItemsScanned && (
-        <>
-          {/* Mobile Device Banner */}
-          {isMobile && (
-            <Alert className="bg-blue-50 border-blue-200">
-              <Smartphone className="h-4 w-4 text-blue-600" />
-              <AlertDescription className="text-blue-800 text-sm">
-                <strong>Mobile Device:</strong> {deviceInfo}. Hold steady and ensure good lighting.
+        <Card className="border-2 border-green-500 shadow-lg">
+          <CardHeader className="bg-green-50 border-b border-green-200 py-3">
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="bg-green-600 p-2 rounded-lg">
+                  <Camera className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <span className="text-green-800">📷 Scan Physical QR Codes</span>
+                  <p className="text-xs font-normal text-green-600 mt-0.5">
+                    Point camera at QR stickers on materials
+                  </p>
+                </div>
+              </div>
+              {availableCameras.length > 0 && (
+                <Badge className="bg-green-600">
+                  {availableCameras.length} camera{availableCameras.length > 1 ? 's' : ''}
+                </Badge>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 space-y-4">
+            {/* Instructions Banner */}
+            <Alert className="bg-amber-50 border-amber-300">
+              <Truck className="h-4 w-4 text-amber-600" />
+              <AlertDescription className="text-amber-800 text-sm">
+                <strong>Loading Workflow:</strong> As you load each material into the vehicle, 
+                scan its QR code sticker. The system will automatically track which items have been loaded.
               </AlertDescription>
             </Alert>
-          )}
 
-          {/* Camera Scanner */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Camera className="h-5 w-5" />
-                  Scan QR Codes
-                </div>
-                {availableCameras.length > 0 && (
-                  <Badge variant="outline" className="text-xs">
-                    {availableCameras.length} camera{availableCameras.length > 1 ? 's' : ''}
-                  </Badge>
-                )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Camera Error */}
-              {cameraError && (
-                <Alert className="bg-red-50 border-red-200">
-                  <AlertCircle className="h-4 w-4 text-red-600" />
-                  <AlertDescription className="text-red-800 text-sm">
-                    {cameraError}
+            {/* Mobile Device Info */}
+            {isMobile && (
+              <Alert className="bg-blue-50 border-blue-200">
+                <Smartphone className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="text-blue-800 text-sm">
+                  <strong>Tip:</strong> Hold phone steady, 6-12 inches from QR code. Ensure good lighting.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* Camera Error */}
+            {cameraError && (
+              <Alert className="bg-red-50 border-red-200">
+                <AlertCircle className="h-4 w-4 text-red-600" />
+                <AlertDescription className="text-red-800 text-sm">
+                  {cameraError}
+                  <Button 
+                    variant="link" 
+                    className="text-red-700 p-0 h-auto ml-2"
+                    onClick={() => {
+                      setCameraError(null);
+                      listAvailableCameras();
+                    }}
+                  >
+                    Try Again
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            {/* Camera View - Larger and more prominent */}
+            <div className="relative bg-black rounded-xl overflow-hidden" style={{ minHeight: '350px' }}>
+              <div 
+                id={scannerContainerId} 
+                className="w-full"
+                style={{ minHeight: '350px' }}
+              />
+              
+              {!isScanning && !cameraError && (
+                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-gray-800 to-gray-900">
+                  <div className="text-center text-white p-6">
+                    <div className="bg-green-600/20 p-6 rounded-full inline-block mb-4">
+                      <Camera className="h-16 w-16 text-green-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold mb-2">Ready to Scan</h3>
+                    <p className="text-sm opacity-70 mb-4">
+                      Tap the button below to activate your camera
+                    </p>
                     <Button 
-                      variant="link" 
-                      className="text-red-700 p-0 h-auto ml-2"
-                      onClick={() => {
-                        setCameraError(null);
-                        listAvailableCameras();
-                      }}
+                      onClick={startCameraScanning} 
+                      size="lg" 
+                      className="bg-green-600 hover:bg-green-700 text-white px-8 py-6 text-lg"
                     >
-                      Try Again
+                      <Camera className="h-6 w-6 mr-2" />
+                      Start Camera Scanner
                     </Button>
-                  </AlertDescription>
-                </Alert>
+                  </div>
+                </div>
               )}
               
-              {/* Camera View */}
-              <div className="relative bg-black rounded-lg overflow-hidden min-h-[300px]">
-                <div 
-                  id={scannerContainerId} 
-                  className="w-full"
-                  style={{ minHeight: '300px' }}
-                />
-                
-                {!isScanning && !cameraError && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80">
-                    <div className="text-center text-white">
-                      <Camera className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm opacity-70">Camera not active</p>
-                      <p className="text-xs opacity-50">Tap "Start Scanner" to begin</p>
-                    </div>
+              {isScanning && (
+                <>
+                  {/* Scanning overlay with corners */}
+                  <div className="absolute inset-0 pointer-events-none">
+                    <div className="absolute top-8 left-8 w-16 h-16 border-l-4 border-t-4 border-green-400 rounded-tl-lg" />
+                    <div className="absolute top-8 right-8 w-16 h-16 border-r-4 border-t-4 border-green-400 rounded-tr-lg" />
+                    <div className="absolute bottom-20 left-8 w-16 h-16 border-l-4 border-b-4 border-green-400 rounded-bl-lg" />
+                    <div className="absolute bottom-20 right-8 w-16 h-16 border-r-4 border-b-4 border-green-400 rounded-br-lg" />
                   </div>
-                )}
-                
-                {isScanning && (
-                  <div className="absolute bottom-4 left-0 right-0 text-center pointer-events-none">
-                    <span className="bg-green-600 text-white text-sm px-3 py-1 rounded-full animate-pulse">
-                      🔍 Scanning for QR codes...
+                  <div className="absolute bottom-4 left-0 right-0 text-center">
+                    <span className="bg-green-600 text-white text-sm px-4 py-2 rounded-full shadow-lg animate-pulse inline-flex items-center gap-2">
+                      <Scan className="h-4 w-4" />
+                      Scanning... Point at QR code
                     </span>
                   </div>
-                )}
-              </div>
+                </>
+              )}
+            </div>
 
-              {/* Camera Controls */}
-              <div className="flex flex-wrap gap-2">
-                {!isScanning ? (
-                  <Button onClick={startCameraScanning} className="flex-1 sm:flex-none" size="lg">
-                    <Camera className="h-5 w-5 mr-2" />
-                    Start Scanner
-                  </Button>
-                ) : (
-                  <Button onClick={() => { stopScanning(); toast.info('Scanner stopped'); }} variant="destructive" className="flex-1 sm:flex-none" size="lg">
-                    <RotateCcw className="h-5 w-5 mr-2" />
-                    Stop Scanner
-                  </Button>
-                )}
-                
+            {/* Camera Controls - Only show when scanning */}
+            {isScanning && (
+              <div className="flex flex-wrap gap-2 justify-center">
+                <Button onClick={stopScanning} variant="destructive" size="lg">
+                  <X className="h-5 w-5 mr-2" />
+                  Stop Scanner
+                </Button>
                 {availableCameras.length > 1 && (
-                  <Button onClick={toggleCamera} variant="outline" size="lg">
+                  <Button onClick={switchCamera} variant="outline" size="lg">
                     <RotateCcw className="h-5 w-5 mr-2" />
-                    {isMobile ? 'Flip' : 'Switch Camera'}
+                    Switch Camera
                   </Button>
                 )}
               </div>
-            </CardContent>
-          </Card>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
-          {/* Manual Entry */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Scan className="h-5 w-5" />
-                Manual / Physical Scanner
-              </CardTitle>
+      {/* ════════════════════════════════════════════════════════════════════════════ */}
+      {/* ITEMS CHECKLIST - Collapsible, shows what's been scanned */}
+      {/* ════════════════════════════════════════════════════════════════════════════ */}
+      <Card>
+        <CardHeader 
+          className="pb-2 cursor-pointer hover:bg-gray-50 transition-colors" 
+          onClick={() => setShowItemsList(!showItemsList)}
+        >
+          <CardTitle className="text-base flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <QrCode className="h-4 w-4 text-gray-600" />
+              <span>Items Checklist</span>
+              <Badge variant="outline" className="ml-2">
+                {selectedOrder.dispatched_items}/{selectedOrder.total_items} loaded
+              </Badge>
+            </div>
+            <Button variant="ghost" size="sm" className="h-8 px-2">
+              {showItemsList ? '▲ Hide' : '▼ Show'}
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        {showItemsList && (
+          <CardContent className="pt-0">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[300px] overflow-y-auto">
+              {selectedOrder.items
+                .sort((a, b) => a.item_sequence - b.item_sequence)
+                .map(item => (
+                  <div 
+                    key={item.id}
+                    className={`flex items-center gap-2 p-2 rounded-lg border text-sm ${
+                      item.dispatch_scanned 
+                        ? 'bg-green-50 border-green-200' 
+                        : 'bg-gray-50 border-gray-200'
+                    }`}
+                  >
+                    {item.dispatch_scanned ? (
+                      <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+                    ) : (
+                      <Circle className="h-4 w-4 text-gray-400 shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className={`font-medium truncate ${item.dispatch_scanned ? 'text-green-700' : 'text-gray-700'}`}>
+                        #{item.item_sequence} - {item.material_type}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {item.quantity} {item.unit}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </CardContent>
+        )}
+      </Card>
+
+      {/* ════════════════════════════════════════════════════════════════════════════ */}
+      {/* SECONDARY: Manual Entry - Collapsed by default */}
+      {/* ════════════════════════════════════════════════════════════════════════════ */}
+      {!allItemsScanned && (
+        <details className="group">
+          <summary className="cursor-pointer list-none">
+            <Card className="border-dashed border-gray-300 hover:border-gray-400 transition-colors">
+              <CardContent className="py-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <QrCode className="h-4 w-4" />
+                    <span className="text-sm font-medium">Manual / Physical Scanner</span>
+                    <Badge variant="outline" className="text-xs">Alternative</Badge>
+                  </div>
+                  <span className="text-xs text-gray-500 group-open:hidden">▼ Expand</span>
+                  <span className="text-xs text-gray-500 hidden group-open:inline">▲ Collapse</span>
+                </div>
+              </CardContent>
+            </Card>
+          </summary>
+          <Card className="mt-2 border-gray-200">
+            <CardHeader className="py-3">
+              <CardDescription>
+                Use this only if camera scanning doesn't work. Type or paste QR code manually.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="qr-code">QR Code</Label>
+                <Label htmlFor="manual-qr">QR Code</Label>
                 <Input
-                  id="qr-code"
+                  id="manual-qr"
+                  placeholder="Scan or enter QR code"
                   value={manualQRCode}
                   onChange={(e) => setManualQRCode(e.target.value)}
-                  placeholder="Scan or enter QR code"
-                  className="font-mono"
-                  onKeyDown={(e) => e.key === 'Enter' && handleManualScan()}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleManualScan();
+                    }
+                  }}
                 />
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="condition">Condition</Label>
+                  <Label>Condition</Label>
                   <Select value={materialCondition} onValueChange={setMaterialCondition}>
-                    <SelectTrigger id="condition">
+                    <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="good">Good</SelectItem>
-                      <SelectItem value="minor_damage">Minor Damage</SelectItem>
                       <SelectItem value="damaged">Damaged</SelectItem>
-                      <SelectItem value="excellent">Excellent</SelectItem>
+                      <SelectItem value="partial">Partial</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-
                 <div className="space-y-2">
-                  <Label htmlFor="notes">Notes</Label>
+                  <Label>Notes</Label>
                   <Input
-                    id="notes"
+                    placeholder="Optional notes"
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Optional notes"
                   />
                 </div>
               </div>
-
-              <Button onClick={handleManualScan} className="w-full" disabled={!allowAccess}>
-                <Scan className="h-4 w-4 mr-2" />
+              <Button 
+                onClick={handleManualScan} 
+                disabled={!manualQRCode.trim()}
+                className="w-full bg-amber-600 hover:bg-amber-700"
+              >
+                <QrCode className="h-4 w-4 mr-2" />
                 Record Dispatch Scan
               </Button>
             </CardContent>
           </Card>
-        </>
-      )}
+        </details>
 
       {/* Completion Card */}
       {allItemsScanned && (
