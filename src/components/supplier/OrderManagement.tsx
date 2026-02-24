@@ -125,119 +125,109 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
   }, [supplierId]);
 
   const loadOrders = async () => {
+    // Use native fetch API (same as dashboard) for reliability
+    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+    
     try {
       setLoading(true);
-      console.log('🔍 Loading orders... supplierId prop:', supplierId);
+      console.log('🔍 OrderManagement: Loading orders... supplierId prop:', supplierId);
 
-      // Step 1: Get current user from multiple sources
-      let userId: string | undefined;
-      
-      // Try Supabase auth first
+      // Get auth token and user ID from localStorage
+      let accessToken = '';
+      let userId = '';
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        userId = user?.id;
+        const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          accessToken = parsed.access_token || '';
+          userId = parsed.user?.id || '';
+        }
       } catch (e) {
-        console.log('Auth check failed, trying localStorage');
+        console.log('Could not get auth from localStorage');
       }
-      
-      // Fallback to localStorage
-      if (!userId) {
-        try {
-          const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-          if (stored) {
-            const parsed = JSON.parse(stored);
-            userId = parsed.user?.id;
-          }
-        } catch (e) {}
+
+      const headers: Record<string, string> = {
+        'apikey': SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json'
+      };
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
       }
-      
+
+      // Build supplier IDs list
+      const orderSupplierIds: string[] = [];
       const effectiveId = supplierId && supplierId.trim() !== '' ? supplierId : userId;
       
-      if (!effectiveId) {
-        console.log('❌ No user or supplier ID available');
-        setOrders([]);
-        return;
-      }
+      if (effectiveId) orderSupplierIds.push(effectiveId);
+      if (userId && !orderSupplierIds.includes(userId)) orderSupplierIds.push(userId);
 
-      console.log('🔑 Effective ID:', effectiveId, 'userId:', userId, 'supplierId prop:', supplierId);
-
-      // Step 2: Build comprehensive list of supplier IDs
-      const allSupplierIds: string[] = [effectiveId];
-      if (userId && userId !== effectiveId) allSupplierIds.push(userId);
-
-      // Look up supplier record
+      // Look up supplier record to get all related IDs
       try {
-        const { data: supplierRecords } = await supabase
-          .from('suppliers')
-          .select('id, user_id')
-          .or(`id.eq.${effectiveId},user_id.eq.${effectiveId}${userId && userId !== effectiveId ? `,id.eq.${userId},user_id.eq.${userId}` : ''}`);
-
-        if (supplierRecords) {
-          supplierRecords.forEach(rec => {
-            if (rec.id && !allSupplierIds.includes(rec.id)) allSupplierIds.push(rec.id);
-            if (rec.user_id && !allSupplierIds.includes(rec.user_id)) allSupplierIds.push(rec.user_id);
+        const supplierResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/suppliers?or=(user_id.eq.${effectiveId},id.eq.${effectiveId})&select=id,user_id`,
+          { headers, cache: 'no-store' }
+        );
+        if (supplierResponse.ok) {
+          const supplierData = await supplierResponse.json();
+          supplierData.forEach((s: any) => {
+            if (s.id && !orderSupplierIds.includes(s.id)) orderSupplierIds.push(s.id);
+            if (s.user_id && !orderSupplierIds.includes(s.user_id)) orderSupplierIds.push(s.user_id);
           });
         }
       } catch (e) {
-        console.log('Supplier lookup skipped');
+        console.log('Supplier lookup failed');
       }
 
-      console.log('🔑 All supplier IDs to check:', allSupplierIds);
+      console.log('🔑 OrderManagement: Supplier IDs to check:', orderSupplierIds);
 
-      // Step 3: Fetch orders - try with IN clause first, then fallback to OR
-      let purchaseOrders: any[] = [];
-      
-      const { data: ordersData, error } = await supabase
-        .from('purchase_orders')
-        .select('*')
-        .in('supplier_id', allSupplierIds)
-        .order('created_at', { ascending: false })
-        .limit(500);
-
-      if (error) {
-        console.error('❌ Error fetching orders:', error);
-        // Try alternative query
-        const orFilter = allSupplierIds.map(id => `supplier_id.eq.${id}`).join(',');
-        const { data: altData } = await supabase
-          .from('purchase_orders')
-          .select('*')
-          .or(orFilter)
-          .order('created_at', { ascending: false })
-          .limit(500);
-        purchaseOrders = altData || [];
-      } else {
-        purchaseOrders = ordersData || [];
-      }
-
-      console.log(`✅ Found ${purchaseOrders.length} orders`);
-
-      if (purchaseOrders.length === 0) {
-        // Debug: Check what supplier_ids exist in purchase_orders
-        const { data: debugOrders } = await supabase
-          .from('purchase_orders')
-          .select('id, supplier_id, po_number')
-          .limit(10);
-        console.log('🔍 DEBUG - Sample orders in DB:', debugOrders);
+      if (orderSupplierIds.length === 0) {
+        console.log('❌ No supplier IDs found');
         setOrders([]);
         return;
       }
 
-      // Step 4: Get buyer profiles
-      const buyerIds = [...new Set(purchaseOrders.map(po => po.buyer_id).filter(Boolean))];
+      // Fetch orders using native fetch (same as dashboard)
+      const supplierIdsParam = orderSupplierIds.join(',');
+      const ordersResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=in.(${supplierIdsParam})&order=created_at.desc&limit=500`,
+        { headers, cache: 'no-store' }
+      );
+
+      if (!ordersResponse.ok) {
+        console.error('❌ Orders fetch failed:', ordersResponse.status);
+        setOrders([]);
+        return;
+      }
+
+      const purchaseOrders = await ordersResponse.json();
+      console.log(`✅ OrderManagement: Found ${purchaseOrders?.length || 0} orders`);
+
+      if (!purchaseOrders || purchaseOrders.length === 0) {
+        setOrders([]);
+        return;
+      }
+
+      // Fetch buyer profiles
+      const buyerIds = [...new Set(purchaseOrders.map((po: any) => po.buyer_id).filter(Boolean))];
       let buyerProfiles: Record<string, any> = {};
       
       if (buyerIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('user_id, full_name, email, phone')
-          .in('user_id', buyerIds);
-        
-        if (profiles) {
-          profiles.forEach(p => { buyerProfiles[p.user_id] = p; });
+        try {
+          const profilesResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/profiles?user_id=in.(${buyerIds.join(',')})&select=user_id,full_name,email,phone`,
+            { headers, cache: 'no-store' }
+          );
+          if (profilesResponse.ok) {
+            const profiles = await profilesResponse.json();
+            profiles.forEach((p: any) => { buyerProfiles[p.user_id] = p; });
+          }
+        } catch (e) {
+          console.log('Profiles fetch failed');
         }
       }
 
-      // Step 5: Map orders to UI format
+      // Map orders to UI format
       const realOrders: Order[] = purchaseOrders.map((po: any, index: number) => {
         const buyer = buyerProfiles[po.buyer_id] || {};
         const items = Array.isArray(po.items) ? po.items : [];
@@ -275,7 +265,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
       });
 
       setOrders(realOrders);
-      console.log(`✅ Loaded ${realOrders.length} orders successfully`);
+      console.log(`✅ OrderManagement: Loaded ${realOrders.length} orders successfully`);
 
     } catch (error) {
       console.error('Error loading orders:', error);
