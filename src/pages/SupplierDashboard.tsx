@@ -526,6 +526,7 @@ const SupplierDashboard = () => {
   });
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [activeTab, setActiveTab] = useState('overview');
+  const [viewOrdersSubTab, setViewOrdersSubTab] = useState('orders');
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [showProfileView, setShowProfileView] = useState(false);
   const [quoteRequests, setQuoteRequests] = useState<any[]>([]);
@@ -1775,7 +1776,7 @@ const SupplierDashboard = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Tabs defaultValue="orders" className="space-y-4">
+                <Tabs value={viewOrdersSubTab} onValueChange={setViewOrdersSubTab} className="space-y-4">
                   <TabsList className={`${isDarkMode ? 'bg-slate-700' : 'bg-gray-100'} p-1 rounded-lg`}>
                     <TabsTrigger value="orders" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
                       <Package className="h-4 w-4 mr-1" />
@@ -1801,7 +1802,7 @@ const SupplierDashboard = () => {
                     <OrderManagement 
                       supplierId={supplierRecordId || user?.id || ''} 
                       isDarkMode={isDarkMode} 
-                      onNavigateToDispatch={() => setActiveTab('scan-qr')}
+                      onNavigateToDispatch={() => setViewOrdersSubTab('dispatch')}
                     />
                   </TabsContent>
 
