@@ -229,38 +229,38 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
         const buyer = buyerProfiles[po.buyer_id] || {};
         const items = Array.isArray(po.items) ? po.items : [];
         const isQuoteRequest = po.po_number?.startsWith('QR-') || po.status === 'pending' || po.status === 'quoted';
-          
-          return {
-            id: po.id,
-            order_number: po.po_number || `ORD-${String(index + 1).padStart(4, '0')}`,
-            customer_name: buyer.full_name || po.project_name || 'Customer',
-            customer_email: buyer.email || '',
-            customer_phone: buyer.phone || '',
-            delivery_address: po.delivery_address || '',
-            items: items.map((item: any) => ({
-              name: item.material_name || item.name || 'Item',
-              quantity: item.quantity || 1,
-              price: item.unit_price || item.price || 0
-            })),
-            total_amount: po.total_amount || 0,
-            status: (po.status || 'pending') as Order['status'],
-            payment_status: 'paid' as const,
-            notes: po.special_instructions || po.delivery_notes || '',
-            created_at: po.created_at,
-            updated_at: po.updated_at || po.created_at,
-            order_type: isQuoteRequest ? 'quote_request' : 'direct_purchase',
-            buyer_role: po.buyer_role || 'unknown',
-            // Delivery provider fields
-            delivery_provider_id: po.delivery_provider_id || undefined,
-            delivery_provider_name: po.delivery_provider_name || undefined,
-            delivery_provider_phone: po.delivery_provider_phone || undefined,
-            delivery_vehicle_info: po.delivery_vehicle_info || undefined,
-            delivery_status: po.delivery_status || undefined,
-            delivery_assigned_at: po.delivery_assigned_at || undefined,
-            delivery_accepted_at: po.delivery_accepted_at || undefined,
-            estimated_delivery_time: po.estimated_delivery_time || undefined
-          };
-        });
+        
+        return {
+          id: po.id,
+          order_number: po.po_number || `ORD-${String(index + 1).padStart(4, '0')}`,
+          customer_name: buyer.full_name || po.project_name || 'Customer',
+          customer_email: buyer.email || '',
+          customer_phone: buyer.phone || '',
+          delivery_address: po.delivery_address || '',
+          items: items.map((item: any) => ({
+            name: item.material_name || item.name || 'Item',
+            quantity: item.quantity || 1,
+            price: item.unit_price || item.price || 0
+          })),
+          total_amount: po.total_amount || 0,
+          status: (po.status || 'pending') as Order['status'],
+          payment_status: 'paid' as const,
+          notes: po.special_instructions || po.delivery_notes || '',
+          created_at: po.created_at,
+          updated_at: po.updated_at || po.created_at,
+          order_type: isQuoteRequest ? 'quote_request' : 'direct_purchase',
+          buyer_role: po.buyer_role || 'unknown',
+          // Delivery provider fields
+          delivery_provider_id: po.delivery_provider_id || undefined,
+          delivery_provider_name: po.delivery_provider_name || undefined,
+          delivery_provider_phone: po.delivery_provider_phone || undefined,
+          delivery_vehicle_info: po.delivery_vehicle_info || undefined,
+          delivery_status: po.delivery_status || undefined,
+          delivery_assigned_at: po.delivery_assigned_at || undefined,
+          delivery_accepted_at: po.delivery_accepted_at || undefined,
+          estimated_delivery_time: po.estimated_delivery_time || undefined
+        };
+      });
 
         setOrders(realOrders);
         console.log(`✅ Loaded ${realOrders.length} orders`);
