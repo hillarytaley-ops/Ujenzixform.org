@@ -61,10 +61,11 @@ import { PendingQuoteRequests } from "@/components/builders/PendingQuoteRequests
 import DeliveryRequest from "@/components/DeliveryRequest";
 import { InAppCommunication } from "@/components/communication/InAppCommunication";
 import { TrackingTab } from "@/components/tracking/TrackingTab";
-import { Navigation as NavigationIcon, Settings, QrCode } from "lucide-react";
+import { Navigation as NavigationIcon, Navigation, Settings, QrCode } from "lucide-react";
 import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
 import { ProfileViewDialog } from "@/components/profile/ProfileViewDialog";
 import { ProjectDetails } from "@/components/projects/ProjectDetails";
+import { MapLocationPicker } from "@/components/location/MapLocationPicker";
 
 const ProfessionalBuilderDashboardPage = () => {
   // Use AuthContext for reliable user data
@@ -104,6 +105,7 @@ const ProfessionalBuilderDashboardPage = () => {
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [selectedProject, setSelectedProject] = useState<any>(null);
   const [gettingProjectLocation, setGettingProjectLocation] = useState(false);
+  const [showMapPicker, setShowMapPicker] = useState(false);
   const [newProject, setNewProject] = useState({
     name: '',
     location: '',
@@ -1442,45 +1444,110 @@ const ProfessionalBuilderDashboardPage = () => {
                               <MapPin className="h-4 w-4" />
                               Project Site GPS Location
                             </Label>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={getProjectLocation}
-                              disabled={gettingProjectLocation}
-                              className="border-blue-300 text-blue-700 hover:bg-blue-100"
-                            >
-                              {gettingProjectLocation ? (
-                                <>
-                                  <div className="h-4 w-4 mr-2 animate-spin border-2 border-blue-500 border-t-transparent rounded-full" />
-                                  Getting Location...
-                                </>
-                              ) : (
-                                <>
-                                  <MapPin className="h-4 w-4 mr-2" />
-                                  📍 Use Current Location
-                                </>
-                              )}
-                            </Button>
+                            <div className="flex gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setShowMapPicker(true)}
+                                className="border-blue-300 text-blue-700 hover:bg-blue-100"
+                              >
+                                <MapPin className="h-4 w-4 mr-2" />
+                                🗺️ Search on Map
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={getProjectLocation}
+                                disabled={gettingProjectLocation}
+                                className="border-green-300 text-green-700 hover:bg-green-100"
+                              >
+                                {gettingProjectLocation ? (
+                                  <>
+                                    <div className="h-4 w-4 mr-2 animate-spin border-2 border-green-500 border-t-transparent rounded-full" />
+                                    Getting...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Navigation className="h-4 w-4 mr-2" />
+                                    📍 My Location
+                                  </>
+                                )}
+                              </Button>
+                            </div>
                           </div>
-                          <p className="text-xs text-blue-600 mb-2">
+                          <p className="text-xs text-blue-600 mb-3">
                             Setting the GPS location ensures accurate delivery of materials to your project site
                           </p>
-                          {newProject.latitude && newProject.longitude ? (
-                            <div className="bg-green-100 border border-green-300 rounded p-2 text-sm">
-                              <p className="text-green-800 font-medium flex items-center gap-1">
-                                <CheckCircle className="h-4 w-4" />
-                                Location Set!
-                              </p>
-                              <p className="text-green-700 text-xs font-mono">
-                                Lat: {newProject.latitude.toFixed(6)}, Lng: {newProject.longitude.toFixed(6)}
-                              </p>
-                              {newProject.address && (
-                                <p className="text-green-600 text-xs mt-1 truncate">📍 {newProject.address}</p>
-                              )}
+                          
+                          {/* Map Picker */}
+                          {showMapPicker && (
+                            <div className="mb-3 border border-blue-300 rounded-lg p-3 bg-white">
+                              <MapLocationPicker
+                                initialLocation={{
+                                  latitude: newProject.latitude || undefined,
+                                  longitude: newProject.longitude || undefined,
+                                  address: newProject.address
+                                }}
+                                onLocationSelect={(location) => {
+                                  setNewProject(prev => ({
+                                    ...prev,
+                                    latitude: location.latitude,
+                                    longitude: location.longitude,
+                                    address: location.address,
+                                    location: prev.location || location.county || location.address?.split(',')[0] || ''
+                                  }));
+                                  setShowMapPicker(false);
+                                  toast({
+                                    title: '📍 Location Set!',
+                                    description: location.county 
+                                      ? `Project location set to ${location.county}` 
+                                      : 'GPS coordinates saved from map.'
+                                  });
+                                }}
+                                onClose={() => setShowMapPicker(false)}
+                                title="Select Project Location"
+                                description="Search for an address or click on the map to set your project site location"
+                              />
                             </div>
-                          ) : (
-                            <p className="text-xs text-gray-500 italic">No GPS coordinates set yet</p>
+                          )}
+                          
+                          {/* Location Status */}
+                          {!showMapPicker && (
+                            <>
+                              {newProject.latitude && newProject.longitude ? (
+                                <div className="bg-green-100 border border-green-300 rounded p-3 text-sm">
+                                  <p className="text-green-800 font-medium flex items-center gap-1">
+                                    <CheckCircle className="h-4 w-4" />
+                                    Location Set!
+                                  </p>
+                                  <p className="text-green-700 text-xs font-mono mt-1">
+                                    Lat: {newProject.latitude.toFixed(6)}, Lng: {newProject.longitude.toFixed(6)}
+                                  </p>
+                                  {newProject.address && (
+                                    <p className="text-green-600 text-xs mt-1">📍 {newProject.address}</p>
+                                  )}
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="mt-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 p-0 h-auto"
+                                    onClick={() => setShowMapPicker(true)}
+                                  >
+                                    Change location on map →
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div className="text-center py-4 border-2 border-dashed border-blue-200 rounded-lg">
+                                  <MapPin className="h-8 w-8 text-blue-300 mx-auto mb-2" />
+                                  <p className="text-sm text-gray-600">No GPS coordinates set yet</p>
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    Use "Search on Map" to find any location, or "My Location" if you're at the project site
+                                  </p>
+                                </div>
+                              )}
+                            </>
                           )}
                         </div>
                         
