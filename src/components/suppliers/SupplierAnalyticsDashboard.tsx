@@ -69,6 +69,7 @@ import {
 
 interface SupplierAnalyticsDashboardProps {
   supplierId: string;
+  onNavigateToOrders?: () => void;
 }
 
 interface SalesMetrics {
@@ -113,7 +114,7 @@ interface CategoryData {
 
 const CHART_COLORS = ['#2563eb', '#16a34a', '#dc2626', '#ca8a04', '#9333ea', '#0891b2', '#be123c', '#15803d'];
 
-export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProps> = ({ supplierId }) => {
+export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProps> = ({ supplierId, onNavigateToOrders }) => {
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState('30days');
   const [metrics, setMetrics] = useState<SalesMetrics | null>(null);
@@ -164,7 +165,7 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
       setRevenueData(chartData);
 
       // Calculate category distribution
-      const categories = calculateCategoryDistribution(ordersData);
+      const categories = calculateCategoryDistribution(ordersData, productsData);
       setCategoryData(categories);
 
       // Get top performing products
@@ -327,38 +328,127 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
   };
 
   const generateRevenueChartData = (orders: any[]): RevenueData[] => {
-    // Group by date - only confirmed/completed orders for revenue
-    const grouped = new Map<string, { revenue: number; orders: number; quotes: number }>();
+    // Determine the number of days based on timeRange
+    const daysMap: Record<string, number> = {
+      '7days': 7,
+      '30days': 30,
+      '90days': 90,
+      'year': 365
+    };
+    const numDays = daysMap[timeRange] || 30;
     
+    // Create a map for all days in the range
+    const today = new Date();
+    const dailyData = new Map<string, { revenue: number; orders: number; quotes: number }>();
+    
+    // Initialize all days with zero values
+    for (let i = numDays - 1; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      const dateKey = date.toISOString().split('T')[0]; // YYYY-MM-DD format for sorting
+      dailyData.set(dateKey, { revenue: 0, orders: 0, quotes: 0 });
+    }
+    
+    // Populate with actual order data
     orders.forEach(order => {
-      const date = new Date(order.created_at || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      const existing = grouped.get(date) || { revenue: 0, orders: 0, quotes: 0 };
-      const isConfirmed = ['confirmed', 'completed', 'delivered'].includes(order.status);
-      grouped.set(date, {
-        revenue: existing.revenue + (isConfirmed ? (parseFloat(order.total_amount) || 0) : 0),
-        orders: existing.orders + (isConfirmed ? 1 : 0),
-        quotes: existing.quotes + (['pending', 'quoted'].includes(order.status) ? 1 : 0)
-      });
+      const orderDate = new Date(order.created_at || Date.now());
+      const dateKey = orderDate.toISOString().split('T')[0];
+      
+      // Only include orders within the time range
+      if (dailyData.has(dateKey)) {
+        const existing = dailyData.get(dateKey)!;
+        const isConfirmed = ['confirmed', 'completed', 'delivered', 'shipped'].includes(order.status);
+        const isQuote = ['pending', 'quoted'].includes(order.status);
+        
+        dailyData.set(dateKey, {
+          revenue: existing.revenue + (isConfirmed ? (parseFloat(order.total_amount) || 0) : 0),
+          orders: existing.orders + (isConfirmed ? 1 : 0),
+          quotes: existing.quotes + (isQuote ? 1 : 0)
+        });
+      }
     });
 
-    // Convert to array and sort
-    return Array.from(grouped.entries()).map(([date, data]) => ({
-      date,
-      ...data
-    })).slice(-14); // Last 14 data points
+    // Convert to array, sort by date, and format for display
+    const result = Array.from(dailyData.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([dateKey, data]) => {
+        const date = new Date(dateKey);
+        const displayDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        return {
+          date: displayDate,
+          ...data
+        };
+      });
+    
+    // For longer periods, aggregate to show fewer data points
+    if (numDays > 30) {
+      // Group by week for 90 days, by month for year
+      const aggregationDays = numDays > 90 ? 30 : 7;
+      const aggregated: RevenueData[] = [];
+      
+      for (let i = 0; i < result.length; i += aggregationDays) {
+        const chunk = result.slice(i, i + aggregationDays);
+        const aggregatedData = chunk.reduce(
+          (acc, item) => ({
+            date: chunk[0].date,
+            revenue: acc.revenue + item.revenue,
+            orders: acc.orders + item.orders,
+            quotes: acc.quotes + item.quotes
+          }),
+          { date: '', revenue: 0, orders: 0, quotes: 0 }
+        );
+        aggregated.push(aggregatedData);
+      }
+      return aggregated;
+    }
+    
+    return result;
   };
 
-  const calculateCategoryDistribution = (orders: any[]): CategoryData[] => {
+  const calculateCategoryDistribution = (orders: any[], products: any[]): CategoryData[] => {
     const categories = new Map<string, number>();
     
     // Extract categories from order items
     orders.forEach(order => {
       const items = order.items || [];
-      items.forEach((item: any) => {
-        const category = item.category || 'Other';
-        categories.set(category, (categories.get(category) || 0) + (parseFloat(item.total_price) || parseFloat(item.price) || 0));
-      });
+      
+      // Process items array if present
+      if (items.length > 0) {
+        items.forEach((item: any) => {
+          const category = item.category || 'Other';
+          const amount = parseFloat(item.total_price) || parseFloat(item.price) || 0;
+          categories.set(category, (categories.get(category) || 0) + amount);
+        });
+      } else {
+        // Try to get category from order's material_name or look up in products
+        let category = order.category || 'Other';
+        
+        // Try to find category from material name
+        const materialName = order.material_name || '';
+        if (materialName.toLowerCase().includes('cement')) category = 'Cement';
+        else if (materialName.toLowerCase().includes('steel') || materialName.toLowerCase().includes('iron')) category = 'Steel';
+        else if (materialName.toLowerCase().includes('paint')) category = 'Paint';
+        else if (materialName.toLowerCase().includes('roof') || materialName.toLowerCase().includes('mabati')) category = 'Roofing';
+        else if (materialName.toLowerCase().includes('timber') || materialName.toLowerCase().includes('wood')) category = 'Timber';
+        else if (materialName.toLowerCase().includes('pipe') || materialName.toLowerCase().includes('plumbing')) category = 'Plumbing';
+        else if (materialName.toLowerCase().includes('electrical') || materialName.toLowerCase().includes('wire')) category = 'Electrical';
+        else if (materialName.toLowerCase().includes('tile') || materialName.toLowerCase().includes('ceramic')) category = 'Tiles';
+        
+        const amount = parseFloat(order.total_amount) || 0;
+        if (amount > 0) {
+          categories.set(category, (categories.get(category) || 0) + amount);
+        }
+      }
     });
+
+    // If no categories from orders, use product categories
+    if (categories.size === 0 && products.length > 0) {
+      products.forEach(product => {
+        const category = product.category || product.admin_material_images?.category || 'Other';
+        const price = parseFloat(product.price) || 0;
+        categories.set(category, (categories.get(category) || 0) + price);
+      });
+    }
 
     return Array.from(categories.entries())
       .map(([name, value], index) => ({
@@ -371,23 +461,66 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
   };
 
   const calculateProductPerformance = (products: any[], orders: any[]): ProductPerformance[] => {
-    return products.slice(0, 10).map((product, index) => {
-      const productOrders = orders.filter(o => o.product_id === product.product_id);
-      const totalSales = productOrders.reduce((sum, o) => sum + (o.quantity || 0), 0);
-      const revenue = productOrders.reduce((sum, o) => sum + (o.total_price || 0), 0);
+    // Build a map of product sales from order items
+    const productSalesMap = new Map<string, { quantity: number; revenue: number; orderCount: number }>();
+    
+    // Extract sales data from orders
+    orders.forEach(order => {
+      const items = order.items || [];
+      items.forEach((item: any) => {
+        const productId = item.product_id || item.id;
+        const existing = productSalesMap.get(productId) || { quantity: 0, revenue: 0, orderCount: 0 };
+        productSalesMap.set(productId, {
+          quantity: existing.quantity + (item.quantity || 1),
+          revenue: existing.revenue + (parseFloat(item.total_price) || parseFloat(item.price) || 0),
+          orderCount: existing.orderCount + 1
+        });
+      });
+      
+      // Also check if order has direct product info
+      if (order.product_id || order.material_name) {
+        const productId = order.product_id || order.material_name;
+        const existing = productSalesMap.get(productId) || { quantity: 0, revenue: 0, orderCount: 0 };
+        productSalesMap.set(productId, {
+          quantity: existing.quantity + (order.quantity || 1),
+          revenue: existing.revenue + (parseFloat(order.total_amount) || 0),
+          orderCount: existing.orderCount + 1
+        });
+      }
+    });
+
+    // Map products with their sales data
+    const productPerformance: ProductPerformance[] = products.map((product) => {
+      const productId = product.product_id || product.id;
+      const productName = product.product_name || product.admin_material_images?.name || product.material_name || 'Unknown Product';
+      const salesData = productSalesMap.get(productId) || { quantity: 0, revenue: 0, orderCount: 0 };
+      
+      // Calculate stock level from product data
+      const stockQuantity = product.stock_quantity || 0;
+      const minStock = product.min_stock_level || 10;
+      const maxStock = product.max_stock_level || 100;
+      const stockLevel = maxStock > 0 ? Math.min(100, (stockQuantity / maxStock) * 100) : (product.in_stock ? 100 : 0);
+      
+      // Determine trend based on recent orders
+      const trend: 'up' | 'down' | 'stable' = salesData.orderCount > 2 ? 'up' : salesData.orderCount > 0 ? 'stable' : 'down';
 
       return {
-        id: product.id,
-        name: product.admin_material_images?.name || `Product ${index + 1}`,
-        category: product.admin_material_images?.category || 'General',
-        totalSales,
-        revenue,
-        views: Math.floor(Math.random() * 500) + 100,
-        conversionRate: Math.random() * 20 + 5,
-        stockLevel: product.in_stock ? 100 : 0,
-        trend: Math.random() > 0.5 ? 'up' : 'down'
+        id: productId,
+        name: productName,
+        category: product.category || product.admin_material_images?.category || 'General',
+        totalSales: salesData.quantity,
+        revenue: salesData.revenue,
+        views: salesData.orderCount * 10 + Math.floor(Math.random() * 50), // Estimate views from orders
+        conversionRate: salesData.orderCount > 0 ? Math.min(100, (salesData.orderCount / (salesData.orderCount + 5)) * 100) : 0,
+        stockLevel: Math.round(stockLevel),
+        trend
       };
     });
+
+    // Sort by revenue and return top 5
+    return productPerformance
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
   };
 
   const loadMockData = () => {
@@ -697,69 +830,137 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
               <Package className="h-5 w-5" />
               Top Performing Products
             </CardTitle>
-            <CardDescription>Products with highest sales</CardDescription>
+            <CardDescription>Products from your inventory with highest sales</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {topProducts.map((product, index) => (
-                <div key={product.id} className="flex items-center gap-4 p-3 rounded-lg bg-muted/50">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold">
-                    {index + 1}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{product.name}</p>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <span>{product.totalSales} sold</span>
-                      <span>•</span>
-                      <span>{formatCurrency(product.revenue)}</span>
+              {topProducts.length > 0 ? (
+                topProducts.map((product, index) => (
+                  <div key={product.id} className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold">
+                      {index + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{product.name}</p>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span>{product.totalSales} sold</span>
+                        <span>•</span>
+                        <span>{formatCurrency(product.revenue)}</span>
+                        {product.category && (
+                          <>
+                            <span>•</span>
+                            <Badge variant="outline" className="text-xs">{product.category}</Badge>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {product.trend === 'up' ? (
+                        <ArrowUpRight className="h-4 w-4 text-green-600" />
+                      ) : product.trend === 'down' ? (
+                        <ArrowDownRight className="h-4 w-4 text-red-600" />
+                      ) : (
+                        <div className="w-4 h-0.5 bg-gray-400" />
+                      )}
+                      <div className="w-16" title={`Stock: ${product.stockLevel}%`}>
+                        <Progress 
+                          value={product.stockLevel} 
+                          className={`h-2 ${product.stockLevel < 30 ? '[&>div]:bg-red-500' : product.stockLevel < 60 ? '[&>div]:bg-yellow-500' : ''}`} 
+                        />
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {product.trend === 'up' ? (
-                      <ArrowUpRight className="h-4 w-4 text-green-600" />
-                    ) : product.trend === 'down' ? (
-                      <ArrowDownRight className="h-4 w-4 text-red-600" />
-                    ) : (
-                      <div className="w-4 h-0.5 bg-gray-400" />
-                    )}
-                    <div className="w-16">
-                      <Progress value={product.stockLevel} className="h-2" />
-                    </div>
-                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>No products in inventory yet</p>
+                  <p className="text-xs">Add products to see performance metrics</p>
                 </div>
-              ))}
+              )}
             </div>
           </CardContent>
         </Card>
 
         {/* Recent Orders */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              Recent Orders
-            </CardTitle>
-            <CardDescription>Latest order activity</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Recent Orders
+              </CardTitle>
+              <CardDescription>Latest order activity</CardDescription>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => {
+                if (onNavigateToOrders) {
+                  onNavigateToOrders();
+                } else {
+                  // Fallback: dispatch custom event
+                  const event = new CustomEvent('navigateToTab', { detail: { tab: 'view-orders' } });
+                  window.dispatchEvent(event);
+                }
+                toast({
+                  title: "📦 Navigating to Orders",
+                  description: "Opening the full orders list...",
+                });
+              }}
+            >
+              <Eye className="h-4 w-4 mr-1" />
+              View All
+            </Button>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {recentOrders.map((order) => (
-                <div key={order.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium">{order.order_number}</p>
-                      <Badge className={getStatusColor(order.status)}>
-                        {order.status}
-                      </Badge>
+              {recentOrders.length > 0 ? (
+                recentOrders.map((order) => {
+                  // Format date for display
+                  const orderDate = new Date(order.created_at || Date.now());
+                  const now = new Date();
+                  const diffMs = now.getTime() - orderDate.getTime();
+                  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                  
+                  let dateDisplay = '';
+                  if (diffHours < 1) dateDisplay = 'Just now';
+                  else if (diffHours < 24) dateDisplay = `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+                  else if (diffDays < 7) dateDisplay = `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+                  else dateDisplay = orderDate.toLocaleDateString();
+                  
+                  // Get customer name from order
+                  const customerName = order.buyer_name || order.customer_name || order.buyer_email?.split('@')[0] || 'Customer';
+                  
+                  return (
+                    <div key={order.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{order.po_number || order.order_number || `ORD-${order.id?.slice(0, 8)}`}</p>
+                          <Badge className={getStatusColor(order.status)}>
+                            {order.status}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground truncate">{customerName}</p>
+                        {order.material_name && (
+                          <p className="text-xs text-muted-foreground truncate">{order.material_name}</p>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium">{formatCurrency(order.total_amount || order.amount)}</p>
+                        <p className="text-xs text-muted-foreground">{dateDisplay}</p>
+                      </div>
                     </div>
-                    <p className="text-sm text-muted-foreground truncate">{order.customer}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium">{formatCurrency(order.amount)}</p>
-                    <p className="text-xs text-muted-foreground">{order.date}</p>
-                  </div>
+                  );
+                })
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <ShoppingCart className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>No recent orders</p>
+                  <p className="text-xs">Orders will appear here when customers place them</p>
                 </div>
-              ))}
+              )}
             </div>
           </CardContent>
         </Card>

@@ -2022,7 +2022,12 @@ const SupplierDashboard = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {user && <SupplierAnalyticsDashboard supplierId={supplierRecordId || user.id} />}
+                {user && (
+                  <SupplierAnalyticsDashboard 
+                    supplierId={supplierRecordId || user.id} 
+                    onNavigateToOrders={() => setActiveTab('view-orders')}
+                  />
+                )}
               </CardContent>
             </Card>
           </TabsContent>
