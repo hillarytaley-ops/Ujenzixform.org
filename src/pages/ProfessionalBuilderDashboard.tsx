@@ -97,6 +97,7 @@ const ProfessionalBuilderDashboardPage = () => {
 
   // Active tab state for card navigation
   const [activeTab, setActiveTab] = useState('projects');
+  const [extrasSubTab, setExtrasSubTab] = useState('team'); // Sub-tab for Extras (team or support)
 
   // Projects state - start with loading false to show empty state immediately
   const [projects, setProjects] = useState<any[]>([]);
@@ -1244,13 +1245,16 @@ const ProfessionalBuilderDashboardPage = () => {
             <span className="text-[10px] sm:text-xs">Invoices</span>
           </Button>
           <Button 
-            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'team' 
+            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'extras' 
               ? 'bg-gradient-to-r from-violet-500 to-purple-600 ring-2 ring-violet-300 shadow-lg text-white' 
               : 'bg-white hover:bg-violet-50 text-gray-700 border shadow-sm'}`}
-            onClick={() => setActiveTab('team')}
+            onClick={() => {
+              setActiveTab('extras');
+              setExtrasSubTab('team'); // Default to team when opening Extras
+            }}
           >
-            <Users className="h-5 w-5" />
-            <span className="text-[10px] sm:text-xs">Team</span>
+            <Settings className="h-5 w-5" />
+            <span className="text-[10px] sm:text-xs">Extras</span>
           </Button>
           <Button 
             className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'monitoring' 
@@ -1269,24 +1273,6 @@ const ProfessionalBuilderDashboardPage = () => {
           >
             <Video className="h-5 w-5" />
             <span className="text-[10px] sm:text-xs">Portfolio</span>
-          </Button>
-          <Button 
-            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'profile' 
-              ? 'bg-gradient-to-r from-indigo-500 to-blue-600 ring-2 ring-indigo-300 shadow-lg text-white' 
-              : 'bg-white hover:bg-indigo-50 text-gray-700 border shadow-sm'}`}
-            onClick={() => setActiveTab('profile')}
-          >
-            <User className="h-5 w-5" />
-            <span className="text-[10px] sm:text-xs">Profile</span>
-          </Button>
-          <Button 
-            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'support' 
-              ? 'bg-gradient-to-r from-gray-500 to-gray-600 ring-2 ring-gray-300 shadow-lg text-white' 
-              : 'bg-white hover:bg-gray-100 text-gray-700 border shadow-sm'}`}
-            onClick={() => setActiveTab('support')}
-          >
-            <Headphones className="h-5 w-5" />
-            <span className="text-[10px] sm:text-xs">Support</span>
           </Button>
           <Button 
             className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'order-history' 
@@ -1318,10 +1304,10 @@ const ProfessionalBuilderDashboardPage = () => {
             <TabsTrigger value="tracking">Tracking</TabsTrigger>
             <TabsTrigger value="request-delivery">Request Delivery</TabsTrigger>
             <TabsTrigger value="invoices">Invoices</TabsTrigger>
-            <TabsTrigger value="team">Team</TabsTrigger>
+            <TabsTrigger value="extras">Extras</TabsTrigger>
             <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
             <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
-            <TabsTrigger value="profile">Profile</TabsTrigger>
+            <TabsTrigger value="team">Team</TabsTrigger>
             <TabsTrigger value="support">Support</TabsTrigger>
             <TabsTrigger value="order-history">Order History</TabsTrigger>
             <TabsTrigger value="my-analytics">Analytics</TabsTrigger>
@@ -2060,25 +2046,94 @@ const ProfessionalBuilderDashboardPage = () => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="team">
+          {/* Extras Tab - Contains Team and Support as sub-tabs */}
+          <TabsContent value="extras" className="mt-0">
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-blue-600" />
-                  Team Management
-                </CardTitle>
-                <CardDescription>Manage your construction team</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-12 text-gray-500">
-                  <Users className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-                  <p className="text-lg font-medium">No team members</p>
-                  <p className="text-sm mb-4">Add team members to collaborate</p>
-                  <Button className="bg-blue-600 hover:bg-blue-700">
-                    <User className="h-4 w-4 mr-2" />
-                    Invite Team Member
-                  </Button>
-                </div>
+              <CardContent className="p-0">
+                <Tabs value={extrasSubTab} onValueChange={setExtrasSubTab} className="w-full">
+                  <TabsList className="grid w-full grid-cols-2 mb-6 bg-gray-100 p-1 rounded-lg h-auto">
+                    <TabsTrigger 
+                      value="team"
+                      className="data-[state=active]:bg-white data-[state=active]:text-violet-700 data-[state=active]:shadow-sm data-[state=active]:border-violet-200 data-[state=active]:border py-3 rounded-md font-medium transition-all"
+                    >
+                      <Users className="h-4 w-4 mr-2 text-violet-600" />
+                      <span>Team</span>
+                    </TabsTrigger>
+                    <TabsTrigger 
+                      value="support"
+                      className="data-[state=active]:bg-white data-[state=active]:text-violet-700 data-[state=active]:shadow-sm data-[state=active]:border-violet-200 data-[state=active]:border py-3 rounded-md font-medium transition-all"
+                    >
+                      <Headphones className="h-4 w-4 mr-2 text-violet-600" />
+                      <span>Support</span>
+                    </TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="team" className="mt-0">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Users className="h-5 w-5 text-blue-600" />
+                          Team Management
+                        </CardTitle>
+                        <CardDescription>Manage your construction team</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-center py-12 text-gray-500">
+                          <Users className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+                          <p className="text-lg font-medium">No team members</p>
+                          <p className="text-sm mb-4">Add team members to collaborate</p>
+                          <Button className="bg-blue-600 hover:bg-blue-700">
+                            <User className="h-4 w-4 mr-2" />
+                            Invite Team Member
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                  
+                  <TabsContent value="support" className="mt-0">
+                    <div className="space-y-6">
+                      {/* In-App Communication */}
+                      {user && (
+                        <InAppCommunication
+                          userId={user.id}
+                          userName={user.email || 'Builder'}
+                          userRole="professional_builder"
+                          isDarkMode={false}
+                        />
+                      )}
+
+                      {/* Quick Contact Info */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+                          <CardContent className="p-4">
+                            <h4 className="font-semibold mb-2 flex items-center gap-2">
+                              <Clock className="h-4 w-4 text-blue-600" />
+                              Support Hours
+                            </h4>
+                            <p className="text-sm text-muted-foreground">
+                              Mon - Fri: 8AM - 6PM<br />
+                              Saturday: 9AM - 4PM<br />
+                              Sunday: Closed
+                            </p>
+                          </CardContent>
+                        </Card>
+                        <Card className="bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800">
+                          <CardContent className="p-4">
+                            <h4 className="font-semibold mb-2 flex items-center gap-2">
+                              <AlertCircle className="h-4 w-4 text-indigo-600" />
+                              Priority Support
+                            </h4>
+                            <p className="text-sm text-muted-foreground">
+                              Call: +254 700 000 000<br />
+                              Email: pro@UjenziXform.co.ke
+                            </p>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    </div>
+                  </TabsContent>
+                </Tabs>
               </CardContent>
             </Card>
           </TabsContent>
@@ -2578,77 +2633,6 @@ const ProfessionalBuilderDashboardPage = () => {
             </Card>
           </TabsContent>
 
-          {/* Profile Tab */}
-          <TabsContent value="profile">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="h-5 w-5 text-indigo-600" />
-                  Edit Your Profile
-                </CardTitle>
-                <CardDescription>
-                  Update your company information, specialties, and credentials to attract more clients
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <BuilderProfileEdit
-                  userId={user?.id || ''}
-                  builderCategory="professional"
-                  onSave={() => {
-                    toast({
-                      title: "Profile Updated!",
-                      description: "Your profile has been saved successfully.",
-                    });
-                    // Refresh to show updated data
-                    checkAuth();
-                  }}
-                />
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="support">
-            <div className="space-y-6">
-              {/* In-App Communication */}
-              {user && (
-                <InAppCommunication
-                  userId={user.id}
-                  userName={user.email || 'Builder'}
-                  userRole="professional_builder"
-                  isDarkMode={false}
-                />
-              )}
-
-              {/* Quick Contact Info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-                  <CardContent className="p-4">
-                    <h4 className="font-semibold mb-2 flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-blue-600" />
-                      Support Hours
-                    </h4>
-                    <p className="text-sm text-muted-foreground">
-                      Mon - Fri: 8AM - 6PM<br />
-                      Saturday: 9AM - 4PM<br />
-                      Sunday: Closed
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card className="bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800">
-                  <CardContent className="p-4">
-                    <h4 className="font-semibold mb-2 flex items-center gap-2">
-                      <AlertCircle className="h-4 w-4 text-indigo-600" />
-                      Priority Support
-                    </h4>
-                    <p className="text-sm text-muted-foreground">
-                      Call: +254 700 000 000<br />
-                      Email: pro@UjenziXform.co.ke
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          </TabsContent>
 
           {/* Order History Tab */}
           <TabsContent value="order-history">
