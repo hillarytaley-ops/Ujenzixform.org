@@ -527,7 +527,7 @@ const SupplierDashboard = () => {
   });
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [activeTab, setActiveTab] = useState('overview');
-  const [viewOrdersSubTab, setViewOrdersSubTab] = useState('orders');
+  const [viewOrdersSubTab, setViewOrdersSubTab] = useState('quotes');
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [showProfileView, setShowProfileView] = useState(false);
   const [quoteRequests, setQuoteRequests] = useState<any[]>([]);
@@ -1604,8 +1604,8 @@ const SupplierDashboard = () => {
             onClick={() => setActiveTab('scan-qr')}
           >
             <div className="flex flex-col items-center gap-2">
-              <Scan className="h-6 w-6" />
-              <span className="text-xs sm:text-sm">Scan QR</span>
+              <QrCode className="h-6 w-6" />
+              <span className="text-xs sm:text-sm">QR Codes</span>
             </div>
           </Button>
           <Button 
@@ -1649,7 +1649,7 @@ const SupplierDashboard = () => {
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="materials">My Materials</TabsTrigger>
             <TabsTrigger value="view-orders">View Orders</TabsTrigger>
-            <TabsTrigger value="scan-qr">Scan QR</TabsTrigger>
+            <TabsTrigger value="scan-qr">QR Codes</TabsTrigger>
             <TabsTrigger value="extra">Extra</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
             <TabsTrigger value="reports">Reports</TabsTrigger>
@@ -1792,10 +1792,6 @@ const SupplierDashboard = () => {
               <CardContent>
                 <Tabs value={viewOrdersSubTab} onValueChange={setViewOrdersSubTab} className="space-y-4">
                   <TabsList className={`${isDarkMode ? 'bg-slate-700' : 'bg-gray-100'} p-1 rounded-lg`}>
-                    <TabsTrigger value="orders" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
-                      <Package className="h-4 w-4 mr-1" />
-                      Orders
-                    </TabsTrigger>
                     <TabsTrigger value="quotes" className="data-[state=active]:bg-amber-500 data-[state=active]:text-white">
                       <FileCheck className="h-4 w-4 mr-1" />
                       Quotes
@@ -1805,20 +1801,15 @@ const SupplierDashboard = () => {
                         </span>
                       )}
                     </TabsTrigger>
+                    <TabsTrigger value="orders" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
+                      <Package className="h-4 w-4 mr-1" />
+                      Orders
+                    </TabsTrigger>
                     <TabsTrigger value="dispatch" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
                       <Truck className="h-4 w-4 mr-1" />
                       Dispatch
                     </TabsTrigger>
                   </TabsList>
-
-                  {/* Orders Sub-Tab */}
-                  <TabsContent value="orders">
-                    <OrderManagement 
-                      supplierId={supplierRecordId || user?.id || ''} 
-                      isDarkMode={isDarkMode} 
-                      onNavigateToDispatch={() => setViewOrdersSubTab('dispatch')}
-                    />
-                  </TabsContent>
 
                   {/* Quotes Sub-Tab */}
                   <TabsContent value="quotes">
@@ -1834,6 +1825,15 @@ const SupplierDashboard = () => {
                       setSelectedQuote={setSelectedQuote}
                       setActiveTab={setActiveTab}
                       fetchQuoteRequests={fetchQuoteRequests}
+                    />
+                  </TabsContent>
+
+                  {/* Orders Sub-Tab */}
+                  <TabsContent value="orders">
+                    <OrderManagement 
+                      supplierId={supplierRecordId || user?.id || ''} 
+                      isDarkMode={isDarkMode} 
+                      onNavigateToDispatch={() => setViewOrdersSubTab('dispatch')}
                     />
                   </TabsContent>
 
@@ -1861,7 +1861,7 @@ const SupplierDashboard = () => {
           </TabsContent>
 
           {/* ═══════════════════════════════════════════════════════════════════════════════════ */}
-          {/* SCAN QR TAB - Contains: QR Codes */}
+          {/* QR CODES TAB - Contains: QR Code Management */}
           {/* ═══════════════════════════════════════════════════════════════════════════════════ */}
           <TabsContent value="scan-qr">
             <Card className={cardBg}>
