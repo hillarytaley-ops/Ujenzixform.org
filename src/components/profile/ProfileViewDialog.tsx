@@ -31,6 +31,7 @@ interface ProfileViewDialogProps {
   onClose: () => void;
   onEditProfile?: () => void;
   onExitDashboard: () => void;
+  userRole?: string; // Optional - if not provided, will be read from localStorage
 }
 
 export const ProfileViewDialog: React.FC<ProfileViewDialogProps> = ({

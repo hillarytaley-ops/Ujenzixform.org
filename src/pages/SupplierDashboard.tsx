@@ -122,39 +122,103 @@ const QuotesManagementContent: React.FC<QuotesManagementContentProps> = ({
   setActiveTab,
   fetchQuoteRequests
 }) => {
+  const [activeFilter, setActiveFilter] = useState<'all' | 'pending' | 'quoted' | 'confirmed'>('all');
+  
   const pendingQuotes = quoteRequests.filter(q => q.status === 'pending');
   const quotedQuotes = quoteRequests.filter(q => q.status === 'quoted');
   const confirmedQuotes = quoteRequests.filter(q => q.status === 'confirmed' || q.status === 'accepted');
 
+  // Filter quotes based on active filter
+  const filteredQuotes = activeFilter === 'all' 
+    ? quoteRequests 
+    : activeFilter === 'pending' 
+    ? pendingQuotes 
+    : activeFilter === 'quoted' 
+    ? quotedQuotes 
+    : confirmedQuotes;
+
   return (
     <div className="space-y-4">
-      {/* Quick Stats */}
+      {/* Clickable Status Filter Cards */}
       <div className="grid grid-cols-3 gap-4">
-        <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-amber-900/20' : 'bg-amber-50'} border ${isDarkMode ? 'border-amber-800' : 'border-amber-200'}`}>
+        <button
+          onClick={() => setActiveFilter(activeFilter === 'pending' ? 'all' : 'pending')}
+          className={`p-4 rounded-lg border text-left transition-all duration-200 ${
+            activeFilter === 'pending'
+              ? 'ring-2 ring-amber-500 shadow-lg scale-[1.02]'
+              : 'hover:shadow-md hover:scale-[1.01]'
+          } ${isDarkMode ? 'bg-amber-900/20 border-amber-800' : 'bg-amber-50 border-amber-200'}`}
+        >
           <div className="flex items-center gap-2">
             <Clock className="h-5 w-5 text-amber-500" />
             <span className={`font-semibold ${textColor}`}>{pendingQuotes.length}</span>
           </div>
           <p className={`text-xs ${mutedText}`}>Pending Response</p>
-        </div>
-        <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-blue-900/20' : 'bg-blue-50'} border ${isDarkMode ? 'border-blue-800' : 'border-blue-200'}`}>
+          {activeFilter === 'pending' && (
+            <p className="text-xs text-amber-600 mt-1 font-medium">✓ Showing</p>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveFilter(activeFilter === 'quoted' ? 'all' : 'quoted')}
+          className={`p-4 rounded-lg border text-left transition-all duration-200 ${
+            activeFilter === 'quoted'
+              ? 'ring-2 ring-blue-500 shadow-lg scale-[1.02]'
+              : 'hover:shadow-md hover:scale-[1.01]'
+          } ${isDarkMode ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border-blue-200'}`}
+        >
           <div className="flex items-center gap-2">
             <FileCheck className="h-5 w-5 text-blue-500" />
             <span className={`font-semibold ${textColor}`}>{quotedQuotes.length}</span>
           </div>
           <p className={`text-xs ${mutedText}`}>Awaiting Client</p>
-        </div>
-        <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-green-900/20' : 'bg-green-50'} border ${isDarkMode ? 'border-green-800' : 'border-green-200'}`}>
+          {activeFilter === 'quoted' && (
+            <p className="text-xs text-blue-600 mt-1 font-medium">✓ Showing</p>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveFilter(activeFilter === 'confirmed' ? 'all' : 'confirmed')}
+          className={`p-4 rounded-lg border text-left transition-all duration-200 ${
+            activeFilter === 'confirmed'
+              ? 'ring-2 ring-green-500 shadow-lg scale-[1.02]'
+              : 'hover:shadow-md hover:scale-[1.01]'
+          } ${isDarkMode ? 'bg-green-900/20 border-green-800' : 'bg-green-50 border-green-200'}`}
+        >
           <div className="flex items-center gap-2">
             <CheckCircle className="h-5 w-5 text-green-500" />
             <span className={`font-semibold ${textColor}`}>{confirmedQuotes.length}</span>
           </div>
           <p className={`text-xs ${mutedText}`}>Confirmed Orders</p>
-        </div>
+          {activeFilter === 'confirmed' && (
+            <p className="text-xs text-green-600 mt-1 font-medium">✓ Showing</p>
+          )}
+        </button>
       </div>
 
-      {/* Refresh Button */}
-      <div className="flex justify-end">
+      {/* Active Filter Indicator & Refresh Button */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {activeFilter !== 'all' && (
+            <Badge 
+              variant="outline" 
+              className={`${
+                activeFilter === 'pending' ? 'bg-amber-100 text-amber-700 border-amber-300' :
+                activeFilter === 'quoted' ? 'bg-blue-100 text-blue-700 border-blue-300' :
+                'bg-green-100 text-green-700 border-green-300'
+              }`}
+            >
+              Filtered: {activeFilter === 'pending' ? 'Pending Response' : activeFilter === 'quoted' ? 'Awaiting Client' : 'Confirmed Orders'}
+              <button 
+                onClick={() => setActiveFilter('all')} 
+                className="ml-2 hover:text-red-500"
+              >
+                ×
+              </button>
+            </Badge>
+          )}
+          {activeFilter === 'all' && (
+            <span className={`text-sm ${mutedText}`}>Showing all {quoteRequests.length} quotes</span>
+          )}
+        </div>
         <Button variant="outline" size="sm" onClick={fetchQuoteRequests} disabled={loadingQuotes}>
           <RefreshCw className={`h-4 w-4 mr-1 ${loadingQuotes ? 'animate-spin' : ''}`} />
           Refresh
@@ -166,9 +230,9 @@ const QuotesManagementContent: React.FC<QuotesManagementContentProps> = ({
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent"></div>
         </div>
-      ) : quoteRequests.length > 0 ? (
+      ) : filteredQuotes.length > 0 ? (
         <div className="space-y-4">
-          {quoteRequests.map((quote) => (
+          {filteredQuotes.map((quote) => (
             <div
               key={quote.id}
               className={`p-4 rounded-lg border ${
@@ -246,8 +310,20 @@ const QuotesManagementContent: React.FC<QuotesManagementContentProps> = ({
       ) : (
         <div className="text-center py-12">
           <FileCheck className={`h-16 w-16 mx-auto mb-4 ${isDarkMode ? 'text-slate-600' : 'text-gray-300'}`} />
-          <p className={`text-lg font-medium ${textColor}`}>No Quote Requests Yet</p>
-          <p className={mutedText}>Quote requests from professional builders will appear here</p>
+          {activeFilter !== 'all' ? (
+            <>
+              <p className={`text-lg font-medium ${textColor}`}>No {activeFilter === 'pending' ? 'Pending' : activeFilter === 'quoted' ? 'Awaiting Client' : 'Confirmed'} Quotes</p>
+              <p className={mutedText}>No quotes match the selected filter</p>
+              <Button variant="outline" size="sm" className="mt-4" onClick={() => setActiveFilter('all')}>
+                Show All Quotes
+              </Button>
+            </>
+          ) : (
+            <>
+              <p className={`text-lg font-medium ${textColor}`}>No Quote Requests Yet</p>
+              <p className={mutedText}>Quote requests from professional builders will appear here</p>
+            </>
+          )}
         </div>
       )}
     </div>
