@@ -37,6 +37,7 @@ import {
 interface SupplierQuoteReviewProps {
   builderId: string;
   isDarkMode?: boolean;
+  showOnlyQuoted?: boolean; // When true, only show quotes that suppliers have responded to
 }
 
 interface QuotationRequest {
@@ -75,7 +76,8 @@ interface QuotationRequest {
 
 export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({ 
   builderId,
-  isDarkMode = false 
+  isDarkMode = false,
+  showOnlyQuoted = false 
 }) => {
   const [quotes, setQuotes] = useState<QuotationRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -238,9 +240,11 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 8000);
       
-      // Query by buyer_id first
-      const queryUrl = `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${effectiveBuilderId}&status=in.(pending,quoted,confirmed,rejected)&order=updated_at.desc`;
-      console.log('🔗 SupplierQuoteReview query URL:', queryUrl);
+      // Query by buyer_id first - filter by status based on showOnlyQuoted prop
+      // When showOnlyQuoted is true, only show quotes that suppliers have responded to (status = 'quoted')
+      const statusFilter = showOnlyQuoted ? 'quoted' : 'pending,quoted,confirmed,rejected';
+      const queryUrl = `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${effectiveBuilderId}&status=in.(${statusFilter})&order=updated_at.desc`;
+      console.log('🔗 SupplierQuoteReview query URL:', queryUrl, '(showOnlyQuoted:', showOnlyQuoted, ')');
       
       const ordersResponse = await fetch(queryUrl, { headers, signal: controller.signal, cache: 'no-store' });
       clearTimeout(timeoutId);
@@ -259,8 +263,9 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
         const builderIdTimeout = setTimeout(() => builderIdController.abort(), 5000);
         
         try {
+          const statusFilter = showOnlyQuoted ? 'quoted' : 'pending,quoted,confirmed,rejected';
           const builderIdResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/purchase_orders?builder_id=eq.${effectiveBuilderId}&status=in.(pending,quoted,confirmed,rejected)&order=updated_at.desc`,
+            `${SUPABASE_URL}/rest/v1/purchase_orders?builder_id=eq.${effectiveBuilderId}&status=in.(${statusFilter})&order=updated_at.desc`,
             { headers, signal: builderIdController.signal, cache: 'no-store' }
           );
           clearTimeout(builderIdTimeout);
@@ -667,17 +672,25 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <CardTitle className={`flex items-center gap-2 ${textColor}`}>
-                <FileText className="h-5 w-5 text-blue-500" />
-                Supplier Quote Responses
+                <FileText className="h-5 w-5 text-green-500" />
+                {showOnlyQuoted ? 'Supplier Responses' : 'All Quote Activity'}
               </CardTitle>
               <CardDescription className={mutedText}>
-                Review and accept/reject pricing from suppliers
+                {showOnlyQuoted 
+                  ? 'Suppliers have responded with pricing - accept or reject below'
+                  : 'Review and manage all your quote requests'}
               </CardDescription>
             </div>
-            <div className="flex items-center gap-2">
-              <Badge className="bg-yellow-100 text-yellow-700">{pendingQuotes.length} Pending</Badge>
-              <Badge className="bg-blue-100 text-blue-700">{quotedQuotes.length} To Review</Badge>
-              <Badge className="bg-green-100 text-green-700">{acceptedQuotes.length} Accepted</Badge>
+            <div className="flex items-center gap-2 flex-wrap">
+              {!showOnlyQuoted && (
+                <>
+                  <Badge className="bg-yellow-100 text-yellow-700">{pendingQuotes.length} Pending</Badge>
+                  <Badge className="bg-green-100 text-green-700">{acceptedQuotes.length} Accepted</Badge>
+                </>
+              )}
+              <Badge className="bg-blue-100 text-blue-700 border border-blue-300">
+                {quotedQuotes.length} {showOnlyQuoted ? 'Response(s)' : 'To Review'}
+              </Badge>
               <Button variant="outline" size="sm" onClick={fetchQuotes}>
                 <RefreshCw className="h-4 w-4 mr-1" />
                 Refresh
@@ -811,8 +824,8 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
         </Card>
       )}
 
-      {/* Pending Quotes (Awaiting Supplier Response) */}
-      {pendingQuotes.length > 0 && (
+      {/* Pending Quotes (Awaiting Supplier Response) - Only show when not filtered to quoted only */}
+      {!showOnlyQuoted && pendingQuotes.length > 0 && (
         <Card className={cardBg}>
           <CardHeader className="pb-2">
             <CardTitle className={`flex items-center gap-2 text-sm ${textColor}`}>
@@ -835,8 +848,8 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
         </Card>
       )}
 
-      {/* Accepted Quotes */}
-      {acceptedQuotes.length > 0 && (
+      {/* Accepted Quotes - Only show when not filtered to quoted only */}
+      {!showOnlyQuoted && acceptedQuotes.length > 0 && (
         <Card className={cardBg}>
           <CardHeader className="pb-2">
             <CardTitle className={`flex items-center gap-2 text-sm ${textColor}`}>
@@ -894,11 +907,26 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
       {quotes.length === 0 && (
         <Card className={cardBg}>
           <CardContent className="py-12 text-center">
-            <FileText className={`h-12 w-12 mx-auto mb-4 ${isDarkMode ? 'text-slate-600' : 'text-gray-300'}`} />
-            <p className={textColor}>No quote requests yet</p>
-            <p className={`text-sm ${mutedText}`}>
-              Request quotes from the Materials page to get started
-            </p>
+            {showOnlyQuoted ? (
+              <>
+                <CheckCircle className={`h-12 w-12 mx-auto mb-4 ${isDarkMode ? 'text-slate-600' : 'text-gray-300'}`} />
+                <p className={`font-medium ${textColor}`}>No Supplier Responses Yet</p>
+                <p className={`text-sm ${mutedText} mt-2`}>
+                  When suppliers respond to your quote requests with pricing, they'll appear here for you to accept or reject.
+                </p>
+                <p className={`text-xs ${mutedText} mt-3`}>
+                  💡 Tip: Suppliers typically respond within 2-24 hours
+                </p>
+              </>
+            ) : (
+              <>
+                <FileText className={`h-12 w-12 mx-auto mb-4 ${isDarkMode ? 'text-slate-600' : 'text-gray-300'}`} />
+                <p className={textColor}>No quote requests yet</p>
+                <p className={`text-sm ${mutedText}`}>
+                  Request quotes from the Materials page to get started
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
       )}

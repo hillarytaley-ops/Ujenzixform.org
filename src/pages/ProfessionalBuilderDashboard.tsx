@@ -1812,33 +1812,43 @@ const ProfessionalBuilderDashboardPage = () => {
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-gray-900">
                   <FileText className="h-5 w-5 text-green-600" />
-                  My Quote Requests
+                  Quotes Management
                 </CardTitle>
-                <CardDescription>Track and compare quotes from suppliers</CardDescription>
+                <CardDescription>Track sent quotes and review supplier responses</CardDescription>
               </CardHeader>
               <CardContent>
                 <Tabs defaultValue="my-requests" className="w-full">
                   <TabsList className="grid w-full grid-cols-2 mb-6 bg-gray-100 p-1 rounded-lg h-auto">
                     <TabsTrigger 
                       value="my-requests"
-                      className="data-[state=active]:bg-white data-[state=active]:text-green-700 data-[state=active]:shadow-sm py-3 rounded-md font-medium transition-all"
+                      className="data-[state=active]:bg-white data-[state=active]:text-amber-700 data-[state=active]:shadow-sm data-[state=active]:border-amber-200 data-[state=active]:border py-3 rounded-md font-medium transition-all"
                     >
-                      <Clock className="h-4 w-4 mr-2" />
-                      My Quote Requests
+                      <Clock className="h-4 w-4 mr-2 text-amber-600" />
+                      <div className="flex flex-col items-start">
+                        <span>My Quote Requests</span>
+                        <span className="text-[10px] font-normal text-gray-500">Sent quotes awaiting response</span>
+                      </div>
                     </TabsTrigger>
                     <TabsTrigger 
                       value="supplier-quotes"
-                      className="data-[state=active]:bg-white data-[state=active]:text-green-700 data-[state=active]:shadow-sm py-3 rounded-md font-medium transition-all"
+                      className="data-[state=active]:bg-white data-[state=active]:text-green-700 data-[state=active]:shadow-sm data-[state=active]:border-green-200 data-[state=active]:border py-3 rounded-md font-medium transition-all"
                     >
-                      <FileText className="h-4 w-4 mr-2" />
-                      Supplier Responses
+                      <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+                      <div className="flex flex-col items-start">
+                        <span>Supplier Responses</span>
+                        <span className="text-[10px] font-normal text-gray-500">Accept or reject quotes</span>
+                      </div>
                     </TabsTrigger>
                   </TabsList>
+                  
+                  {/* My Quote Requests - Sent quotes awaiting supplier response */}
                   <TabsContent value="my-requests" className="mt-0">
                     <PendingQuoteRequests builderId={user?.id || ''} />
                   </TabsContent>
+                  
+                  {/* Supplier Responses - Quotes that suppliers have responded to */}
                   <TabsContent value="supplier-quotes" className="mt-0">
-                    <SupplierQuoteReview builderId={user?.id || ''} />
+                    <SupplierQuoteReview builderId={user?.id || ''} showOnlyQuoted={true} />
                   </TabsContent>
                 </Tabs>
               </CardContent>
