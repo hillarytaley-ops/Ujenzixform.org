@@ -521,10 +521,11 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
       
       if (response.ok) {
         const data = await response.json();
-        const priceMap: Record<string, { price: number; in_stock: boolean; description?: string; variant_prices?: any[] }> = {};
+        const priceMap: Record<string, { price: number; market_price: number; in_stock: boolean; description?: string; variant_prices?: any[] }> = {};
         data.forEach((item: any) => {
           priceMap[item.product_id] = { 
             price: item.price, 
+            market_price: item.market_price || 0,
             in_stock: item.in_stock,
             description: item.description || '',
             variant_prices: item.variant_prices || []
@@ -540,7 +541,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
 
   // Set price for an admin-uploaded product (single price or variant prices)
   // Using fetch API to avoid Supabase client hanging
-  const handleSetPrice = async (productId: string, price: number, inStock: boolean, description?: string, variantPrices?: any[]) => {
+  const handleSetPrice = async (productId: string, price: number, inStock: boolean, description?: string, variantPrices?: any[], marketPrice?: number) => {
     const effectiveSupplierId = getEffectiveSupplierId();
     
     if (!effectiveSupplierId) {
@@ -573,6 +574,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
         supplier_id: effectiveSupplierId,
         product_id: productId,
         price: price,
+        market_price: marketPrice || 0,
         in_stock: inStock,
         description: description || null,
         variant_prices: variantPrices || [],
@@ -602,6 +604,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
             },
             body: JSON.stringify({
               price: price,
+              market_price: marketPrice || 0,
               in_stock: inStock,
               description: description || null,
               variant_prices: variantPrices || [],
@@ -647,7 +650,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
       
       setSupplierPrices(prev => ({
         ...prev,
-        [productId]: { price, in_stock: inStock, description: description || '', variant_prices: variantPrices || [] }
+        [productId]: { price, market_price: marketPrice || 0, in_stock: inStock, description: description || '', variant_prices: variantPrices || [] }
       }));
       
       setPricingProduct(null);
@@ -1645,15 +1648,44 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
                 
                 {/* Single Price - Always show as fallback/main price */}
                 {!(pricingProduct.pricing_type === 'variants' && pricingProduct.variants?.length > 0) && customVariants.length === 0 && (
-                  <div className="space-y-2 pt-2 border-t">
-                    <Label>Your Price (KES) *</Label>
-                    <Input
-                      type="number"
-                      defaultValue={supplierPrices[pricingProduct.id]?.price || 0}
-                      id="pricing-input"
-                      placeholder="Enter your price"
-                      className="h-10"
-                    />
+                  <div className="space-y-3 pt-2 border-t">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                          Market Price (KES)
+                          <span className="text-xs text-muted-foreground font-normal">Cost price</span>
+                        </Label>
+                        <Input
+                          type="number"
+                          defaultValue={supplierPrices[pricingProduct.id]?.market_price || 0}
+                          id="market-price-input"
+                          placeholder="Enter cost price"
+                          className="h-10"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                          Selling Price (KES) *
+                          <span className="text-xs text-muted-foreground font-normal">Customer price</span>
+                        </Label>
+                        <Input
+                          type="number"
+                          defaultValue={supplierPrices[pricingProduct.id]?.price || 0}
+                          id="pricing-input"
+                          placeholder="Enter selling price"
+                          className="h-10"
+                        />
+                      </div>
+                    </div>
+                    
+                    {/* Profit Preview */}
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                      <p className="text-xs text-green-700 font-medium mb-1">💰 Profit Tracking</p>
+                      <p className="text-xs text-green-600">
+                        Enter both market price (your cost) and selling price to track profit margins. 
+                        This helps monitor your business profitability.
+                      </p>
+                    </div>
                   </div>
                 )}
                 
@@ -1732,13 +1764,16 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
                   allVariantPrices = [...allVariantPrices, ...customVariantData];
                 }
                 
-                // Determine main price
+                // Determine main price and market price
                 let mainPrice = 0;
+                let marketPrice = 0;
                 if (allVariantPrices.length > 0) {
                   mainPrice = allVariantPrices[0]?.price || 0;
                 } else {
                   const priceInput = document.getElementById('pricing-input') as HTMLInputElement;
+                  const marketPriceInput = document.getElementById('market-price-input') as HTMLInputElement;
                   mainPrice = parseFloat(priceInput?.value) || 0;
+                  marketPrice = parseFloat(marketPriceInput?.value) || 0;
                 }
                 
                 // Save price with images and variants
@@ -1747,7 +1782,8 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
                   mainPrice,
                   stockCheckbox.checked,
                   descriptionInput.value.trim() || undefined,
-                  allVariantPrices.length > 0 ? allVariantPrices : undefined
+                  allVariantPrices.length > 0 ? allVariantPrices : undefined,
+                  marketPrice
                 );
                 
                 // If custom images were uploaded, save them to supplier_product_prices

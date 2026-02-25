@@ -55,7 +55,8 @@ interface InventoryItem {
   min_stock_level: number;
   max_stock_level: number;
   unit: string;
-  unit_price: number;
+  market_price: number;  // Cost price / market price
+  selling_price: number; // Selling price to customers
   last_restocked: string;
   status: 'in_stock' | 'low_stock' | 'out_of_stock';
 }
@@ -101,11 +102,14 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
+  const [showPriceDialog, setShowPriceDialog] = useState(false);
   const [updateQuantity, setUpdateQuantity] = useState<number>(0);
   const [updateReason, setUpdateReason] = useState('');
   const [updateType, setUpdateType] = useState<'add' | 'remove' | 'set'>('add');
   const [saving, setSaving] = useState(false);
   const [lowStockThreshold, setLowStockThreshold] = useState(10);
+  const [editMarketPrice, setEditMarketPrice] = useState<number>(0);
+  const [editSellingPrice, setEditSellingPrice] = useState<number>(0);
   
   const { toast } = useToast();
 
@@ -258,7 +262,8 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
           min_stock_level: minStock,
           max_stock_level: p.max_stock_level || 1000,
           unit: details.unit || p.unit || 'piece',
-          unit_price: p.price || 0,
+          market_price: p.market_price || 0,
+          selling_price: p.price || p.selling_price || 0,
           last_restocked: p.last_restocked || p.updated_at || new Date().toISOString(),
           status
         };
@@ -314,7 +319,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
       inStockProducts: items.filter(i => i.status === 'in_stock').length,
       lowStockProducts: items.filter(i => i.status === 'low_stock').length,
       outOfStockProducts: items.filter(i => i.status === 'out_of_stock').length,
-      totalValue: items.reduce((sum, i) => sum + (i.current_stock * i.unit_price), 0)
+      totalValue: items.reduce((sum, i) => sum + (i.current_stock * i.selling_price), 0)
     };
     setStats(stats);
   };
@@ -422,6 +427,67 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
     }
   };
 
+  const handleUpdatePrices = async () => {
+    if (!selectedItem) return;
+    
+    setSaving(true);
+    try {
+      const { SUPABASE_URL, SUPABASE_ANON_KEY, accessToken } = getSupabaseConfig();
+      
+      const updateData: any = {
+        market_price: editMarketPrice,
+        price: editSellingPrice, // 'price' is the selling price in the database
+      };
+      
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/supplier_product_prices?id=eq.${selectedItem.id}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal',
+          },
+          body: JSON.stringify(updateData),
+        }
+      );
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to update prices');
+      }
+      
+      console.log('💰 Prices updated successfully');
+      
+      // Calculate profit margin
+      const profitMargin = editMarketPrice > 0 
+        ? (((editSellingPrice - editMarketPrice) / editMarketPrice) * 100).toFixed(1)
+        : '0';
+      
+      toast({
+        title: '✅ Prices Updated',
+        description: `${selectedItem.product_name} - Market: KES ${editMarketPrice.toLocaleString()}, Selling: KES ${editSellingPrice.toLocaleString()} (${profitMargin}% margin)`
+      });
+      
+      setShowPriceDialog(false);
+      setSelectedItem(null);
+      setEditMarketPrice(0);
+      setEditSellingPrice(0);
+      loadInventory();
+      
+    } catch (error: any) {
+      console.error('Error updating prices:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.message || 'Failed to update prices'
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const filteredInventory = inventory.filter(item => {
     const matchesSearch = item.product_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           item.category.toLowerCase().includes(searchQuery.toLowerCase());
@@ -444,17 +510,24 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
 
   const exportInventory = () => {
     const csv = [
-      ['Product Name', 'Category', 'Current Stock', 'Min Level', 'Unit', 'Unit Price', 'Status', 'Last Restocked'].join(','),
-      ...inventory.map(item => [
-        `"${item.product_name}"`,
-        `"${item.category}"`,
-        item.current_stock,
-        item.min_stock_level,
-        item.unit,
-        item.unit_price,
-        item.status,
-        new Date(item.last_restocked).toLocaleDateString()
-      ].join(','))
+      ['Product Name', 'Category', 'Current Stock', 'Min Level', 'Unit', 'Market Price', 'Selling Price', 'Profit Margin', 'Status', 'Last Restocked'].join(','),
+      ...inventory.map(item => {
+        const profitMargin = item.market_price > 0 
+          ? (((item.selling_price - item.market_price) / item.market_price) * 100).toFixed(1)
+          : '0';
+        return [
+          `"${item.product_name}"`,
+          `"${item.category}"`,
+          item.current_stock,
+          item.min_stock_level,
+          item.unit,
+          item.market_price,
+          item.selling_price,
+          `${profitMargin}%`,
+          item.status,
+          new Date(item.last_restocked).toLocaleDateString()
+        ].join(',');
+      })
     ].join('\n');
     
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -621,51 +694,89 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
                   <th className="text-center py-3 px-4 text-slate-400 font-medium">Stock</th>
                   <th className="text-center py-3 px-4 text-slate-400 font-medium">Min Level</th>
                   <th className="text-center py-3 px-4 text-slate-400 font-medium">Status</th>
-                  <th className="text-right py-3 px-4 text-slate-400 font-medium">Value</th>
+                  <th className="text-right py-3 px-4 text-slate-400 font-medium">Market Price</th>
+                  <th className="text-right py-3 px-4 text-slate-400 font-medium">Selling Price</th>
                   <th className="text-center py-3 px-4 text-slate-400 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredInventory.map((item) => (
-                  <tr key={item.id} className="border-b border-slate-700/50 hover:bg-slate-700/30">
-                    <td className="py-3 px-4">
-                      <div>
-                        <p className="text-white font-medium">{item.product_name}</p>
-                        <p className="text-xs text-slate-500">{item.unit}</p>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-slate-300">{item.category}</td>
-                    <td className="py-3 px-4 text-center">
-                      <span className={`font-bold ${
-                        item.status === 'out_of_stock' ? 'text-red-400' :
-                        item.status === 'low_stock' ? 'text-yellow-400' : 'text-green-400'
-                      }`}>
-                        {item.current_stock}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-center text-slate-400">{item.min_stock_level}</td>
-                    <td className="py-3 px-4 text-center">{getStatusBadge(item.status)}</td>
-                    <td className="py-3 px-4 text-right text-white">
-                      KES {((item.current_stock || 0) * (item.unit_price || 0)).toLocaleString()}
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedItem(item);
-                          setShowUpdateDialog(true);
-                        }}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
+                {filteredInventory.map((item) => {
+                  const profitMargin = item.market_price > 0 
+                    ? (((item.selling_price - item.market_price) / item.market_price) * 100).toFixed(1)
+                    : '0';
+                  const isProfitable = parseFloat(profitMargin) > 0;
+                  
+                  return (
+                    <tr key={item.id} className="border-b border-slate-700/50 hover:bg-slate-700/30">
+                      <td className="py-3 px-4">
+                        <div>
+                          <p className="text-white font-medium">{item.product_name}</p>
+                          <p className="text-xs text-slate-500">{item.unit}</p>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-slate-300">{item.category}</td>
+                      <td className="py-3 px-4 text-center">
+                        <span className={`font-bold ${
+                          item.status === 'out_of_stock' ? 'text-red-400' :
+                          item.status === 'low_stock' ? 'text-yellow-400' : 'text-green-400'
+                        }`}>
+                          {item.current_stock}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-center text-slate-400">{item.min_stock_level}</td>
+                      <td className="py-3 px-4 text-center">{getStatusBadge(item.status)}</td>
+                      <td className="py-3 px-4 text-right">
+                        <span className="text-slate-400">
+                          KES {(item.market_price || 0).toLocaleString()}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <div className="flex flex-col items-end">
+                          <span className="text-white font-medium">
+                            KES {(item.selling_price || 0).toLocaleString()}
+                          </span>
+                          {item.market_price > 0 && (
+                            <span className={`text-xs ${isProfitable ? 'text-green-400' : 'text-red-400'}`}>
+                              {isProfitable ? '+' : ''}{profitMargin}% margin
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Update Stock"
+                            onClick={() => {
+                              setSelectedItem(item);
+                              setShowUpdateDialog(true);
+                            }}
+                          >
+                            <Package className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Edit Prices"
+                            onClick={() => {
+                              setSelectedItem(item);
+                              setEditMarketPrice(item.market_price || 0);
+                              setEditSellingPrice(item.selling_price || 0);
+                              setShowPriceDialog(true);
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
                 
                 {filteredInventory.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center text-slate-400">
+                    <td colSpan={8} className="py-8 text-center text-slate-400">
                       No products found. Add products to start tracking inventory.
                     </td>
                   </tr>
@@ -850,6 +961,106 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
           <DialogFooter>
             <Button onClick={() => setShowSettingsDialog(false)}>
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Prices Dialog */}
+      <Dialog open={showPriceDialog} onOpenChange={setShowPriceDialog}>
+        <DialogContent className="bg-slate-900 border-slate-700">
+          <DialogHeader>
+            <DialogTitle className="text-white">Edit Prices</DialogTitle>
+            <DialogDescription>
+              {selectedItem?.product_name} - Update market and selling prices
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div>
+              <Label className="text-slate-300">Market Price (Cost Price)</Label>
+              <div className="relative mt-2">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">KES</span>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={editMarketPrice}
+                  onChange={(e) => setEditMarketPrice(parseFloat(e.target.value) || 0)}
+                  className="bg-slate-800 border-slate-600 pl-12"
+                  placeholder="0.00"
+                />
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                The price you paid to acquire this product
+              </p>
+            </div>
+            
+            <div>
+              <Label className="text-slate-300">Selling Price</Label>
+              <div className="relative mt-2">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">KES</span>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={editSellingPrice}
+                  onChange={(e) => setEditSellingPrice(parseFloat(e.target.value) || 0)}
+                  className="bg-slate-800 border-slate-600 pl-12"
+                  placeholder="0.00"
+                />
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                The price customers will pay for this product
+              </p>
+            </div>
+            
+            {/* Profit Calculation Preview */}
+            {editMarketPrice > 0 && (
+              <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+                <h4 className="text-sm font-medium text-slate-300 mb-3">Profit Analysis</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-slate-500">Profit per Unit</p>
+                    <p className={`text-lg font-bold ${
+                      editSellingPrice - editMarketPrice >= 0 ? 'text-green-400' : 'text-red-400'
+                    }`}>
+                      KES {(editSellingPrice - editMarketPrice).toLocaleString()}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500">Profit Margin</p>
+                    <p className={`text-lg font-bold ${
+                      editSellingPrice - editMarketPrice >= 0 ? 'text-green-400' : 'text-red-400'
+                    }`}>
+                      {(((editSellingPrice - editMarketPrice) / editMarketPrice) * 100).toFixed(1)}%
+                    </p>
+                  </div>
+                </div>
+                {selectedItem && selectedItem.current_stock > 0 && (
+                  <div className="mt-3 pt-3 border-t border-slate-700">
+                    <p className="text-xs text-slate-500">Potential Profit (Current Stock: {selectedItem.current_stock})</p>
+                    <p className={`text-lg font-bold ${
+                      editSellingPrice - editMarketPrice >= 0 ? 'text-green-400' : 'text-red-400'
+                    }`}>
+                      KES {((editSellingPrice - editMarketPrice) * selectedItem.current_stock).toLocaleString()}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPriceDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleUpdatePrices} 
+              disabled={saving || (editSellingPrice <= 0 && editMarketPrice <= 0)}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {saving ? 'Updating...' : 'Update Prices'}
             </Button>
           </DialogFooter>
         </DialogContent>
