@@ -15,4 +15,4 @@ export { DeliveryProviderDirectory } from './DeliveryProviderDirectory';
 export { DeliveryMFAChallenge } from './DeliveryMFAChallenge';
 export { DeliveryErrorRecovery } from './DeliveryErrorRecovery';
 export { DeliveryRequestCard } from './DeliveryRequestCard';
-
+export { ArrivalScanReminder } from './ArrivalScanReminder';

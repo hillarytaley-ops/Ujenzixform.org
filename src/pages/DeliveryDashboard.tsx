@@ -57,6 +57,7 @@ import { InAppCommunication } from "@/components/communication/InAppCommunicatio
 import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
 import { ProfileViewDialog } from "@/components/profile/ProfileViewDialog";
 import { ReceivingScanner } from "@/components/qr/ReceivingScanner";
+import { ArrivalScanReminder } from "@/components/delivery/ArrivalScanReminder";
 
 interface DashboardStats {
   totalDeliveries: number;
@@ -82,6 +83,7 @@ interface ActiveDelivery {
   urgency?: 'normal' | 'urgent' | 'emergency';
   special_instructions?: string;
   created_at?: string;
+  purchase_order_id?: string; // Link to the order for QR scanning
 }
 
 interface DeliveryHistory {
@@ -137,6 +139,8 @@ const DeliveryDashboard = () => {
   const [activeTab, setActiveTab] = useState("active");
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [showProfileView, setShowProfileView] = useState(false);
+  const [selectedDeliveryForScan, setSelectedDeliveryForScan] = useState<string | null>(null);
+  const [showArrivalScanner, setShowArrivalScanner] = useState(false);
   const [notificationCount, setNotificationCount] = useState(0);
   const [pendingNotificationCount, setPendingNotificationCount] = useState(0);
 
@@ -1042,14 +1046,44 @@ const DeliveryDashboard = () => {
                     {activeDeliveries
                       .filter(d => ['accepted', 'pending_pickup', 'in_transit'].includes(d.status))
                       .map((delivery) => (
-                        <DeliveryRequestCard
-                          key={delivery.id}
-                          delivery={delivery}
-                          isDarkMode={isDarkMode}
-                          onNavigate={(delivery) => console.log('Navigate to:', delivery)}
-                          onCall={(phone) => window.open(`tel:${phone}`)}
-                          onCaptureProof={(id) => setShowProofCapture(id)}
-                        />
+                        <div key={delivery.id} className="space-y-3">
+                          <DeliveryRequestCard
+                            delivery={delivery}
+                            isDarkMode={isDarkMode}
+                            onNavigate={(delivery) => console.log('Navigate to:', delivery)}
+                            onCall={(phone) => window.open(`tel:${phone}`)}
+                            onCaptureProof={(id) => setShowProofCapture(id)}
+                            onMarkArrived={(id) => {
+                              // Scroll to the scan reminder and trigger it
+                              setSelectedDeliveryForScan(id);
+                              toast({
+                                title: "📍 Arrival Confirmed",
+                                description: "Please scan all materials to complete the delivery.",
+                              });
+                            }}
+                          />
+                          
+                          {/* Arrival Scan Reminder - Shows expected QR codes for this delivery */}
+                          {(delivery.status === 'in_transit' || selectedDeliveryForScan === delivery.id) && (
+                            <ArrivalScanReminder
+                              deliveryId={delivery.id}
+                              orderId={delivery.purchase_order_id}
+                              isDarkMode={isDarkMode}
+                              onNavigateToScanner={() => {
+                                setSelectedDeliveryForScan(delivery.id);
+                                setActiveTab('scanning');
+                              }}
+                              onScanComplete={() => {
+                                toast({
+                                  title: "🎉 Delivery Complete!",
+                                  description: "All items have been scanned and confirmed.",
+                                });
+                                setSelectedDeliveryForScan(null);
+                                refetchData();
+                              }}
+                            />
+                          )}
+                        </div>
                       ))}
                   </div>
                 </div>

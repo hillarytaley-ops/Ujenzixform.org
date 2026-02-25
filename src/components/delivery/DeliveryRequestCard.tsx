@@ -50,6 +50,7 @@ interface DeliveryRequestCardProps {
   onNavigate?: (delivery: DeliveryRequest) => void;
   onCall?: (phone: string) => void;
   onCaptureProof?: (deliveryId: string) => void;
+  onMarkArrived?: (deliveryId: string) => void;
 }
 
 export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
@@ -59,7 +60,8 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
   onReject,
   onNavigate,
   onCall,
-  onCaptureProof
+  onCaptureProof,
+  onMarkArrived
 }) => {
   const [isAccepting, setIsAccepting] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
@@ -440,31 +442,44 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
 
                 {/* Action Buttons for Accepted Deliveries */}
                 {isAccepted && (
-                  <div className="flex flex-wrap gap-2">
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => onCall?.(delivery.customer_phone)}
-                    >
-                      <Phone className="h-4 w-4 mr-1" />
-                      Call
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => onCaptureProof?.(delivery.id)}
-                    >
-                      <Camera className="h-4 w-4 mr-1" />
-                      Proof
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      className="bg-teal-600 hover:bg-teal-700"
-                      onClick={() => onNavigate?.(delivery)}
-                    >
-                      <NavigationIcon className="h-4 w-4 mr-1" />
-                      Navigate
-                    </Button>
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-2">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => onCall?.(delivery.customer_phone)}
+                      >
+                        <Phone className="h-4 w-4 mr-1" />
+                        Call
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => onCaptureProof?.(delivery.id)}
+                      >
+                        <Camera className="h-4 w-4 mr-1" />
+                        Proof
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        className="bg-teal-600 hover:bg-teal-700"
+                        onClick={() => onNavigate?.(delivery)}
+                      >
+                        <NavigationIcon className="h-4 w-4 mr-1" />
+                        Navigate
+                      </Button>
+                    </div>
+                    
+                    {/* I've Arrived Button - Prominent for in_transit deliveries */}
+                    {delivery.status === 'in_transit' && onMarkArrived && (
+                      <Button 
+                        className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white h-12"
+                        onClick={() => onMarkArrived(delivery.id)}
+                      >
+                        <MapPin className="h-5 w-5 mr-2" />
+                        📍 I've Arrived - Scan Materials
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>
