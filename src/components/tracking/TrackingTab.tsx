@@ -136,6 +136,8 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
       
       // For builders, we need to get their profile ID as well
       let profileId = userId;
+      let supplierId = userId;
+      
       if (userRole === 'professional_builder' || userRole === 'private_client') {
         try {
           const profileResponse = await fetch(
@@ -160,17 +162,8 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
         }
       }
       
-      // Build query based on user role
-      // NOTE: Delivery providers don't need tracking numbers - they have their own delivery management
-      let url = `${SUPABASE_URL}/rest/v1/tracking_numbers?order=created_at.desc&select=*`;
-      
-      if (userRole === 'admin') {
-        // Admin sees all tracking numbers - no filter needed
-        console.log('📦 Admin mode: fetching ALL tracking numbers');
-      } else if (userRole === 'supplier') {
-        // Suppliers see tracking numbers for their orders (where they are the supplier)
-        // First try to get supplier record ID
-        let supplierId = userId;
+      // For suppliers, get their supplier record ID
+      if (userRole === 'supplier') {
         try {
           const supplierResponse = await fetch(
             `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${userId}&select=id`,
@@ -191,6 +184,16 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
         } catch (e) {
           console.log('📦 Could not fetch supplier, using userId');
         }
+      }
+      
+      // Build query based on user role
+      let url = `${SUPABASE_URL}/rest/v1/tracking_numbers?order=created_at.desc&select=*`;
+      
+      if (userRole === 'admin') {
+        // Admin sees all tracking numbers - no filter needed
+        console.log('📦 Admin mode: fetching ALL tracking numbers');
+      } else if (userRole === 'supplier') {
+        // Suppliers see tracking numbers for their orders (where they are the supplier)
         url += `&or=(supplier_id.eq.${userId},supplier_id.eq.${supplierId})`;
         console.log('📦 Supplier mode: filtering by userId:', userId, 'and supplierId:', supplierId);
       } else {
@@ -208,45 +211,103 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
         }
       });
 
+      let trackingData: TrackingNumber[] = [];
+      
       if (response.ok) {
-        const data = await response.json();
-        setTrackingNumbers(data || []);
-        console.log('📦 Tracking numbers loaded:', data?.length || 0, data);
-        
-        // Debug: show what builder_ids exist in the data
-        if (data && data.length > 0) {
-          console.log('📦 Builder IDs in tracking numbers:', data.map((t: any) => t.builder_id));
-        }
+        trackingData = await response.json() || [];
+        console.log('📦 Tracking numbers loaded from tracking_numbers table:', trackingData.length);
       } else {
         const errorText = await response.text();
         console.error('📦 Failed to fetch tracking numbers:', response.status, errorText);
-        setTrackingNumbers([]);
       }
       
-      // Also fetch ALL tracking numbers to see what exists (for debugging)
-      if (userRole !== 'admin') {
-        const allResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/tracking_numbers?select=id,tracking_number,builder_id,status&limit=10`,
-          {
+      // For suppliers, also fetch from purchase_orders that have delivery info
+      // This provides tracking data even if tracking_numbers table doesn't have entries
+      if (userRole === 'supplier') {
+        try {
+          const ordersUrl = `${SUPABASE_URL}/rest/v1/purchase_orders?or=(supplier_id.eq.${userId},supplier_id.eq.${supplierId})&delivery_status=neq.pending&select=id,order_number,status,delivery_address,delivery_provider_id,delivery_provider_name,delivery_provider_phone,delivery_vehicle_info,delivery_status,delivery_assigned_at,delivery_accepted_at,estimated_delivery_time,created_at,updated_at&order=created_at.desc`;
+          
+          console.log('📦 Fetching supplier orders with delivery info...');
+          
+          const ordersResponse = await fetch(ordersUrl, {
             headers: {
               'apikey': SUPABASE_ANON_KEY,
               'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
             }
+          });
+          
+          if (ordersResponse.ok) {
+            const ordersData = await ordersResponse.json();
+            console.log('📦 Orders with delivery info:', ordersData?.length || 0);
+            
+            // Convert orders to tracking number format for display
+            const orderTrackingData: TrackingNumber[] = (ordersData || []).map((order: any) => ({
+              id: order.id,
+              tracking_number: order.order_number || `ORD-${order.id.slice(0, 8).toUpperCase()}`,
+              delivery_request_id: order.id,
+              purchase_order_id: order.id,
+              builder_id: order.builder_id || '',
+              delivery_provider_id: order.delivery_provider_id,
+              supplier_id: supplierId,
+              status: mapDeliveryStatusToTrackingStatus(order.delivery_status || order.status),
+              current_latitude: null,
+              current_longitude: null,
+              last_location_update: null,
+              pickup_address: null,
+              delivery_address: order.delivery_address || 'Address not specified',
+              materials_description: `Order #${order.order_number || order.id.slice(0, 8)}`,
+              estimated_delivery_date: order.estimated_delivery_time,
+              actual_delivery_date: order.status === 'delivered' ? order.updated_at : null,
+              provider_name: order.delivery_provider_name,
+              provider_phone: order.delivery_provider_phone,
+              vehicle_type: order.delivery_vehicle_info,
+              vehicle_registration: null,
+              created_at: order.created_at,
+              accepted_at: order.delivery_accepted_at,
+              picked_up_at: null,
+              delivered_at: order.status === 'delivered' ? order.updated_at : null,
+            }));
+            
+            // Merge with existing tracking data, avoiding duplicates
+            const existingIds = new Set(trackingData.map(t => t.purchase_order_id));
+            const newOrderTracking = orderTrackingData.filter((ot: TrackingNumber) => !existingIds.has(ot.purchase_order_id));
+            trackingData = [...trackingData, ...newOrderTracking];
+            
+            console.log('📦 Total tracking entries after merge:', trackingData.length);
           }
-        );
-        if (allResponse.ok) {
-          const allData = await allResponse.json();
-          console.log('📦 DEBUG - All tracking numbers in system:', allData);
-          console.log('📦 DEBUG - Your userId is:', userId);
-          console.log('📦 DEBUG - Your profileId is:', profileId);
+        } catch (e) {
+          console.error('📦 Error fetching orders for tracking:', e);
         }
       }
+      
+      setTrackingNumbers(trackingData);
+      console.log('📦 Final tracking numbers:', trackingData.length);
+      
     } catch (error) {
       console.error('📦 Error fetching tracking numbers:', error);
       setTrackingNumbers([]);
     } finally {
       setLoading(false);
     }
+  };
+  
+  // Helper function to map delivery status to tracking status
+  const mapDeliveryStatusToTrackingStatus = (status: string): TrackingNumber['status'] => {
+    const statusMap: Record<string, TrackingNumber['status']> = {
+      'pending': 'pending',
+      'requested': 'pending',
+      'assigned': 'accepted',
+      'accepted': 'accepted',
+      'picked_up': 'picked_up',
+      'in_transit': 'in_transit',
+      'near_destination': 'near_destination',
+      'delivered': 'delivered',
+      'completed': 'delivered',
+      'shipped': 'in_transit',
+      'cancelled': 'cancelled',
+      'rejected': 'cancelled',
+    };
+    return statusMap[status] || 'pending';
   };
 
   const copyToClipboard = (text: string) => {
