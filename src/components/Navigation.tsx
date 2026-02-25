@@ -14,6 +14,7 @@ const Navigation = () => {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userRoleState, setUserRoleState] = useState<string | null>(null);
+  const [userDisplayName, setUserDisplayName] = useState<string | null>(null);
   const location = useLocation();
   const { toast } = useToast();
   
@@ -36,6 +37,7 @@ const Navigation = () => {
       // Also check localStorage
       const cachedEmail = localStorage.getItem('user_email');
       const cachedRole = localStorage.getItem('user_role');
+      const cachedDisplayName = localStorage.getItem('user_display_name');
       
       if (cachedEmail && !userEmail) {
         console.log('🧭 Got email from localStorage:', cachedEmail);
@@ -44,8 +46,12 @@ const Navigation = () => {
       if (cachedRole && !userRoleState) {
         setUserRoleState(cachedRole);
       }
+      if (cachedDisplayName && !userDisplayName) {
+        setUserDisplayName(cachedDisplayName);
+      }
       
       // If no email yet, try to get from Supabase session
+      let userId: string | null = null;
       if (!authUser?.email && !cachedEmail) {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user?.email) {
@@ -53,6 +59,49 @@ const Navigation = () => {
           setUserEmail(session.user.email);
           localStorage.setItem('user_email', session.user.email);
           localStorage.setItem('user_id', session.user.id);
+          userId = session.user.id;
+        }
+      } else {
+        userId = authUser?.id || localStorage.getItem('user_id');
+      }
+      
+      // Fetch user profile to get display name
+      if (userId && !userDisplayName && !cachedDisplayName) {
+        try {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name, store_name, company_name')
+            .eq('id', userId)
+            .single();
+          
+          if (profile) {
+            const displayName = profile.full_name || profile.store_name || profile.company_name;
+            if (displayName) {
+              console.log('🧭 Got display name from profile:', displayName);
+              setUserDisplayName(displayName);
+              localStorage.setItem('user_display_name', displayName);
+            }
+          }
+          
+          // Also check suppliers table for supplier role
+          if (!profile?.full_name && (authRole === 'supplier' || cachedRole === 'supplier')) {
+            const { data: supplier } = await supabase
+              .from('suppliers')
+              .select('company_name, contact_person')
+              .eq('user_id', userId)
+              .single();
+            
+            if (supplier) {
+              const supplierName = supplier.contact_person || supplier.company_name;
+              if (supplierName) {
+                console.log('🧭 Got display name from supplier:', supplierName);
+                setUserDisplayName(supplierName);
+                localStorage.setItem('user_display_name', supplierName);
+              }
+            }
+          }
+        } catch (err) {
+          console.log('🧭 Could not fetch profile for display name');
         }
       }
     };
@@ -64,8 +113,10 @@ const Navigation = () => {
   const isLoggedIn = !!(authUser || userEmail || userRoleState);
   const displayEmail = authUser?.email || userEmail;
   const displayRole = authRole || userRoleState;
+  // Use profile name if available, otherwise fall back to email
+  const displayName = userDisplayName || displayEmail;
   
-  console.log('🧭 Nav state - email:', displayEmail, 'role:', displayRole, 'loggedIn:', isLoggedIn);
+  console.log('🧭 Nav state - name:', displayName, 'email:', displayEmail, 'role:', displayRole, 'loggedIn:', isLoggedIn);
 
   // Public navigation items (visible to everyone)
   // NOTE: Tracking is only accessible from within dashboards (for clients and suppliers)
@@ -168,7 +219,7 @@ const Navigation = () => {
           {isLoggedIn ? (
             <div className="flex items-center gap-2">
               <span className="text-white text-xs font-medium bg-white/20 px-3 py-1.5 rounded-md max-w-[200px] truncate">
-                {displayEmail || 'User'}
+                {displayName || 'User'}
               </span>
               <Button 
                 type="button"
@@ -229,7 +280,7 @@ const Navigation = () => {
               {isLoggedIn ? (
                 <div className="space-y-4">
                   <p className="text-gray-700 text-center font-medium truncate px-2">
-                    {displayEmail || 'User'}
+                    {displayName || 'User'}
                   </p>
                   <button 
                     type="button"
