@@ -70,44 +70,138 @@ export const ProfileViewDialog: React.FC<ProfileViewDialogProps> = ({
       // Fetch profile from API
       const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
       const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      const accessToken = sessionData?.access_token || '';
       
       const effectiveUserId = userId || sessionData?.user?.id;
       
+      let profileData: any = null;
+      let supplierData: any = null;
+      let deliveryProviderData: any = null;
+      
       if (effectiveUserId) {
+        // Fetch from profiles table
         try {
           const response = await fetch(
             `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${effectiveUserId}&select=*`,
-            { headers: { 'apikey': apiKey }, cache: 'no-store' }
+            { 
+              headers: { 
+                'apikey': apiKey,
+                'Authorization': accessToken ? `Bearer ${accessToken}` : ''
+              }, 
+              cache: 'no-store' 
+            }
           );
           
           if (response.ok) {
             const data = await response.json();
             if (data && data.length > 0) {
-              setProfile({
-                ...data[0],
-                role: userRole,
-                email: data[0].email || sessionData?.user?.email || userEmail
-              });
-              setLoading(false);
-              return;
+              profileData = data[0];
             }
           }
         } catch (e) {
           console.warn('Profile fetch failed');
         }
+        
+        // If user is a supplier, fetch supplier-specific data
+        if (userRole === 'supplier') {
+          try {
+            const supplierResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${effectiveUserId}&select=*`,
+              { 
+                headers: { 
+                  'apikey': apiKey,
+                  'Authorization': accessToken ? `Bearer ${accessToken}` : ''
+                }, 
+                cache: 'no-store' 
+              }
+            );
+            
+            if (supplierResponse.ok) {
+              const supplierDataArr = await supplierResponse.json();
+              if (supplierDataArr && supplierDataArr.length > 0) {
+                supplierData = supplierDataArr[0];
+              }
+            }
+          } catch (e) {
+            console.warn('Supplier data fetch failed');
+          }
+        }
+        
+        // If user is a delivery provider, fetch delivery provider-specific data
+        if (userRole === 'delivery' || userRole === 'delivery_provider') {
+          try {
+            const deliveryResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${effectiveUserId}&select=*`,
+              { 
+                headers: { 
+                  'apikey': apiKey,
+                  'Authorization': accessToken ? `Bearer ${accessToken}` : ''
+                }, 
+                cache: 'no-store' 
+              }
+            );
+            
+            if (deliveryResponse.ok) {
+              const deliveryDataArr = await deliveryResponse.json();
+              if (deliveryDataArr && deliveryDataArr.length > 0) {
+                deliveryProviderData = deliveryDataArr[0];
+              }
+            }
+          } catch (e) {
+            console.warn('Delivery provider data fetch failed');
+          }
+        }
       }
 
-      // Fallback to cached data
-      setProfile({
-        full_name: userName || sessionData?.user?.user_metadata?.full_name || 'User',
-        email: sessionData?.user?.email || userEmail || 'Not provided',
-        phone: sessionData?.user?.phone || 'Not provided',
+      // Merge data from all sources, prioritizing role-specific data
+      const mergedProfile: any = {
         role: userRole,
-        avatar_url: sessionData?.user?.user_metadata?.avatar_url
-      });
+        email: profileData?.email || sessionData?.user?.email || userEmail || 'Not provided',
+        created_at: profileData?.created_at
+      };
+      
+      if (userRole === 'supplier' && supplierData) {
+        // For suppliers, prioritize supplier table data
+        mergedProfile.full_name = supplierData.contact_person || supplierData.company_name || profileData?.full_name || userName || 'User';
+        mergedProfile.company_name = supplierData.company_name || profileData?.store_name || profileData?.company_name;
+        mergedProfile.phone = supplierData.phone || profileData?.phone;
+        mergedProfile.location = supplierData.county || supplierData.physical_address || profileData?.location;
+        mergedProfile.avatar_url = supplierData.company_logo_url || profileData?.avatar_url;
+      } else if ((userRole === 'delivery' || userRole === 'delivery_provider') && deliveryProviderData) {
+        // For delivery providers, prioritize delivery_providers table data
+        mergedProfile.full_name = deliveryProviderData.full_name || deliveryProviderData.company_name || profileData?.full_name || userName || 'User';
+        mergedProfile.company_name = deliveryProviderData.company_name;
+        mergedProfile.phone = deliveryProviderData.phone || profileData?.phone;
+        mergedProfile.location = deliveryProviderData.service_area || profileData?.location;
+        mergedProfile.avatar_url = deliveryProviderData.profile_photo_url || profileData?.avatar_url;
+      } else if (profileData) {
+        // For other roles, use profiles table data
+        mergedProfile.full_name = profileData.full_name || userName || 'User';
+        mergedProfile.company_name = profileData.store_name || profileData.company_name;
+        mergedProfile.phone = profileData.phone;
+        mergedProfile.location = profileData.location;
+        mergedProfile.avatar_url = profileData.avatar_url;
+      } else {
+        // Fallback to cached/session data
+        mergedProfile.full_name = userName || sessionData?.user?.user_metadata?.full_name || 'User';
+        mergedProfile.phone = sessionData?.user?.phone;
+        mergedProfile.avatar_url = sessionData?.user?.user_metadata?.avatar_url;
+      }
+      
+      setProfile(mergedProfile);
       
     } catch (error) {
       console.error('Error loading profile:', error);
+      // Fallback
+      const userRole = localStorage.getItem('user_role');
+      const userName = localStorage.getItem('user_name');
+      const userEmail = localStorage.getItem('user_email');
+      setProfile({
+        full_name: userName || 'User',
+        email: userEmail || 'Not provided',
+        phone: 'Not provided',
+        role: userRole
+      });
     } finally {
       setLoading(false);
     }
@@ -174,29 +268,28 @@ export const ProfileViewDialog: React.FC<ProfileViewDialogProps> = ({
 
             {/* Profile Details */}
             <div className="space-y-3">
+              {/* Company/Business Name - Show prominently for suppliers */}
+              {profile.company_name && (
+                <div className="flex items-center gap-3 text-gray-700">
+                  <Building2 className="h-4 w-4 text-blue-500" />
+                  <span className="text-sm font-medium">{profile.company_name}</span>
+                </div>
+              )}
+              
               <div className="flex items-center gap-3 text-gray-600">
                 <Mail className="h-4 w-4 text-gray-400" />
                 <span className="text-sm">{profile.email || 'Not provided'}</span>
               </div>
               
-              {profile.phone && (
-                <div className="flex items-center gap-3 text-gray-600">
-                  <Phone className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm">{profile.phone}</span>
-                </div>
-              )}
+              <div className="flex items-center gap-3 text-gray-600">
+                <Phone className="h-4 w-4 text-gray-400" />
+                <span className="text-sm">{profile.phone || 'Not provided'}</span>
+              </div>
               
               {profile.location && (
                 <div className="flex items-center gap-3 text-gray-600">
                   <MapPin className="h-4 w-4 text-gray-400" />
                   <span className="text-sm">{profile.location}</span>
-                </div>
-              )}
-              
-              {profile.company_name && (
-                <div className="flex items-center gap-3 text-gray-600">
-                  <Building2 className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm">{profile.company_name}</span>
                 </div>
               )}
 
