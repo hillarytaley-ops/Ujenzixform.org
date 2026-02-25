@@ -502,50 +502,102 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
 
   const calculateProductPerformance = (products: any[], orders: any[]): ProductPerformance[] => {
     // Build a map of product sales from order items
+    // Key by both product_id and product name (normalized) for better matching
     const productSalesMap = new Map<string, { quantity: number; revenue: number; orderCount: number; name?: string }>();
+    const productNameSalesMap = new Map<string, { quantity: number; revenue: number; orderCount: number }>();
     
-    // Extract sales data from orders
-    orders.forEach(order => {
+    console.log('📊 Calculating product performance from', orders.length, 'orders and', products.length, 'products');
+    
+    // Only count confirmed/completed orders for sales
+    const confirmedOrders = orders.filter(o => ['confirmed', 'completed', 'delivered', 'shipped', 'accepted'].includes(o.status));
+    console.log('📊 Confirmed orders for sales calculation:', confirmedOrders.length);
+    
+    // Extract sales data from confirmed orders
+    confirmedOrders.forEach(order => {
       const items = order.items || [];
+      
+      // Process order items array
       items.forEach((item: any) => {
         const productId = item.product_id || item.id;
-        const existing = productSalesMap.get(productId) || { quantity: 0, revenue: 0, orderCount: 0 };
-        productSalesMap.set(productId, {
-          quantity: existing.quantity + (item.quantity || 1),
-          revenue: existing.revenue + (parseFloat(item.total_price) || parseFloat(item.price) || 0),
-          orderCount: existing.orderCount + 1,
-          name: item.name || item.product_name || item.material_name || existing.name
-        });
+        const productName = (item.name || item.product_name || item.material_name || '').toLowerCase().trim();
+        const quantity = parseInt(item.quantity) || 1;
+        const revenue = parseFloat(item.total_price) || (parseFloat(item.price || item.unit_price || 0) * quantity);
+        
+        // Store by product ID
+        if (productId) {
+          const existing = productSalesMap.get(productId) || { quantity: 0, revenue: 0, orderCount: 0 };
+          productSalesMap.set(productId, {
+            quantity: existing.quantity + quantity,
+            revenue: existing.revenue + revenue,
+            orderCount: existing.orderCount + 1,
+            name: item.name || item.product_name || item.material_name || existing.name
+          });
+        }
+        
+        // Also store by product name for fuzzy matching
+        if (productName) {
+          const existingByName = productNameSalesMap.get(productName) || { quantity: 0, revenue: 0, orderCount: 0 };
+          productNameSalesMap.set(productName, {
+            quantity: existingByName.quantity + quantity,
+            revenue: existingByName.revenue + revenue,
+            orderCount: existingByName.orderCount + 1
+          });
+        }
       });
       
-      // Also check if order has direct product info
-      if (order.product_id || order.material_name) {
-        const productId = order.product_id || order.material_name;
-        const existing = productSalesMap.get(productId) || { quantity: 0, revenue: 0, orderCount: 0 };
-        productSalesMap.set(productId, {
-          quantity: existing.quantity + (order.quantity || 1),
-          revenue: existing.revenue + (parseFloat(order.total_amount) || 0),
-          orderCount: existing.orderCount + 1,
-          name: order.material_name || existing.name
-        });
+      // Also check if order has direct product info (for simpler order structures)
+      if (!items.length && (order.material_name || order.product_name)) {
+        const productName = (order.material_name || order.product_name || '').toLowerCase().trim();
+        const quantity = parseInt(order.quantity) || 1;
+        const revenue = parseFloat(order.total_amount) || 0;
+        
+        if (productName) {
+          const existingByName = productNameSalesMap.get(productName) || { quantity: 0, revenue: 0, orderCount: 0 };
+          productNameSalesMap.set(productName, {
+            quantity: existingByName.quantity + quantity,
+            revenue: existingByName.revenue + revenue,
+            orderCount: existingByName.orderCount + 1
+          });
+        }
       }
     });
+
+    console.log('📊 Product sales map entries:', productSalesMap.size);
+    console.log('📊 Product name sales map entries:', productNameSalesMap.size);
 
     // Map products with their sales data
     const productPerformance: ProductPerformance[] = products.map((product) => {
       const productId = product.product_id || product.id;
-      const salesData = productSalesMap.get(productId) || { quantity: 0, revenue: 0, orderCount: 0 };
+      const productName = (product.product_name || product.name || '').toLowerCase().trim();
       
-      // Get product name - prioritize product_name from merged data, then other sources
-      const productName = product.product_name || 
+      // Try to find sales data by product ID first, then by name
+      let salesData = productSalesMap.get(productId) || { quantity: 0, revenue: 0, orderCount: 0 };
+      
+      // If no sales by ID, try to match by product name
+      if (salesData.quantity === 0 && productName) {
+        // Try exact match first
+        const byName = productNameSalesMap.get(productName);
+        if (byName) {
+          salesData = byName;
+        } else {
+          // Try partial match
+          for (const [name, data] of productNameSalesMap.entries()) {
+            if (name.includes(productName) || productName.includes(name)) {
+              salesData = data;
+              break;
+            }
+          }
+        }
+      }
+      
+      // Get display name - prioritize product_name from merged data
+      const displayName = product.product_name || 
                           product.name || 
-                          salesData.name ||
                           product.material_name || 
                           (productId ? `Product ${productId.slice(0, 8)}` : 'Unnamed Product');
       
       // Calculate stock level from product data
       const stockQuantity = product.stock_quantity ?? (product.in_stock ? 100 : 0);
-      const minStock = product.min_stock_level || 10;
       const maxStock = product.max_stock_level || 100;
       const stockLevel = maxStock > 0 ? Math.min(100, (stockQuantity / maxStock) * 100) : (product.in_stock ? 100 : 0);
       
@@ -554,7 +606,7 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
 
       return {
         id: productId,
-        name: productName,
+        name: displayName,
         category: product.category || 'General',
         totalSales: salesData.quantity,
         revenue: salesData.revenue,
@@ -565,10 +617,15 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
       };
     });
 
-    // Sort by revenue (then by stock level for products with no sales) and return top 5
+    // Sort by total sales first (units sold), then by revenue, then by stock level
+    // This ensures products with actual sales appear at the top
     return productPerformance
       .sort((a, b) => {
+        // First priority: products with actual sales
+        if (b.totalSales !== a.totalSales) return b.totalSales - a.totalSales;
+        // Second priority: revenue
         if (b.revenue !== a.revenue) return b.revenue - a.revenue;
+        // Third priority: stock level (for products with no sales yet)
         return b.stockLevel - a.stockLevel;
       })
       .slice(0, 5);
@@ -879,24 +936,38 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Package className="h-5 w-5" />
-              Top Performing Products
+              {topProducts.some(p => p.totalSales > 0) ? 'Top Performing Products' : 'Your Products'}
             </CardTitle>
-            <CardDescription>Products from your inventory with highest sales</CardDescription>
+            <CardDescription>
+              {topProducts.some(p => p.totalSales > 0) 
+                ? 'Products from your inventory with highest sales' 
+                : 'Products in your inventory (no sales yet)'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               {topProducts.length > 0 ? (
                 topProducts.map((product, index) => (
                   <div key={product.id} className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold">
+                    <div className={`flex items-center justify-center w-8 h-8 rounded-full font-bold ${
+                      product.totalSales > 0 
+                        ? 'bg-primary/10 text-primary' 
+                        : 'bg-gray-100 text-gray-400'
+                    }`}>
                       {index + 1}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate">{product.name}</p>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span>{product.totalSales} sold</span>
-                        <span>•</span>
-                        <span>{formatCurrency(product.revenue)}</span>
+                        {product.totalSales > 0 ? (
+                          <>
+                            <span className="text-green-600 font-medium">{product.totalSales} sold</span>
+                            <span>•</span>
+                            <span className="text-green-600">{formatCurrency(product.revenue)}</span>
+                          </>
+                        ) : (
+                          <span className="text-amber-600">No sales yet</span>
+                        )}
                         {product.category && (
                           <>
                             <span>•</span>
@@ -906,12 +977,16 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {product.trend === 'up' ? (
-                        <ArrowUpRight className="h-4 w-4 text-green-600" />
-                      ) : product.trend === 'down' ? (
-                        <ArrowDownRight className="h-4 w-4 text-red-600" />
+                      {product.totalSales > 0 ? (
+                        product.trend === 'up' ? (
+                          <ArrowUpRight className="h-4 w-4 text-green-600" />
+                        ) : product.trend === 'down' ? (
+                          <ArrowDownRight className="h-4 w-4 text-red-600" />
+                        ) : (
+                          <div className="w-4 h-0.5 bg-gray-400" />
+                        )
                       ) : (
-                        <div className="w-4 h-0.5 bg-gray-400" />
+                        <Clock className="h-4 w-4 text-gray-400" title="Awaiting first sale" />
                       )}
                       <div className="w-16" title={`Stock: ${product.stockLevel}%`}>
                         <Progress 
