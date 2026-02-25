@@ -20,6 +20,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import QRCodeLib from 'qrcode';
+import { getPrefetchedQRCodes } from '@/services/dataPrefetch';
 
 interface MaterialItem {
   id: string;
@@ -260,11 +261,24 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
       console.log('⚡ QR Manager: Using cached auth - userId:', stored.id, 'role:', cachedRole);
       setUserRole(cachedRole);
       
-      // For suppliers, use cached supplier ID if available
+      // For suppliers, try prefetched data first (instant)
       if (cachedRole === 'supplier' && (cachedSupplierId || propSupplierId)) {
         const supplierId = propSupplierId || cachedSupplierId || stored.id;
         setResolvedSupplierId(supplierId);
         console.log('⚡ QR Manager: Using cached supplierId:', supplierId);
+        
+        // Try prefetched QR codes first
+        const prefetchedQRCodes = getPrefetchedQRCodes(supplierId);
+        if (prefetchedQRCodes && prefetchedQRCodes.length > 0) {
+          console.log('⚡ QR Manager: Using prefetched QR codes:', prefetchedQRCodes.length);
+          setItems(prefetchedQRCodes);
+          groupItemsByClient(prefetchedQRCodes);
+          setLoading(false);
+          // Fetch fresh data in background
+          fetchMaterialItemsFast(cachedRole, stored.id, supplierId);
+          return;
+        }
+        
         await fetchMaterialItemsFast(cachedRole, stored.id, supplierId);
         return;
       }

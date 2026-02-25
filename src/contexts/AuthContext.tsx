@@ -26,6 +26,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { prefetchDashboardData, clearPrefetchCache } from '@/services/dataPrefetch';
 
 interface AuthContextType {
   user: User | null;
@@ -45,8 +46,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
 
-  // Fetch user role (non-blocking)
-  const fetchUserRole = useCallback(async (userId: string) => {
+  // Fetch user role (non-blocking) and trigger data prefetch
+  const fetchUserRole = useCallback(async (userId: string, triggerPrefetch: boolean = false) => {
     try {
       const { data: roleData, error } = await supabase
         .from('user_roles')
@@ -64,6 +65,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         localStorage.setItem('user_role', role);
         localStorage.setItem('user_role_id', userId);
         console.log('AuthContext: Role synced to localStorage:', role);
+        
+        // Trigger data prefetch in background after login
+        if (triggerPrefetch) {
+          const accessToken = (await supabase.auth.getSession()).data.session?.access_token;
+          if (accessToken) {
+            console.log('AuthContext: Starting data prefetch for faster dashboard loading...');
+            // Run prefetch in background - don't await
+            prefetchDashboardData(userId, role, accessToken).catch(err => {
+              console.warn('AuthContext: Prefetch error (non-critical):', err);
+            });
+          }
+        }
       }
     } catch (error) {
       console.error('AuthContext: Error fetching user role:', error);
@@ -127,8 +140,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
           localStorage.setItem('user_id', currentSession.user.id);
           
-          // Fetch role synchronously on sign-in
-          await fetchUserRole(currentSession.user.id);
+          // Fetch role synchronously on sign-in AND trigger prefetch
+          await fetchUserRole(currentSession.user.id, true);
           
           // Also fetch user profile name for display
           try {
@@ -223,6 +236,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.removeItem('user_id');
       localStorage.removeItem('admin_authenticated');
       localStorage.removeItem('admin_login_time');
+      localStorage.removeItem('supplier_id');
+      // Clear prefetch cache
+      clearPrefetchCache();
       await supabase.auth.signOut();
     } catch (error) {
       console.error('Sign out error:', error);
@@ -238,6 +254,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.removeItem('user_id');
       localStorage.removeItem('admin_authenticated');
       localStorage.removeItem('admin_login_time');
+      localStorage.removeItem('supplier_id');
+      clearPrefetchCache();
     }
   };
 

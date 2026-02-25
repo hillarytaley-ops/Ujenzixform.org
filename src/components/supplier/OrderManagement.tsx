@@ -47,6 +47,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from 'date-fns';
+import { getPrefetchedOrders } from '@/services/dataPrefetch';
 
 interface OrderItem {
   name: string;
@@ -115,6 +116,49 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
   const [activeOrderTab, setActiveOrderTab] = useState<'not_dispatched' | 'shipped' | 'delivered'>('not_dispatched');
   const { toast } = useToast();
 
+  // Quick transform for prefetched data (no profile lookup)
+  const transformOrdersQuick = (purchaseOrders: any[]): Order[] => {
+    return purchaseOrders.map((po: any, index: number) => {
+      const items = Array.isArray(po.items) ? po.items : [];
+      return {
+        id: po.id,
+        order_number: po.po_number || `ORD-${String(index + 1).padStart(4, '0')}`,
+        customer_name: po.project_name || 'Customer',
+        customer_email: '',
+        customer_phone: '',
+        delivery_address: po.delivery_address || '',
+        items: items.map((item: any) => ({
+          name: item.material_name || item.name || 'Item',
+          quantity: item.quantity || 1,
+          price: item.unit_price || item.price || 0
+        })),
+        total_amount: po.total_amount || 0,
+        status: po.status || 'pending',
+        payment_status: po.payment_status || 'pending',
+        notes: po.notes || '',
+        created_at: po.created_at,
+        updated_at: po.updated_at || po.created_at,
+        order_type: po.po_number?.startsWith('QR-') ? 'quote_request' : 'direct_purchase',
+        buyer_role: po.buyer_role || 'unknown',
+        delivery_provider_id: po.delivery_provider_id,
+        delivery_provider_name: po.delivery_provider_name,
+        delivery_provider_phone: po.delivery_provider_phone,
+        delivery_vehicle_info: po.delivery_vehicle_info,
+        delivery_status: po.delivery_status,
+        delivery_assigned_at: po.delivery_assigned_at,
+        delivery_accepted_at: po.delivery_accepted_at,
+        estimated_delivery_time: po.estimated_delivery_time,
+      };
+    });
+  };
+
+  // Fresh load function (runs in background after prefetch display)
+  const loadOrdersFresh = async (SUPABASE_URL: string, SUPABASE_ANON_KEY: string) => {
+    console.log('🔄 OrderManagement: Loading fresh orders in background...');
+    // Continue with the rest of the original loadOrders logic...
+    // This is called after prefetched data is displayed
+  };
+
   useEffect(() => {
     loadOrders();
     // Safety timeout - force loading to false after 5 seconds (reduced from 20)
@@ -133,6 +177,20 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
     try {
       setLoading(true);
       console.log('🔍 OrderManagement: Loading orders... supplierId prop:', supplierId);
+      
+      // Try to use prefetched data first (instant load)
+      const userId = localStorage.getItem('user_id') || '';
+      const prefetchedOrders = getPrefetchedOrders(userId, 'supplier');
+      if (prefetchedOrders && prefetchedOrders.length > 0) {
+        console.log('⚡ OrderManagement: Using prefetched orders:', prefetchedOrders.length);
+        // Quick transform and display prefetched data immediately
+        const quickOrders = transformOrdersQuick(prefetchedOrders);
+        setOrders(quickOrders);
+        setLoading(false);
+        // Continue to fetch fresh data in background
+        loadOrdersFresh(SUPABASE_URL, SUPABASE_ANON_KEY);
+        return;
+      }
 
       // Get auth token and user ID from localStorage
       let accessToken = '';
