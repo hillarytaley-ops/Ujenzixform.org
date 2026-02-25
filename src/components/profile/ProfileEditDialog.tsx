@@ -57,6 +57,11 @@ interface ProfileData {
   website?: string;
   avatar_url?: string;
   address?: string;
+  // Supplier-specific fields (from suppliers table)
+  supplier_id?: string;
+  contact_person?: string;
+  company_logo_url?: string;
+  county?: string;
 }
 
 const KENYAN_COUNTIES = [
@@ -91,7 +96,7 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
   }, [isOpen]);
 
   const loadProfile = async () => {
-    console.log('📝 ProfileEditDialog: Loading profile...');
+    console.log('📝 ProfileEditDialog: Loading profile... userRole:', userRole);
     
     // Get user info from localStorage FIRST (instant)
     let userId = '';
@@ -139,12 +144,12 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
     // Show loading but with a very short timeout
     setLoading(true);
     
-    // Safety timeout - show default profile after 3 seconds max
+    // Safety timeout - show default profile after 4 seconds max
     const timeoutId = setTimeout(() => {
       console.log('📝 ProfileEditDialog: Timeout - showing default profile');
       setProfile(defaultProfile);
       setLoading(false);
-    }, 3000);
+    }, 4000);
 
     // Try to fetch profile with short timeout
     try {
@@ -163,31 +168,78 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
         accessToken = session?.access_token || '';
       }
 
+      const headers = {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+      };
+
+      // Fetch profile from profiles table
       const controller = new AbortController();
-      const fetchTimeout = setTimeout(() => controller.abort(), 2500);
+      const fetchTimeout = setTimeout(() => controller.abort(), 3000);
 
       const response = await fetch(
         `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${userId}&select=*`,
-        {
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
-          },
-          signal: controller.signal
-        }
+        { headers, signal: controller.signal }
       );
       clearTimeout(fetchTimeout);
+
+      let profileData: ProfileData = { ...defaultProfile };
 
       if (response.ok) {
         const profiles = await response.json();
         if (profiles && profiles.length > 0) {
-          clearTimeout(timeoutId);
-          setProfile({ ...profiles[0], email: userEmail });
-          console.log('✅ ProfileEditDialog: Profile loaded:', profiles[0].full_name);
-          setLoading(false);
-          return;
+          profileData = { ...profiles[0], email: userEmail };
+          console.log('✅ ProfileEditDialog: Profile loaded from profiles table:', profiles[0].full_name);
         }
       }
+
+      // If user is a supplier, ALSO fetch from suppliers table to get store/company name
+      if (userRole === 'supplier') {
+        console.log('📝 ProfileEditDialog: User is supplier, fetching supplier data...');
+        
+        try {
+          const supplierController = new AbortController();
+          const supplierTimeout = setTimeout(() => supplierController.abort(), 3000);
+
+          const supplierResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${userId}&select=*`,
+            { headers, signal: supplierController.signal }
+          );
+          clearTimeout(supplierTimeout);
+
+          if (supplierResponse.ok) {
+            const suppliers = await supplierResponse.json();
+            if (suppliers && suppliers.length > 0) {
+              const supplierData = suppliers[0];
+              console.log('✅ ProfileEditDialog: Supplier data loaded:', supplierData.company_name);
+              
+              // Merge supplier data into profile
+              profileData = {
+                ...profileData,
+                supplier_id: supplierData.id,
+                company_name: supplierData.company_name || profileData.company_name,
+                store_name: supplierData.company_name || profileData.store_name,
+                contact_person: supplierData.contact_person,
+                phone: supplierData.phone || profileData.phone,
+                location: supplierData.county || supplierData.location || profileData.location,
+                county: supplierData.county,
+                address: supplierData.address || supplierData.physical_address || profileData.address,
+                avatar_url: supplierData.company_logo_url || profileData.avatar_url,
+                company_logo_url: supplierData.company_logo_url,
+                website: supplierData.website_url || profileData.website,
+                bio: supplierData.description || profileData.bio,
+              };
+            }
+          }
+        } catch (supplierError) {
+          console.log('📝 ProfileEditDialog: Supplier fetch failed:', supplierError);
+        }
+      }
+
+      clearTimeout(timeoutId);
+      setProfile(profileData);
+      setLoading(false);
+      return;
     } catch (fetchError) {
       console.log('📝 ProfileEditDialog: REST fetch failed:', fetchError);
     }
@@ -464,27 +516,74 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
         }
       }
 
-      // Also update supplier record if user is a supplier (non-blocking)
+      // Also update supplier record if user is a supplier - THIS IS CRITICAL for store name, logo, etc.
       if (userRole === 'supplier') {
-        // Fire and forget - don't block profile save
-        fetch(
-          `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${profile.user_id}`,
-          {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${accessToken}`,
-              'Prefer': 'return=minimal'
-            },
-            body: JSON.stringify({
-              phone: profile.phone || null,
-              location: profile.location || null,
-              updated_at: new Date().toISOString()
-            })
+        console.log('📝 ProfileEditDialog: Updating supplier record...');
+        
+        const supplierUpdateData: Record<string, any> = {
+          phone: profile.phone || null,
+          county: profile.location || null,
+          updated_at: new Date().toISOString()
+        };
+
+        // Include company_name if provided (store name)
+        if (profile.store_name || profile.company_name) {
+          supplierUpdateData.company_name = profile.store_name || profile.company_name;
+        }
+
+        // Include contact_person if provided
+        if (profile.contact_person) {
+          supplierUpdateData.contact_person = profile.contact_person;
+        }
+
+        // Include company_logo_url if avatar was uploaded
+        if (profile.avatar_url) {
+          supplierUpdateData.company_logo_url = profile.avatar_url;
+        }
+
+        // Include address if provided
+        if (profile.address) {
+          supplierUpdateData.physical_address = profile.address;
+          supplierUpdateData.address = profile.address;
+        }
+
+        // Include website if provided
+        if (profile.website) {
+          supplierUpdateData.website_url = profile.website;
+        }
+
+        // Include bio/description if provided
+        if (profile.bio) {
+          supplierUpdateData.description = profile.bio;
+        }
+
+        console.log('📝 ProfileEditDialog: Supplier update data:', supplierUpdateData);
+
+        try {
+          const supplierResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${profile.user_id}`,
+            {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken}`,
+                'Prefer': 'return=representation'
+              },
+              body: JSON.stringify(supplierUpdateData)
+            }
+          );
+
+          if (supplierResponse.ok) {
+            const result = await supplierResponse.json();
+            console.log('✅ ProfileEditDialog: Supplier record updated:', result);
+          } else {
+            const errorText = await supplierResponse.text();
+            console.error('📝 ProfileEditDialog: Supplier update failed:', supplierResponse.status, errorText);
           }
-        ).then(r => r.ok && console.log('✅ Supplier record updated'))
-         .catch(() => console.log('📝 Supplier update skipped'));
+        } catch (supplierError) {
+          console.error('📝 ProfileEditDialog: Supplier update error:', supplierError);
+        }
       }
 
       // Update delivery provider record if applicable (non-blocking)
@@ -754,22 +853,42 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
 
               {/* Store Name (for Suppliers) */}
               {isSupplier && (
-                <div>
-                  <Label htmlFor="storeName" className="flex items-center gap-2">
-                    <Store className="h-4 w-4 text-orange-500" />
-                    Store / Business Name
-                  </Label>
-                  <Input
-                    id="storeName"
-                    value={profile.store_name || profile.company_name || ''}
-                    onChange={(e) => setProfile({ ...profile, store_name: e.target.value, company_name: e.target.value })}
-                    placeholder="e.g., Mombasa Building Supplies"
-                    className="mt-1"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    This name will be shown to customers when they browse suppliers
-                  </p>
-                </div>
+                <>
+                  <div>
+                    <Label htmlFor="storeName" className="flex items-center gap-2">
+                      <Store className="h-4 w-4 text-orange-500" />
+                      Store / Business Name *
+                    </Label>
+                    <Input
+                      id="storeName"
+                      value={profile.store_name || profile.company_name || ''}
+                      onChange={(e) => setProfile({ ...profile, store_name: e.target.value, company_name: e.target.value })}
+                      placeholder="e.g., Mombasa Building Supplies"
+                      className="mt-1"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      This name will be shown to customers when they browse suppliers
+                    </p>
+                  </div>
+
+                  {/* Contact Person (for Suppliers) */}
+                  <div>
+                    <Label htmlFor="contactPerson" className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-blue-500" />
+                      Contact Person
+                    </Label>
+                    <Input
+                      id="contactPerson"
+                      value={profile.contact_person || profile.full_name || ''}
+                      onChange={(e) => setProfile({ ...profile, contact_person: e.target.value })}
+                      placeholder="Primary contact name"
+                      className="mt-1"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      The person customers should ask for
+                    </p>
+                  </div>
+                </>
               )}
 
               {/* Company Name (for non-suppliers) */}
