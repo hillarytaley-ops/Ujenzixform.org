@@ -770,95 +770,139 @@ const DeliveryDashboard = () => {
           </Card>
         </div>
 
-        {/* Quick Actions - Simplified (removed duplicates) */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        {/* Card-Style Navigation - All tabs in one row */}
+        <div className="grid grid-cols-4 md:grid-cols-8 gap-2 mb-8">
           <Button 
-            className="h-auto py-4 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600"
+            variant="ghost"
+            className={`h-auto py-3 px-2 flex flex-col items-center gap-1 transition-all ${
+              activeTab === 'active' 
+                ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg ring-2 ring-teal-300' 
+                : isDarkMode 
+                  ? 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700' 
+                  : 'bg-white text-gray-700 hover:bg-teal-50 border border-gray-200 shadow-sm'
+            }`}
             onClick={() => setActiveTab('active')}
           >
-            <div className="flex flex-col items-center gap-2">
-              <NavigationIcon className="h-6 w-6" />
-              <span>Start Navigation</span>
-            </div>
+            <Truck className="h-5 w-5" />
+            <span className="text-xs font-medium">Active</span>
+            {activeDeliveries.length > 0 && (
+              <Badge className="text-[10px] px-1 py-0 bg-yellow-500 text-white">{activeDeliveries.length}</Badge>
+            )}
           </Button>
           <Button 
-            variant="outline" 
-            className={`h-auto py-4 border-2 ${isDarkMode ? 'border-cyan-600 bg-cyan-900/20 hover:bg-cyan-900/40' : 'border-cyan-300 bg-cyan-50 hover:bg-cyan-100'}`}
-            onClick={() => setActiveTab('scanning')}
-          >
-            <div className="flex flex-col items-center gap-2">
-              <Scan className="h-6 w-6 text-cyan-600" />
-              <span>Scan QR</span>
-            </div>
-          </Button>
-          <Button 
-            variant="outline" 
-            className={`h-auto py-4 border-2 ${isDarkMode ? 'border-gray-600 hover:bg-gray-800' : 'hover:bg-teal-50'}`}
-            onClick={() => setActiveTab('analytics')}
-          >
-            <div className="flex flex-col items-center gap-2">
-              <BarChart3 className="h-6 w-6 text-teal-600" />
-              <span>Earnings</span>
-            </div>
-          </Button>
-          <Button 
-            variant="outline" 
-            className={`h-auto py-4 border-2 ${isDarkMode ? 'border-gray-600 hover:bg-gray-800' : 'hover:bg-teal-50'}`}
+            variant="ghost"
+            className={`h-auto py-3 px-2 flex flex-col items-center gap-1 transition-all ${
+              activeTab === 'schedule' 
+                ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg ring-2 ring-teal-300' 
+                : isDarkMode 
+                  ? 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700' 
+                  : 'bg-white text-gray-700 hover:bg-teal-50 border border-gray-200 shadow-sm'
+            }`}
             onClick={() => setActiveTab('schedule')}
           >
-            <div className="flex flex-col items-center gap-2">
-              <Calendar className="h-6 w-6 text-teal-600" />
-              <span>Schedule</span>
-            </div>
+            <Calendar className="h-5 w-5" />
+            <span className="text-xs font-medium">Schedule</span>
+          </Button>
+          <Button 
+            variant="ghost"
+            className={`h-auto py-3 px-2 flex flex-col items-center gap-1 transition-all ${
+              activeTab === 'map' 
+                ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg ring-2 ring-teal-300' 
+                : isDarkMode 
+                  ? 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700' 
+                  : 'bg-white text-gray-700 hover:bg-teal-50 border border-gray-200 shadow-sm'
+            }`}
+            onClick={() => setActiveTab('map')}
+          >
+            <Map className="h-5 w-5" />
+            <span className="text-xs font-medium">Map</span>
+          </Button>
+          <Button 
+            variant="ghost"
+            className={`h-auto py-3 px-2 flex flex-col items-center gap-1 transition-all ${
+              activeTab === 'scanning' 
+                ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg ring-2 ring-teal-300' 
+                : isDarkMode 
+                  ? 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700' 
+                  : 'bg-white text-gray-700 hover:bg-teal-50 border border-gray-200 shadow-sm'
+            }`}
+            onClick={() => setActiveTab('scanning')}
+          >
+            <Scan className="h-5 w-5" />
+            <span className="text-xs font-medium">Scan QR</span>
+          </Button>
+          <Button 
+            variant="ghost"
+            className={`h-auto py-3 px-2 flex flex-col items-center gap-1 transition-all ${
+              activeTab === 'history' 
+                ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg ring-2 ring-teal-300' 
+                : isDarkMode 
+                  ? 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700' 
+                  : 'bg-white text-gray-700 hover:bg-teal-50 border border-gray-200 shadow-sm'
+            }`}
+            onClick={() => setActiveTab('history')}
+          >
+            <Clock className="h-5 w-5" />
+            <span className="text-xs font-medium">History</span>
+          </Button>
+          <Button 
+            variant="ghost"
+            className={`h-auto py-3 px-2 flex flex-col items-center gap-1 transition-all ${
+              activeTab === 'analytics' 
+                ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg ring-2 ring-teal-300' 
+                : isDarkMode 
+                  ? 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700' 
+                  : 'bg-white text-gray-700 hover:bg-teal-50 border border-gray-200 shadow-sm'
+            }`}
+            onClick={() => setActiveTab('analytics')}
+          >
+            <BarChart3 className="h-5 w-5" />
+            <span className="text-xs font-medium">Analytics</span>
+          </Button>
+          <Button 
+            variant="ghost"
+            className={`h-auto py-3 px-2 flex flex-col items-center gap-1 transition-all relative ${
+              activeTab === 'notifications' 
+                ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg ring-2 ring-teal-300' 
+                : isDarkMode 
+                  ? 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700' 
+                  : 'bg-white text-gray-700 hover:bg-teal-50 border border-gray-200 shadow-sm'
+            }`}
+            onClick={() => setActiveTab('notifications')}
+          >
+            <Bell className="h-5 w-5" />
+            <span className="text-xs font-medium">Alerts</span>
+            {pendingNotificationCount > 0 && (
+              <Badge className="absolute -top-1 -right-1 text-[10px] px-1 py-0 bg-red-500 text-white animate-pulse">{pendingNotificationCount}</Badge>
+            )}
+          </Button>
+          <Button 
+            variant="ghost"
+            className={`h-auto py-3 px-2 flex flex-col items-center gap-1 transition-all ${
+              activeTab === 'support' 
+                ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg ring-2 ring-teal-300' 
+                : isDarkMode 
+                  ? 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700' 
+                  : 'bg-white text-gray-700 hover:bg-teal-50 border border-gray-200 shadow-sm'
+            }`}
+            onClick={() => setActiveTab('support')}
+          >
+            <Headphones className="h-5 w-5" />
+            <span className="text-xs font-medium">Support</span>
           </Button>
         </div>
 
-        {/* Main Content Tabs - Simplified & Uniform Styling */}
+        {/* Main Content Tabs - Hidden TabsList, controlled by card buttons above */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} shadow-md p-1 rounded-lg flex-wrap h-auto gap-1`}>
-            <TabsTrigger value="active" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
-              <Truck className="h-4 w-4 mr-1" />
-              Active ({activeDeliveries.length})
-            </TabsTrigger>
-            <TabsTrigger value="schedule" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
-              <Calendar className="h-4 w-4 mr-1" />
-              Schedule
-            </TabsTrigger>
-            <TabsTrigger value="map" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
-              <Map className="h-4 w-4 mr-1" />
-              Map
-            </TabsTrigger>
-            <TabsTrigger value="scanning" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
-              <Scan className="h-4 w-4 mr-1" />
-              Scanning
-            </TabsTrigger>
-            <TabsTrigger value="history" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
-              <Clock className="h-4 w-4 mr-1" />
-              History
-            </TabsTrigger>
-            <TabsTrigger value="analytics" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
-              <BarChart3 className="h-4 w-4 mr-1" />
-              Analytics
-            </TabsTrigger>
-            <TabsTrigger value="notifications" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white relative">
-              <Bell className="h-4 w-4 mr-1" />
-              Alerts
-              {notificationCount > 0 && (
-                <Badge 
-                  className={`ml-1 text-xs px-1.5 py-0 min-w-[20px] h-5 ${
-                    pendingNotificationCount > 0 
-                      ? 'bg-red-500 text-white animate-pulse' 
-                      : 'bg-gray-500 text-white'
-                  }`}
-                >
-                  {pendingNotificationCount > 0 ? pendingNotificationCount : notificationCount}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="support" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
-              <Headphones className="h-4 w-4 mr-1" />
-              Support
-            </TabsTrigger>
+          <TabsList className="hidden">
+            <TabsTrigger value="active">Active</TabsTrigger>
+            <TabsTrigger value="schedule">Schedule</TabsTrigger>
+            <TabsTrigger value="map">Map</TabsTrigger>
+            <TabsTrigger value="scanning">Scanning</TabsTrigger>
+            <TabsTrigger value="history">History</TabsTrigger>
+            <TabsTrigger value="analytics">Analytics</TabsTrigger>
+            <TabsTrigger value="notifications">Alerts</TabsTrigger>
+            <TabsTrigger value="support">Support</TabsTrigger>
           </TabsList>
 
           {/* Active Deliveries Tab */}
