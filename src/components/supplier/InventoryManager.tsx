@@ -529,11 +529,11 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'in_stock':
-        return <Badge className="bg-green-500/20 text-green-400 border-green-500/50">In Stock</Badge>;
+        return <Badge className="bg-emerald-100 text-emerald-700 border-emerald-300 font-medium">In Stock</Badge>;
       case 'low_stock':
-        return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/50">Low Stock</Badge>;
+        return <Badge className="bg-amber-100 text-amber-700 border-amber-300 font-medium">Low Stock</Badge>;
       case 'out_of_stock':
-        return <Badge className="bg-red-500/20 text-red-400 border-red-500/50">Out of Stock</Badge>;
+        return <Badge className="bg-red-100 text-red-700 border-red-300 font-medium">Out of Stock</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -603,61 +603,61 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Card className="bg-slate-800/50 border-slate-700">
+        <Card className="bg-gradient-to-br from-blue-500 to-blue-600 border-blue-400 shadow-lg hover:shadow-xl transition-shadow">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <Package className="h-8 w-8 text-blue-400" />
+              <Package className="h-8 w-8 text-white/90" />
               <div>
                 <p className="text-2xl font-bold text-white">{stats.totalProducts}</p>
-                <p className="text-xs text-slate-400">Total Products</p>
+                <p className="text-xs text-blue-100">Total Products</p>
               </div>
             </div>
           </CardContent>
         </Card>
         
-        <Card className="bg-slate-800/50 border-slate-700">
+        <Card className="bg-gradient-to-br from-emerald-500 to-teal-600 border-emerald-400 shadow-lg hover:shadow-xl transition-shadow">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <CheckCircle className="h-8 w-8 text-green-400" />
+              <CheckCircle className="h-8 w-8 text-white/90" />
               <div>
                 <p className="text-2xl font-bold text-white">{stats.inStockProducts}</p>
-                <p className="text-xs text-slate-400">In Stock</p>
+                <p className="text-xs text-emerald-100">In Stock</p>
               </div>
             </div>
           </CardContent>
         </Card>
         
-        <Card className="bg-slate-800/50 border-slate-700">
+        <Card className="bg-gradient-to-br from-amber-500 to-orange-500 border-amber-400 shadow-lg hover:shadow-xl transition-shadow">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <AlertTriangle className="h-8 w-8 text-yellow-400" />
+              <AlertTriangle className="h-8 w-8 text-white/90" />
               <div>
                 <p className="text-2xl font-bold text-white">{stats.lowStockProducts}</p>
-                <p className="text-xs text-slate-400">Low Stock</p>
+                <p className="text-xs text-amber-100">Low Stock</p>
               </div>
             </div>
           </CardContent>
         </Card>
         
-        <Card className="bg-slate-800/50 border-slate-700">
+        <Card className="bg-gradient-to-br from-red-500 to-rose-600 border-red-400 shadow-lg hover:shadow-xl transition-shadow">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <XCircle className="h-8 w-8 text-red-400" />
+              <XCircle className="h-8 w-8 text-white/90" />
               <div>
                 <p className="text-2xl font-bold text-white">{stats.outOfStockProducts}</p>
-                <p className="text-xs text-slate-400">Out of Stock</p>
+                <p className="text-xs text-red-100">Out of Stock</p>
               </div>
             </div>
           </CardContent>
         </Card>
         
-        <Card className="bg-slate-800/50 border-slate-700">
+        <Card className="bg-gradient-to-br from-violet-500 to-purple-600 border-violet-400 shadow-lg hover:shadow-xl transition-shadow">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <BarChart3 className="h-8 w-8 text-purple-400" />
+              <BarChart3 className="h-8 w-8 text-white/90" />
               <div>
                 <p className="text-2xl font-bold text-white">KES {(stats.totalValue || 0).toLocaleString()}</p>
-                <p className="text-xs text-slate-400">Inventory Value</p>
+                <p className="text-xs text-violet-100">Inventory Value</p>
               </div>
             </div>
           </CardContent>
@@ -692,15 +692,15 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
         </div>
         
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={exportInventory}>
+          <Button variant="outline" size="sm" onClick={exportInventory} className="border-gray-300 text-gray-700 hover:bg-gray-100 hover:text-gray-900">
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setShowSettingsDialog(true)}>
+          <Button variant="outline" size="sm" onClick={() => setShowSettingsDialog(true)} className="border-gray-300 text-gray-700 hover:bg-gray-100 hover:text-gray-900">
             <Settings className="h-4 w-4 mr-2" />
             Settings
           </Button>
-          <Button size="sm" onClick={loadInventory}>
+          <Button size="sm" onClick={loadInventory} className="bg-emerald-600 hover:bg-emerald-700 text-white">
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
@@ -708,66 +708,66 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
       </div>
 
       {/* Inventory Table */}
-      <Card className="bg-slate-800/50 border-slate-700">
-        <CardHeader>
+      <Card className="bg-white border-gray-200 shadow-md">
+        <CardHeader className="bg-gradient-to-r from-slate-700 to-slate-800 rounded-t-lg">
           <CardTitle className="text-white flex items-center gap-2">
             <Package className="h-5 w-5" />
             Inventory ({filteredInventory.length} products)
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-slate-700">
-                  <th className="text-left py-3 px-4 text-slate-400 font-medium">Product</th>
-                  <th className="text-left py-3 px-4 text-slate-400 font-medium">Category</th>
-                  <th className="text-center py-3 px-4 text-slate-400 font-medium">Stock</th>
-                  <th className="text-center py-3 px-4 text-slate-400 font-medium">Min Level</th>
-                  <th className="text-center py-3 px-4 text-slate-400 font-medium">Status</th>
-                  <th className="text-right py-3 px-4 text-slate-400 font-medium">Market Price</th>
-                  <th className="text-right py-3 px-4 text-slate-400 font-medium">Selling Price</th>
-                  <th className="text-center py-3 px-4 text-slate-400 font-medium">Actions</th>
+                <tr className="border-b border-gray-200 bg-gray-50">
+                  <th className="text-left py-3 px-4 text-gray-700 font-semibold">Product</th>
+                  <th className="text-left py-3 px-4 text-gray-700 font-semibold">Category</th>
+                  <th className="text-center py-3 px-4 text-gray-700 font-semibold">Stock</th>
+                  <th className="text-center py-3 px-4 text-gray-700 font-semibold">Min Level</th>
+                  <th className="text-center py-3 px-4 text-gray-700 font-semibold">Status</th>
+                  <th className="text-right py-3 px-4 text-gray-700 font-semibold">Market Price</th>
+                  <th className="text-right py-3 px-4 text-gray-700 font-semibold">Selling Price</th>
+                  <th className="text-center py-3 px-4 text-gray-700 font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredInventory.map((item) => {
+                {filteredInventory.map((item, index) => {
                   const profitMargin = item.market_price > 0 
                     ? (((item.selling_price - item.market_price) / item.market_price) * 100).toFixed(1)
                     : '0';
                   const isProfitable = parseFloat(profitMargin) > 0;
                   
                   return (
-                    <tr key={item.id} className="border-b border-slate-700/50 hover:bg-slate-700/30">
+                    <tr key={item.id} className={`border-b border-gray-100 hover:bg-blue-50/50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
                       <td className="py-3 px-4">
                         <div>
-                          <p className="text-white font-medium">{item.product_name}</p>
-                          <p className="text-xs text-slate-500">{item.unit}</p>
+                          <p className="text-gray-900 font-medium">{item.product_name}</p>
+                          <p className="text-xs text-gray-500">{item.unit}</p>
                         </div>
                       </td>
-                      <td className="py-3 px-4 text-slate-300">{item.category}</td>
+                      <td className="py-3 px-4 text-gray-700">{item.category}</td>
                       <td className="py-3 px-4 text-center">
                         <span className={`font-bold ${
-                          item.status === 'out_of_stock' ? 'text-red-400' :
-                          item.status === 'low_stock' ? 'text-yellow-400' : 'text-green-400'
+                          item.status === 'out_of_stock' ? 'text-red-600' :
+                          item.status === 'low_stock' ? 'text-amber-600' : 'text-emerald-600'
                         }`}>
                           {item.current_stock}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-center text-slate-400">{item.min_stock_level}</td>
+                      <td className="py-3 px-4 text-center text-gray-600">{item.min_stock_level}</td>
                       <td className="py-3 px-4 text-center">{getStatusBadge(item.status)}</td>
                       <td className="py-3 px-4 text-right">
-                        <span className="text-slate-400">
+                        <span className="text-gray-600">
                           KES {(item.market_price || 0).toLocaleString()}
                         </span>
                       </td>
                       <td className="py-3 px-4 text-right">
                         <div className="flex flex-col items-end">
-                          <span className="text-white font-medium">
+                          <span className="text-gray-900 font-semibold">
                             KES {(item.selling_price || 0).toLocaleString()}
                           </span>
                           {item.market_price > 0 && (
-                            <span className={`text-xs ${isProfitable ? 'text-green-400' : 'text-red-400'}`}>
+                            <span className={`text-xs font-medium ${isProfitable ? 'text-emerald-600' : 'text-red-600'}`}>
                               {isProfitable ? '+' : ''}{profitMargin}% margin
                             </span>
                           )}
@@ -779,6 +779,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
                             variant="ghost"
                             size="sm"
                             title="Update Stock"
+                            className="text-blue-600 hover:text-blue-700 hover:bg-blue-100"
                             onClick={() => {
                               setSelectedItem(item);
                               setShowUpdateDialog(true);
@@ -790,6 +791,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
                             variant="ghost"
                             size="sm"
                             title="Edit Prices"
+                            className="text-violet-600 hover:text-violet-700 hover:bg-violet-100"
                             onClick={() => {
                               setSelectedItem(item);
                               setEditMarketPrice(item.market_price || 0);
@@ -807,7 +809,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
                 
                 {filteredInventory.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-slate-400">
+                    <td colSpan={8} className="py-8 text-center text-gray-500">
                       No products found. Add products to start tracking inventory.
                     </td>
                   </tr>
@@ -820,39 +822,39 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
 
       {/* Stock Movement History */}
       {stockMovements.length > 0 && (
-        <Card className="bg-slate-800/50 border-slate-700">
-          <CardHeader>
+        <Card className="bg-white border-gray-200 shadow-md">
+          <CardHeader className="bg-gradient-to-r from-slate-700 to-slate-800 rounded-t-lg">
             <CardTitle className="text-white flex items-center gap-2">
               <History className="h-5 w-5" />
               Recent Stock Movements
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-4">
             <div className="space-y-2">
               {stockMovements.slice(0, 10).map((movement) => (
-                <div key={movement.id} className="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
+                <div key={movement.id} className="flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-lg border border-gray-100 transition-colors">
                   <div className="flex items-center gap-3">
                     {movement.movement_type === 'in' ? (
-                      <ArrowUpCircle className="h-5 w-5 text-green-400" />
+                      <ArrowUpCircle className="h-5 w-5 text-emerald-600" />
                     ) : movement.movement_type === 'out' ? (
-                      <ArrowDownCircle className="h-5 w-5 text-red-400" />
+                      <ArrowDownCircle className="h-5 w-5 text-red-600" />
                     ) : (
-                      <RefreshCw className="h-5 w-5 text-blue-400" />
+                      <RefreshCw className="h-5 w-5 text-blue-600" />
                     )}
                     <div>
-                      <p className="text-white font-medium">{movement.product_name}</p>
-                      <p className="text-xs text-slate-400">{movement.reason}</p>
+                      <p className="text-gray-900 font-medium">{movement.product_name}</p>
+                      <p className="text-xs text-gray-500">{movement.reason}</p>
                     </div>
                   </div>
                   <div className="text-right">
                     <p className={`font-bold ${
-                      movement.movement_type === 'in' ? 'text-green-400' : 
-                      movement.movement_type === 'out' ? 'text-red-400' : 'text-blue-400'
+                      movement.movement_type === 'in' ? 'text-emerald-600' : 
+                      movement.movement_type === 'out' ? 'text-red-600' : 'text-blue-600'
                     }`}>
                       {movement.movement_type === 'in' ? '+' : movement.movement_type === 'out' ? '-' : ''}
                       {movement.quantity}
                     </p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-gray-500">
                       {new Date(movement.created_at).toLocaleDateString()}
                     </p>
                   </div>
