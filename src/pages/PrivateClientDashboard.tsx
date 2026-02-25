@@ -88,6 +88,7 @@ const PrivateClientDashboard = () => {
   const [deliveries, setDeliveries] = useState<DeliveryRequest[]>([]);
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [showProfileView, setShowProfileView] = useState(false);
+  const [activeTab, setActiveTab] = useState('orders');
   const [stats, setStats] = useState({
     totalOrders: 0,
     pendingOrders: 0,
@@ -709,85 +710,104 @@ const PrivateClientDashboard = () => {
 
       {/* Main Content */}
       <div className="container mx-auto max-w-7xl px-4 py-8">
-        <Tabs defaultValue="orders" className="space-y-6">
-          {/* Responsive Tabs - Scrollable on mobile, wrapped on larger screens */}
-          <div className="overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 md:overflow-visible">
-            <TabsList className="bg-white shadow-sm border inline-flex md:flex md:flex-wrap h-auto gap-1 p-1 min-w-max md:min-w-0">
-              <TabsTrigger 
-                value="orders" 
-                className="data-[state=active]:bg-green-500 data-[state=active]:text-white flex items-center gap-1 px-2 py-1.5 text-xs sm:text-sm sm:px-3 sm:gap-2"
-                title="My Orders"
-              >
-                <Package className="h-4 w-4 flex-shrink-0" />
-                <span className="hidden xs:inline sm:inline">Orders</span>
-                <span className="xs:hidden sm:hidden">Orders</span>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="order-tracking" 
-                className="data-[state=active]:bg-cyan-500 data-[state=active]:text-white flex items-center gap-1 px-2 py-1.5 text-xs sm:text-sm sm:px-3 sm:gap-2"
-                title="QR Scan Status"
-              >
-                <QrCode className="h-4 w-4 flex-shrink-0" />
-                <span className="hidden sm:inline">QR Status</span>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="deliveries" 
-                className="data-[state=active]:bg-green-500 data-[state=active]:text-white flex items-center gap-1 px-2 py-1.5 text-xs sm:text-sm sm:px-3 sm:gap-2"
-                title="Deliveries"
-              >
-                <Truck className="h-4 w-4 flex-shrink-0" />
-                <span className="hidden xs:inline sm:inline">Deliveries</span>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="tracking" 
-                className="data-[state=active]:bg-blue-500 data-[state=active]:text-white flex items-center gap-1 px-2 py-1.5 text-xs sm:text-sm sm:px-3 sm:gap-2"
-                title="Tracking"
-              >
-                <NavigationIcon className="h-4 w-4 flex-shrink-0" />
-                <span className="hidden sm:inline">Tracking</span>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="request-delivery" 
-                className="data-[state=active]:bg-teal-500 data-[state=active]:text-white flex items-center gap-1 px-2 py-1.5 text-xs sm:text-sm sm:px-3 sm:gap-2"
-                title="Request Delivery"
-              >
-                <Plus className="h-4 w-4 flex-shrink-0" />
-                <span className="hidden sm:inline">Request</span>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="payments" 
-                className="data-[state=active]:bg-green-500 data-[state=active]:text-white flex items-center gap-1 px-2 py-1.5 text-xs sm:text-sm sm:px-3 sm:gap-2"
-                title="Payments"
-              >
-                <CreditCard className="h-4 w-4 flex-shrink-0" />
-                <span className="hidden sm:inline">Payments</span>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="wishlist" 
-                className="data-[state=active]:bg-green-500 data-[state=active]:text-white flex items-center gap-1 px-2 py-1.5 text-xs sm:text-sm sm:px-3 sm:gap-2"
-                title="Wishlist"
-              >
-                <Heart className="h-4 w-4 flex-shrink-0" />
-                <span className="hidden sm:inline">Wishlist</span>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="monitoring" 
-                className="data-[state=active]:bg-cyan-500 data-[state=active]:text-white flex items-center gap-1 px-2 py-1.5 text-xs sm:text-sm sm:px-3 sm:gap-2"
-                title="Monitoring"
-              >
-                <Video className="h-4 w-4 flex-shrink-0" />
-                <span className="hidden sm:inline">Monitor</span>
-              </TabsTrigger>
-              <TabsTrigger 
-                value="support" 
-                className="data-[state=active]:bg-purple-500 data-[state=active]:text-white flex items-center gap-1 px-2 py-1.5 text-xs sm:text-sm sm:px-3 sm:gap-2"
-                title="Support"
-              >
-                <Headphones className="h-4 w-4 flex-shrink-0" />
-                <span className="hidden sm:inline">Support</span>
-              </TabsTrigger>
-            </TabsList>
-          </div>
+        {/* Navigation Cards - Single Row */}
+        <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-2 mb-6">
+          <Button 
+            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'orders' 
+              ? 'bg-gradient-to-r from-green-500 to-emerald-600 ring-2 ring-green-300 shadow-lg text-white' 
+              : 'bg-white hover:bg-green-50 text-gray-700 border shadow-sm'}`}
+            onClick={() => setActiveTab('orders')}
+          >
+            <Package className="h-5 w-5" />
+            <span className="text-[10px] sm:text-xs">Orders</span>
+          </Button>
+          <Button 
+            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'order-tracking' 
+              ? 'bg-gradient-to-r from-cyan-500 to-sky-600 ring-2 ring-cyan-300 shadow-lg text-white' 
+              : 'bg-white hover:bg-cyan-50 text-gray-700 border shadow-sm'}`}
+            onClick={() => setActiveTab('order-tracking')}
+          >
+            <QrCode className="h-5 w-5" />
+            <span className="text-[10px] sm:text-xs">QR Status</span>
+          </Button>
+          <Button 
+            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'deliveries' 
+              ? 'bg-gradient-to-r from-amber-500 to-orange-500 ring-2 ring-amber-300 shadow-lg text-white' 
+              : 'bg-white hover:bg-amber-50 text-gray-700 border shadow-sm'}`}
+            onClick={() => setActiveTab('deliveries')}
+          >
+            <Truck className="h-5 w-5" />
+            <span className="text-[10px] sm:text-xs">Deliveries</span>
+          </Button>
+          <Button 
+            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'tracking' 
+              ? 'bg-gradient-to-r from-blue-500 to-indigo-600 ring-2 ring-blue-300 shadow-lg text-white' 
+              : 'bg-white hover:bg-blue-50 text-gray-700 border shadow-sm'}`}
+            onClick={() => setActiveTab('tracking')}
+          >
+            <NavigationIcon className="h-5 w-5" />
+            <span className="text-[10px] sm:text-xs">Tracking</span>
+          </Button>
+          <Button 
+            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'request-delivery' 
+              ? 'bg-gradient-to-r from-teal-500 to-emerald-500 ring-2 ring-teal-300 shadow-lg text-white' 
+              : 'bg-white hover:bg-teal-50 text-gray-700 border shadow-sm'}`}
+            onClick={() => setActiveTab('request-delivery')}
+          >
+            <Plus className="h-5 w-5" />
+            <span className="text-[10px] sm:text-xs">Request</span>
+          </Button>
+          <Button 
+            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'payments' 
+              ? 'bg-gradient-to-r from-green-600 to-emerald-700 ring-2 ring-green-300 shadow-lg text-white' 
+              : 'bg-white hover:bg-green-50 text-gray-700 border shadow-sm'}`}
+            onClick={() => setActiveTab('payments')}
+          >
+            <CreditCard className="h-5 w-5" />
+            <span className="text-[10px] sm:text-xs">Payments</span>
+          </Button>
+          <Button 
+            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'wishlist' 
+              ? 'bg-gradient-to-r from-pink-500 to-rose-500 ring-2 ring-pink-300 shadow-lg text-white' 
+              : 'bg-white hover:bg-pink-50 text-gray-700 border shadow-sm'}`}
+            onClick={() => setActiveTab('wishlist')}
+          >
+            <Heart className="h-5 w-5" />
+            <span className="text-[10px] sm:text-xs">Wishlist</span>
+          </Button>
+          <Button 
+            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'monitoring' 
+              ? 'bg-gradient-to-r from-cyan-500 to-sky-500 ring-2 ring-cyan-300 shadow-lg text-white' 
+              : 'bg-white hover:bg-cyan-50 text-gray-700 border shadow-sm'}`}
+            onClick={() => setActiveTab('monitoring')}
+          >
+            <Video className="h-5 w-5" />
+            <span className="text-[10px] sm:text-xs">Monitor</span>
+          </Button>
+          <Button 
+            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'support' 
+              ? 'bg-gradient-to-r from-purple-500 to-violet-600 ring-2 ring-purple-300 shadow-lg text-white' 
+              : 'bg-white hover:bg-purple-50 text-gray-700 border shadow-sm'}`}
+            onClick={() => setActiveTab('support')}
+          >
+            <Headphones className="h-5 w-5" />
+            <span className="text-[10px] sm:text-xs">Support</span>
+          </Button>
+        </div>
+
+        {/* Tab Content - Hidden TabsList, content controlled by cards above */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="hidden">
+            <TabsTrigger value="orders">Orders</TabsTrigger>
+            <TabsTrigger value="order-tracking">QR Status</TabsTrigger>
+            <TabsTrigger value="deliveries">Deliveries</TabsTrigger>
+            <TabsTrigger value="tracking">Tracking</TabsTrigger>
+            <TabsTrigger value="request-delivery">Request Delivery</TabsTrigger>
+            <TabsTrigger value="payments">Payments</TabsTrigger>
+            <TabsTrigger value="wishlist">Wishlist</TabsTrigger>
+            <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
+            <TabsTrigger value="support">Support</TabsTrigger>
+          </TabsList>
 
           <TabsContent value="orders">
             <Card>

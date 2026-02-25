@@ -94,6 +94,9 @@ const ProfessionalBuilderDashboardPage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // Active tab state for card navigation
+  const [activeTab, setActiveTab] = useState('projects');
+
   // Projects state - start with loading false to show empty state immediately
   const [projects, setProjects] = useState<any[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(true); // Will be set to false quickly
@@ -1115,64 +1118,153 @@ const ProfessionalBuilderDashboardPage = () => {
 
       {/* Main Content */}
       <div className="container mx-auto max-w-7xl px-4 py-8">
-        <Tabs defaultValue="projects" className="space-y-6">
-          <TabsList className="bg-white shadow-sm border flex-wrap h-auto p-1">
-            <TabsTrigger value="projects" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
-              <Building2 className="h-4 w-4 mr-2" />
-              Projects
-            </TabsTrigger>
-            <TabsTrigger value="quotes" className="data-[state=active]:bg-green-500 data-[state=active]:text-white">
-              <CreditCard className="h-4 w-4 mr-2" />
-              Quotes
-            </TabsTrigger>
-            <TabsTrigger value="orders" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
-              <Package className="h-4 w-4 mr-2" />
-              Orders
-            </TabsTrigger>
-            <TabsTrigger value="deliveries" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
-              <Truck className="h-4 w-4 mr-2" />
-              Deliveries
-            </TabsTrigger>
-            <TabsTrigger value="tracking" className="data-[state=active]:bg-green-500 data-[state=active]:text-white">
-              <NavigationIcon className="h-4 w-4 mr-2" />
-              Tracking
-            </TabsTrigger>
-            <TabsTrigger value="request-delivery" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white">
-              <Send className="h-4 w-4 mr-2" />
-              Request Delivery
-            </TabsTrigger>
-            <TabsTrigger value="invoices" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
-              <FileText className="h-4 w-4 mr-2" />
-              Invoices
-            </TabsTrigger>
-            <TabsTrigger value="team" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
-              <Users className="h-4 w-4 mr-2" />
-              Team
-            </TabsTrigger>
-            <TabsTrigger value="monitoring" className="data-[state=active]:bg-cyan-500 data-[state=active]:text-white">
-              <Camera className="h-4 w-4 mr-2" />
-              Monitoring
-            </TabsTrigger>
-            <TabsTrigger value="portfolio" className="data-[state=active]:bg-purple-500 data-[state=active]:text-white">
-              <Video className="h-4 w-4 mr-2" />
-              Portfolio
-            </TabsTrigger>
-            <TabsTrigger value="profile" className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white">
-              <User className="h-4 w-4 mr-2" />
-              Profile
-            </TabsTrigger>
-            <TabsTrigger value="support" className="data-[state=active]:bg-gray-500 data-[state=active]:text-white">
-              <Headphones className="h-4 w-4 mr-2" />
-              Support
-            </TabsTrigger>
-            <TabsTrigger value="order-history" className="data-[state=active]:bg-indigo-500 data-[state=active]:text-white">
-              <FileText className="h-4 w-4 mr-2" />
-              Order History
-            </TabsTrigger>
-            <TabsTrigger value="my-analytics" className="data-[state=active]:bg-pink-500 data-[state=active]:text-white">
-              <BarChart3 className="h-4 w-4 mr-2" />
-              Analytics
-            </TabsTrigger>
+        {/* Navigation Cards - Single Row */}
+        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-7 lg:grid-cols-14 gap-2 mb-6">
+          <Button 
+            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'projects' 
+              ? 'bg-gradient-to-r from-blue-500 to-blue-600 ring-2 ring-blue-300 shadow-lg text-white' 
+              : 'bg-white hover:bg-blue-50 text-gray-700 border shadow-sm'}`}
+            onClick={() => setActiveTab('projects')}
+          >
+            <Building2 className="h-5 w-5" />
+            <span className="text-[10px] sm:text-xs">Projects</span>
+          </Button>
+          <Button 
+            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'quotes' 
+              ? 'bg-gradient-to-r from-green-500 to-green-600 ring-2 ring-green-300 shadow-lg text-white' 
+              : 'bg-white hover:bg-green-50 text-gray-700 border shadow-sm'}`}
+            onClick={() => setActiveTab('quotes')}
+          >
+            <CreditCard className="h-5 w-5" />
+            <span className="text-[10px] sm:text-xs">Quotes</span>
+          </Button>
+          <Button 
+            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'orders' 
+              ? 'bg-gradient-to-r from-blue-500 to-indigo-600 ring-2 ring-blue-300 shadow-lg text-white' 
+              : 'bg-white hover:bg-blue-50 text-gray-700 border shadow-sm'}`}
+            onClick={() => setActiveTab('orders')}
+          >
+            <Package className="h-5 w-5" />
+            <span className="text-[10px] sm:text-xs">Orders</span>
+          </Button>
+          <Button 
+            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'deliveries' 
+              ? 'bg-gradient-to-r from-amber-500 to-orange-500 ring-2 ring-amber-300 shadow-lg text-white' 
+              : 'bg-white hover:bg-amber-50 text-gray-700 border shadow-sm'}`}
+            onClick={() => setActiveTab('deliveries')}
+          >
+            <Truck className="h-5 w-5" />
+            <span className="text-[10px] sm:text-xs">Deliveries</span>
+          </Button>
+          <Button 
+            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'tracking' 
+              ? 'bg-gradient-to-r from-teal-500 to-cyan-500 ring-2 ring-teal-300 shadow-lg text-white' 
+              : 'bg-white hover:bg-teal-50 text-gray-700 border shadow-sm'}`}
+            onClick={() => setActiveTab('tracking')}
+          >
+            <NavigationIcon className="h-5 w-5" />
+            <span className="text-[10px] sm:text-xs">Tracking</span>
+          </Button>
+          <Button 
+            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'request-delivery' 
+              ? 'bg-gradient-to-r from-teal-500 to-emerald-500 ring-2 ring-teal-300 shadow-lg text-white' 
+              : 'bg-white hover:bg-teal-50 text-gray-700 border shadow-sm'}`}
+            onClick={() => setActiveTab('request-delivery')}
+          >
+            <Send className="h-5 w-5" />
+            <span className="text-[10px] sm:text-xs">Request</span>
+          </Button>
+          <Button 
+            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'invoices' 
+              ? 'bg-gradient-to-r from-slate-500 to-slate-600 ring-2 ring-slate-300 shadow-lg text-white' 
+              : 'bg-white hover:bg-slate-50 text-gray-700 border shadow-sm'}`}
+            onClick={() => setActiveTab('invoices')}
+          >
+            <FileText className="h-5 w-5" />
+            <span className="text-[10px] sm:text-xs">Invoices</span>
+          </Button>
+          <Button 
+            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'team' 
+              ? 'bg-gradient-to-r from-violet-500 to-purple-600 ring-2 ring-violet-300 shadow-lg text-white' 
+              : 'bg-white hover:bg-violet-50 text-gray-700 border shadow-sm'}`}
+            onClick={() => setActiveTab('team')}
+          >
+            <Users className="h-5 w-5" />
+            <span className="text-[10px] sm:text-xs">Team</span>
+          </Button>
+          <Button 
+            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'monitoring' 
+              ? 'bg-gradient-to-r from-cyan-500 to-sky-500 ring-2 ring-cyan-300 shadow-lg text-white' 
+              : 'bg-white hover:bg-cyan-50 text-gray-700 border shadow-sm'}`}
+            onClick={() => setActiveTab('monitoring')}
+          >
+            <Camera className="h-5 w-5" />
+            <span className="text-[10px] sm:text-xs">Monitor</span>
+          </Button>
+          <Button 
+            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'portfolio' 
+              ? 'bg-gradient-to-r from-purple-500 to-pink-500 ring-2 ring-purple-300 shadow-lg text-white' 
+              : 'bg-white hover:bg-purple-50 text-gray-700 border shadow-sm'}`}
+            onClick={() => setActiveTab('portfolio')}
+          >
+            <Video className="h-5 w-5" />
+            <span className="text-[10px] sm:text-xs">Portfolio</span>
+          </Button>
+          <Button 
+            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'profile' 
+              ? 'bg-gradient-to-r from-indigo-500 to-blue-600 ring-2 ring-indigo-300 shadow-lg text-white' 
+              : 'bg-white hover:bg-indigo-50 text-gray-700 border shadow-sm'}`}
+            onClick={() => setActiveTab('profile')}
+          >
+            <User className="h-5 w-5" />
+            <span className="text-[10px] sm:text-xs">Profile</span>
+          </Button>
+          <Button 
+            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'support' 
+              ? 'bg-gradient-to-r from-gray-500 to-gray-600 ring-2 ring-gray-300 shadow-lg text-white' 
+              : 'bg-white hover:bg-gray-100 text-gray-700 border shadow-sm'}`}
+            onClick={() => setActiveTab('support')}
+          >
+            <Headphones className="h-5 w-5" />
+            <span className="text-[10px] sm:text-xs">Support</span>
+          </Button>
+          <Button 
+            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'order-history' 
+              ? 'bg-gradient-to-r from-indigo-500 to-violet-600 ring-2 ring-indigo-300 shadow-lg text-white' 
+              : 'bg-white hover:bg-indigo-50 text-gray-700 border shadow-sm'}`}
+            onClick={() => setActiveTab('order-history')}
+          >
+            <FileText className="h-5 w-5" />
+            <span className="text-[10px] sm:text-xs">History</span>
+          </Button>
+          <Button 
+            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'my-analytics' 
+              ? 'bg-gradient-to-r from-pink-500 to-rose-500 ring-2 ring-pink-300 shadow-lg text-white' 
+              : 'bg-white hover:bg-pink-50 text-gray-700 border shadow-sm'}`}
+            onClick={() => setActiveTab('my-analytics')}
+          >
+            <BarChart3 className="h-5 w-5" />
+            <span className="text-[10px] sm:text-xs">Analytics</span>
+          </Button>
+        </div>
+
+        {/* Tab Content - Hidden TabsList, content controlled by cards above */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="hidden">
+            <TabsTrigger value="projects">Projects</TabsTrigger>
+            <TabsTrigger value="quotes">Quotes</TabsTrigger>
+            <TabsTrigger value="orders">Orders</TabsTrigger>
+            <TabsTrigger value="deliveries">Deliveries</TabsTrigger>
+            <TabsTrigger value="tracking">Tracking</TabsTrigger>
+            <TabsTrigger value="request-delivery">Request Delivery</TabsTrigger>
+            <TabsTrigger value="invoices">Invoices</TabsTrigger>
+            <TabsTrigger value="team">Team</TabsTrigger>
+            <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
+            <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
+            <TabsTrigger value="profile">Profile</TabsTrigger>
+            <TabsTrigger value="support">Support</TabsTrigger>
+            <TabsTrigger value="order-history">Order History</TabsTrigger>
+            <TabsTrigger value="my-analytics">Analytics</TabsTrigger>
           </TabsList>
 
           <TabsContent value="projects">
