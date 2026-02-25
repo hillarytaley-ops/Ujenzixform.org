@@ -44,9 +44,10 @@ import {
   AlertTriangle,
   FileText
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from 'date-fns';
+import { generateDispatchPDFForOrder } from "@/utils/dispatchPDFGenerator";
 
 interface OrderItem {
   name: string;
@@ -112,6 +113,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
   const [orderTypeFilter, setOrderTypeFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null); // Track which order is being updated
+  const [generatingPDFOrderId, setGeneratingPDFOrderId] = useState<string | null>(null); // Track PDF generation
   const [activeOrderTab, setActiveOrderTab] = useState<'not_dispatched' | 'shipped' | 'delivered'>('not_dispatched');
   const { toast } = useToast();
 
@@ -317,6 +319,82 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
       });
     } finally {
       setUpdatingOrderId(null); // Clear the updating state
+    }
+  };
+
+  // Handle dispatch with PDF generation
+  const handleDispatchWithPDF = async (order: Order) => {
+    setGeneratingPDFOrderId(order.id);
+    
+    try {
+      toast({
+        title: '📄 Generating QR Codes...',
+        description: 'Preparing dispatch document with QR codes for scanning.',
+      });
+
+      // Get supplier name for the PDF
+      let supplierName = 'Supplier';
+      try {
+        const { data: supplierData } = await supabase
+          .from('suppliers')
+          .select('company_name')
+          .eq('id', supplierId)
+          .maybeSingle();
+        
+        if (supplierData?.company_name) {
+          supplierName = supplierData.company_name;
+        }
+      } catch (e) {
+        console.log('Could not fetch supplier name');
+      }
+
+      // Generate the dispatch PDF
+      const result = await generateDispatchPDFForOrder(
+        {
+          id: order.id,
+          po_number: order.order_number,
+          buyer_name: order.customer_name,
+          buyer_email: order.customer_email,
+          buyer_phone: order.customer_phone,
+          delivery_address: order.delivery_address,
+          project_name: order.project_name,
+          total_amount: order.total_amount,
+          items: order.items || [],
+          created_at: order.created_at
+        },
+        supplierId || '',
+        supplierName
+      );
+
+      if (result.success) {
+        toast({
+          title: '✅ Dispatch PDF Generated!',
+          description: `QR codes for ${result.itemCount} items are ready. Print and attach to materials before dispatch.`,
+        });
+        
+        // Optionally navigate to dispatch scanner
+        if (onNavigateToDispatch) {
+          toast({
+            title: '📱 Next Step',
+            description: 'Go to the Dispatch tab to scan QR codes as you load materials.',
+          });
+        }
+      } else {
+        toast({
+          title: 'Error',
+          description: result.error || 'Failed to generate dispatch PDF',
+          variant: 'destructive'
+        });
+      }
+    } catch (error: any) {
+      console.error('Error generating dispatch PDF:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to generate dispatch PDF. Please allow popups.',
+        variant: 'destructive'
+      });
+    } finally {
+      setGeneratingPDFOrderId(null);
     }
   };
 
@@ -532,18 +610,22 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
                       <Button variant="ghost" size="sm" onClick={() => setSelectedOrder(order)}>
                         <Eye className="h-4 w-4" />
                       </Button>
-                      {/* For Direct Purchase orders (confirmed), show Dispatch button */}
+                      {/* For Direct Purchase orders (confirmed), show Dispatch button that generates PDF */}
                       {order.order_type === 'direct_purchase' && order.status === 'confirmed' && (
                         <Button 
                           size="sm" 
-                          onClick={() => {
-                            if (onNavigateToDispatch) {
-                              onNavigateToDispatch();
-                            }
-                          }}
+                          onClick={() => handleDispatchWithPDF(order)}
+                          disabled={generatingPDFOrderId === order.id}
                           className="bg-green-600 hover:bg-green-700 text-xs"
                         >
-                          🚚 Dispatch
+                          {generatingPDFOrderId === order.id ? (
+                            <>
+                              <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                              Generating...
+                            </>
+                          ) : (
+                            '🚚 Dispatch'
+                          )}
                         </Button>
                       )}
                       {/* For Quote Requests (pending), show Confirm/Reject */}
