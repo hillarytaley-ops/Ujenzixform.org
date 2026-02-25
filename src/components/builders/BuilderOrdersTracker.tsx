@@ -222,6 +222,9 @@ const QRCodeDialog: React.FC<{
   );
 };
 
+// Filter types for order status
+type OrderFilter = 'all' | 'pending' | 'dispatched' | 'in_transit' | 'received';
+
 export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ builderId }) => {
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [scanEvents, setScanEvents] = useState<ScanEvent[]>([]);
@@ -229,6 +232,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
   const [selectedQRItem, setSelectedQRItem] = useState<MaterialItem | null>(null);
   const [showQRDialog, setShowQRDialog] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<OrderFilter>('all'); // Filter state
   const { toast } = useToast();
 
   useEffect(() => {
@@ -530,96 +534,146 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
   const receivedItems = orders.reduce((acc, o) => acc + (o.material_items?.filter(i => ['received', 'verified'].includes(i.status) || i.receive_scanned).length || 0), 0);
   const pendingItems = orders.reduce((acc, o) => acc + (o.material_items?.filter(i => !i.dispatch_scanned && !['dispatched', 'in_transit', 'received', 'verified'].includes(i.status)).length || 0), 0);
 
+  // Filter orders based on active filter
+  const getFilteredOrders = () => {
+    if (activeFilter === 'all') return orders;
+    
+    return orders.filter(order => {
+      const items = order.material_items || [];
+      switch (activeFilter) {
+        case 'pending':
+          // Orders that are accepted/confirmed but not yet dispatched
+          return items.some(i => !i.dispatch_scanned && !['dispatched', 'in_transit', 'received', 'verified'].includes(i.status));
+        case 'dispatched':
+          // Orders with dispatched items (but not yet in transit or received)
+          return items.some(i => (i.dispatch_scanned || i.status === 'dispatched') && !['in_transit', 'received', 'verified'].includes(i.status) && !i.receive_scanned);
+        case 'in_transit':
+          // Orders currently being delivered
+          return items.some(i => i.status === 'in_transit');
+        case 'received':
+          // Orders that have been fully received
+          return items.some(i => ['received', 'verified'].includes(i.status) || i.receive_scanned);
+        default:
+          return true;
+      }
+    });
+  };
+
+  const filteredOrders = getFilteredOrders();
+
   return (
     <div className="space-y-6">
-      {/* Summary Stats - 5 columns for full status flow */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-        {/* Total Items */}
-        <Card className="border-blue-200 bg-blue-50/50">
+      {/* Filter Cards - Clickable status filters */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {/* Pending/Confirmed - Accepted quotes awaiting dispatch */}
+        <Card 
+          className={`cursor-pointer transition-all duration-200 hover:shadow-md ${
+            activeFilter === 'pending' 
+              ? 'border-2 border-amber-500 bg-amber-100 ring-2 ring-amber-300 shadow-lg' 
+              : 'border-amber-200 bg-amber-50/50 hover:bg-amber-100/70'
+          }`}
+          onClick={() => setActiveFilter(activeFilter === 'pending' ? 'all' : 'pending')}
+        >
           <CardContent className="p-3">
             <div className="flex items-center gap-2">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Package className="h-4 w-4 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-xl font-bold text-blue-700">{totalItems}</p>
-                <p className="text-xs text-blue-600">Total Items</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        {/* Pending/Confirmed */}
-        <Card className="border-amber-200 bg-amber-50/50">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2">
-              <div className="p-2 bg-amber-100 rounded-lg">
+              <div className={`p-2 rounded-lg ${activeFilter === 'pending' ? 'bg-amber-200' : 'bg-amber-100'}`}>
                 <Clock className="h-4 w-4 text-amber-600" />
               </div>
               <div>
                 <p className="text-xl font-bold text-amber-700">{pendingItems}</p>
-                <p className="text-xs text-amber-600">Pending</p>
+                <p className="text-xs text-amber-600 font-medium">Pending</p>
               </div>
             </div>
+            <p className="text-[10px] text-amber-600/80 mt-1">Accepted quotes</p>
           </CardContent>
         </Card>
 
         {/* Dispatched */}
-        <Card className="border-orange-200 bg-orange-50/50">
+        <Card 
+          className={`cursor-pointer transition-all duration-200 hover:shadow-md ${
+            activeFilter === 'dispatched' 
+              ? 'border-2 border-orange-500 bg-orange-100 ring-2 ring-orange-300 shadow-lg' 
+              : 'border-orange-200 bg-orange-50/50 hover:bg-orange-100/70'
+          }`}
+          onClick={() => setActiveFilter(activeFilter === 'dispatched' ? 'all' : 'dispatched')}
+        >
           <CardContent className="p-3">
             <div className="flex items-center gap-2">
-              <div className="p-2 bg-orange-100 rounded-lg">
+              <div className={`p-2 rounded-lg ${activeFilter === 'dispatched' ? 'bg-orange-200' : 'bg-orange-100'}`}>
                 <Package className="h-4 w-4 text-orange-600" />
               </div>
               <div>
                 <p className="text-xl font-bold text-orange-700">{dispatchedItems}</p>
-                <p className="text-xs text-orange-600">📦 Dispatched</p>
+                <p className="text-xs text-orange-600 font-medium">📦 Dispatched</p>
               </div>
             </div>
+            <p className="text-[10px] text-orange-600/80 mt-1">Sent by supplier</p>
           </CardContent>
         </Card>
         
         {/* In Transit */}
-        <Card className="border-purple-200 bg-purple-50/50">
+        <Card 
+          className={`cursor-pointer transition-all duration-200 hover:shadow-md ${
+            activeFilter === 'in_transit' 
+              ? 'border-2 border-purple-500 bg-purple-100 ring-2 ring-purple-300 shadow-lg' 
+              : 'border-purple-200 bg-purple-50/50 hover:bg-purple-100/70'
+          }`}
+          onClick={() => setActiveFilter(activeFilter === 'in_transit' ? 'all' : 'in_transit')}
+        >
           <CardContent className="p-3">
             <div className="flex items-center gap-2">
-              <div className="p-2 bg-purple-100 rounded-lg">
+              <div className={`p-2 rounded-lg ${activeFilter === 'in_transit' ? 'bg-purple-200' : 'bg-purple-100'}`}>
                 <Truck className="h-4 w-4 text-purple-600" />
               </div>
               <div>
                 <p className="text-xl font-bold text-purple-700">{inTransitItems}</p>
-                <p className="text-xs text-purple-600">🚚 In Transit</p>
+                <p className="text-xs text-purple-600 font-medium">🚚 In Transit</p>
               </div>
             </div>
+            <p className="text-[10px] text-purple-600/80 mt-1">Being delivered</p>
           </CardContent>
         </Card>
         
         {/* Received */}
-        <Card className="border-green-200 bg-green-50/50">
+        <Card 
+          className={`cursor-pointer transition-all duration-200 hover:shadow-md ${
+            activeFilter === 'received' 
+              ? 'border-2 border-green-500 bg-green-100 ring-2 ring-green-300 shadow-lg' 
+              : 'border-green-200 bg-green-50/50 hover:bg-green-100/70'
+          }`}
+          onClick={() => setActiveFilter(activeFilter === 'received' ? 'all' : 'received')}
+        >
           <CardContent className="p-3">
             <div className="flex items-center gap-2">
-              <div className="p-2 bg-green-100 rounded-lg">
+              <div className={`p-2 rounded-lg ${activeFilter === 'received' ? 'bg-green-200' : 'bg-green-100'}`}>
                 <CheckCircle className="h-4 w-4 text-green-600" />
               </div>
               <div>
                 <p className="text-xl font-bold text-green-700">{receivedItems}</p>
-                <p className="text-xs text-green-600">✅ Received</p>
+                <p className="text-xs text-green-600 font-medium">✅ Received</p>
               </div>
             </div>
+            <p className="text-[10px] text-green-600/80 mt-1">Delivery confirmed</p>
           </CardContent>
         </Card>
       </div>
       
-      {/* Status Flow Legend */}
-      <div className="flex items-center justify-center gap-2 text-xs text-gray-500 flex-wrap">
-        <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded">Pending</span>
-        <span>→</span>
-        <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded">📦 Dispatched</span>
-        <span>→</span>
-        <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded">🚚 In Transit</span>
-        <span>→</span>
-        <span className="bg-green-100 text-green-700 px-2 py-1 rounded">✅ Received</span>
-      </div>
+      {/* Active Filter Indicator */}
+      {activeFilter !== 'all' && (
+        <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
+          <span className="text-sm text-blue-700">
+            Showing: <strong className="capitalize">{activeFilter.replace('_', ' ')}</strong> orders ({filteredOrders.length})
+          </span>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => setActiveFilter('all')}
+            className="text-blue-600 hover:text-blue-800 hover:bg-blue-100"
+          >
+            Show All Orders
+          </Button>
+        </div>
+      )}
 
       {/* Orders List */}
       <Card>
@@ -637,7 +691,31 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
           </Button>
         </CardHeader>
         <CardContent className="space-y-4">
-          {orders.map((order) => {
+          {filteredOrders.length === 0 ? (
+            <div className="text-center py-8">
+              <Package className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-600 font-medium">
+                {activeFilter === 'all' 
+                  ? 'No orders yet' 
+                  : `No ${activeFilter.replace('_', ' ')} orders`}
+              </p>
+              <p className="text-sm text-gray-500 mt-1">
+                {activeFilter === 'all' 
+                  ? 'Your confirmed orders will appear here'
+                  : 'Try selecting a different filter above'}
+              </p>
+              {activeFilter !== 'all' && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-3"
+                  onClick={() => setActiveFilter('all')}
+                >
+                  Show All Orders
+                </Button>
+              )}
+            </div>
+          ) : filteredOrders.map((order) => {
             const isExpanded = expandedOrder === order.id;
             const progress = getOrderProgress(order.material_items || []);
             
