@@ -235,7 +235,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
   const [selectedQRItem, setSelectedQRItem] = useState<MaterialItem | null>(null);
   const [showQRDialog, setShowQRDialog] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<OrderFilter>('all'); // Filter state
+  const [activeFilter, setActiveFilter] = useState<OrderFilter>('pending'); // Default to pending orders
   const { toast } = useToast();
 
   useEffect(() => {
