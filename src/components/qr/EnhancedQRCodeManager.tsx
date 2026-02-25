@@ -166,53 +166,60 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
   };
 
   useEffect(() => {
-    checkAuthAndFetch();
-    // Safety timeout - force loading to false after 15 seconds
+    // Start loading immediately with fast path
+    fastCheckAuthAndFetch();
+    
+    // Safety timeout - force loading to false after 8 seconds (reduced from 15)
     const safetyTimeout = setTimeout(() => {
       setLoading(false);
       console.log('⏱️ QR Manager safety timeout - forcing loading false');
-    }, 15000);
+    }, 8000);
     
-    // Set up real-time subscription to material_items for auto-refresh
-    // This ensures QR codes appear immediately when a builder accepts a quote
-    const subscription = supabase
-      .channel('qr-codes-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'material_items'
-        },
-        (payload) => {
-          console.log('🔔 New QR code created:', payload.new);
-          // Refresh the list when new QR codes are inserted
-          checkAuthAndFetch();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'material_items'
-        },
-        (payload) => {
-          console.log('🔄 QR code updated:', payload.new);
-          // Update the item in the list
-          setItems(prev => prev.map(item => 
-            item.id === (payload.new as MaterialItem).id ? (payload.new as MaterialItem) : item
-          ));
-        }
-      )
-      .subscribe();
-    
-    console.log('📡 QR Manager: Real-time subscription active');
+    // Delay real-time subscription setup to not block initial load
+    let subscription: any = null;
+    const subscriptionTimeout = setTimeout(() => {
+      subscription = supabase
+        .channel('qr-codes-realtime')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'material_items'
+          },
+          (payload) => {
+            console.log('🔔 New QR code created:', payload.new);
+            // Refresh the list when new QR codes are inserted
+            fastCheckAuthAndFetch();
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'material_items'
+          },
+          (payload) => {
+            console.log('🔄 QR code updated:', payload.new);
+            // Update the item in the list
+            setItems(prev => prev.map(item => 
+              item.id === (payload.new as MaterialItem).id ? (payload.new as MaterialItem) : item
+            ));
+          }
+        )
+        .subscribe();
+      
+      console.log('📡 QR Manager: Real-time subscription active');
+    }, 2000); // Delay subscription by 2 seconds
     
     return () => {
       clearTimeout(safetyTimeout);
-      subscription.unsubscribe();
-      console.log('📡 QR Manager: Real-time subscription closed');
+      clearTimeout(subscriptionTimeout);
+      if (subscription) {
+        subscription.unsubscribe();
+        console.log('📡 QR Manager: Real-time subscription closed');
+      }
     };
   }, []);
 
@@ -238,6 +245,96 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
       promise,
       new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Timeout')), ms))
     ]);
+  };
+
+  // FAST PATH: Use localStorage first, skip slow Supabase auth calls
+  const fastCheckAuthAndFetch = async () => {
+    console.log('⚡ QR Manager: Fast path starting...');
+    
+    // Try localStorage first (instant)
+    const stored = getUserFromStorage();
+    const cachedRole = localStorage.getItem('user_role');
+    const cachedSupplierId = localStorage.getItem('supplier_id');
+    
+    if (stored?.id && cachedRole) {
+      console.log('⚡ QR Manager: Using cached auth - userId:', stored.id, 'role:', cachedRole);
+      setUserRole(cachedRole);
+      
+      // For suppliers, use cached supplier ID if available
+      if (cachedRole === 'supplier' && (cachedSupplierId || propSupplierId)) {
+        const supplierId = propSupplierId || cachedSupplierId || stored.id;
+        setResolvedSupplierId(supplierId);
+        console.log('⚡ QR Manager: Using cached supplierId:', supplierId);
+        await fetchMaterialItemsFast(cachedRole, stored.id, supplierId);
+        return;
+      }
+      
+      // For admin, fetch directly
+      if (cachedRole === 'admin') {
+        await fetchMaterialItemsFast(cachedRole, stored.id, null);
+        return;
+      }
+    }
+    
+    // Fallback to full auth check if no cache
+    console.log('⚠️ QR Manager: No cache, using full auth check...');
+    await checkAuthAndFetch();
+  };
+
+  // Fast fetch that skips supplier lookup if we already have the ID
+  const fetchMaterialItemsFast = async (role: string, userId: string, supplierId: string | null) => {
+    console.log('⚡ Fast fetch: role=', role, 'userId=', userId, 'supplierId=', supplierId);
+    
+    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+    const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+    
+    const stored = getUserFromStorage();
+    const headers: Record<string, string> = { 'apikey': apiKey };
+    if (stored?.accessToken) {
+      headers['Authorization'] = `Bearer ${stored.accessToken}`;
+    }
+    
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      
+      let url: string;
+      if (role === 'supplier' && supplierId) {
+        url = `${SUPABASE_URL}/rest/v1/material_items?supplier_id=eq.${supplierId}&order=created_at.desc&limit=500`;
+      } else if (role === 'admin') {
+        url = `${SUPABASE_URL}/rest/v1/material_items?order=created_at.desc&limit=1000`;
+      } else {
+        console.log('⚠️ Unknown role for fast fetch:', role);
+        setLoading(false);
+        return;
+      }
+      
+      console.log('⚡ Fast fetching from:', url);
+      
+      const response = await fetch(url, { 
+        headers, 
+        signal: controller.signal,
+        cache: 'no-store'
+      });
+      clearTimeout(timeoutId);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('⚡ Fast fetch success:', data?.length || 0, 'items');
+        setItems(data || []);
+        groupItemsByClient(data || []);
+      } else {
+        console.log('❌ Fast fetch failed:', response.status);
+      }
+    } catch (e: any) {
+      if (e.name === 'AbortError') {
+        console.log('⏱️ Fast fetch timeout');
+      } else {
+        console.log('⚠️ Fast fetch error:', e.message);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const checkAuthAndFetch = async () => {
@@ -369,8 +466,11 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
         finalSupplierId = userId;
       }
       
-      // Store the resolved supplier ID
+      // Store the resolved supplier ID (in state and localStorage for faster future loads)
       setResolvedSupplierId(finalSupplierId);
+      if (finalSupplierId) {
+        localStorage.setItem('supplier_id', finalSupplierId);
+      }
 
       console.log('✅ Final supplier ID for QR query:', finalSupplierId);
       
