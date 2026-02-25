@@ -75,6 +75,9 @@ interface ScanEvent {
   scanned_at: string;
   material_condition: string;
   notes: string;
+  purchase_order_id?: string;
+  po_number?: string;
+  material_type?: string;
 }
 
 interface BuilderOrdersTrackerProps {
@@ -381,17 +384,49 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       }
       
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
       
-      const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/qr_scan_events?order=scanned_at.desc&limit=50`,
-        { headers, signal: controller.signal, cache: 'no-store' }
-      );
+      // Fetch scan events and material items separately, then join in memory
+      const [scansRes, itemsRes] = await Promise.all([
+        fetch(`${SUPABASE_URL}/rest/v1/qr_scan_events?order=scanned_at.desc&limit=50`, { headers, signal: controller.signal, cache: 'no-store' }),
+        fetch(`${SUPABASE_URL}/rest/v1/material_items?select=id,qr_code,purchase_order_id,material_type`, { headers, signal: controller.signal, cache: 'no-store' })
+      ]);
       clearTimeout(timeoutId);
       
-      if (response.ok) {
-        const data = await response.json();
-        setScanEvents(data || []);
+      if (scansRes.ok && itemsRes.ok) {
+        const scans = await scansRes.json();
+        const items = await itemsRes.json();
+        const itemsMap = new Map(items.map((item: any) => [item.qr_code, item]));
+        
+        // Fetch purchase orders for the items
+        const orderIds = [...new Set(items.map((item: any) => item.purchase_order_id).filter(Boolean))];
+        let ordersMap = new Map();
+        if (orderIds.length > 0) {
+          const ordersParam = orderIds.join(',');
+          const ordersController = new AbortController();
+          const ordersTimeoutId = setTimeout(() => ordersController.abort(), 5000);
+          const ordersRes = await fetch(
+            `${SUPABASE_URL}/rest/v1/purchase_orders?id=in.(${ordersParam})&select=id,po_number`,
+            { headers, signal: ordersController.signal, cache: 'no-store' }
+          );
+          clearTimeout(ordersTimeoutId);
+          if (ordersRes.ok) {
+            const orders = await ordersRes.json();
+            ordersMap = new Map(orders.map((order: any) => [order.id, order]));
+          }
+        }
+        
+        const transformedData = scans.map((scan: any) => {
+          const item = itemsMap.get(scan.qr_code);
+          const order = item?.purchase_order_id ? ordersMap.get(item.purchase_order_id) : null;
+          return {
+            ...scan,
+            purchase_order_id: item?.purchase_order_id || null,
+            po_number: order?.po_number || null,
+            material_type: item?.material_type || null,
+          };
+        });
+        setScanEvents(transformedData);
       }
     } catch (error: any) {
       if (error?.name !== 'AbortError') {
@@ -427,13 +462,63 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
           schema: 'public',
           table: 'qr_scan_events'
         },
-        (payload) => {
+        async (payload) => {
           const newScan = payload.new as ScanEvent;
-          setScanEvents(prev => [newScan, ...prev.slice(0, 49)]);
+          
+          // Fetch order information for the new scan
+          let enrichedScan: ScanEvent = { ...newScan };
+          try {
+            const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+            const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+            const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+            let accessToken = '';
+            if (stored) {
+              try {
+                const parsed = JSON.parse(stored);
+                accessToken = parsed.access_token || '';
+              } catch (e) {}
+            }
+            const headers: Record<string, string> = { 'apikey': apiKey };
+            if (accessToken) {
+              headers['Authorization'] = `Bearer ${accessToken}`;
+            }
+            
+            // Fetch material item info
+            const itemRes = await fetch(
+              `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${newScan.qr_code}&select=purchase_order_id,material_type&limit=1`,
+              { headers, cache: 'no-store' }
+            );
+            
+            if (itemRes.ok) {
+              const items = await itemRes.json();
+              const item = items[0];
+              
+              if (item?.purchase_order_id) {
+                const orderRes = await fetch(
+                  `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${item.purchase_order_id}&select=po_number&limit=1`,
+                  { headers, cache: 'no-store' }
+                );
+                if (orderRes.ok) {
+                  const orders = await orderRes.json();
+                  const order = orders[0];
+                  enrichedScan = {
+                    ...newScan,
+                    purchase_order_id: item.purchase_order_id,
+                    po_number: order?.po_number || null,
+                    material_type: item.material_type || null,
+                  };
+                }
+              }
+            }
+          } catch (e) {
+            console.log('Could not fetch order info for new scan:', e);
+          }
+          
+          setScanEvents(prev => [enrichedScan, ...prev.slice(0, 49)]);
           
           toast({
             title: '📦 Material Update',
-            description: `QR ${newScan.qr_code} was ${newScan.scan_type}ed`,
+            description: `QR ${enrichedScan.qr_code} was ${enrichedScan.scan_type}ed${enrichedScan.po_number ? ` (Order: ${enrichedScan.po_number})` : ''}`,
           });
         }
       )
@@ -991,46 +1076,137 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       </Card>
 
       {/* Recent Scan Activity */}
-      {scanEvents.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Eye className="h-5 w-5 text-purple-600" />
-              Recent Scan Activity
-            </CardTitle>
-            <CardDescription>Real-time updates on your material scans</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {scanEvents.slice(0, 10).map((scan) => (
-                <div 
-                  key={scan.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                >
-                  <div className="flex items-center gap-3">
-                    <Badge className={
-                      scan.scan_type === 'dispatch' ? 'bg-blue-100 text-blue-800' :
-                      scan.scan_type === 'receiving' ? 'bg-green-100 text-green-800' :
-                      'bg-purple-100 text-purple-800'
-                    }>
-                      {scan.scan_type}
-                    </Badge>
-                    <div>
-                      <p className="text-sm font-medium">{scan.qr_code}</p>
-                      <p className="text-xs text-gray-500">
-                        {format(new Date(scan.scanned_at), 'MMM dd, HH:mm')}
-                      </p>
+      {scanEvents.length > 0 && (() => {
+        // Group scans by order
+        const scansByOrder = new Map<string, ScanEvent[]>();
+        const ungroupedScans: ScanEvent[] = [];
+        
+        scanEvents.forEach(scan => {
+          if (scan.purchase_order_id && scan.po_number) {
+            const key = `${scan.purchase_order_id}|${scan.po_number}`;
+            if (!scansByOrder.has(key)) {
+              scansByOrder.set(key, []);
+            }
+            scansByOrder.get(key)!.push(scan);
+          } else {
+            ungroupedScans.push(scan);
+          }
+        });
+        
+        // Sort orders by most recent scan
+        const sortedOrders = Array.from(scansByOrder.entries()).sort((a, b) => {
+          const aLatest = new Date(a[1][0].scanned_at).getTime();
+          const bLatest = new Date(b[1][0].scanned_at).getTime();
+          return bLatest - aLatest;
+        });
+        
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Eye className="h-5 w-5 text-purple-600" />
+                Recent Scan Activity
+              </CardTitle>
+              <CardDescription>Real-time updates on your material scans</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4 max-h-96 overflow-y-auto">
+                {/* Grouped by Order */}
+                {sortedOrders.map(([orderKey, scans]) => {
+                  const [orderId, poNumber] = orderKey.split('|');
+                  const sortedScans = scans.sort((a, b) => 
+                    new Date(b.scanned_at).getTime() - new Date(a.scanned_at).getTime()
+                  );
+                  
+                  return (
+                    <div key={orderKey} className="space-y-2">
+                      <div className="flex items-center gap-2 pb-2 border-b border-gray-200">
+                        <Package className="h-4 w-4 text-blue-600" />
+                        <p className="text-sm font-semibold text-gray-700">Order: {poNumber}</p>
+                        <Badge variant="outline" className="text-xs">
+                          {scans.length} {scans.length === 1 ? 'scan' : 'scans'}
+                        </Badge>
+                      </div>
+                      <div className="space-y-2 pl-4">
+                        {sortedScans.slice(0, 5).map((scan) => (
+                          <div 
+                            key={scan.id}
+                            className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                          >
+                            <div className="flex items-center gap-3 flex-1">
+                              <Badge className={
+                                scan.scan_type === 'dispatch' ? 'bg-blue-100 text-blue-800' :
+                                scan.scan_type === 'receiving' ? 'bg-green-100 text-green-800' :
+                                'bg-purple-100 text-purple-800'
+                              }>
+                                {scan.scan_type}
+                              </Badge>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{scan.qr_code}</p>
+                                {scan.material_type && (
+                                  <p className="text-xs text-gray-500 truncate">{scan.material_type}</p>
+                                )}
+                                <p className="text-xs text-gray-500">
+                                  {format(new Date(scan.scanned_at), 'MMM dd, HH:mm')}
+                                </p>
+                              </div>
+                            </div>
+                            {scan.material_condition && (
+                              <Badge variant="outline" className="ml-2">{scan.material_condition}</Badge>
+                            )}
+                          </div>
+                        ))}
+                        {sortedScans.length > 5 && (
+                          <p className="text-xs text-gray-500 pl-3">
+                            +{sortedScans.length - 5} more scans for this order
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                
+                {/* Ungrouped scans (if any) */}
+                {ungroupedScans.length > 0 && (
+                  <div className="space-y-2 pt-2 border-t border-gray-200">
+                    <div className="flex items-center gap-2 pb-2">
+                      <AlertCircle className="h-4 w-4 text-amber-600" />
+                      <p className="text-sm font-semibold text-gray-700">Other Scans</p>
+                    </div>
+                    <div className="space-y-2 pl-4">
+                      {ungroupedScans.slice(0, 5).map((scan) => (
+                        <div 
+                          key={scan.id}
+                          className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                        >
+                          <div className="flex items-center gap-3">
+                            <Badge className={
+                              scan.scan_type === 'dispatch' ? 'bg-blue-100 text-blue-800' :
+                              scan.scan_type === 'receiving' ? 'bg-green-100 text-green-800' :
+                              'bg-purple-100 text-purple-800'
+                            }>
+                              {scan.scan_type}
+                            </Badge>
+                            <div>
+                              <p className="text-sm font-medium">{scan.qr_code}</p>
+                              <p className="text-xs text-gray-500">
+                                {format(new Date(scan.scanned_at), 'MMM dd, HH:mm')}
+                              </p>
+                            </div>
+                          </div>
+                          {scan.material_condition && (
+                            <Badge variant="outline">{scan.material_condition}</Badge>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   </div>
-                  {scan.material_condition && (
-                    <Badge variant="outline">{scan.material_condition}</Badge>
-                  )}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* QR Code Full Size Dialog */}
       <QRCodeDialog 
