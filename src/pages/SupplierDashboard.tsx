@@ -122,7 +122,8 @@ const QuotesManagementContent: React.FC<QuotesManagementContentProps> = ({
   setActiveTab,
   fetchQuoteRequests
 }) => {
-  const [activeFilter, setActiveFilter] = useState<'all' | 'pending' | 'quoted' | 'confirmed'>('all');
+  // Default to 'pending' to show Pending Response quotes as the primary view
+  const [activeFilter, setActiveFilter] = useState<'all' | 'pending' | 'quoted' | 'confirmed'>('pending');
   
   const pendingQuotes = quoteRequests.filter(q => q.status === 'pending');
   const quotedQuotes = quoteRequests.filter(q => q.status === 'quoted');
@@ -198,22 +199,28 @@ const QuotesManagementContent: React.FC<QuotesManagementContentProps> = ({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {activeFilter !== 'all' && (
-            <Badge 
-              variant="outline" 
-              className={`${
-                activeFilter === 'pending' ? 'bg-amber-100 text-amber-700 border-amber-300' :
-                activeFilter === 'quoted' ? 'bg-blue-100 text-blue-700 border-blue-300' :
-                'bg-green-100 text-green-700 border-green-300'
-              }`}
-            >
-              Filtered: {activeFilter === 'pending' ? 'Pending Response' : activeFilter === 'quoted' ? 'Awaiting Client' : 'Confirmed Orders'}
-              <button 
-                onClick={() => setActiveFilter('all')} 
-                className="ml-2 hover:text-red-500"
+            <>
+              <Badge 
+                variant="outline" 
+                className={`${
+                  activeFilter === 'pending' ? 'bg-amber-100 text-amber-700 border-amber-300' :
+                  activeFilter === 'quoted' ? 'bg-blue-100 text-blue-700 border-blue-300' :
+                  'bg-green-100 text-green-700 border-green-300'
+                }`}
               >
-                ×
-              </button>
-            </Badge>
+                {activeFilter === 'pending' ? `📋 Pending Response (${pendingQuotes.length})` : 
+                 activeFilter === 'quoted' ? `⏳ Awaiting Client (${quotedQuotes.length})` : 
+                 `✅ Confirmed Orders (${confirmedQuotes.length})`}
+              </Badge>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setActiveFilter('all')}
+                className="text-xs text-gray-500 hover:text-gray-700"
+              >
+                Show All ({quoteRequests.length})
+              </Button>
+            </>
           )}
           {activeFilter === 'all' && (
             <span className={`text-sm ${mutedText}`}>Showing all {quoteRequests.length} quotes</span>
