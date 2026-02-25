@@ -612,13 +612,6 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
     );
   }
 
-  // Calculate stats
-  const totalItems = orders.reduce((acc, o) => acc + (o.material_items?.length || 0), 0);
-  const dispatchedItems = orders.reduce((acc, o) => acc + (o.material_items?.filter(i => i.status === 'dispatched' || i.dispatch_scanned).length || 0), 0);
-  const inTransitItems = orders.reduce((acc, o) => acc + (o.material_items?.filter(i => i.status === 'in_transit').length || 0), 0);
-  const receivedItems = orders.reduce((acc, o) => acc + (o.material_items?.filter(i => ['received', 'verified'].includes(i.status) || i.receive_scanned).length || 0), 0);
-  const pendingItems = orders.reduce((acc, o) => acc + (o.material_items?.filter(i => !i.dispatch_scanned && !['dispatched', 'in_transit', 'received', 'verified'].includes(i.status)).length || 0), 0);
-
   // Filter orders based on active filter
   const getFilteredOrders = () => {
     if (activeFilter === 'all') return orders;
@@ -646,6 +639,25 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
 
   const filteredOrders = getFilteredOrders();
 
+  // Calculate stats - Count ORDERS (not items) to match the tab filtering
+  const totalOrders = orders.length;
+  const pendingOrders = orders.filter(order => {
+    const items = order.material_items || [];
+    return items.some(i => !i.dispatch_scanned && !['dispatched', 'in_transit', 'received', 'verified'].includes(i.status));
+  }).length;
+  const dispatchedOrders = orders.filter(order => {
+    const items = order.material_items || [];
+    return items.some(i => (i.dispatch_scanned || i.status === 'dispatched') && !['in_transit', 'received', 'verified'].includes(i.status) && !i.receive_scanned);
+  }).length;
+  const inTransitOrders = orders.filter(order => {
+    const items = order.material_items || [];
+    return items.some(i => i.status === 'in_transit');
+  }).length;
+  const receivedOrders = orders.filter(order => {
+    const items = order.material_items || [];
+    return items.some(i => ['received', 'verified'].includes(i.status) || i.receive_scanned);
+  }).length;
+
   return (
     <div className="space-y-6">
       {/* Filter Cards - Clickable status filters */}
@@ -665,7 +677,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                 <Clock className="h-4 w-4 text-amber-600" />
               </div>
               <div>
-                <p className="text-xl font-bold text-amber-700">{pendingItems}</p>
+                <p className="text-xl font-bold text-amber-700">{pendingOrders}</p>
                 <p className="text-xs text-amber-600 font-medium">Pending</p>
               </div>
             </div>
@@ -688,7 +700,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                 <Package className="h-4 w-4 text-orange-600" />
               </div>
               <div>
-                <p className="text-xl font-bold text-orange-700">{dispatchedItems}</p>
+                <p className="text-xl font-bold text-orange-700">{dispatchedOrders}</p>
                 <p className="text-xs text-orange-600 font-medium">📦 Dispatched</p>
               </div>
             </div>
@@ -711,7 +723,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                 <Truck className="h-4 w-4 text-purple-600" />
               </div>
               <div>
-                <p className="text-xl font-bold text-purple-700">{inTransitItems}</p>
+                <p className="text-xl font-bold text-purple-700">{inTransitOrders}</p>
                 <p className="text-xs text-purple-600 font-medium">🚚 In Transit</p>
               </div>
             </div>
@@ -734,7 +746,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                 <CheckCircle className="h-4 w-4 text-green-600" />
               </div>
               <div>
-                <p className="text-xl font-bold text-green-700">{receivedItems}</p>
+                <p className="text-xl font-bold text-green-700">{receivedOrders}</p>
                 <p className="text-xs text-green-600 font-medium">✅ Received</p>
               </div>
             </div>
