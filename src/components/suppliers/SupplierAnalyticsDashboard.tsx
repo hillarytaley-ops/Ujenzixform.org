@@ -236,6 +236,7 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
       const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
       const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
 
+      // Fetch supplier product prices
       const response = await fetch(
         `${SUPABASE_URL}/rest/v1/supplier_product_prices?supplier_id=eq.${supplierId}`,
         {
@@ -247,9 +248,48 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
       );
 
       if (response.ok) {
-        const data = await response.json();
-        console.log('📊 Products loaded via REST:', data?.length);
-        return data || [];
+        const products = await response.json();
+        console.log('📊 Products loaded via REST:', products?.length);
+        
+        if (products && products.length > 0) {
+          // Get product IDs to fetch names from admin_material_images
+          const productIds = products.map((p: any) => p.product_id).filter(Boolean);
+          
+          if (productIds.length > 0) {
+            // Fetch product details from admin_material_images
+            const idsParam = productIds.map((id: string) => `"${id}"`).join(',');
+            const materialsResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/admin_material_images?id=in.(${idsParam})&select=id,name,category,unit`,
+              {
+                headers: {
+                  'apikey': SUPABASE_ANON_KEY,
+                  'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+                },
+              }
+            );
+            
+            if (materialsResponse.ok) {
+              const materials = await materialsResponse.json();
+              const materialsMap = new Map<string, any>();
+              materials.forEach((m: any) => {
+                materialsMap.set(m.id, m);
+              });
+              
+              // Merge product data with material names
+              return products.map((product: any) => {
+                const materialInfo = materialsMap.get(product.product_id);
+                return {
+                  ...product,
+                  product_name: materialInfo?.name || product.product_name || `Product ${product.product_id?.slice(0, 8) || ''}`,
+                  category: materialInfo?.category || product.category || 'General',
+                  unit: materialInfo?.unit || product.unit || 'piece'
+                };
+              });
+            }
+          }
+        }
+        
+        return products || [];
       }
       return [];
     } catch (error) {
@@ -462,7 +502,7 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
 
   const calculateProductPerformance = (products: any[], orders: any[]): ProductPerformance[] => {
     // Build a map of product sales from order items
-    const productSalesMap = new Map<string, { quantity: number; revenue: number; orderCount: number }>();
+    const productSalesMap = new Map<string, { quantity: number; revenue: number; orderCount: number; name?: string }>();
     
     // Extract sales data from orders
     orders.forEach(order => {
@@ -473,7 +513,8 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
         productSalesMap.set(productId, {
           quantity: existing.quantity + (item.quantity || 1),
           revenue: existing.revenue + (parseFloat(item.total_price) || parseFloat(item.price) || 0),
-          orderCount: existing.orderCount + 1
+          orderCount: existing.orderCount + 1,
+          name: item.name || item.product_name || item.material_name || existing.name
         });
       });
       
@@ -484,7 +525,8 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
         productSalesMap.set(productId, {
           quantity: existing.quantity + (order.quantity || 1),
           revenue: existing.revenue + (parseFloat(order.total_amount) || 0),
-          orderCount: existing.orderCount + 1
+          orderCount: existing.orderCount + 1,
+          name: order.material_name || existing.name
         });
       }
     });
@@ -492,11 +534,17 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
     // Map products with their sales data
     const productPerformance: ProductPerformance[] = products.map((product) => {
       const productId = product.product_id || product.id;
-      const productName = product.product_name || product.admin_material_images?.name || product.material_name || 'Unknown Product';
       const salesData = productSalesMap.get(productId) || { quantity: 0, revenue: 0, orderCount: 0 };
       
+      // Get product name - prioritize product_name from merged data, then other sources
+      const productName = product.product_name || 
+                          product.name || 
+                          salesData.name ||
+                          product.material_name || 
+                          (productId ? `Product ${productId.slice(0, 8)}` : 'Unnamed Product');
+      
       // Calculate stock level from product data
-      const stockQuantity = product.stock_quantity || 0;
+      const stockQuantity = product.stock_quantity ?? (product.in_stock ? 100 : 0);
       const minStock = product.min_stock_level || 10;
       const maxStock = product.max_stock_level || 100;
       const stockLevel = maxStock > 0 ? Math.min(100, (stockQuantity / maxStock) * 100) : (product.in_stock ? 100 : 0);
@@ -507,7 +555,7 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
       return {
         id: productId,
         name: productName,
-        category: product.category || product.admin_material_images?.category || 'General',
+        category: product.category || 'General',
         totalSales: salesData.quantity,
         revenue: salesData.revenue,
         views: salesData.orderCount * 10 + Math.floor(Math.random() * 50), // Estimate views from orders
@@ -517,9 +565,12 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
       };
     });
 
-    // Sort by revenue and return top 5
+    // Sort by revenue (then by stock level for products with no sales) and return top 5
     return productPerformance
-      .sort((a, b) => b.revenue - a.revenue)
+      .sort((a, b) => {
+        if (b.revenue !== a.revenue) return b.revenue - a.revenue;
+        return b.stockLevel - a.stockLevel;
+      })
       .slice(0, 5);
   };
 
