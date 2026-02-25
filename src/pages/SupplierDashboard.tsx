@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DashboardLoader } from "@/components/ui/DashboardLoader";
+import { toast } from "sonner";
 import { 
   Package, 
   ShoppingCart, 
@@ -844,7 +845,10 @@ const SupplierDashboard = () => {
     }
     
     if (!accessToken) {
-      alert('Not authenticated - please sign in again');
+      toast.error('Not authenticated', {
+        description: 'Please sign in again to continue.',
+        duration: 5000,
+      });
       setProcessingQuote(false);
       return;
     }
@@ -971,18 +975,28 @@ const SupplierDashboard = () => {
       setSelectedQuote(null);
       setQuoteResponse({ quoteAmount: '', validUntil: '', supplierNotes: '' });
 
-      // Show success message
-      alert(action === 'approve' 
-        ? '✅ Quote sent to builder! They will review and accept/reject.' 
-        : '❌ Quote request rejected.'
-      );
+      // Show success toast notification
+      if (action === 'approve') {
+        toast.success('Quote sent to builder!', {
+          description: 'They will review and accept/reject your quote.',
+          duration: 5000,
+        });
+      } else {
+        toast.error('Quote request rejected', {
+          description: 'The builder has been notified.',
+          duration: 5000,
+        });
+      }
       
       // Refresh quote requests using the existing fetchQuoteRequests function
       fetchQuoteRequests();
 
     } catch (error: any) {
       console.error('Error processing quote:', error);
-      alert(error.message || 'Failed to process quote');
+      toast.error('Failed to process quote', {
+        description: error.message || 'Please try again later.',
+        duration: 5000,
+      });
     } finally {
       setProcessingQuote(false);
     }
