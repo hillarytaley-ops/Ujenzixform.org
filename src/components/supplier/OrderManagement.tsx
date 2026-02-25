@@ -178,21 +178,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
       setLoading(true);
       console.log('🔍 OrderManagement: Loading orders... supplierId prop:', supplierId);
       
-      // Try to use prefetched data first (instant load)
-      const userId = localStorage.getItem('user_id') || '';
-      const prefetchedOrders = getPrefetchedOrders(userId, 'supplier');
-      if (prefetchedOrders && prefetchedOrders.length > 0) {
-        console.log('⚡ OrderManagement: Using prefetched orders:', prefetchedOrders.length);
-        // Quick transform and display prefetched data immediately
-        const quickOrders = transformOrdersQuick(prefetchedOrders);
-        setOrders(quickOrders);
-        setLoading(false);
-        // Continue to fetch fresh data in background
-        loadOrdersFresh(SUPABASE_URL, SUPABASE_ANON_KEY);
-        return;
-      }
-
-      // Get auth token and user ID from localStorage
+      // Get auth token and user ID from localStorage first
       let accessToken = '';
       let userId = '';
       try {
@@ -204,6 +190,24 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
         }
       } catch (e) {
         console.log('Could not get auth from localStorage');
+      }
+      
+      // Also try direct user_id from localStorage
+      if (!userId) {
+        userId = localStorage.getItem('user_id') || '';
+      }
+      
+      // Try to use prefetched data first (instant load)
+      const prefetchedOrders = getPrefetchedOrders(userId, 'supplier');
+      if (prefetchedOrders && prefetchedOrders.length > 0) {
+        console.log('⚡ OrderManagement: Using prefetched orders:', prefetchedOrders.length);
+        // Quick transform and display prefetched data immediately
+        const quickOrders = transformOrdersQuick(prefetchedOrders);
+        setOrders(quickOrders);
+        setLoading(false);
+        // Continue to fetch fresh data in background
+        loadOrdersFresh(SUPABASE_URL, SUPABASE_ANON_KEY);
+        return;
       }
 
       const headers: Record<string, string> = {

@@ -134,7 +134,7 @@ const prefetchSupplierData = async (userId: string, accessToken: string): Promis
   const result: PrefetchResult = {};
   
   // First, get the supplier ID
-  let supplierId = localStorage.getItem('supplier_id');
+  let supplierId: string | null = localStorage.getItem('supplier_id');
   
   if (!supplierId) {
     // Try to find supplier by user_id
@@ -145,7 +145,7 @@ const prefetchSupplierData = async (userId: string, accessToken: string): Promis
     );
     
     if (suppliers && suppliers.length > 0) {
-      supplierId = suppliers[0].id;
+      supplierId = suppliers[0].id as string;
       localStorage.setItem('supplier_id', supplierId);
       console.log('📦 Prefetch: Found supplier ID:', supplierId);
     } else {
@@ -157,7 +157,7 @@ const prefetchSupplierData = async (userId: string, accessToken: string): Promis
       );
       
       if (profiles && profiles.length > 0) {
-        const profileId = profiles[0].id;
+        const profileId = profiles[0].id as string;
         const suppliersByProfile = await fastFetch(
           `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${profileId}&select=id,company_name`,
           accessToken,
@@ -165,7 +165,7 @@ const prefetchSupplierData = async (userId: string, accessToken: string): Promis
         );
         
         if (suppliersByProfile && suppliersByProfile.length > 0) {
-          supplierId = suppliersByProfile[0].id;
+          supplierId = suppliersByProfile[0].id as string;
           localStorage.setItem('supplier_id', supplierId);
         }
       }
