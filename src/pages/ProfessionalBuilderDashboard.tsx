@@ -100,8 +100,10 @@ const ProfessionalBuilderDashboardPage = () => {
   // Projects state - start with loading false to show empty state immediately
   const [projects, setProjects] = useState<any[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(true); // Will be set to false quickly
+  const [creatingProject, setCreatingProject] = useState(false); // Separate state for creation
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [selectedProject, setSelectedProject] = useState<any>(null);
+  const [gettingProjectLocation, setGettingProjectLocation] = useState(false);
   const [newProject, setNewProject] = useState({
     name: '',
     location: '',
@@ -110,7 +112,10 @@ const ProfessionalBuilderDashboardPage = () => {
     budget: '',
     project_type: 'residential',
     client_name: '',
-    expected_end_date: ''
+    expected_end_date: '',
+    latitude: null as number | null,
+    longitude: null as number | null,
+    address: ''
   });
 
   // Deliveries state
@@ -731,6 +736,92 @@ const ProfessionalBuilderDashboardPage = () => {
     return () => clearTimeout(timer);
   }, [authUser]);
 
+  // Get current GPS location for project
+  const getProjectLocation = async () => {
+    if (!navigator.geolocation) {
+      toast({
+        title: 'Not Supported',
+        description: 'Geolocation is not supported by your browser',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setGettingProjectLocation(true);
+
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          resolve,
+          reject,
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+        );
+      });
+
+      const { latitude, longitude } = position.coords;
+      console.log('📍 Got project coordinates:', latitude, longitude);
+
+      // Update project with coordinates
+      setNewProject(prev => ({
+        ...prev,
+        latitude,
+        longitude
+      }));
+
+      // Try to get address from coordinates
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
+          { headers: { 'User-Agent': 'UjenziXform/1.0' } }
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          const address = data.display_name || '';
+          const county = data.address?.county || data.address?.city || data.address?.state || '';
+          
+          setNewProject(prev => ({
+            ...prev,
+            latitude,
+            longitude,
+            address: address.substring(0, 200),
+            location: prev.location || county || address.split(',')[0]
+          }));
+
+          toast({
+            title: '📍 Location Set!',
+            description: county ? `Project location set to ${county}` : 'GPS coordinates saved.'
+          });
+        }
+      } catch (geoError) {
+        console.log('📍 Reverse geocoding failed, using coordinates only');
+        toast({
+          title: '📍 Coordinates Saved',
+          description: `Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)}`
+        });
+      }
+    } catch (error: any) {
+      console.error('📍 Geolocation error:', error);
+      let errorMessage = 'Failed to get location';
+      
+      if (error.code === 1) {
+        errorMessage = 'Location access denied. Please allow location access.';
+      } else if (error.code === 2) {
+        errorMessage = 'Location unavailable. Please try again.';
+      } else if (error.code === 3) {
+        errorMessage = 'Location request timed out.';
+      }
+
+      toast({
+        title: 'Location Error',
+        description: errorMessage,
+        variant: 'destructive'
+      });
+    } finally {
+      setGettingProjectLocation(false);
+    }
+  };
+
   // Create new project
   const handleCreateProject = async () => {
     if (!newProject.name || !newProject.location) {
@@ -742,11 +833,38 @@ const ProfessionalBuilderDashboardPage = () => {
       return;
     }
 
-    setLoadingProjects(true);
+    setCreatingProject(true);
     const userId = getUserId();
     const accessToken = await getAccessToken();
     
     try {
+      const projectData: Record<string, any> = {
+        builder_id: userId,
+        name: newProject.name,
+        location: newProject.location,
+        description: newProject.description || null,
+        start_date: newProject.start_date || null,
+        expected_end_date: newProject.expected_end_date || null,
+        budget: newProject.budget ? parseFloat(newProject.budget) : null,
+        project_type: newProject.project_type || 'residential',
+        client_name: newProject.client_name || null,
+        status: 'active',
+        progress: 0
+      };
+
+      // Include GPS coordinates if available (for delivery location)
+      if (newProject.latitude && newProject.longitude) {
+        projectData.latitude = newProject.latitude;
+        projectData.longitude = newProject.longitude;
+      }
+
+      // Include detailed address if available
+      if (newProject.address) {
+        projectData.address = newProject.address;
+      }
+
+      console.log('📁 Creating project:', projectData);
+
       const response = await fetch(`${SUPABASE_URL}/rest/v1/builder_projects`, {
         method: 'POST',
         headers: {
@@ -755,29 +873,18 @@ const ProfessionalBuilderDashboardPage = () => {
           'Content-Type': 'application/json',
           'Prefer': 'return=representation'
         },
-        body: JSON.stringify({
-          builder_id: userId,
-          name: newProject.name,
-          location: newProject.location,
-          description: newProject.description || null,
-          start_date: newProject.start_date || null,
-          expected_end_date: newProject.expected_end_date || null,
-          budget: newProject.budget ? parseFloat(newProject.budget) : null,
-          project_type: newProject.project_type || 'residential',
-          client_name: newProject.client_name || null,
-          status: 'active',
-          progress: 0
-        })
+        body: JSON.stringify(projectData)
       });
 
       if (response.ok) {
         const data = await response.json();
+        console.log('✅ Project created:', data);
         setProjects(prev => [data[0], ...prev]);
         setStats(prev => ({ ...prev, activeProjects: prev.activeProjects + 1 }));
         
         toast({
           title: "🏗️ Project Created!",
-          description: "Your new project has been created successfully.",
+          description: `"${newProject.name}" has been created successfully. You can now order materials for this project.`,
         });
 
         setShowCreateProject(false);
@@ -789,11 +896,15 @@ const ProfessionalBuilderDashboardPage = () => {
           budget: '',
           project_type: 'residential',
           client_name: '',
-          expected_end_date: ''
+          expected_end_date: '',
+          latitude: null,
+          longitude: null,
+          address: ''
         });
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to create project');
+        const errorText = await response.text();
+        console.error('❌ Project creation failed:', response.status, errorText);
+        throw new Error(errorText || 'Failed to create project');
       }
     } catch (error: any) {
       console.error('Error creating project:', error);
@@ -803,7 +914,7 @@ const ProfessionalBuilderDashboardPage = () => {
         variant: "destructive",
       });
     } finally {
-      setLoadingProjects(false);
+      setCreatingProject(false);
     }
   };
 
@@ -1292,7 +1403,7 @@ const ProfessionalBuilderDashboardPage = () => {
                         Create New Project
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-2xl">
+                    <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                       <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                           <Building2 className="h-5 w-5 text-blue-600" />
@@ -1322,6 +1433,55 @@ const ProfessionalBuilderDashboardPage = () => {
                               onChange={(e) => setNewProject(prev => ({ ...prev, location: e.target.value }))}
                             />
                           </div>
+                        </div>
+
+                        {/* GPS Location Section */}
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <Label className="flex items-center gap-2 text-blue-800">
+                              <MapPin className="h-4 w-4" />
+                              Project Site GPS Location
+                            </Label>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={getProjectLocation}
+                              disabled={gettingProjectLocation}
+                              className="border-blue-300 text-blue-700 hover:bg-blue-100"
+                            >
+                              {gettingProjectLocation ? (
+                                <>
+                                  <div className="h-4 w-4 mr-2 animate-spin border-2 border-blue-500 border-t-transparent rounded-full" />
+                                  Getting Location...
+                                </>
+                              ) : (
+                                <>
+                                  <MapPin className="h-4 w-4 mr-2" />
+                                  📍 Use Current Location
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                          <p className="text-xs text-blue-600 mb-2">
+                            Setting the GPS location ensures accurate delivery of materials to your project site
+                          </p>
+                          {newProject.latitude && newProject.longitude ? (
+                            <div className="bg-green-100 border border-green-300 rounded p-2 text-sm">
+                              <p className="text-green-800 font-medium flex items-center gap-1">
+                                <CheckCircle className="h-4 w-4" />
+                                Location Set!
+                              </p>
+                              <p className="text-green-700 text-xs font-mono">
+                                Lat: {newProject.latitude.toFixed(6)}, Lng: {newProject.longitude.toFixed(6)}
+                              </p>
+                              {newProject.address && (
+                                <p className="text-green-600 text-xs mt-1 truncate">📍 {newProject.address}</p>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-gray-500 italic">No GPS coordinates set yet</p>
+                          )}
                         </div>
                         
                         <div className="grid md:grid-cols-2 gap-4">
@@ -1393,15 +1553,25 @@ const ProfessionalBuilderDashboardPage = () => {
                         </div>
                       </div>
                       <DialogFooter>
-                        <Button variant="outline" onClick={() => setShowCreateProject(false)}>
+                        <Button variant="outline" onClick={() => setShowCreateProject(false)} disabled={creatingProject}>
                           Cancel
                         </Button>
                         <Button 
                           onClick={handleCreateProject} 
-                          disabled={loadingProjects}
+                          disabled={creatingProject || !newProject.name || !newProject.location}
                           className="bg-blue-600 hover:bg-blue-700"
                         >
-                          {loadingProjects ? 'Creating...' : 'Create Project'}
+                          {creatingProject ? (
+                            <>
+                              <div className="h-4 w-4 mr-2 animate-spin border-2 border-white border-t-transparent rounded-full" />
+                              Creating...
+                            </>
+                          ) : (
+                            <>
+                              <Briefcase className="h-4 w-4 mr-2" />
+                              Create Project
+                            </>
+                          )}
                         </Button>
                       </DialogFooter>
                     </DialogContent>

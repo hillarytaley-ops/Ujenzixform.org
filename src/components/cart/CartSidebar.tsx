@@ -22,8 +22,9 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCart, CartItem } from '@/contexts/CartContext';
-import { ShoppingCart, Trash2, Plus, Minus, Package, X, FileText, CreditCard, Scale, Store, Users, Truck, Video } from 'lucide-react';
+import { ShoppingCart, Trash2, Plus, Minus, Package, X, FileText, CreditCard, Scale, Store, Users, Truck, Video, Building2, MapPin } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 import { CartPriceComparison } from './CartPriceComparison';
@@ -31,6 +32,17 @@ import { CartPriceComparisonAll } from './CartPriceComparisonAll';
 import { MultiSupplierQuoteDialog } from './MultiSupplierQuoteDialog';
 import { DeliveryPromptDialog } from '@/components/builders/DeliveryPromptDialog';
 import { MonitoringServicePrompt } from '@/components/builders/MonitoringServicePrompt';
+
+// Project interface for project selection
+interface BuilderProject {
+  id: string;
+  name: string;
+  location: string;
+  latitude?: number;
+  longitude?: number;
+  address?: string;
+  status: string;
+}
 
 // Helper for fetch with timeout
 const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs: number = 10000) => {
@@ -71,6 +83,58 @@ export const CartSidebar: React.FC = () => {
   const [showMonitoringPrompt, setShowMonitoringPrompt] = useState(false);
   const [lastOrderId, setLastOrderId] = useState<string | null>(null);
   const [lastOrderTotal, setLastOrderTotal] = useState<number>(0);
+  
+  // Project selection for linking orders to projects
+  const [projects, setProjects] = useState<BuilderProject[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+
+  // Load user's projects for order association
+  const loadProjects = async () => {
+    const currentRole = userRole || localStorage.getItem('user_role');
+    // Only load projects for builders
+    if (currentRole !== 'professional_builder' && currentRole !== 'private_client') {
+      return;
+    }
+
+    setLoadingProjects(true);
+    try {
+      let userId = '';
+      let accessToken = '';
+      
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          userId = parsed.user?.id || '';
+          accessToken = parsed.access_token || '';
+        }
+      } catch (e) {}
+
+      if (!userId) return;
+
+      const response = await fetchWithTimeout(
+        `${SUPABASE_URL}/rest/v1/builder_projects?builder_id=eq.${userId}&status=in.(active,in_progress)&select=id,name,location,latitude,longitude,address,status&order=created_at.desc`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+          }
+        },
+        5000
+      );
+
+      if (response.ok) {
+        const projectsData = await response.json();
+        console.log('📁 Cart: Loaded projects for order association:', projectsData.length);
+        setProjects(projectsData || []);
+      }
+    } catch (error) {
+      console.error('Error loading projects:', error);
+    } finally {
+      setLoadingProjects(false);
+    }
+  };
 
   // Check user role on mount and when cart opens - use localStorage FIRST for instant access
   useEffect(() => {
@@ -110,6 +174,8 @@ export const CartSidebar: React.FC = () => {
     // Only run async check if cart is open (to avoid unnecessary calls)
     if (isCartOpen) {
       checkUserRole();
+      // Load projects for order association
+      loadProjects();
     }
   }, [isCartOpen]);
 
@@ -223,14 +289,23 @@ export const CartSidebar: React.FC = () => {
         const poNumber = `QR-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
         const supplierName = suppliersMap[supplierId] || supplierItems[0]?.supplier_name || 'General Catalog';
         
-        const quotePayload = {
+        // Get selected project details for delivery address
+        const selectedProject = projects.find(p => p.id === selectedProjectId);
+        const deliveryAddress = selectedProject 
+          ? `${selectedProject.name} - ${selectedProject.location}${selectedProject.address ? ` (${selectedProject.address})` : ''}`
+          : 'To be provided';
+        const projectName = selectedProject?.name 
+          ? `${selectedProject.name} - Quote from ${supplierName}`
+          : `Quote Request - ${supplierName}`;
+
+        const quotePayload: Record<string, any> = {
           po_number: poNumber,
           buyer_id: userId,
           supplier_id: supplierId,
           total_amount: supplierTotal,
-          delivery_address: 'To be provided',
+          delivery_address: deliveryAddress,
           delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          project_name: `Quote Request - ${supplierName}`,
+          project_name: projectName,
           status: 'pending',
           items: supplierItems.map(item => ({
             material_id: item.id,
@@ -243,6 +318,12 @@ export const CartSidebar: React.FC = () => {
           })),
           created_at: new Date().toISOString()
         };
+
+        // Link quote to project if selected
+        if (selectedProjectId) {
+          quotePayload.project_id = selectedProjectId;
+          console.log('📁 Linking quote to project:', selectedProjectId);
+        }
 
         try {
           const quoteResponse = await fetchWithTimeout(
@@ -450,15 +531,22 @@ export const CartSidebar: React.FC = () => {
       
       console.log('✅ Final supplier for order:', validatedSupplierId, supplierName);
       
+      // Get selected project details for delivery address
+      const selectedProject = projects.find(p => p.id === selectedProjectId);
+      const deliveryAddress = selectedProject 
+        ? `${selectedProject.name} - ${selectedProject.location}${selectedProject.address ? ` (${selectedProject.address})` : ''}`
+        : 'To be provided';
+      const projectName = selectedProject?.name || 'Direct Purchase - ' + new Date().toLocaleDateString();
+
       // Create purchase order using native fetch
-      const orderPayload = {
+      const orderPayload: Record<string, any> = {
         po_number: poNumber,
         buyer_id: userId,
         supplier_id: validatedSupplierId,
         total_amount: getTotalPrice(),
-        delivery_address: 'To be provided',
+        delivery_address: deliveryAddress,
         delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        project_name: 'Direct Purchase - ' + new Date().toLocaleDateString(),
+        project_name: projectName,
         status: 'confirmed',
         items: items.map(item => ({
           material_id: item.id,
@@ -469,6 +557,12 @@ export const CartSidebar: React.FC = () => {
           unit_price: item.unit_price
         }))
       };
+
+      // Link order to project if selected (for tracking spending)
+      if (selectedProjectId) {
+        orderPayload.project_id = selectedProjectId;
+        console.log('📁 Linking order to project:', selectedProjectId, projectName);
+      }
 
       console.log('🛒 Creating purchase order via fetch API...');
 
@@ -689,6 +783,45 @@ export const CartSidebar: React.FC = () => {
 
             <Separator className="my-2" />
 
+            {/* Project Selection for Builders */}
+            {(userRole === 'professional_builder' || userRole === 'private_client') && projects.length > 0 && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
+                <div className="flex items-center gap-2 text-blue-800 text-sm font-medium">
+                  <Building2 className="h-4 w-4" />
+                  Link Order to Project
+                </div>
+                <Select
+                  value={selectedProjectId || ''}
+                  onValueChange={(value) => setSelectedProjectId(value || null)}
+                >
+                  <SelectTrigger className="w-full bg-white border-blue-200">
+                    <SelectValue placeholder="Select a project (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">No project (general purchase)</SelectItem>
+                    {projects.map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-3 w-3 text-blue-600" />
+                          <span>{project.name}</span>
+                          <span className="text-xs text-gray-500">({project.location})</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedProjectId && (
+                  <div className="text-xs text-blue-600 flex items-center gap-1">
+                    <MapPin className="h-3 w-3" />
+                    Materials will be delivered to: {projects.find(p => p.id === selectedProjectId)?.location}
+                  </div>
+                )}
+                <p className="text-[10px] text-blue-500">
+                  Linking orders to projects helps track spending and ensures accurate delivery
+                </p>
+              </div>
+            )}
+
             {/* Cart Summary */}
             <div className="space-y-3 pt-2">
               <div className="bg-gray-50 rounded-lg p-3 space-y-2">
@@ -700,6 +833,17 @@ export const CartSidebar: React.FC = () => {
                   <span className="text-gray-600">Delivery</span>
                   <span className="text-green-600 font-medium">To be quoted</span>
                 </div>
+                {selectedProjectId && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600 flex items-center gap-1">
+                      <Building2 className="h-3 w-3" />
+                      Project
+                    </span>
+                    <span className="text-blue-600 font-medium truncate max-w-[150px]">
+                      {projects.find(p => p.id === selectedProjectId)?.name}
+                    </span>
+                  </div>
+                )}
                 <Separator />
                 <div className="flex justify-between text-base font-bold">
                   <span>Estimated Total</span>

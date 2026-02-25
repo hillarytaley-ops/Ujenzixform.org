@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,7 +24,7 @@ import {
 import { 
   Plus, MapPin, Calendar, DollarSign, Users, Building2,
   TrendingUp, Eye, Edit, Trash2, MoreVertical, Clock,
-  CheckCircle, AlertTriangle, Loader2, Target, FileText
+  CheckCircle, AlertTriangle, Loader2, Target, FileText, ShoppingCart
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -33,7 +33,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 interface Project {
