@@ -607,14 +607,15 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
   const downloadQRCode = async (qrCode: string, materialType: string, itemSeq: number) => {
     try {
       // Large QR code size for easy scanning on any device
-      const qrSize = 600;
+      const qrSize = 500;
       const padding = 60;
-      const labelHeight = 180;
+      const headerHeight = 100; // Space for QR code number at top
+      const footerHeight = 120; // Space for product name at bottom
       
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       const totalWidth = qrSize + (padding * 2);
-      const totalHeight = qrSize + (padding * 2) + labelHeight;
+      const totalHeight = headerHeight + qrSize + footerHeight;
       
       canvas.width = totalWidth;
       canvas.height = totalHeight;
@@ -625,6 +626,28 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
       ctx.fillStyle = 'white';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+      // ═══════════════════════════════════════════════════════════════
+      // HEADER SECTION - QR Code Number (at top)
+      // ═══════════════════════════════════════════════════════════════
+      ctx.fillStyle = '#0891b2'; // Cyan color
+      ctx.fillRect(0, 0, totalWidth, headerHeight);
+      
+      // QR Code number - large and bold at top
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 28px Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`QR #${itemSeq}`, totalWidth / 2, 40);
+      
+      // QR code string - monospace for readability
+      ctx.fillStyle = '#e0f2fe';
+      ctx.font = '14px "Courier New", monospace';
+      // Truncate if too long
+      const displayCode = qrCode.length > 45 ? qrCode.substring(0, 42) + '...' : qrCode;
+      ctx.fillText(displayCode, totalWidth / 2, 70);
+
+      // ═══════════════════════════════════════════════════════════════
+      // QR CODE IMAGE SECTION (in middle)
+      // ═══════════════════════════════════════════════════════════════
       // Create temporary canvas for QR code using qrcode library
       const qrCanvas = document.createElement('canvas');
       await QRCodeLib.toCanvas(qrCanvas, qrCode, {
@@ -637,47 +660,44 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
         }
       });
 
-      // Draw QR code onto main canvas
-      ctx.drawImage(qrCanvas, padding, padding);
+      // Draw QR code onto main canvas (centered)
+      ctx.drawImage(qrCanvas, padding, headerHeight);
 
       // Draw border around QR code area
       ctx.strokeStyle = '#e5e7eb';
       ctx.lineWidth = 2;
-      ctx.strokeRect(padding - 10, padding - 10, qrSize + 20, qrSize + 20);
+      ctx.strokeRect(padding - 5, headerHeight - 5, qrSize + 10, qrSize + 10);
 
-      // Add label section with background
-      const labelY = padding + qrSize + 20;
+      // ═══════════════════════════════════════════════════════════════
+      // FOOTER SECTION - Product Name (below image)
+      // ═══════════════════════════════════════════════════════════════
+      const footerY = headerHeight + qrSize;
       ctx.fillStyle = '#f8fafc';
-      ctx.fillRect(padding - 10, labelY, qrSize + 20, labelHeight - 30);
-      ctx.strokeRect(padding - 10, labelY, qrSize + 20, labelHeight - 30);
+      ctx.fillRect(0, footerY, totalWidth, footerHeight);
+      
+      // Border line at top of footer
+      ctx.strokeStyle = '#e5e7eb';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, footerY);
+      ctx.lineTo(totalWidth, footerY);
+      ctx.stroke();
 
-      // Material type - large and bold
+      // Product name - large and bold
       ctx.fillStyle = '#1e293b';
-      ctx.font = 'bold 36px Arial, sans-serif';
+      ctx.font = 'bold 32px Arial, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(materialType.toUpperCase(), totalWidth / 2, labelY + 45);
+      ctx.fillText(materialType.toUpperCase(), totalWidth / 2, footerY + 45);
       
-      // Item number
-      ctx.fillStyle = '#3b82f6';
-      ctx.font = 'bold 28px Arial, sans-serif';
-      ctx.fillText(`ITEM #${itemSeq}`, totalWidth / 2, labelY + 85);
-      
-      // QR code string - monospace for readability
-      ctx.fillStyle = '#64748b';
-      ctx.font = '18px "Courier New", monospace';
-      // Truncate if too long
-      const displayCode = qrCode.length > 40 ? qrCode.substring(0, 37) + '...' : qrCode;
-      ctx.fillText(displayCode, totalWidth / 2, labelY + 120);
-
-      // Add "SCAN ME" indicator at top
+      // "SCAN ME" indicator
       ctx.fillStyle = '#059669';
-      ctx.font = 'bold 24px Arial, sans-serif';
-      ctx.fillText('📱 SCAN ME', totalWidth / 2, 35);
+      ctx.font = 'bold 18px Arial, sans-serif';
+      ctx.fillText('📱 SCAN TO VERIFY', totalWidth / 2, footerY + 75);
 
-      // Add company branding at bottom
+      // Company branding at bottom
       ctx.fillStyle = '#94a3b8';
-      ctx.font = '14px Arial, sans-serif';
-      ctx.fillText('UjenziPro Material Tracking', totalWidth / 2, totalHeight - 15);
+      ctx.font = '12px Arial, sans-serif';
+      ctx.fillText('UjenziPro Material Tracking System', totalWidth / 2, footerY + 105);
 
       const link = document.createElement('a');
       link.download = `QR_${materialType.replace(/\s+/g, '_')}_Item${itemSeq}.png`;
@@ -686,7 +706,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
 
       toast({
         title: "✅ QR Code Downloaded",
-        description: `${materialType} - Item #${itemSeq}`,
+        description: `${materialType} - QR #${itemSeq}`,
       });
     } catch (error) {
       console.error('Error generating QR code:', error);
@@ -882,7 +902,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
 
     const qrResults = await Promise.all(qrPromises);
 
-    // Build print HTML with status indicators
+    // Build print HTML with QR Number at top, QR image in middle, Product name below
     const printHTML = `
       <!DOCTYPE html>
       <html>
@@ -905,11 +925,11 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
           .qr-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 20px; }
           .qr-item { 
             border: 2px solid #ddd; 
-            padding: 15px; 
             text-align: center; 
             page-break-inside: avoid; 
             border-radius: 8px;
             background: #fff;
+            overflow: hidden;
           }
           .qr-item.completed { 
             border-color: #22c55e; 
@@ -921,17 +941,54 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
             background: #fef2f2; 
             opacity: 0.5;
           }
+          /* QR Number Header - at top */
+          .qr-number-header {
+            background: #0891b2;
+            color: white;
+            padding: 10px 8px;
+          }
+          .qr-number {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 4px;
+          }
+          .qr-code-text { 
+            font-family: monospace; 
+            font-size: 8px; 
+            color: #e0f2fe; 
+            word-break: break-all; 
+          }
+          /* QR Image - in middle */
+          .qr-image-container {
+            padding: 15px;
+            background: white;
+          }
           .qr-item img { width: 150px; height: 150px; }
-          .qr-item h3 { font-size: 12px; margin-top: 10px; word-wrap: break-word; font-weight: bold; }
-          .qr-item p { font-size: 10px; color: #666; margin-top: 5px; }
-          .qr-code-text { font-family: monospace; font-size: 8px; color: #999; margin-top: 5px; word-break: break-all; }
+          /* Product Name Footer - below image */
+          .product-footer {
+            background: #f8fafc;
+            padding: 12px 8px;
+            border-top: 1px solid #e5e7eb;
+          }
+          .product-name { 
+            font-size: 14px; 
+            font-weight: bold; 
+            color: #1e293b;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+          }
+          .scan-me {
+            font-size: 10px;
+            color: #059669;
+            font-weight: bold;
+          }
           .status-badge { 
             display: inline-block; 
             padding: 3px 8px; 
             border-radius: 4px; 
             font-size: 9px; 
             font-weight: bold; 
-            margin-top: 8px; 
+            margin-top: 6px; 
           }
           .completed-badge { background: #22c55e; color: white; }
           .pending-badge { background: #eab308; color: white; }
@@ -939,6 +996,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
           @media print {
             .qr-grid { grid-template-columns: repeat(3, 1fr); }
             .qr-item { border: 2px solid #000; }
+            .qr-number-header { background: #333 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           }
         </style>
       </head>
@@ -954,16 +1012,26 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
             const isDispatched = item.dispatch_scanned && !item.receive_scanned;
             return `
               <div class="qr-item ${isCompleted ? 'completed' : ''}">
-                <img src="${qrDataUrl}" alt="QR Code" />
-                <h3>${item.material_type}</h3>
-                <p>Unit ${item.item_sequence} • ${item.unit}</p>
-                <p class="qr-code-text">${item.qr_code}</p>
-                ${isCompleted 
-                  ? '<p class="status-badge completed-badge">✅ COMPLETED</p>' 
-                  : isDispatched 
-                    ? '<p class="status-badge dispatched-badge">🚚 DISPATCHED</p>'
-                    : '<p class="status-badge pending-badge">⏳ PENDING</p>'
-                }
+                <!-- QR Number at top -->
+                <div class="qr-number-header">
+                  <div class="qr-number">QR #${item.item_sequence}</div>
+                  <div class="qr-code-text">${item.qr_code}</div>
+                </div>
+                <!-- QR Image in middle -->
+                <div class="qr-image-container">
+                  <img src="${qrDataUrl}" alt="QR Code" />
+                </div>
+                <!-- Product name below image -->
+                <div class="product-footer">
+                  <div class="product-name">${item.material_type}</div>
+                  <div class="scan-me">📱 SCAN TO VERIFY</div>
+                  ${isCompleted 
+                    ? '<span class="status-badge completed-badge">✅ COMPLETED</span>' 
+                    : isDispatched 
+                      ? '<span class="status-badge dispatched-badge">🚚 DISPATCHED</span>'
+                      : '<span class="status-badge pending-badge">⏳ PENDING</span>'
+                  }
+                </div>
               </div>
             `;
           }).join('')}
@@ -1018,7 +1086,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
       qrByClient[clientKey].push({ item, qrDataUrl });
     });
 
-    // Build HTML with page breaks between clients
+    // Build HTML with page breaks between clients - QR Number at top, image in middle, product name below
     const clientSections = clientGroups.map((group, groupIndex) => {
       const clientQRs = qrByClient[group.buyer_id] || [];
       if (clientQRs.length === 0) return '';
@@ -1036,11 +1104,21 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
           <div class="qr-grid">
             ${clientQRs.map(({ item, qrDataUrl }) => `
               <div class="qr-item ${item.dispatch_scanned && item.receive_scanned ? 'completed' : ''}">
-                <img src="${qrDataUrl}" alt="QR Code" />
-                <h3>${item.material_type}</h3>
-                <p>Unit ${item.item_sequence} • ${item.unit}</p>
-                <p class="qr-code-text">${item.qr_code}</p>
-                ${item.dispatch_scanned && item.receive_scanned ? '<p class="status-badge completed-badge">✅ COMPLETED</p>' : ''}
+                <!-- QR Number at top -->
+                <div class="qr-number-header">
+                  <div class="qr-number">QR #${item.item_sequence}</div>
+                  <div class="qr-code-text">${item.qr_code}</div>
+                </div>
+                <!-- QR Image in middle -->
+                <div class="qr-image-container">
+                  <img src="${qrDataUrl}" alt="QR Code" />
+                </div>
+                <!-- Product name below image -->
+                <div class="product-footer">
+                  <div class="product-name">${item.material_type}</div>
+                  <div class="scan-me">📱 SCAN TO VERIFY</div>
+                  ${item.dispatch_scanned && item.receive_scanned ? '<span class="status-badge completed-badge">✅ COMPLETED</span>' : ''}
+                </div>
               </div>
             `).join('')}
           </div>
@@ -1077,27 +1155,64 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
           .qr-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
           .qr-item { 
             border: 2px solid #ddd; 
-            padding: 15px; 
             text-align: center; 
             page-break-inside: avoid; 
             border-radius: 8px;
             background: #fff;
+            overflow: hidden;
           }
           .qr-item.completed { 
             border-color: #22c55e; 
             background: #f0fdf4; 
           }
+          /* QR Number Header - at top */
+          .qr-number-header {
+            background: #0891b2;
+            color: white;
+            padding: 10px 8px;
+          }
+          .qr-number {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 4px;
+          }
+          .qr-code-text { 
+            font-family: monospace; 
+            font-size: 8px; 
+            color: #e0f2fe; 
+            word-break: break-all; 
+          }
+          /* QR Image - in middle */
+          .qr-image-container {
+            padding: 15px;
+            background: white;
+          }
           .qr-item img { width: 150px; height: 150px; }
-          .qr-item h3 { font-size: 12px; margin-top: 10px; word-wrap: break-word; font-weight: bold; }
-          .qr-item p { font-size: 10px; color: #666; margin-top: 5px; }
-          .qr-code-text { font-family: monospace; font-size: 8px; color: #999; margin-top: 5px; word-break: break-all; }
+          /* Product Name Footer - below image */
+          .product-footer {
+            background: #f8fafc;
+            padding: 12px 8px;
+            border-top: 1px solid #e5e7eb;
+          }
+          .product-name { 
+            font-size: 14px; 
+            font-weight: bold; 
+            color: #1e293b;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+          }
+          .scan-me {
+            font-size: 10px;
+            color: #059669;
+            font-weight: bold;
+          }
           .status-badge { 
             display: inline-block; 
             padding: 3px 8px; 
             border-radius: 4px; 
             font-size: 9px; 
             font-weight: bold; 
-            margin-top: 8px; 
+            margin-top: 6px; 
           }
           .completed-badge { background: #22c55e; color: white; }
           
@@ -1107,6 +1222,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
             .qr-grid { grid-template-columns: repeat(3, 1fr); }
             .qr-item { border: 2px solid #000; }
             .client-section { margin-bottom: 0; }
+            .qr-number-header { background: #333 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           }
         </style>
       </head>
