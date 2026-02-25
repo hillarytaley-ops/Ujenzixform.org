@@ -571,7 +571,8 @@ export const SupplierAnalyticsDashboard: React.FC<SupplierAnalyticsDashboardProp
       const productName = (product.product_name || product.name || '').toLowerCase().trim();
       
       // Try to find sales data by product ID first, then by name
-      let salesData = productSalesMap.get(productId) || { quantity: 0, revenue: 0, orderCount: 0 };
+      let salesData: { quantity: number; revenue: number; orderCount: number } = 
+        productSalesMap.get(productId) || { quantity: 0, revenue: 0, orderCount: 0 };
       
       // If no sales by ID, try to match by product name
       if (salesData.quantity === 0 && productName) {
