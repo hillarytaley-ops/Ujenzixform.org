@@ -434,12 +434,13 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
     try {
       const { SUPABASE_URL, SUPABASE_ANON_KEY, accessToken } = getSupabaseConfig();
       
-      const updateData: any = {
+      // First try to update with market_price
+      let updateData: any = {
         market_price: editMarketPrice,
         price: editSellingPrice, // 'price' is the selling price in the database
       };
       
-      const response = await fetch(
+      let response = await fetch(
         `${SUPABASE_URL}/rest/v1/supplier_product_prices?id=eq.${selectedItem.id}`,
         {
           method: 'PATCH',
@@ -453,22 +454,52 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
         }
       );
       
+      // If market_price column doesn't exist, try without it
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(errorText || 'Failed to update prices');
+        if (errorText.includes('market_price') && errorText.includes('could not find')) {
+          console.log('💡 market_price column not found, updating only selling price...');
+          // Retry without market_price
+          updateData = { price: editSellingPrice };
+          response = await fetch(
+            `${SUPABASE_URL}/rest/v1/supplier_product_prices?id=eq.${selectedItem.id}`,
+            {
+              method: 'PATCH',
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=minimal',
+              },
+              body: JSON.stringify(updateData),
+            }
+          );
+          
+          if (!response.ok) {
+            const retryErrorText = await response.text();
+            throw new Error(retryErrorText || 'Failed to update prices');
+          }
+          
+          toast({
+            title: '✅ Selling Price Updated',
+            description: `${selectedItem.product_name} - Selling: KES ${editSellingPrice.toLocaleString()}. Note: Market price tracking requires a database update.`
+          });
+        } else {
+          throw new Error(errorText || 'Failed to update prices');
+        }
+      } else {
+        console.log('💰 Prices updated successfully');
+        
+        // Calculate profit margin
+        const profitMargin = editMarketPrice > 0 
+          ? (((editSellingPrice - editMarketPrice) / editMarketPrice) * 100).toFixed(1)
+          : '0';
+        
+        toast({
+          title: '✅ Prices Updated',
+          description: `${selectedItem.product_name} - Market: KES ${editMarketPrice.toLocaleString()}, Selling: KES ${editSellingPrice.toLocaleString()} (${profitMargin}% margin)`
+        });
       }
-      
-      console.log('💰 Prices updated successfully');
-      
-      // Calculate profit margin
-      const profitMargin = editMarketPrice > 0 
-        ? (((editSellingPrice - editMarketPrice) / editMarketPrice) * 100).toFixed(1)
-        : '0';
-      
-      toast({
-        title: '✅ Prices Updated',
-        description: `${selectedItem.product_name} - Market: KES ${editMarketPrice.toLocaleString()}, Selling: KES ${editSellingPrice.toLocaleString()} (${profitMargin}% margin)`
-      });
       
       setShowPriceDialog(false);
       setSelectedItem(null);

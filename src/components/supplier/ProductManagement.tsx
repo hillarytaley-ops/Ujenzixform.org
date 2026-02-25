@@ -636,6 +636,73 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ supplierId
       
       if (!response.ok) {
         const errorText = await response.text();
+        
+        // Check if the error is about missing market_price column
+        if (errorText.includes('market_price') && (errorText.includes('could not find') || errorText.includes('does not exist'))) {
+          console.log('💡 market_price column not found, retrying without it...');
+          
+          // Retry without market_price
+          const retryPayload = existingPrice ? {
+            price: price,
+            in_stock: inStock,
+            description: description || null,
+            variant_prices: variantPrices || [],
+            updated_at: new Date().toISOString()
+          } : {
+            supplier_id: effectiveSupplierId,
+            product_id: productId,
+            price: price,
+            in_stock: inStock,
+            description: description || null,
+            variant_prices: variantPrices || [],
+            updated_at: new Date().toISOString()
+          };
+          
+          const retryResponse = await fetch(
+            existingPrice 
+              ? `https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/supplier_product_prices?supplier_id=eq.${effectiveSupplierId}&product_id=eq.${productId}`
+              : 'https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/supplier_product_prices',
+            {
+              method: existingPrice ? 'PATCH' : 'POST',
+              headers: {
+                'apikey': apiKey,
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=representation'
+              },
+              body: JSON.stringify(retryPayload)
+            }
+          );
+          
+          if (!retryResponse.ok) {
+            const retryErrorText = await retryResponse.text();
+            console.error('❌ Retry also failed:', retryResponse.status, retryErrorText);
+            toast({
+              title: 'Error Saving Price',
+              description: `Database error: ${retryResponse.status}. Please try again.`,
+              variant: 'destructive'
+            });
+            return;
+          }
+          
+          const retryData = await retryResponse.json();
+          console.log('✅ Price saved successfully (without market_price):', retryData);
+          
+          setSupplierPrices(prev => ({
+            ...prev,
+            [productId]: { price, market_price: 0, in_stock: inStock, description: description || '', variant_prices: variantPrices || [] }
+          }));
+          
+          setPricingProduct(null);
+          setEditingVariantPrices({});
+          
+          toast({
+            title: 'Price Updated',
+            description: 'Selling price saved. Note: Market price tracking requires a database update.'
+          });
+          return;
+        }
+        
         console.error('❌ Database save failed:', response.status, errorText);
         toast({
           title: 'Error Saving Price',
