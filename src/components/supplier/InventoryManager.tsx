@@ -668,21 +668,21 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div className="flex flex-col sm:flex-row gap-2 flex-1">
           <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-slate-400" />
             <Input
               placeholder="Search products..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-slate-800 border-slate-600"
+              className="pl-10 bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-500"
             />
           </div>
           
           <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-[150px] bg-slate-800 border-slate-600">
+            <SelectTrigger className="w-[150px] bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-600 text-gray-700 dark:text-slate-300">
               <Filter className="h-4 w-4 mr-2" />
               <SelectValue placeholder="Filter" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700">
               <SelectItem value="all">All Status</SelectItem>
               <SelectItem value="in_stock">In Stock</SelectItem>
               <SelectItem value="low_stock">Low Stock</SelectItem>
@@ -865,23 +865,23 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
 
       {/* Update Stock Dialog */}
       <Dialog open={showUpdateDialog} onOpenChange={setShowUpdateDialog}>
-        <DialogContent className="bg-slate-900 border-slate-700">
+        <DialogContent className="bg-white dark:bg-slate-900 border-gray-200 dark:border-slate-700">
           <DialogHeader>
-            <DialogTitle className="text-white">Update Stock</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-gray-900 dark:text-white">Update Stock</DialogTitle>
+            <DialogDescription className="text-gray-600 dark:text-slate-400">
               {selectedItem?.product_name} - Current: {selectedItem?.current_stock} {selectedItem?.unit}(s)
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4 py-4">
             <div>
-              <Label>Update Type</Label>
+              <Label className="text-gray-700 dark:text-slate-300 font-medium">Update Type</Label>
               <div className="flex gap-2 mt-2">
                 <Button
                   variant={updateType === 'add' ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setUpdateType('add')}
-                  className={updateType === 'add' ? 'bg-green-600' : ''}
+                  className={updateType === 'add' ? 'bg-green-600 hover:bg-green-700 text-white' : 'border-gray-300 dark:border-slate-600'}
                 >
                   <ArrowUpCircle className="h-4 w-4 mr-1" />
                   Add Stock
@@ -890,7 +890,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
                   variant={updateType === 'remove' ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setUpdateType('remove')}
-                  className={updateType === 'remove' ? 'bg-red-600' : ''}
+                  className={updateType === 'remove' ? 'bg-red-600 hover:bg-red-700 text-white' : 'border-gray-300 dark:border-slate-600'}
                 >
                   <ArrowDownCircle className="h-4 w-4 mr-1" />
                   Remove
@@ -899,7 +899,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
                   variant={updateType === 'set' ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setUpdateType('set')}
-                  className={updateType === 'set' ? 'bg-blue-600' : ''}
+                  className={updateType === 'set' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'border-gray-300 dark:border-slate-600'}
                 >
                   <RefreshCw className="h-4 w-4 mr-1" />
                   Set To
@@ -908,16 +908,16 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
             </div>
             
             <div>
-              <Label>Quantity</Label>
+              <Label className="text-gray-700 dark:text-slate-300 font-medium">Quantity</Label>
               <Input
                 type="number"
                 min="0"
                 value={updateQuantity}
                 onChange={(e) => setUpdateQuantity(parseInt(e.target.value) || 0)}
-                className="bg-slate-800 border-slate-600"
+                className="bg-gray-50 dark:bg-slate-800 border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white"
               />
               {updateType !== 'set' && selectedItem && (
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
                   New stock will be: {updateType === 'add' 
                     ? selectedItem.current_stock + updateQuantity 
                     : Math.max(0, selectedItem.current_stock - updateQuantity)}
@@ -926,21 +926,21 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
             </div>
             
             <div>
-              <Label>Reason (Optional)</Label>
+              <Label className="text-gray-700 dark:text-slate-300 font-medium">Reason (Optional)</Label>
               <Input
                 value={updateReason}
                 onChange={(e) => setUpdateReason(e.target.value)}
                 placeholder="e.g., New shipment arrived, Sold to customer"
-                className="bg-slate-800 border-slate-600"
+                className="bg-gray-50 dark:bg-slate-800 border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-500"
               />
             </div>
           </div>
           
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowUpdateDialog(false)}>
+            <Button variant="outline" onClick={() => setShowUpdateDialog(false)} className="border-gray-300 dark:border-slate-600 text-gray-700 dark:text-slate-300">
               Cancel
             </Button>
-            <Button onClick={handleUpdateStock} disabled={saving || updateQuantity <= 0}>
+            <Button onClick={handleUpdateStock} disabled={saving || updateQuantity <= 0} className="bg-blue-600 hover:bg-blue-700 text-white">
               {saving ? 'Updating...' : 'Update Stock'}
             </Button>
           </DialogFooter>
@@ -949,48 +949,48 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
 
       {/* Settings Dialog */}
       <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog}>
-        <DialogContent className="bg-slate-900 border-slate-700">
+        <DialogContent className="bg-white dark:bg-slate-900 border-gray-200 dark:border-slate-700">
           <DialogHeader>
-            <DialogTitle className="text-white">Inventory Settings</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-gray-900 dark:text-white">Inventory Settings</DialogTitle>
+            <DialogDescription className="text-gray-600 dark:text-slate-400">
               Configure low stock alerts and notifications
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4 py-4">
             <div>
-              <Label>Default Low Stock Threshold</Label>
+              <Label className="text-gray-700 dark:text-slate-300 font-medium">Default Low Stock Threshold</Label>
               <Input
                 type="number"
                 min="1"
                 value={lowStockThreshold}
                 onChange={(e) => setLowStockThreshold(parseInt(e.target.value) || 10)}
-                className="bg-slate-800 border-slate-600"
+                className="bg-gray-50 dark:bg-slate-800 border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white"
               />
-              <p className="text-xs text-slate-400 mt-1">
+              <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
                 Products below this quantity will show as "Low Stock"
               </p>
             </div>
             
             <div className="flex items-center justify-between">
               <div>
-                <Label>Email Alerts</Label>
-                <p className="text-xs text-slate-400">Get notified when stock is low</p>
+                <Label className="text-gray-700 dark:text-slate-300 font-medium">Email Alerts</Label>
+                <p className="text-xs text-gray-500 dark:text-slate-400">Get notified when stock is low</p>
               </div>
-              <Badge variant="outline">Coming Soon</Badge>
+              <Badge variant="outline" className="border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-400">Coming Soon</Badge>
             </div>
             
             <div className="flex items-center justify-between">
               <div>
-                <Label>Auto-Reorder</Label>
-                <p className="text-xs text-slate-400">Automatically reorder when stock is low</p>
+                <Label className="text-gray-700 dark:text-slate-300 font-medium">Auto-Reorder</Label>
+                <p className="text-xs text-gray-500 dark:text-slate-400">Automatically reorder when stock is low</p>
               </div>
-              <Badge variant="outline">Coming Soon</Badge>
+              <Badge variant="outline" className="border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-400">Coming Soon</Badge>
             </div>
           </div>
           
           <DialogFooter>
-            <Button onClick={() => setShowSettingsDialog(false)}>
+            <Button onClick={() => setShowSettingsDialog(false)} className="bg-blue-600 hover:bg-blue-700 text-white">
               Close
             </Button>
           </DialogFooter>
@@ -999,80 +999,80 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
 
       {/* Edit Prices Dialog */}
       <Dialog open={showPriceDialog} onOpenChange={setShowPriceDialog}>
-        <DialogContent className="bg-slate-900 border-slate-700">
+        <DialogContent className="bg-white dark:bg-slate-900 border-gray-200 dark:border-slate-700">
           <DialogHeader>
-            <DialogTitle className="text-white">Edit Prices</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-gray-900 dark:text-white">Edit Prices</DialogTitle>
+            <DialogDescription className="text-gray-600 dark:text-slate-400">
               {selectedItem?.product_name} - Update market and selling prices
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4 py-4">
             <div>
-              <Label className="text-slate-300">Market Price (Cost Price)</Label>
+              <Label className="text-gray-700 dark:text-slate-300 font-medium">Market Price (Cost Price)</Label>
               <div className="relative mt-2">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">KES</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-slate-400 text-sm font-medium">KES</span>
                 <Input
                   type="number"
                   min="0"
                   step="0.01"
                   value={editMarketPrice}
                   onChange={(e) => setEditMarketPrice(parseFloat(e.target.value) || 0)}
-                  className="bg-slate-800 border-slate-600 pl-12"
+                  className="bg-gray-50 dark:bg-slate-800 border-gray-300 dark:border-slate-600 pl-12 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-500"
                   placeholder="0.00"
                 />
               </div>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
                 The price you paid to acquire this product
               </p>
             </div>
             
             <div>
-              <Label className="text-slate-300">Selling Price</Label>
+              <Label className="text-gray-700 dark:text-slate-300 font-medium">Selling Price</Label>
               <div className="relative mt-2">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">KES</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-slate-400 text-sm font-medium">KES</span>
                 <Input
                   type="number"
                   min="0"
                   step="0.01"
                   value={editSellingPrice}
                   onChange={(e) => setEditSellingPrice(parseFloat(e.target.value) || 0)}
-                  className="bg-slate-800 border-slate-600 pl-12"
+                  className="bg-gray-50 dark:bg-slate-800 border-gray-300 dark:border-slate-600 pl-12 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-500"
                   placeholder="0.00"
                 />
               </div>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
                 The price customers will pay for this product
               </p>
             </div>
             
             {/* Profit Calculation Preview */}
             {editMarketPrice > 0 && (
-              <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                <h4 className="text-sm font-medium text-slate-300 mb-3">Profit Analysis</h4>
+              <div className="bg-gray-100 dark:bg-slate-800/50 rounded-lg p-4 border border-gray-200 dark:border-slate-700">
+                <h4 className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-3">Profit Analysis</h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-xs text-slate-500">Profit per Unit</p>
+                    <p className="text-xs text-gray-500 dark:text-slate-400">Profit per Unit</p>
                     <p className={`text-lg font-bold ${
-                      editSellingPrice - editMarketPrice >= 0 ? 'text-green-400' : 'text-red-400'
+                      editSellingPrice - editMarketPrice >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
                     }`}>
                       KES {(editSellingPrice - editMarketPrice).toLocaleString()}
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs text-slate-500">Profit Margin</p>
+                    <p className="text-xs text-gray-500 dark:text-slate-400">Profit Margin</p>
                     <p className={`text-lg font-bold ${
-                      editSellingPrice - editMarketPrice >= 0 ? 'text-green-400' : 'text-red-400'
+                      editSellingPrice - editMarketPrice >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
                     }`}>
                       {(((editSellingPrice - editMarketPrice) / editMarketPrice) * 100).toFixed(1)}%
                     </p>
                   </div>
                 </div>
                 {selectedItem && selectedItem.current_stock > 0 && (
-                  <div className="mt-3 pt-3 border-t border-slate-700">
-                    <p className="text-xs text-slate-500">Potential Profit (Current Stock: {selectedItem.current_stock})</p>
+                  <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-700">
+                    <p className="text-xs text-gray-500 dark:text-slate-400">Potential Profit (Current Stock: {selectedItem.current_stock})</p>
                     <p className={`text-lg font-bold ${
-                      editSellingPrice - editMarketPrice >= 0 ? 'text-green-400' : 'text-red-400'
+                      editSellingPrice - editMarketPrice >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
                     }`}>
                       KES {((editSellingPrice - editMarketPrice) * selectedItem.current_stock).toLocaleString()}
                     </p>
@@ -1083,13 +1083,13 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ supplierId }
           </div>
           
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPriceDialog(false)}>
+            <Button variant="outline" onClick={() => setShowPriceDialog(false)} className="border-gray-300 dark:border-slate-600 text-gray-700 dark:text-slate-300">
               Cancel
             </Button>
             <Button 
               onClick={handleUpdatePrices} 
               disabled={saving || (editSellingPrice <= 0 && editMarketPrice <= 0)}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-blue-600 hover:bg-blue-700 text-white"
             >
               {saving ? 'Updating...' : 'Update Prices'}
             </Button>
