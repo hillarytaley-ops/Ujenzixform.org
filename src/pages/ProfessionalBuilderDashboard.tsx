@@ -1808,18 +1808,41 @@ const ProfessionalBuilderDashboardPage = () => {
 
           {/* Quotes Tab - Review supplier pricing */}
           <TabsContent value="quotes">
-            <Tabs defaultValue="my-requests" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-4">
-                <TabsTrigger value="my-requests">My Quote Requests</TabsTrigger>
-                <TabsTrigger value="supplier-quotes">Supplier Responses</TabsTrigger>
-              </TabsList>
-              <TabsContent value="my-requests">
-                <PendingQuoteRequests builderId={user?.id || ''} />
-              </TabsContent>
-              <TabsContent value="supplier-quotes">
-                <SupplierQuoteReview builderId={user?.id || ''} />
-              </TabsContent>
-            </Tabs>
+            <Card className="border-0 shadow-none bg-transparent">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-gray-900">
+                  <FileText className="h-5 w-5 text-green-600" />
+                  My Quote Requests
+                </CardTitle>
+                <CardDescription>Track and compare quotes from suppliers</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Tabs defaultValue="my-requests" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2 mb-6 bg-gray-100 p-1 rounded-lg h-auto">
+                    <TabsTrigger 
+                      value="my-requests"
+                      className="data-[state=active]:bg-white data-[state=active]:text-green-700 data-[state=active]:shadow-sm py-3 rounded-md font-medium transition-all"
+                    >
+                      <Clock className="h-4 w-4 mr-2" />
+                      My Quote Requests
+                    </TabsTrigger>
+                    <TabsTrigger 
+                      value="supplier-quotes"
+                      className="data-[state=active]:bg-white data-[state=active]:text-green-700 data-[state=active]:shadow-sm py-3 rounded-md font-medium transition-all"
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Supplier Responses
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="my-requests" className="mt-0">
+                    <PendingQuoteRequests builderId={user?.id || ''} />
+                  </TabsContent>
+                  <TabsContent value="supplier-quotes" className="mt-0">
+                    <SupplierQuoteReview builderId={user?.id || ''} />
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="orders">
