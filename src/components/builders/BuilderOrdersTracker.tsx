@@ -758,12 +758,23 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
         case 'pending':
           // Orders that are pending/confirmed/quoted (accepted quotes or supplier responded) but not yet dispatched
           // This includes orders awaiting delivery provider allocation
-          const isPendingStatus = order.status === 'pending' || order.status === 'confirmed' || order.status === 'quoted';
+          // EXCLUDE orders that have dispatched status or any dispatched items (those belong in dispatched tab)
+          const orderStatus = order.status || 'pending';
+          if (['dispatched', 'partially_dispatched'].includes(orderStatus)) return false; // Exclude dispatched orders
+          
+          const hasDispatchedItems = items.some(i => (i.dispatch_scanned || i.status === 'dispatched') && !['in_transit', 'received', 'verified'].includes(i.status) && !i.receive_scanned);
+          if (hasDispatchedItems) return false; // Exclude orders with dispatched items
+          
+          const isPendingStatus = orderStatus === 'pending' || orderStatus === 'confirmed' || orderStatus === 'quoted';
           const hasPendingItems = items.some(i => !i.dispatch_scanned && !['dispatched', 'in_transit', 'received', 'verified'].includes(i.status));
-          return isPendingStatus || hasPendingItems;
+          // Only show if status is pending/confirmed/quoted AND no items are dispatched
+          return (isPendingStatus || hasPendingItems) && !hasDispatchedItems;
         case 'dispatched':
-          // Orders with dispatched items (but not yet in transit or received)
-          return items.some(i => (i.dispatch_scanned || i.status === 'dispatched') && !['in_transit', 'received', 'verified'].includes(i.status) && !i.receive_scanned);
+          // Orders with dispatched status or dispatched items (but not yet in transit or received)
+          const orderStatusForDispatch = order.status || 'pending';
+          const hasDispatchedStatus = ['dispatched', 'partially_dispatched'].includes(orderStatusForDispatch);
+          const hasDispatchedItems = items.some(i => (i.dispatch_scanned || i.status === 'dispatched') && !['in_transit', 'received', 'verified'].includes(i.status) && !i.receive_scanned);
+          return hasDispatchedStatus || hasDispatchedItems;
         case 'in_transit':
           // Orders currently being delivered
           return items.some(i => i.status === 'in_transit');
@@ -782,14 +793,24 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
   const totalOrders = orders.length;
   const pendingOrders = orders.filter(order => {
     // Include orders with status 'pending', 'confirmed', or 'quoted' (accepted quotes or supplier responded awaiting dispatch)
-    const isPendingStatus = order.status === 'pending' || order.status === 'confirmed' || order.status === 'quoted';
+    // EXCLUDE orders that have dispatched status or any dispatched items (those belong in dispatched tab)
+    const orderStatus = order.status || 'pending';
+    if (['dispatched', 'partially_dispatched'].includes(orderStatus)) return false; // Exclude dispatched orders
+    
     const items = order.material_items || [];
+    const hasDispatchedItems = items.some(i => (i.dispatch_scanned || i.status === 'dispatched') && !['in_transit', 'received', 'verified'].includes(i.status) && !i.receive_scanned);
+    if (hasDispatchedItems) return false; // Exclude orders with dispatched items
+    
+    const isPendingStatus = orderStatus === 'pending' || orderStatus === 'confirmed' || orderStatus === 'quoted';
     const hasPendingItems = items.some(i => !i.dispatch_scanned && !['dispatched', 'in_transit', 'received', 'verified'].includes(i.status));
-    return isPendingStatus || hasPendingItems;
+    return (isPendingStatus || hasPendingItems) && !hasDispatchedItems;
   }).length;
   const dispatchedOrders = orders.filter(order => {
+    const orderStatusForDispatch = order.status || 'pending';
+    const hasDispatchedStatus = ['dispatched', 'partially_dispatched'].includes(orderStatusForDispatch);
     const items = order.material_items || [];
-    return items.some(i => (i.dispatch_scanned || i.status === 'dispatched') && !['in_transit', 'received', 'verified'].includes(i.status) && !i.receive_scanned);
+    const hasDispatchedItems = items.some(i => (i.dispatch_scanned || i.status === 'dispatched') && !['in_transit', 'received', 'verified'].includes(i.status) && !i.receive_scanned);
+    return hasDispatchedStatus || hasDispatchedItems;
   }).length;
   const inTransitOrders = orders.filter(order => {
     const items = order.material_items || [];
