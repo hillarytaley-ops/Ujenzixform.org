@@ -289,8 +289,9 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
       
       // Fetch purchase orders with delivery provider information
+      // Note: Using * selects all columns including delivery_provider fields
       const ordersResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${builderId}&select=*,delivery_provider_id,delivery_provider_name,delivery_provider_phone,delivery_status&order=created_at.desc`,
+        `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${builderId}&select=*&order=created_at.desc`,
         { headers, signal: controller.signal, cache: 'no-store' }
       );
       clearTimeout(timeoutId);
@@ -437,6 +438,56 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
   };
 
   const setupRealtimeSubscription = () => {
+    // Subscribe to purchase_orders changes (for synchronization with Supplier Dashboard)
+    const ordersChannel = supabase
+      .channel('builder-purchase-orders-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'purchase_orders',
+          filter: `buyer_id=eq.${builderId}`
+        },
+        (payload) => {
+          console.log('🔄 Purchase order change detected:', payload.eventType, payload.new?.po_number);
+          fetchOrders(); // Refresh orders when any change occurs
+          
+          // Show toast for important status changes
+          if (payload.eventType === 'UPDATE' && payload.new) {
+            const newStatus = payload.new.status;
+            const oldStatus = payload.old?.status;
+            
+            // Notify when delivery provider is assigned
+            if (!payload.old?.delivery_provider_id && payload.new.delivery_provider_id) {
+              toast({
+                title: '🚚 Delivery Provider Assigned',
+                description: `Order ${payload.new.po_number || ''} now has a delivery provider assigned`,
+              });
+            }
+            
+            // Notify when order goes in transit
+            if (payload.new.delivery_status === 'in_transit' && payload.old?.delivery_status !== 'in_transit') {
+              toast({
+                title: '🚚 Order In Transit',
+                description: `Order ${payload.new.po_number || ''} is now in transit to destination`,
+              });
+            }
+            
+            // Notify when order status changes to confirmed (builder accepted)
+            if (oldStatus === 'pending' && (newStatus === 'confirmed' || newStatus === 'pending')) {
+              if (payload.new.delivery_provider_id) {
+                toast({
+                  title: '✅ Order Accepted',
+                  description: `Order ${payload.new.po_number || ''} accepted and delivery provider assigned`,
+                });
+              }
+            }
+          }
+        }
+      )
+      .subscribe();
+
     // Subscribe to material_items changes
     const itemsChannel = supabase
       .channel('builder-material-items')
@@ -526,6 +577,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       .subscribe();
 
     return () => {
+      supabase.removeChannel(ordersChannel);
       supabase.removeChannel(itemsChannel);
       supabase.removeChannel(scansChannel);
     };
