@@ -241,8 +241,11 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
       const timeoutId = setTimeout(() => controller.abort(), 8000);
       
       // Query by buyer_id first - filter by status based on showOnlyQuoted prop
-      // When showOnlyQuoted is true, only show quotes that suppliers have responded to (status = 'quoted')
-      const statusFilter = showOnlyQuoted ? 'quoted' : 'pending,quoted,confirmed,rejected';
+      // When showOnlyQuoted is true, only show quotes that suppliers have responded to
+      // Include both new status flow and legacy statuses for backward compatibility
+      const statusFilter = showOnlyQuoted 
+        ? 'quote_responded,quote_revised,quote_viewed_by_builder,quoted' 
+        : 'quote_created,quote_received_by_supplier,quote_responded,quote_revised,quote_viewed_by_builder,quote_accepted,quote_rejected,pending,quoted,confirmed,rejected';
       const queryUrl = `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${effectiveBuilderId}&status=in.(${statusFilter})&order=updated_at.desc`;
       console.log('🔗 SupplierQuoteReview query URL:', queryUrl, '(showOnlyQuoted:', showOnlyQuoted, ')');
       
@@ -263,7 +266,9 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
         const builderIdTimeout = setTimeout(() => builderIdController.abort(), 5000);
         
         try {
-          const statusFilter = showOnlyQuoted ? 'quoted' : 'pending,quoted,confirmed,rejected';
+          const statusFilter = showOnlyQuoted 
+            ? 'quote_responded,quote_revised,quote_viewed_by_builder,quoted' 
+            : 'quote_created,quote_received_by_supplier,quote_responded,quote_revised,quote_viewed_by_builder,quote_accepted,quote_rejected,pending,quoted,confirmed,rejected';
           const builderIdResponse = await fetch(
             `${SUPABASE_URL}/rest/v1/purchase_orders?builder_id=eq.${effectiveBuilderId}&status=in.(${statusFilter})&order=updated_at.desc`,
             { headers, signal: builderIdController.signal, cache: 'no-store' }
@@ -320,6 +325,31 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
       }
       
       setQuotes(transformedQuotes);
+      
+      // Mark quotes as viewed by builder when they're displayed
+      // Only mark if status is quote_responded or quote_revised
+      const quotesToMarkAsViewed = transformedQuotes.filter(
+        q => q.status === 'quote_responded' || q.status === 'quote_revised'
+      );
+      
+      if (quotesToMarkAsViewed.length > 0) {
+        // Mark as viewed asynchronously (don't wait)
+        quotesToMarkAsViewed.forEach(async (quote) => {
+          try {
+            await fetch(`${SUPABASE_URL}/rest/v1/rpc/mark_quote_viewed_by_builder`, {
+              method: 'POST',
+              headers: {
+                ...headers,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ po_id: quote.id })
+            });
+          } catch (e) {
+            // Silently fail - not critical
+            console.debug('Could not mark quote as viewed:', e);
+          }
+        });
+      }
     } catch (error) {
       console.error('Error fetching quotes:', error);
       toast({
@@ -338,12 +368,28 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
     const headers = getAuthHeaders();
     
     try {
-      // Update purchase order to 'confirmed' using native fetch
+      // First, mark as viewed if not already viewed
+      if (quote.status === 'quote_responded' || quote.status === 'quote_revised') {
+        try {
+          await fetch(`${SUPABASE_URL}/rest/v1/rpc/mark_quote_viewed_by_builder`, {
+            method: 'POST',
+            headers: {
+              ...headers,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ po_id: quote.id })
+          });
+        } catch (e) {
+          console.warn('Could not mark quote as viewed:', e);
+        }
+      }
+      
+      // Update purchase order to 'quote_accepted' - trigger will convert to order
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
       
       const updatePayload = { 
-        status: 'pending', // Set to pending - awaiting delivery provider allocation
+        status: 'quote_accepted', // Will be auto-converted to 'pending' order by trigger
         total_amount: quote.quote_amount || quote.purchase_order?.total_amount,
         delivery_required: true, // Default to delivery, user can change to pickup
         updated_at: new Date().toISOString()
@@ -573,13 +619,29 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
       
       console.log('🔄 Rejecting quote:', selectedQuote.id);
       
+      // First, mark as viewed if not already viewed
+      if (selectedQuote.status === 'quote_responded' || selectedQuote.status === 'quote_revised') {
+        try {
+          await fetch(`${SUPABASE_URL}/rest/v1/rpc/mark_quote_viewed_by_builder`, {
+            method: 'POST',
+            headers: {
+              ...headers,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ po_id: selectedQuote.id })
+          });
+        } catch (e) {
+          console.warn('Could not mark quote as viewed:', e);
+        }
+      }
+      
       const response = await fetch(
         `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${selectedQuote.id}`,
         {
           method: 'PATCH',
           headers: { ...headers, 'Prefer': 'return=minimal' },
           body: JSON.stringify({ 
-            status: 'rejected',
+            status: 'quote_rejected',
             updated_at: new Date().toISOString()
           }),
           signal: controller.signal,

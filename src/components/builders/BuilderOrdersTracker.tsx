@@ -25,7 +25,10 @@ import {
   Maximize2,
   ShieldCheck,
   ShieldX,
-  AlertCircle
+  AlertCircle,
+  Edit,
+  XCircle,
+  FileText
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -640,6 +643,15 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
   // Order status flow: confirmed → dispatched → in_transit → delivered
   const getStatusColor = (status: string) => {
     switch (status) {
+      // New quote status flow
+      case 'quote_created': return 'bg-blue-100 text-blue-800';
+      case 'quote_received_by_supplier': return 'bg-cyan-100 text-cyan-800';
+      case 'quote_responded': return 'bg-green-100 text-green-800';
+      case 'quote_revised': return 'bg-yellow-100 text-yellow-800';
+      case 'quote_viewed_by_builder': return 'bg-indigo-100 text-indigo-800';
+      case 'quote_accepted': return 'bg-emerald-100 text-emerald-800';
+      case 'quote_rejected': return 'bg-red-100 text-red-800';
+      // Legacy statuses
       case 'pending': return 'bg-gray-100 text-gray-800';
       case 'confirmed': return 'bg-amber-100 text-amber-800';
       case 'quoted': return 'bg-green-100 text-green-800';
@@ -657,6 +669,15 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
 
   const getStatusIcon = (status: string) => {
     switch (status) {
+      // New quote status flow
+      case 'quote_created': return <FileText className="h-4 w-4" />;
+      case 'quote_received_by_supplier': return <Eye className="h-4 w-4" />;
+      case 'quote_responded': return <CheckCircle className="h-4 w-4" />;
+      case 'quote_revised': return <Edit className="h-4 w-4" />;
+      case 'quote_viewed_by_builder': return <Eye className="h-4 w-4" />;
+      case 'quote_accepted': return <CheckCircle className="h-4 w-4" />;
+      case 'quote_rejected': return <XCircle className="h-4 w-4" />;
+      // Legacy statuses
       case 'pending': return <Clock className="h-4 w-4" />;
       case 'confirmed': return <CheckCircle className="h-4 w-4" />;
       case 'quoted': return <CheckCircle className="h-4 w-4" />;
@@ -729,7 +750,42 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       return '✅ Received';
     }
     
-    // For quoted orders (supplier has responded), show delivery provider status if assigned
+    // Handle new quote status flow
+    if (status === 'quote_created') {
+      return '📝 Quote Created';
+    }
+    if (status === 'quote_received_by_supplier') {
+      return '👁️ Supplier Viewing Quote';
+    }
+    if (status === 'quote_responded') {
+      if (hasDeliveryProvider) {
+        return `Supplier Responded - To Be Delivered by ${providerName}`;
+      }
+      return 'Supplier Responded';
+    }
+    if (status === 'quote_revised') {
+      if (hasDeliveryProvider) {
+        return `Quote Revised - To Be Delivered by ${providerName}`;
+      }
+      return 'Quote Revised';
+    }
+    if (status === 'quote_viewed_by_builder') {
+      if (hasDeliveryProvider) {
+        return `Quote Viewed - To Be Delivered by ${providerName}`;
+      }
+      return 'Quote Viewed';
+    }
+    if (status === 'quote_accepted') {
+      if (hasDeliveryProvider) {
+        return `Quote Accepted - To Be Delivered by ${providerName}`;
+      }
+      return 'Quote Accepted';
+    }
+    if (status === 'quote_rejected') {
+      return '❌ Quote Rejected';
+    }
+    
+    // For quoted orders (supplier has responded) - legacy status
     if (status === 'quoted') {
       if (hasDeliveryProvider) {
         return `Supplier Responded - To Be Delivered by ${providerName}`;
@@ -837,9 +893,13 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
           const pendingHasDispatchedItems = items.some(i => (i.dispatch_scanned || i.status === 'dispatched') && !['in_transit', 'received', 'verified'].includes(i.status) && !i.receive_scanned);
           if (pendingHasDispatchedItems) return false; // Exclude orders with dispatched items
           
-          const isPendingStatus = orderStatus === 'pending' || orderStatus === 'confirmed' || orderStatus === 'quoted';
+          // Include new quote status flow statuses
+          const isPendingStatus = orderStatus === 'pending' || orderStatus === 'confirmed' || orderStatus === 'quoted' ||
+                                  orderStatus === 'quote_created' || orderStatus === 'quote_received_by_supplier' ||
+                                  orderStatus === 'quote_responded' || orderStatus === 'quote_revised' ||
+                                  orderStatus === 'quote_viewed_by_builder' || orderStatus === 'quote_accepted';
           const hasPendingItems = items.some(i => !i.dispatch_scanned && !['dispatched', 'in_transit', 'received', 'verified'].includes(i.status));
-          // Only show if status is pending/confirmed/quoted AND no items are dispatched
+          // Only show if status is pending/confirmed/quoted (or new quote statuses) AND no items are dispatched
           return (isPendingStatus || hasPendingItems) && !pendingHasDispatchedItems;
         }
         case 'dispatched': {
@@ -977,7 +1037,11 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                     <CheckCircle className="h-5 w-5" />
                   </div>
                   <span className="text-xs mt-1 font-medium">
-                    {order.status === 'quoted' ? 'Supplier Responded' : 'Accepted'}
+                    {order.status === 'quote_responded' || order.status === 'quote_revised' || order.status === 'quote_viewed_by_builder' || order.status === 'quoted' 
+                      ? 'Supplier Responded' 
+                      : order.status === 'quote_accepted' 
+                      ? 'Quote Accepted' 
+                      : 'Accepted'}
                   </span>
                   {order.delivery_provider_id || order.delivery_provider_name ? (
                     <span className="text-[10px] text-green-600 mt-0.5 font-medium">
@@ -985,7 +1049,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                     </span>
                   ) : (
                     <span className="text-[10px] text-gray-500 mt-0.5">
-                      {order.status === 'quoted' ? 'Awaiting Provider' : 'Awaiting Provider'}
+                      Awaiting Provider
                     </span>
                   )}
                 </div>
@@ -1179,8 +1243,8 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       const deliveryStatus = order.delivery_status || 'pending';
       const providerAccepted = hasProvider || ['assigned', 'accepted', 'picked_up', 'in_transit', 'delivered'].includes(deliveryStatus);
       
-      // Separate "Supplier Responded" (quoted) orders
-      if (orderStatus === 'quoted') {
+      // Separate "Supplier Responded" orders (quoted, quote_responded, quote_revised, quote_viewed_by_builder)
+      if (orderStatus === 'quoted' || orderStatus === 'quote_responded' || orderStatus === 'quote_revised' || orderStatus === 'quote_viewed_by_builder') {
         supplierResponded.push(order);
       } else if (providerAccepted) {
         acceptedByProvider.push(order);

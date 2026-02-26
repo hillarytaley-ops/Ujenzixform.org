@@ -272,12 +272,23 @@ const QuotesManagementContent: React.FC<QuotesManagementContentProps> = ({
 
                 <div className="flex flex-col items-end gap-2">
                   <Badge className={`${
-                    quote.status === 'pending' ? 'bg-amber-100 text-amber-700' :
-                    quote.status === 'quoted' ? 'bg-blue-100 text-blue-700' :
-                    quote.status === 'confirmed' || quote.status === 'accepted' ? 'bg-green-100 text-green-700' :
-                    'bg-red-100 text-red-700'
+                    quote.status === 'quote_created' || quote.status === 'pending' ? 'bg-amber-100 text-amber-700' :
+                    quote.status === 'quote_received_by_supplier' ? 'bg-cyan-100 text-cyan-700' :
+                    quote.status === 'quote_responded' || quote.status === 'quoted' ? 'bg-blue-100 text-blue-700' :
+                    quote.status === 'quote_revised' ? 'bg-yellow-100 text-yellow-700' :
+                    quote.status === 'quote_viewed_by_builder' ? 'bg-indigo-100 text-indigo-700' :
+                    quote.status === 'quote_accepted' || quote.status === 'confirmed' || quote.status === 'accepted' ? 'bg-green-100 text-green-700' :
+                    quote.status === 'quote_rejected' ? 'bg-red-100 text-red-700' :
+                    'bg-gray-100 text-gray-700'
                   }`}>
-                    {quote.status === 'pending' ? 'Awaiting Response' :
+                    {quote.status === 'quote_created' ? 'Quote Created' :
+                     quote.status === 'quote_received_by_supplier' ? 'Viewing Quote' :
+                     quote.status === 'quote_responded' ? 'Quote Sent' :
+                     quote.status === 'quote_revised' ? 'Quote Revised' :
+                     quote.status === 'quote_viewed_by_builder' ? 'Client Viewing' :
+                     quote.status === 'quote_accepted' ? 'Quote Accepted' :
+                     quote.status === 'quote_rejected' ? 'Quote Rejected' :
+                     quote.status === 'pending' ? 'Awaiting Response' :
                      quote.status === 'quoted' ? 'Awaiting Client' :
                      quote.status === 'confirmed' || quote.status === 'accepted' ? 'Confirmed' :
                      quote.status}
@@ -287,7 +298,7 @@ const QuotesManagementContent: React.FC<QuotesManagementContentProps> = ({
                     <p className={`font-bold ${textColor}`}>KES {Number(quote.quote_amount).toLocaleString()}</p>
                   )}
 
-                  {quote.status === 'pending' && (
+                  {(quote.status === 'quote_created' || quote.status === 'quote_received_by_supplier' || quote.status === 'pending') && (
                     <div className="flex gap-2">
                       <Button size="sm" className="bg-green-500 hover:bg-green-600" onClick={() => openQuoteDialog(quote)}>
                         <CheckCircle className="h-4 w-4 mr-1" />
@@ -789,8 +800,9 @@ const SupplierDashboard = () => {
       // This ensures we don't miss any due to ID mismatches
       let allQuotes: any[] = [];
       try {
+        // Include both new status flow and legacy statuses for backward compatibility
         const quotesResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/purchase_orders?status=in.(pending,quoted,rejected,confirmed)&order=created_at.desc&limit=100`,
+          `${SUPABASE_URL}/rest/v1/purchase_orders?status=in.(quote_created,quote_received_by_supplier,quote_responded,quote_revised,quote_viewed_by_builder,quote_accepted,quote_rejected,pending,quoted,rejected,confirmed)&order=created_at.desc&limit=100`,
           { headers, cache: 'no-store' }
         );
         
@@ -843,6 +855,31 @@ const SupplierDashboard = () => {
 
       console.log('📋 Quote requests loaded:', uniqueQuotes.length, 'from purchase_orders:', transformedPOQuotes.length);
       setQuoteRequests(uniqueQuotes);
+      
+      // Mark quotes as received by supplier when they're displayed
+      // Only mark if status is quote_created or pending
+      const quotesToMarkAsReceived = uniqueQuotes.filter(
+        q => q.status === 'quote_created' || q.status === 'pending'
+      );
+      
+      if (quotesToMarkAsReceived.length > 0) {
+        // Mark as received asynchronously (don't wait)
+        quotesToMarkAsReceived.forEach(async (quote) => {
+          try {
+            await fetch(`${SUPABASE_URL}/rest/v1/rpc/mark_quote_received_by_supplier`, {
+              method: 'POST',
+              headers: {
+                ...headers,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ po_id: quote.id })
+            });
+          } catch (e) {
+            // Silently fail - not critical
+            console.debug('Could not mark quote as received:', e);
+          }
+        });
+      }
     } catch (error: any) {
       if (error.name === 'AbortError') {
         console.error('Quote fetch timed out');
@@ -937,7 +974,8 @@ const SupplierDashboard = () => {
     }
     
     try {
-      const newStatus = action === 'approve' ? 'quoted' : 'rejected';
+      // Use new status flow: quote_responded for approved, quote_rejected for rejected
+      const newStatus = action === 'approve' ? 'quote_responded' : 'quote_rejected';
       
       if (action === 'approve' && !quoteResponse.quoteAmount) {
         throw new Error('Please enter a quote amount');
@@ -952,6 +990,11 @@ const SupplierDashboard = () => {
           status: newStatus,
           updated_at: new Date().toISOString()
         };
+        
+        // If this is a revision (status was already quote_responded), use quote_revised
+        if (action === 'approve' && selectedQuote.status === 'quote_responded') {
+          updateData.status = 'quote_revised';
+        }
         
         if (action === 'approve') {
           const quoteAmountValue = parseFloat(quoteResponse.quoteAmount);
