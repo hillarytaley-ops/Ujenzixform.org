@@ -296,9 +296,10 @@ const ProfessionalBuilderDashboardPage = () => {
               console.log('📹 DIRECT: ✅ State updated via Supabase');
             }
           }
-        } else {
-          const errorText = await response.text();
-          console.log('📹 DIRECT: REST failed:', response.status, errorText);
+          } else if (response.status === 401) {
+            // This is handled in the 401 block above, but log for debugging
+            const errorText = await response.text();
+            console.log('📹 DIRECT: REST failed with 401:', errorText);
           // Fallback to Supabase client
           const { data, error } = await supabase
             .from('monitoring_service_requests')

@@ -531,7 +531,8 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
         if (response.status === 401) {
           console.log('📝 ProfileEditDialog: 401 error, refreshing session...');
           try {
-            const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
+            // Use getSession() which automatically refreshes expired tokens
+            const { data: { session: newSession }, error: refreshError } = await supabase.auth.getSession();
             if (refreshError) {
               console.error('📝 ProfileEditDialog: Session refresh failed:', refreshError);
               throw new Error('Session expired. Please refresh the page and try again.');
@@ -600,6 +601,32 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
               body: JSON.stringify(insertData)
             }
           );
+          
+          // If upsert also gets 401, retry with refreshed token
+          if (response.status === 401) {
+            console.log('📝 ProfileEditDialog: Upsert also got 401, refreshing and retrying...');
+            try {
+              const { data: { session: newSession } } = await supabase.auth.getSession();
+              if (newSession?.access_token) {
+                accessToken = newSession.access_token;
+                response = await fetch(
+                  `${SUPABASE_URL}/rest/v1/profiles`,
+                  {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'apikey': SUPABASE_ANON_KEY,
+                      'Authorization': `Bearer ${accessToken}`,
+                      'Prefer': 'resolution=merge-duplicates,return=minimal'
+                    },
+                    body: JSON.stringify(insertData)
+                  }
+                );
+              }
+            } catch (retryError) {
+              console.error('📝 ProfileEditDialog: Upsert retry failed:', retryError);
+            }
+          }
           
           if (!response.ok) {
             const upsertError = await response.text();
