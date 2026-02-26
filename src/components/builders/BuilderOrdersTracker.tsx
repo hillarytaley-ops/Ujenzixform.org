@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -579,7 +579,8 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       supabase.removeChannel(itemsChannel);
       supabase.removeChannel(scansChannel);
     };
-  }, [builderId, toast, fetchOrders, fetchScanEvents]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [builderId, toast]);
 
 
   // Order status flow: confirmed → dispatched → in_transit → delivered
