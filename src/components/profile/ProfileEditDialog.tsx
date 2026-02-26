@@ -730,8 +730,10 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
       }
 
       // Update builder record if applicable (non-blocking)
+      // Note: builders table may not exist or user may not have a record - 404 is expected and OK
       if (userRole === 'professional_builder' || userRole === 'private_client') {
         // Fire and forget - don't block profile save
+        // Silently handle 404s since builders table may not exist for all users
         fetch(
           `${SUPABASE_URL}/rest/v1/builders?user_id=eq.${profile.user_id}`,
           {
@@ -748,8 +750,19 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
               updated_at: new Date().toISOString()
             })
           }
-        ).then(r => r.ok && console.log('✅ Builder record updated'))
-         .catch(() => console.log('📝 Builder update skipped'));
+        ).then(r => {
+          if (r.ok) {
+            console.log('✅ Builder record updated');
+          } else if (r.status === 404) {
+            // 404 is expected if builders table doesn't exist or user has no record - silently ignore
+            console.log('📝 Builder record not found (404) - this is OK, skipping update');
+          } else {
+            console.log('📝 Builder update failed:', r.status);
+          }
+        }).catch(() => {
+          // Silently ignore errors - this is a non-blocking operation
+          console.log('📝 Builder update skipped');
+        });
       }
 
       console.log('✅ ProfileEditDialog: Profile saved successfully');
