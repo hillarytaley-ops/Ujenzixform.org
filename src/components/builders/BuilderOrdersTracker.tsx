@@ -651,6 +651,12 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       case 'quote_viewed_by_builder': return 'bg-indigo-100 text-indigo-800';
       case 'quote_accepted': return 'bg-emerald-100 text-emerald-800';
       case 'quote_rejected': return 'bg-red-100 text-red-800';
+      // Order phase statuses
+      case 'order_created': return 'bg-purple-100 text-purple-800';
+      case 'awaiting_delivery_request': return 'bg-amber-100 text-amber-800';
+      case 'delivery_requested': return 'bg-blue-100 text-blue-800';
+      case 'awaiting_delivery_provider': return 'bg-orange-100 text-orange-800';
+      case 'delivery_assigned': return 'bg-green-100 text-green-800';
       // Legacy statuses
       case 'pending': return 'bg-gray-100 text-gray-800';
       case 'confirmed': return 'bg-amber-100 text-amber-800';
@@ -677,6 +683,12 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       case 'quote_viewed_by_builder': return <Eye className="h-4 w-4" />;
       case 'quote_accepted': return <CheckCircle className="h-4 w-4" />;
       case 'quote_rejected': return <XCircle className="h-4 w-4" />;
+      // Order phase statuses
+      case 'order_created': return <Package className="h-4 w-4" />;
+      case 'awaiting_delivery_request': return <Clock className="h-4 w-4" />;
+      case 'delivery_requested': return <Truck className="h-4 w-4" />;
+      case 'awaiting_delivery_provider': return <Clock className="h-4 w-4" />;
+      case 'delivery_assigned': return <CheckCircle className="h-4 w-4" />;
       // Legacy statuses
       case 'pending': return <Clock className="h-4 w-4" />;
       case 'confirmed': return <CheckCircle className="h-4 w-4" />;
@@ -783,6 +795,26 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
     }
     if (status === 'quote_rejected') {
       return '❌ Quote Rejected';
+    }
+    
+    // Handle order phase statuses
+    if (status === 'order_created') {
+      return '📦 Order Created';
+    }
+    if (status === 'awaiting_delivery_request') {
+      return '⏳ Awaiting Delivery Request';
+    }
+    if (status === 'delivery_requested') {
+      return '📤 Delivery Requested - Awaiting Provider';
+    }
+    if (status === 'awaiting_delivery_provider') {
+      return '⏳ Awaiting Delivery Provider';
+    }
+    if (status === 'delivery_assigned') {
+      if (hasDeliveryProvider && providerName && providerName !== 'Delivery Provider') {
+        return `✅ To Be Delivered by ${providerName}`;
+      }
+      return '✅ Delivery Assigned';
     }
     
     // For quoted orders (supplier has responded) - legacy status
@@ -893,11 +925,14 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
           const pendingHasDispatchedItems = items.some(i => (i.dispatch_scanned || i.status === 'dispatched') && !['in_transit', 'received', 'verified'].includes(i.status) && !i.receive_scanned);
           if (pendingHasDispatchedItems) return false; // Exclude orders with dispatched items
           
-          // Include new quote status flow statuses
+          // Include new quote status flow and order phase statuses
           const isPendingStatus = orderStatus === 'pending' || orderStatus === 'confirmed' || orderStatus === 'quoted' ||
                                   orderStatus === 'quote_created' || orderStatus === 'quote_received_by_supplier' ||
                                   orderStatus === 'quote_responded' || orderStatus === 'quote_revised' ||
-                                  orderStatus === 'quote_viewed_by_builder' || orderStatus === 'quote_accepted';
+                                  orderStatus === 'quote_viewed_by_builder' || orderStatus === 'quote_accepted' ||
+                                  orderStatus === 'order_created' || orderStatus === 'awaiting_delivery_request' ||
+                                  orderStatus === 'delivery_requested' || orderStatus === 'awaiting_delivery_provider' ||
+                                  orderStatus === 'delivery_assigned';
           const hasPendingItems = items.some(i => !i.dispatch_scanned && !['dispatched', 'in_transit', 'received', 'verified'].includes(i.status));
           // Only show if status is pending/confirmed/quoted (or new quote statuses) AND no items are dispatched
           return (isPendingStatus || hasPendingItems) && !pendingHasDispatchedItems;
@@ -1246,9 +1281,13 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       // Separate "Supplier Responded" orders (quoted, quote_responded, quote_revised, quote_viewed_by_builder)
       if (orderStatus === 'quoted' || orderStatus === 'quote_responded' || orderStatus === 'quote_revised' || orderStatus === 'quote_viewed_by_builder') {
         supplierResponded.push(order);
-      } else if (providerAccepted) {
+      } 
+      // Separate "Delivery Assigned" orders (delivery_assigned)
+      else if (orderStatus === 'delivery_assigned' || providerAccepted) {
         acceptedByProvider.push(order);
-      } else {
+      } 
+      // All other pending/awaiting statuses
+      else {
         awaitingProvider.push(order);
       }
     });
