@@ -579,8 +579,10 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       supabase.removeChannel(itemsChannel);
       supabase.removeChannel(scansChannel);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [builderId, toast]);
+    // fetchOrders and fetchScanEvents are memoized with useCallback
+    // They only change when builderId/toast changes, which is when we want this effect to re-run anyway
+    // This ensures subscriptions always use the latest function versions
+  }, [builderId, toast, fetchOrders, fetchScanEvents]);
 
 
   // Order status flow: confirmed → dispatched → in_transit → delivered
