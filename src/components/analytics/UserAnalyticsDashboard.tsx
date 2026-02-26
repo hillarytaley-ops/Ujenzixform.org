@@ -373,34 +373,45 @@ export const UserAnalyticsDashboard: React.FC<UserAnalyticsDashboardProps> = ({ 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-indigo-600/10 via-purple-600/10 to-pink-600/10 rounded-lg p-6 border border-indigo-500/20">
         <div>
-          <h2 className="text-2xl font-bold text-white">
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
             {isSupplier ? 'Sales Analytics' : 'Spending Analytics'}
           </h2>
-          <p className="text-slate-400">Track your {isSupplier ? 'business performance' : 'purchase history'}</p>
+          <p className="text-indigo-200 mt-2 text-sm font-medium">
+            {isSupplier ? 'Track your business performance and revenue trends' : 'Monitor your purchase history and spending patterns'}
+          </p>
         </div>
         
         <div className="flex gap-2">
           <Select value={dateRange} onValueChange={setDateRange}>
-            <SelectTrigger className="w-[150px] bg-slate-800 border-slate-600">
-              <Calendar className="h-4 w-4 mr-2" />
-              <SelectValue />
+            <SelectTrigger className="w-[150px] bg-white/10 backdrop-blur-sm border-indigo-400/30 text-white hover:bg-white/20">
+              <Calendar className="h-4 w-4 mr-2 text-indigo-300" />
+              <SelectValue className="text-white" />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7">Last 7 Days</SelectItem>
-              <SelectItem value="30">Last 30 Days</SelectItem>
-              <SelectItem value="90">Last 90 Days</SelectItem>
-              <SelectItem value="365">Last Year</SelectItem>
+            <SelectContent className="bg-slate-800 border-slate-600">
+              <SelectItem value="7" className="text-white hover:bg-indigo-600">Last 7 Days</SelectItem>
+              <SelectItem value="30" className="text-white hover:bg-indigo-600">Last 30 Days</SelectItem>
+              <SelectItem value="90" className="text-white hover:bg-indigo-600">Last 90 Days</SelectItem>
+              <SelectItem value="365" className="text-white hover:bg-indigo-600">Last Year</SelectItem>
             </SelectContent>
           </Select>
           
-          <Button variant="outline" size="sm" onClick={exportReport}>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={exportReport}
+            className="bg-white/10 backdrop-blur-sm border-indigo-400/30 text-white hover:bg-indigo-600/50 hover:border-indigo-400"
+          >
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
           
-          <Button size="sm" onClick={loadAnalytics}>
+          <Button 
+            size="sm" 
+            onClick={loadAnalytics}
+            className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg"
+          >
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
@@ -409,91 +420,101 @@ export const UserAnalyticsDashboard: React.FC<UserAnalyticsDashboardProps> = ({ 
 
       {/* Key Metrics */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-blue-600/20 to-blue-800/20 border-blue-500/30">
-          <CardContent className="p-4">
+        <Card className="bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600 border-blue-400/50 shadow-lg hover:shadow-xl transition-all">
+          <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-blue-300">{isSupplier ? 'Total Revenue' : 'Total Spent'}</p>
-                <p className="text-2xl font-bold text-white">
+                <p className="text-sm font-medium text-blue-100 mb-1">{isSupplier ? 'Total Revenue' : 'Total Spent'}</p>
+                <p className="text-3xl font-bold text-white mb-2">
                   KES {(analytics.totalRevenue || 0).toLocaleString()}
                 </p>
-                <div className={`flex items-center text-xs mt-1 ${
-                  (analytics.revenueChange || 0) >= 0 ? 'text-green-400' : 'text-red-400'
+                <div className={`flex items-center text-xs font-medium ${
+                  (analytics.revenueChange || 0) >= 0 ? 'text-emerald-200' : 'text-red-200'
                 }`}>
                   {(analytics.revenueChange || 0) >= 0 ? (
-                    <ArrowUpRight className="h-3 w-3" />
+                    <ArrowUpRight className="h-3 w-3 mr-1" />
                   ) : (
-                    <ArrowDownRight className="h-3 w-3" />
+                    <ArrowDownRight className="h-3 w-3 mr-1" />
                   )}
                   {Math.abs(analytics.revenueChange || 0).toFixed(1)}% vs previous period
                 </div>
               </div>
-              <DollarSign className="h-10 w-10 text-blue-400" />
+              <div className="bg-white/20 rounded-full p-3">
+                <DollarSign className="h-8 w-8 text-white" />
+              </div>
             </div>
           </CardContent>
         </Card>
         
-        <Card className="bg-gradient-to-br from-green-600/20 to-green-800/20 border-green-500/30">
-          <CardContent className="p-4">
+        <Card className="bg-gradient-to-br from-emerald-500 via-green-600 to-teal-600 border-emerald-400/50 shadow-lg hover:shadow-xl transition-all">
+          <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-green-300">Total Orders</p>
-                <p className="text-2xl font-bold text-white">{analytics.totalOrders}</p>
-                <p className="text-xs text-green-400 mt-1">
+                <p className="text-sm font-medium text-emerald-100 mb-1">Total Orders</p>
+                <p className="text-3xl font-bold text-white mb-2">{analytics.totalOrders}</p>
+                <p className="text-xs font-medium text-emerald-200">
                   {analytics.completedOrders} completed
                 </p>
               </div>
-              <ShoppingCart className="h-10 w-10 text-green-400" />
+              <div className="bg-white/20 rounded-full p-3">
+                <ShoppingCart className="h-8 w-8 text-white" />
+              </div>
             </div>
           </CardContent>
         </Card>
         
-        <Card className="bg-gradient-to-br from-purple-600/20 to-purple-800/20 border-purple-500/30">
-          <CardContent className="p-4">
+        <Card className="bg-gradient-to-br from-purple-500 via-purple-600 to-pink-600 border-purple-400/50 shadow-lg hover:shadow-xl transition-all">
+          <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-purple-300">Avg Order Value</p>
-                <p className="text-2xl font-bold text-white">
+                <p className="text-sm font-medium text-purple-100 mb-1">Avg Order Value</p>
+                <p className="text-3xl font-bold text-white mb-2">
                   KES {(analytics.averageOrderValue || 0).toLocaleString()}
                 </p>
-                <p className="text-xs text-purple-400 mt-1">
+                <p className="text-xs font-medium text-purple-200">
                   Per order
                 </p>
               </div>
-              <Target className="h-10 w-10 text-purple-400" />
+              <div className="bg-white/20 rounded-full p-3">
+                <Target className="h-8 w-8 text-white" />
+              </div>
             </div>
           </CardContent>
         </Card>
         
         {isSupplier ? (
-          <Card className="bg-gradient-to-br from-yellow-600/20 to-yellow-800/20 border-yellow-500/30">
-            <CardContent className="p-4">
+          <Card className="bg-gradient-to-br from-amber-500 via-yellow-500 to-orange-500 border-amber-400/50 shadow-lg hover:shadow-xl transition-all">
+            <CardContent className="p-5">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-yellow-300">Rating</p>
-                  <p className="text-2xl font-bold text-white">
+                  <p className="text-sm font-medium text-amber-100 mb-1">Rating</p>
+                  <p className="text-3xl font-bold text-white mb-2">
                     {analytics.averageRating.toFixed(1)} ⭐
                   </p>
-                  <p className="text-xs text-yellow-400 mt-1">
+                  <p className="text-xs font-medium text-amber-200">
                     Customer satisfaction
                   </p>
                 </div>
-                <Star className="h-10 w-10 text-yellow-400" />
+                <div className="bg-white/20 rounded-full p-3">
+                  <Star className="h-8 w-8 text-white" />
+                </div>
               </div>
             </CardContent>
           </Card>
         ) : (
-          <Card className="bg-gradient-to-br from-orange-600/20 to-orange-800/20 border-orange-500/30">
-            <CardContent className="p-4">
+          <Card className="bg-gradient-to-br from-orange-500 via-red-500 to-rose-600 border-orange-400/50 shadow-lg hover:shadow-xl transition-all">
+            <CardContent className="p-5">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-orange-300">Pending Orders</p>
-                  <p className="text-2xl font-bold text-white">{analytics.pendingOrders}</p>
-                  <p className="text-xs text-orange-400 mt-1">
+                  <p className="text-sm font-medium text-orange-100 mb-1">Pending Orders</p>
+                  <p className="text-3xl font-bold text-white mb-2">{analytics.pendingOrders}</p>
+                  <p className="text-xs font-medium text-orange-200">
                     Awaiting delivery
                   </p>
                 </div>
-                <Package className="h-10 w-10 text-orange-400" />
+                <div className="bg-white/20 rounded-full p-3">
+                  <Package className="h-8 w-8 text-white" />
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -503,31 +524,31 @@ export const UserAnalyticsDashboard: React.FC<UserAnalyticsDashboardProps> = ({ 
       {/* Charts & Details */}
       <div className="grid md:grid-cols-2 gap-6">
         {/* Monthly Trend */}
-        <Card className="bg-slate-800/50 border-slate-700">
-          <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
+        <Card className="bg-gradient-to-br from-slate-800 via-slate-700 to-slate-800 border-indigo-500/30 shadow-lg">
+          <CardHeader className="bg-gradient-to-r from-indigo-600/20 to-purple-600/20 border-b border-indigo-500/30">
+            <CardTitle className="text-white flex items-center gap-2 text-lg font-semibold">
+              <TrendingUp className="h-5 w-5 text-indigo-400" />
               {isSupplier ? 'Revenue' : 'Spending'} Trend
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-6">
             {analytics.monthlyRevenue.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {analytics.monthlyRevenue.map((data, index) => {
                   const maxAmount = Math.max(...analytics.monthlyRevenue.map(d => d.amount));
                   const percentage = (data.amount / maxAmount) * 100;
                   
                   return (
-                    <div key={index} className="space-y-1">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-400">{data.month}</span>
-                        <span className="text-white font-medium">
+                    <div key={index} className="space-y-2">
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-indigo-200 font-medium">{data.month}</span>
+                        <span className="text-white font-bold text-base">
                           KES {(data.amount || 0).toLocaleString()}
                         </span>
                       </div>
-                      <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                      <div className="h-3 bg-slate-600/50 rounded-full overflow-hidden shadow-inner">
                         <div
-                          className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-500"
+                          className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-full transition-all duration-700 shadow-md"
                           style={{ width: `${percentage}%` }}
                         />
                       </div>
@@ -536,46 +557,54 @@ export const UserAnalyticsDashboard: React.FC<UserAnalyticsDashboardProps> = ({ 
                 })}
               </div>
             ) : (
-              <p className="text-slate-400 text-center py-8">No data for this period</p>
+              <div className="text-center py-12">
+                <TrendingUp className="h-12 w-12 mx-auto mb-4 text-slate-500 opacity-50" />
+                <p className="text-slate-400 font-medium">No data for this period</p>
+                <p className="text-slate-500 text-sm mt-1">Start making purchases to see trends</p>
+              </div>
             )}
           </CardContent>
         </Card>
 
         {/* Top Products */}
-        <Card className="bg-slate-800/50 border-slate-700">
-          <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
-              <Award className="h-5 w-5" />
+        <Card className="bg-gradient-to-br from-slate-800 via-slate-700 to-slate-800 border-purple-500/30 shadow-lg">
+          <CardHeader className="bg-gradient-to-r from-purple-600/20 to-pink-600/20 border-b border-purple-500/30">
+            <CardTitle className="text-white flex items-center gap-2 text-lg font-semibold">
+              <Award className="h-5 w-5 text-purple-400" />
               Top Products
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-6">
             {analytics.topProducts.length > 0 ? (
               <div className="space-y-3">
                 {analytics.topProducts.map((product, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-slate-700/30 rounded-lg">
+                  <div key={index} className="flex items-center justify-between p-4 bg-gradient-to-r from-slate-700/50 to-slate-600/30 rounded-lg border border-slate-600/50 hover:border-purple-500/50 transition-all">
                     <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                        index === 0 ? 'bg-yellow-500/20 text-yellow-400' :
-                        index === 1 ? 'bg-slate-400/20 text-slate-300' :
-                        index === 2 ? 'bg-orange-500/20 text-orange-400' :
-                        'bg-slate-600/20 text-slate-400'
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shadow-md ${
+                        index === 0 ? 'bg-gradient-to-br from-yellow-400 to-amber-500 text-white' :
+                        index === 1 ? 'bg-gradient-to-br from-slate-400 to-slate-500 text-white' :
+                        index === 2 ? 'bg-gradient-to-br from-orange-400 to-red-500 text-white' :
+                        'bg-gradient-to-br from-slate-600 to-slate-700 text-slate-300'
                       }`}>
                         {index + 1}
                       </div>
                       <div>
-                        <p className="text-white font-medium truncate max-w-[150px]">{product.name}</p>
-                        <p className="text-xs text-slate-400">{product.sales} {isSupplier ? 'sold' : 'purchased'}</p>
+                        <p className="text-white font-semibold truncate max-w-[150px]">{product.name}</p>
+                        <p className="text-xs text-purple-300 font-medium">{product.sales} {isSupplier ? 'sold' : 'purchased'}</p>
                       </div>
                     </div>
-                    <p className="text-white font-medium">
+                    <p className="text-white font-bold text-base">
                       KES {(product.revenue || 0).toLocaleString()}
                     </p>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-slate-400 text-center py-8">No products data</p>
+              <div className="text-center py-12">
+                <Award className="h-12 w-12 mx-auto mb-4 text-slate-500 opacity-50" />
+                <p className="text-slate-400 font-medium">No products data</p>
+                <p className="text-slate-500 text-sm mt-1">Product analytics will appear here</p>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -584,42 +613,48 @@ export const UserAnalyticsDashboard: React.FC<UserAnalyticsDashboardProps> = ({ 
       {/* Supplier-specific metrics */}
       {isSupplier && (
         <div className="grid md:grid-cols-3 gap-4">
-          <Card className="bg-slate-800/50 border-slate-700">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <Users className="h-8 w-8 text-cyan-400" />
+          <Card className="bg-gradient-to-br from-cyan-500 via-blue-500 to-indigo-600 border-cyan-400/50 shadow-lg hover:shadow-xl transition-all">
+            <CardContent className="p-5">
+              <div className="flex items-center gap-4">
+                <div className="bg-white/20 rounded-full p-3">
+                  <Users className="h-8 w-8 text-white" />
+                </div>
                 <div>
-                  <p className="text-2xl font-bold text-white">{analytics.totalCustomers}</p>
-                  <p className="text-xs text-slate-400">Total Customers</p>
-                  <p className="text-xs text-cyan-400">{analytics.repeatCustomers} repeat buyers</p>
+                  <p className="text-3xl font-bold text-white mb-1">{analytics.totalCustomers}</p>
+                  <p className="text-sm font-medium text-cyan-100">Total Customers</p>
+                  <p className="text-xs font-medium text-cyan-200 mt-1">{analytics.repeatCustomers} repeat buyers</p>
                 </div>
               </div>
             </CardContent>
           </Card>
           
-          <Card className="bg-slate-800/50 border-slate-700">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <Package className="h-8 w-8 text-emerald-400" />
+          <Card className="bg-gradient-to-br from-emerald-500 via-teal-500 to-green-600 border-emerald-400/50 shadow-lg hover:shadow-xl transition-all">
+            <CardContent className="p-5">
+              <div className="flex items-center gap-4">
+                <div className="bg-white/20 rounded-full p-3">
+                  <Package className="h-8 w-8 text-white" />
+                </div>
                 <div>
-                  <p className="text-2xl font-bold text-white">{analytics.totalProducts}</p>
-                  <p className="text-xs text-slate-400">Products Listed</p>
+                  <p className="text-3xl font-bold text-white mb-1">{analytics.totalProducts}</p>
+                  <p className="text-sm font-medium text-emerald-100">Products Listed</p>
                   {analytics.lowStockProducts > 0 && (
-                    <p className="text-xs text-yellow-400">{analytics.lowStockProducts} low stock</p>
+                    <p className="text-xs font-medium text-amber-200 mt-1">{analytics.lowStockProducts} low stock</p>
                   )}
                 </div>
               </div>
             </CardContent>
           </Card>
           
-          <Card className="bg-slate-800/50 border-slate-700">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <Zap className="h-8 w-8 text-amber-400" />
+          <Card className="bg-gradient-to-br from-amber-500 via-yellow-500 to-orange-500 border-amber-400/50 shadow-lg hover:shadow-xl transition-all">
+            <CardContent className="p-5">
+              <div className="flex items-center gap-4">
+                <div className="bg-white/20 rounded-full p-3">
+                  <Zap className="h-8 w-8 text-white" />
+                </div>
                 <div>
-                  <p className="text-2xl font-bold text-white">{analytics.fulfillmentRate.toFixed(0)}%</p>
-                  <p className="text-xs text-slate-400">Fulfillment Rate</p>
-                  <p className="text-xs text-amber-400">Order completion</p>
+                  <p className="text-3xl font-bold text-white mb-1">{analytics.fulfillmentRate.toFixed(0)}%</p>
+                  <p className="text-sm font-medium text-amber-100">Fulfillment Rate</p>
+                  <p className="text-xs font-medium text-amber-200 mt-1">Order completion</p>
                 </div>
               </div>
             </CardContent>

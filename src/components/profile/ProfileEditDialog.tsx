@@ -173,24 +173,42 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
         'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
       };
 
-      // Fetch profile from profiles table
-      const controller = new AbortController();
-      const fetchTimeout = setTimeout(() => controller.abort(), 3000);
-
-      const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${userId}&select=*`,
-        { headers, signal: controller.signal }
-      );
-      clearTimeout(fetchTimeout);
-
+      // Fetch profile from profiles table - use Supabase client for better auth handling
       let profileData: ProfileData = { ...defaultProfile };
+      
+      try {
+        // Try using Supabase client first (handles auth automatically)
+        const { data: profiles, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', userId)
+          .maybeSingle();
+        
+        if (profileError) {
+          console.warn('📝 ProfileEditDialog: Supabase client fetch error:', profileError.message);
+          // Fallback to REST API
+          const controller = new AbortController();
+          const fetchTimeout = setTimeout(() => controller.abort(), 3000);
 
-      if (response.ok) {
-        const profiles = await response.json();
-        if (profiles && profiles.length > 0) {
-          profileData = { ...profiles[0], email: userEmail };
-          console.log('✅ ProfileEditDialog: Profile loaded from profiles table:', profiles[0].full_name);
+          const response = await fetch(
+            `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${userId}&select=*`,
+            { headers, signal: controller.signal }
+          );
+          clearTimeout(fetchTimeout);
+
+          if (response.ok) {
+            const profiles = await response.json();
+            if (profiles && profiles.length > 0) {
+              profileData = { ...profiles[0], email: userEmail };
+              console.log('✅ ProfileEditDialog: Profile loaded from REST API:', profiles[0].full_name);
+            }
+          }
+        } else if (profiles) {
+          profileData = { ...profiles, email: userEmail };
+          console.log('✅ ProfileEditDialog: Profile loaded from Supabase client:', profiles.full_name);
         }
+      } catch (fetchError) {
+        console.warn('📝 ProfileEditDialog: Profile fetch error:', fetchError);
       }
 
       // If user is a supplier, ALSO fetch from suppliers table to get store/company name
@@ -385,34 +403,50 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
     console.log('📝 ProfileEditDialog: Saving profile for user:', profile.user_id);
 
     try {
-      // Get access token
+      // Get access token - use Supabase's getSession() which handles token refresh automatically
       let accessToken = '';
+      
       try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        if (storedSession) {
-          const parsed = JSON.parse(storedSession);
-          accessToken = parsed?.access_token || '';
+        // First try Supabase's getSession() - this handles token refresh automatically
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.warn('📝 ProfileEditDialog: Session error:', sessionError.message);
+        }
+        
+        if (session?.access_token) {
+          accessToken = session.access_token;
+          console.log('📝 ProfileEditDialog: Got fresh token from Supabase (length:', accessToken.length, ')');
+        } else {
+          // Fallback to localStorage
+          console.log('📝 ProfileEditDialog: No session from Supabase, trying localStorage...');
+          const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          if (storedSession) {
+            const parsed = JSON.parse(storedSession);
+            accessToken = parsed?.access_token || '';
+            if (accessToken) {
+              console.log('📝 ProfileEditDialog: Got token from localStorage (length:', accessToken.length, ')');
+            }
+          }
         }
       } catch (e) {
-        console.log('📝 ProfileEditDialog: Failed to parse session from localStorage');
-      }
-
-      if (!accessToken) {
-        console.log('📝 ProfileEditDialog: No token in localStorage, trying supabase.auth.getSession()');
-        const { data: { session } } = await supabase.auth.getSession();
-        accessToken = session?.access_token || '';
+        console.error('📝 ProfileEditDialog: Error getting session:', e);
       }
 
       if (!accessToken) {
         console.error('📝 ProfileEditDialog: No access token found!');
-        throw new Error('No access token found. Please log out and log back in.');
+        toast({
+          title: 'Authentication Error',
+          description: 'Please refresh the page and try again. If the problem persists, please log out and log back in.',
+          variant: 'destructive'
+        });
+        throw new Error('No access token found. Please refresh the page and try again.');
       }
       
       console.log('📝 ProfileEditDialog: Got access token, proceeding with save...');
 
-      // Prepare update data - ONLY include fields that ACTUALLY exist in profiles table
-      // Based on error logs, profiles table has: id, user_id, full_name, phone, location, avatar_url, updated_at
-      // Does NOT have: address, bio, website, company_name, store_name, latitude, longitude
+      // Prepare update data - Include all fields that exist in profiles table
+      // Based on migrations, profiles table has: full_name, phone, location, avatar_url, company_name, bio, website, county, etc.
       const updateData: Record<string, any> = {
         full_name: profile.full_name || '',
         phone: profile.phone || null,
@@ -420,6 +454,12 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
         avatar_url: profile.avatar_url || null,
         updated_at: new Date().toISOString()
       };
+
+      // Add optional fields if they exist in the profile
+      if (profile.company_name) updateData.company_name = profile.company_name;
+      if (profile.bio) updateData.bio = profile.bio;
+      if (profile.website) updateData.website = profile.website;
+      if (profile.county) updateData.county = profile.county;
 
       console.log('📝 ProfileEditDialog: Update data:', updateData);
 
@@ -447,8 +487,8 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
         if (!result || result.length === 0) {
           console.log('📝 ProfileEditDialog: No rows updated, trying upsert...');
           
-          // Use ONLY the fields that ACTUALLY exist in profiles table
-          const insertData = {
+          // Use all fields that exist in profiles table
+          const insertData: Record<string, any> = {
             id: profile.id || profile.user_id,
             user_id: profile.user_id,
             full_name: profile.full_name || '',
@@ -457,6 +497,12 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
             avatar_url: profile.avatar_url || null,
             updated_at: new Date().toISOString()
           };
+
+          // Add optional fields if they exist
+          if (profile.company_name) insertData.company_name = profile.company_name;
+          if (profile.bio) insertData.bio = profile.bio;
+          if (profile.website) insertData.website = profile.website;
+          if (profile.county) insertData.county = profile.county;
           
           response = await fetch(
             `${SUPABASE_URL}/rest/v1/profiles`,
@@ -481,38 +527,85 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
         const errorText = await response.text();
         console.error('📝 ProfileEditDialog: Save error:', response.status, errorText);
         
-        // Try upsert as fallback
-        console.log('📝 ProfileEditDialog: PATCH failed, trying upsert...');
-        
-        // Use ONLY the fields that ACTUALLY exist in profiles table
-        const insertData = {
-          id: profile.id || profile.user_id,
-          user_id: profile.user_id,
-          full_name: profile.full_name || '',
-          phone: profile.phone || null,
-          location: profile.location || null,
-          avatar_url: profile.avatar_url || null,
-          updated_at: new Date().toISOString()
-        };
-        
-        response = await fetch(
-          `${SUPABASE_URL}/rest/v1/profiles`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${accessToken}`,
-              'Prefer': 'resolution=merge-duplicates,return=minimal'
-            },
-            body: JSON.stringify(insertData)
+        // If 401, try refreshing the session
+        if (response.status === 401) {
+          console.log('📝 ProfileEditDialog: 401 error, refreshing session...');
+          try {
+            const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
+            if (refreshError) {
+              console.error('📝 ProfileEditDialog: Session refresh failed:', refreshError);
+              throw new Error('Session expired. Please refresh the page and try again.');
+            }
+            if (newSession?.access_token) {
+              accessToken = newSession.access_token;
+              console.log('📝 ProfileEditDialog: Session refreshed, retrying save...');
+              // Retry the PATCH with new token
+              response = await fetch(
+                `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${profile.user_id}`,
+                {
+                  method: 'PATCH',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Prefer': 'return=representation'
+                  },
+                  body: JSON.stringify(updateData)
+                }
+              );
+              
+              if (response.ok) {
+                const result = await response.json();
+                console.log('📝 ProfileEditDialog: Retry PATCH result:', result);
+                // Continue with success flow - response is now ok
+              }
+            }
+          } catch (refreshError) {
+            console.error('📝 ProfileEditDialog: Session refresh error:', refreshError);
+            throw new Error('Session expired. Please refresh the page and try again.');
           }
-        );
+        }
         
+        // If still not ok after retry, try upsert as fallback
         if (!response.ok) {
-          const upsertError = await response.text();
-          console.error('📝 ProfileEditDialog: Upsert also failed:', upsertError);
-          throw new Error(`Save failed: ${response.status}`);
+          console.log('📝 ProfileEditDialog: PATCH failed, trying upsert...');
+          
+          // Use all fields that exist in profiles table
+          const insertData: Record<string, any> = {
+            id: profile.id || profile.user_id,
+            user_id: profile.user_id,
+            full_name: profile.full_name || '',
+            phone: profile.phone || null,
+            location: profile.location || null,
+            avatar_url: profile.avatar_url || null,
+            updated_at: new Date().toISOString()
+          };
+
+          // Add optional fields if they exist
+          if (profile.company_name) insertData.company_name = profile.company_name;
+          if (profile.bio) insertData.bio = profile.bio;
+          if (profile.website) insertData.website = profile.website;
+          if (profile.county) insertData.county = profile.county;
+          
+          response = await fetch(
+            `${SUPABASE_URL}/rest/v1/profiles`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken}`,
+                'Prefer': 'resolution=merge-duplicates,return=minimal'
+              },
+              body: JSON.stringify(insertData)
+            }
+          );
+          
+          if (!response.ok) {
+            const upsertError = await response.text();
+            console.error('📝 ProfileEditDialog: Upsert also failed:', upsertError);
+            throw new Error(`Save failed: ${response.status}. ${upsertError || 'Please try again.'}`);
+          }
         }
       }
 

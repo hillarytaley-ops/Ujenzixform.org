@@ -605,13 +605,6 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                 Mark all read
               </Button>
             )}
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => setShowSettings(!showSettings)}
-            >
-              {showSettings ? 'Hide' : 'Settings'}
-            </Button>
           </div>
         </div>
       </CardHeader>
@@ -734,13 +727,13 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             notifications.map((notification) => (
               <div
                 key={notification.id}
-                className={`p-3 rounded-lg border transition-colors ${
+                className={`p-2.5 rounded-lg border transition-colors ${
                   notification.read 
                     ? 'bg-white border-gray-200' 
                     : 'bg-teal-50 border-teal-200'
                 }`}
               >
-                <div className="flex items-start gap-3">
+                <div className="flex items-start gap-2">
                   <div className="flex-shrink-0 mt-0.5">
                     {getNotificationIcon(notification.type)}
                   </div>
@@ -749,7 +742,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                       <p className="font-medium text-sm truncate">{notification.title}</p>
                       <Badge 
                         variant="outline" 
-                        className={`text-xs ${getPriorityColor(notification.priority)}`}
+                        className={`text-xs px-1.5 py-0 ${getPriorityColor(notification.priority)}`}
                       >
                         {notification.priority}
                       </Badge>
@@ -757,174 +750,178 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                     
                     {/* Material and quantity info */}
                     {notification.materialType && (
-                      <p className="text-sm text-gray-700 font-medium flex items-center gap-1 mb-1">
-                        <Package className="h-3.5 w-3.5 text-blue-500" />
+                      <p className="text-xs text-gray-700 font-medium flex items-center gap-1 mb-1.5">
+                        <Package className="h-3 w-3 text-blue-500" />
                         {notification.materialType}
                         {notification.quantity && <span className="text-gray-500">({notification.quantity})</span>}
                       </p>
                     )}
                     
-                    {/* Pickup Address */}
+                    {/* Pickup Address - More compact */}
                     {notification.pickupAddress && (
-                      <div className="bg-green-50 rounded-md p-2 mb-2 border border-green-100">
-                        <div className="flex items-start justify-between gap-2">
+                      <div className="bg-green-50 rounded-md p-1.5 mb-1.5 border border-green-100">
+                        <div className="flex items-start justify-between gap-1.5">
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-semibold text-green-700 mb-0.5 flex items-center gap-1">
-                              <MapPin className="h-3 w-3" />
+                              <MapPin className="h-2.5 w-2.5" />
                               📦 PICKUP
                             </p>
-                            <p className="text-sm text-green-800 break-words">{notification.pickupAddress}</p>
+                            <p className="text-xs text-green-800 break-words leading-tight">{notification.pickupAddress}</p>
                           </div>
-                          <div className="flex gap-1 flex-shrink-0">
+                          <div className="flex gap-0.5 flex-shrink-0">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 copyAddress(notification.pickupAddress!, 'Pickup');
                               }}
-                              className="p-1.5 bg-green-100 hover:bg-green-200 rounded text-green-700 transition-colors"
+                              className="p-1 bg-green-100 hover:bg-green-200 rounded text-green-700 transition-colors"
                               title="Copy pickup address"
                             >
-                              <Copy className="h-3.5 w-3.5" />
+                              <Copy className="h-3 w-3" />
                             </button>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 openInMaps(notification.pickupAddress!);
                               }}
-                              className="p-1.5 bg-green-100 hover:bg-green-200 rounded text-green-700 transition-colors"
+                              className="p-1 bg-green-100 hover:bg-green-200 rounded text-green-700 transition-colors"
                               title="Open in Google Maps"
                             >
-                              <ExternalLink className="h-3.5 w-3.5" />
+                              <ExternalLink className="h-3 w-3" />
                             </button>
                           </div>
                         </div>
                       </div>
                     )}
                     
-                    {/* Delivery Address */}
+                    {/* Delivery Address - More compact */}
                     {notification.deliveryAddress && (
-                      <div className="bg-orange-50 rounded-md p-2 mb-2 border border-orange-100">
-                        <div className="flex items-start justify-between gap-2">
+                      <div className="bg-orange-50 rounded-md p-1.5 mb-1.5 border border-orange-100">
+                        <div className="flex items-start justify-between gap-1.5">
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-semibold text-orange-700 mb-0.5 flex items-center gap-1">
-                              <Truck className="h-3 w-3" />
+                              <Truck className="h-2.5 w-2.5" />
                               🏠 DELIVERY
                             </p>
-                            <p className="text-sm text-orange-800 break-words">{notification.deliveryAddress}</p>
+                            <p className="text-xs text-orange-800 break-words leading-tight">{notification.deliveryAddress}</p>
                           </div>
-                          <div className="flex gap-1 flex-shrink-0">
+                          <div className="flex gap-0.5 flex-shrink-0">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 copyAddress(notification.deliveryAddress!, 'Delivery');
                               }}
-                              className="p-1.5 bg-orange-100 hover:bg-orange-200 rounded text-orange-700 transition-colors"
+                              className="p-1 bg-orange-100 hover:bg-orange-200 rounded text-orange-700 transition-colors"
                               title="Copy delivery address"
                             >
-                              <Copy className="h-3.5 w-3.5" />
+                              <Copy className="h-3 w-3" />
                             </button>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 openInMaps(notification.deliveryAddress!);
                               }}
-                              className="p-1.5 bg-orange-100 hover:bg-orange-200 rounded text-orange-700 transition-colors"
+                              className="p-1 bg-orange-100 hover:bg-orange-200 rounded text-orange-700 transition-colors"
                               title="Open in Google Maps"
                             >
-                              <ExternalLink className="h-3.5 w-3.5" />
+                              <ExternalLink className="h-3 w-3" />
                             </button>
                           </div>
                         </div>
                       </div>
                     )}
                     
-                    {/* Start Navigation Button - shows when both addresses available */}
-                    {notification.pickupAddress && notification.deliveryAddress && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openNavigation(notification.pickupAddress!, notification.deliveryAddress!);
-                        }}
-                        className="w-full mb-2 py-2 px-3 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-md flex items-center justify-center gap-2 transition-colors"
-                      >
-                        <Navigation className="h-4 w-4" />
-                        Start Navigation (Pickup → Delivery)
-                      </button>
-                    )}
+                    {/* Action Buttons - Compact and side by side */}
+                    <div className="flex gap-1.5 mt-1.5">
+                      {/* Start Navigation Button - Compact */}
+                      {notification.pickupAddress && notification.deliveryAddress && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openNavigation(notification.pickupAddress!, notification.deliveryAddress!);
+                          }}
+                          className="flex-1 py-1.5 px-2 bg-blue-500 hover:bg-blue-600 text-white text-xs font-medium rounded-md flex items-center justify-center gap-1.5 transition-colors"
+                        >
+                          <Navigation className="h-3 w-3" />
+                          <span className="truncate">Start Navigation</span>
+                        </button>
+                      )}
+                      
+                      {/* Accept Button - Compact, only for pending */}
+                      {notification.status === 'pending' && (
+                        <button
+                          type="button"
+                          className={`flex-1 py-1.5 px-2 rounded-md text-white text-xs font-medium flex items-center justify-center gap-1.5 transition-colors ${
+                            acceptingId 
+                              ? 'bg-gray-400 cursor-not-allowed' 
+                              : 'bg-green-600 hover:bg-green-700 active:bg-green-800'
+                          }`}
+                          onClick={() => {
+                            console.log('🔘 NATIVE BUTTON clicked for:', notification.id, 'acceptingId:', acceptingId);
+                            if (!acceptingId) {
+                              handleAcceptDelivery(notification.id);
+                            }
+                          }}
+                          disabled={!!acceptingId}
+                        >
+                          {acceptingId === notification.id ? (
+                            <>
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                              <span className="truncate">Accepting...</span>
+                            </>
+                          ) : acceptingId ? (
+                            <>
+                              <Clock className="h-3 w-3" />
+                              <span className="truncate">Wait...</span>
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle className="h-3 w-3" />
+                              <span className="truncate">Accept</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
                     
-                    {/* Estimated cost */}
-                    {notification.estimatedCost && notification.estimatedCost > 0 && (
-                      <p className="text-sm text-gray-600 flex items-center gap-1 mb-1">
-                        <DollarSign className="h-3.5 w-3.5 text-green-600" />
-                        Est. KES {notification.estimatedCost.toLocaleString()}
+                    {/* Estimated cost and timestamp - Compact */}
+                    <div className="flex items-center justify-between mt-1.5">
+                      {notification.estimatedCost && notification.estimatedCost > 0 && (
+                        <p className="text-xs text-gray-600 flex items-center gap-1">
+                          <DollarSign className="h-3 w-3 text-green-600" />
+                          KES {notification.estimatedCost.toLocaleString()}
+                        </p>
+                      )}
+                      <p className="text-xs text-gray-400 flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {formatTime(notification.timestamp)}
                       </p>
-                    )}
-                    
-                    <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {formatTime(notification.timestamp)}
-                    </p>
+                    </div>
                   </div>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       deleteNotification(notification.id);
                     }}
-                    className="flex-shrink-0 p-1 hover:bg-gray-200 rounded"
+                    className="flex-shrink-0 p-0.5 hover:bg-gray-200 rounded mt-0.5"
                   >
-                    <X className="h-4 w-4 text-gray-400" />
+                    <X className="h-3.5 w-3.5 text-gray-400" />
                   </button>
                 </div>
                 
-                {/* Single Accept Button - Show for pending delivery requests */}
-                {notification.status === 'pending' && (
-                  <button
-                    type="button"
-                    className={`w-full mt-3 py-2 px-4 rounded-md text-white font-medium flex items-center justify-center gap-2 transition-colors ${
-                      acceptingId 
-                        ? 'bg-gray-400 cursor-not-allowed' 
-                        : 'bg-green-600 hover:bg-green-700 active:bg-green-800'
-                    }`}
-                    onClick={() => {
-                      console.log('🔘 NATIVE BUTTON clicked for:', notification.id, 'acceptingId:', acceptingId);
-                      if (!acceptingId) {
-                        handleAcceptDelivery(notification.id);
-                      }
-                    }}
-                    disabled={!!acceptingId}
-                  >
-                    {acceptingId === notification.id ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Accepting...
-                      </>
-                    ) : acceptingId ? (
-                      <>
-                        <Clock className="h-4 w-4" />
-                        Please Wait...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="h-4 w-4" />
-                        Accept This Delivery
-                      </>
-                    )}
-                  </button>
-                )}
-                
-                {/* Status indicator for non-pending deliveries */}
+                {/* Status indicator for non-pending deliveries - Compact */}
                 {notification.status && notification.status !== 'pending' && (
-                  <div className="mt-2 pt-2 border-t border-gray-100">
+                  <div className="mt-1.5 pt-1.5 border-t border-gray-100">
                     <Badge 
                       variant="outline" 
-                      className={`text-xs ${
+                      className={`text-xs px-1.5 py-0 ${
                         notification.status === 'assigned' ? 'bg-blue-50 text-blue-700 border-blue-200' :
                         notification.status === 'in_transit' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
                         notification.status === 'delivered' ? 'bg-green-50 text-green-700 border-green-200' :
                         'bg-gray-50 text-gray-700 border-gray-200'
                       }`}
                     >
-                      Status: {notification.status?.replace('_', ' ')}
+                      {notification.status?.replace('_', ' ')}
                     </Badge>
                   </div>
                 )}

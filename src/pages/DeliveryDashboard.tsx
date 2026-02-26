@@ -136,7 +136,8 @@ const DeliveryDashboard = () => {
   const [isOnline, setIsOnline] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [showProofCapture, setShowProofCapture] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState("active");
+  const [activeTab, setActiveTab] = useState("deliveries");
+  const [deliveriesSubTab, setDeliveriesSubTab] = useState("pending"); // Sub-tab for Deliveries (pending, scheduled, in_transit, delivered)
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [showProfileView, setShowProfileView] = useState(false);
   const [selectedDeliveryForScan, setSelectedDeliveryForScan] = useState<string | null>(null);
@@ -774,38 +775,29 @@ const DeliveryDashboard = () => {
           </Card>
         </div>
 
-        {/* Card-Style Navigation - All tabs in one row */}
-        <div className="grid grid-cols-4 md:grid-cols-8 gap-2 mb-8">
+        {/* Card-Style Navigation - Reorganized with Deliveries button */}
+        <div className="grid grid-cols-4 md:grid-cols-6 gap-2 mb-8">
           <Button 
             variant="ghost"
             className={`h-auto py-3 px-2 flex flex-col items-center gap-1 transition-all ${
-              activeTab === 'active' 
+              activeTab === 'deliveries' 
                 ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg ring-2 ring-teal-300' 
                 : isDarkMode 
                   ? 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700' 
                   : 'bg-white text-gray-700 hover:bg-teal-50 border border-gray-200 shadow-sm'
             }`}
-            onClick={() => setActiveTab('active')}
+            onClick={() => {
+              setActiveTab('deliveries');
+              setDeliveriesSubTab('pending'); // Default to pending when opening Deliveries
+            }}
           >
             <Truck className="h-5 w-5" />
-            <span className="text-xs font-medium">Active</span>
-            {activeDeliveries.length > 0 && (
-              <Badge className="text-[10px] px-1 py-0 bg-yellow-500 text-white">{activeDeliveries.length}</Badge>
+            <span className="text-xs font-medium">Deliveries</span>
+            {(pendingRequests.length > 0 || activeDeliveries.length > 0) && (
+              <Badge className="text-[10px] px-1 py-0 bg-yellow-500 text-white">
+                {pendingRequests.length + activeDeliveries.length}
+              </Badge>
             )}
-          </Button>
-          <Button 
-            variant="ghost"
-            className={`h-auto py-3 px-2 flex flex-col items-center gap-1 transition-all ${
-              activeTab === 'schedule' 
-                ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg ring-2 ring-teal-300' 
-                : isDarkMode 
-                  ? 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700' 
-                  : 'bg-white text-gray-700 hover:bg-teal-50 border border-gray-200 shadow-sm'
-            }`}
-            onClick={() => setActiveTab('schedule')}
-          >
-            <Calendar className="h-5 w-5" />
-            <span className="text-xs font-medium">Schedule</span>
           </Button>
           <Button 
             variant="ghost"
@@ -834,20 +826,6 @@ const DeliveryDashboard = () => {
           >
             <Scan className="h-5 w-5" />
             <span className="text-xs font-medium">Scan QR</span>
-          </Button>
-          <Button 
-            variant="ghost"
-            className={`h-auto py-3 px-2 flex flex-col items-center gap-1 transition-all ${
-              activeTab === 'history' 
-                ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg ring-2 ring-teal-300' 
-                : isDarkMode 
-                  ? 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700' 
-                  : 'bg-white text-gray-700 hover:bg-teal-50 border border-gray-200 shadow-sm'
-            }`}
-            onClick={() => setActiveTab('history')}
-          >
-            <Clock className="h-5 w-5" />
-            <span className="text-xs font-medium">History</span>
           </Button>
           <Button 
             variant="ghost"
@@ -899,210 +877,333 @@ const DeliveryDashboard = () => {
         {/* Main Content Tabs - Hidden TabsList, controlled by card buttons above */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="hidden">
-            <TabsTrigger value="active">Active</TabsTrigger>
-            <TabsTrigger value="schedule">Schedule</TabsTrigger>
+            <TabsTrigger value="deliveries">Deliveries</TabsTrigger>
             <TabsTrigger value="map">Map</TabsTrigger>
             <TabsTrigger value="scanning">Scanning</TabsTrigger>
-            <TabsTrigger value="history">History</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
             <TabsTrigger value="notifications">Alerts</TabsTrigger>
             <TabsTrigger value="support">Support</TabsTrigger>
           </TabsList>
 
-          {/* Active Deliveries Tab */}
-          <TabsContent value="active">
+          {/* Deliveries Tab with Sub-tabs */}
+          <TabsContent value="deliveries">
             <div className="space-y-4">
-              {/* Available Requests Section - From Database */}
-              {pendingRequests.length > 0 && (
-                <div className="mb-6">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
-                    <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                      🚚 Available Delivery Jobs ({pendingRequests.length})
-                    </h3>
-                    <Badge className="bg-green-100 text-green-800 ml-2">First-Come-First-Served</Badge>
-                  </div>
-                  <Alert className="mb-4 bg-green-50 border-green-200">
-                    <Zap className="h-4 w-4 text-green-600" />
-                    <AlertDescription className="text-green-700">
-                      These are new delivery requests from builders. Accept quickly - first provider to accept gets the job!
-                    </AlertDescription>
-                  </Alert>
-                  <div className="space-y-4">
-                    {pendingRequests.map((request) => (
-                      <DeliveryRequestCard
-                        key={request.id}
-                        delivery={{
-                          id: request.id,
-                          pickup_location: request.pickup_address || request.pickup_location || 'Pickup location',
-                          delivery_location: request.delivery_address || request.delivery_location || 'Delivery location',
-                          material_type: request.material_type || 'Construction Materials',
-                          quantity: request.quantity?.toString() || 'N/A',
-                          customer_name: request.builder_name || request.contact_name || 'Builder',
-                          customer_phone: request.builder_phone || request.contact_phone || '',
-                          status: 'pending',
-                          estimated_time: '30 mins',
-                          price: request.estimated_cost || request.budget_range || 0,
-                          distance: request.distance_km || 0,
-                          urgency: request.priority_level || request.urgency || 'normal',
-                          special_instructions: request.special_instructions,
-                          created_at: request.created_at,
-                          // Date-based scheduling - shows expected delivery date
-                          pickup_date: request.pickup_date,
-                          delivery_date: request.delivery_date,
-                          expected_delivery_date: request.expected_delivery_date
-                        }}
-                        isDarkMode={isDarkMode}
-                        onAccept={async (id) => {
-                          const result = await handleAcceptDelivery(id);
-                          if (result.success) {
-                            toast({
-                              title: "✅ Delivery Accepted!",
-                              description: "You got the job! Navigate to pickup location.",
-                            });
-                            refetchData();
-                          } else {
-                            toast({
-                              title: "❌ Could not accept",
-                              description: result.error || "Someone else may have accepted this delivery.",
-                              variant: "destructive"
-                            });
-                            refetchData();
-                          }
-                        }}
-                        onReject={(id) => {
-                          handleRejectDelivery(id);
-                          toast({
-                            title: "Delivery Declined",
-                            description: "This delivery has been removed from your list.",
-                          });
-                        }}
-                        onNavigate={(delivery) => console.log('Navigate to:', delivery)}
-                        onCall={(phone) => phone && window.open(`tel:${phone}`)}
-                        onCaptureProof={(id) => setShowProofCapture(id)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* Sub-tabs for Deliveries */}
+              <Tabs value={deliveriesSubTab} onValueChange={setDeliveriesSubTab} className="w-full">
+                <TabsList className={`grid w-full grid-cols-4 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+                  <TabsTrigger value="pending" className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Pending
+                    {pendingRequests.length > 0 && (
+                      <Badge className="ml-1 bg-yellow-500 text-white text-xs">{pendingRequests.length}</Badge>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger value="scheduled" className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Scheduled
+                    {activeDeliveries.filter(d => d.status === 'assigned' || d.status === 'accepted').length > 0 && (
+                      <Badge className="ml-1 bg-blue-500 text-white text-xs">
+                        {activeDeliveries.filter(d => d.status === 'assigned' || d.status === 'accepted').length}
+                      </Badge>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger value="in_transit" className="flex items-center gap-2">
+                    <Truck className="h-4 w-4" />
+                    In Transit
+                    {activeDeliveries.filter(d => d.status === 'in_transit').length > 0 && (
+                      <Badge className="ml-1 bg-purple-500 text-white text-xs">
+                        {activeDeliveries.filter(d => d.status === 'in_transit').length}
+                      </Badge>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger value="delivered" className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4" />
+                    Delivered
+                    {deliveryHistory.length > 0 && (
+                      <Badge className="ml-1 bg-green-500 text-white text-xs">{deliveryHistory.length}</Badge>
+                    )}
+                  </TabsTrigger>
+                </TabsList>
 
-              {/* Pending Requests Section */}
-              {activeDeliveries.filter(d => d.status === 'pending' || d.status === 'assigned').length > 0 && (
-                <div className="mb-6">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="h-2 w-2 bg-yellow-500 rounded-full animate-pulse"></div>
-                    <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                      My Assigned Deliveries ({activeDeliveries.filter(d => d.status === 'pending' || d.status === 'assigned').length})
-                    </h3>
-                  </div>
+                {/* Pending Sub-tab - Orders not yet assigned */}
+                <TabsContent value="pending" className="mt-4">
                   <div className="space-y-4">
-                    {activeDeliveries
-                      .filter(d => d.status === 'pending' || d.status === 'assigned')
-                      .sort((a, b) => {
-                        // Sort by urgency first
-                        const urgencyOrder = { emergency: 0, urgent: 1, normal: 2 };
-                        return (urgencyOrder[a.urgency || 'normal'] || 2) - (urgencyOrder[b.urgency || 'normal'] || 2);
-                      })
-                      .map((delivery) => (
-                        <DeliveryRequestCard
-                          key={delivery.id}
-                          delivery={delivery}
-                          isDarkMode={isDarkMode}
-                          onAccept={(id) => {
-                            setActiveDeliveries(prev => 
-                              prev.map(d => d.id === id ? { ...d, status: 'accepted' } : d)
-                            );
-                            toast({
-                              title: "✅ Delivery Accepted",
-                              description: `Delivery ${id} has been accepted. Navigate to pickup location.`,
-                            });
-                          }}
-                          onReject={(id, reason) => {
-                            setActiveDeliveries(prev => prev.filter(d => d.id !== id));
-                            toast({
-                              title: "Delivery Rejected",
-                              description: `Delivery ${id} has been rejected. Reason: ${reason}`,
-                            });
-                          }}
-                          onNavigate={(delivery) => console.log('Navigate to:', delivery)}
-                          onCall={(phone) => window.open(`tel:${phone}`)}
-                          onCaptureProof={(id) => setShowProofCapture(id)}
-                        />
-                      ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Accepted/In Progress Section */}
-              {activeDeliveries.filter(d => ['accepted', 'pending_pickup', 'in_transit'].includes(d.status)).length > 0 && (
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="h-2 w-2 bg-green-500 rounded-full"></div>
-                    <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                      Active Deliveries ({activeDeliveries.filter(d => ['accepted', 'pending_pickup', 'in_transit'].includes(d.status)).length})
-                    </h3>
-                  </div>
-                  <div className="space-y-4">
-                    {activeDeliveries
-                      .filter(d => ['accepted', 'pending_pickup', 'in_transit'].includes(d.status))
-                      .map((delivery) => (
-                        <div key={delivery.id} className="space-y-3">
-                          <DeliveryRequestCard
-                            delivery={delivery}
-                            isDarkMode={isDarkMode}
-                            onNavigate={(delivery) => console.log('Navigate to:', delivery)}
-                            onCall={(phone) => window.open(`tel:${phone}`)}
-                            onCaptureProof={(id) => setShowProofCapture(id)}
-                            onMarkArrived={(id) => {
-                              // Scroll to the scan reminder and trigger it
-                              setSelectedDeliveryForScan(id);
-                              toast({
-                                title: "📍 Arrival Confirmed",
-                                description: "Please scan all materials to complete the delivery.",
-                              });
-                            }}
-                          />
-                          
-                          {/* Arrival Scan Reminder - Shows expected QR codes for this delivery */}
-                          {(delivery.status === 'in_transit' || selectedDeliveryForScan === delivery.id) && (
-                            <ArrivalScanReminder
-                              deliveryId={delivery.id}
-                              orderId={delivery.purchase_order_id}
-                              isDarkMode={isDarkMode}
-                              onNavigateToScanner={() => {
-                                setSelectedDeliveryForScan(delivery.id);
-                                setActiveTab('scanning');
-                              }}
-                              onScanComplete={() => {
-                                toast({
-                                  title: "🎉 Delivery Complete!",
-                                  description: "All items have been scanned and confirmed.",
-                                });
-                                setSelectedDeliveryForScan(null);
-                                refetchData();
-                              }}
-                            />
-                          )}
+                    {/* Available Requests Section - From Database */}
+                    {pendingRequests.length > 0 ? (
+                      <div className="mb-6">
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
+                          <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                            🚚 Available Delivery Jobs ({pendingRequests.length})
+                          </h3>
+                          <Badge className="bg-green-100 text-green-800 ml-2">First-Come-First-Served</Badge>
                         </div>
-                      ))}
+                        <Alert className="mb-4 bg-green-50 border-green-200">
+                          <Zap className="h-4 w-4 text-green-600" />
+                          <AlertDescription className="text-green-700">
+                            These are new delivery requests from builders. Accept quickly - first provider to accept gets the job!
+                          </AlertDescription>
+                        </Alert>
+                        <div className="space-y-4">
+                          {pendingRequests.map((request) => (
+                            <DeliveryRequestCard
+                              key={request.id}
+                              delivery={{
+                                id: request.id,
+                                pickup_location: request.pickup_address || request.pickup_location || 'Pickup location',
+                                delivery_location: request.delivery_address || request.delivery_location || 'Delivery location',
+                                material_type: request.material_type || 'Construction Materials',
+                                quantity: request.quantity?.toString() || 'N/A',
+                                customer_name: request.builder_name || request.contact_name || 'Builder',
+                                customer_phone: request.builder_phone || request.contact_phone || '',
+                                status: 'pending',
+                                estimated_time: '30 mins',
+                                price: request.estimated_cost || request.budget_range || 0,
+                                distance: request.distance_km || 0,
+                                urgency: request.priority_level || request.urgency || 'normal',
+                                special_instructions: request.special_instructions,
+                                created_at: request.created_at,
+                                pickup_date: request.pickup_date,
+                                delivery_date: request.delivery_date,
+                                expected_delivery_date: request.expected_delivery_date
+                              }}
+                              isDarkMode={isDarkMode}
+                              onAccept={async (id) => {
+                                const result = await handleAcceptDelivery(id);
+                                if (result.success) {
+                                  toast({
+                                    title: "✅ Delivery Accepted!",
+                                    description: "You got the job! Navigate to pickup location.",
+                                  });
+                                  refetchData();
+                                } else {
+                                  toast({
+                                    title: "❌ Could not accept",
+                                    description: result.error || "Someone else may have accepted this delivery.",
+                                    variant: "destructive"
+                                  });
+                                  refetchData();
+                                }
+                              }}
+                              onReject={(id) => {
+                                handleRejectDelivery(id);
+                                toast({
+                                  title: "Delivery Declined",
+                                  description: "This delivery has been removed from your list.",
+                                });
+                              }}
+                              onNavigate={(delivery) => console.log('Navigate to:', delivery)}
+                              onCall={(phone) => phone && window.open(`tel:${phone}`)}
+                              onCaptureProof={(id) => setShowProofCapture(id)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : ''}>
+                        <CardContent className="py-12 text-center">
+                          <Clock className={`h-12 w-12 ${isDarkMode ? 'text-gray-600' : 'text-gray-300'} mx-auto mb-4`} />
+                          <p className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>No pending delivery requests</p>
+                          <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>New requests will appear here when available</p>
+                        </CardContent>
+                      </Card>
+                    )}
                   </div>
-                </div>
-              )}
+                </TabsContent>
 
-              {activeDeliveries.length === 0 && (
-                <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : ''}>
-                  <CardContent className="py-12 text-center">
-                    <Truck className={`h-12 w-12 ${isDarkMode ? 'text-gray-600' : 'text-gray-300'} mx-auto mb-4`} />
-                    <p className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>No active deliveries</p>
-                    <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>New delivery requests will appear here</p>
-                  </CardContent>
-                </Card>
-              )}
+                {/* Scheduled Sub-tab - Orders allocated for delivery */}
+                <TabsContent value="scheduled" className="mt-4">
+                  <div className="space-y-4">
+                    {activeDeliveries.filter(d => d.status === 'assigned' || d.status === 'accepted').length > 0 ? (
+                      <div className="space-y-4">
+                        {activeDeliveries
+                          .filter(d => d.status === 'assigned' || d.status === 'accepted')
+                          .sort((a, b) => {
+                            const urgencyOrder = { emergency: 0, urgent: 1, normal: 2 };
+                            return (urgencyOrder[a.urgency || 'normal'] || 2) - (urgencyOrder[b.urgency || 'normal'] || 2);
+                          })
+                          .map((delivery) => (
+                            <DeliveryRequestCard
+                              key={delivery.id}
+                              delivery={delivery}
+                              isDarkMode={isDarkMode}
+                              onNavigate={(delivery) => console.log('Navigate to:', delivery)}
+                              onCall={(phone) => window.open(`tel:${phone}`)}
+                              onCaptureProof={(id) => setShowProofCapture(id)}
+                            />
+                          ))}
+                      </div>
+                    ) : (
+                      <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : ''}>
+                        <CardContent className="py-12 text-center">
+                          <Calendar className={`h-12 w-12 ${isDarkMode ? 'text-gray-600' : 'text-gray-300'} mx-auto mb-4`} />
+                          <p className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>No scheduled deliveries</p>
+                          <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Accepted deliveries will appear here</p>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                </TabsContent>
+
+                {/* In Transit Sub-tab - Orders currently on their way */}
+                <TabsContent value="in_transit" className="mt-4">
+                  <div className="space-y-4">
+                    {activeDeliveries.filter(d => d.status === 'in_transit').length > 0 ? (
+                      <div className="space-y-4">
+                        {activeDeliveries
+                          .filter(d => d.status === 'in_transit')
+                          .map((delivery) => (
+                            <div key={delivery.id} className="space-y-3">
+                              <DeliveryRequestCard
+                                delivery={delivery}
+                                isDarkMode={isDarkMode}
+                                onNavigate={(delivery) => console.log('Navigate to:', delivery)}
+                                onCall={(phone) => window.open(`tel:${phone}`)}
+                                onCaptureProof={(id) => setShowProofCapture(id)}
+                                onMarkArrived={(id) => {
+                                  setSelectedDeliveryForScan(id);
+                                  toast({
+                                    title: "📍 Arrival Confirmed",
+                                    description: "Please scan all materials to complete the delivery.",
+                                  });
+                                }}
+                              />
+                              {/* Arrival Scan Reminder */}
+                              {selectedDeliveryForScan === delivery.id && (
+                                <ArrivalScanReminder
+                                  deliveryId={delivery.id}
+                                  orderId={delivery.purchase_order_id}
+                                  isDarkMode={isDarkMode}
+                                  onNavigateToScanner={() => {
+                                    setSelectedDeliveryForScan(delivery.id);
+                                    setActiveTab('scanning');
+                                  }}
+                                  onScanComplete={() => {
+                                    toast({
+                                      title: "🎉 Delivery Complete!",
+                                      description: "All items have been scanned and confirmed.",
+                                    });
+                                    setSelectedDeliveryForScan(null);
+                                    refetchData();
+                                  }}
+                                />
+                              )}
+                            </div>
+                          ))}
+                      </div>
+                    ) : (
+                      <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : ''}>
+                        <CardContent className="py-12 text-center">
+                          <Truck className={`h-12 w-12 ${isDarkMode ? 'text-gray-600' : 'text-gray-300'} mx-auto mb-4`} />
+                          <p className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>No deliveries in transit</p>
+                          <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Active deliveries will appear here when in transit</p>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                </TabsContent>
+
+                {/* Delivered Sub-tab - Successfully delivered orders */}
+                <TabsContent value="delivered" className="mt-4">
+                  <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : ''}>
+                    <CardHeader>
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <CardTitle className={isDarkMode ? 'text-white' : ''}>Delivery History</CardTitle>
+                          <CardDescription className={isDarkMode ? 'text-gray-400' : ''}>
+                            Your past deliveries • Most recent first • {deliveryHistory.length} total
+                          </CardDescription>
+                        </div>
+                        <Button variant="outline" size="sm" onClick={() => refetchData()}>
+                          <Clock className="h-4 w-4 mr-2" />
+                          Refresh
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {deliveryHistory.length === 0 ? (
+                        <div className="text-center py-12">
+                          <Package className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                          <p className={`text-lg font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                            No delivery history yet
+                          </p>
+                          <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                            Your completed deliveries will appear here
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {[...deliveryHistory]
+                            .sort((a, b) => new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime())
+                            .map((delivery, index) => {
+                              const completedDate = new Date(delivery.completed_at);
+                              const isToday = completedDate.toDateString() === new Date().toDateString();
+                              const isYesterday = completedDate.toDateString() === new Date(Date.now() - 86400000).toDateString();
+                              
+                              return (
+                                <div key={delivery.id} className={`flex items-center justify-between p-4 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg hover:${isDarkMode ? 'bg-gray-600' : 'bg-gray-100'} transition-colors border-l-4 ${index === 0 ? 'border-l-green-500' : 'border-l-gray-300'}`}>
+                                  <div className="flex items-center gap-4">
+                                    <div className={`p-2 ${isDarkMode ? 'bg-gray-600' : 'bg-white'} rounded-lg shadow-sm`}>
+                                      <CheckCircle className="h-8 w-8 text-green-500" />
+                                    </div>
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        <p className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{delivery.material_type}</p>
+                                        {index === 0 && (
+                                          <Badge className="bg-green-100 text-green-700 text-xs">Most Recent</Badge>
+                                        )}
+                                      </div>
+                                      <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                        <MapPin className="h-3 w-3 inline mr-1" />
+                                        {delivery.pickup_location} → {delivery.delivery_location}
+                                      </p>
+                                      <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-400'} mt-1`}>
+                                        <Calendar className="h-3 w-3 inline mr-1" />
+                                        {isToday ? 'Today' : isYesterday ? 'Yesterday' : completedDate.toLocaleDateString('en-US', { 
+                                          weekday: 'short', 
+                                          month: 'short', 
+                                          day: 'numeric',
+                                          year: completedDate.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+                                        })}
+                                        {' at '}
+                                        {completedDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-4">
+                                    <div className="text-right">
+                                      <p className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{formatCurrency(delivery.price)}</p>
+                                      <Badge variant="outline" className={`text-xs ${
+                                        delivery.status === 'delivered' || delivery.status === 'completed' 
+                                          ? 'border-green-300 text-green-600' 
+                                          : delivery.status === 'cancelled' 
+                                            ? 'border-red-300 text-red-600' 
+                                            : 'border-gray-300 text-gray-600'
+                                      }`}>
+                                        {delivery.status === 'delivered' || delivery.status === 'completed' ? '✓ Completed' : delivery.status}
+                                      </Badge>
+                                    </div>
+                                    {delivery.rating > 0 && (
+                                      <div className="flex items-center gap-1 bg-amber-50 px-2 py-1 rounded">
+                                        <Star className="h-4 w-4 text-amber-400 fill-amber-400" />
+                                        <span className={`font-medium text-amber-700`}>{delivery.rating.toFixed(1)}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
             </div>
           </TabsContent>
 
-          {/* Schedule Tab - Combines Today, Pending, and Route Planning */}
-          <TabsContent value="schedule">
+          {/* Schedule Tab - REMOVED (now part of Deliveries) */}
+          <TabsContent value="schedule" className="hidden">
             <div className="space-y-6">
               {/* Today's Summary */}
               <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'}>
@@ -1152,102 +1253,8 @@ const DeliveryDashboard = () => {
             />
           </TabsContent>
 
-          {/* History Tab - Shows past deliveries with most recent first */}
-          <TabsContent value="history">
-            <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : ''}>
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <CardTitle className={isDarkMode ? 'text-white' : ''}>Delivery History</CardTitle>
-                    <CardDescription className={isDarkMode ? 'text-gray-400' : ''}>
-                      Your past deliveries • Most recent first • {deliveryHistory.length} total
-                    </CardDescription>
-                  </div>
-                  <Button variant="outline" size="sm" onClick={() => refetchData()}>
-                    <Clock className="h-4 w-4 mr-2" />
-                    Refresh
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {deliveryHistory.length === 0 ? (
-                  <div className="text-center py-12">
-                    <Package className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                    <p className={`text-lg font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                      No delivery history yet
-                    </p>
-                    <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                      Your completed deliveries will appear here
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {/* Sort by completed_at descending (most recent first) */}
-                    {[...deliveryHistory]
-                      .sort((a, b) => new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime())
-                      .map((delivery, index) => {
-                        const completedDate = new Date(delivery.completed_at);
-                        const isToday = completedDate.toDateString() === new Date().toDateString();
-                        const isYesterday = completedDate.toDateString() === new Date(Date.now() - 86400000).toDateString();
-                        
-                        return (
-                          <div key={delivery.id} className={`flex items-center justify-between p-4 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg hover:${isDarkMode ? 'bg-gray-600' : 'bg-gray-100'} transition-colors border-l-4 ${index === 0 ? 'border-l-green-500' : 'border-l-gray-300'}`}>
-                            <div className="flex items-center gap-4">
-                              <div className={`p-2 ${isDarkMode ? 'bg-gray-600' : 'bg-white'} rounded-lg shadow-sm`}>
-                                <CheckCircle className="h-8 w-8 text-green-500" />
-                              </div>
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <p className={`font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{delivery.material_type}</p>
-                                  {index === 0 && (
-                                    <Badge className="bg-green-100 text-green-700 text-xs">Most Recent</Badge>
-                                  )}
-                                </div>
-                                <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                                  <MapPin className="h-3 w-3 inline mr-1" />
-                                  {delivery.pickup_location} → {delivery.delivery_location}
-                                </p>
-                                <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-400'} mt-1`}>
-                                  <Calendar className="h-3 w-3 inline mr-1" />
-                                  {isToday ? 'Today' : isYesterday ? 'Yesterday' : completedDate.toLocaleDateString('en-US', { 
-                                    weekday: 'short', 
-                                    month: 'short', 
-                                    day: 'numeric',
-                                    year: completedDate.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
-                                  })}
-                                  {' at '}
-                                  {completedDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-4">
-                              <div className="text-right">
-                                <p className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{formatCurrency(delivery.price)}</p>
-                                <Badge variant="outline" className={`text-xs ${
-                                  delivery.status === 'delivered' || delivery.status === 'completed' 
-                                    ? 'border-green-300 text-green-600' 
-                                    : delivery.status === 'cancelled' 
-                                      ? 'border-red-300 text-red-600' 
-                                      : 'border-gray-300 text-gray-600'
-                                }`}>
-                                  {delivery.status === 'delivered' || delivery.status === 'completed' ? '✓ Completed' : delivery.status}
-                                </Badge>
-                              </div>
-                              {delivery.rating > 0 && (
-                                <div className="flex items-center gap-1 bg-amber-50 px-2 py-1 rounded">
-                                  <Star className="h-4 w-4 text-amber-400 fill-amber-400" />
-                                  <span className={`font-medium text-amber-700`}>{delivery.rating.toFixed(1)}</span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+          {/* History Tab - REMOVED (now part of Deliveries > Delivered) */}
+          <TabsContent value="history" className="hidden">
 
           {/* Analytics Tab - Includes Earnings and Achievements */}
           <TabsContent value="analytics">

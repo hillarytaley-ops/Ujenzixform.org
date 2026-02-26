@@ -6,6 +6,14 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
   Table,
   TableBody,
   TableCell,
@@ -76,6 +84,8 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [activeCategory, setActiveCategory] = useState<string>('all'); // 'all', 'track', 'active', 'delivered', 'pending'
+  const [showTrackModal, setShowTrackModal] = useState(false);
   const { toast } = useToast();
 
   // Get userId from props or localStorage fallback
@@ -356,7 +366,12 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
       tn.delivery_address?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       tn.provider_name?.toLowerCase().includes(searchQuery.toLowerCase());
     
-    const matchesStatus = statusFilter === 'all' || tn.status === statusFilter;
+    let matchesStatus = true;
+    if (statusFilter === 'active') {
+      matchesStatus = ['accepted', 'picked_up', 'in_transit', 'near_destination'].includes(tn.status);
+    } else if (statusFilter !== 'all') {
+      matchesStatus = tn.status === statusFilter;
+    }
     
     return matchesSearch && matchesStatus;
   });
@@ -364,115 +379,232 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
   const activeDeliveries = trackingNumbers.filter(tn => ['accepted', 'picked_up', 'in_transit', 'near_destination'].includes(tn.status));
   const completedDeliveries = trackingNumbers.filter(tn => tn.status === 'delivered');
   const pendingDeliveries = trackingNumbers.filter(tn => tn.status === 'pending');
+  
+  // Handle category button clicks
+  const handleCategoryClick = (category: string) => {
+    setActiveCategory(category);
+    if (category === 'track') {
+      setShowTrackModal(true);
+    } else if (category === 'active') {
+      setStatusFilter('active');
+    } else if (category === 'delivered') {
+      setStatusFilter('delivered');
+    } else if (category === 'pending') {
+      setStatusFilter('pending');
+    } else {
+      setStatusFilter('all');
+    }
+  };
+  
+  // Get filtered tracking numbers based on active category
+  const getCategoryFilteredNumbers = () => {
+    if (activeCategory === 'active') {
+      return activeDeliveries;
+    } else if (activeCategory === 'delivered') {
+      return completedDeliveries;
+    } else if (activeCategory === 'pending') {
+      return pendingDeliveries;
+    }
+    return filteredTrackingNumbers;
+  };
 
   return (
     <div className="space-y-6">
-      {/* Header Stats */}
+      {/* Header Stats - Now Clickable Buttons */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
-          <CardContent className="p-4">
+        <Button
+          onClick={() => handleCategoryClick('track')}
+          className="h-auto p-0 bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white border-0 shadow-lg hover:shadow-xl transition-all"
+        >
+          <CardContent className="p-4 w-full">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-blue-100 text-sm">Total Tracking</p>
-                <p className="text-3xl font-bold">{trackingNumbers.length}</p>
+              <div className="text-left">
+                <p className="text-blue-100 text-sm font-medium mb-1">Track a Delivery</p>
+                <p className="text-2xl font-bold">Click to Track</p>
+                <p className="text-blue-200 text-xs mt-1">Manage dispatched packages</p>
               </div>
-              <Package className="h-10 w-10 text-blue-200" />
+              <div className="bg-white/20 rounded-full p-3">
+                <Package className="h-10 w-10 text-white" />
+              </div>
             </div>
           </CardContent>
-        </Card>
+        </Button>
         
-        <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white">
-          <CardContent className="p-4">
+        <Button
+          onClick={() => handleCategoryClick('active')}
+          className={`h-auto p-0 bg-gradient-to-br from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white border-0 shadow-lg hover:shadow-xl transition-all ${activeCategory === 'active' ? 'ring-4 ring-orange-300' : ''}`}
+        >
+          <CardContent className="p-4 w-full">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-orange-100 text-sm">Active Deliveries</p>
+              <div className="text-left">
+                <p className="text-orange-100 text-sm font-medium mb-1">Active Deliveries</p>
                 <p className="text-3xl font-bold">{activeDeliveries.length}</p>
+                <p className="text-orange-200 text-xs mt-1">Currently in transit</p>
               </div>
-              <Truck className="h-10 w-10 text-orange-200" />
+              <div className="bg-white/20 rounded-full p-3">
+                <Truck className="h-10 w-10 text-white" />
+              </div>
             </div>
           </CardContent>
-        </Card>
+        </Button>
         
-        <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white">
-          <CardContent className="p-4">
+        <Button
+          onClick={() => handleCategoryClick('delivered')}
+          className={`h-auto p-0 bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white border-0 shadow-lg hover:shadow-xl transition-all ${activeCategory === 'delivered' ? 'ring-4 ring-green-300' : ''}`}
+        >
+          <CardContent className="p-4 w-full">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-green-100 text-sm">Delivered</p>
+              <div className="text-left">
+                <p className="text-green-100 text-sm font-medium mb-1">Delivered</p>
                 <p className="text-3xl font-bold">{completedDeliveries.length}</p>
+                <p className="text-green-200 text-xs mt-1">Previously delivered</p>
               </div>
-              <CheckCircle2 className="h-10 w-10 text-green-200" />
+              <div className="bg-white/20 rounded-full p-3">
+                <CheckCircle2 className="h-10 w-10 text-white" />
+              </div>
             </div>
           </CardContent>
-        </Card>
+        </Button>
         
-        <Card className="bg-gradient-to-br from-gray-500 to-gray-600 text-white">
-          <CardContent className="p-4">
+        <Button
+          onClick={() => handleCategoryClick('pending')}
+          className={`h-auto p-0 bg-gradient-to-br from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white border-0 shadow-lg hover:shadow-xl transition-all ${activeCategory === 'pending' ? 'ring-4 ring-gray-300' : ''}`}
+        >
+          <CardContent className="p-4 w-full">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-100 text-sm">Pending</p>
+              <div className="text-left">
+                <p className="text-gray-100 text-sm font-medium mb-1">Pending</p>
                 <p className="text-3xl font-bold">{pendingDeliveries.length}</p>
+                <p className="text-gray-200 text-xs mt-1">Awaiting delivery</p>
               </div>
-              <Clock className="h-10 w-10 text-gray-200" />
+              <div className="bg-white/20 rounded-full p-3">
+                <Clock className="h-10 w-10 text-white" />
+              </div>
             </div>
           </CardContent>
-        </Card>
+        </Button>
       </div>
 
-      {/* Quick Track Portal */}
-      <Card className="border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-blue-800">
-            <MapPin className="h-5 w-5" />
-            Quick Track Your Delivery
-          </CardTitle>
-          <CardDescription>
-            Enter your tracking number to view real-time delivery status and location
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-3">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Enter tracking number (e.g., TRK-20260216-A7B3C)"
-                className="pl-10"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+      {/* Track a Delivery Modal */}
+      <Dialog open={showTrackModal} onOpenChange={setShowTrackModal}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-blue-800">
+              <MapPin className="h-5 w-5" />
+              Track a Delivery
+            </DialogTitle>
+            <DialogDescription>
+              Enter your tracking number to view real-time delivery status and location for dispatched packages
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="flex gap-3">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Enter tracking number (e.g., TRK-20260216-A7B3C)"
+                  className="pl-10"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && searchQuery) {
+                      window.open(`/tracking?number=${searchQuery}`, '_blank');
+                      setShowTrackModal(false);
+                    }
+                  }}
+                />
+              </div>
+              <Button 
+                className="bg-blue-600 hover:bg-blue-700"
+                onClick={() => {
+                  if (searchQuery) {
+                    window.open(`/tracking?number=${searchQuery}`, '_blank');
+                    setShowTrackModal(false);
+                  } else {
+                    toast({
+                      title: "Tracking Number Required",
+                      description: "Please enter a tracking number to track your delivery",
+                      variant: "destructive",
+                    });
+                  }
+                }}
+              >
+                <Navigation className="h-4 w-4 mr-2" />
+                Track Now
+              </Button>
             </div>
-            <Button 
-              className="bg-blue-600 hover:bg-blue-700"
-              onClick={() => {
-                if (searchQuery) {
-                  window.open(`/tracking?number=${searchQuery}`, '_blank');
-                }
-              }}
-            >
-              <Navigation className="h-4 w-4 mr-2" />
-              Track Now
-            </Button>
-          </div>
-          
-          <div className="mt-4 p-4 bg-white rounded-lg border">
-            <h4 className="font-medium text-gray-800 mb-2">📍 How to track your delivery:</h4>
-            <ol className="text-sm text-gray-600 space-y-1 list-decimal list-inside">
-              <li>Copy your tracking number from the list below</li>
-              <li>Go to the <a href="/tracking" className="text-blue-600 hover:underline">Tracking Page</a></li>
-              <li>Paste your tracking number and click "Track"</li>
-              <li>View real-time location and status updates</li>
+            
+            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <h4 className="font-medium text-blue-800 mb-2">📍 How to track your delivery:</h4>
+            <ol className="text-sm text-blue-700 space-y-1 list-decimal list-inside">
+              <li>Copy your tracking number from the list below or from your order confirmation</li>
+              <li>Enter it in the field above and click "Track Now"</li>
+              <li>View real-time location and status updates on the tracking page</li>
+              <li>Get notifications when your delivery status changes</li>
             </ol>
           </div>
-        </CardContent>
-      </Card>
+          
+          {trackingNumbers.length > 0 && (
+            <div className="mt-4">
+              <p className="text-sm font-medium text-gray-700 mb-2">Your Recent Tracking Numbers:</p>
+              <div className="max-h-48 overflow-y-auto space-y-2">
+                {trackingNumbers.slice(0, 5).map((tn) => (
+                  <Button
+                    key={tn.id}
+                    variant="outline"
+                    className="w-full justify-between text-left"
+                    onClick={() => {
+                      setSearchQuery(tn.tracking_number);
+                      window.open(`/tracking?number=${tn.tracking_number}`, '_blank');
+                      setShowTrackModal(false);
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      {getStatusIcon(tn.status)}
+                      <code className="font-mono text-sm">{tn.tracking_number}</code>
+                    </div>
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowTrackModal(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 items-center">
+        {activeCategory !== 'all' && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setActiveCategory('all');
+              setStatusFilter('all');
+            }}
+            className="border-blue-300 text-blue-700 hover:bg-blue-50"
+          >
+            <X className="h-4 w-4 mr-2" />
+            Clear Filter
+          </Button>
+        )}
         {['all', 'pending', 'accepted', 'picked_up', 'in_transit', 'delivered', 'cancelled'].map((status) => (
           <Button
             key={status}
             variant={statusFilter === status ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setStatusFilter(status)}
+            onClick={() => {
+              setStatusFilter(status);
+              if (status === 'all') {
+                setActiveCategory('all');
+              }
+            }}
             className={statusFilter === status ? 'bg-blue-600' : ''}
           >
             {status === 'all' ? 'All' : status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
@@ -525,6 +657,15 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
             </div>
           ) : (
             <div className="overflow-x-auto">
+              {activeCategory !== 'all' && (
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800 font-medium">
+                    {activeCategory === 'active' && `Showing ${activeDeliveries.length} active delivery${activeDeliveries.length !== 1 ? 'ies' : ''} currently in transit`}
+                    {activeCategory === 'delivered' && `Showing ${completedDeliveries.length} previously delivered order${completedDeliveries.length !== 1 ? 's' : ''}`}
+                    {activeCategory === 'pending' && `Showing ${pendingDeliveries.length} order${pendingDeliveries.length !== 1 ? 's' : ''} awaiting delivery`}
+                  </p>
+                </div>
+              )}
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -537,7 +678,7 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredTrackingNumbers.map((tn) => (
+                  {getCategoryFilteredNumbers().map((tn) => (
                     <TableRow key={tn.id} className="hover:bg-gray-50">
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -621,19 +762,19 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
         </CardContent>
       </Card>
 
-      {/* Active Deliveries Timeline */}
-      {activeDeliveries.length > 0 && (
+      {/* Active Deliveries Timeline - Only show when not filtering by active category */}
+      {activeDeliveries.length > 0 && activeCategory !== 'active' && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Truck className="h-5 w-5 text-orange-500" />
               Active Deliveries
             </CardTitle>
-            <CardDescription>Deliveries currently in progress</CardDescription>
+            <CardDescription>Deliveries currently in progress - Click "Active Deliveries" button above to see all</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {activeDeliveries.map((delivery) => (
+              {activeDeliveries.slice(0, 3).map((delivery) => (
                 <div 
                   key={delivery.id} 
                   className="flex items-center gap-4 p-4 border rounded-lg hover:bg-gray-50 transition-colors"
@@ -670,6 +811,16 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
                   </Button>
                 </div>
               ))}
+              {activeDeliveries.length > 3 && (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => handleCategoryClick('active')}
+                >
+                  View All {activeDeliveries.length} Active Deliveries
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>

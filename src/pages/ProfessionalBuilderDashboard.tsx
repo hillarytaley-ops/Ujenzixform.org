@@ -827,7 +827,13 @@ const ProfessionalBuilderDashboardPage = () => {
   };
 
   // Create new project
-  const handleCreateProject = async () => {
+  const handleCreateProject = async (e?: React.FormEvent) => {
+    // Prevent default form submission if called from form
+    if (e) {
+      e.preventDefault();
+    }
+
+    // Validation
     if (!newProject.name || !newProject.location) {
       toast({
         title: "Missing Information",
@@ -837,37 +843,59 @@ const ProfessionalBuilderDashboardPage = () => {
       return;
     }
 
+    if (!user?.id && !authUser?.id) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to create a project.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setCreatingProject(true);
     const userId = getUserId();
+    
+    if (!userId) {
+      toast({
+        title: "Error",
+        description: "Unable to identify user. Please refresh the page and try again.",
+        variant: "destructive",
+      });
+      setCreatingProject(false);
+      return;
+    }
+
     const accessToken = await getAccessToken();
     
     try {
       const projectData: Record<string, any> = {
         builder_id: userId,
-        name: newProject.name,
-        location: newProject.location,
-        description: newProject.description || null,
+        name: newProject.name.trim(),
+        location: newProject.location.trim(),
+        description: newProject.description?.trim() || null,
         start_date: newProject.start_date || null,
         expected_end_date: newProject.expected_end_date || null,
         budget: newProject.budget ? parseFloat(newProject.budget) : null,
         project_type: newProject.project_type || 'residential',
-        client_name: newProject.client_name || null,
+        client_name: newProject.client_name?.trim() || null,
         status: 'active',
         progress: 0
       };
 
       // Include GPS coordinates if available (for delivery location)
       if (newProject.latitude && newProject.longitude) {
-        projectData.latitude = newProject.latitude;
-        projectData.longitude = newProject.longitude;
+        projectData.latitude = parseFloat(newProject.latitude.toString());
+        projectData.longitude = parseFloat(newProject.longitude.toString());
       }
 
       // Include detailed address if available
       if (newProject.address) {
-        projectData.address = newProject.address;
+        projectData.address = newProject.address.trim();
       }
 
       console.log('📁 Creating project:', projectData);
+      console.log('📁 User ID:', userId);
+      console.log('📁 Access Token:', accessToken ? 'Present' : 'Missing');
 
       const response = await fetch(`${SUPABASE_URL}/rest/v1/builder_projects`, {
         method: 'POST',
@@ -880,41 +908,65 @@ const ProfessionalBuilderDashboardPage = () => {
         body: JSON.stringify(projectData)
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        console.log('✅ Project created:', data);
-        setProjects(prev => [data[0], ...prev]);
-        setStats(prev => ({ ...prev, activeProjects: prev.activeProjects + 1 }));
-        
-        toast({
-          title: "🏗️ Project Created!",
-          description: `"${newProject.name}" has been created successfully. You can now order materials for this project.`,
-        });
+      console.log('📁 Response status:', response.status);
 
-        setShowCreateProject(false);
-        setNewProject({ 
-          name: '', 
-          location: '', 
-          description: '', 
-          start_date: '', 
-          budget: '',
-          project_type: 'residential',
-          client_name: '',
-          expected_end_date: '',
-          latitude: null,
-          longitude: null,
-          address: ''
-        });
-      } else {
+      if (!response.ok) {
         const errorText = await response.text();
         console.error('❌ Project creation failed:', response.status, errorText);
-        throw new Error(errorText || 'Failed to create project');
+        
+        let errorMessage = 'Failed to create project. ';
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorMessage += errorJson.message || errorJson.error || errorText;
+        } catch {
+          errorMessage += errorText || 'Please check your connection and try again.';
+        }
+        
+        throw new Error(errorMessage);
       }
-    } catch (error: any) {
-      console.error('Error creating project:', error);
+
+      const data = await response.json();
+      console.log('✅ Project created:', data);
+      
+      // Ensure we have the created project data
+      const createdProject = Array.isArray(data) ? data[0] : data;
+      
+      if (!createdProject) {
+        throw new Error('Project was created but no data was returned');
+      }
+
+      // Refresh projects list
+      await fetchProjects();
+      
+      // Update stats
+      setStats(prev => ({ ...prev, activeProjects: prev.activeProjects + 1 }));
+      
       toast({
-        title: "Error",
-        description: error.message || "Failed to create project. Please try again.",
+        title: "🏗️ Project Created!",
+        description: `"${newProject.name}" has been created successfully. You can now order materials for this project.`,
+      });
+
+      // Reset form and close dialog
+      setShowCreateProject(false);
+      setShowMapPicker(false);
+      setNewProject({ 
+        name: '', 
+        location: '', 
+        description: '', 
+        start_date: '', 
+        budget: '',
+        project_type: 'residential',
+        client_name: '',
+        expected_end_date: '',
+        latitude: null,
+        longitude: null,
+        address: ''
+      });
+    } catch (error: any) {
+      console.error('❌ Error creating project:', error);
+      toast({
+        title: "Error Creating Project",
+        description: error.message || "Failed to create project. Please check your connection and try again.",
         variant: "destructive",
       });
     } finally {
@@ -1321,7 +1373,7 @@ const ProfessionalBuilderDashboardPage = () => {
                           Add a new construction project to track materials, deliveries, and spending
                         </DialogDescription>
                       </DialogHeader>
-                      <div className="space-y-4 py-4">
+                      <form id="create-project-form" onSubmit={(e) => { e.preventDefault(); handleCreateProject(e); }} className="space-y-4 py-4">
                         <div className="grid md:grid-cols-2 gap-4">
                           <div>
                             <Label htmlFor="project-name">Project Name *</Label>
@@ -1330,6 +1382,7 @@ const ProfessionalBuilderDashboardPage = () => {
                               placeholder="e.g., Residential Building Phase 1"
                               value={newProject.name}
                               onChange={(e) => setNewProject(prev => ({ ...prev, name: e.target.value }))}
+                              required
                             />
                           </div>
                           <div>
@@ -1339,6 +1392,7 @@ const ProfessionalBuilderDashboardPage = () => {
                               placeholder="e.g., Westlands, Nairobi"
                               value={newProject.location}
                               onChange={(e) => setNewProject(prev => ({ ...prev, location: e.target.value }))}
+                              required
                             />
                           </div>
                         </div>
@@ -1524,13 +1578,14 @@ const ProfessionalBuilderDashboardPage = () => {
                             />
                           </div>
                         </div>
-                      </div>
+                      </form>
                       <DialogFooter>
                         <Button variant="outline" onClick={() => setShowCreateProject(false)} disabled={creatingProject}>
                           Cancel
                         </Button>
                         <Button 
-                          onClick={handleCreateProject} 
+                          type="submit"
+                          form="create-project-form"
                           disabled={creatingProject || !newProject.name || !newProject.location}
                           className="bg-blue-600 hover:bg-blue-700"
                         >
@@ -2752,15 +2807,9 @@ const ProfessionalBuilderDashboardPage = () => {
 
           {/* Analytics Tab */}
           <TabsContent value="my-analytics">
-            <Card>
-              <CardHeader>
-                <CardTitle>Spending Analytics</CardTitle>
-                <CardDescription>Track your spending patterns and trends</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {user && <UserAnalyticsDashboard userId={user.id} userRole="professional_builder" />}
-              </CardContent>
-            </Card>
+            <div className="space-y-6">
+              {user && <UserAnalyticsDashboard userId={user.id} userRole="professional_builder" />}
+            </div>
           </TabsContent>
         </Tabs>
 
