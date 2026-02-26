@@ -73,13 +73,6 @@ const ProviderRotationManager: React.FC<ProviderRotationManagerProps> = ({
   });
   const { toast } = useToast();
 
-  useEffect(() => {
-    if (isOpen && deliveryRequest?.id) {
-      fetchProviderResponses();
-      setupRealtimeSubscription();
-    }
-  }, [isOpen, deliveryRequest?.id]);
-
   const fetchProviderResponses = async () => {
     if (!deliveryRequest?.id) return;
 
@@ -150,6 +143,17 @@ const ProviderRotationManager: React.FC<ProviderRotationManagerProps> = ({
       supabase.removeChannel(channel);
     };
   };
+
+  useEffect(() => {
+    if (isOpen && deliveryRequest?.id) {
+      fetchProviderResponses();
+      const cleanup = setupRealtimeSubscription();
+      
+      return () => {
+        if (cleanup) cleanup();
+      };
+    }
+  }, [isOpen, deliveryRequest?.id]);
 
   const handleAcceptProvider = async (providerId: string) => {
     if (userRole !== 'builder' && userRole !== 'admin') {
