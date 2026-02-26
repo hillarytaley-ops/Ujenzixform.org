@@ -824,7 +824,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
     return orders.filter(order => {
       const items = order.material_items || [];
       switch (activeFilter) {
-        case 'pending':
+        case 'pending': {
           // Orders that are pending/confirmed/quoted (accepted quotes or supplier responded) but not yet dispatched
           // This includes orders awaiting delivery provider allocation
           // EXCLUDE orders that have dispatched status or any dispatched items (those belong in dispatched tab)
@@ -838,18 +838,22 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
           const hasPendingItems = items.some(i => !i.dispatch_scanned && !['dispatched', 'in_transit', 'received', 'verified'].includes(i.status));
           // Only show if status is pending/confirmed/quoted AND no items are dispatched
           return (isPendingStatus || hasPendingItems) && !hasDispatchedItems;
-        case 'dispatched':
+        }
+        case 'dispatched': {
           // Orders with dispatched status or dispatched items (but not yet in transit or received)
           const orderStatusForDispatch = order.status || 'pending';
           const hasDispatchedStatus = ['dispatched', 'partially_dispatched'].includes(orderStatusForDispatch);
           const hasDispatchedItems = items.some(i => (i.dispatch_scanned || i.status === 'dispatched') && !['in_transit', 'received', 'verified'].includes(i.status) && !i.receive_scanned);
           return hasDispatchedStatus || hasDispatchedItems;
-        case 'in_transit':
+        }
+        case 'in_transit': {
           // Orders currently being delivered
           return items.some(i => i.status === 'in_transit');
-        case 'received':
+        }
+        case 'received': {
           // Orders that have been fully received
           return items.some(i => ['received', 'verified'].includes(i.status) || i.receive_scanned);
+        }
         default:
           return true;
       }
