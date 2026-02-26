@@ -513,25 +513,16 @@ BEGIN
         FROM purchase_orders po
         WHERE po.id = v_po_id;
         
-        -- Update purchase_order status
+        -- Update purchase_order status - automatically move to in_transit after dispatch
         UPDATE purchase_orders
         SET 
-            status = CASE 
-                WHEN status = 'ready_for_dispatch' THEN 'dispatched'
-                WHEN status = 'delivery_assigned' THEN 'dispatched'
-                ELSE status
-            END,
+            status = 'in_transit',
             dispatched_at = CASE 
-                WHEN dispatched_at IS NULL AND status IN ('ready_for_dispatch', 'delivery_assigned') THEN NOW()
+                WHEN dispatched_at IS NULL THEN NOW()
                 ELSE dispatched_at
             END,
-            -- Automatically move to in_transit after dispatch
-            status = CASE 
-                WHEN status IN ('ready_for_dispatch', 'delivery_assigned', 'dispatched') THEN 'in_transit'
-                ELSE status
-            END,
             in_transit_at = CASE 
-                WHEN in_transit_at IS NULL AND status IN ('ready_for_dispatch', 'delivery_assigned', 'dispatched') THEN NOW()
+                WHEN in_transit_at IS NULL THEN NOW()
                 ELSE in_transit_at
             END,
             updated_at = NOW()
