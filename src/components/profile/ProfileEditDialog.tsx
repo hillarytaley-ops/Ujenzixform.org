@@ -518,11 +518,39 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
             }
           );
           
+          // If upsert also gets 401, retry with refreshed token
+          if (response.status === 401) {
+            console.log('📝 ProfileEditDialog: Upsert got 401, refreshing and retrying...');
+            try {
+              const { data: { session: newSession } } = await supabase.auth.getSession();
+              if (newSession?.access_token) {
+                accessToken = newSession.access_token;
+                response = await fetch(
+                  `${SUPABASE_URL}/rest/v1/profiles`,
+                  {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'apikey': SUPABASE_ANON_KEY,
+                      'Authorization': `Bearer ${accessToken}`,
+                      'Prefer': 'resolution=merge-duplicates,return=minimal'
+                    },
+                    body: JSON.stringify(insertData)
+                  }
+                );
+              }
+            } catch (retryError) {
+              console.error('📝 ProfileEditDialog: Upsert retry failed:', retryError);
+            }
+          }
+          
           if (!response.ok) {
             const errorText = await response.text();
             console.error('📝 ProfileEditDialog: Upsert error:', response.status, errorText);
+            throw new Error(`Save failed: ${response.status}. ${errorText || 'Please try again.'}`);
           }
         }
+        // Profile saved successfully - continue to update related records
       } else {
         const errorText = await response.text();
         console.error('📝 ProfileEditDialog: Save error:', response.status, errorText);
@@ -637,8 +665,9 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
       }
 
       // Also update supplier record if user is a supplier - THIS IS CRITICAL for store name, logo, etc.
+      // This is non-blocking - don't wait for it to complete
       if (userRole === 'supplier') {
-        console.log('📝 ProfileEditDialog: Updating supplier record...');
+        console.log('📝 ProfileEditDialog: Updating supplier record (non-blocking)...');
         
         const supplierUpdateData: Record<string, any> = {
           phone: profile.phone || null,
@@ -679,31 +708,28 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
 
         console.log('📝 ProfileEditDialog: Supplier update data:', supplierUpdateData);
 
-        try {
-          const supplierResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${profile.user_id}`,
-            {
-              method: 'PATCH',
-              headers: {
-                'Content-Type': 'application/json',
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${accessToken}`,
-                'Prefer': 'return=representation'
-              },
-              body: JSON.stringify(supplierUpdateData)
-            }
-          );
-
-          if (supplierResponse.ok) {
-            const result = await supplierResponse.json();
-            console.log('✅ ProfileEditDialog: Supplier record updated:', result);
-          } else {
-            const errorText = await supplierResponse.text();
-            console.error('📝 ProfileEditDialog: Supplier update failed:', supplierResponse.status, errorText);
+        // Fire and forget - don't block profile save
+        fetch(
+          `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${profile.user_id}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify(supplierUpdateData)
           }
-        } catch (supplierError) {
-          console.error('📝 ProfileEditDialog: Supplier update error:', supplierError);
-        }
+        ).then(r => {
+          if (r.ok) {
+            console.log('✅ ProfileEditDialog: Supplier record updated');
+          } else {
+            console.log('📝 ProfileEditDialog: Supplier update failed:', r.status);
+          }
+        }).catch(err => {
+          console.error('📝 ProfileEditDialog: Supplier update error:', err);
+        });
       }
 
       // Update delivery provider record if applicable (non-blocking)
