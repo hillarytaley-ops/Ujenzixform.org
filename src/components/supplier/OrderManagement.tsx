@@ -81,6 +81,7 @@ interface Order {
   delivery_assigned_at?: string;
   delivery_accepted_at?: string;
   estimated_delivery_time?: string;
+  delivery_required?: boolean; // Track if builder requested delivery
 }
 
 interface OrderManagementProps {
@@ -148,6 +149,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
         delivery_assigned_at: po.delivery_assigned_at,
         delivery_accepted_at: po.delivery_accepted_at,
         estimated_delivery_time: po.estimated_delivery_time,
+        delivery_required: po.delivery_required || false,
       };
     });
   };
@@ -167,6 +169,67 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
       console.log('⏱️ Orders safety timeout - forcing loading false after 5s');
     }, 5000);
     return () => clearTimeout(safetyTimeout);
+  }, [supplierId]);
+
+  // Real-time subscription for order updates (synchronization with Builder Dashboard)
+  useEffect(() => {
+    if (!supplierId) return;
+
+    console.log('📡 OrderManagement: Setting up real-time subscription for supplier:', supplierId);
+
+    // Subscribe to purchase_orders changes for this supplier
+    const channel = supabase
+      .channel('supplier-orders-realtime')
+      .on('postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'purchase_orders',
+          filter: `supplier_id=eq.${supplierId}`
+        },
+        (payload) => {
+          console.log('🔄 OrderManagement: Order change detected:', payload.eventType, payload.new?.po_number);
+          
+          // Refresh orders when any change occurs
+          loadOrders();
+          
+          // Show toast notification for important status changes
+          if (payload.eventType === 'UPDATE' && payload.new) {
+            const newStatus = payload.new.status;
+            const oldStatus = payload.old?.status;
+            
+            // Notify when builder accepts order
+            if (oldStatus === 'pending' && (newStatus === 'confirmed' || newStatus === 'pending')) {
+              toast({
+                title: '✅ Order Accepted',
+                description: `Builder accepted order ${payload.new.po_number || ''}`,
+              });
+            }
+            
+            // Notify when delivery provider is assigned
+            if (!payload.old?.delivery_provider_id && payload.new.delivery_provider_id) {
+              toast({
+                title: '🚚 Delivery Provider Assigned',
+                description: `Delivery provider assigned to order ${payload.new.po_number || ''}`,
+              });
+            }
+            
+            // Notify when order goes in transit
+            if (payload.new.delivery_status === 'in_transit' && payload.old?.delivery_status !== 'in_transit') {
+              toast({
+                title: '🚚 Order In Transit',
+                description: `Order ${payload.new.po_number || ''} is now in transit`,
+              });
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('🔌 OrderManagement: Cleaning up real-time subscription');
+      supabase.removeChannel(channel);
+    };
   }, [supplierId]);
 
   const loadOrders = async () => {
@@ -250,10 +313,10 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
         return;
       }
 
-      // Fetch orders using native fetch (same as dashboard)
+      // Fetch orders using native fetch (same as dashboard) - Include delivery provider and delivery_required fields
       const supplierIdsParam = orderSupplierIds.join(',');
       const ordersResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=in.(${supplierIdsParam})&order=created_at.desc&limit=500`,
+        `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=in.(${supplierIdsParam})&select=*,delivery_provider_id,delivery_provider_name,delivery_provider_phone,delivery_status,delivery_required&order=created_at.desc&limit=500`,
         { headers, cache: 'no-store' }
       );
 
@@ -323,7 +386,8 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
           delivery_status: po.delivery_status || undefined,
           delivery_assigned_at: po.delivery_assigned_at || undefined,
           delivery_accepted_at: po.delivery_accepted_at || undefined,
-          estimated_delivery_time: po.estimated_delivery_time || undefined
+          estimated_delivery_time: po.estimated_delivery_time || undefined,
+          delivery_required: po.delivery_required || false
         };
       });
 
@@ -468,19 +532,38 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
       );
     }
 
-    // Helper to get delivery status badge - Shows "To be delivered by [provider name]"
+    // Helper to get delivery status badge - Enhanced to show delivery provider status
     const getDeliveryStatusBadge = (order: Order) => {
+      // Check if delivery is required
+      const requiresDelivery = order.delivery_required !== false; // Default to true if not specified
+      
+      // If no delivery provider assigned
       if (!order.delivery_provider_id && !order.delivery_provider_name) {
-        return (
-          <div className="text-xs">
-            <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200 text-xs">
-              🚚 No delivery assigned
-            </Badge>
-            <p className={`${mutedText} mt-1 text-[10px]`}>Awaiting assignment</p>
-          </div>
-        );
+        if (requiresDelivery) {
+          return (
+            <div className="text-xs">
+              <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-300 text-xs">
+                ⏳ Awaiting Delivery Provider
+              </Badge>
+              <p className={`${mutedText} mt-1 text-[10px]`}>
+                {order.status === 'confirmed' || order.status === 'pending' 
+                  ? 'Builder accepted - awaiting provider assignment' 
+                  : 'Delivery requested - awaiting assignment'}
+              </p>
+            </div>
+          );
+        } else {
+          return (
+            <div className="text-xs">
+              <Badge variant="outline" className="bg-gray-50 text-gray-600 border-gray-200 text-xs">
+                📦 Pickup Only
+              </Badge>
+            </div>
+          );
+        }
       }
       
+      // Delivery provider is assigned
       const deliveryStatusColors: Record<string, string> = {
         pending: 'bg-gray-100 text-gray-700 border-gray-300',
         requested: 'bg-yellow-100 text-yellow-700 border-yellow-300',
@@ -493,21 +576,46 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
       };
       
       const status = order.delivery_status || 'assigned';
+      const isInTransit = status === 'in_transit' || status === 'picked_up';
       const isAccepted = status === 'accepted' || status === 'picked_up' || status === 'in_transit' || status === 'delivered';
+      const isDelivered = status === 'delivered';
       
       return (
-        <div className="space-y-1 min-w-[140px]">
-          {/* Show "To be delivered by" with provider name */}
-          <div className={`text-xs p-2 rounded ${isAccepted ? 'bg-green-50 border border-green-200' : 'bg-blue-50 border border-blue-200'}`}>
-            <p className={`font-semibold ${isAccepted ? 'text-green-700' : 'text-blue-700'}`}>
-              {isAccepted ? '✅ Accepted' : '📋 Assigned'}
-            </p>
-            <p className="font-medium text-gray-800 mt-1">
-              🚚 To be delivered by:
-            </p>
-            <p className="font-bold text-blue-600">{order.delivery_provider_name}</p>
+        <div className="space-y-1 min-w-[160px]">
+          {/* Show delivery provider information */}
+          <div className={`text-xs p-2 rounded ${
+            isDelivered ? 'bg-emerald-50 border border-emerald-200' :
+            isInTransit ? 'bg-indigo-50 border border-indigo-200' :
+            isAccepted ? 'bg-green-50 border border-green-200' : 
+            'bg-blue-50 border border-blue-200'
+          }`}>
+            {isInTransit ? (
+              <>
+                <p className="font-semibold text-indigo-700 mb-1">
+                  🚚 In Transit to Destination
+                </p>
+                <p className="font-bold text-indigo-600">{order.delivery_provider_name}</p>
+              </>
+            ) : isDelivered ? (
+              <>
+                <p className="font-semibold text-emerald-700 mb-1">
+                  ✓ Delivered by:
+                </p>
+                <p className="font-bold text-emerald-600">{order.delivery_provider_name}</p>
+              </>
+            ) : (
+              <>
+                <p className={`font-semibold ${isAccepted ? 'text-green-700' : 'text-blue-700'} mb-1`}>
+                  {isAccepted ? '✅ Accepted' : '📋 Assigned'}
+                </p>
+                <p className="font-medium text-gray-800 mt-1">
+                  Delivered by:
+                </p>
+                <p className="font-bold text-blue-600">{order.delivery_provider_name}</p>
+              </>
+            )}
             {order.delivery_provider_phone && (
-              <p className="text-gray-500 text-[10px]">📞 {order.delivery_provider_phone}</p>
+              <p className="text-gray-500 text-[10px] mt-1">📞 {order.delivery_provider_phone}</p>
             )}
           </div>
           {/* Status badge */}
@@ -581,10 +689,20 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
                     {getDeliveryStatusBadge(order)}
                   </TableCell>
                   <TableCell>
-                    <Badge className={`${statusConfig.color} flex items-center gap-1 w-fit`}>
-                      <StatusIcon className="h-3 w-3" />
-                      {statusConfig.label}
-                    </Badge>
+                    <div className="space-y-1">
+                      <Badge className={`${statusConfig.color} flex items-center gap-1 w-fit`}>
+                        <StatusIcon className="h-3 w-3" />
+                        {statusConfig.label}
+                      </Badge>
+                      {/* Show if builder accepted the order */}
+                      {(order.status === 'confirmed' || (order.status === 'pending' && order.order_type === 'quote_request')) && (
+                        <p className="text-[10px] text-green-600 mt-1">✓ Builder Accepted</p>
+                      )}
+                      {/* Show if delivery was requested */}
+                      {order.delivery_required && !order.delivery_provider_id && (
+                        <p className="text-[10px] text-blue-600 mt-1">📦 Delivery Requested</p>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className={`text-sm ${mutedText}`}>
                     {format(new Date(order.created_at), 'MMM dd, HH:mm')}
