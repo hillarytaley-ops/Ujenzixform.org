@@ -669,10 +669,16 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
                       variant="outline" 
                       className={order.order_type === 'direct_purchase' 
                         ? 'bg-green-50 text-green-700 border-green-200' 
+                        : (order.status === 'confirmed' || (order.status === 'pending' && order.order_type === 'quote_request'))
+                        ? 'bg-purple-50 text-purple-700 border-purple-200'
                         : 'bg-blue-50 text-blue-700 border-blue-200'
                       }
                     >
-                      {order.order_type === 'direct_purchase' ? '🛒 Direct' : '📋 Quote'}
+                      {order.order_type === 'direct_purchase' 
+                        ? '🛒 Direct' 
+                        : (order.status === 'confirmed' || (order.status === 'pending' && order.order_type === 'quote_request'))
+                        ? '📦 Order'
+                        : '📋 Quote'}
                     </Badge>
                     {order.buyer_role && (
                       <p className={`text-[10px] mt-1 ${mutedText}`}>
