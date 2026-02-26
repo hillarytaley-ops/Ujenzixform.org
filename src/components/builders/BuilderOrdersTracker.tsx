@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -238,6 +238,189 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
   const [activeFilter, setActiveFilter] = useState<OrderFilter>('pending'); // Default to pending orders
   const { toast } = useToast();
 
+  // Define fetchOrders with useCallback to ensure stable reference
+  const fetchOrders = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      console.log('🔍 BuilderOrdersTracker: Fetching orders for builder:', builderId);
+      
+      // Use native fetch with timeout for faster loading
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      
+      // Get access token from localStorage
+      const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      let accessToken = '';
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          accessToken = parsed.access_token || '';
+        } catch (e) {}
+      }
+      
+      const headers: Record<string, string> = { 'apikey': apiKey };
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+      }
+      
+      // Fetch purchase orders for this builder with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+      
+      // Fetch purchase orders with delivery provider information
+      // Note: Using * selects all columns including delivery_provider fields
+      const ordersResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${builderId}&select=*&order=created_at.desc`,
+        { headers, signal: controller.signal, cache: 'no-store' }
+      );
+      clearTimeout(timeoutId);
+      
+      if (!ordersResponse.ok) {
+        throw new Error(`HTTP ${ordersResponse.status}`);
+      }
+      
+      const ordersData = await ordersResponse.json();
+      console.log('📦 Orders fetched:', ordersData?.length || 0, 'orders');
+
+      if (!ordersData || ordersData.length === 0) {
+        setOrders([]);
+        setLoading(false);
+        return;
+      }
+
+      // Fetch material items for these orders
+      const orderIds = ordersData.map((po: any) => po.id);
+      const allMaterialItems: MaterialItem[] = [];
+      
+      try {
+        const itemsController = new AbortController();
+        const itemsTimeoutId = setTimeout(() => itemsController.abort(), 5000);
+        
+        const itemsResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/material_items?purchase_order_id=in.(${orderIds.join(',')})&select=*&order=item_sequence.asc`,
+          { headers, signal: itemsController.signal, cache: 'no-store' }
+        );
+        clearTimeout(itemsTimeoutId);
+        
+        if (itemsResponse.ok) {
+          const itemsData = await itemsResponse.json();
+          allMaterialItems.push(...itemsData);
+          console.log('📦 Material items fetched:', allMaterialItems.length);
+        }
+      } catch (error: any) {
+        if (error?.name !== 'AbortError') {
+          console.log('⚠️ Material items fetch timeout, continuing without items');
+        }
+      }
+
+      // Combine orders with their material items
+      const ordersWithItems: PurchaseOrder[] = ordersData.map((po: any) => {
+        const items = allMaterialItems.filter((item: MaterialItem) => item.buyer_id === po.buyer_id);
+        return {
+          ...po,
+          material_items: items.length > 0 ? items : po.items || []
+        };
+      });
+
+      console.log('📦 Orders with items:', ordersWithItems.length);
+      setOrders(ordersWithItems);
+    } catch (error: any) {
+      console.error('❌ Error fetching orders:', error);
+      setOrders([]);
+      if (error?.name !== 'AbortError') {
+        toast({
+          title: 'Error',
+          description: 'Failed to load orders',
+          variant: 'destructive'
+        });
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [builderId, toast]);
+
+  // Define fetchScanEvents with useCallback
+  const fetchScanEvents = useCallback(async () => {
+    try {
+      // Use native fetch with timeout for faster loading
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      let accessToken = '';
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          accessToken = parsed.access_token || '';
+        } catch (e) {}
+      }
+      const headers: Record<string, string> = { 'apikey': apiKey };
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+      }
+
+      // Fetch scan events for this builder's orders
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
+      const scansResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/qr_scan_events?buyer_id=eq.${builderId}&order=created_at.desc&limit=50`,
+        { headers, signal: controller.signal, cache: 'no-store' }
+      );
+      clearTimeout(timeoutId);
+
+      if (scansResponse.ok) {
+        const scansData = await scansResponse.json();
+        
+        // Enrich scan events with order information
+        const enrichedScans: ScanEvent[] = [];
+        for (const scan of scansData) {
+          try {
+            // Fetch material item info
+            const itemRes = await fetch(
+              `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${scan.qr_code}&select=purchase_order_id,material_type&limit=1`,
+              { headers, cache: 'no-store' }
+            );
+            
+            if (itemRes.ok) {
+              const items = await itemRes.json();
+              const item = items[0];
+              
+              if (item?.purchase_order_id) {
+                const orderRes = await fetch(
+                  `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${item.purchase_order_id}&select=po_number&limit=1`,
+                  { headers, cache: 'no-store' }
+                );
+                if (orderRes.ok) {
+                  const orders = await orderRes.json();
+                  const order = orders[0];
+                  enrichedScans.push({
+                    ...scan,
+                    purchase_order_id: item.purchase_order_id,
+                    po_number: order?.po_number || null,
+                    material_type: item.material_type || null,
+                  });
+                  continue;
+                }
+              }
+            }
+          } catch (e) {
+            console.log('Could not enrich scan:', e);
+          }
+          
+          // If enrichment failed, add scan as-is
+          enrichedScans.push(scan);
+        }
+        
+        setScanEvents(enrichedScans);
+      }
+    } catch (error: any) {
+      if (error?.name !== 'AbortError') {
+        console.error('Error fetching scan events:', error);
+      }
+    }
+  }, [builderId]);
+
   useEffect(() => {
     if (!builderId) {
       setLoading(false);
@@ -396,185 +579,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       supabase.removeChannel(itemsChannel);
       supabase.removeChannel(scansChannel);
     };
-  }, [builderId, toast]);
-
-  const fetchOrders = async () => {
-    try {
-      setLoading(true);
-      
-      console.log('🔍 BuilderOrdersTracker: Fetching orders for builder:', builderId);
-      
-      // Use native fetch with timeout for faster loading
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-      
-      // Get access token from localStorage
-      const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-      let accessToken = '';
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored);
-          accessToken = parsed.access_token || '';
-        } catch (e) {}
-      }
-      
-      const headers: Record<string, string> = { 'apikey': apiKey };
-      if (accessToken) {
-        headers['Authorization'] = `Bearer ${accessToken}`;
-      }
-      
-      // Fetch purchase orders for this builder with timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
-      
-      // Fetch purchase orders with delivery provider information
-      // Note: Using * selects all columns including delivery_provider fields
-      const ordersResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${builderId}&select=*&order=created_at.desc`,
-        { headers, signal: controller.signal, cache: 'no-store' }
-      );
-      clearTimeout(timeoutId);
-      
-      if (!ordersResponse.ok) {
-        throw new Error(`HTTP ${ordersResponse.status}`);
-      }
-      
-      const ordersData = await ordersResponse.json();
-      console.log('📦 Orders fetched:', ordersData?.length || 0, 'orders');
-
-      if (!ordersData || ordersData.length === 0) {
-        setOrders([]);
-        setLoading(false);
-        return;
-      }
-
-      // Fetch all material items for all orders in one batch request
-      const orderIds = ordersData.map((o: any) => o.id);
-      const orderIdsParam = orderIds.join(',');
-      
-      let allMaterialItems: MaterialItem[] = [];
-      try {
-        const itemsController = new AbortController();
-        const itemsTimeoutId = setTimeout(() => itemsController.abort(), 5000);
-        
-        const itemsResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/material_items?purchase_order_id=in.(${orderIdsParam})&order=item_sequence.asc`,
-          { headers, signal: itemsController.signal, cache: 'no-store' }
-        );
-        clearTimeout(itemsTimeoutId);
-        
-        if (itemsResponse.ok) {
-          allMaterialItems = await itemsResponse.json();
-          console.log('📦 Material items fetched:', allMaterialItems.length);
-        }
-      } catch (e) {
-        console.log('⚠️ Material items fetch timeout, continuing without items');
-      }
-
-      // Group material items by order
-      const itemsByOrder = new Map<string, MaterialItem[]>();
-      allMaterialItems.forEach(item => {
-        const orderId = (item as any).purchase_order_id;
-        if (!itemsByOrder.has(orderId)) {
-          itemsByOrder.set(orderId, []);
-        }
-        itemsByOrder.get(orderId)!.push(item);
-      });
-
-      // Combine orders with their items
-      const ordersWithItems = ordersData.map((order: any) => ({
-        ...order,
-        material_items: itemsByOrder.get(order.id) || []
-      }));
-
-      console.log('📦 Orders with items:', ordersWithItems.length);
-      setOrders(ordersWithItems);
-    } catch (error: any) {
-      console.error('❌ Error fetching orders:', error?.message || error);
-      if (error?.name !== 'AbortError') {
-        toast({
-          title: 'Error',
-          description: 'Failed to load orders',
-          variant: 'destructive'
-        });
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchScanEvents = async () => {
-    try {
-      // Use native fetch with timeout for faster loading
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-      
-      // Get access token from localStorage
-      const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-      let accessToken = '';
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored);
-          accessToken = parsed.access_token || '';
-        } catch (e) {}
-      }
-      
-      const headers: Record<string, string> = { 'apikey': apiKey };
-      if (accessToken) {
-        headers['Authorization'] = `Bearer ${accessToken}`;
-      }
-      
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
-      
-      // Fetch scan events and material items separately, then join in memory
-      const [scansRes, itemsRes] = await Promise.all([
-        fetch(`${SUPABASE_URL}/rest/v1/qr_scan_events?order=scanned_at.desc&limit=50`, { headers, signal: controller.signal, cache: 'no-store' }),
-        fetch(`${SUPABASE_URL}/rest/v1/material_items?select=id,qr_code,purchase_order_id,material_type`, { headers, signal: controller.signal, cache: 'no-store' })
-      ]);
-      clearTimeout(timeoutId);
-      
-      if (scansRes.ok && itemsRes.ok) {
-        const scans = await scansRes.json();
-        const items = await itemsRes.json();
-        const itemsMap = new Map(items.map((item: any) => [item.qr_code, item]));
-        
-        // Fetch purchase orders for the items
-        const orderIds = [...new Set(items.map((item: any) => item.purchase_order_id).filter(Boolean))];
-        let ordersMap = new Map();
-        if (orderIds.length > 0) {
-          const ordersParam = orderIds.join(',');
-          const ordersController = new AbortController();
-          const ordersTimeoutId = setTimeout(() => ordersController.abort(), 5000);
-          const ordersRes = await fetch(
-            `${SUPABASE_URL}/rest/v1/purchase_orders?id=in.(${ordersParam})&select=id,po_number`,
-            { headers, signal: ordersController.signal, cache: 'no-store' }
-          );
-          clearTimeout(ordersTimeoutId);
-          if (ordersRes.ok) {
-            const orders = await ordersRes.json();
-            ordersMap = new Map(orders.map((order: any) => [order.id, order]));
-          }
-        }
-        
-        const transformedData = scans.map((scan: any) => {
-          const item = itemsMap.get(scan.qr_code);
-          const order = item?.purchase_order_id ? ordersMap.get(item.purchase_order_id) : null;
-          return {
-            ...scan,
-            purchase_order_id: item?.purchase_order_id || null,
-            po_number: order?.po_number || null,
-            material_type: item?.material_type || null,
-          };
-        });
-        setScanEvents(transformedData);
-      }
-    } catch (error: any) {
-      if (error?.name !== 'AbortError') {
-        console.error('Error fetching scan events:', error);
-      }
-    }
-  };
+  }, [builderId, toast, fetchOrders, fetchScanEvents]);
 
 
   // Order status flow: confirmed → dispatched → in_transit → delivered
