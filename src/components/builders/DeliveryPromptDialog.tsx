@@ -702,9 +702,9 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
                   💡 Click "Search on Map" to select location visually on an interactive map
                 </p>
               </div>
-                
-                {/* Delivery Map Picker */}
-                {showDeliveryMap && (
+
+              {/* Delivery Map Picker */}
+              {showDeliveryMap && (
                   <div className="mt-3 border-2 border-blue-500 rounded-lg p-4 bg-white shadow-lg">
                     <MapLocationPicker
                       initialLocation={
