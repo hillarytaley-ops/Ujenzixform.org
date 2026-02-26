@@ -320,48 +320,117 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
         itemsByOrder.get(orderId)!.push(item);
       });
 
-      // Fetch delivery provider names for orders that have provider_id but no name
-      const ordersNeedingProviderNames = ordersData.filter((o: any) => 
-        o.delivery_provider_id && !o.delivery_provider_name
-      );
+      // Fetch delivery requests to get provider information for orders
+      let deliveryRequestsMap = new Map<string, any>();
+      try {
+        const drController = new AbortController();
+        const drTimeoutId = setTimeout(() => drController.abort(), 5000);
+        
+        // Fetch delivery requests that are accepted/assigned for these orders
+        const drResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${orderIdsParam})&status=in.(accepted,assigned,picked_up,in_transit,delivered)&provider_id=not.is.null&select=purchase_order_id,provider_id,status`,
+          { headers, signal: drController.signal, cache: 'no-store' }
+        );
+        clearTimeout(drTimeoutId);
+        
+        if (drResponse.ok) {
+          const deliveryRequests = await drResponse.json();
+          console.log('🚚 Delivery requests fetched:', deliveryRequests.length);
+          
+          // Map delivery requests to purchase orders
+          deliveryRequests.forEach((dr: any) => {
+            if (dr.purchase_order_id && dr.provider_id) {
+              deliveryRequestsMap.set(dr.purchase_order_id, dr);
+            }
+          });
+        }
+      } catch (e) {
+        console.log('⚠️ Delivery requests fetch timeout, continuing without delivery request data');
+      }
       
+      // Collect all provider IDs (from purchase_orders and delivery_requests)
+      const allProviderIds = new Set<string>();
+      ordersData.forEach((o: any) => {
+        if (o.delivery_provider_id) allProviderIds.add(o.delivery_provider_id);
+        const dr = deliveryRequestsMap.get(o.id);
+        if (dr?.provider_id) allProviderIds.add(dr.provider_id);
+      });
+      
+      // Fetch provider names for all provider IDs
       let providerNamesMap = new Map<string, string>();
-      if (ordersNeedingProviderNames.length > 0) {
+      if (allProviderIds.size > 0) {
         try {
-          const providerIds = [...new Set(ordersNeedingProviderNames.map((o: any) => o.delivery_provider_id).filter(Boolean))];
-          if (providerIds.length > 0) {
-            const providerIdsParam = providerIds.join(',');
-            const providersController = new AbortController();
-            const providersTimeoutId = setTimeout(() => providersController.abort(), 5000);
-            
-            // Fetch provider names from delivery_providers table
-            const providersRes = await fetch(
-              `${SUPABASE_URL}/rest/v1/delivery_providers?id=in.(${providerIdsParam})&select=id,provider_name,company_name`,
+          const providerIdsArray = Array.from(allProviderIds);
+          const providerIdsParam = providerIdsArray.join(',');
+          const providersController = new AbortController();
+          const providersTimeoutId = setTimeout(() => providersController.abort(), 5000);
+          
+          // Fetch provider names from delivery_providers table
+          const providersRes = await fetch(
+            `${SUPABASE_URL}/rest/v1/delivery_providers?id=in.(${providerIdsParam})&select=id,provider_name,company_name`,
+            { headers, signal: providersController.signal, cache: 'no-store' }
+          );
+          
+          if (providersRes.ok) {
+            const providers = await providersRes.json();
+            providers.forEach((p: any) => {
+              providerNamesMap.set(p.id, p.provider_name || p.company_name || 'Delivery Provider');
+            });
+            console.log('👤 Provider names fetched:', providerNamesMap.size);
+          }
+          
+          // Also try to get from profiles table (in case provider is a user)
+          try {
+            const profilesRes = await fetch(
+              `${SUPABASE_URL}/rest/v1/profiles?user_id=in.(${providerIdsParam})&select=user_id,full_name`,
               { headers, signal: providersController.signal, cache: 'no-store' }
             );
-            
-            if (providersRes.ok) {
-              const providers = await providersRes.json();
-              providers.forEach((p: any) => {
-                providerNamesMap.set(p.id, p.provider_name || p.company_name || 'Delivery Provider');
+            if (profilesRes.ok) {
+              const profiles = await profilesRes.json();
+              profiles.forEach((p: any) => {
+                if (p.user_id && p.full_name && !providerNamesMap.has(p.user_id)) {
+                  providerNamesMap.set(p.user_id, p.full_name);
+                }
               });
             }
-            clearTimeout(providersTimeoutId);
+          } catch (e) {
+            console.log('⚠️ Profiles fetch failed, continuing');
           }
+          
+          clearTimeout(providersTimeoutId);
         } catch (e) {
           console.log('⚠️ Provider names fetch timeout, continuing without names');
         }
       }
 
-      // Combine orders with their items and enriched provider names
-      const ordersWithItems = ordersData.map((order: any) => ({
-        ...order,
-        material_items: itemsByOrder.get(order.id) || [],
-        // Set provider name if we found it
-        delivery_provider_name: order.delivery_provider_name || 
-          (order.delivery_provider_id ? providerNamesMap.get(order.delivery_provider_id) : null) || 
-          order.delivery_provider_name
-      }));
+      // Combine orders with their items and enriched provider information
+      const ordersWithItems = ordersData.map((order: any) => {
+        const dr = deliveryRequestsMap.get(order.id);
+        
+        // Get provider ID from delivery_request if not in purchase_order
+        const providerId = order.delivery_provider_id || dr?.provider_id;
+        
+        // Get provider name - prioritize purchase_order, then delivery_request, then lookup
+        let providerName = order.delivery_provider_name;
+        if (!providerName && providerId) {
+          providerName = providerNamesMap.get(providerId) || null;
+        }
+        
+        // Update delivery_status if delivery_request has more recent status
+        let deliveryStatus = order.delivery_status;
+        if (dr?.status && ['accepted', 'assigned', 'picked_up', 'in_transit', 'delivered'].includes(dr.status)) {
+          deliveryStatus = dr.status;
+        }
+        
+        return {
+          ...order,
+          material_items: itemsByOrder.get(order.id) || [],
+          // Enrich with provider information
+          delivery_provider_id: providerId || order.delivery_provider_id,
+          delivery_provider_name: providerName || order.delivery_provider_name,
+          delivery_status: deliveryStatus || order.delivery_status
+        };
+      });
 
       console.log('📦 Orders with items:', ordersWithItems.length);
       setOrders(ordersWithItems);
