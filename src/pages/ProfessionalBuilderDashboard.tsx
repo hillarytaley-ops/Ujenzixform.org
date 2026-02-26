@@ -1991,7 +1991,7 @@ const ProfessionalBuilderDashboardPage = () => {
             })()}
           </TabsContent>
 
-          {/* Deliveries Tab - Contains Request Materials, Delivery Schedule, and Delivery History as sub-tabs */}
+          {/* Deliveries Tab - Contains Request Delivery, Delivery Schedule, and Delivery History as sub-tabs */}
           <TabsContent value="deliveries" className="mt-0">
             <Card>
               <CardContent className="p-0">
@@ -2002,7 +2002,7 @@ const ProfessionalBuilderDashboardPage = () => {
                       className="data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-sm data-[state=active]:border-blue-200 data-[state=active]:border py-3 rounded-md font-medium transition-all"
                     >
                       <Send className="h-4 w-4 mr-2 text-blue-600" />
-                      <span>Request Materials</span>
+                      <span>Request Delivery</span>
                     </TabsTrigger>
                     <TabsTrigger 
                       value="schedule"
@@ -2020,13 +2020,13 @@ const ProfessionalBuilderDashboardPage = () => {
                     </TabsTrigger>
                   </TabsList>
                   
-                  {/* Request Materials Sub-tab */}
+                  {/* Request Delivery Sub-tab */}
                   <TabsContent value="request" className="mt-0">
                     <Card>
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                           <Send className="h-5 w-5 text-teal-600" />
-                          Request Materials
+                          Request Delivery
                         </CardTitle>
                         <CardDescription>
                           Request delivery for materials sourced outside UjenziXform or for site-to-site transfers
