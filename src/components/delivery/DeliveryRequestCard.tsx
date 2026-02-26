@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -67,6 +67,7 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
   const [isRejecting, setIsRejecting] = useState(false);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
+  const acceptingRef = useRef(false); // Use ref for immediate click prevention
   const { toast } = useToast();
 
   const getStatusColor = (status: string) => {
@@ -120,29 +121,31 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
     }).format(amount);
   };
 
-  const handleAccept = async () => {
-    // Prevent double-click
-    if (isAccepting) return;
+  const handleAccept = async (e?: React.MouseEvent) => {
+    // Prevent event bubbling and default behavior
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     
+    // Prevent double-click using ref (immediate check, no state delay)
+    if (acceptingRef.current || isAccepting) {
+      console.log('🛑 Already accepting, ignoring click');
+      return;
+    }
+    
+    // Set both ref and state immediately
+    acceptingRef.current = true;
     setIsAccepting(true);
     console.log('🔘 DeliveryRequestCard: Accept clicked for:', delivery.id);
     
-    // Just call the parent callback - let the parent handle the database update
-    // This prevents double database updates
-    if (onAccept) {
-      try {
+    try {
+      // Just call the parent callback - let the parent handle the database update
+      // This prevents double database updates
+      if (onAccept) {
         await onAccept(delivery.id);
-      } catch (error: any) {
-        console.error('Error in onAccept callback:', error);
-        toast({
-          title: "Error",
-          description: error.message || "Failed to accept delivery. Please try again.",
-          variant: "destructive"
-        });
-      }
-    } else {
-      // Fallback: If no onAccept callback, do direct update
-      try {
+      } else {
+        // Fallback: If no onAccept callback, do direct update
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('User not authenticated');
 
@@ -165,17 +168,22 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
           title: "✅ Delivery Accepted!",
           description: `Tracking: ${trackingNumber}. Navigate to pickup location!`,
         });
-      } catch (error: any) {
-        console.error('Error accepting delivery:', error);
-        toast({
-          title: "Error",
-          description: error.message || "Failed to accept delivery.",
-          variant: "destructive"
-        });
       }
+    } catch (error: any) {
+      console.error('Error accepting delivery:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to accept delivery. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      // Only reset if the delivery is still pending (operation might have changed status)
+      // This prevents re-enabling if the delivery was successfully accepted
+      setTimeout(() => {
+        acceptingRef.current = false;
+        setIsAccepting(false);
+      }, 1000); // Small delay to prevent rapid re-clicks
     }
-    
-    setIsAccepting(false);
   };
 
   const handleReject = async () => {
@@ -413,8 +421,9 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
                   <div className="flex gap-2 w-full">
                     <Button 
                       className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                      onClick={handleAccept}
-                      disabled={isAccepting}
+                      onClick={(e) => handleAccept(e)}
+                      disabled={isAccepting || acceptingRef.current}
+                      type="button"
                     >
                       {isAccepting ? (
                         <>
