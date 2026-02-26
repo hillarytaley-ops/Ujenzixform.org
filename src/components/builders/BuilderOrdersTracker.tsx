@@ -238,7 +238,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
   const [activeFilter, setActiveFilter] = useState<OrderFilter>('pending'); // Default to pending orders
   const { toast } = useToast();
 
-  // Define fetchOrders with useCallback to ensure stable reference
+  // Define fetchOrders - using useCallback but will be recreated when builderId/toast changes
   const fetchOrders = useCallback(async () => {
     try {
       setLoading(true);
