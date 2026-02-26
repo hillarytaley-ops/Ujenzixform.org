@@ -729,8 +729,11 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       return '✅ Received';
     }
     
-    // For quoted orders (supplier has responded), show "Supplier Responded"
+    // For quoted orders (supplier has responded), show delivery provider status if assigned
     if (status === 'quoted') {
+      if (hasDeliveryProvider) {
+        return `Supplier Responded - To Be Delivered by ${providerName}`;
+      }
       return 'Supplier Responded';
     }
     
@@ -893,12 +896,12 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                   ? 'bg-green-500 text-white'
                   : 'bg-gray-200 text-gray-400'
               }`}>✓</div>
-              <div className={`w-4 h-0.5 ${
-                ['dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status) ||
-                (order.delivery_provider_id && ['pending', 'confirmed'].includes(order.status))
-                  ? 'bg-green-500'
-                  : 'bg-gray-200'
-              }`} />
+                        <div className={`w-4 h-0.5 ${
+                          ['dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status) ||
+                          (order.delivery_provider_id && ['pending', 'confirmed', 'quoted'].includes(order.status))
+                            ? 'bg-green-500'
+                            : 'bg-gray-200'
+                        }`} />
               {/* Dispatched */}
               <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
                 ['dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status)
@@ -967,19 +970,23 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                 {/* Step 1: Pending/Confirmed */}
                 <div className="flex flex-col items-center">
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                    ['pending', 'confirmed', 'dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status)
+                    ['pending', 'confirmed', 'quoted', 'dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status)
                       ? 'bg-green-500 text-white'
                       : 'bg-gray-200 text-gray-400'
                   }`}>
                     <CheckCircle className="h-5 w-5" />
                   </div>
-                  <span className="text-xs mt-1 font-medium">Accepted</span>
+                  <span className="text-xs mt-1 font-medium">
+                    {order.status === 'quoted' ? 'Supplier Responded' : 'Accepted'}
+                  </span>
                   {order.delivery_provider_id || order.delivery_provider_name ? (
                     <span className="text-[10px] text-green-600 mt-0.5 font-medium">
                       To be delivered by: {order.delivery_provider_name || 'Provider'}
                     </span>
                   ) : (
-                    <span className="text-[10px] text-gray-500 mt-0.5">Awaiting Provider</span>
+                    <span className="text-[10px] text-gray-500 mt-0.5">
+                      {order.status === 'quoted' ? 'Awaiting Provider' : 'Awaiting Provider'}
+                    </span>
                   )}
                 </div>
                 
@@ -1156,31 +1163,36 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
     </Card>
   );
 
-  // Group pending orders into two categories: accepted by provider vs awaiting provider
+  // Group pending orders into three categories: supplier responded, accepted by provider, awaiting provider
   const getGroupedPendingOrders = () => {
     if (activeFilter !== 'pending') {
-      return { acceptedByProvider: [], awaitingProvider: [] };
+      return { supplierResponded: [], acceptedByProvider: [], awaitingProvider: [] };
     }
     
+    const supplierResponded: PurchaseOrder[] = [];
     const acceptedByProvider: PurchaseOrder[] = [];
     const awaitingProvider: PurchaseOrder[] = [];
     
     filteredOrders.forEach(order => {
+      const orderStatus = order.status || 'pending';
       const hasProvider = order.delivery_provider_id || order.delivery_provider_name;
       const deliveryStatus = order.delivery_status || 'pending';
       const providerAccepted = hasProvider || ['assigned', 'accepted', 'picked_up', 'in_transit', 'delivered'].includes(deliveryStatus);
       
-      if (providerAccepted) {
+      // Separate "Supplier Responded" (quoted) orders
+      if (orderStatus === 'quoted') {
+        supplierResponded.push(order);
+      } else if (providerAccepted) {
         acceptedByProvider.push(order);
       } else {
         awaitingProvider.push(order);
       }
     });
     
-    return { acceptedByProvider, awaitingProvider };
+    return { supplierResponded, acceptedByProvider, awaitingProvider };
   };
 
-  const { acceptedByProvider, awaitingProvider } = getGroupedPendingOrders();
+  const { supplierResponded, acceptedByProvider, awaitingProvider } = getGroupedPendingOrders();
 
   // Calculate stats - Count ORDERS (not items) to match the tab filtering
   const totalOrders = orders.length;
@@ -1371,6 +1383,23 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
           ) : activeFilter === 'pending' ? (
             // Grouped display for pending orders
             <div className="space-y-6">
+              {/* Supplier Responded Orders */}
+              {supplierResponded.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 pb-2 border-b border-blue-200">
+                    <CheckCircle className="h-5 w-5 text-blue-600" />
+                    <h3 className="text-lg font-semibold text-blue-700">
+                      Quotes Responded to by Supplier ({supplierResponded.length})
+                    </h3>
+                  </div>
+                  {supplierResponded.map((order) => {
+                    const isExpanded = expandedOrder === order.id;
+                    const progress = getOrderProgress(order.material_items || []);
+                    return renderOrderCard(order, isExpanded, progress);
+                  })}
+                </div>
+              )}
+              
               {/* Orders Accepted by Delivery Provider */}
               {acceptedByProvider.length > 0 && (
                 <div className="space-y-3">
