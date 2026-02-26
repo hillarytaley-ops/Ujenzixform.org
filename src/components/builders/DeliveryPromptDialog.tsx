@@ -744,7 +744,6 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
                     />
                   </div>
                 )}
-              </div>
 
               <div className="relative py-1">
                 <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
