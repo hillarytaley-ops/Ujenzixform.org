@@ -588,6 +588,37 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
     const status = order.status || 'pending';
     const hasDeliveryProvider = order.delivery_provider_id || order.delivery_provider_name;
     const providerName = order.delivery_provider_name || 'Delivery Provider';
+    const items = order.material_items || [];
+    
+    // Check if items are dispatched, in transit, or received (regardless of order status)
+    const hasDispatchedItems = items.some((i: any) => (i.dispatch_scanned || i.status === 'dispatched') && !['in_transit', 'received', 'verified'].includes(i.status) && !i.receive_scanned);
+    const hasInTransitItems = items.some((i: any) => i.status === 'in_transit');
+    const hasReceivedItems = items.some((i: any) => ['received', 'verified'].includes(i.status) || i.receive_scanned);
+    
+    // For orders with dispatched items, show provider name (dispatched orders MUST have a provider)
+    if (hasDispatchedItems) {
+      if (hasDeliveryProvider) {
+        return `📦 To Be Delivered by ${providerName}`;
+      }
+      // Even if provider name not in data, show dispatched status (provider exists but name not loaded)
+      return '📦 Dispatched';
+    }
+    
+    // For orders with in-transit items, show provider name
+    if (hasInTransitItems) {
+      if (hasDeliveryProvider) {
+        return `🚚 To Be Delivered by ${providerName}`;
+      }
+      return '🚚 In Transit';
+    }
+    
+    // For orders with received items, show who delivered it
+    if (hasReceivedItems) {
+      if (hasDeliveryProvider) {
+        return `✅ Delivered by ${providerName}`;
+      }
+      return '✅ Received';
+    }
     
     // For pending and confirmed orders (accepted quotes), show delivery provider status
     if (status === 'pending' || status === 'confirmed') {
