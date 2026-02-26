@@ -751,21 +751,6 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
                 <div className="relative flex justify-center text-xs"><span className="bg-white px-2 text-gray-400">or address</span></div>
               </div>
 
-                  {/* Delivery Address - Text */}
-                  <div className="space-y-2">
-                    <Label htmlFor="deliveryAddress" className="flex items-center gap-1 text-sm text-gray-600">
-                      <MapPin className="h-3 w-3" />
-                      Delivery Address (Street/Area)
-                    </Label>
-                    <Input
-                      id="deliveryAddress"
-                      placeholder="e.g., Plot 123, Ngong Road, Nairobi"
-                      value={deliveryData.deliveryAddress}
-                      onChange={(e) => setDeliveryData(prev => ({ ...prev, deliveryAddress: e.target.value }))}
-                    />
-                  </div>
-
-                  {/* Validation message */}
               {/* Address field */}
               <div className="space-y-1">
                 <Label className="text-xs text-gray-500">Delivery Address</Label>
