@@ -320,10 +320,47 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
         itemsByOrder.get(orderId)!.push(item);
       });
 
-      // Combine orders with their items
+      // Fetch delivery provider names for orders that have provider_id but no name
+      const ordersNeedingProviderNames = ordersData.filter((o: any) => 
+        o.delivery_provider_id && !o.delivery_provider_name
+      );
+      
+      let providerNamesMap = new Map<string, string>();
+      if (ordersNeedingProviderNames.length > 0) {
+        try {
+          const providerIds = [...new Set(ordersNeedingProviderNames.map((o: any) => o.delivery_provider_id).filter(Boolean))];
+          if (providerIds.length > 0) {
+            const providerIdsParam = providerIds.join(',');
+            const providersController = new AbortController();
+            const providersTimeoutId = setTimeout(() => providersController.abort(), 5000);
+            
+            // Fetch provider names from delivery_providers table
+            const providersRes = await fetch(
+              `${SUPABASE_URL}/rest/v1/delivery_providers?id=in.(${providerIdsParam})&select=id,provider_name,company_name`,
+              { headers, signal: providersController.signal, cache: 'no-store' }
+            );
+            
+            if (providersRes.ok) {
+              const providers = await providersRes.json();
+              providers.forEach((p: any) => {
+                providerNamesMap.set(p.id, p.provider_name || p.company_name || 'Delivery Provider');
+              });
+            }
+            clearTimeout(providersTimeoutId);
+          }
+        } catch (e) {
+          console.log('⚠️ Provider names fetch timeout, continuing without names');
+        }
+      }
+
+      // Combine orders with their items and enriched provider names
       const ordersWithItems = ordersData.map((order: any) => ({
         ...order,
-        material_items: itemsByOrder.get(order.id) || []
+        material_items: itemsByOrder.get(order.id) || [],
+        // Set provider name if we found it
+        delivery_provider_name: order.delivery_provider_name || 
+          (order.delivery_provider_id ? providerNamesMap.get(order.delivery_provider_id) : null) || 
+          order.delivery_provider_name
       }));
 
       console.log('📦 Orders with items:', ordersWithItems.length);
@@ -586,7 +623,10 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
   // Get human-readable status label with delivery provider info for orders
   const getStatusLabel = (order: any) => {
     const status = order.status || 'pending';
-    const hasDeliveryProvider = order.delivery_provider_id || order.delivery_provider_name;
+    const deliveryStatus = order.delivery_status || 'pending';
+    // Check if provider has accepted - either by ID/name or by delivery_status
+    const hasDeliveryProvider = order.delivery_provider_id || order.delivery_provider_name || 
+                                ['assigned', 'accepted', 'picked_up', 'in_transit', 'delivered'].includes(deliveryStatus);
     const providerName = order.delivery_provider_name || 'Delivery Provider';
     const items = order.material_items || [];
     
@@ -628,6 +668,13 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
     // For pending and confirmed orders (accepted quotes), show delivery provider status
     if (status === 'pending' || status === 'confirmed') {
       if (hasDeliveryProvider) {
+        // Show provider name if available, otherwise show generic message
+        if (order.delivery_provider_name && order.delivery_provider_name !== 'Delivery Provider') {
+          return `To Be Delivered by ${order.delivery_provider_name}`;
+        } else if (order.delivery_provider_id || ['assigned', 'accepted', 'picked_up', 'in_transit', 'delivered'].includes(deliveryStatus)) {
+          // Provider has accepted but name not loaded yet - show generic message
+          return 'To Be Delivered by Provider';
+        }
         return `To Be Delivered by ${providerName}`;
       }
       return 'Awaiting Delivery Provider';
