@@ -388,9 +388,15 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
 
   // Accept a delivery request - SINGLE CLICK
   const handleAcceptDelivery = async (requestId: string) => {
-    // Prevent double-click - check if already accepting ANY request
-    if (acceptingId) {
-      console.log('🛑 Already processing an accept request, ignoring click');
+    // Prevent double-click - check if already accepting THIS specific request
+    if (acceptingId === requestId) {
+      console.log('🛑 Already processing this accept request, ignoring click');
+      return;
+    }
+    
+    // Prevent accepting multiple requests simultaneously
+    if (acceptingId && acceptingId !== requestId) {
+      console.log('🛑 Already processing another accept request, ignoring click');
       return;
     }
     
