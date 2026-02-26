@@ -579,7 +579,8 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       supabase.removeChannel(itemsChannel);
       supabase.removeChannel(scansChannel);
     };
-  }, [builderId, toast, fetchOrders, fetchScanEvents]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [builderId, toast]);
 
 
   // Order status flow: confirmed → dispatched → in_transit → delivered
