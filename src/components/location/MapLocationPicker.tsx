@@ -76,6 +76,7 @@ export const MapLocationPicker: React.FC<MapLocationPickerProps> = ({
   title = "Select Delivery Location",
   description = "Search for an address or click on the map to set the delivery location"
 }) => {
+  console.log('🗺️ MapLocationPicker component rendered', { title, hasInitialLocation: !!initialLocation });
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);

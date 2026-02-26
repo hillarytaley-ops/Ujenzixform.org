@@ -732,8 +732,12 @@ const DeliveryRequest = () => {
                     type="button"
                     variant="outline"
                     size="icon"
-                    onClick={() => setShowPickupMap(true)}
-                    title="Search on map"
+                    onClick={() => {
+                      console.log('🗺️ Pickup Map button clicked');
+                      setShowPickupMap(true);
+                    }}
+                    title="Search on map - Click to open interactive map"
+                    className="border-blue-500 text-blue-600 hover:bg-blue-50"
                   >
                     <MapIcon className="h-4 w-4" />
                   </Button>
@@ -775,7 +779,8 @@ const DeliveryRequest = () => {
                 
                 {/* Pickup Map Picker */}
                 {showPickupMap && (
-                  <div className="mt-3 border border-green-300 rounded-lg p-3 bg-white">
+                  <div className="mt-3 border-2 border-blue-500 rounded-lg p-3 bg-white shadow-lg">
+                    {console.log('🗺️ Rendering Pickup MapLocationPicker')}
                     <MapLocationPicker
                       initialLocation={
                         formData.pickupCoordinates
@@ -853,8 +858,12 @@ const DeliveryRequest = () => {
                     type="button"
                     variant="outline"
                     size="icon"
-                    onClick={() => setShowDeliveryMap(true)}
-                    title="Search on map"
+                    onClick={() => {
+                      console.log('🗺️ Delivery Map button clicked');
+                      setShowDeliveryMap(true);
+                    }}
+                    title="Search on map - Click to open interactive map"
+                    className="border-blue-500 text-blue-600 hover:bg-blue-50"
                   >
                     <MapIcon className="h-4 w-4" />
                   </Button>
@@ -896,7 +905,8 @@ const DeliveryRequest = () => {
                 
                 {/* Delivery Map Picker */}
                 {showDeliveryMap && (
-                  <div className="mt-3 border border-blue-300 rounded-lg p-3 bg-white">
+                  <div className="mt-3 border-2 border-blue-500 rounded-lg p-3 bg-white shadow-lg">
+                    {console.log('🗺️ Rendering Delivery MapLocationPicker')}
                     <MapLocationPicker
                       initialLocation={
                         formData.deliveryCoordinates

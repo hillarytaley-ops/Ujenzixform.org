@@ -970,8 +970,12 @@ export const MonitoringServiceRequest: React.FC = () => {
                         type="button"
                         variant="outline"
                         size="icon"
-                        onClick={() => setShowProjectMap(true)}
-                        title="Search on map"
+                        onClick={() => {
+                          console.log('🗺️ Project Map button clicked');
+                          setShowProjectMap(true);
+                        }}
+                        title="Search on map - Click to open interactive map"
+                        className="border-blue-500 text-blue-600 hover:bg-blue-50"
                       >
                         <MapIcon className="h-4 w-4" />
                       </Button>
@@ -997,7 +1001,8 @@ export const MonitoringServiceRequest: React.FC = () => {
                     
                     {/* Interactive Map Picker */}
                     {showProjectMap && (
-                      <div className="mt-3 border border-blue-300 rounded-lg p-3 bg-white">
+                      <div className="mt-3 border-2 border-blue-500 rounded-lg p-3 bg-white shadow-lg">
+                        {console.log('🗺️ Rendering Project MapLocationPicker')}
                         <MapLocationPicker
                           initialLocation={
                             formData.projectGpsCoordinates
