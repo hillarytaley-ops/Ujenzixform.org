@@ -831,20 +831,20 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
           const orderStatus = order.status || 'pending';
           if (['dispatched', 'partially_dispatched'].includes(orderStatus)) return false; // Exclude dispatched orders
           
-          const hasDispatchedItems = items.some(i => (i.dispatch_scanned || i.status === 'dispatched') && !['in_transit', 'received', 'verified'].includes(i.status) && !i.receive_scanned);
-          if (hasDispatchedItems) return false; // Exclude orders with dispatched items
+          const pendingHasDispatchedItems = items.some(i => (i.dispatch_scanned || i.status === 'dispatched') && !['in_transit', 'received', 'verified'].includes(i.status) && !i.receive_scanned);
+          if (pendingHasDispatchedItems) return false; // Exclude orders with dispatched items
           
           const isPendingStatus = orderStatus === 'pending' || orderStatus === 'confirmed' || orderStatus === 'quoted';
           const hasPendingItems = items.some(i => !i.dispatch_scanned && !['dispatched', 'in_transit', 'received', 'verified'].includes(i.status));
           // Only show if status is pending/confirmed/quoted AND no items are dispatched
-          return (isPendingStatus || hasPendingItems) && !hasDispatchedItems;
+          return (isPendingStatus || hasPendingItems) && !pendingHasDispatchedItems;
         }
         case 'dispatched': {
           // Orders with dispatched status or dispatched items (but not yet in transit or received)
           const orderStatusForDispatch = order.status || 'pending';
           const hasDispatchedStatus = ['dispatched', 'partially_dispatched'].includes(orderStatusForDispatch);
-          const hasDispatchedItems = items.some(i => (i.dispatch_scanned || i.status === 'dispatched') && !['in_transit', 'received', 'verified'].includes(i.status) && !i.receive_scanned);
-          return hasDispatchedStatus || hasDispatchedItems;
+          const dispatchedHasDispatchedItems = items.some(i => (i.dispatch_scanned || i.status === 'dispatched') && !['in_transit', 'received', 'verified'].includes(i.status) && !i.receive_scanned);
+          return hasDispatchedStatus || dispatchedHasDispatchedItems;
         }
         case 'in_transit': {
           // Orders currently being delivered
