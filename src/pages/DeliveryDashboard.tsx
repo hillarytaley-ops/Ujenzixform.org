@@ -206,15 +206,20 @@ const DeliveryDashboard = () => {
         quantity: d.quantity || d.estimated_weight || 'N/A',
         customer_name: d.builder_name || d.builder_email?.split('@')[0] || 'Customer',
         customer_phone: d.builder_phone || '+254 700 000 000',
-        status: d.status,
+        status: d.status || d.display_status || 'pending',
         estimated_time: d.estimated_time || '30 mins',
         price: d.price || d.delivery_fee || d.estimated_cost || 0,
         distance: d.distance || 0,
-        urgency: d.urgency,
+        urgency: d.urgency || d.priority_level || 'normal',
         special_instructions: d.special_instructions,
-        created_at: d.created_at
+        created_at: d.created_at,
+        purchase_order_id: d.purchase_order_id
       }));
       setActiveDeliveries(formattedActive);
+      console.log('🚚 Active deliveries loaded:', formattedActive.length, 'Statuses:', formattedActive.map(d => d.status));
+    } else {
+      // Ensure empty array if no data
+      setActiveDeliveries([]);
     }
     // Transform delivery history - ONLY THIS PROVIDER'S HISTORY
     if (isolatedHistory && isolatedHistory.length > 0) {
@@ -233,6 +238,16 @@ const DeliveryDashboard = () => {
     // Set pending requests that this provider can accept
     if (isolatedPendingRequests) {
       setPendingRequests(isolatedPendingRequests);
+      console.log('🚚 Pending requests loaded:', isolatedPendingRequests.length);
+    } else {
+      setPendingRequests([]);
+    }
+    
+    // Set delivery history
+    if (isolatedHistory) {
+      console.log('🚚 Delivery history loaded:', isolatedHistory.length);
+    } else {
+      setDeliveryHistory([]);
     }
   }, [isolatedProfile, isolatedStats, isolatedActiveDeliveries, isolatedHistory, isolatedPendingRequests]);
 
@@ -901,18 +916,38 @@ const DeliveryDashboard = () => {
                   <TabsTrigger value="scheduled" className="flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
                     Scheduled
-                    {activeDeliveries.filter(d => d.status === 'assigned' || d.status === 'accepted').length > 0 && (
+                    {activeDeliveries.filter(d => 
+                      d.status === 'assigned' || 
+                      d.status === 'accepted' || 
+                      d.status === 'scheduled' ||
+                      d.status === 'pending_pickup'
+                    ).length > 0 && (
                       <Badge className="ml-1 bg-blue-500 text-white text-xs">
-                        {activeDeliveries.filter(d => d.status === 'assigned' || d.status === 'accepted').length}
+                        {activeDeliveries.filter(d => 
+                          d.status === 'assigned' || 
+                          d.status === 'accepted' || 
+                          d.status === 'scheduled' ||
+                          d.status === 'pending_pickup'
+                        ).length}
                       </Badge>
                     )}
                   </TabsTrigger>
                   <TabsTrigger value="in_transit" className="flex items-center gap-2">
                     <Truck className="h-4 w-4" />
                     In Transit
-                    {activeDeliveries.filter(d => d.status === 'in_transit').length > 0 && (
+                    {activeDeliveries.filter(d => 
+                      d.status === 'in_transit' || 
+                      d.status === 'picked_up' ||
+                      d.status === 'on_the_way' ||
+                      d.status === 'near_destination'
+                    ).length > 0 && (
                       <Badge className="ml-1 bg-purple-500 text-white text-xs">
-                        {activeDeliveries.filter(d => d.status === 'in_transit').length}
+                        {activeDeliveries.filter(d => 
+                          d.status === 'in_transit' || 
+                          d.status === 'picked_up' ||
+                          d.status === 'on_the_way' ||
+                          d.status === 'near_destination'
+                        ).length}
                       </Badge>
                     )}
                   </TabsTrigger>
@@ -1014,45 +1049,71 @@ const DeliveryDashboard = () => {
                 {/* Scheduled Sub-tab - Orders allocated for delivery */}
                 <TabsContent value="scheduled" className="mt-4">
                   <div className="space-y-4">
-                    {activeDeliveries.filter(d => d.status === 'assigned' || d.status === 'accepted').length > 0 ? (
-                      <div className="space-y-4">
-                        {activeDeliveries
-                          .filter(d => d.status === 'assigned' || d.status === 'accepted')
-                          .sort((a, b) => {
-                            const urgencyOrder = { emergency: 0, urgent: 1, normal: 2 };
-                            return (urgencyOrder[a.urgency || 'normal'] || 2) - (urgencyOrder[b.urgency || 'normal'] || 2);
-                          })
-                          .map((delivery) => (
-                            <DeliveryRequestCard
-                              key={delivery.id}
-                              delivery={delivery}
-                              isDarkMode={isDarkMode}
-                              onNavigate={(delivery) => console.log('Navigate to:', delivery)}
-                              onCall={(phone) => window.open(`tel:${phone}`)}
-                              onCaptureProof={(id) => setShowProofCapture(id)}
-                            />
-                          ))}
-                      </div>
-                    ) : (
-                      <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : ''}>
-                        <CardContent className="py-12 text-center">
-                          <Calendar className={`h-12 w-12 ${isDarkMode ? 'text-gray-600' : 'text-gray-300'} mx-auto mb-4`} />
-                          <p className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>No scheduled deliveries</p>
-                          <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Accepted deliveries will appear here</p>
-                        </CardContent>
-                      </Card>
-                    )}
+                    {(() => {
+                      const scheduled = activeDeliveries.filter(d => 
+                        d.status === 'assigned' || 
+                        d.status === 'accepted' || 
+                        d.status === 'scheduled' ||
+                        d.status === 'pending_pickup'
+                      );
+                      
+                      return scheduled.length > 0 ? (
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-2 mb-3">
+                            <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse"></div>
+                            <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                              📅 Scheduled Deliveries ({scheduled.length})
+                            </h3>
+                          </div>
+                          {scheduled
+                            .sort((a, b) => {
+                              const urgencyOrder = { emergency: 0, urgent: 1, normal: 2 };
+                              return (urgencyOrder[a.urgency || 'normal'] || 2) - (urgencyOrder[b.urgency || 'normal'] || 2);
+                            })
+                            .map((delivery) => (
+                              <DeliveryRequestCard
+                                key={delivery.id}
+                                delivery={delivery}
+                                isDarkMode={isDarkMode}
+                                onNavigate={(delivery) => console.log('Navigate to:', delivery)}
+                                onCall={(phone) => window.open(`tel:${phone}`)}
+                                onCaptureProof={(id) => setShowProofCapture(id)}
+                              />
+                            ))}
+                        </div>
+                      ) : (
+                        <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : ''}>
+                          <CardContent className="py-12 text-center">
+                            <Calendar className={`h-12 w-12 ${isDarkMode ? 'text-gray-600' : 'text-gray-300'} mx-auto mb-4`} />
+                            <p className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>No scheduled deliveries</p>
+                            <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Accepted deliveries will appear here</p>
+                          </CardContent>
+                        </Card>
+                      );
+                    })()}
                   </div>
                 </TabsContent>
 
                 {/* In Transit Sub-tab - Orders currently on their way */}
                 <TabsContent value="in_transit" className="mt-4">
                   <div className="space-y-4">
-                    {activeDeliveries.filter(d => d.status === 'in_transit').length > 0 ? (
-                      <div className="space-y-4">
-                        {activeDeliveries
-                          .filter(d => d.status === 'in_transit')
-                          .map((delivery) => (
+                    {(() => {
+                      const inTransit = activeDeliveries.filter(d => 
+                        d.status === 'in_transit' || 
+                        d.status === 'picked_up' ||
+                        d.status === 'on_the_way' ||
+                        d.status === 'near_destination'
+                      );
+                      
+                      return inTransit.length > 0 ? (
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-2 mb-3">
+                            <div className="h-2 w-2 bg-purple-500 rounded-full animate-pulse"></div>
+                            <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                              🚚 Deliveries In Transit ({inTransit.length})
+                            </h3>
+                          </div>
+                          {inTransit.map((delivery) => (
                             <div key={delivery.id} className="space-y-3">
                               <DeliveryRequestCard
                                 delivery={delivery}
@@ -1090,16 +1151,17 @@ const DeliveryDashboard = () => {
                               )}
                             </div>
                           ))}
-                      </div>
-                    ) : (
-                      <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : ''}>
-                        <CardContent className="py-12 text-center">
-                          <Truck className={`h-12 w-12 ${isDarkMode ? 'text-gray-600' : 'text-gray-300'} mx-auto mb-4`} />
-                          <p className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>No deliveries in transit</p>
-                          <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Active deliveries will appear here when in transit</p>
-                        </CardContent>
-                      </Card>
-                    )}
+                        </div>
+                      ) : (
+                        <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : ''}>
+                          <CardContent className="py-12 text-center">
+                            <Truck className={`h-12 w-12 ${isDarkMode ? 'text-gray-600' : 'text-gray-300'} mx-auto mb-4`} />
+                            <p className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>No deliveries in transit</p>
+                            <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Active deliveries will appear here when in transit</p>
+                          </CardContent>
+                        </Card>
+                      );
+                    })()}
                   </div>
                 </TabsContent>
 
