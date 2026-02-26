@@ -239,25 +239,164 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
   const { toast } = useToast();
 
   useEffect(() => {
-    if (builderId) {
-      fetchOrders();
-      fetchScanEvents();
-      const cleanup = setupRealtimeSubscription();
-      
-      // Safety timeout - stop loading after 10 seconds max
-      const timeout = setTimeout(() => {
-        setLoading(false);
-      }, 10000);
-      
-      return () => {
-        clearTimeout(timeout);
-        if (cleanup) cleanup();
-      };
-    } else {
-      // No builderId - stop loading immediately
+    if (!builderId) {
       setLoading(false);
+      return;
     }
-  }, [builderId]);
+
+    fetchOrders();
+    fetchScanEvents();
+    
+    // Safety timeout - stop loading after 10 seconds max
+    const timeout = setTimeout(() => {
+      setLoading(false);
+    }, 10000);
+    
+    // Set up real-time subscriptions
+    const ordersChannel = supabase
+      .channel(`builder-purchase-orders-realtime-${builderId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'purchase_orders',
+          filter: `buyer_id=eq.${builderId}`
+        },
+        (payload) => {
+          console.log('🔄 Purchase order change detected:', payload.eventType, payload.new?.po_number);
+          fetchOrders(); // Refresh orders when any change occurs
+          
+          // Show toast for important status changes
+          if (payload.eventType === 'UPDATE' && payload.new) {
+            const newStatus = payload.new.status;
+            const oldStatus = payload.old?.status;
+            
+            // Notify when delivery provider is assigned
+            if (!payload.old?.delivery_provider_id && payload.new.delivery_provider_id) {
+              toast({
+                title: '🚚 Delivery Provider Assigned',
+                description: `Order ${payload.new.po_number || ''} now has a delivery provider assigned`,
+              });
+            }
+            
+            // Notify when order goes in transit
+            if (payload.new.delivery_status === 'in_transit' && payload.old?.delivery_status !== 'in_transit') {
+              toast({
+                title: '🚚 Order In Transit',
+                description: `Order ${payload.new.po_number || ''} is now in transit to destination`,
+              });
+            }
+            
+            // Notify when order status changes to confirmed (builder accepted)
+            if (oldStatus === 'pending' && (newStatus === 'confirmed' || newStatus === 'pending')) {
+              if (payload.new.delivery_provider_id) {
+                toast({
+                  title: '✅ Order Accepted',
+                  description: `Order ${payload.new.po_number || ''} accepted and delivery provider assigned`,
+                });
+              }
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    // Subscribe to material_items changes
+    const itemsChannel = supabase
+      .channel(`builder-material-items-${builderId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'material_items'
+        },
+        () => {
+          fetchOrders();
+        }
+      )
+      .subscribe();
+
+    // Subscribe to scan events
+    const scansChannel = supabase
+      .channel(`builder-scan-events-${builderId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'qr_scan_events'
+        },
+        async (payload) => {
+          const newScan = payload.new as ScanEvent;
+          
+          // Fetch order information for the new scan
+          let enrichedScan: ScanEvent = { ...newScan };
+          try {
+            const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+            const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+            const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+            let accessToken = '';
+            if (stored) {
+              try {
+                const parsed = JSON.parse(stored);
+                accessToken = parsed.access_token || '';
+              } catch (e) {}
+            }
+            const headers: Record<string, string> = { 'apikey': apiKey };
+            if (accessToken) {
+              headers['Authorization'] = `Bearer ${accessToken}`;
+            }
+            
+            // Fetch material item info
+            const itemRes = await fetch(
+              `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${newScan.qr_code}&select=purchase_order_id,material_type&limit=1`,
+              { headers, cache: 'no-store' }
+            );
+            
+            if (itemRes.ok) {
+              const items = await itemRes.json();
+              const item = items[0];
+              
+              if (item?.purchase_order_id) {
+                const orderRes = await fetch(
+                  `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${item.purchase_order_id}&select=po_number&limit=1`,
+                  { headers, cache: 'no-store' }
+                );
+                if (orderRes.ok) {
+                  const orders = await orderRes.json();
+                  const order = orders[0];
+                  enrichedScan = {
+                    ...newScan,
+                    purchase_order_id: item.purchase_order_id,
+                    po_number: order?.po_number || null,
+                    material_type: item.material_type || null,
+                  };
+                }
+              }
+            }
+          } catch (e) {
+            console.log('Could not fetch order info for new scan:', e);
+          }
+          
+          setScanEvents(prev => [enrichedScan, ...prev.slice(0, 49)]);
+          
+          toast({
+            title: '📦 Material Update',
+            description: `QR ${enrichedScan.qr_code} was ${enrichedScan.scan_type}ed${enrichedScan.po_number ? ` (Order: ${enrichedScan.po_number})` : ''}`,
+          });
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      clearTimeout(timeout);
+      supabase.removeChannel(ordersChannel);
+      supabase.removeChannel(itemsChannel);
+      supabase.removeChannel(scansChannel);
+    };
+  }, [builderId, toast]);
 
   const fetchOrders = async () => {
     try {
@@ -437,151 +576,6 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
     }
   };
 
-  const setupRealtimeSubscription = () => {
-    // Subscribe to purchase_orders changes (for synchronization with Supplier Dashboard)
-    const ordersChannel = supabase
-      .channel('builder-purchase-orders-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'purchase_orders',
-          filter: `buyer_id=eq.${builderId}`
-        },
-        (payload) => {
-          console.log('🔄 Purchase order change detected:', payload.eventType, payload.new?.po_number);
-          fetchOrders(); // Refresh orders when any change occurs
-          
-          // Show toast for important status changes
-          if (payload.eventType === 'UPDATE' && payload.new) {
-            const newStatus = payload.new.status;
-            const oldStatus = payload.old?.status;
-            
-            // Notify when delivery provider is assigned
-            if (!payload.old?.delivery_provider_id && payload.new.delivery_provider_id) {
-              toast({
-                title: '🚚 Delivery Provider Assigned',
-                description: `Order ${payload.new.po_number || ''} now has a delivery provider assigned`,
-              });
-            }
-            
-            // Notify when order goes in transit
-            if (payload.new.delivery_status === 'in_transit' && payload.old?.delivery_status !== 'in_transit') {
-              toast({
-                title: '🚚 Order In Transit',
-                description: `Order ${payload.new.po_number || ''} is now in transit to destination`,
-              });
-            }
-            
-            // Notify when order status changes to confirmed (builder accepted)
-            if (oldStatus === 'pending' && (newStatus === 'confirmed' || newStatus === 'pending')) {
-              if (payload.new.delivery_provider_id) {
-                toast({
-                  title: '✅ Order Accepted',
-                  description: `Order ${payload.new.po_number || ''} accepted and delivery provider assigned`,
-                });
-              }
-            }
-          }
-        }
-      )
-      .subscribe();
-
-    // Subscribe to material_items changes
-    const itemsChannel = supabase
-      .channel('builder-material-items')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'material_items'
-        },
-        () => {
-          fetchOrders();
-        }
-      )
-      .subscribe();
-
-    // Subscribe to scan events
-    const scansChannel = supabase
-      .channel('builder-scan-events')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'qr_scan_events'
-        },
-        async (payload) => {
-          const newScan = payload.new as ScanEvent;
-          
-          // Fetch order information for the new scan
-          let enrichedScan: ScanEvent = { ...newScan };
-          try {
-            const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-            const apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-            const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-            let accessToken = '';
-            if (stored) {
-              try {
-                const parsed = JSON.parse(stored);
-                accessToken = parsed.access_token || '';
-              } catch (e) {}
-            }
-            const headers: Record<string, string> = { 'apikey': apiKey };
-            if (accessToken) {
-              headers['Authorization'] = `Bearer ${accessToken}`;
-            }
-            
-            // Fetch material item info
-            const itemRes = await fetch(
-              `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${newScan.qr_code}&select=purchase_order_id,material_type&limit=1`,
-              { headers, cache: 'no-store' }
-            );
-            
-            if (itemRes.ok) {
-              const items = await itemRes.json();
-              const item = items[0];
-              
-              if (item?.purchase_order_id) {
-                const orderRes = await fetch(
-                  `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${item.purchase_order_id}&select=po_number&limit=1`,
-                  { headers, cache: 'no-store' }
-                );
-                if (orderRes.ok) {
-                  const orders = await orderRes.json();
-                  const order = orders[0];
-                  enrichedScan = {
-                    ...newScan,
-                    purchase_order_id: item.purchase_order_id,
-                    po_number: order?.po_number || null,
-                    material_type: item.material_type || null,
-                  };
-                }
-              }
-            }
-          } catch (e) {
-            console.log('Could not fetch order info for new scan:', e);
-          }
-          
-          setScanEvents(prev => [enrichedScan, ...prev.slice(0, 49)]);
-          
-          toast({
-            title: '📦 Material Update',
-            description: `QR ${enrichedScan.qr_code} was ${enrichedScan.scan_type}ed${enrichedScan.po_number ? ` (Order: ${enrichedScan.po_number})` : ''}`,
-          });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(ordersChannel);
-      supabase.removeChannel(itemsChannel);
-      supabase.removeChannel(scansChannel);
-    };
-  };
 
   // Order status flow: confirmed → dispatched → in_transit → delivered
   const getStatusColor = (status: string) => {
