@@ -98,6 +98,7 @@ const ProfessionalBuilderDashboardPage = () => {
   // Active tab state for card navigation
   const [activeTab, setActiveTab] = useState('projects');
   const [extrasSubTab, setExtrasSubTab] = useState('team'); // Sub-tab for Extras (team or support)
+  const [deliveriesSubTab, setDeliveriesSubTab] = useState('request'); // Sub-tab for Deliveries (request, schedule, history)
 
   // Projects state - start with loading false to show empty state immediately
   const [projects, setProjects] = useState<any[]>([]);
@@ -1147,24 +1148,6 @@ const ProfessionalBuilderDashboardPage = () => {
                   Order Materials
                 </Button>
               </Link>
-              <Link to="/delivery">
-                <Button className="bg-white/90 text-blue-700 hover:bg-white">
-                  <Truck className="h-4 w-4 mr-2" />
-                  Delivery
-                </Button>
-              </Link>
-              <Link to="/scanners">
-                <Button className="bg-white/90 text-blue-700 hover:bg-white">
-                  <QrCode className="h-4 w-4 mr-2" />
-                  Scanners
-                </Button>
-              </Link>
-              <Link to="/monitoring">
-                <Button className="bg-white/90 text-blue-700 hover:bg-white">
-                  <Video className="h-4 w-4 mr-2" />
-                  Monitoring
-                </Button>
-              </Link>
               <Button 
                 className="bg-white/90 text-blue-700 hover:bg-white"
                 onClick={() => setShowProfileView(true)}
@@ -1225,15 +1208,6 @@ const ProfessionalBuilderDashboardPage = () => {
           >
             <NavigationIcon className="h-5 w-5" />
             <span className="text-[10px] sm:text-xs">Tracking</span>
-          </Button>
-          <Button 
-            className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'request-delivery' 
-              ? 'bg-gradient-to-r from-teal-500 to-emerald-500 ring-2 ring-teal-300 shadow-lg text-white' 
-              : 'bg-white hover:bg-teal-50 text-gray-700 border shadow-sm'}`}
-            onClick={() => setActiveTab('request-delivery')}
-          >
-            <Send className="h-5 w-5" />
-            <span className="text-[10px] sm:text-xs">Request</span>
           </Button>
           <Button 
             className={`h-auto py-3 px-2 transition-all flex flex-col items-center gap-1 ${activeTab === 'invoices' 
@@ -1302,7 +1276,6 @@ const ProfessionalBuilderDashboardPage = () => {
             <TabsTrigger value="orders">Orders</TabsTrigger>
             <TabsTrigger value="deliveries">Deliveries</TabsTrigger>
             <TabsTrigger value="tracking">Tracking</TabsTrigger>
-            <TabsTrigger value="request-delivery">Request Delivery</TabsTrigger>
             <TabsTrigger value="invoices">Invoices</TabsTrigger>
             <TabsTrigger value="extras">Extras</TabsTrigger>
             <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
@@ -1808,154 +1781,320 @@ const ProfessionalBuilderDashboardPage = () => {
             })()}
           </TabsContent>
 
-          <TabsContent value="deliveries">
+          {/* Deliveries Tab - Contains Request Materials, Delivery Schedule, and Delivery History as sub-tabs */}
+          <TabsContent value="deliveries" className="mt-0">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Truck className="h-5 w-5 text-blue-600" />
-                    Scheduled Deliveries
-                  </CardTitle>
-                  <CardDescription>Track incoming material deliveries</CardDescription>
-                </div>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => loadDeliveries(getUserId(), true)}
-                  disabled={loadingDeliveries}
-                >
-                  {loadingDeliveries ? 'Refreshing...' : 'Refresh'}
-                </Button>
-              </CardHeader>
-              <CardContent>
-                {loadingDeliveries ? (
-                  <div className="text-center py-12">
-                    <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4" />
-                    <p className="text-gray-500">Loading deliveries...</p>
-                  </div>
-                ) : deliveries.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500">
-                    <Truck className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-                    <p className="text-lg font-medium">No scheduled deliveries</p>
-                    <p className="text-sm">Your deliveries will appear here</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {deliveries.map((delivery) => (
-                      <div 
-                        key={delivery.id} 
-                        className="border rounded-lg p-4 hover:border-blue-300 hover:bg-blue-50/30 transition-all"
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <Truck className={`h-5 w-5 ${
-                                delivery.display_status === 'delivered' ? 'text-green-600' :
-                                delivery.display_status === 'in_transit' ? 'text-blue-600' :
-                                delivery.display_status === 'accepted' ? 'text-teal-600' :
-                                'text-orange-500'
-                              }`} />
-                              <h3 className="font-semibold">
-                                {delivery.materials_description || delivery.pickup_address || 'Delivery Request'}
-                              </h3>
-                              <Badge 
-                                variant={
-                                  delivery.display_status === 'delivered' ? 'default' :
-                                  delivery.display_status === 'in_transit' ? 'default' :
-                                  delivery.display_status === 'accepted' ? 'default' :
-                                  'secondary'
-                                }
-                                className={
-                                  delivery.display_status === 'delivered' ? 'bg-green-500' :
-                                  delivery.display_status === 'in_transit' ? 'bg-blue-500' :
-                                  delivery.display_status === 'accepted' ? 'bg-teal-500' :
-                                  delivery.display_status === 'pending' ? 'bg-orange-500' :
-                                  ''
-                                }
-                              >
-                                {delivery.display_status?.replace('_', ' ') || 'Pending'}
-                              </Badge>
-                              {delivery.type === 'request' && (
-                                <Badge variant="outline" className="text-xs">Request</Badge>
-                              )}
+              <CardContent className="p-0">
+                <Tabs value={deliveriesSubTab} onValueChange={setDeliveriesSubTab} className="w-full">
+                  <TabsList className="grid w-full grid-cols-3 mb-6 bg-gray-100 p-1 rounded-lg h-auto">
+                    <TabsTrigger 
+                      value="request"
+                      className="data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-sm data-[state=active]:border-blue-200 data-[state=active]:border py-3 rounded-md font-medium transition-all"
+                    >
+                      <Send className="h-4 w-4 mr-2 text-blue-600" />
+                      <span>Request Materials</span>
+                    </TabsTrigger>
+                    <TabsTrigger 
+                      value="schedule"
+                      className="data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-sm data-[state=active]:border-blue-200 data-[state=active]:border py-3 rounded-md font-medium transition-all"
+                    >
+                      <Calendar className="h-4 w-4 mr-2 text-blue-600" />
+                      <span>Delivery Schedule</span>
+                    </TabsTrigger>
+                    <TabsTrigger 
+                      value="history"
+                      className="data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-sm data-[state=active]:border-blue-200 data-[state=active]:border py-3 rounded-md font-medium transition-all"
+                    >
+                      <FileText className="h-4 w-4 mr-2 text-blue-600" />
+                      <span>Delivery History</span>
+                    </TabsTrigger>
+                  </TabsList>
+                  
+                  {/* Request Materials Sub-tab */}
+                  <TabsContent value="request" className="mt-0">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Send className="h-5 w-5 text-teal-600" />
+                          Request Materials
+                        </CardTitle>
+                        <CardDescription>
+                          Request delivery for materials sourced outside UjenziXform or for site-to-site transfers
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {/* Info Banner */}
+                        <div className="bg-gradient-to-r from-teal-50 to-blue-50 border border-teal-200 rounded-lg p-4 mb-6">
+                          <div className="flex items-start gap-3">
+                            <div className="p-2 bg-teal-500 rounded-lg text-white">
+                              <Truck className="h-5 w-5" />
                             </div>
-                            
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600 mb-2">
-                              {delivery.pickup_address && (
-                                <div className="flex items-center gap-1">
-                                  <MapPin className="h-4 w-4 text-gray-400" />
-                                  <span className="font-medium">From:</span> {delivery.pickup_address}
-                                </div>
-                              )}
-                              {delivery.delivery_address && (
-                                <div className="flex items-center gap-1">
-                                  <MapPin className="h-4 w-4 text-blue-400" />
-                                  <span className="font-medium">To:</span> {delivery.delivery_address}
-                                </div>
-                              )}
+                            <div>
+                              <h4 className="font-semibold text-teal-800 mb-1">When to Use Manual Delivery Request</h4>
+                              <ul className="text-sm text-teal-700 space-y-1">
+                                <li>• Materials purchased from suppliers outside UjenziXform</li>
+                                <li>• Site-to-site material transfers between your projects</li>
+                                <li>• Returning defective materials to suppliers</li>
+                                <li>• Moving existing inventory to a new construction site</li>
+                              </ul>
                             </div>
-
-                            {delivery.estimated_delivery && (
-                              <div className="flex items-center gap-1 text-sm text-gray-500">
-                                <Calendar className="h-4 w-4" />
-                                <span>Expected: {new Date(delivery.estimated_delivery).toLocaleDateString()}</span>
-                              </div>
-                            )}
-
-                            {delivery.tracking_number && (
-                              <div className="mt-2 text-sm">
-                                <span className="font-medium text-gray-700">Tracking:</span>{' '}
-                                <code className="bg-gray-100 px-2 py-1 rounded">{delivery.tracking_number}</code>
-                              </div>
-                            )}
-                          </div>
-                          
-                          <div className="text-right">
-                            {delivery.estimated_cost && (
-                              <p className="text-lg font-bold text-blue-600">
-                                KES {delivery.estimated_cost.toLocaleString()}
-                              </p>
-                            )}
-                            <p className="text-xs text-gray-400">
-                              {new Date(delivery.created_at).toLocaleDateString()}
-                            </p>
-                            {delivery.provider_name && (
-                              <p className="text-xs text-gray-500 mt-1">
-                                Driver: {delivery.provider_name}
-                              </p>
-                            )}
                           </div>
                         </div>
-
-                        {/* Progress indicator for in-transit deliveries */}
-                        {delivery.display_status === 'in_transit' && (
-                          <div className="mt-4 pt-4 border-t">
-                            <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
-                              <span>Pickup</span>
-                              <span>In Transit</span>
-                              <span>Delivered</span>
-                            </div>
-                            <div className="w-full bg-gray-200 rounded-full h-2">
-                              <div className="bg-blue-500 h-2 rounded-full w-1/2 transition-all duration-500" />
-                            </div>
+                        
+                        <DeliveryRequest />
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                  
+                  {/* Delivery Schedule Sub-tab - Shows scheduled deliveries sorted by soonest date */}
+                  <TabsContent value="schedule" className="mt-0">
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between">
+                        <div>
+                          <CardTitle className="flex items-center gap-2">
+                            <Truck className="h-5 w-5 text-blue-600" />
+                            Delivery Schedule
+                          </CardTitle>
+                          <CardDescription>Your scheduled deliveries from start to finish, sorted by soonest date</CardDescription>
+                        </div>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => loadDeliveries(getUserId(), true)}
+                          disabled={loadingDeliveries}
+                        >
+                          {loadingDeliveries ? 'Refreshing...' : 'Refresh'}
+                        </Button>
+                      </CardHeader>
+                      <CardContent>
+                        {loadingDeliveries ? (
+                          <div className="text-center py-12">
+                            <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4" />
+                            <p className="text-gray-500">Loading deliveries...</p>
                           </div>
-                        )}
+                        ) : (() => {
+                          // Filter to only show pending, accepted, and in_transit deliveries (future/scheduled)
+                          const scheduledDeliveries = deliveries.filter(d => 
+                            ['pending', 'accepted', 'in_transit'].includes(d.display_status || '')
+                          ).sort((a, b) => {
+                            // Sort by estimated_delivery date (soonest first)
+                            const dateA = a.estimated_delivery ? new Date(a.estimated_delivery).getTime() : 0;
+                            const dateB = b.estimated_delivery ? new Date(b.estimated_delivery).getTime() : 0;
+                            return dateA - dateB;
+                          });
+                          
+                          return scheduledDeliveries.length === 0 ? (
+                            <div className="text-center py-12 text-gray-500">
+                              <Truck className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+                              <p className="text-lg font-medium">No scheduled deliveries</p>
+                              <p className="text-sm">Your scheduled deliveries will appear here</p>
+                            </div>
+                          ) : (
+                            <div className="space-y-4">
+                              {scheduledDeliveries.map((delivery) => (
+                                <div 
+                                  key={delivery.id} 
+                                  className="border rounded-lg p-4 hover:border-blue-300 hover:bg-blue-50/30 transition-all"
+                                >
+                                  <div className="flex items-start justify-between">
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <Truck className={`h-5 w-5 ${
+                                          delivery.display_status === 'in_transit' ? 'text-blue-600' :
+                                          delivery.display_status === 'accepted' ? 'text-teal-600' :
+                                          'text-orange-500'
+                                        }`} />
+                                        <h3 className="font-semibold">
+                                          {delivery.materials_description || delivery.pickup_address || 'Delivery Request'}
+                                        </h3>
+                                        <Badge 
+                                          variant={
+                                            delivery.display_status === 'in_transit' ? 'default' :
+                                            delivery.display_status === 'accepted' ? 'default' :
+                                            'secondary'
+                                          }
+                                          className={
+                                            delivery.display_status === 'in_transit' ? 'bg-blue-500' :
+                                            delivery.display_status === 'accepted' ? 'bg-teal-500' :
+                                            delivery.display_status === 'pending' ? 'bg-orange-500' :
+                                            ''
+                                          }
+                                        >
+                                          {delivery.display_status?.replace('_', ' ') || 'Pending'}
+                                        </Badge>
+                                      </div>
+                                      
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600 mb-2">
+                                        {delivery.pickup_address && (
+                                          <div className="flex items-center gap-1">
+                                            <MapPin className="h-4 w-4 text-gray-400" />
+                                            <span className="font-medium">From:</span> {delivery.pickup_address}
+                                          </div>
+                                        )}
+                                        {delivery.delivery_address && (
+                                          <div className="flex items-center gap-1">
+                                            <MapPin className="h-4 w-4 text-blue-400" />
+                                            <span className="font-medium">To:</span> {delivery.delivery_address}
+                                          </div>
+                                        )}
+                                      </div>
 
-                        {delivery.display_status === 'delivered' && (
-                          <div className="mt-4 pt-4 border-t flex items-center gap-2 text-green-600">
-                            <CheckCircle className="h-5 w-5" />
-                            <span className="font-medium">Delivered successfully</span>
-                            {delivery.delivered_at && (
-                              <span className="text-sm text-gray-500">
-                                on {new Date(delivery.delivered_at).toLocaleString()}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
+                                      {delivery.estimated_delivery && (
+                                        <div className="flex items-center gap-1 text-sm text-gray-500">
+                                          <Calendar className="h-4 w-4" />
+                                          <span className="font-medium">Expected: {new Date(delivery.estimated_delivery).toLocaleDateString()}</span>
+                                        </div>
+                                      )}
+
+                                      {delivery.tracking_number && (
+                                        <div className="mt-2 text-sm">
+                                          <span className="font-medium text-gray-700">Tracking:</span>{' '}
+                                          <code className="bg-gray-100 px-2 py-1 rounded">{delivery.tracking_number}</code>
+                                        </div>
+                                      )}
+                                    </div>
+                                    
+                                    <div className="text-right">
+                                      {delivery.estimated_cost && (
+                                        <p className="text-lg font-bold text-blue-600">
+                                          KES {delivery.estimated_cost.toLocaleString()}
+                                        </p>
+                                      )}
+                                      <p className="text-xs text-gray-400">
+                                        {new Date(delivery.created_at).toLocaleDateString()}
+                                      </p>
+                                      {delivery.provider_name && (
+                                        <p className="text-xs text-gray-500 mt-1">
+                                          Driver: {delivery.provider_name}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Progress indicator for in-transit deliveries */}
+                                  {delivery.display_status === 'in_transit' && (
+                                    <div className="mt-4 pt-4 border-t">
+                                      <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
+                                        <span>Pickup</span>
+                                        <span>In Transit</span>
+                                        <span>Delivered</span>
+                                      </div>
+                                      <div className="w-full bg-gray-200 rounded-full h-2">
+                                        <div className="bg-blue-500 h-2 rounded-full w-1/2 transition-all duration-500" />
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                  
+                  {/* Delivery History Sub-tab - Shows completed/delivered deliveries */}
+                  <TabsContent value="history" className="mt-0">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <FileText className="h-5 w-5 text-green-600" />
+                          Delivery History
+                        </CardTitle>
+                        <CardDescription>View your completed and past deliveries</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {(() => {
+                          // Filter to only show delivered/completed deliveries
+                          const historyDeliveries = deliveries.filter(d => 
+                            d.display_status === 'delivered'
+                          ).sort((a, b) => {
+                            // Sort by delivered_at or created_at (most recent first)
+                            const dateA = a.delivered_at ? new Date(a.delivered_at).getTime() : new Date(a.created_at).getTime();
+                            const dateB = b.delivered_at ? new Date(b.delivered_at).getTime() : new Date(b.created_at).getTime();
+                            return dateB - dateA;
+                          });
+                          
+                          return historyDeliveries.length === 0 ? (
+                            <div className="text-center py-12 text-gray-500">
+                              <CheckCircle className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+                              <p className="text-lg font-medium">No delivery history</p>
+                              <p className="text-sm">Completed deliveries will appear here</p>
+                            </div>
+                          ) : (
+                            <div className="space-y-4">
+                              {historyDeliveries.map((delivery) => (
+                                <div 
+                                  key={delivery.id} 
+                                  className="border rounded-lg p-4 hover:border-green-300 hover:bg-green-50/30 transition-all"
+                                >
+                                  <div className="flex items-start justify-between">
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <CheckCircle className="h-5 w-5 text-green-600" />
+                                        <h3 className="font-semibold">
+                                          {delivery.materials_description || delivery.pickup_address || 'Delivery Request'}
+                                        </h3>
+                                        <Badge className="bg-green-500">
+                                          Delivered
+                                        </Badge>
+                                      </div>
+                                      
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600 mb-2">
+                                        {delivery.pickup_address && (
+                                          <div className="flex items-center gap-1">
+                                            <MapPin className="h-4 w-4 text-gray-400" />
+                                            <span className="font-medium">From:</span> {delivery.pickup_address}
+                                          </div>
+                                        )}
+                                        {delivery.delivery_address && (
+                                          <div className="flex items-center gap-1">
+                                            <MapPin className="h-4 w-4 text-green-400" />
+                                            <span className="font-medium">To:</span> {delivery.delivery_address}
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      {delivery.delivered_at && (
+                                        <div className="flex items-center gap-1 text-sm text-green-600 mb-2">
+                                          <CheckCircle className="h-4 w-4" />
+                                          <span className="font-medium">Delivered on: {new Date(delivery.delivered_at).toLocaleString()}</span>
+                                        </div>
+                                      )}
+
+                                      {delivery.tracking_number && (
+                                        <div className="mt-2 text-sm">
+                                          <span className="font-medium text-gray-700">Tracking:</span>{' '}
+                                          <code className="bg-gray-100 px-2 py-1 rounded">{delivery.tracking_number}</code>
+                                        </div>
+                                      )}
+                                    </div>
+                                    
+                                    <div className="text-right">
+                                      {delivery.estimated_cost && (
+                                        <p className="text-lg font-bold text-green-600">
+                                          KES {delivery.estimated_cost.toLocaleString()}
+                                        </p>
+                                      )}
+                                      <p className="text-xs text-gray-400">
+                                        {new Date(delivery.created_at).toLocaleDateString()}
+                                      </p>
+                                      {delivery.provider_name && (
+                                        <p className="text-xs text-gray-500 mt-1">
+                                          Driver: {delivery.provider_name}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                </Tabs>
               </CardContent>
             </Card>
           </TabsContent>
@@ -1987,42 +2126,6 @@ const ProfessionalBuilderDashboardPage = () => {
                   userRole="professional_builder"
                   userName={profile?.full_name || user?.email?.split('@')[0]}
                 />
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Manual Delivery Request Tab */}
-          <TabsContent value="request-delivery">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Send className="h-5 w-5 text-teal-600" />
-                  Request Manual Delivery
-                </CardTitle>
-                <CardDescription>
-                  Request delivery for materials sourced outside UjenziXform or for site-to-site transfers
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {/* Info Banner */}
-                <div className="bg-gradient-to-r from-teal-50 to-blue-50 border border-teal-200 rounded-lg p-4 mb-6">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 bg-teal-500 rounded-lg text-white">
-                      <Truck className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-teal-800 mb-1">When to Use Manual Delivery Request</h4>
-                      <ul className="text-sm text-teal-700 space-y-1">
-                        <li>• Materials purchased from suppliers outside UjenziXform</li>
-                        <li>• Site-to-site material transfers between your projects</li>
-                        <li>• Returning defective materials to suppliers</li>
-                        <li>• Moving existing inventory to a new construction site</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-                
-                <DeliveryRequest />
               </CardContent>
             </Card>
           </TabsContent>
