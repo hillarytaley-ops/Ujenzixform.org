@@ -147,6 +147,13 @@ const DeliveryRequest = () => {
   const [copiedDelivery, setCopiedDelivery] = useState(false);
   const [showPickupMap, setShowPickupMap] = useState(false);
   const [showDeliveryMap, setShowDeliveryMap] = useState(false);
+
+  // Debug: Log when map state changes
+  useEffect(() => {
+    if (showPickupMap) console.log('🗺️ Pickup map is now visible');
+    if (showDeliveryMap) console.log('🗺️ Delivery map is now visible');
+  }, [showPickupMap, showDeliveryMap]);
+
   const [formData, setFormData] = useState({
     pickupAddress: "",
     pickupCoordinates: "",
@@ -780,7 +787,6 @@ const DeliveryRequest = () => {
                 {/* Pickup Map Picker */}
                 {showPickupMap && (
                   <div className="mt-3 border-2 border-blue-500 rounded-lg p-3 bg-white shadow-lg">
-                    {console.log('🗺️ Rendering Pickup MapLocationPicker')}
                     <MapLocationPicker
                       initialLocation={
                         formData.pickupCoordinates
@@ -906,7 +912,6 @@ const DeliveryRequest = () => {
                 {/* Delivery Map Picker */}
                 {showDeliveryMap && (
                   <div className="mt-3 border-2 border-blue-500 rounded-lg p-3 bg-white shadow-lg">
-                    {console.log('🗺️ Rendering Delivery MapLocationPicker')}
                     <MapLocationPicker
                       initialLocation={
                         formData.deliveryCoordinates

@@ -1002,7 +1002,6 @@ export const MonitoringServiceRequest: React.FC = () => {
                     {/* Interactive Map Picker */}
                     {showProjectMap && (
                       <div className="mt-3 border-2 border-blue-500 rounded-lg p-3 bg-white shadow-lg">
-                        {console.log('🗺️ Rendering Project MapLocationPicker')}
                         <MapLocationPicker
                           initialLocation={
                             formData.projectGpsCoordinates
