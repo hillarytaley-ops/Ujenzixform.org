@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
+import { MapLocationPicker } from '@/components/location/MapLocationPicker';
 
 // Helper for fetch with timeout
 const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs: number = 10000) => {
@@ -50,7 +51,8 @@ import {
   Star,
   Zap,
   Navigation,
-  Copy
+  Copy,
+  Map as MapIcon
 } from 'lucide-react';
 
 interface MonitoringServicePromptProps {
@@ -266,6 +268,7 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
     gpsCoordinates: ''
   });
   const [gettingLocation, setGettingLocation] = useState(false);
+  const [showSiteMap, setShowSiteMap] = useState(false);
   const { toast } = useToast();
 
   // Get GPS coordinates
@@ -737,6 +740,15 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
                   <Button
                     type="button"
                     variant="outline"
+                    size="icon"
+                    onClick={() => setShowSiteMap(true)}
+                    title="Search on map"
+                  >
+                    <MapIcon className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
                     size="sm"
                     onClick={getGPSLocation}
                     disabled={gettingLocation}
@@ -768,6 +780,48 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
                     <CheckCircle className="h-3 w-3" />
                     Location captured: {formData.gpsCoordinates}
                   </p>
+                )}
+                
+                {/* Site Map Picker */}
+                {showSiteMap && (
+                  <div className="mt-3 border border-blue-300 rounded-lg p-3 bg-white">
+                    <MapLocationPicker
+                      initialLocation={
+                        formData.gpsCoordinates
+                          ? (() => {
+                              const parts = formData.gpsCoordinates.split(',').map(s => s.trim());
+                              if (parts.length === 2) {
+                                const lat = parseFloat(parts[0]);
+                                const lng = parseFloat(parts[1]);
+                                if (!isNaN(lat) && !isNaN(lng)) {
+                                  return {
+                                    latitude: lat,
+                                    longitude: lng,
+                                    address: formData.siteAddress
+                                  };
+                                }
+                              }
+                              return undefined;
+                            })()
+                          : undefined
+                      }
+                      onLocationSelect={(location) => {
+                        setFormData(prev => ({
+                          ...prev,
+                          gpsCoordinates: `${location.latitude}, ${location.longitude}`,
+                          siteAddress: prev.siteAddress || location.address
+                        }));
+                        setShowSiteMap(false);
+                        toast({
+                          title: '📍 Site Location Set!',
+                          description: `GPS coordinates saved: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`
+                        });
+                      }}
+                      onClose={() => setShowSiteMap(false)}
+                      title="Select Site Location"
+                      description="Search for an address or click on the map to set your construction site location"
+                    />
+                  </div>
                 )}
               </div>
 

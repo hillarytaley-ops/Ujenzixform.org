@@ -34,7 +34,8 @@ import {
   Phone,
   Mail,
   Calendar,
-  DollarSign
+  DollarSign,
+  Map as MapIcon
 } from "lucide-react";
 import {
   Select,
@@ -46,6 +47,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { MapLocationPicker } from "@/components/location/MapLocationPicker";
 
 interface MonitoringService {
   id: string;
@@ -213,6 +215,7 @@ export const MonitoringServiceRequest: React.FC = () => {
   
   const [estimatedCost, setEstimatedCost] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showProjectMap, setShowProjectMap] = useState(false);
   const { toast } = useToast();
   
   // Get monitoring services based on builder type
@@ -950,12 +953,48 @@ export const MonitoringServiceRequest: React.FC = () => {
                   
                   <div className="space-y-2">
                     <Label htmlFor="projectLocation">Project Location *</Label>
-                    <Input
-                      id="projectLocation"
-                      value={formData.projectLocation}
-                      onChange={(e) => updateFormData('projectLocation', e.target.value)}
-                      placeholder="e.g., Westlands, Nairobi"
-                    />
+                    <div className="flex gap-2">
+                      <Input
+                        id="projectLocation"
+                        value={formData.projectLocation}
+                        onChange={(e) => updateFormData('projectLocation', e.target.value)}
+                        placeholder="e.g., Westlands, Nairobi"
+                        className="flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setShowProjectMap(true)}
+                        title="Search on map"
+                      >
+                        <MapIcon className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    {showProjectMap && (
+                      <div className="mt-3 border border-blue-300 rounded-lg p-3 bg-white">
+                        <MapLocationPicker
+                          initialLocation={
+                            formData.projectLocation
+                              ? undefined // Let user search or click on map
+                              : undefined
+                          }
+                          onLocationSelect={(location) => {
+                            updateFormData('projectLocation', location.address || location.county || '');
+                            setShowProjectMap(false);
+                            toast({
+                              title: '📍 Project Location Set!',
+                              description: location.county 
+                                ? `Location set to ${location.county}` 
+                                : 'GPS coordinates saved from map.'
+                            });
+                          }}
+                          onClose={() => setShowProjectMap(false)}
+                          title="Select Project Location"
+                          description="Search for an address or click on the map to set your project site location"
+                        />
+                      </div>
+                    )}
                   </div>
                   
                   <div className="space-y-2">

@@ -91,9 +91,12 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      // Reset profile state when dialog opens to ensure fresh data
+      setProfile(null);
+      setLoading(true);
       loadProfile();
     }
-  }, [isOpen]);
+  }, [isOpen, userRole]);
 
   const loadProfile = async () => {
     console.log('📝 ProfileEditDialog: Loading profile... userRole:', userRole);
@@ -205,7 +208,17 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
           }
         } else if (profiles) {
           profileData = { ...profiles, email: userEmail };
-          console.log('✅ ProfileEditDialog: Profile loaded from Supabase client:', profiles.full_name);
+          console.log('✅ ProfileEditDialog: Profile loaded from Supabase client:', profiles.full_name || profiles.email || 'User');
+          console.log('📝 ProfileEditDialog: Profile data:', {
+            full_name: profiles.full_name,
+            email: userEmail,
+            phone: profiles.phone,
+            company_name: profiles.company_name,
+            location: profiles.location,
+            county: profiles.county
+          });
+        } else {
+          console.log('📝 ProfileEditDialog: No profile found in database, using default');
         }
       } catch (fetchError) {
         console.warn('📝 ProfileEditDialog: Profile fetch error:', fetchError);
@@ -257,6 +270,13 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
       clearTimeout(timeoutId);
       setProfile(profileData);
       setLoading(false);
+      console.log('✅ ProfileEditDialog: Profile loaded successfully:', {
+        full_name: profileData.full_name,
+        email: profileData.email,
+        phone: profileData.phone,
+        company_name: profileData.company_name,
+        location: profileData.location
+      });
       return;
     } catch (fetchError) {
       console.log('📝 ProfileEditDialog: REST fetch failed:', fetchError);
@@ -835,13 +855,23 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
       }
 
       console.log('✅ ProfileEditDialog: Profile saved successfully');
+      
+      // Reload the profile from database to ensure we have the latest data
+      console.log('📝 ProfileEditDialog: Reloading profile after save...');
+      await loadProfile();
+      
       toast({
         title: '✅ Profile Updated!',
         description: 'Your profile has been saved successfully'
       });
 
+      // Call onSave callback to refresh dashboard profile
       onSave?.();
-      onClose();
+      
+      // Close the dialog after a brief delay to show the success message
+      setTimeout(() => {
+        onClose();
+      }, 500);
     } catch (error: any) {
       console.error('📝 ProfileEditDialog: Save error:', error);
       toast({

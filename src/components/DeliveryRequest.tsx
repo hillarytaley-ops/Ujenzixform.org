@@ -10,8 +10,9 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useToast } from "@/hooks/use-toast";
 import { UserRole } from "@/types/userProfile";
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
-import { MapPin, Package, Truck, Calendar, Shield, AlertTriangle, Navigation, Copy, Check } from "lucide-react";
+import { MapPin, Package, Truck, Calendar, Shield, AlertTriangle, Navigation, Copy, Check, Map as MapIcon } from "lucide-react";
 import { deliveryProviderNotificationService } from "@/services/DeliveryProviderNotificationService";
+import { MapLocationPicker } from "@/components/location/MapLocationPicker";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // COMPREHENSIVE KENYA CONSTRUCTION MATERIALS CATEGORIES
@@ -144,6 +145,8 @@ const DeliveryRequest = () => {
   const [gettingDeliveryLocation, setGettingDeliveryLocation] = useState(false);
   const [copiedPickup, setCopiedPickup] = useState(false);
   const [copiedDelivery, setCopiedDelivery] = useState(false);
+  const [showPickupMap, setShowPickupMap] = useState(false);
+  const [showDeliveryMap, setShowDeliveryMap] = useState(false);
   const [formData, setFormData] = useState({
     pickupAddress: "",
     pickupCoordinates: "",
@@ -710,6 +713,15 @@ const DeliveryRequest = () => {
                     type="button"
                     variant="outline"
                     size="icon"
+                    onClick={() => setShowPickupMap(true)}
+                    title="Search on map"
+                  >
+                    <MapIcon className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
                     onClick={() => getCurrentLocation('pickup')}
                     disabled={gettingPickupLocation}
                     title="Get current location"
@@ -739,8 +751,45 @@ const DeliveryRequest = () => {
                   </p>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  💡 Tip: Click the location button to auto-detect your GPS, or paste coordinates from Google Maps
+                  💡 Tip: Use "Search on Map" for interactive location selection, or click the location button to auto-detect your GPS
                 </p>
+                
+                {/* Pickup Map Picker */}
+                {showPickupMap && (
+                  <div className="mt-3 border border-green-300 rounded-lg p-3 bg-white">
+                    <MapLocationPicker
+                      initialLocation={
+                        formData.pickupCoordinates
+                          ? (() => {
+                              const coords = parseCoordinates(formData.pickupCoordinates);
+                              return coords
+                                ? {
+                                    latitude: coords.lat,
+                                    longitude: coords.lng,
+                                    address: formData.pickupAddress
+                                  }
+                                : undefined;
+                            })()
+                          : undefined
+                      }
+                      onLocationSelect={(location) => {
+                        setFormData(prev => ({
+                          ...prev,
+                          pickupCoordinates: `${location.latitude}, ${location.longitude}`,
+                          pickupAddress: prev.pickupAddress || location.address
+                        }));
+                        setShowPickupMap(false);
+                        toast({
+                          title: '📍 Pickup Location Set!',
+                          description: `GPS coordinates saved: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`
+                        });
+                      }}
+                      onClose={() => setShowPickupMap(false)}
+                      title="Select Pickup Location"
+                      description="Search for an address or click on the map to set the pickup location"
+                    />
+                  </div>
+                )}
               </div>
             </div>
 
@@ -785,6 +834,15 @@ const DeliveryRequest = () => {
                     type="button"
                     variant="outline"
                     size="icon"
+                    onClick={() => setShowDeliveryMap(true)}
+                    title="Search on map"
+                  >
+                    <MapIcon className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
                     onClick={() => getCurrentLocation('delivery')}
                     disabled={gettingDeliveryLocation}
                     title="Get current location"
@@ -814,8 +872,45 @@ const DeliveryRequest = () => {
                   </p>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  💡 Tip: For construction sites without addresses, GPS coordinates help drivers find the exact location
+                  💡 Tip: Use "Search on Map" for interactive location selection, or click the location button to auto-detect your GPS
                 </p>
+                
+                {/* Delivery Map Picker */}
+                {showDeliveryMap && (
+                  <div className="mt-3 border border-blue-300 rounded-lg p-3 bg-white">
+                    <MapLocationPicker
+                      initialLocation={
+                        formData.deliveryCoordinates
+                          ? (() => {
+                              const coords = parseCoordinates(formData.deliveryCoordinates);
+                              return coords
+                                ? {
+                                    latitude: coords.lat,
+                                    longitude: coords.lng,
+                                    address: formData.deliveryAddress
+                                  }
+                                : undefined;
+                            })()
+                          : undefined
+                      }
+                      onLocationSelect={(location) => {
+                        setFormData(prev => ({
+                          ...prev,
+                          deliveryCoordinates: `${location.latitude}, ${location.longitude}`,
+                          deliveryAddress: prev.deliveryAddress || location.address
+                        }));
+                        setShowDeliveryMap(false);
+                        toast({
+                          title: '📍 Delivery Location Set!',
+                          description: `GPS coordinates saved: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`
+                        });
+                      }}
+                      onClose={() => setShowDeliveryMap(false)}
+                      title="Select Delivery Location"
+                      description="Search for an address or click on the map to set the delivery location"
+                    />
+                  </div>
+                )}
               </div>
             </div>
 
