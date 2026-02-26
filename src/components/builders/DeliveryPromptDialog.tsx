@@ -670,30 +670,42 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
               )}
 
               {/* Manual coordinates */}
-              <div className="space-y-1">
-                <Label className="text-xs text-gray-500">Or enter coordinates</Label>
-                <div className="flex gap-1">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <MapIcon className="h-4 w-4 text-blue-600" />
+                  Or enter coordinates / Search on Map
+                </Label>
+                <div className="flex gap-2">
                   <Input
                     placeholder="-1.286389, 36.817223"
                     value={deliveryData.deliveryCoordinates}
                     onChange={(e) => setDeliveryData(prev => ({ ...prev, deliveryCoordinates: e.target.value }))}
-                    className="font-mono text-xs h-8 flex-1"
+                    className="font-mono text-sm flex-1"
                   />
                   <Button
                     type="button"
                     variant="outline"
-                    size="icon"
-                    onClick={() => setShowDeliveryMap(true)}
-                    title="Search on map"
-                    className="h-8 w-8"
+                    size="default"
+                    onClick={() => {
+                      console.log('🗺️ Delivery Map button clicked in DeliveryPromptDialog');
+                      setShowDeliveryMap(true);
+                    }}
+                    title="Click to open interactive map for location selection"
+                    className="border-2 border-blue-500 text-blue-600 hover:bg-blue-50 font-medium px-4"
                   >
-                    <MapIcon className="h-3 w-3" />
+                    <MapIcon className="h-4 w-4 mr-2" />
+                    Search on Map
                   </Button>
                 </div>
+                <p className="text-xs text-blue-600 flex items-center gap-1">
+                  <MapIcon className="h-3 w-3" />
+                  💡 Click "Search on Map" to select location visually on an interactive map
+                </p>
+              </div>
                 
                 {/* Delivery Map Picker */}
                 {showDeliveryMap && (
-                  <div className="mt-2 border border-blue-300 rounded-lg p-2 bg-white">
+                  <div className="mt-3 border-2 border-blue-500 rounded-lg p-4 bg-white shadow-lg">
                     <MapLocationPicker
                       initialLocation={
                         deliveryData.deliveryCoordinates

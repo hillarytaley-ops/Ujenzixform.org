@@ -725,13 +725,13 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
 
               {/* GPS Location */}
               <div className="space-y-2">
-                <Label className="flex items-center gap-1">
-                  <Navigation className="h-3 w-3" />
+                <Label className="flex items-center gap-2 text-sm font-medium">
+                  <Navigation className="h-4 w-4 text-blue-600" />
                   GPS Coordinates
                 </Label>
                 <div className="flex gap-2">
                   <Input
-                    placeholder="Click 'Get GPS' to capture location"
+                    placeholder="Click 'Get GPS' or 'Search on Map' to capture location"
                     value={formData.gpsCoordinates}
                     onChange={(e) => setFormData(prev => ({ ...prev, gpsCoordinates: e.target.value }))}
                     className="flex-1"
@@ -740,25 +740,30 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
                   <Button
                     type="button"
                     variant="outline"
-                    size="icon"
-                    onClick={() => setShowSiteMap(true)}
-                    title="Search on map"
+                    size="default"
+                    onClick={() => {
+                      console.log('🗺️ Site Map button clicked in MonitoringServicePrompt');
+                      setShowSiteMap(true);
+                    }}
+                    title="Click to open interactive map for location selection"
+                    className="border-2 border-blue-500 text-blue-600 hover:bg-blue-50 font-medium px-4 whitespace-nowrap"
                   >
-                    <MapIcon className="h-4 w-4" />
+                    <MapIcon className="h-4 w-4 mr-2" />
+                    Search on Map
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
-                    size="sm"
+                    size="default"
                     onClick={getGPSLocation}
                     disabled={gettingLocation}
-                    className="whitespace-nowrap"
+                    className="whitespace-nowrap border-green-500 text-green-600 hover:bg-green-50"
                   >
                     {gettingLocation ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     ) : (
                       <>
-                        <Navigation className="h-4 w-4 mr-1" />
+                        <Navigation className="h-4 w-4 mr-2" />
                         Get GPS
                       </>
                     )}
@@ -767,7 +772,7 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
                     <Button
                       type="button"
                       variant="ghost"
-                      size="sm"
+                      size="default"
                       onClick={copyCoordinates}
                       title="Copy coordinates"
                     >
@@ -775,6 +780,10 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
                     </Button>
                   )}
                 </div>
+                <p className="text-xs text-blue-600 flex items-center gap-1">
+                  <MapIcon className="h-3 w-3" />
+                  💡 Use "Search on Map" for interactive location selection or "Get GPS" for current location
+                </p>
                 {formData.gpsCoordinates && (
                   <p className="text-xs text-green-600 flex items-center gap-1">
                     <CheckCircle className="h-3 w-3" />
@@ -784,7 +793,7 @@ export const MonitoringServicePrompt: React.FC<MonitoringServicePromptProps> = (
                 
                 {/* Site Map Picker */}
                 {showSiteMap && (
-                  <div className="mt-3 border border-blue-300 rounded-lg p-3 bg-white">
+                  <div className="mt-3 border-2 border-blue-500 rounded-lg p-4 bg-white shadow-lg">
                     <MapLocationPicker
                       initialLocation={
                         formData.gpsCoordinates
