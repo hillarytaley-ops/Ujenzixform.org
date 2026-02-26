@@ -510,6 +510,27 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
     };
   };
 
+  useEffect(() => {
+    if (builderId) {
+      fetchOrders();
+      fetchScanEvents();
+      const cleanup = setupRealtimeSubscription();
+      
+      // Safety timeout - stop loading after 10 seconds max
+      const timeout = setTimeout(() => {
+        setLoading(false);
+      }, 10000);
+      
+      return () => {
+        clearTimeout(timeout);
+        if (cleanup) cleanup();
+      };
+    } else {
+      // No builderId - stop loading immediately
+      setLoading(false);
+    }
+  }, [builderId]);
+
   // Order status flow: confirmed → dispatched → in_transit → delivered
   const getStatusColor = (status: string) => {
     switch (status) {
