@@ -638,26 +638,31 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
   // Get human-readable status label with delivery provider info for orders
   const getStatusLabel = (order: any) => {
     const status = order.status || 'pending';
+    const deliveryStatus = order.delivery_status;
     const hasDeliveryProvider = order.delivery_provider_id || order.delivery_provider_name;
     const providerName = order.delivery_provider_name || 'Delivery Provider';
+    
+    // Check if order is in transit (priority check)
+    if (deliveryStatus === 'in_transit' || status === 'in_transit') {
+      return `🚚 In Transit to Destination (${providerName})`;
+    }
     
     switch (status) {
       case 'pending':
         // Show delivery provider allocation status with name if available
         if (hasDeliveryProvider) {
-          return `To be delivered by: ${providerName}`;
+          return `Delivered by: ${providerName}`;
         }
         return 'Awaiting Delivery Provider';
       case 'confirmed':
         // For confirmed orders, also check delivery provider
         if (hasDeliveryProvider) {
-          return `To be delivered by: ${providerName}`;
+          return `Delivered by: ${providerName}`;
         }
         return 'Awaiting Delivery Provider';
       case 'quoted': return 'Quoted';
       case 'dispatched': return '📦 Dispatched';
       case 'partially_dispatched': return '📦 Partially Dispatched';
-      case 'in_transit': return '🚚 In Transit';
       case 'partially_delivered': return '📬 Partially Delivered';
       case 'received': return '✅ Received';
       case 'delivered': return '✅ Delivered';
