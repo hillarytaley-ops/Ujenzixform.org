@@ -237,9 +237,14 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
   const [showQRDialog, setShowQRDialog] = useState(false);
   const [activeFilter, setActiveFilter] = useState<OrderFilter>('pending'); // Default to pending orders
   const { toast } = useToast();
+  
+  // Use refs to store latest function references to avoid stale closures
+  const fetchOrdersRef = useRef<(() => Promise<void>) | null>(null);
+  const fetchScanEventsRef = useRef<(() => Promise<void>) | null>(null);
 
   // Define fetchOrders with useCallback to ensure stable reference
   const fetchOrders = useCallback(async () => {
+    fetchOrdersRef.current = fetchOrders;
     try {
       setLoading(true);
       
@@ -448,7 +453,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
         },
         (payload) => {
           console.log('🔄 Purchase order change detected:', payload.eventType, payload.new?.po_number);
-          fetchOrders(); // Refresh orders when any change occurs
+          if (fetchOrdersRef.current) fetchOrdersRef.current(); // Refresh orders when any change occurs
           
           // Show toast for important status changes
           if (payload.eventType === 'UPDATE' && payload.new) {
@@ -496,7 +501,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
           table: 'material_items'
         },
         () => {
-          fetchOrders();
+          if (fetchOrdersRef.current) fetchOrdersRef.current();
         }
       )
       .subscribe();
