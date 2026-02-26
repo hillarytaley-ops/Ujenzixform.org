@@ -589,19 +589,15 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
     const hasDeliveryProvider = order.delivery_provider_id || order.delivery_provider_name;
     const providerName = order.delivery_provider_name || 'Delivery Provider';
     
+    // For pending and confirmed orders (accepted quotes), show delivery provider status
+    if (status === 'pending' || status === 'confirmed') {
+      if (hasDeliveryProvider) {
+        return `To Be Delivered by ${providerName}`;
+      }
+      return 'Awaiting Delivery Provider';
+    }
+    
     switch (status) {
-      case 'pending':
-        // Show delivery provider allocation status with name if available
-        if (hasDeliveryProvider) {
-          return `To be delivered by: ${providerName}`;
-        }
-        return 'Awaiting Delivery Provider';
-      case 'confirmed':
-        // For confirmed orders, also check delivery provider
-        if (hasDeliveryProvider) {
-          return `To be delivered by: ${providerName}`;
-        }
-        return 'Awaiting Delivery Provider';
       case 'quoted': return 'Quoted';
       case 'dispatched': return '📦 Dispatched';
       case 'partially_dispatched': return '📦 Partially Dispatched';
