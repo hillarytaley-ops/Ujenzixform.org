@@ -564,11 +564,42 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
     }
   };
 
-  // Get human-readable status label
-  const getStatusLabel = (status: string) => {
+  // Get human-readable status label for items
+  const getItemStatusLabel = (status: string) => {
     switch (status) {
       case 'pending': return 'Pending';
-      case 'confirmed': return 'Order Confirmed';
+      case 'confirmed': return 'Confirmed';
+      case 'quoted': return 'Quoted';
+      case 'dispatched': return '📦 Dispatched';
+      case 'partially_dispatched': return '📦 Partially Dispatched';
+      case 'in_transit': return '🚚 In Transit';
+      case 'partially_delivered': return '📬 Partially Delivered';
+      case 'received': return '✅ Received';
+      case 'delivered': return '✅ Delivered';
+      case 'verified': return '✓ Verified';
+      case 'damaged': return '⚠️ Damaged';
+      default: return status;
+    }
+  };
+
+  // Get human-readable status label with delivery provider info for orders
+  const getStatusLabel = (order: any) => {
+    const status = order.status || 'pending';
+    const hasDeliveryProvider = order.delivery_provider_id || order.delivery_provider_name;
+    
+    switch (status) {
+      case 'pending':
+        // Show delivery provider allocation status
+        if (hasDeliveryProvider) {
+          return 'Delivery Provider Allocated';
+        }
+        return 'Awaiting Delivery Provider';
+      case 'confirmed':
+        // For confirmed orders, also check delivery provider
+        if (hasDeliveryProvider) {
+          return 'Delivery Provider Allocated';
+        }
+        return 'Awaiting Delivery Provider';
       case 'quoted': return 'Quoted';
       case 'dispatched': return '📦 Dispatched';
       case 'partially_dispatched': return '📦 Partially Dispatched';
@@ -620,8 +651,11 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       const items = order.material_items || [];
       switch (activeFilter) {
         case 'pending':
-          // Orders that are accepted/confirmed but not yet dispatched
-          return items.some(i => !i.dispatch_scanned && !['dispatched', 'in_transit', 'received', 'verified'].includes(i.status));
+          // Orders that are pending/confirmed (accepted quotes) but not yet dispatched
+          // This includes orders awaiting delivery provider allocation
+          const isPendingStatus = order.status === 'pending' || order.status === 'confirmed';
+          const hasPendingItems = items.some(i => !i.dispatch_scanned && !['dispatched', 'in_transit', 'received', 'verified'].includes(i.status));
+          return isPendingStatus || hasPendingItems;
         case 'dispatched':
           // Orders with dispatched items (but not yet in transit or received)
           return items.some(i => (i.dispatch_scanned || i.status === 'dispatched') && !['in_transit', 'received', 'verified'].includes(i.status) && !i.receive_scanned);
@@ -642,8 +676,11 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
   // Calculate stats - Count ORDERS (not items) to match the tab filtering
   const totalOrders = orders.length;
   const pendingOrders = orders.filter(order => {
+    // Include orders with status 'pending' or 'confirmed' (accepted quotes awaiting dispatch)
+    const isPendingStatus = order.status === 'pending' || order.status === 'confirmed';
     const items = order.material_items || [];
-    return items.some(i => !i.dispatch_scanned && !['dispatched', 'in_transit', 'received', 'verified'].includes(i.status));
+    const hasPendingItems = items.some(i => !i.dispatch_scanned && !['dispatched', 'in_transit', 'received', 'verified'].includes(i.status));
+    return isPendingStatus || hasPendingItems;
   }).length;
   const dispatchedOrders = orders.filter(order => {
     const items = order.material_items || [];
@@ -898,7 +935,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                       {/* Status Badge */}
                       <Badge className={`${getStatusColor(order.status)} px-3 py-1 whitespace-nowrap`}>
                         {getStatusIcon(order.status)}
-                        <span className="ml-1">{getStatusLabel(order.status)}</span>
+                        <span className="ml-1">{getStatusLabel(order)}</span>
                       </Badge>
                       
                       {isExpanded ? (
@@ -916,16 +953,21 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                       <div className="bg-gray-50 rounded-lg p-4">
                         <p className="font-medium text-sm text-gray-600 mb-3">Order Status Timeline</p>
                         <div className="flex items-center justify-between">
-                          {/* Step 1: Confirmed */}
+                          {/* Step 1: Pending/Confirmed */}
                           <div className="flex flex-col items-center">
                             <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                              ['confirmed', 'dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status)
+                              ['pending', 'confirmed', 'dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status)
                                 ? 'bg-green-500 text-white'
                                 : 'bg-gray-200 text-gray-400'
                             }`}>
                               <CheckCircle className="h-5 w-5" />
                             </div>
-                            <span className="text-xs mt-1 font-medium">Confirmed</span>
+                            <span className="text-xs mt-1 font-medium">Accepted</span>
+                            {order.delivery_provider_id || order.delivery_provider_name ? (
+                              <span className="text-[10px] text-green-600 mt-0.5">Provider Allocated</span>
+                            ) : (
+                              <span className="text-[10px] text-gray-500 mt-0.5">Awaiting Provider</span>
+                            )}
                           </div>
                           
                           {/* Line */}
@@ -1016,7 +1058,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                                 <h3 className="text-xl font-bold text-gray-800">{item.material_type}</h3>
                                 <Badge className={`text-base px-4 py-2 ${getStatusColor(item.status)}`}>
                                   {getStatusIcon(item.status)}
-                                  <span className="ml-2">{getStatusLabel(item.status)}</span>
+                                  <span className="ml-2">{getItemStatusLabel(item.status)}</span>
                                 </Badge>
                               </div>
                               
