@@ -437,7 +437,7 @@ const DeliveryRequest = () => {
       }
 
       // Create delivery request with enhanced validation
-      const requestData = {
+      const requestData: any = {
         builder_id: builderId,
         pickup_address: fullPickupAddress,
         delivery_address: fullDeliveryAddress,
@@ -451,6 +451,25 @@ const DeliveryRequest = () => {
         weight_kg: parseFloat(formData.weight) || null,
         status: 'pending'
       };
+      
+      // Add GPS coordinates as separate fields if provided (for accurate location tracking)
+      if (formData.pickupCoordinates.trim()) {
+        const pickupCoords = parseCoordinates(formData.pickupCoordinates.trim());
+        if (pickupCoords) {
+          requestData.pickup_coordinates = formData.pickupCoordinates.trim();
+          requestData.pickup_latitude = pickupCoords.lat;
+          requestData.pickup_longitude = pickupCoords.lng;
+        }
+      }
+      
+      if (formData.deliveryCoordinates.trim()) {
+        const deliveryCoords = parseCoordinates(formData.deliveryCoordinates.trim());
+        if (deliveryCoords) {
+          requestData.delivery_coordinates = formData.deliveryCoordinates.trim();
+          requestData.delivery_latitude = deliveryCoords.lat;
+          requestData.delivery_longitude = deliveryCoords.lng;
+        }
+      }
 
       console.log('🚚 DeliveryRequest: Inserting delivery request via REST API...');
       

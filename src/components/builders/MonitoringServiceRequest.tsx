@@ -35,7 +35,8 @@ import {
   Mail,
   Calendar,
   DollarSign,
-  Map as MapIcon
+  Map as MapIcon,
+  Navigation
 } from "lucide-react";
 import {
   Select,
@@ -68,6 +69,7 @@ interface ServiceRequest {
   // Project Information
   projectName: string;
   projectLocation: string;
+  projectGpsCoordinates?: string; // GPS coordinates for accurate location
   projectSize: string;
   projectType: string;
   projectDuration: string;
@@ -195,6 +197,7 @@ export const MonitoringServiceRequest: React.FC = () => {
     builderType: '',
     projectName: '',
     projectLocation: '',
+    projectGpsCoordinates: '',
     projectSize: '',
     projectType: '',
     projectDuration: '',
@@ -359,6 +362,7 @@ export const MonitoringServiceRequest: React.FC = () => {
         builder_type: formData.builderType || 'professional', // Default to professional if not set
         project_name: formData.projectName,
         project_location: formData.projectLocation,
+        project_gps_coordinates: formData.projectGpsCoordinates || null,
         project_size: formData.projectSize,
         project_type: formData.projectType,
         project_duration: formData.projectDuration,
@@ -412,6 +416,7 @@ export const MonitoringServiceRequest: React.FC = () => {
         builderType: currentBuilderType,
         projectName: '',
         projectLocation: '',
+        projectGpsCoordinates: '',
         projectSize: '',
         projectType: '',
         projectDuration: '',
@@ -971,27 +976,60 @@ export const MonitoringServiceRequest: React.FC = () => {
                         <MapIcon className="h-4 w-4" />
                       </Button>
                     </div>
+                    
+                    {/* GPS Coordinates Input */}
+                    <div className="space-y-1">
+                      <Label htmlFor="projectGpsCoordinates" className="flex items-center gap-2 text-sm text-gray-600">
+                        <Navigation className="h-3 w-3" />
+                        GPS Coordinates (optional but recommended for accurate location)
+                      </Label>
+                      <Input
+                        id="projectGpsCoordinates"
+                        value={formData.projectGpsCoordinates || ''}
+                        onChange={(e) => updateFormData('projectGpsCoordinates', e.target.value)}
+                        placeholder="e.g., -1.2921, 36.8219"
+                        className="font-mono text-sm"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        💡 Use "Search on Map" button above to select location on interactive map for accurate coordinates
+                      </p>
+                    </div>
+                    
+                    {/* Interactive Map Picker */}
                     {showProjectMap && (
                       <div className="mt-3 border border-blue-300 rounded-lg p-3 bg-white">
                         <MapLocationPicker
                           initialLocation={
-                            formData.projectLocation
-                              ? undefined // Let user search or click on map
+                            formData.projectGpsCoordinates
+                              ? (() => {
+                                  const parts = formData.projectGpsCoordinates.split(',').map(s => s.trim());
+                                  if (parts.length === 2) {
+                                    const lat = parseFloat(parts[0]);
+                                    const lng = parseFloat(parts[1]);
+                                    if (!isNaN(lat) && !isNaN(lng)) {
+                                      return {
+                                        latitude: lat,
+                                        longitude: lng,
+                                        address: formData.projectLocation
+                                      };
+                                    }
+                                  }
+                                  return undefined;
+                                })()
                               : undefined
                           }
                           onLocationSelect={(location) => {
                             updateFormData('projectLocation', location.address || location.county || '');
+                            updateFormData('projectGpsCoordinates', `${location.latitude}, ${location.longitude}`);
                             setShowProjectMap(false);
                             toast({
                               title: '📍 Project Location Set!',
-                              description: location.county 
-                                ? `Location set to ${location.county}` 
-                                : 'GPS coordinates saved from map.'
+                              description: `GPS coordinates saved: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`
                             });
                           }}
                           onClose={() => setShowProjectMap(false)}
                           title="Select Project Location"
-                          description="Search for an address or click on the map to set your project site location"
+                          description="Search for an address or click on the map to set your project site location. Coordinates will be saved automatically."
                         />
                       </div>
                     )}
