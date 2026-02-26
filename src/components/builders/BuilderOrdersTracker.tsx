@@ -424,6 +424,10 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       }
     }
   }, [builderId]);
+  
+  // Update refs after functions are defined to avoid circular references
+  fetchOrdersRef.current = fetchOrders;
+  fetchScanEventsRef.current = fetchScanEvents;
 
   useEffect(() => {
     if (!builderId) {
