@@ -1202,46 +1202,6 @@ const DeliveryDashboard = () => {
             </div>
           </TabsContent>
 
-          {/* Schedule Tab - REMOVED (now part of Deliveries) */}
-          <TabsContent value="schedule" className="hidden">
-            <div className="space-y-6">
-              {/* Today's Summary */}
-              <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white'}>
-                <CardHeader>
-                  <CardTitle className={`flex items-center gap-2 ${isDarkMode ? 'text-white' : ''}`}>
-                    <Calendar className="h-5 w-5 text-teal-500" />
-                    Today's Schedule
-                  </CardTitle>
-                  <CardDescription className={isDarkMode ? 'text-gray-400' : ''}>
-                    {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-3 gap-4 mb-6">
-                    <div className={`p-4 rounded-lg text-center ${isDarkMode ? 'bg-green-900/30' : 'bg-green-50'}`}>
-                      <p className={`text-2xl font-bold text-green-600`}>{stats.completedToday}</p>
-                      <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Completed Today</p>
-                    </div>
-                    <div className={`p-4 rounded-lg text-center ${isDarkMode ? 'bg-yellow-900/30' : 'bg-yellow-50'}`}>
-                      <p className={`text-2xl font-bold text-yellow-600`}>{stats.pendingDeliveries}</p>
-                      <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Pending</p>
-                    </div>
-                    <div className={`p-4 rounded-lg text-center ${isDarkMode ? 'bg-blue-900/30' : 'bg-blue-50'}`}>
-                      <p className={`text-2xl font-bold text-blue-600`}>{activeDeliveries.length}</p>
-                      <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Active</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Route Optimizer */}
-              <RouteOptimizer 
-                deliveries={routeDeliveries}
-                onRouteOptimized={(route) => console.log('Optimized route:', route)}
-                onStartNavigation={(stop) => console.log('Start navigation to:', stop)}
-              />
-            </div>
-          </TabsContent>
 
           {/* Map Tab */}
           <TabsContent value="map">
@@ -1252,9 +1212,6 @@ const DeliveryDashboard = () => {
               onRefresh={() => console.log('Refresh map')}
             />
           </TabsContent>
-
-          {/* History Tab - REMOVED (now part of Deliveries > Delivered) */}
-          <TabsContent value="history" className="hidden">
 
           {/* Analytics Tab - Includes Earnings and Achievements */}
           <TabsContent value="analytics">
