@@ -237,10 +237,6 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
   const [showQRDialog, setShowQRDialog] = useState(false);
   const [activeFilter, setActiveFilter] = useState<OrderFilter>('pending'); // Default to pending orders
   const { toast } = useToast();
-  
-  // Use refs to store latest function references to avoid stale closures
-  const fetchOrdersRef = useRef<(() => Promise<void>) | null>(null);
-  const fetchScanEventsRef = useRef<(() => Promise<void>) | null>(null);
 
   // Define fetchOrders with useCallback to ensure stable reference
   const fetchOrders = useCallback(async () => {
@@ -424,12 +420,6 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       }
     }
   }, [builderId]);
-  
-  // Update refs when functions change
-  useEffect(() => {
-    fetchOrdersRef.current = fetchOrders;
-    fetchScanEventsRef.current = fetchScanEvents;
-  }, [fetchOrders, fetchScanEvents]);
 
   useEffect(() => {
     if (!builderId) {
@@ -458,7 +448,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
         },
         (payload) => {
           console.log('🔄 Purchase order change detected:', payload.eventType, payload.new?.po_number);
-          if (fetchOrdersRef.current) fetchOrdersRef.current(); // Refresh orders when any change occurs
+          fetchOrders(); // Refresh orders when any change occurs
           
           // Show toast for important status changes
           if (payload.eventType === 'UPDATE' && payload.new) {
@@ -506,7 +496,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
           table: 'material_items'
         },
         () => {
-          if (fetchOrdersRef.current) fetchOrdersRef.current();
+          fetchOrders();
         }
       )
       .subscribe();
@@ -589,8 +579,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       supabase.removeChannel(itemsChannel);
       supabase.removeChannel(scansChannel);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [builderId, toast]);
+  }, [builderId, toast, fetchOrders, fetchScanEvents]);
 
 
   // Order status flow: confirmed → dispatched → in_transit → delivered
