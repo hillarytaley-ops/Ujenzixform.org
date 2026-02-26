@@ -862,6 +862,326 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
 
   const filteredOrders = getFilteredOrders();
 
+  // Render order card component
+  const renderOrderCard = (order: PurchaseOrder, isExpanded: boolean, progress: number) => (
+    <Card key={order.id} className="border">
+      <CardContent className="p-4">
+        {/* Order Header */}
+        <div 
+          className="flex items-center justify-between cursor-pointer"
+          onClick={() => setExpandedOrder(isExpanded ? null : order.id)}
+        >
+          <div className="flex items-center gap-4">
+            <div className="p-2 bg-blue-50 rounded-lg">
+              <QrCode className="h-6 w-6 text-blue-600" />
+            </div>
+            <div>
+              <p className="font-semibold">{order.po_number}</p>
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <Calendar className="h-3 w-3" />
+                {format(new Date(order.created_at), 'MMM dd, yyyy')}
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            {/* Mini Status Timeline - Always Visible */}
+            <div className="hidden sm:flex items-center gap-1">
+              {/* Confirmed/Pending */}
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                ['pending', 'confirmed', 'dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status)
+                  ? 'bg-green-500 text-white'
+                  : 'bg-gray-200 text-gray-400'
+              }`}>✓</div>
+              <div className={`w-4 h-0.5 ${
+                ['dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status) ||
+                (order.delivery_provider_id && ['pending', 'confirmed'].includes(order.status))
+                  ? 'bg-green-500'
+                  : 'bg-gray-200'
+              }`} />
+              {/* Dispatched */}
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                ['dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status)
+                  ? 'bg-orange-500 text-white'
+                  : 'bg-gray-200 text-gray-400'
+              }`}>📦</div>
+              <div className={`w-4 h-0.5 ${
+                ['in_transit', 'delivered', 'received', 'verified'].includes(order.status)
+                  ? 'bg-green-500'
+                  : 'bg-gray-200'
+              }`} />
+              {/* In Transit */}
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                ['in_transit', 'delivered', 'received', 'verified'].includes(order.status)
+                  ? 'bg-purple-500 text-white'
+                  : 'bg-gray-200 text-gray-400'
+              }`}>🚚</div>
+              <div className={`w-4 h-0.5 ${
+                ['delivered', 'received', 'verified'].includes(order.status)
+                  ? 'bg-green-500'
+                  : 'bg-gray-200'
+              }`} />
+              {/* Delivered */}
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                ['delivered', 'received', 'verified'].includes(order.status)
+                  ? 'bg-green-600 text-white'
+                  : 'bg-gray-200 text-gray-400'
+              }`}>✅</div>
+            </div>
+            
+            {/* Progress Bar - Hidden on mobile */}
+            <div className="hidden lg:block w-24">
+              <div className="flex items-center justify-between text-xs mb-1">
+                <span className="text-gray-500">Progress</span>
+                <span className="font-medium">{progress}%</span>
+              </div>
+              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-green-500 transition-all duration-300"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            </div>
+            
+            {/* Status Badge */}
+            <Badge className={`${getStatusColor(order.status)} px-3 py-1 whitespace-nowrap`}>
+              {getStatusIcon(order.status)}
+              <span className="ml-1">{getStatusLabel(order)}</span>
+            </Badge>
+            
+            {isExpanded ? (
+              <ChevronUp className="h-5 w-5 text-gray-400" />
+            ) : (
+              <ChevronDown className="h-5 w-5 text-gray-400" />
+            )}
+          </div>
+        </div>
+        
+        {/* Order Details (Expanded) - Same as before */}
+        {isExpanded && (
+          <div className="mt-4 pt-4 border-t space-y-4">
+            {/* Order Status Timeline */}
+            <div className="bg-gray-50 rounded-lg p-4">
+              <p className="font-medium text-sm text-gray-600 mb-3">Order Status Timeline</p>
+              <div className="flex items-center justify-between">
+                {/* Step 1: Pending/Confirmed */}
+                <div className="flex flex-col items-center">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                    ['pending', 'confirmed', 'dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status)
+                      ? 'bg-green-500 text-white'
+                      : 'bg-gray-200 text-gray-400'
+                  }`}>
+                    <CheckCircle className="h-5 w-5" />
+                  </div>
+                  <span className="text-xs mt-1 font-medium">Accepted</span>
+                  {order.delivery_provider_id || order.delivery_provider_name ? (
+                    <span className="text-[10px] text-green-600 mt-0.5 font-medium">
+                      To be delivered by: {order.delivery_provider_name || 'Provider'}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-gray-500 mt-0.5">Awaiting Provider</span>
+                  )}
+                </div>
+                
+                {/* Line */}
+                <div className={`flex-1 h-1 mx-2 ${
+                  ['dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status) ||
+                  (order.delivery_provider_id && ['pending', 'confirmed'].includes(order.status))
+                    ? 'bg-green-500'
+                    : 'bg-gray-200'
+                }`} />
+                
+                {/* Step 2: Dispatched */}
+                <div className="flex flex-col items-center">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                    ['dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status)
+                      ? 'bg-orange-500 text-white'
+                      : 'bg-gray-200 text-gray-400'
+                  }`}>
+                    <Package className="h-5 w-5" />
+                  </div>
+                  <span className="text-xs mt-1 font-medium">Dispatched</span>
+                  <span className="text-[10px] text-gray-500">QR Scanned</span>
+                </div>
+                
+                {/* Line */}
+                <div className={`flex-1 h-1 mx-2 ${
+                  ['in_transit', 'delivered', 'received', 'verified'].includes(order.status)
+                    ? 'bg-green-500'
+                    : 'bg-gray-200'
+                }`} />
+                
+                {/* Step 3: In Transit */}
+                <div className="flex flex-col items-center">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                    ['in_transit', 'delivered', 'received', 'verified'].includes(order.status)
+                      ? 'bg-purple-500 text-white animate-pulse'
+                      : 'bg-gray-200 text-gray-400'
+                  }`}>
+                    <Truck className="h-5 w-5" />
+                  </div>
+                  <span className="text-xs mt-1 font-medium">In Transit</span>
+                  <span className="text-[10px] text-gray-500">Being Tracked</span>
+                </div>
+                
+                {/* Line */}
+                <div className={`flex-1 h-1 mx-2 ${
+                  ['delivered', 'received', 'verified'].includes(order.status)
+                    ? 'bg-green-500'
+                    : 'bg-gray-200'
+                }`} />
+                
+                {/* Step 4: Delivered/Received */}
+                <div className="flex flex-col items-center">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                    ['delivered', 'received', 'verified'].includes(order.status)
+                      ? 'bg-green-500 text-white'
+                      : 'bg-gray-200 text-gray-400'
+                  }`}>
+                    <CheckCircle className="h-5 w-5" />
+                  </div>
+                  <span className="text-xs mt-1 font-medium">Delivered</span>
+                  <span className="text-[10px] text-gray-500">QR Received</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Delivery Info */}
+            <div className="space-y-3">
+              <div className="flex items-start gap-2 text-sm">
+                <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
+                <div>
+                  <p className="font-medium">Delivery Address</p>
+                  <p className="text-gray-600">{order.delivery_address}</p>
+                </div>
+              </div>
+              
+              {/* Delivery Provider Info */}
+              {(order.delivery_provider_id || order.delivery_provider_name) && (
+                <div className="flex items-start gap-2 text-sm bg-blue-50 p-3 rounded-lg border border-blue-200">
+                  <Truck className="h-4 w-4 text-blue-600 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-blue-900">Delivery Provider</p>
+                    <p className="text-blue-700">{order.delivery_provider_name || 'Assigned Provider'}</p>
+                    {order.delivery_provider_phone && (
+                      <p className="text-xs text-blue-600 mt-1">Phone: {order.delivery_provider_phone}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* Material Items with QR Codes - EXTRA LARGE */}
+            <div>
+              <p className="font-medium mb-4 flex items-center gap-2 text-lg">
+                <QrCode className="h-5 w-5" />
+                Material Items with QR Codes ({order.material_items?.length || 0})
+              </p>
+              <div className="space-y-6">
+                {order.material_items?.map((item) => (
+                  <div 
+                    key={item.id}
+                    className="flex flex-col items-center p-6 bg-white rounded-xl border-2 border-gray-200 shadow-lg hover:shadow-xl transition-shadow"
+                  >
+                    {/* Item Header */}
+                    <div className="w-full flex flex-col sm:flex-row items-center justify-between mb-4 gap-3">
+                      <h3 className="text-xl font-bold text-gray-800">{item.material_type}</h3>
+                      <Badge className={`text-base px-4 py-2 ${getStatusColor(item.status)}`}>
+                        {getStatusIcon(item.status)}
+                        <span className="ml-2">{getItemStatusLabel(item.status)}</span>
+                      </Badge>
+                    </div>
+                    
+                    {/* HUGE QR Code Image */}
+                    <div 
+                      className="cursor-pointer hover:scale-[1.02] transition-transform my-4"
+                      onClick={() => {
+                        setSelectedQRItem(item);
+                        setShowQRDialog(true);
+                      }}
+                      title="Click to enlarge for scanning"
+                    >
+                      <div className="relative p-4 bg-white rounded-2xl border-4 border-blue-200 shadow-xl">
+                        <QRCodeImage value={item.qr_code} size={280} />
+                        <div className="absolute -bottom-3 -right-3 bg-blue-600 text-white p-2 rounded-full shadow-lg">
+                          <Maximize2 className="h-5 w-5" />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* QR Code Value */}
+                    <p className="font-mono text-sm bg-gray-100 px-4 py-2 rounded-lg my-3 break-all text-center max-w-full">
+                      {item.qr_code}
+                    </p>
+                    
+                    {/* Item Details */}
+                    <div className="w-full grid grid-cols-2 gap-4 mt-2">
+                      <div className="bg-gray-50 p-4 rounded-lg text-center">
+                        <p className="text-gray-500 text-sm">Quantity</p>
+                        <p className="font-bold text-xl">{item.quantity} {item.unit}</p>
+                      </div>
+                      <div className="bg-gray-50 p-4 rounded-lg text-center">
+                        <p className="text-gray-500 text-sm">Category</p>
+                        <p className="font-bold text-xl">{item.category}</p>
+                      </div>
+                    </div>
+                    
+                    <Button 
+                      variant="default" 
+                      size="lg" 
+                      className="mt-4 w-full sm:w-auto px-8"
+                      onClick={() => {
+                        setSelectedQRItem(item);
+                        setShowQRDialog(true);
+                      }}
+                    >
+                      <Maximize2 className="h-5 w-5 mr-2" />
+                      Open Full Screen for Scanning
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            {/* Total */}
+            <div className="flex justify-between items-center pt-2 border-t">
+              <span className="text-gray-600">Total Amount</span>
+              <span className="text-lg font-bold">
+                KES {order.total_amount?.toLocaleString() || '0'}
+              </span>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+
+  // Group pending orders into two categories: accepted by provider vs awaiting provider
+  const getGroupedPendingOrders = () => {
+    if (activeFilter !== 'pending') {
+      return { acceptedByProvider: [], awaitingProvider: [] };
+    }
+    
+    const acceptedByProvider: PurchaseOrder[] = [];
+    const awaitingProvider: PurchaseOrder[] = [];
+    
+    filteredOrders.forEach(order => {
+      const hasProvider = order.delivery_provider_id || order.delivery_provider_name;
+      const deliveryStatus = order.delivery_status || 'pending';
+      const providerAccepted = hasProvider || ['assigned', 'accepted', 'picked_up', 'in_transit', 'delivered'].includes(deliveryStatus);
+      
+      if (providerAccepted) {
+        acceptedByProvider.push(order);
+      } else {
+        awaitingProvider.push(order);
+      }
+    });
+    
+    return { acceptedByProvider, awaitingProvider };
+  };
+
+  const { acceptedByProvider, awaitingProvider } = getGroupedPendingOrders();
+
   // Calculate stats - Count ORDERS (not items) to match the tab filtering
   const totalOrders = orders.length;
   const pendingOrders = orders.filter(order => {
@@ -1048,302 +1368,47 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                 </Button>
               )}
             </div>
+          ) : activeFilter === 'pending' ? (
+            // Grouped display for pending orders
+            <div className="space-y-6">
+              {/* Orders Accepted by Delivery Provider */}
+              {acceptedByProvider.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 pb-2 border-b border-green-200">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <h3 className="text-lg font-semibold text-green-700">
+                      Accepted by Delivery Provider ({acceptedByProvider.length})
+                    </h3>
+                  </div>
+                  {acceptedByProvider.map((order) => {
+                    const isExpanded = expandedOrder === order.id;
+                    const progress = getOrderProgress(order.material_items || []);
+                    return renderOrderCard(order, isExpanded, progress);
+                  })}
+                </div>
+              )}
+              
+              {/* Orders Awaiting Delivery Provider Response */}
+              {awaitingProvider.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 pb-2 border-b border-amber-200">
+                    <Clock className="h-5 w-5 text-amber-600" />
+                    <h3 className="text-lg font-semibold text-amber-700">
+                      Awaiting Delivery Provider Response ({awaitingProvider.length})
+                    </h3>
+                  </div>
+                  {awaitingProvider.map((order) => {
+                    const isExpanded = expandedOrder === order.id;
+                    const progress = getOrderProgress(order.material_items || []);
+                    return renderOrderCard(order, isExpanded, progress);
+                  })}
+                </div>
+              )}
+            </div>
           ) : filteredOrders.map((order) => {
             const isExpanded = expandedOrder === order.id;
             const progress = getOrderProgress(order.material_items || []);
-            
-            return (
-              <Card key={order.id} className="border">
-                <CardContent className="p-4">
-                  {/* Order Header */}
-                  <div 
-                    className="flex items-center justify-between cursor-pointer"
-                    onClick={() => setExpandedOrder(isExpanded ? null : order.id)}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="p-2 bg-blue-50 rounded-lg">
-                        <QrCode className="h-6 w-6 text-blue-600" />
-                      </div>
-                      <div>
-                        <p className="font-semibold">{order.po_number}</p>
-                        <div className="flex items-center gap-2 text-sm text-gray-500">
-                          <Calendar className="h-3 w-3" />
-                          {format(new Date(order.created_at), 'MMM dd, yyyy')}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-3">
-                      {/* Mini Status Timeline - Always Visible */}
-                      <div className="hidden sm:flex items-center gap-1">
-                        {/* Confirmed/Pending */}
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                          ['pending', 'confirmed', 'dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status)
-                            ? 'bg-green-500 text-white'
-                            : 'bg-gray-200 text-gray-400'
-                        }`}>✓</div>
-                        <div className={`w-4 h-0.5 ${
-                          ['dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status) ||
-                          (order.delivery_provider_id && ['pending', 'confirmed'].includes(order.status))
-                            ? 'bg-green-500'
-                            : 'bg-gray-200'
-                        }`} />
-                        {/* Dispatched */}
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                          ['dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status)
-                            ? 'bg-orange-500 text-white'
-                            : 'bg-gray-200 text-gray-400'
-                        }`}>📦</div>
-                        <div className={`w-4 h-0.5 ${
-                          ['in_transit', 'delivered', 'received', 'verified'].includes(order.status)
-                            ? 'bg-green-500'
-                            : 'bg-gray-200'
-                        }`} />
-                        {/* In Transit */}
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                          ['in_transit', 'delivered', 'received', 'verified'].includes(order.status)
-                            ? 'bg-purple-500 text-white'
-                            : 'bg-gray-200 text-gray-400'
-                        }`}>🚚</div>
-                        <div className={`w-4 h-0.5 ${
-                          ['delivered', 'received', 'verified'].includes(order.status)
-                            ? 'bg-green-500'
-                            : 'bg-gray-200'
-                        }`} />
-                        {/* Delivered */}
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                          ['delivered', 'received', 'verified'].includes(order.status)
-                            ? 'bg-green-600 text-white'
-                            : 'bg-gray-200 text-gray-400'
-                        }`}>✅</div>
-                      </div>
-                      
-                      {/* Progress Bar - Hidden on mobile */}
-                      <div className="hidden lg:block w-24">
-                        <div className="flex items-center justify-between text-xs mb-1">
-                          <span className="text-gray-500">Progress</span>
-                          <span className="font-medium">{progress}%</span>
-                        </div>
-                        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-green-500 transition-all duration-300"
-                            style={{ width: `${progress}%` }}
-                          />
-                        </div>
-                      </div>
-                      
-                      {/* Status Badge */}
-                      <Badge className={`${getStatusColor(order.status)} px-3 py-1 whitespace-nowrap`}>
-                        {getStatusIcon(order.status)}
-                        <span className="ml-1">{getStatusLabel(order)}</span>
-                      </Badge>
-                      
-                      {isExpanded ? (
-                        <ChevronUp className="h-5 w-5 text-gray-400" />
-                      ) : (
-                        <ChevronDown className="h-5 w-5 text-gray-400" />
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Order Details (Expanded) */}
-                  {isExpanded && (
-                    <div className="mt-4 pt-4 border-t space-y-4">
-                      {/* Order Status Timeline */}
-                      <div className="bg-gray-50 rounded-lg p-4">
-                        <p className="font-medium text-sm text-gray-600 mb-3">Order Status Timeline</p>
-                        <div className="flex items-center justify-between">
-                          {/* Step 1: Pending/Confirmed */}
-                          <div className="flex flex-col items-center">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                              ['pending', 'confirmed', 'dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status)
-                                ? 'bg-green-500 text-white'
-                                : 'bg-gray-200 text-gray-400'
-                            }`}>
-                              <CheckCircle className="h-5 w-5" />
-                            </div>
-                            <span className="text-xs mt-1 font-medium">Accepted</span>
-                            {order.delivery_provider_id || order.delivery_provider_name ? (
-                              <span className="text-[10px] text-green-600 mt-0.5 font-medium">
-                                To be delivered by: {order.delivery_provider_name || 'Provider'}
-                              </span>
-                            ) : (
-                              <span className="text-[10px] text-gray-500 mt-0.5">Awaiting Provider</span>
-                            )}
-                          </div>
-                          
-                          {/* Line */}
-                          <div className={`flex-1 h-1 mx-2 ${
-                            ['dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status) ||
-                            (order.delivery_provider_id && ['pending', 'confirmed'].includes(order.status))
-                              ? 'bg-green-500'
-                              : 'bg-gray-200'
-                          }`} />
-                          
-                          {/* Step 2: Dispatched */}
-                          <div className="flex flex-col items-center">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                              ['dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status)
-                                ? 'bg-orange-500 text-white'
-                                : 'bg-gray-200 text-gray-400'
-                            }`}>
-                              <Package className="h-5 w-5" />
-                            </div>
-                            <span className="text-xs mt-1 font-medium">Dispatched</span>
-                            <span className="text-[10px] text-gray-500">QR Scanned</span>
-                          </div>
-                          
-                          {/* Line */}
-                          <div className={`flex-1 h-1 mx-2 ${
-                            ['in_transit', 'delivered', 'received', 'verified'].includes(order.status)
-                              ? 'bg-green-500'
-                              : 'bg-gray-200'
-                          }`} />
-                          
-                          {/* Step 3: In Transit */}
-                          <div className="flex flex-col items-center">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                              ['in_transit', 'delivered', 'received', 'verified'].includes(order.status)
-                                ? 'bg-purple-500 text-white animate-pulse'
-                                : 'bg-gray-200 text-gray-400'
-                            }`}>
-                              <Truck className="h-5 w-5" />
-                            </div>
-                            <span className="text-xs mt-1 font-medium">In Transit</span>
-                            <span className="text-[10px] text-gray-500">Being Tracked</span>
-                          </div>
-                          
-                          {/* Line */}
-                          <div className={`flex-1 h-1 mx-2 ${
-                            ['delivered', 'received', 'verified'].includes(order.status)
-                              ? 'bg-green-500'
-                              : 'bg-gray-200'
-                          }`} />
-                          
-                          {/* Step 4: Delivered/Received */}
-                          <div className="flex flex-col items-center">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                              ['delivered', 'received', 'verified'].includes(order.status)
-                                ? 'bg-green-500 text-white'
-                                : 'bg-gray-200 text-gray-400'
-                            }`}>
-                              <CheckCircle className="h-5 w-5" />
-                            </div>
-                            <span className="text-xs mt-1 font-medium">Delivered</span>
-                            <span className="text-[10px] text-gray-500">QR Received</span>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* Delivery Info */}
-                      <div className="space-y-3">
-                        <div className="flex items-start gap-2 text-sm">
-                          <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
-                          <div>
-                            <p className="font-medium">Delivery Address</p>
-                            <p className="text-gray-600">{order.delivery_address}</p>
-                          </div>
-                        </div>
-                        
-                        {/* Delivery Provider Info */}
-                        {(order.delivery_provider_id || order.delivery_provider_name) && (
-                          <div className="flex items-start gap-2 text-sm bg-blue-50 p-3 rounded-lg border border-blue-200">
-                            <Truck className="h-4 w-4 text-blue-600 mt-0.5" />
-                            <div>
-                              <p className="font-medium text-blue-900">Delivery Provider</p>
-                              <p className="text-blue-700">{order.delivery_provider_name || 'Assigned Provider'}</p>
-                              {order.delivery_provider_phone && (
-                                <p className="text-xs text-blue-600 mt-1">Phone: {order.delivery_provider_phone}</p>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Material Items with QR Codes - EXTRA LARGE */}
-                      <div>
-                        <p className="font-medium mb-4 flex items-center gap-2 text-lg">
-                          <QrCode className="h-5 w-5" />
-                          Material Items with QR Codes ({order.material_items?.length || 0})
-                        </p>
-                        <div className="space-y-6">
-                          {order.material_items?.map((item) => (
-                            <div 
-                              key={item.id}
-                              className="flex flex-col items-center p-6 bg-white rounded-xl border-2 border-gray-200 shadow-lg hover:shadow-xl transition-shadow"
-                            >
-                              {/* Item Header */}
-                              <div className="w-full flex flex-col sm:flex-row items-center justify-between mb-4 gap-3">
-                                <h3 className="text-xl font-bold text-gray-800">{item.material_type}</h3>
-                                <Badge className={`text-base px-4 py-2 ${getStatusColor(item.status)}`}>
-                                  {getStatusIcon(item.status)}
-                                  <span className="ml-2">{getItemStatusLabel(item.status)}</span>
-                                </Badge>
-                              </div>
-                              
-                              {/* HUGE QR Code Image */}
-                              <div 
-                                className="cursor-pointer hover:scale-[1.02] transition-transform my-4"
-                                onClick={() => {
-                                  setSelectedQRItem(item);
-                                  setShowQRDialog(true);
-                                }}
-                                title="Click to enlarge for scanning"
-                              >
-                                <div className="relative p-4 bg-white rounded-2xl border-4 border-blue-200 shadow-xl">
-                                  <QRCodeImage value={item.qr_code} size={280} />
-                                  <div className="absolute -bottom-3 -right-3 bg-blue-600 text-white p-2 rounded-full shadow-lg">
-                                    <Maximize2 className="h-5 w-5" />
-                                  </div>
-                                </div>
-                              </div>
-                              
-                              {/* QR Code Value */}
-                              <p className="font-mono text-sm bg-gray-100 px-4 py-2 rounded-lg my-3 break-all text-center max-w-full">
-                                {item.qr_code}
-                              </p>
-                              
-                              {/* Item Details */}
-                              <div className="w-full grid grid-cols-2 gap-4 mt-2">
-                                <div className="bg-gray-50 p-4 rounded-lg text-center">
-                                  <p className="text-gray-500 text-sm">Quantity</p>
-                                  <p className="font-bold text-xl">{item.quantity} {item.unit}</p>
-                                </div>
-                                <div className="bg-gray-50 p-4 rounded-lg text-center">
-                                  <p className="text-gray-500 text-sm">Category</p>
-                                  <p className="font-bold text-xl">{item.category}</p>
-                                </div>
-                              </div>
-                              
-                              <Button 
-                                variant="default" 
-                                size="lg" 
-                                className="mt-4 w-full sm:w-auto px-8"
-                                onClick={() => {
-                                  setSelectedQRItem(item);
-                                  setShowQRDialog(true);
-                                }}
-                              >
-                                <Maximize2 className="h-5 w-5 mr-2" />
-                                Open Full Screen for Scanning
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      
-                      {/* Total */}
-                      <div className="flex justify-between items-center pt-2 border-t">
-                        <span className="text-gray-600">Total Amount</span>
-                        <span className="text-lg font-bold">
-                          KES {order.total_amount?.toLocaleString() || '0'}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
+            return renderOrderCard(order, isExpanded, progress);
           })}
         </CardContent>
       </Card>
