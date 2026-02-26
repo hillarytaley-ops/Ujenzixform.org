@@ -599,12 +599,37 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
     
     switch (status) {
       case 'quoted': return 'Quoted';
-      case 'dispatched': return '📦 Dispatched';
-      case 'partially_dispatched': return '📦 Partially Dispatched';
-      case 'in_transit': return '🚚 In Transit';
+      case 'dispatched':
+        // If delivery provider is assigned, show provider name
+        if (hasDeliveryProvider) {
+          return `📦 To Be Delivered by ${providerName}`;
+        }
+        return '📦 Dispatched';
+      case 'partially_dispatched':
+        // If delivery provider is assigned, show provider name
+        if (hasDeliveryProvider) {
+          return `📦 To Be Delivered by ${providerName}`;
+        }
+        return '📦 Partially Dispatched';
+      case 'in_transit':
+        // If delivery provider is assigned, show provider name
+        if (hasDeliveryProvider) {
+          return `🚚 To Be Delivered by ${providerName}`;
+        }
+        return '🚚 In Transit';
       case 'partially_delivered': return '📬 Partially Delivered';
-      case 'received': return '✅ Received';
-      case 'delivered': return '✅ Delivered';
+      case 'received':
+        // If delivery provider is assigned, show who delivered it
+        if (hasDeliveryProvider) {
+          return `✅ Delivered by ${providerName}`;
+        }
+        return '✅ Received';
+      case 'delivered':
+        // If delivery provider is assigned, show who delivered it
+        if (hasDeliveryProvider) {
+          return `✅ Delivered by ${providerName}`;
+        }
+        return '✅ Delivered';
       case 'verified': return '✓ Verified';
       case 'damaged': return '⚠️ Damaged';
       default: return status;
