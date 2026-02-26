@@ -316,7 +316,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
       // Fetch orders using native fetch (same as dashboard) - Include delivery provider and delivery_required fields
       const supplierIdsParam = orderSupplierIds.join(',');
       const ordersResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=in.(${supplierIdsParam})&select=*,delivery_provider_id,delivery_provider_name,delivery_provider_phone,delivery_status,delivery_required&order=created_at.desc&limit=500`,
+        `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=in.(${supplierIdsParam})&select=*&order=created_at.desc&limit=500`,
         { headers, cache: 'no-store' }
       );
 
