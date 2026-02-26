@@ -2594,7 +2594,46 @@ const ProfessionalBuilderDashboardPage = () => {
                               value={monitoringRequest.projectLocation}
                               onChange={(e) => setMonitoringRequest(prev => ({ ...prev, projectLocation: e.target.value }))}
                             />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              onClick={() => setShowMonitoringMap(true)}
+                              title="Search on map"
+                              className="absolute right-2 top-2 h-7 w-7"
+                            >
+                              <MapIcon className="h-4 w-4" />
+                            </Button>
                           </div>
+                          
+                          {/* Monitoring Map Picker */}
+                          {showMonitoringMap && (
+                            <div className="mt-2 border border-blue-300 rounded-lg p-3 bg-white">
+                              <MapLocationPicker
+                                initialLocation={
+                                  monitoringRequest.projectLocation
+                                    ? undefined // Let user search or click on map
+                                    : undefined
+                                }
+                                onLocationSelect={(location) => {
+                                  setMonitoringRequest(prev => ({
+                                    ...prev,
+                                    projectLocation: location.address || location.county || ''
+                                  }));
+                                  setShowMonitoringMap(false);
+                                  toast({
+                                    title: '📍 Project Location Set!',
+                                    description: location.county 
+                                      ? `Location set to ${location.county}` 
+                                      : 'GPS coordinates saved from map.'
+                                  });
+                                }}
+                                onClose={() => setShowMonitoringMap(false)}
+                                title="Select Project Location"
+                                description="Search for an address or click on the map to set your project site location"
+                              />
+                            </div>
+                          )}
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="projectDescription">Project Description</Label>

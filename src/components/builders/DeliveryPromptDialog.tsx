@@ -35,12 +35,14 @@ import {
   Eye,
   Navigation,
   Copy,
-  MapPinned
+  MapPinned,
+  Map as MapIcon
 } from 'lucide-react';
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { MonitoringServicePrompt } from './MonitoringServicePrompt';
 import { deliveryProviderNotificationService } from '@/services/DeliveryProviderNotificationService';
+import { MapLocationPicker } from '@/components/location/MapLocationPicker';
 
 // Helper for fetch with timeout
 const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs: number = 10000) => {
@@ -121,6 +123,7 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [showMonitoringPrompt, setShowMonitoringPrompt] = useState(false);
   const [gettingLocation, setGettingLocation] = useState(false);
+  const [showDeliveryMap, setShowDeliveryMap] = useState(false);
   const [deliveryData, setDeliveryData] = useState({
     deliveryAddress: '',
     deliveryCoordinates: '',
@@ -669,12 +672,66 @@ export const DeliveryPromptDialog: React.FC<DeliveryPromptDialogProps> = ({
               {/* Manual coordinates */}
               <div className="space-y-1">
                 <Label className="text-xs text-gray-500">Or enter coordinates</Label>
-                <Input
-                  placeholder="-1.286389, 36.817223"
-                  value={deliveryData.deliveryCoordinates}
-                  onChange={(e) => setDeliveryData(prev => ({ ...prev, deliveryCoordinates: e.target.value }))}
-                  className="font-mono text-xs h-8"
-                />
+                <div className="flex gap-1">
+                  <Input
+                    placeholder="-1.286389, 36.817223"
+                    value={deliveryData.deliveryCoordinates}
+                    onChange={(e) => setDeliveryData(prev => ({ ...prev, deliveryCoordinates: e.target.value }))}
+                    className="font-mono text-xs h-8 flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setShowDeliveryMap(true)}
+                    title="Search on map"
+                    className="h-8 w-8"
+                  >
+                    <MapIcon className="h-3 w-3" />
+                  </Button>
+                </div>
+                
+                {/* Delivery Map Picker */}
+                {showDeliveryMap && (
+                  <div className="mt-2 border border-blue-300 rounded-lg p-2 bg-white">
+                    <MapLocationPicker
+                      initialLocation={
+                        deliveryData.deliveryCoordinates
+                          ? (() => {
+                              const parts = deliveryData.deliveryCoordinates.split(',').map(s => s.trim());
+                              if (parts.length === 2) {
+                                const lat = parseFloat(parts[0]);
+                                const lng = parseFloat(parts[1]);
+                                if (!isNaN(lat) && !isNaN(lng)) {
+                                  return {
+                                    latitude: lat,
+                                    longitude: lng,
+                                    address: deliveryData.deliveryAddress
+                                  };
+                                }
+                              }
+                              return undefined;
+                            })()
+                          : undefined
+                      }
+                      onLocationSelect={(location) => {
+                        setDeliveryData(prev => ({
+                          ...prev,
+                          deliveryCoordinates: `${location.latitude}, ${location.longitude}`,
+                          deliveryAddress: prev.deliveryAddress || location.address
+                        }));
+                        setShowDeliveryMap(false);
+                        toast({
+                          title: '📍 Delivery Location Set!',
+                          description: `GPS coordinates saved: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`
+                        });
+                      }}
+                      onClose={() => setShowDeliveryMap(false)}
+                      title="Select Delivery Location"
+                      description="Search for an address or click on the map to set the delivery location"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="relative py-1">
