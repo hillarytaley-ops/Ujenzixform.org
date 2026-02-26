@@ -201,25 +201,39 @@ const ProfessionalBuilderDashboardPage = () => {
       console.log('📹 DIRECT: Loading monitoring requests for:', userId);
       
       try {
-        // Get access token
-        let accessToken = '';
-        try {
-          const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-          if (storedSession) {
-            const parsed = JSON.parse(storedSession);
-            accessToken = parsed.access_token || '';
+        // Get fresh access token using getAccessToken (handles refresh automatically)
+        let accessToken = await getAccessToken();
+        
+        if (!accessToken) {
+          console.log('📹 DIRECT: No access token available, using Supabase client fallback');
+          // Fallback to Supabase client directly
+          const { data, error } = await supabase
+            .from('monitoring_service_requests')
+            .select('*')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false });
+          
+          if (error) {
+            console.error('📹 DIRECT: Supabase error:', error.message);
+          } else {
+            console.log('📹 DIRECT: Supabase got', data?.length || 0, 'requests');
+            if (data && data.length > 0) {
+              setMonitoringRequests(data);
+              console.log('📹 DIRECT: ✅ State updated via Supabase');
+            }
           }
-        } catch (e) {}
+          return;
+        }
         
         console.log('📹 DIRECT: Using token length:', accessToken?.length || 0);
         
         // Try REST API first
         const response = await fetch(
-          `https://wuuyjjpgzgeimiptuuws.supabase.co/rest/v1/monitoring_service_requests?user_id=eq.${userId}&order=created_at.desc`,
+          `${SUPABASE_URL}/rest/v1/monitoring_service_requests?user_id=eq.${userId}&order=created_at.desc`,
           {
             headers: {
-              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo',
-              'Authorization': `Bearer ${accessToken || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo'}`,
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
             }
           }
         );
@@ -233,6 +247,54 @@ const ProfessionalBuilderDashboardPage = () => {
           if (data && data.length > 0) {
             setMonitoringRequests(data);
             console.log('📹 DIRECT: ✅ State updated with', data.length, 'requests');
+          }
+        } else if (response.status === 401) {
+          // JWT expired - refresh token and retry once
+          console.log('📹 DIRECT: JWT expired, refreshing token and retrying...');
+          try {
+            // Force refresh by getting a new session
+            const { data: { session: newSession } } = await supabase.auth.getSession();
+            if (newSession?.access_token) {
+              const retryResponse = await fetch(
+                `${SUPABASE_URL}/rest/v1/monitoring_service_requests?user_id=eq.${userId}&order=created_at.desc`,
+                {
+                  headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${newSession.access_token}`,
+                  }
+                }
+              );
+              
+              if (retryResponse.ok) {
+                const data = await retryResponse.json();
+                console.log('📹 DIRECT: Retry successful, got', data?.length || 0, 'requests');
+                if (data && data.length > 0) {
+                  setMonitoringRequests(data);
+                  console.log('📹 DIRECT: ✅ State updated after retry');
+                }
+                return;
+              }
+            }
+          } catch (retryError) {
+            console.error('📹 DIRECT: Retry failed:', retryError);
+          }
+          
+          // If retry failed, fallback to Supabase client
+          console.log('📹 DIRECT: Retry failed, using Supabase client fallback');
+          const { data, error } = await supabase
+            .from('monitoring_service_requests')
+            .select('*')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false });
+          
+          if (error) {
+            console.error('📹 DIRECT: Supabase error:', error.message);
+          } else {
+            console.log('📹 DIRECT: Supabase got', data?.length || 0, 'requests');
+            if (data && data.length > 0) {
+              setMonitoringRequests(data);
+              console.log('📹 DIRECT: ✅ State updated via Supabase');
+            }
           }
         } else {
           const errorText = await response.text();
@@ -256,6 +318,21 @@ const ProfessionalBuilderDashboardPage = () => {
         }
       } catch (e) {
         console.error('📹 DIRECT: Error:', e);
+        // Final fallback to Supabase client
+        try {
+          const { data, error } = await supabase
+            .from('monitoring_service_requests')
+            .select('*')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false });
+          
+          if (!error && data && data.length > 0) {
+            setMonitoringRequests(data);
+            console.log('📹 DIRECT: ✅ State updated via Supabase (final fallback)');
+          }
+        } catch (fallbackError) {
+          console.error('📹 DIRECT: Final fallback also failed:', fallbackError);
+        }
       }
     };
     
@@ -343,15 +420,32 @@ const ProfessionalBuilderDashboardPage = () => {
       // Fetch monitoring requests using REST API for reliability
       const fetchMonitoringRequests = async () => {
         try {
-          const accessToken = await getAccessToken();
+          let accessToken = await getAccessToken();
           console.log('📹 Fetching monitoring requests for user:', userId);
+          
+          if (!accessToken) {
+            // Fallback to Supabase client if no token
+            const { data, error } = await supabase
+              .from('monitoring_service_requests')
+              .select('*')
+              .eq('user_id', userId)
+              .order('created_at', { ascending: false });
+            
+            if (error) {
+              console.log('📹 Supabase client fallback error:', error.message);
+            } else if (data && data.length > 0) {
+              console.log('📹 Monitoring requests (fallback):', data.length);
+              setMonitoringRequests(data);
+            }
+            return;
+          }
           
           const response = await fetch(
             `${SUPABASE_URL}/rest/v1/monitoring_service_requests?user_id=eq.${userId}&order=created_at.desc`,
             {
               headers: {
                 'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+                'Authorization': `Bearer ${accessToken}`,
               }
             }
           );
@@ -361,6 +455,49 @@ const ProfessionalBuilderDashboardPage = () => {
             console.log('📹 Monitoring requests loaded:', data?.length || 0, 'requests');
             if (data && data.length > 0) {
               console.log('📹 First request status:', data[0].status, 'access_code:', data[0].access_code);
+              setMonitoringRequests(data);
+            }
+          } else if (response.status === 401) {
+            // JWT expired - refresh token and retry once
+            console.log('📹 JWT expired, refreshing token and retrying...');
+            try {
+              const { data: { session: newSession } } = await supabase.auth.getSession();
+              if (newSession?.access_token) {
+                const retryResponse = await fetch(
+                  `${SUPABASE_URL}/rest/v1/monitoring_service_requests?user_id=eq.${userId}&order=created_at.desc`,
+                  {
+                    headers: {
+                      'apikey': SUPABASE_ANON_KEY,
+                      'Authorization': `Bearer ${newSession.access_token}`,
+                    }
+                  }
+                );
+                
+                if (retryResponse.ok) {
+                  const data = await retryResponse.json();
+                  console.log('📹 Retry successful, got', data?.length || 0, 'requests');
+                  if (data && data.length > 0) {
+                    setMonitoringRequests(data);
+                  }
+                  return;
+                }
+              }
+            } catch (retryError) {
+              console.error('📹 Retry failed:', retryError);
+            }
+            
+            // If retry failed, fallback to Supabase client
+            console.log('📹 Retry failed, using Supabase client fallback');
+            const { data, error } = await supabase
+              .from('monitoring_service_requests')
+              .select('*')
+              .eq('user_id', userId)
+              .order('created_at', { ascending: false });
+            
+            if (error) {
+              console.log('📹 Supabase client fallback error:', error.message);
+            } else if (data && data.length > 0) {
+              console.log('📹 Monitoring requests (fallback):', data.length);
               setMonitoringRequests(data);
             }
           } else {
@@ -381,6 +518,21 @@ const ProfessionalBuilderDashboardPage = () => {
           }
         } catch (e) {
           console.error('📹 Error fetching monitoring requests:', e);
+          // Final fallback to Supabase client
+          try {
+            const { data, error } = await supabase
+              .from('monitoring_service_requests')
+              .select('*')
+              .eq('user_id', userId)
+              .order('created_at', { ascending: false });
+            
+            if (!error && data && data.length > 0) {
+              setMonitoringRequests(data);
+              console.log('📹 Monitoring requests loaded via Supabase (final fallback)');
+            }
+          } catch (fallbackError) {
+            console.error('📹 Final fallback also failed:', fallbackError);
+          }
         }
       };
       
