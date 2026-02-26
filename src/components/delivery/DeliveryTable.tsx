@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Eye, MapPin, Phone, Shield, Lock } from "lucide-react";
+import { MapPin, Phone, Shield, Lock } from "lucide-react";
 import { useSecureDeliveries } from "@/hooks/useSecureDeliveries";
 
 type DeliveryStatus = 'pending' | 'picked_up' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'cancelled';
@@ -67,7 +67,6 @@ const DeliveryTable = ({ deliveries, userRole, onStatusUpdate, onViewDetails }: 
             <TableHead>Delivery</TableHead>
             <TableHead>Driver</TableHead>
             <TableHead>Created</TableHead>
-            <TableHead>Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -159,16 +158,6 @@ const DeliveryTable = ({ deliveries, userRole, onStatusUpdate, onViewDetails }: 
               </TableCell>
               <TableCell className="text-sm">
                 {formatDate(delivery.created_at)}
-              </TableCell>
-              <TableCell>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onViewDetails(delivery)}
-                >
-                  <Eye className="h-4 w-4 mr-1" />
-                  View
-                </Button>
               </TableCell>
             </TableRow>
           ))}
