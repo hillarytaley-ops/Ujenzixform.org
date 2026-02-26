@@ -852,13 +852,19 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                         <button
                           type="button"
                           className={`flex-1 py-1.5 px-2 rounded-md text-white text-xs font-medium flex items-center justify-center gap-1.5 transition-colors ${
-                            acceptingId 
+                            acceptingId === notification.id
+                              ? 'bg-blue-500 cursor-wait' 
+                              : acceptingId
                               ? 'bg-gray-400 cursor-not-allowed' 
                               : 'bg-green-600 hover:bg-green-700 active:bg-green-800'
                           }`}
-                          onClick={() => {
-                            console.log('🔘 NATIVE BUTTON clicked for:', notification.id, 'acceptingId:', acceptingId);
-                            if (!acceptingId) {
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            console.log('🔘 Accept button clicked for:', notification.id, 'acceptingId:', acceptingId);
+                            
+                            // Only process if this specific notification is not already being accepted
+                            if (acceptingId !== notification.id && !acceptingId) {
                               handleAcceptDelivery(notification.id);
                             }
                           }}
