@@ -407,30 +407,73 @@ export const ProfileEditDialog: React.FC<ProfileEditDialogProps> = ({
       let accessToken = '';
       
       try {
-        // First try Supabase's getSession() - this handles token refresh automatically
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError) {
-          console.warn('📝 ProfileEditDialog: Session error:', sessionError.message);
-        }
-        
-        if (session?.access_token) {
-          accessToken = session.access_token;
-          console.log('📝 ProfileEditDialog: Got fresh token from Supabase (length:', accessToken.length, ')');
-        } else {
-          // Fallback to localStorage
-          console.log('📝 ProfileEditDialog: No session from Supabase, trying localStorage...');
-          const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-          if (storedSession) {
+        console.log('📝 ProfileEditDialog: Getting session...');
+        // Add timeout to prevent hanging - try localStorage first for speed, then getSession
+        // This ensures we don't wait forever if getSession hangs
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          try {
             const parsed = JSON.parse(storedSession);
             accessToken = parsed?.access_token || '';
             if (accessToken) {
-              console.log('📝 ProfileEditDialog: Got token from localStorage (length:', accessToken.length, ')');
+              console.log('📝 ProfileEditDialog: Got token from localStorage (fast path, length:', accessToken.length, ')');
+            }
+          } catch (parseError) {
+            console.warn('📝 ProfileEditDialog: Failed to parse localStorage, trying getSession...');
+          }
+        }
+        
+        // If we don't have a token from localStorage, try getSession with timeout
+        if (!accessToken) {
+          console.log('📝 ProfileEditDialog: No localStorage token, trying getSession...');
+          try {
+            // Create a timeout promise
+            const timeoutPromise = new Promise<never>((_, reject) => {
+              setTimeout(() => reject(new Error('Session timeout after 3 seconds')), 3000);
+            });
+            
+            // Race between getSession and timeout
+            const sessionResult = await Promise.race([
+              supabase.auth.getSession(),
+              timeoutPromise
+            ]);
+            
+            const { data: { session }, error: sessionError } = sessionResult as { data: { session: any }, error: any };
+            
+            if (sessionError) {
+              console.warn('📝 ProfileEditDialog: Session error:', sessionError.message);
+            }
+            
+            if (session?.access_token) {
+              accessToken = session.access_token;
+              console.log('📝 ProfileEditDialog: Got fresh token from Supabase (length:', accessToken.length, ')');
+            }
+          } catch (sessionError: any) {
+            // Timeout or other error - we already tried localStorage above
+            if (sessionError?.message?.includes('timeout')) {
+              console.log('📝 ProfileEditDialog: getSession timed out, using localStorage token if available');
+            } else {
+              console.error('📝 ProfileEditDialog: getSession error:', sessionError);
             }
           }
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error('📝 ProfileEditDialog: Error getting session:', e);
+        // Final fallback - try localStorage one more time
+        if (!accessToken) {
+          try {
+            const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+            if (storedSession) {
+              const parsed = JSON.parse(storedSession);
+              accessToken = parsed?.access_token || '';
+              if (accessToken) {
+                console.log('📝 ProfileEditDialog: Got token from localStorage (final fallback, length:', accessToken.length, ')');
+              }
+            }
+          } catch (localStorageError) {
+            console.error('📝 ProfileEditDialog: localStorage fallback also failed:', localStorageError);
+          }
+        }
       }
 
       if (!accessToken) {
