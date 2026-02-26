@@ -244,7 +244,6 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
 
   // Define fetchOrders with useCallback to ensure stable reference
   const fetchOrders = useCallback(async () => {
-    fetchOrdersRef.current = fetchOrders;
     try {
       setLoading(true);
       
