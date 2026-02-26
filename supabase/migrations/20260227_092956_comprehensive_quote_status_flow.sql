@@ -48,6 +48,12 @@ BEGIN
         'delivery_requested',
         'awaiting_delivery_provider',
         'delivery_assigned',
+        'ready_for_dispatch',
+        'dispatched',
+        'in_transit',
+        'delivery_arrived',
+        'received',
+        'completed',
         -- Legacy statuses (for backward compatibility)
         'pending',
         'quoted',
@@ -140,6 +146,37 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
                    WHERE table_name = 'purchase_orders' AND column_name = 'delivery_assigned_at') THEN
         ALTER TABLE purchase_orders ADD COLUMN delivery_assigned_at TIMESTAMPTZ;
+    END IF;
+    
+    -- Dispatch and delivery timestamps
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'purchase_orders' AND column_name = 'ready_for_dispatch_at') THEN
+        ALTER TABLE purchase_orders ADD COLUMN ready_for_dispatch_at TIMESTAMPTZ;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'purchase_orders' AND column_name = 'dispatched_at') THEN
+        ALTER TABLE purchase_orders ADD COLUMN dispatched_at TIMESTAMPTZ;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'purchase_orders' AND column_name = 'in_transit_at') THEN
+        ALTER TABLE purchase_orders ADD COLUMN in_transit_at TIMESTAMPTZ;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'purchase_orders' AND column_name = 'delivery_arrived_at') THEN
+        ALTER TABLE purchase_orders ADD COLUMN delivery_arrived_at TIMESTAMPTZ;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'purchase_orders' AND column_name = 'received_at') THEN
+        ALTER TABLE purchase_orders ADD COLUMN received_at TIMESTAMPTZ;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'purchase_orders' AND column_name = 'completed_at') THEN
+        ALTER TABLE purchase_orders ADD COLUMN completed_at TIMESTAMPTZ;
     END IF;
     
     RAISE NOTICE 'Added quote and order status tracking columns';
@@ -429,7 +466,175 @@ CREATE TRIGGER trigger_update_order_on_provider_accept
     EXECUTE FUNCTION update_order_status_on_provider_accept();
 
 -- ============================================================
--- 11. UPDATE EXISTING RECORDS
+-- 11. FUNCTION TO MARK ORDER AS READY FOR DISPATCH
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION mark_ready_for_dispatch(po_id UUID)
+RETURNS VOID AS $$
+BEGIN
+    -- Update status when supplier prepares materials
+    UPDATE purchase_orders
+    SET 
+        status = CASE 
+            WHEN status = 'delivery_assigned' THEN 'ready_for_dispatch'
+            ELSE status
+        END,
+        ready_for_dispatch_at = CASE 
+            WHEN ready_for_dispatch_at IS NULL AND status = 'delivery_assigned' THEN NOW()
+            ELSE ready_for_dispatch_at
+        END,
+        updated_at = NOW()
+    WHERE id = po_id 
+    AND status = 'delivery_assigned';
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION mark_ready_for_dispatch TO authenticated;
+
+-- ============================================================
+-- 12. TRIGGER TO UPDATE STATUS WHEN DISPATCH QR IS SCANNED
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION update_order_status_on_dispatch()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_po_id UUID;
+    v_provider_name TEXT;
+BEGIN
+    -- When material_items are dispatched (dispatch_scanned = true or status = 'dispatched')
+    IF (NEW.dispatch_scanned = TRUE AND (OLD.dispatch_scanned IS NULL OR OLD.dispatch_scanned = FALSE)) 
+       OR (NEW.status = 'dispatched' AND (OLD.status IS NULL OR OLD.status != 'dispatched')) THEN
+        
+        v_po_id := NEW.purchase_order_id;
+        
+        -- Get provider name for display
+        SELECT COALESCE(po.delivery_provider_name, 'Delivery Provider')
+        INTO v_provider_name
+        FROM purchase_orders po
+        WHERE po.id = v_po_id;
+        
+        -- Update purchase_order status
+        UPDATE purchase_orders
+        SET 
+            status = CASE 
+                WHEN status = 'ready_for_dispatch' THEN 'dispatched'
+                WHEN status = 'delivery_assigned' THEN 'dispatched'
+                ELSE status
+            END,
+            dispatched_at = CASE 
+                WHEN dispatched_at IS NULL AND status IN ('ready_for_dispatch', 'delivery_assigned') THEN NOW()
+                ELSE dispatched_at
+            END,
+            -- Automatically move to in_transit after dispatch
+            status = CASE 
+                WHEN status IN ('ready_for_dispatch', 'delivery_assigned', 'dispatched') THEN 'in_transit'
+                ELSE status
+            END,
+            in_transit_at = CASE 
+                WHEN in_transit_at IS NULL AND status IN ('ready_for_dispatch', 'delivery_assigned', 'dispatched') THEN NOW()
+                ELSE in_transit_at
+            END,
+            updated_at = NOW()
+        WHERE id = v_po_id
+        AND status IN ('ready_for_dispatch', 'delivery_assigned');
+        
+        RAISE NOTICE 'Updated purchase_order % status to in_transit after dispatch', v_po_id;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_update_order_on_dispatch ON material_items;
+CREATE TRIGGER trigger_update_order_on_dispatch
+    AFTER UPDATE ON material_items
+    FOR EACH ROW
+    EXECUTE FUNCTION update_order_status_on_dispatch();
+
+-- ============================================================
+-- 13. FUNCTION TO MARK DELIVERY AS ARRIVED
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION mark_delivery_arrived(po_id UUID)
+RETURNS VOID AS $$
+BEGIN
+    -- Update status when provider arrives at destination
+    UPDATE purchase_orders
+    SET 
+        status = CASE 
+            WHEN status = 'in_transit' THEN 'delivery_arrived'
+            ELSE status
+        END,
+        delivery_arrived_at = CASE 
+            WHEN delivery_arrived_at IS NULL AND status = 'in_transit' THEN NOW()
+            ELSE delivery_arrived_at
+        END,
+        updated_at = NOW()
+    WHERE id = po_id 
+    AND status = 'in_transit';
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION mark_delivery_arrived TO authenticated;
+
+-- ============================================================
+-- 14. TRIGGER TO UPDATE STATUS WHEN RECEIVE QR IS SCANNED
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION update_order_status_on_receive()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_po_id UUID;
+    v_all_received BOOLEAN;
+BEGIN
+    -- When material_items are received (receive_scanned = true or status = 'received')
+    IF (NEW.receive_scanned = TRUE AND (OLD.receive_scanned IS NULL OR OLD.receive_scanned = FALSE)) 
+       OR (NEW.status IN ('received', 'verified') AND OLD.status NOT IN ('received', 'verified')) THEN
+        
+        v_po_id := NEW.purchase_order_id;
+        
+        -- Check if all items are received
+        SELECT COUNT(*) = SUM(CASE WHEN receive_scanned = TRUE OR status IN ('received', 'verified') THEN 1 ELSE 0 END)
+        INTO v_all_received
+        FROM material_items
+        WHERE purchase_order_id = v_po_id;
+        
+        -- Update purchase_order status
+        UPDATE purchase_orders
+        SET 
+            status = CASE 
+                WHEN v_all_received THEN 'completed'
+                WHEN status = 'delivery_arrived' THEN 'received'
+                WHEN status = 'in_transit' THEN 'received'
+                ELSE status
+            END,
+            received_at = CASE 
+                WHEN received_at IS NULL AND status IN ('delivery_arrived', 'in_transit') THEN NOW()
+                ELSE received_at
+            END,
+            completed_at = CASE 
+                WHEN completed_at IS NULL AND v_all_received THEN NOW()
+                ELSE completed_at
+            END,
+            updated_at = NOW()
+        WHERE id = v_po_id
+        AND status IN ('delivery_arrived', 'in_transit', 'received');
+        
+        RAISE NOTICE 'Updated purchase_order % status to %', v_po_id, CASE WHEN v_all_received THEN 'completed' ELSE 'received' END;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_update_order_on_receive ON material_items;
+CREATE TRIGGER trigger_update_order_on_receive
+    AFTER UPDATE ON material_items
+    FOR EACH ROW
+    EXECUTE FUNCTION update_order_status_on_receive();
+
+-- ============================================================
+-- 15. UPDATE EXISTING RECORDS
 -- ============================================================
 
 -- Set quote_created_at for existing pending/quoted orders
@@ -445,14 +650,14 @@ WHERE status IN ('pending', 'quoted')
 AND quote_created_at IS NULL;
 
 -- ============================================================
--- 12. CREATE INDEXES FOR PERFORMANCE
+-- 16. CREATE INDEXES FOR PERFORMANCE
 -- ============================================================
 
 CREATE INDEX IF NOT EXISTS idx_purchase_orders_quote_status ON purchase_orders(status) 
 WHERE status IN ('quote_created', 'quote_received_by_supplier', 'quote_responded', 'quote_revised', 'quote_viewed_by_builder', 'quote_accepted', 'quote_rejected');
 
 CREATE INDEX IF NOT EXISTS idx_purchase_orders_order_status ON purchase_orders(status) 
-WHERE status IN ('order_created', 'awaiting_delivery_request', 'delivery_requested', 'awaiting_delivery_provider', 'delivery_assigned');
+WHERE status IN ('order_created', 'awaiting_delivery_request', 'delivery_requested', 'awaiting_delivery_provider', 'delivery_assigned', 'ready_for_dispatch', 'dispatched', 'in_transit', 'delivery_arrived', 'received', 'completed');
 
 CREATE INDEX IF NOT EXISTS idx_purchase_orders_quote_created_at ON purchase_orders(quote_created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_purchase_orders_quote_responded_at ON purchase_orders(quote_responded_at DESC);
@@ -460,6 +665,12 @@ CREATE INDEX IF NOT EXISTS idx_purchase_orders_quote_accepted_at ON purchase_ord
 CREATE INDEX IF NOT EXISTS idx_purchase_orders_order_created_at ON purchase_orders(order_created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_purchase_orders_delivery_requested_at ON purchase_orders(delivery_requested_at DESC);
 CREATE INDEX IF NOT EXISTS idx_purchase_orders_delivery_assigned_at ON purchase_orders(delivery_assigned_at DESC);
+CREATE INDEX IF NOT EXISTS idx_purchase_orders_ready_for_dispatch_at ON purchase_orders(ready_for_dispatch_at DESC);
+CREATE INDEX IF NOT EXISTS idx_purchase_orders_dispatched_at ON purchase_orders(dispatched_at DESC);
+CREATE INDEX IF NOT EXISTS idx_purchase_orders_in_transit_at ON purchase_orders(in_transit_at DESC);
+CREATE INDEX IF NOT EXISTS idx_purchase_orders_delivery_arrived_at ON purchase_orders(delivery_arrived_at DESC);
+CREATE INDEX IF NOT EXISTS idx_purchase_orders_received_at ON purchase_orders(received_at DESC);
+CREATE INDEX IF NOT EXISTS idx_purchase_orders_completed_at ON purchase_orders(completed_at DESC);
 
 -- ============================================================
 -- Migration Complete

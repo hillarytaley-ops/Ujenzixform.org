@@ -657,6 +657,12 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       case 'delivery_requested': return 'bg-blue-100 text-blue-800';
       case 'awaiting_delivery_provider': return 'bg-orange-100 text-orange-800';
       case 'delivery_assigned': return 'bg-green-100 text-green-800';
+      case 'ready_for_dispatch': return 'bg-teal-100 text-teal-800';
+      case 'dispatched': return 'bg-orange-100 text-orange-800';
+      case 'in_transit': return 'bg-purple-100 text-purple-800';
+      case 'delivery_arrived': return 'bg-cyan-100 text-cyan-800';
+      case 'received': return 'bg-green-100 text-green-800';
+      case 'completed': return 'bg-emerald-100 text-emerald-800';
       // Legacy statuses
       case 'pending': return 'bg-gray-100 text-gray-800';
       case 'confirmed': return 'bg-amber-100 text-amber-800';
@@ -689,6 +695,12 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       case 'delivery_requested': return <Truck className="h-4 w-4" />;
       case 'awaiting_delivery_provider': return <Clock className="h-4 w-4" />;
       case 'delivery_assigned': return <CheckCircle className="h-4 w-4" />;
+      case 'ready_for_dispatch': return <Package className="h-4 w-4" />;
+      case 'dispatched': return <Package className="h-4 w-4" />;
+      case 'in_transit': return <Truck className="h-4 w-4" />;
+      case 'delivery_arrived': return <MapPin className="h-4 w-4" />;
+      case 'received': return <CheckCircle className="h-4 w-4" />;
+      case 'completed': return <CheckCircle className="h-4 w-4" />;
       // Legacy statuses
       case 'pending': return <Clock className="h-4 w-4" />;
       case 'confirmed': return <CheckCircle className="h-4 w-4" />;
@@ -816,6 +828,36 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       }
       return '✅ Delivery Assigned';
     }
+    if (status === 'ready_for_dispatch') {
+      return '📦 Ready for Dispatch';
+    }
+    if (status === 'dispatched') {
+      if (hasDeliveryProvider && providerName && providerName !== 'Delivery Provider') {
+        return `📦 Dispatched - Being Delivered by ${providerName}`;
+      }
+      return '📦 Dispatched';
+    }
+    if (status === 'in_transit') {
+      if (hasDeliveryProvider && providerName && providerName !== 'Delivery Provider') {
+        return `🚚 Being Delivered by ${providerName}`;
+      }
+      return '🚚 In Transit';
+    }
+    if (status === 'delivery_arrived') {
+      if (hasDeliveryProvider && providerName && providerName !== 'Delivery Provider') {
+        return `📍 Arrived - Delivered by ${providerName}`;
+      }
+      return '📍 Delivery Arrived';
+    }
+    if (status === 'received') {
+      if (hasDeliveryProvider && providerName && providerName !== 'Delivery Provider') {
+        return `✅ Received - Delivered by ${providerName}`;
+      }
+      return '✅ Received';
+    }
+    if (status === 'completed') {
+      return '✅ Completed';
+    }
     
     // For quoted orders (supplier has responded) - legacy status
     if (status === 'quoted') {
@@ -841,10 +883,12 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
     }
     
     switch (status) {
+      case 'ready_for_dispatch':
+        return '📦 Ready for Dispatch';
       case 'dispatched':
         // If delivery provider is assigned, show provider name
-        if (hasDeliveryProvider) {
-          return `📦 To Be Delivered by ${providerName}`;
+        if (hasDeliveryProvider && providerName && providerName !== 'Delivery Provider') {
+          return `📦 Dispatched - Being Delivered by ${providerName}`;
         }
         return '📦 Dispatched';
       case 'partially_dispatched':
@@ -855,10 +899,15 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
         return '📦 Partially Dispatched';
       case 'in_transit':
         // If delivery provider is assigned, show provider name
-        if (hasDeliveryProvider) {
+        if (hasDeliveryProvider && providerName && providerName !== 'Delivery Provider') {
           return `🚚 Being Delivered by ${providerName}`;
         }
         return '🚚 In Transit';
+      case 'delivery_arrived':
+        if (hasDeliveryProvider && providerName && providerName !== 'Delivery Provider') {
+          return `📍 Arrived - Delivered by ${providerName}`;
+        }
+        return '📍 Delivery Arrived';
       case 'partially_delivered': return '📬 Partially Delivered';
       case 'received':
         // If delivery provider is assigned, show who delivered it
@@ -925,14 +974,16 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
           const pendingHasDispatchedItems = items.some(i => (i.dispatch_scanned || i.status === 'dispatched') && !['in_transit', 'received', 'verified'].includes(i.status) && !i.receive_scanned);
           if (pendingHasDispatchedItems) return false; // Exclude orders with dispatched items
           
-          // Include new quote status flow and order phase statuses
+          // Include new quote status flow and order phase statuses (but exclude completed)
           const isPendingStatus = orderStatus === 'pending' || orderStatus === 'confirmed' || orderStatus === 'quoted' ||
                                   orderStatus === 'quote_created' || orderStatus === 'quote_received_by_supplier' ||
                                   orderStatus === 'quote_responded' || orderStatus === 'quote_revised' ||
                                   orderStatus === 'quote_viewed_by_builder' || orderStatus === 'quote_accepted' ||
                                   orderStatus === 'order_created' || orderStatus === 'awaiting_delivery_request' ||
                                   orderStatus === 'delivery_requested' || orderStatus === 'awaiting_delivery_provider' ||
-                                  orderStatus === 'delivery_assigned';
+                                  orderStatus === 'delivery_assigned' || orderStatus === 'ready_for_dispatch' ||
+                                  orderStatus === 'dispatched' || orderStatus === 'in_transit' ||
+                                  orderStatus === 'delivery_arrived' || orderStatus === 'received';
           const hasPendingItems = items.some(i => !i.dispatch_scanned && !['dispatched', 'in_transit', 'received', 'verified'].includes(i.status));
           // Only show if status is pending/confirmed/quoted (or new quote statuses) AND no items are dispatched
           return (isPendingStatus || hasPendingItems) && !pendingHasDispatchedItems;
