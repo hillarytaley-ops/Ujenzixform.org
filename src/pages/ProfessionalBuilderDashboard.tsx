@@ -35,7 +35,8 @@ import {
   Upload,
   Play,
   XCircle,
-  Eye
+  Eye,
+  Map as MapIcon
 } from "lucide-react";
 import { BuilderProfileEdit } from "@/components/builders/BuilderProfileEdit";
 import { BuilderVideoPortfolio } from "@/components/builders/BuilderVideoPortfolio";
@@ -82,6 +83,7 @@ const ProfessionalBuilderDashboardPage = () => {
     totalSpent: 0,
   });
   const [monitoringDialogOpen, setMonitoringDialogOpen] = useState(false);
+  const [showMonitoringMap, setShowMonitoringMap] = useState(false);
   const [monitoringRequest, setMonitoringRequest] = useState({
     projectName: '',
     projectLocation: '',
