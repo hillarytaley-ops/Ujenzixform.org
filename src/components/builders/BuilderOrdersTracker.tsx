@@ -288,8 +288,9 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
       
+      // Fetch purchase orders with delivery provider information
       const ordersResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${builderId}&order=created_at.desc`,
+        `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${builderId}&select=*,delivery_provider_id,delivery_provider_name,delivery_provider_phone,delivery_status&order=created_at.desc`,
         { headers, signal: controller.signal, cache: 'no-store' }
       );
       clearTimeout(timeoutId);
@@ -586,18 +587,19 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
   const getStatusLabel = (order: any) => {
     const status = order.status || 'pending';
     const hasDeliveryProvider = order.delivery_provider_id || order.delivery_provider_name;
+    const providerName = order.delivery_provider_name || 'Delivery Provider';
     
     switch (status) {
       case 'pending':
-        // Show delivery provider allocation status
+        // Show delivery provider allocation status with name if available
         if (hasDeliveryProvider) {
-          return 'Delivery Provider Allocated';
+          return `To be delivered by: ${providerName}`;
         }
         return 'Awaiting Delivery Provider';
       case 'confirmed':
         // For confirmed orders, also check delivery provider
         if (hasDeliveryProvider) {
-          return 'Delivery Provider Allocated';
+          return `To be delivered by: ${providerName}`;
         }
         return 'Awaiting Delivery Provider';
       case 'quoted': return 'Quoted';
@@ -877,14 +879,15 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                     <div className="flex items-center gap-3">
                       {/* Mini Status Timeline - Always Visible */}
                       <div className="hidden sm:flex items-center gap-1">
-                        {/* Confirmed */}
+                        {/* Confirmed/Pending */}
                         <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                          ['confirmed', 'dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status)
+                          ['pending', 'confirmed', 'dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status)
                             ? 'bg-green-500 text-white'
                             : 'bg-gray-200 text-gray-400'
                         }`}>✓</div>
                         <div className={`w-4 h-0.5 ${
-                          ['dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status)
+                          ['dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status) ||
+                          (order.delivery_provider_id && ['pending', 'confirmed'].includes(order.status))
                             ? 'bg-green-500'
                             : 'bg-gray-200'
                         }`} />
@@ -964,7 +967,9 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                             </div>
                             <span className="text-xs mt-1 font-medium">Accepted</span>
                             {order.delivery_provider_id || order.delivery_provider_name ? (
-                              <span className="text-[10px] text-green-600 mt-0.5">Provider Allocated</span>
+                              <span className="text-[10px] text-green-600 mt-0.5 font-medium">
+                                To be delivered by: {order.delivery_provider_name || 'Provider'}
+                              </span>
                             ) : (
                               <span className="text-[10px] text-gray-500 mt-0.5">Awaiting Provider</span>
                             )}
@@ -972,7 +977,8 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                           
                           {/* Line */}
                           <div className={`flex-1 h-1 mx-2 ${
-                            ['dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status)
+                            ['dispatched', 'in_transit', 'delivered', 'received', 'verified'].includes(order.status) ||
+                            (order.delivery_provider_id && ['pending', 'confirmed'].includes(order.status))
                               ? 'bg-green-500'
                               : 'bg-gray-200'
                           }`} />
@@ -1033,12 +1039,28 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                       </div>
                       
                       {/* Delivery Info */}
-                      <div className="flex items-start gap-2 text-sm">
-                        <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
-                        <div>
-                          <p className="font-medium">Delivery Address</p>
-                          <p className="text-gray-600">{order.delivery_address}</p>
+                      <div className="space-y-3">
+                        <div className="flex items-start gap-2 text-sm">
+                          <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
+                          <div>
+                            <p className="font-medium">Delivery Address</p>
+                            <p className="text-gray-600">{order.delivery_address}</p>
+                          </div>
                         </div>
+                        
+                        {/* Delivery Provider Info */}
+                        {(order.delivery_provider_id || order.delivery_provider_name) && (
+                          <div className="flex items-start gap-2 text-sm bg-blue-50 p-3 rounded-lg border border-blue-200">
+                            <Truck className="h-4 w-4 text-blue-600 mt-0.5" />
+                            <div>
+                              <p className="font-medium text-blue-900">Delivery Provider</p>
+                              <p className="text-blue-700">{order.delivery_provider_name || 'Assigned Provider'}</p>
+                              {order.delivery_provider_phone && (
+                                <p className="text-xs text-blue-600 mt-1">Phone: {order.delivery_provider_phone}</p>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                       
                       {/* Material Items with QR Codes - EXTRA LARGE */}
