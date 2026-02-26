@@ -269,7 +269,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       
       // Fetch purchase orders with delivery provider information
       const ordersResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${builderId}&select=*,delivery_provider_id,delivery_provider_name,delivery_provider_phone,delivery_status&order=created_at.desc`,
+        `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${builderId}&select=*&order=created_at.desc`,
         { headers, signal: controller.signal, cache: 'no-store' }
       );
       clearTimeout(timeoutId);
