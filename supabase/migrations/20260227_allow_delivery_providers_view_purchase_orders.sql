@@ -18,6 +18,7 @@ DROP POLICY IF EXISTS "purchase_orders_delivery_provider_view" ON purchase_order
 
 -- Create policy for delivery providers to view purchase_orders that need delivery
 -- They can see orders with delivery-related statuses (awaiting delivery providers)
+-- First, create a simple policy that doesn't check delivery_provider_id
 CREATE POLICY "purchase_orders_delivery_provider_view" ON purchase_orders
     FOR SELECT TO authenticated
     USING (
@@ -33,19 +34,6 @@ CREATE POLICY "purchase_orders_delivery_provider_view" ON purchase_orders
             'awaiting_delivery_provider',
             'delivery_assigned',
             'ready_for_dispatch'
-        )
-        AND (
-            -- Either no provider assigned yet (available for all providers)
-            -- Use COALESCE to handle case where column might not exist
-            COALESCE(delivery_provider_id, NULL) IS NULL
-            OR
-            -- Or assigned to this provider (check via delivery_providers table)
-            delivery_provider_id IN (
-                SELECT id FROM delivery_providers WHERE user_id = auth.uid()
-            )
-            OR
-            -- Or provider_id matches the user_id directly (fallback)
-            delivery_provider_id = auth.uid()
         )
     );
 
