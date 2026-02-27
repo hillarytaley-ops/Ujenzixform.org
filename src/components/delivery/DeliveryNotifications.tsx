@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -57,6 +57,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const acceptingRef = useRef<string | null>(null); // Use ref for immediate click prevention
   const [settings, setSettings] = useState<NotificationSettings>({
     pushEnabled: false,
     soundEnabled: true,
@@ -425,7 +426,8 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     
     console.log('🚚 handleAcceptDelivery: START - Accepting with providerId:', providerId, 'requestId:', requestId);
     
-    // Set accepting state IMMEDIATELY to disable button
+    // Set accepting state IMMEDIATELY to disable button (both ref and state)
+    acceptingRef.current = requestId;
     setAcceptingId(requestId);
     
     // Generate tracking number upfront
@@ -492,6 +494,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       });
     } finally {
       console.log('🚚 handleAcceptDelivery: END - clearing acceptingId');
+      acceptingRef.current = null;
       setAcceptingId(null);
     }
   };
@@ -876,14 +879,18 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            console.log('🔘 Accept button clicked for:', notification.id, 'acceptingId:', acceptingId);
+                            console.log('🔘 Accept button clicked for:', notification.id, 'acceptingId:', acceptingId, 'acceptingRef:', acceptingRef.current);
                             
-                            // Only process if this specific notification is not already being accepted
-                            if (acceptingId !== notification.id && !acceptingId) {
-                              handleAcceptDelivery(notification.id);
+                            // Prevent double-click using ref (immediate check, no state delay)
+                            if (acceptingRef.current || acceptingId) {
+                              console.log('🛑 Already accepting, ignoring click');
+                              return;
                             }
+                            
+                            // Process the acceptance
+                            handleAcceptDelivery(notification.id);
                           }}
-                          disabled={!!acceptingId}
+                          disabled={!!acceptingRef.current || !!acceptingId}
                         >
                           {acceptingId === notification.id ? (
                             <>

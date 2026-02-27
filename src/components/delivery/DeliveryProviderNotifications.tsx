@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -59,6 +59,8 @@ export const DeliveryProviderNotifications: React.FC<{ providerId: string }> = (
     vibration: true
   });
   const [loading, setLoading] = useState(true);
+  const [acceptingId, setAcceptingId] = useState<string | null>(null);
+  const acceptingRef = useRef<string | null>(null); // Use ref for immediate click prevention
   const { toast } = useToast();
 
   useEffect(() => {
@@ -316,6 +318,16 @@ export const DeliveryProviderNotifications: React.FC<{ providerId: string }> = (
   };
 
   const handleAcceptDelivery = async (requestId: string) => {
+    // Prevent double-click using ref (immediate check, no state delay)
+    if (acceptingRef.current || acceptingId) {
+      console.log('🛑 Already accepting, ignoring click');
+      return;
+    }
+    
+    // Set accepting state IMMEDIATELY (both ref and state)
+    acceptingRef.current = requestId;
+    setAcceptingId(requestId);
+    
     try {
       // CHECK: Does this provider already have an active delivery?
       const { data: activeDeliveries, error: activeError } = await supabase
@@ -368,6 +380,10 @@ export const DeliveryProviderNotifications: React.FC<{ providerId: string }> = (
         description: error.message || 'Failed to accept delivery. Please try again.',
         variant: 'destructive'
       });
+    } finally {
+      // Clear accepting state
+      acceptingRef.current = null;
+      setAcceptingId(null);
     }
   };
 
@@ -616,10 +632,16 @@ export const DeliveryProviderNotifications: React.FC<{ providerId: string }> = (
                   <div className="flex gap-3">
                     <Button 
                       className="flex-1 bg-green-600 hover:bg-green-700"
-                      onClick={() => handleAcceptDelivery(request.id)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleAcceptDelivery(request.id);
+                      }}
+                      disabled={!!acceptingRef.current || !!acceptingId}
+                      type="button"
                     >
                       <CheckCircle className="h-4 w-4 mr-2" />
-                      Accept Delivery
+                      {acceptingId === request.id ? 'Accepting...' : 'Accept Delivery'}
                     </Button>
                     <Button 
                       variant="outline" 
