@@ -66,19 +66,21 @@ BEGIN
                        TO_CHAR(NOW(), 'YYYYMMDD') || '-' ||
                        LPAD(FLOOR(RANDOM() * 10000)::TEXT, 4, '0');
       
-      INSERT INTO public.material_items (
-        purchase_order_id, qr_code, item_sequence, material_type, category,
-        quantity, unit, supplier_id, status
-      ) VALUES (
-        NEW.id, qr_code_value, item_index,
-        COALESCE(item->>'name', item->>'material_name', 'Unknown Material'),
-        material_category,
-        COALESCE((item->>'quantity')::NUMERIC, 1),
-        COALESCE(item->>'unit', 'units'),
-        supplier_uuid,
-        'pending'
-      )
-      ON CONFLICT (purchase_order_id, item_sequence) DO NOTHING;
+      -- Check if this specific item already exists before inserting
+      IF NOT EXISTS (SELECT 1 FROM material_items WHERE purchase_order_id = NEW.id AND item_sequence = item_index) THEN
+        INSERT INTO public.material_items (
+          purchase_order_id, qr_code, item_sequence, material_type, category,
+          quantity, unit, supplier_id, status
+        ) VALUES (
+          NEW.id, qr_code_value, item_index,
+          COALESCE(item->>'name', item->>'material_name', 'Unknown Material'),
+          material_category,
+          COALESCE((item->>'quantity')::NUMERIC, 1),
+          COALESCE(item->>'unit', 'units'),
+          supplier_uuid,
+          'pending'
+        );
+      END IF;
     END LOOP;
     
     UPDATE purchase_orders SET qr_code_generated = true WHERE id = NEW.id;
