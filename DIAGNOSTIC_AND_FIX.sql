@@ -30,7 +30,7 @@ DO $$
 DECLARE
     r RECORD;
 BEGIN
-    -- Drop all triggers
+    -- Drop all triggers on delivery_requests FIRST
     FOR r IN 
         SELECT tgname
         FROM pg_trigger
@@ -41,25 +41,12 @@ BEGIN
         RAISE NOTICE 'Dropped trigger: %', r.tgname;
     END LOOP;
     
-    -- Drop all functions that reference delivery_provider columns
-    FOR r IN 
-        SELECT p.proname, pg_get_function_identity_arguments(p.oid) as args
-        FROM pg_proc p
-        JOIN pg_namespace n ON p.pronamespace = n.oid
-        WHERE n.nspname = 'public'
-        AND p.prosrc LIKE '%delivery_provider%'
-    LOOP
-        BEGIN
-            EXECUTE 'DROP FUNCTION IF EXISTS public.' || quote_ident(r.proname) || 
-                    CASE WHEN r.args IS NOT NULL AND r.args != '' 
-                         THEN '(' || r.args || ')' 
-                         ELSE '()' 
-                    END || ' CASCADE';
-            RAISE NOTICE 'Dropped function: %', r.proname;
-        EXCEPTION WHEN OTHERS THEN
-            RAISE NOTICE 'Could not drop function %: %', r.proname, SQLERRM;
-        END;
-    END LOOP;
+    -- Drop the specific problematic function that's a trigger function
+    DROP FUNCTION IF EXISTS public.update_order_status_on_provider_accept() CASCADE;
+    RAISE NOTICE 'Dropped function: update_order_status_on_provider_accept';
+    
+    -- Keep other functions (they only update purchase_orders, not delivery_requests)
+    -- mark_delivery_assigned, update_order_status_on_dispatch, update_purchase_order_on_delivery_accept are OK
 END $$;
 
 -- Step 4: Create clean tracking function (ONLY sets tracking_number)
@@ -152,7 +139,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Step 7: Recreate triggers
+-- Step 7: Recreate triggers (ONLY the safe ones)
+-- DO NOT recreate update_order_status_on_provider_accept trigger - it's problematic
 CREATE TRIGGER trigger_create_tracking_on_delivery_accept
     BEFORE UPDATE ON delivery_requests
     FOR EACH ROW
@@ -168,6 +156,9 @@ CREATE TRIGGER trigger_update_delivery_requests_updated_at
     BEFORE UPDATE ON delivery_requests
     FOR EACH ROW
     EXECUTE FUNCTION update_delivery_requests_updated_at();
+
+-- Make sure update_order_status_on_provider_accept trigger is NOT recreated
+-- It was causing the error by trying to set delivery_provider_phone on delivery_requests
 
 -- Step 8: Grant permissions
 GRANT EXECUTE ON FUNCTION public.update_purchase_order_on_delivery_accept() TO authenticated;
