@@ -357,7 +357,18 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
       const realOrders: Order[] = purchaseOrders.map((po: any, index: number) => {
         const buyer = buyerProfiles[po.buyer_id] || {};
         const items = Array.isArray(po.items) ? po.items : [];
-        const isQuoteRequest = po.po_number?.startsWith('QR-') || po.status === 'pending' || po.status === 'quoted';
+        // Determine if this is a quote request or an order
+        // Quote requests: pending quotes, quoted, or quote-related statuses
+        // Orders: quote_accepted and beyond (order_created, awaiting_delivery_request, etc.)
+        const isQuoteRequest = po.po_number?.startsWith('QR-') || 
+          (po.status === 'pending' && !po.quote_accepted_at) || 
+          po.status === 'quoted' ||
+          po.status === 'quote_created' ||
+          po.status === 'quote_received_by_supplier' ||
+          po.status === 'quote_responded' ||
+          po.status === 'quote_revised' ||
+          po.status === 'quote_viewed_by_builder' ||
+          po.status === 'quote_rejected';
         
         return {
           id: po.id,
