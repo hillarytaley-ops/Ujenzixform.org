@@ -209,9 +209,11 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
             // Notify when delivery provider is assigned
             if (!payload.old?.delivery_provider_id && payload.new.delivery_provider_id) {
               toast({
-                title: '🚚 Delivery Provider Assigned',
-                description: `Delivery provider assigned to order ${payload.new.po_number || ''}`,
+                title: '✅ Delivery Provider Assigned',
+                description: `Delivery provider ${payload.new.delivery_provider_name || ''} assigned to order ${payload.new.po_number || ''}. Order will move to "Ready for Dispatch".`,
               });
+              // Refresh orders to update the display immediately
+              setTimeout(() => loadOrders(), 500);
             }
             
             // Notify when order goes in transit
