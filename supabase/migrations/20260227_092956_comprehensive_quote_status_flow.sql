@@ -54,6 +54,13 @@ BEGIN
         'delivery_arrived',
         'received',
         'completed',
+        -- Exception and fallback statuses
+        'delivery_cancelled',
+        'order_cancelled',
+        'delivery_failed',
+        'rescheduled_delivery',
+        'supplier_delay',
+        'provider_unavailable',
         -- Legacy statuses (for backward compatibility)
         'pending',
         'quoted',
@@ -177,6 +184,43 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
                    WHERE table_name = 'purchase_orders' AND column_name = 'completed_at') THEN
         ALTER TABLE purchase_orders ADD COLUMN completed_at TIMESTAMPTZ;
+    END IF;
+    
+    -- Exception and fallback status timestamps
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'purchase_orders' AND column_name = 'delivery_cancelled_at') THEN
+        ALTER TABLE purchase_orders ADD COLUMN delivery_cancelled_at TIMESTAMPTZ;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'purchase_orders' AND column_name = 'order_cancelled_at') THEN
+        ALTER TABLE purchase_orders ADD COLUMN order_cancelled_at TIMESTAMPTZ;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'purchase_orders' AND column_name = 'delivery_failed_at') THEN
+        ALTER TABLE purchase_orders ADD COLUMN delivery_failed_at TIMESTAMPTZ;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'purchase_orders' AND column_name = 'rescheduled_delivery_at') THEN
+        ALTER TABLE purchase_orders ADD COLUMN rescheduled_delivery_at TIMESTAMPTZ;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'purchase_orders' AND column_name = 'supplier_delay_at') THEN
+        ALTER TABLE purchase_orders ADD COLUMN supplier_delay_at TIMESTAMPTZ;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'purchase_orders' AND column_name = 'provider_unavailable_at') THEN
+        ALTER TABLE purchase_orders ADD COLUMN provider_unavailable_at TIMESTAMPTZ;
+    END IF;
+    
+    -- Track reschedule count
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'purchase_orders' AND column_name = 'reschedule_count') THEN
+        ALTER TABLE purchase_orders ADD COLUMN reschedule_count INTEGER DEFAULT 0;
     END IF;
     
     RAISE NOTICE 'Added quote and order status tracking columns';
@@ -625,7 +669,177 @@ CREATE TRIGGER trigger_update_order_on_receive
     EXECUTE FUNCTION update_order_status_on_receive();
 
 -- ============================================================
--- 15. UPDATE EXISTING RECORDS
+-- 15. FUNCTIONS FOR EXCEPTION AND FALLBACK STATUSES
+-- ============================================================
+
+-- Function to cancel delivery
+CREATE OR REPLACE FUNCTION cancel_delivery(po_id UUID, reason TEXT DEFAULT NULL)
+RETURNS VOID AS $$
+BEGIN
+    UPDATE purchase_orders
+    SET 
+        status = 'delivery_cancelled',
+        delivery_cancelled_at = NOW(),
+        updated_at = NOW(),
+        notes = CASE 
+            WHEN reason IS NOT NULL THEN COALESCE(notes || E'\n', '') || 'Delivery cancelled: ' || reason
+            ELSE notes
+        END
+    WHERE id = po_id
+    AND status NOT IN ('completed', 'order_cancelled', 'delivery_cancelled');
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION cancel_delivery TO authenticated;
+
+-- Function to cancel order
+CREATE OR REPLACE FUNCTION cancel_order(po_id UUID, reason TEXT DEFAULT NULL)
+RETURNS VOID AS $$
+BEGIN
+    UPDATE purchase_orders
+    SET 
+        status = 'order_cancelled',
+        order_cancelled_at = NOW(),
+        updated_at = NOW(),
+        notes = CASE 
+            WHEN reason IS NOT NULL THEN COALESCE(notes || E'\n', '') || 'Order cancelled: ' || reason
+            ELSE notes
+        END
+    WHERE id = po_id
+    AND status NOT IN ('completed', 'order_cancelled');
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION cancel_order TO authenticated;
+
+-- Function to mark delivery as failed
+CREATE OR REPLACE FUNCTION mark_delivery_failed(po_id UUID, reason TEXT DEFAULT NULL)
+RETURNS VOID AS $$
+BEGIN
+    UPDATE purchase_orders
+    SET 
+        status = 'delivery_failed',
+        delivery_failed_at = NOW(),
+        updated_at = NOW(),
+        notes = CASE 
+            WHEN reason IS NOT NULL THEN COALESCE(notes || E'\n', '') || 'Delivery failed: ' || reason
+            ELSE notes
+        END
+    WHERE id = po_id
+    AND status IN ('in_transit', 'delivery_arrived', 'dispatched', 'delivery_assigned');
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION mark_delivery_failed TO authenticated;
+
+-- Function to reschedule delivery
+CREATE OR REPLACE FUNCTION reschedule_delivery(po_id UUID, new_delivery_date TIMESTAMPTZ, reason TEXT DEFAULT NULL)
+RETURNS VOID AS $$
+BEGIN
+    UPDATE purchase_orders
+    SET 
+        status = 'rescheduled_delivery',
+        delivery_date = new_delivery_date,
+        rescheduled_delivery_at = NOW(),
+        reschedule_count = COALESCE(reschedule_count, 0) + 1,
+        updated_at = NOW(),
+        notes = CASE 
+            WHEN reason IS NOT NULL THEN COALESCE(notes || E'\n', '') || 'Delivery rescheduled: ' || reason
+            ELSE notes
+        END
+    WHERE id = po_id
+    AND status IN ('delivery_requested', 'awaiting_delivery_provider', 'delivery_assigned', 'ready_for_dispatch', 'rescheduled_delivery');
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION reschedule_delivery TO authenticated;
+
+-- Function to mark supplier delay
+CREATE OR REPLACE FUNCTION mark_supplier_delay(po_id UUID, reason TEXT DEFAULT NULL)
+RETURNS VOID AS $$
+BEGIN
+    UPDATE purchase_orders
+    SET 
+        status = 'supplier_delay',
+        supplier_delay_at = NOW(),
+        updated_at = NOW(),
+        notes = CASE 
+            WHEN reason IS NOT NULL THEN COALESCE(notes || E'\n', '') || 'Supplier delay: ' || reason
+            ELSE notes
+        END
+    WHERE id = po_id
+    AND status IN ('delivery_assigned', 'ready_for_dispatch');
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION mark_supplier_delay TO authenticated;
+
+-- Function to mark provider unavailable (auto-triggered after timeout)
+CREATE OR REPLACE FUNCTION mark_provider_unavailable(po_id UUID)
+RETURNS VOID AS $$
+BEGIN
+    UPDATE purchase_orders
+    SET 
+        status = 'provider_unavailable',
+        provider_unavailable_at = NOW(),
+        updated_at = NOW(),
+        notes = COALESCE(notes || E'\n', '') || 'No delivery provider accepted the request within the timeout period.'
+    WHERE id = po_id
+    AND status IN ('delivery_requested', 'awaiting_delivery_provider');
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION mark_provider_unavailable TO authenticated;
+
+-- ============================================================
+-- 16. TRIGGER TO AUTO-MARK PROVIDER_UNAVAILABLE AFTER TIMEOUT
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION check_provider_timeout()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Check for orders that have been awaiting provider for more than 24 hours
+    UPDATE purchase_orders
+    SET 
+        status = 'provider_unavailable',
+        provider_unavailable_at = NOW(),
+        updated_at = NOW()
+    WHERE status IN ('delivery_requested', 'awaiting_delivery_provider')
+    AND delivery_requested_at IS NOT NULL
+    AND delivery_requested_at < NOW() - INTERVAL '24 hours'
+    AND delivery_provider_id IS NULL;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create a scheduled job trigger (runs periodically)
+-- Note: This requires pg_cron extension. For now, we'll create a function that can be called manually or via a cron job
+CREATE OR REPLACE FUNCTION process_provider_timeouts()
+RETURNS INTEGER AS $$
+DECLARE
+    v_count INTEGER;
+BEGIN
+    UPDATE purchase_orders
+    SET 
+        status = 'provider_unavailable',
+        provider_unavailable_at = NOW(),
+        updated_at = NOW(),
+        notes = COALESCE(notes || E'\n', '') || 'No delivery provider accepted the request within 24 hours.'
+    WHERE status IN ('delivery_requested', 'awaiting_delivery_provider')
+    AND delivery_requested_at IS NOT NULL
+    AND delivery_requested_at < NOW() - INTERVAL '24 hours'
+    AND delivery_provider_id IS NULL;
+    
+    GET DIAGNOSTICS v_count = ROW_COUNT;
+    RETURN v_count;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION process_provider_timeouts TO authenticated;
+
+-- ============================================================
+-- 17. UPDATE EXISTING RECORDS
 -- ============================================================
 
 -- Set quote_created_at for existing pending/quoted orders
@@ -641,14 +855,17 @@ WHERE status IN ('pending', 'quoted')
 AND quote_created_at IS NULL;
 
 -- ============================================================
--- 16. CREATE INDEXES FOR PERFORMANCE
+-- 18. CREATE INDEXES FOR PERFORMANCE
 -- ============================================================
 
 CREATE INDEX IF NOT EXISTS idx_purchase_orders_quote_status ON purchase_orders(status) 
 WHERE status IN ('quote_created', 'quote_received_by_supplier', 'quote_responded', 'quote_revised', 'quote_viewed_by_builder', 'quote_accepted', 'quote_rejected');
 
 CREATE INDEX IF NOT EXISTS idx_purchase_orders_order_status ON purchase_orders(status) 
-WHERE status IN ('order_created', 'awaiting_delivery_request', 'delivery_requested', 'awaiting_delivery_provider', 'delivery_assigned', 'ready_for_dispatch', 'dispatched', 'in_transit', 'delivery_arrived', 'received', 'completed');
+WHERE status IN ('order_created', 'awaiting_delivery_request', 'delivery_requested', 'awaiting_delivery_provider', 'delivery_assigned', 'ready_for_dispatch', 'dispatched', 'in_transit', 'delivery_arrived', 'received', 'completed', 'delivery_cancelled', 'order_cancelled', 'delivery_failed', 'rescheduled_delivery', 'supplier_delay', 'provider_unavailable');
+
+CREATE INDEX IF NOT EXISTS idx_purchase_orders_exception_status ON purchase_orders(status) 
+WHERE status IN ('delivery_cancelled', 'order_cancelled', 'delivery_failed', 'rescheduled_delivery', 'supplier_delay', 'provider_unavailable');
 
 CREATE INDEX IF NOT EXISTS idx_purchase_orders_quote_created_at ON purchase_orders(quote_created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_purchase_orders_quote_responded_at ON purchase_orders(quote_responded_at DESC);
@@ -662,6 +879,12 @@ CREATE INDEX IF NOT EXISTS idx_purchase_orders_in_transit_at ON purchase_orders(
 CREATE INDEX IF NOT EXISTS idx_purchase_orders_delivery_arrived_at ON purchase_orders(delivery_arrived_at DESC);
 CREATE INDEX IF NOT EXISTS idx_purchase_orders_received_at ON purchase_orders(received_at DESC);
 CREATE INDEX IF NOT EXISTS idx_purchase_orders_completed_at ON purchase_orders(completed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_purchase_orders_delivery_cancelled_at ON purchase_orders(delivery_cancelled_at DESC);
+CREATE INDEX IF NOT EXISTS idx_purchase_orders_order_cancelled_at ON purchase_orders(order_cancelled_at DESC);
+CREATE INDEX IF NOT EXISTS idx_purchase_orders_delivery_failed_at ON purchase_orders(delivery_failed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_purchase_orders_rescheduled_delivery_at ON purchase_orders(rescheduled_delivery_at DESC);
+CREATE INDEX IF NOT EXISTS idx_purchase_orders_supplier_delay_at ON purchase_orders(supplier_delay_at DESC);
+CREATE INDEX IF NOT EXISTS idx_purchase_orders_provider_unavailable_at ON purchase_orders(provider_unavailable_at DESC);
 
 -- ============================================================
 -- Migration Complete
