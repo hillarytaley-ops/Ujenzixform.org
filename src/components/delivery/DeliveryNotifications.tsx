@@ -279,14 +279,21 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       // ALSO fetch from purchase_orders for orders that are awaiting delivery providers
       // These are orders where quotes were accepted and delivery was requested
       try {
+        // Include more statuses: orders that are created and awaiting delivery request
         const poResponse = await fetch(
-          `${url}/rest/v1/purchase_orders?status=in.(delivery_requested,awaiting_delivery_provider,delivery_assigned,ready_for_dispatch)&order=created_at.desc&limit=50`,
+          `${url}/rest/v1/purchase_orders?status=in.(order_created,awaiting_delivery_request,delivery_requested,awaiting_delivery_provider,delivery_assigned,ready_for_dispatch)&order=created_at.desc&limit=50`,
           { headers, cache: 'no-store' }
         );
+        
+        console.log('📦 purchase_orders fetch status:', poResponse.status, poResponse.statusText);
         
         if (poResponse.ok) {
           const purchaseOrders = await poResponse.json();
           console.log('📦 purchase_orders query result:', { data: purchaseOrders, count: purchaseOrders?.length });
+          
+          if (!purchaseOrders || purchaseOrders.length === 0) {
+            console.log('⚠️ No purchase_orders found - this might be an RLS issue. Check RLS policies.');
+          }
           
           if (purchaseOrders && purchaseOrders.length > 0) {
             // Get unique supplier IDs for address lookup
@@ -380,7 +387,12 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             console.log(`✅ Loaded ${purchaseOrders.length} purchase_orders awaiting delivery`);
           }
         } else {
-          console.error('❌ purchase_orders fetch failed:', poResponse.status, poResponse.statusText);
+          const errorText = await poResponse.text().catch(() => 'Could not read error');
+          console.error('❌ purchase_orders fetch failed:', poResponse.status, poResponse.statusText, errorText);
+          
+          if (poResponse.status === 403) {
+            console.error('🔒 RLS POLICY ISSUE: Delivery provider may not have permission to view purchase_orders. Run migration: 20260227_allow_delivery_providers_view_purchase_orders.sql');
+          }
         }
       } catch (e: any) {
         console.error('❌ Error fetching purchase_orders:', e.message);
