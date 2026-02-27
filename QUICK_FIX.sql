@@ -18,7 +18,7 @@ DROP FUNCTION IF EXISTS public.update_order_in_transit() CASCADE;
 DROP FUNCTION IF EXISTS public.update_purchase_order_on_delivery_accept() CASCADE;
 
 -- Step 3: Create clean tracking function (ONLY sets tracking_number, nothing else)
-CREATE FUNCTION public.create_tracking_on_delivery_accept()
+CREATE OR REPLACE FUNCTION public.create_tracking_on_delivery_accept()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -55,7 +55,7 @@ END;
 $$;
 
 -- Step 4: Create clean purchase order update function (ONLY updates purchase_orders)
-CREATE FUNCTION public.update_purchase_order_on_delivery_accept()
+CREATE OR REPLACE FUNCTION public.update_purchase_order_on_delivery_accept()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -99,7 +99,7 @@ END;
 $$;
 
 -- Step 5: Create updated_at function
-CREATE FUNCTION update_delivery_requests_updated_at()
+CREATE OR REPLACE FUNCTION update_delivery_requests_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
     NEW.updated_at = NOW();
