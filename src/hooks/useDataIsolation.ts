@@ -383,16 +383,107 @@ export const useDeliveryProviderData = () => {
         .maybeSingle();
 
       // Fetch active deliveries assigned to THIS provider only
-      // Database uses provider_id column
+      // Check both delivery_requests and purchase_orders tables
+      
+      // 1. From delivery_requests table
       const { data: activeData, error: activeError } = await supabase
         .from('delivery_requests')
         .select('*')
         .eq('provider_id', userId)
-        .in('status', ['assigned', 'picked_up', 'in_transit', 'out_for_delivery'])
+        .in('status', ['accepted', 'assigned', 'picked_up', 'in_transit', 'out_for_delivery', 'provider_assigned'])
         .order('created_at', { ascending: false });
 
       if (activeError) throw activeError;
-      setActiveDeliveries(activeData || []);
+      
+      // 2. Also fetch from purchase_orders where this provider is assigned
+      // These are orders that were converted from quotes and accepted by builders
+      const { data: purchaseOrdersData, error: poError } = await supabase
+        .from('purchase_orders')
+        .select(`
+          *,
+          supplier:supplier_id (
+            company_name,
+            address,
+            location
+          ),
+          buyer:buyer_id (
+            full_name,
+            phone,
+            email
+          )
+        `)
+        .eq('delivery_provider_id', userId)
+        .in('status', [
+          'quote_accepted',
+          'order_created',
+          'awaiting_delivery_request',
+          'delivery_requested',
+          'awaiting_delivery_provider',
+          'delivery_assigned',
+          'ready_for_dispatch',
+          'dispatched',
+          'in_transit',
+          'delivery_arrived'
+        ])
+        .order('created_at', { ascending: false });
+
+      if (poError) {
+        console.warn('Error fetching purchase_orders for delivery provider:', poError);
+      }
+      
+      // Combine both sources and transform to consistent format
+      const allActiveDeliveries: any[] = [];
+      
+      // Add delivery_requests
+      if (activeData) {
+        activeData.forEach((dr: any) => {
+          allActiveDeliveries.push({
+            ...dr,
+            source: 'delivery_requests',
+            purchase_order_id: dr.purchase_order_id || null
+          });
+        });
+      }
+      
+      // Add purchase_orders (convert to delivery_requests format)
+      if (purchaseOrdersData) {
+        purchaseOrdersData.forEach((po: any) => {
+          // Check if this purchase_order already exists in delivery_requests
+          const existing = allActiveDeliveries.find(d => d.purchase_order_id === po.id);
+          if (!existing) {
+            allActiveDeliveries.push({
+              id: po.id,
+              purchase_order_id: po.id,
+              provider_id: userId,
+              status: po.status,
+              pickup_location: po.supplier?.address || po.supplier?.location || 'Supplier location',
+              pickup_address: po.supplier?.address || po.supplier?.location || 'Supplier location',
+              delivery_location: po.delivery_address || po.delivery_address || 'Delivery location',
+              delivery_address: po.delivery_address || po.delivery_address || 'Delivery location',
+              material_type: Array.isArray(po.items) ? po.items.map((i: any) => i.name || i.material_type).join(', ') : 'Construction Materials',
+              quantity: Array.isArray(po.items) ? po.items.reduce((sum: number, i: any) => sum + (i.quantity || 1), 0) : 1,
+              builder_name: po.buyer?.full_name || 'Builder',
+              builder_phone: po.buyer?.phone || '',
+              builder_email: po.buyer?.email || '',
+              price: po.total_amount || 0,
+              estimated_cost: po.total_amount || 0,
+              created_at: po.created_at,
+              updated_at: po.updated_at,
+              source: 'purchase_orders',
+              delivery_provider_name: po.delivery_provider_name,
+              delivery_assigned_at: po.delivery_assigned_at
+            });
+          }
+        });
+      }
+      
+      console.log('📦 Active deliveries loaded:', {
+        from_delivery_requests: activeData?.length || 0,
+        from_purchase_orders: purchaseOrdersData?.length || 0,
+        total: allActiveDeliveries.length
+      });
+      
+      setActiveDeliveries(allActiveDeliveries);
 
       // Fetch completed deliveries for THIS provider only
       // ORDER BY: Most recent deliveries first (completed_at or updated_at descending)
