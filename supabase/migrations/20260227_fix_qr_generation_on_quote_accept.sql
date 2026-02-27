@@ -32,9 +32,13 @@ BEGIN
   IF EXISTS (SELECT 1 FROM material_items WHERE purchase_order_id = NEW.id LIMIT 1) THEN
     -- QR codes already exist, just mark as generated if not already marked
     IF NEW.qr_code_generated IS NULL OR NEW.qr_code_generated = FALSE THEN
-      UPDATE purchase_orders
-      SET qr_code_generated = true
-      WHERE id = NEW.id;
+      -- Update in a separate statement to avoid trigger recursion
+      PERFORM 1 FROM purchase_orders WHERE id = NEW.id AND (qr_code_generated IS NULL OR qr_code_generated = FALSE);
+      IF FOUND THEN
+        UPDATE purchase_orders
+        SET qr_code_generated = true
+        WHERE id = NEW.id;
+      END IF;
     END IF;
     RETURN NEW;
   END IF;
