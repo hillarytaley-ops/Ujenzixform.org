@@ -887,11 +887,15 @@ CREATE INDEX IF NOT EXISTS idx_purchase_orders_supplier_delay_at ON purchase_ord
 CREATE INDEX IF NOT EXISTS idx_purchase_orders_provider_unavailable_at ON purchase_orders(provider_unavailable_at DESC);
 
 -- ============================================================
--- FIX: Ensure no trigger tries to set delivery_provider_name on delivery_requests
--- delivery_provider_name only exists in purchase_orders, not delivery_requests
+-- FIX: Ensure no trigger tries to set delivery_provider_name/phone on delivery_requests
+-- These columns only exist in purchase_orders, not delivery_requests
 -- ============================================================
 
--- Recreate update_order_in_transit function to ensure it doesn't try to set NEW.delivery_provider_name
+-- Drop ALL triggers that might be trying to set delivery_provider_name or delivery_provider_phone on delivery_requests
+DROP TRIGGER IF EXISTS trigger_update_order_in_transit ON delivery_requests;
+DROP TRIGGER IF EXISTS trigger_update_order_on_provider_accept ON delivery_requests;
+
+-- Recreate update_order_in_transit function to ensure it doesn't try to set NEW columns
 -- This function should ONLY update purchase_orders, never delivery_requests
 CREATE OR REPLACE FUNCTION public.update_order_in_transit()
 RETURNS TRIGGER
@@ -905,7 +909,8 @@ DECLARE
     v_provider_phone TEXT;
 BEGIN
     -- When delivery request is accepted, update the linked purchase order ONLY
-    -- DO NOT try to set NEW.delivery_provider_name on delivery_requests (column doesn't exist)
+    -- CRITICAL: DO NOT try to set NEW.delivery_provider_name or NEW.delivery_provider_phone
+    -- These columns DO NOT EXIST in delivery_requests table
     IF NEW.status = 'accepted' AND (OLD.status IS NULL OR OLD.status != 'accepted') AND NEW.provider_id IS NOT NULL THEN
         po_id := NEW.purchase_order_id;
         
@@ -926,7 +931,7 @@ BEGIN
             END;
             
             -- Update purchase order with delivery provider info
-            -- NOTE: delivery_provider_name is in purchase_orders, NOT delivery_requests
+            -- NOTE: delivery_provider_name and delivery_provider_phone are in purchase_orders, NOT delivery_requests
             UPDATE purchase_orders
             SET 
                 delivery_provider_id = NEW.provider_id,
@@ -955,13 +960,13 @@ BEGIN
         END IF;
     END IF;
     
-    -- Return NEW without modifying it (don't set NEW.delivery_provider_name)
+    -- Return NEW without modifying it
+    -- DO NOT set NEW.delivery_provider_name or NEW.delivery_provider_phone (columns don't exist)
     RETURN NEW;
 END;
 $$;
 
--- Ensure trigger exists and is AFTER UPDATE (not BEFORE)
-DROP TRIGGER IF EXISTS trigger_update_order_in_transit ON delivery_requests;
+-- Recreate trigger as AFTER UPDATE (not BEFORE) to avoid column reference errors
 CREATE TRIGGER trigger_update_order_in_transit
     AFTER UPDATE OF status, provider_id ON delivery_requests
     FOR EACH ROW
