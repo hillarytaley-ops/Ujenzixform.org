@@ -281,8 +281,26 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       try {
         // Include ALL statuses where orders need delivery providers
         // This includes quote_accepted (just accepted) and awaiting_delivery_request (waiting for builder to request delivery)
+        // Also include legacy statuses that might still be in use
+        const statuses = [
+          'quote_accepted',
+          'order_created',
+          'awaiting_delivery_request',
+          'delivery_requested',
+          'awaiting_delivery_provider',
+          'delivery_assigned',
+          'ready_for_dispatch',
+          'dispatched',
+          'in_transit',
+          // Legacy statuses
+          'pending',
+          'quoted',
+          'confirmed',
+          'accepted'
+        ].join(',');
+        
         const poResponse = await fetch(
-          `${url}/rest/v1/purchase_orders?status=in.(quote_accepted,order_created,awaiting_delivery_request,delivery_requested,awaiting_delivery_provider,delivery_assigned,ready_for_dispatch)&order=created_at.desc&limit=100`,
+          `${url}/rest/v1/purchase_orders?status=in.(${statuses})&order=created_at.desc&limit=100`,
           { headers, cache: 'no-store' }
         );
         
