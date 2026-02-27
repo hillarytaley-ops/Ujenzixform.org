@@ -279,9 +279,10 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       // ALSO fetch from purchase_orders for orders that are awaiting delivery providers
       // These are orders where quotes were accepted and delivery was requested
       try {
-        // Include more statuses: orders that are created and awaiting delivery request
+        // Include ALL statuses where orders need delivery providers
+        // This includes quote_accepted (just accepted) and awaiting_delivery_request (waiting for builder to request delivery)
         const poResponse = await fetch(
-          `${url}/rest/v1/purchase_orders?status=in.(order_created,awaiting_delivery_request,delivery_requested,awaiting_delivery_provider,delivery_assigned,ready_for_dispatch)&order=created_at.desc&limit=50`,
+          `${url}/rest/v1/purchase_orders?status=in.(quote_accepted,order_created,awaiting_delivery_request,delivery_requested,awaiting_delivery_provider,delivery_assigned,ready_for_dispatch)&order=created_at.desc&limit=100`,
           { headers, cache: 'no-store' }
         );
         
@@ -363,6 +364,9 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
               } else if (po.status === 'awaiting_delivery_provider') {
                 notificationStatus = 'pending';
                 notificationTitle = '⏳ Awaiting Delivery Provider';
+              } else if (po.status === 'quote_accepted' || po.status === 'order_created' || po.status === 'awaiting_delivery_request') {
+                notificationStatus = 'pending';
+                notificationTitle = '✅ Quote Accepted - Awaiting Delivery Request';
               }
 
               allNotifications.push({

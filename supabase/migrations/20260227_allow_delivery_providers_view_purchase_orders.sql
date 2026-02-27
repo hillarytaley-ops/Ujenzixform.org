@@ -29,7 +29,11 @@ CREATE POLICY "purchase_orders_delivery_provider_view" ON purchase_orders
         )
         AND
         -- Delivery providers can view orders that need delivery providers
+        -- Include quote_accepted and awaiting_delivery_request so providers can see orders immediately after quote acceptance
         status IN (
+            'quote_accepted',
+            'order_created',
+            'awaiting_delivery_request',
             'delivery_requested',
             'awaiting_delivery_provider',
             'delivery_assigned',
