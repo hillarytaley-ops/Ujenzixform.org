@@ -447,8 +447,10 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         updated_at: new Date().toISOString()
       };
       
-      // Explicitly remove any delivery_provider_name if it somehow got added
+      // Explicitly remove any delivery_provider_name or delivery_provider_phone if they somehow got added
+      // These columns only exist in purchase_orders, NOT delivery_requests
       delete updatePayload.delivery_provider_name;
+      delete updatePayload.delivery_provider_phone;
       
       const response = await fetch(
         `${url}/rest/v1/delivery_requests?id=eq.${requestId}`,

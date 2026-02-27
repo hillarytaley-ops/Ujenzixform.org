@@ -19,7 +19,38 @@ BEGIN
     END LOOP;
 END $$;
 
--- Step 2: Drop ALL problematic functions
+-- Step 2: Drop ALL functions that might reference delivery_provider_phone or try to set NEW columns
+-- Find and drop any function that references delivery_provider_phone on delivery_requests
+DO $$
+DECLARE
+    r RECORD;
+    func_signature TEXT;
+BEGIN
+    FOR r IN 
+        SELECT p.proname, pg_get_function_identity_arguments(p.oid) as args
+        FROM pg_proc p
+        JOIN pg_namespace n ON p.pronamespace = n.oid
+        WHERE n.nspname = 'public'
+        AND (
+            p.prosrc LIKE '%NEW.delivery_provider_phone%'
+            OR p.prosrc LIKE '%delivery_provider_phone%delivery_requests%'
+            OR (p.prosrc LIKE '%delivery_provider_phone%' AND p.prosrc LIKE '%NEW.%')
+        )
+    LOOP
+        BEGIN
+            func_signature := 'public.' || quote_ident(r.proname);
+            IF r.args IS NOT NULL AND r.args != '' THEN
+                func_signature := func_signature || '(' || r.args || ')';
+            END IF;
+            EXECUTE 'DROP FUNCTION IF EXISTS ' || func_signature || ' CASCADE';
+            RAISE NOTICE 'Dropped function: %', func_signature;
+        EXCEPTION WHEN OTHERS THEN
+            RAISE NOTICE 'Could not drop function %: %', r.proname, SQLERRM;
+        END;
+    END LOOP;
+END $$;
+
+-- Also drop known functions explicitly
 DROP FUNCTION IF EXISTS public.create_tracking_on_delivery_accept() CASCADE;
 DROP FUNCTION IF EXISTS public.update_order_in_transit() CASCADE;
 DROP FUNCTION IF EXISTS public.update_purchase_order_on_delivery_accept() CASCADE;
