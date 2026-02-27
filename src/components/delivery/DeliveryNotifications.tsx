@@ -467,16 +467,31 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         }
       )
       // Also listen to purchase_orders status changes for delivery-related statuses
+      // Include quote_accepted and awaiting_delivery_request so we see orders immediately after quote acceptance
       .on('postgres_changes',
         { 
           event: 'UPDATE', 
           schema: 'public', 
           table: 'purchase_orders',
-          filter: 'status=in.(delivery_requested,awaiting_delivery_provider,delivery_assigned,ready_for_dispatch)'
+          filter: 'status=in.(quote_accepted,order_created,awaiting_delivery_request,delivery_requested,awaiting_delivery_provider,delivery_assigned,ready_for_dispatch)'
         },
         (payload: any) => {
           console.log('🔔 Purchase order status changed:', payload.new);
           // Reload notifications to get the updated order
+          loadNotifications();
+        }
+      )
+      // Also listen for INSERT events (new orders created)
+      .on('postgres_changes',
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'purchase_orders',
+          filter: 'status=in.(quote_accepted,order_created,awaiting_delivery_request,delivery_requested,awaiting_delivery_provider,delivery_assigned,ready_for_dispatch)'
+        },
+        (payload: any) => {
+          console.log('🔔 New purchase order created:', payload.new);
+          // Reload notifications to get the new order
           loadNotifications();
         }
       )
