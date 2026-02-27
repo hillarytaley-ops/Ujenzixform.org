@@ -18,12 +18,10 @@ DECLARE
   material_category TEXT;
   should_generate BOOLEAN := FALSE;
 BEGIN
-  -- Get supplier ID
-  supplier_uuid := NEW.supplier_id;
-
   -- CRITICAL: Check if QR codes already exist FIRST - prevent any duplicate inserts
   -- This check must happen before any generation logic
-  IF EXISTS (SELECT 1 FROM material_items WHERE purchase_order_id = NEW.id) THEN
+  -- Use a lock to prevent concurrent inserts
+  IF EXISTS (SELECT 1 FROM material_items WHERE purchase_order_id = NEW.id FOR UPDATE SKIP LOCKED) THEN
     -- QR codes already exist - just ensure flag is set and exit immediately
     IF (NEW.qr_code_generated IS NULL OR NEW.qr_code_generated = FALSE) THEN
       UPDATE purchase_orders SET qr_code_generated = true WHERE id = NEW.id;
@@ -35,6 +33,9 @@ BEGIN
   IF NEW.qr_code_generated = TRUE THEN
     RETURN NEW;
   END IF;
+
+  -- Get supplier ID
+  supplier_uuid := NEW.supplier_id;
 
   -- Check if we should generate QR codes
   should_generate := (
