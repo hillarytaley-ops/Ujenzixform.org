@@ -93,7 +93,8 @@ BEGIN
 END;
 $$;
 
--- Update the confirm function
+-- Update the confirm function - DISABLE IT to prevent duplicate generation
+-- The auto_generate_item_qr_codes trigger handles all QR generation now
 CREATE OR REPLACE FUNCTION public.auto_generate_qr_codes_on_confirm()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -101,15 +102,8 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-    IF NEW.status IN ('confirmed', 'quote_accepted', 'order_created', 'awaiting_delivery_request') AND 
-       (OLD.status IS NULL OR OLD.status NOT IN ('confirmed', 'quote_accepted', 'order_created', 'awaiting_delivery_request')) AND
-       (NEW.qr_code_generated IS NULL OR NEW.qr_code_generated = false) THEN
-        
-        IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'generate_qr_codes_for_purchase_order') THEN
-            PERFORM public.generate_qr_codes_for_purchase_order(NEW.id);
-        END IF;
-    END IF;
-    
+    -- DISABLED: Let auto_generate_item_qr_codes handle all QR generation
+    -- This prevents duplicate inserts from two triggers
     RETURN NEW;
 END;
 $$;
