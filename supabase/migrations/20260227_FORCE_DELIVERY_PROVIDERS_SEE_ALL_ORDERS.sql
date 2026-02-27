@@ -4,19 +4,32 @@
 -- Created: February 27, 2026
 -- ============================================================
 
--- Drop ALL existing policies that might block delivery providers
+-- Drop the existing policy to recreate it with more statuses
 DROP POLICY IF EXISTS "purchase_orders_delivery_provider_view" ON purchase_orders;
-DROP POLICY IF EXISTS "purchase_orders_provider_view" ON purchase_orders;
 
 -- Create a VERY PERMISSIVE policy for delivery providers
 -- They can see ANY order that has a delivery-related status
+-- This policy uses OR logic with other policies (PERMISSIVE)
 CREATE POLICY "purchase_orders_delivery_provider_view" ON purchase_orders
     FOR SELECT TO authenticated
     USING (
-        -- User must be a delivery provider
-        EXISTS (
-            SELECT 1 FROM delivery_providers 
-            WHERE user_id = auth.uid()
+        -- User must be a delivery provider (check multiple ways)
+        (
+            EXISTS (
+                SELECT 1 FROM delivery_providers 
+                WHERE user_id = auth.uid()
+            )
+            OR
+            EXISTS (
+                SELECT 1 FROM delivery_providers 
+                WHERE id::text = auth.uid()::text
+            )
+            OR
+            EXISTS (
+                SELECT 1 FROM profiles p
+                JOIN delivery_providers dp ON dp.user_id = p.user_id
+                WHERE p.user_id = auth.uid()
+            )
         )
         AND
         -- Show orders with ANY delivery-related status
@@ -39,7 +52,11 @@ CREATE POLICY "purchase_orders_delivery_provider_view" ON purchase_orders
             'pending',
             'quoted',
             'confirmed',
-            'accepted'
+            'accepted',
+            'processing',
+            'partially_dispatched',
+            'delivered',
+            'verified'
         )
     );
 
