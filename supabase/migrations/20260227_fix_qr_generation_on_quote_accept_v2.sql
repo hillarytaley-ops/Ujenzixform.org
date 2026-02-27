@@ -18,10 +18,12 @@ DECLARE
   material_category TEXT;
   should_generate BOOLEAN := FALSE;
 BEGIN
-  -- CRITICAL: Check if QR codes already exist FIRST - prevent any duplicate inserts
-  -- This check must happen before any generation logic
-  -- Use a lock to prevent concurrent inserts
-  IF EXISTS (SELECT 1 FROM material_items WHERE purchase_order_id = NEW.id FOR UPDATE SKIP LOCKED) THEN
+  -- CRITICAL: Use advisory lock to prevent concurrent execution for same order
+  -- This ensures only one trigger execution can generate QR codes at a time
+  PERFORM pg_advisory_xact_lock(hashtext(NEW.id::TEXT));
+  
+  -- Check if QR codes already exist - must check AFTER acquiring lock
+  IF EXISTS (SELECT 1 FROM material_items WHERE purchase_order_id = NEW.id) THEN
     -- QR codes already exist - just ensure flag is set and exit immediately
     IF (NEW.qr_code_generated IS NULL OR NEW.qr_code_generated = FALSE) THEN
       UPDATE purchase_orders SET qr_code_generated = true WHERE id = NEW.id;
