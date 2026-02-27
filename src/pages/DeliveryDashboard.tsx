@@ -297,11 +297,11 @@ const DeliveryDashboard = () => {
     }
   }, [user?.id]);
 
-  // Real-time subscription for new delivery requests
+  // Real-time subscription for new delivery requests and purchase_orders status updates
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id) return;
 
-    console.log('🔔 Setting up real-time subscription for delivery requests...');
+    console.log('🔔 Setting up real-time subscription for delivery requests and purchase orders...');
     
     const channel = supabase
       .channel('delivery-requests-updates')
@@ -316,9 +316,10 @@ const DeliveryDashboard = () => {
           console.log('🚚 New delivery request received:', payload);
           // Refresh data when new request comes in
           refetchData();
+          loadNotificationCounts();
           toast({
             title: '🚚 New Delivery Request!',
-            description: 'A new delivery job is available. Check Available Jobs.',
+            description: 'A new delivery job is available. Check Alerts tab.',
           });
         }
       )
@@ -332,6 +333,43 @@ const DeliveryDashboard = () => {
         (payload) => {
           console.log('📦 Delivery request updated:', payload);
           refetchData();
+          loadNotificationCounts();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'purchase_orders',
+          filter: `delivery_provider_id=eq.${user.id}`
+        },
+        (payload) => {
+          console.log('📦 Purchase order status updated:', payload.new.status);
+          // When supplier dispatches, status changes to in_transit
+          if (payload.new.status === 'in_transit' && payload.old.status !== 'in_transit') {
+            toast({
+              title: '🚚 Materials Dispatched!',
+              description: 'Materials are now in transit. Check "In Transit" tab.',
+              duration: 5000,
+            });
+            // Auto-switch to In Transit tab if on Deliveries
+            if (activeTab === 'deliveries') {
+              setDeliveriesSubTab('in_transit');
+            }
+          }
+          // When delivery is completed
+          if (payload.new.status === 'delivered' || payload.new.status === 'completed') {
+            toast({
+              title: '✅ Delivery Complete!',
+              description: 'Delivery has been completed successfully.',
+              duration: 5000,
+            });
+            if (activeTab === 'deliveries') {
+              setDeliveriesSubTab('delivered');
+            }
+          }
+          refetchData();
         }
       )
       .subscribe();
@@ -340,7 +378,7 @@ const DeliveryDashboard = () => {
       console.log('🔔 Cleaning up delivery requests subscription');
       supabase.removeChannel(channel);
     };
-  }, [user, refetchData, toast]);
+  }, [user?.id, refetchData, toast, activeTab]);
 
   // Function to load notification counts
   const loadNotificationCounts = useCallback(async () => {
