@@ -206,6 +206,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
 
       // Fetch ALL delivery requests using direct REST API (bypasses potential RLS issues)
       // Focus on pending requests that delivery providers should see
+      let deliveryRequests: any[] = [];
       try {
         const reqResponse = await fetch(
           `${url}/rest/v1/delivery_requests?order=created_at.desc&limit=50`,
@@ -213,7 +214,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         );
         
         if (reqResponse.ok) {
-          const deliveryRequests = await reqResponse.json();
+          deliveryRequests = await reqResponse.json();
           console.log('📦 delivery_requests query result:', { data: deliveryRequests, count: deliveryRequests?.length });
           
           if (deliveryRequests && deliveryRequests.length > 0) {
@@ -317,8 +318,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
               });
               
               // Also check if delivery_requests already has a record for this purchase_order
-              // (We'll check this by looking at the deliveryRequests array from earlier)
-              const deliveryRequestExists = deliveryRequests && deliveryRequests.some((dr: any) => 
+              const deliveryRequestExists = deliveryRequests.some((dr: any) => 
                 dr.purchase_order_id === po.id
               );
               
