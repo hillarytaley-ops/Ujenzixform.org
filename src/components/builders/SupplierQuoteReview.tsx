@@ -154,7 +154,7 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
         project_description: po.project_name,
         special_requirements: null,
         status: po.status === 'confirmed' ? 'accepted' : po.status,
-        quote_amount: po.quote_amount ?? (po.status === 'quoted' ? po.total_amount : null),
+        quote_amount: po.quote_amount ?? ((po.status === 'quoted' || po.status === 'quote_responded' || po.status === 'quote_revised') ? po.total_amount : null),
         quote_valid_until: po.quote_valid_until || null,
         supplier_notes: po.supplier_notes || null,
         created_at: po.created_at,
@@ -244,10 +244,14 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
       // When showOnlyQuoted is true, only show quotes that suppliers have responded to
       // Include both new status flow and legacy statuses for backward compatibility
       const statusFilter = showOnlyQuoted 
-        ? 'quote_responded,quote_revised,quote_viewed_by_builder,quoted' 
-        : 'quote_created,quote_received_by_supplier,quote_responded,quote_revised,quote_viewed_by_builder,quote_accepted,quote_rejected,pending,quoted,confirmed,rejected';
-      const queryUrl = `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${effectiveBuilderId}&status=in.(${statusFilter})&order=updated_at.desc`;
+        ? ['quote_responded', 'quote_revised', 'quote_viewed_by_builder', 'quoted']
+        : ['quote_created', 'quote_received_by_supplier', 'quote_responded', 'quote_revised', 'quote_viewed_by_builder', 'quote_accepted', 'quote_rejected', 'pending', 'quoted', 'confirmed', 'rejected'];
+      
+      // Build query with proper PostgREST syntax for multiple status values
+      const statusParam = statusFilter.map(s => `"${s}"`).join(',');
+      const queryUrl = `${SUPABASE_URL}/rest/v1/purchase_orders?buyer_id=eq.${effectiveBuilderId}&status=in.(${statusParam})&order=updated_at.desc`;
       console.log('🔗 SupplierQuoteReview query URL:', queryUrl, '(showOnlyQuoted:', showOnlyQuoted, ')');
+      console.log('📊 Status filter:', statusFilter);
       
       const ordersResponse = await fetch(queryUrl, { headers, signal: controller.signal, cache: 'no-store' });
       clearTimeout(timeoutId);
@@ -259,50 +263,49 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
       const purchaseOrders = await ordersResponse.json();
       console.log('📋 SupplierQuoteReview: Orders found by buyer_id:', purchaseOrders?.length || 0);
       
-      // DEBUG: If no orders found, check what orders exist for this user
-      if (!purchaseOrders || purchaseOrders.length === 0) {
-        // Try fetching by builder_id as well (some orders might use builder_id instead of buyer_id)
+      // Also try fetching by builder_id to catch all orders
+      let allOrders = [...(purchaseOrders || [])];
+      
+      try {
         const builderIdController = new AbortController();
         const builderIdTimeout = setTimeout(() => builderIdController.abort(), 5000);
         
-        try {
-          const statusFilter = showOnlyQuoted 
-            ? 'quote_responded,quote_revised,quote_viewed_by_builder,quoted' 
-            : 'quote_created,quote_received_by_supplier,quote_responded,quote_revised,quote_viewed_by_builder,quote_accepted,quote_rejected,pending,quoted,confirmed,rejected';
+          const builderStatusFilter = showOnlyQuoted 
+            ? ['quote_responded', 'quote_revised', 'quote_viewed_by_builder', 'quoted']
+            : ['quote_created', 'quote_received_by_supplier', 'quote_responded', 'quote_revised', 'quote_viewed_by_builder', 'quote_accepted', 'quote_rejected', 'pending', 'quoted', 'confirmed', 'rejected'];
+          const builderStatusParam = builderStatusFilter.map(s => `"${s}"`).join(',');
           const builderIdResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/purchase_orders?builder_id=eq.${effectiveBuilderId}&status=in.(${statusFilter})&order=updated_at.desc`,
-            { headers, signal: builderIdController.signal, cache: 'no-store' }
-          );
-          clearTimeout(builderIdTimeout);
+            `${SUPABASE_URL}/rest/v1/purchase_orders?builder_id=eq.${effectiveBuilderId}&status=in.(${builderStatusParam})&order=updated_at.desc`,
+          { headers, signal: builderIdController.signal, cache: 'no-store' }
+        );
+        clearTimeout(builderIdTimeout);
+        
+        if (builderIdResponse.ok) {
+          const builderIdOrders = await builderIdResponse.json();
+          console.log('📋 SupplierQuoteReview: Orders found by builder_id:', builderIdOrders?.length || 0);
           
-          if (builderIdResponse.ok) {
-            const builderIdOrders = await builderIdResponse.json();
-            console.log('📋 SupplierQuoteReview: Orders found by builder_id:', builderIdOrders?.length || 0);
-            
-            if (builderIdOrders && builderIdOrders.length > 0) {
-              // Use builder_id orders
-              console.log('✅ Using builder_id orders instead of buyer_id');
-              const transformedQuotes = await transformOrders(builderIdOrders, headers);
-              setQuotes(transformedQuotes);
-              setLoading(false);
-              return;
-            }
+          // Merge orders from both queries, removing duplicates
+          if (builderIdOrders && builderIdOrders.length > 0) {
+            const existingIds = new Set(allOrders.map(o => o.id));
+            const newOrders = builderIdOrders.filter(o => !existingIds.has(o.id));
+            allOrders = [...allOrders, ...newOrders];
+            console.log('✅ Merged orders from buyer_id and builder_id. Total:', allOrders.length);
           }
-        } catch (e) {
-          console.log('builder_id query timeout');
         }
+      } catch (e) {
+        console.log('builder_id query timeout or error:', e);
       }
       
-      console.log('📋 Supplier quotes loaded:', purchaseOrders?.length || 0);
+      console.log('📋 Supplier quotes loaded:', allOrders?.length || 0);
 
-      if (!purchaseOrders || purchaseOrders.length === 0) {
+      if (!allOrders || allOrders.length === 0) {
         setQuotes([]);
         setLoading(false);
         return;
       }
 
       // Transform purchase orders to quote format using helper
-      const transformedQuotes = await transformOrders(purchaseOrders, headers);
+      const transformedQuotes = await transformOrders(allOrders, headers);
 
       console.log('📋 Loaded quotes from purchase_orders:', transformedQuotes.length);
       console.log('📊 Quote statuses:', transformedQuotes.map(q => ({ 
@@ -312,15 +315,22 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
         total_amount: q.purchase_order?.total_amount 
       })));
       
-      // Debug: Show raw purchase order data for quoted items
-      const quotedOrders = purchaseOrders.filter(po => po.status === 'quoted');
+      // Debug: Show raw purchase order data for quoted items (include new statuses)
+      const quotedOrders = allOrders.filter(po => 
+        po.status === 'quoted' || 
+        po.status === 'quote_responded' || 
+        po.status === 'quote_revised' ||
+        po.status === 'quote_viewed_by_builder'
+      );
       if (quotedOrders.length > 0) {
         console.log('💰 RAW quoted purchase_orders data:', quotedOrders.map(po => ({
           id: po.id.slice(0,8),
           status: po.status,
           quote_amount: po.quote_amount,
           total_amount: po.total_amount,
-          supplier_notes: po.supplier_notes
+          supplier_notes: po.supplier_notes,
+          buyer_id: po.buyer_id?.slice(0,8),
+          builder_id: po.builder_id?.slice(0,8)
         })));
       }
       
@@ -693,12 +703,21 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
+      case 'quote_created':
+      case 'quote_received_by_supplier':
         return <Badge className="bg-yellow-100 text-yellow-700 border-yellow-300">⏳ Awaiting Quote</Badge>;
       case 'quoted':
+      case 'quote_responded':
+      case 'quote_revised':
+      case 'quote_viewed_by_builder':
         return <Badge className="bg-blue-100 text-blue-700 border-blue-300">💰 Quote Received</Badge>;
       case 'accepted':
+      case 'quote_accepted':
+      case 'order_created':
+      case 'awaiting_delivery_request':
         return <Badge className="bg-green-100 text-green-700 border-green-300">✅ Accepted</Badge>;
       case 'rejected':
+      case 'quote_rejected':
         return <Badge className="bg-red-100 text-red-700 border-red-300">❌ Rejected</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
@@ -709,11 +728,28 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
   const textColor = isDarkMode ? 'text-white' : 'text-gray-900';
   const mutedText = isDarkMode ? 'text-gray-400' : 'text-gray-500';
 
-  // Filter quotes by status
-  const pendingQuotes = quotes.filter(q => q.status === 'pending');
-  const quotedQuotes = quotes.filter(q => q.status === 'quoted');
-  const acceptedQuotes = quotes.filter(q => q.status === 'accepted');
-  const rejectedQuotes = quotes.filter(q => q.status === 'rejected');
+  // Filter quotes by status - include both new status flow and legacy statuses
+  const pendingQuotes = quotes.filter(q => 
+    q.status === 'pending' || 
+    q.status === 'quote_created' || 
+    q.status === 'quote_received_by_supplier'
+  );
+  const quotedQuotes = quotes.filter(q => 
+    q.status === 'quoted' || 
+    q.status === 'quote_responded' || 
+    q.status === 'quote_revised' || 
+    q.status === 'quote_viewed_by_builder'
+  );
+  const acceptedQuotes = quotes.filter(q => 
+    q.status === 'accepted' || 
+    q.status === 'quote_accepted' ||
+    q.status === 'order_created' ||
+    q.status === 'awaiting_delivery_request'
+  );
+  const rejectedQuotes = quotes.filter(q => 
+    q.status === 'rejected' || 
+    q.status === 'quote_rejected'
+  );
 
   if (loading) {
     return (
