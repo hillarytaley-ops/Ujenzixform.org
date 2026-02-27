@@ -438,17 +438,24 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       console.log('🚚 Making PATCH request to update delivery_requests...');
       
       // Update the delivery request to assign this provider
+      // NOTE: Only update columns that exist in delivery_requests table
+      // delivery_provider_name is in purchase_orders, not delivery_requests
+      const updatePayload: any = {
+        provider_id: providerId,
+        status: 'accepted',
+        tracking_number: trackingNumber,
+        updated_at: new Date().toISOString()
+      };
+      
+      // Explicitly remove any delivery_provider_name if it somehow got added
+      delete updatePayload.delivery_provider_name;
+      
       const response = await fetch(
         `${url}/rest/v1/delivery_requests?id=eq.${requestId}`,
         {
           method: 'PATCH',
           headers: { ...headers, 'Prefer': 'return=representation' },
-          body: JSON.stringify({
-            provider_id: providerId,
-            status: 'accepted',
-            tracking_number: trackingNumber,
-            updated_at: new Date().toISOString()
-          })
+          body: JSON.stringify(updatePayload)
         }
       );
       
