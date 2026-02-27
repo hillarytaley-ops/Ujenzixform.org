@@ -275,9 +275,120 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         console.error('❌ Error fetching delivery_requests:', e.message);
       }
 
-      // NOTE: We only use delivery_requests as the source of truth
-      // The deliveries and delivery_notifications tables are redundant and cause duplicates
-      // Skipping those tables to prevent duplicate notifications
+      // ALSO fetch from purchase_orders for orders that are awaiting delivery providers
+      // These are orders where quotes were accepted and delivery was requested
+      try {
+        const poResponse = await fetch(
+          `${url}/rest/v1/purchase_orders?status=in.(delivery_requested,awaiting_delivery_provider,delivery_assigned,ready_for_dispatch)&order=created_at.desc&limit=50`,
+          { headers, cache: 'no-store' }
+        );
+        
+        if (poResponse.ok) {
+          const purchaseOrders = await poResponse.json();
+          console.log('📦 purchase_orders query result:', { data: purchaseOrders, count: purchaseOrders?.length });
+          
+          if (purchaseOrders && purchaseOrders.length > 0) {
+            // Get unique supplier IDs for address lookup
+            const supplierIds = [...new Set(purchaseOrders.filter((po: any) => po.supplier_id).map((po: any) => po.supplier_id))];
+            if (supplierIds.length > 0) {
+              try {
+                const suppliersResponse = await fetch(
+                  `${url}/rest/v1/suppliers?id=in.(${supplierIds.join(',')})&select=id,company_name,address,location`,
+                  { headers, cache: 'no-store' }
+                );
+                if (suppliersResponse.ok) {
+                  const suppliers = await suppliersResponse.json();
+                  suppliers.forEach((s: any) => {
+                    supplierAddressCache[s.id] = s.address || (s.location ? `${s.company_name}, ${s.location}` : s.company_name) || 'Supplier location';
+                  });
+                }
+              } catch (e) {
+                console.warn('Could not batch fetch supplier addresses for purchase orders');
+              }
+            }
+
+            // Convert purchase_orders to notifications
+            purchaseOrders.forEach((po: any) => {
+              // Skip if there's already a delivery_request for this purchase_order
+              // Check if any notification has this purchase_order_id or if delivery_requests already has this purchase_order_id
+              const hasDeliveryRequest = allNotifications.some(n => {
+                const notif = n as any;
+                return notif.purchase_order_id === po.id;
+              });
+              
+              // Also check if delivery_requests already has a record for this purchase_order
+              // (We'll check this by looking at the deliveryRequests array from earlier)
+              const deliveryRequestExists = deliveryRequests && deliveryRequests.some((dr: any) => 
+                dr.purchase_order_id === po.id
+              );
+              
+              if (hasDeliveryRequest || deliveryRequestExists) {
+                console.log('⏭️ Skipping purchase_order (already has delivery_request):', po.id);
+                return;
+              }
+
+              // Determine pickup address
+              let pickupAddr = po.supplier_address || '';
+              if (po.supplier_id && supplierAddressCache[po.supplier_id]) {
+                pickupAddr = supplierAddressCache[po.supplier_id];
+              }
+              if (!pickupAddr && po.supplier_name) {
+                pickupAddr = `${po.supplier_name} - Pickup Location`;
+              }
+              if (!pickupAddr) {
+                pickupAddr = 'Supplier location';
+              }
+
+              // Determine material type from items
+              const materialType = po.items && po.items.length > 0
+                ? po.items.map((item: any) => item.material_name || item.name).join(', ')
+                : 'Construction Materials';
+
+              // Determine status for notification
+              let notificationStatus = 'pending';
+              let notificationTitle = '🚚 New Delivery Request!';
+              if (po.status === 'delivery_assigned' || po.status === 'ready_for_dispatch') {
+                notificationStatus = 'assigned';
+                notificationTitle = '📦 Order Ready for Dispatch';
+              } else if (po.status === 'delivery_requested') {
+                notificationStatus = 'pending';
+                notificationTitle = '🚚 Delivery Requested';
+              } else if (po.status === 'awaiting_delivery_provider') {
+                notificationStatus = 'pending';
+                notificationTitle = '⏳ Awaiting Delivery Provider';
+              }
+
+              allNotifications.push({
+                id: `po-${po.id}`, // Prefix to avoid conflicts
+                type: 'new_delivery',
+                title: notificationTitle,
+                message: `${materialType} delivery to ${po.delivery_address || 'Unknown location'}`,
+                timestamp: new Date(po.delivery_requested_at || po.order_created_at || po.created_at),
+                read: po.status !== 'delivery_requested' && po.status !== 'awaiting_delivery_provider',
+                priority: po.status === 'ready_for_dispatch' ? 'high' : 'medium',
+                actionUrl: `/delivery-dashboard?order=${po.id}`,
+                status: notificationStatus,
+                pickupAddress: pickupAddr,
+                deliveryAddress: po.delivery_address || '',
+                materialType: materialType,
+                quantity: po.items?.length || 1,
+                estimatedCost: po.total_amount || po.estimated_cost || 0,
+                purchase_order_id: po.id, // Store for reference
+                source: 'purchase_orders' // Mark as coming from purchase_orders
+              } as Notification & { purchase_order_id?: string; source?: string });
+            });
+            console.log(`✅ Loaded ${purchaseOrders.length} purchase_orders awaiting delivery`);
+          }
+        } else {
+          console.error('❌ purchase_orders fetch failed:', poResponse.status, poResponse.statusText);
+        }
+      } catch (e: any) {
+        console.error('❌ Error fetching purchase_orders:', e.message);
+      }
+
+      // NOTE: We use both delivery_requests and purchase_orders as sources
+      // delivery_requests are created when builder explicitly requests delivery
+      // purchase_orders with delivery statuses are orders that need delivery providers
 
       // Sort by timestamp descending
       allNotifications.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
@@ -339,8 +450,20 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           }
         }
       )
-      // NOTE: Only listening to delivery_requests to prevent duplicate notifications
-      // The deliveries and delivery_notifications tables are redundant
+      // Also listen to purchase_orders status changes for delivery-related statuses
+      .on('postgres_changes',
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'purchase_orders',
+          filter: 'status=in.(delivery_requested,awaiting_delivery_provider,delivery_assigned,ready_for_dispatch)'
+        },
+        (payload: any) => {
+          console.log('🔔 Purchase order status changed:', payload.new);
+          // Reload notifications to get the updated order
+          loadNotifications();
+        }
+      )
       .subscribe();
 
     return () => {
