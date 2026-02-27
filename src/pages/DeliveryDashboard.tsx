@@ -40,7 +40,8 @@ import {
   Map,
   Zap,
   Headphones,
-  LogOut
+  LogOut,
+  X
 } from "lucide-react";
 import { DeliveryCharts } from "@/components/delivery/DeliveryCharts";
 import { DeliveryMap } from "@/components/delivery/DeliveryMap";
@@ -136,8 +137,8 @@ const DeliveryDashboard = () => {
   const [isOnline, setIsOnline] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [showProofCapture, setShowProofCapture] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState("deliveries");
-  const [deliveriesSubTab, setDeliveriesSubTab] = useState("pending"); // Sub-tab for Deliveries (pending, scheduled, in_transit, delivered)
+  const [activeTab, setActiveTab] = useState("alerts"); // Default to Alerts for new requests
+  const [deliveriesSubTab, setDeliveriesSubTab] = useState("scheduled"); // Sub-tab for Deliveries (scheduled, in_transit, delivered) - removed pending
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [showProfileView, setShowProfileView] = useState(false);
   const [selectedDeliveryForScan, setSelectedDeliveryForScan] = useState<string | null>(null);
@@ -804,7 +805,7 @@ const DeliveryDashboard = () => {
             }`}
             onClick={() => {
               setActiveTab('deliveries');
-              setDeliveriesSubTab('pending'); // Default to pending when opening Deliveries
+              setDeliveriesSubTab('scheduled'); // Default to scheduled when opening Deliveries
             }}
           >
             <Truck className="h-5 w-5" />
@@ -904,16 +905,9 @@ const DeliveryDashboard = () => {
           {/* Deliveries Tab with Sub-tabs */}
           <TabsContent value="deliveries">
             <div className="space-y-4">
-              {/* Sub-tabs for Deliveries */}
+              {/* Sub-tabs for Deliveries - Only accepted jobs */}
               <Tabs value={deliveriesSubTab} onValueChange={setDeliveriesSubTab} className="w-full">
-                <TabsList className={`grid w-full grid-cols-4 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
-                  <TabsTrigger value="pending" className="flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    Pending
-                    {pendingRequests.length > 0 && (
-                      <Badge className="ml-1 bg-yellow-500 text-white text-xs">{pendingRequests.length}</Badge>
-                    )}
-                  </TabsTrigger>
+                <TabsList className={`grid w-full grid-cols-3 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
                   <TabsTrigger value="scheduled" className="flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
                     Scheduled
@@ -921,14 +915,18 @@ const DeliveryDashboard = () => {
                       d.status === 'assigned' || 
                       d.status === 'accepted' || 
                       d.status === 'scheduled' ||
-                      d.status === 'pending_pickup'
+                      d.status === 'pending_pickup' ||
+                      d.status === 'delivery_assigned' ||
+                      d.status === 'ready_for_dispatch'
                     ).length > 0 && (
                       <Badge className="ml-1 bg-blue-500 text-white text-xs">
                         {activeDeliveries.filter(d => 
                           d.status === 'assigned' || 
                           d.status === 'accepted' || 
                           d.status === 'scheduled' ||
-                          d.status === 'pending_pickup'
+                          d.status === 'pending_pickup' ||
+                          d.status === 'delivery_assigned' ||
+                          d.status === 'ready_for_dispatch'
                         ).length}
                       </Badge>
                     )}
@@ -940,14 +938,16 @@ const DeliveryDashboard = () => {
                       d.status === 'in_transit' || 
                       d.status === 'picked_up' ||
                       d.status === 'on_the_way' ||
-                      d.status === 'near_destination'
+                      d.status === 'near_destination' ||
+                      d.status === 'dispatched'
                     ).length > 0 && (
                       <Badge className="ml-1 bg-purple-500 text-white text-xs">
                         {activeDeliveries.filter(d => 
                           d.status === 'in_transit' || 
                           d.status === 'picked_up' ||
                           d.status === 'on_the_way' ||
-                          d.status === 'near_destination'
+                          d.status === 'near_destination' ||
+                          d.status === 'dispatched'
                         ).length}
                       </Badge>
                     )}
@@ -961,108 +961,7 @@ const DeliveryDashboard = () => {
                   </TabsTrigger>
                 </TabsList>
 
-                {/* Pending Sub-tab - Orders not yet assigned */}
-                <TabsContent value="pending" className="mt-4">
-                  <div className="space-y-4">
-                    {/* Available Requests Section - From Database */}
-                    {pendingRequests.length > 0 ? (
-                      <div className="mb-6">
-                        <div className="flex items-center gap-2 mb-3">
-                          <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
-                          <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                            🚚 Available Delivery Jobs ({pendingRequests.length})
-                          </h3>
-                          <Badge className="bg-green-100 text-green-800 ml-2">First-Come-First-Served</Badge>
-                        </div>
-                        <Alert className="mb-4 bg-green-50 border-green-200">
-                          <Zap className="h-4 w-4 text-green-600" />
-                          <AlertDescription className="text-green-700">
-                            These are new delivery requests from builders. Accept quickly - first provider to accept gets the job!
-                          </AlertDescription>
-                        </Alert>
-                        <div className="space-y-4">
-                          {pendingRequests.map((request) => (
-                            <DeliveryRequestCard
-                              key={request.id}
-                              delivery={{
-                                id: request.id,
-                                pickup_location: request.pickup_address || request.pickup_location || 'Pickup location',
-                                delivery_location: request.delivery_address || request.delivery_location || 'Delivery location',
-                                material_type: request.material_type || 'Construction Materials',
-                                quantity: request.quantity?.toString() || 'N/A',
-                                customer_name: request.builder_name || request.contact_name || 'Builder',
-                                customer_phone: request.builder_phone || request.contact_phone || '',
-                                status: 'pending',
-                                estimated_time: '30 mins',
-                                price: request.estimated_cost || request.budget_range || 0,
-                                distance: request.distance_km || 0,
-                                urgency: request.priority_level || request.urgency || 'normal',
-                                special_instructions: request.special_instructions,
-                                created_at: request.created_at,
-                                pickup_date: request.pickup_date,
-                                delivery_date: request.delivery_date,
-                                expected_delivery_date: request.expected_delivery_date
-                              }}
-                              isDarkMode={isDarkMode}
-                              onAccept={async (id) => {
-                                // Prevent double-click at parent level
-                                if (acceptingDeliveryRef.current === id || acceptingDeliveryRef.current !== null) {
-                                  console.log('🛑 Already accepting delivery, ignoring:', id);
-                                  return;
-                                }
-                                
-                                acceptingDeliveryRef.current = id;
-                                
-                                try {
-                                  const result = await handleAcceptDelivery(id);
-                                  if (result.success) {
-                                    toast({
-                                      title: "✅ Delivery Accepted!",
-                                      description: "You got the job! Navigate to pickup location.",
-                                    });
-                                    refetchData();
-                                  } else {
-                                    toast({
-                                      title: "❌ Could not accept",
-                                      description: result.error || "Someone else may have accepted this delivery.",
-                                      variant: "destructive"
-                                    });
-                                    refetchData();
-                                  }
-                                } finally {
-                                  // Clear after delay
-                                  setTimeout(() => {
-                                    acceptingDeliveryRef.current = null;
-                                  }, 3000);
-                                }
-                              }}
-                              onReject={(id) => {
-                                handleRejectDelivery(id);
-                                toast({
-                                  title: "Delivery Declined",
-                                  description: "This delivery has been removed from your list.",
-                                });
-                              }}
-                              onNavigate={(delivery) => console.log('Navigate to:', delivery)}
-                              onCall={(phone) => phone && window.open(`tel:${phone}`)}
-                              onCaptureProof={(id) => setShowProofCapture(id)}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      <Card className={isDarkMode ? 'bg-gray-800 border-gray-700' : ''}>
-                        <CardContent className="py-12 text-center">
-                          <Clock className={`h-12 w-12 ${isDarkMode ? 'text-gray-600' : 'text-gray-300'} mx-auto mb-4`} />
-                          <p className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>No pending delivery requests</p>
-                          <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>New requests will appear here when available</p>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </div>
-                </TabsContent>
-
-                {/* Scheduled Sub-tab - Orders allocated for delivery */}
+                {/* Scheduled Sub-tab - Accepted jobs waiting for pickup */}
                 <TabsContent value="scheduled" className="mt-4">
                   <div className="space-y-4">
                     {(() => {
@@ -1070,7 +969,9 @@ const DeliveryDashboard = () => {
                         d.status === 'assigned' || 
                         d.status === 'accepted' || 
                         d.status === 'scheduled' ||
-                        d.status === 'pending_pickup'
+                        d.status === 'pending_pickup' ||
+                        d.status === 'delivery_assigned' ||
+                        d.status === 'ready_for_dispatch'
                       );
                       
                       return scheduled.length > 0 ? (
@@ -1110,7 +1011,7 @@ const DeliveryDashboard = () => {
                   </div>
                 </TabsContent>
 
-                {/* In Transit Sub-tab - Orders currently on their way */}
+                {/* In Transit Sub-tab - Orders currently on their way (auto-updated when supplier dispatches) */}
                 <TabsContent value="in_transit" className="mt-4">
                   <div className="space-y-4">
                     {(() => {
@@ -1118,7 +1019,8 @@ const DeliveryDashboard = () => {
                         d.status === 'in_transit' || 
                         d.status === 'picked_up' ||
                         d.status === 'on_the_way' ||
-                        d.status === 'near_destination'
+                        d.status === 'near_destination' ||
+                        d.status === 'dispatched'
                       );
                       
                       return inTransit.length > 0 ? (
@@ -1129,43 +1031,90 @@ const DeliveryDashboard = () => {
                               🚚 Deliveries In Transit ({inTransit.length})
                             </h3>
                           </div>
+                          <Alert className="mb-4 bg-purple-50 border-purple-200">
+                            <Truck className="h-4 w-4 text-purple-600" />
+                            <AlertDescription className="text-purple-700">
+                              Materials have been dispatched by supplier. Navigate to delivery location and scan QR codes upon arrival to complete delivery.
+                            </AlertDescription>
+                          </Alert>
                           {inTransit.map((delivery) => (
-                            <div key={delivery.id} className="space-y-3">
-                              <DeliveryRequestCard
-                                delivery={delivery}
-                                isDarkMode={isDarkMode}
-                                onNavigate={(delivery) => console.log('Navigate to:', delivery)}
-                                onCall={(phone) => window.open(`tel:${phone}`)}
-                                onCaptureProof={(id) => setShowProofCapture(id)}
-                                onMarkArrived={(id) => {
-                                  setSelectedDeliveryForScan(id);
-                                  toast({
-                                    title: "📍 Arrival Confirmed",
-                                    description: "Please scan all materials to complete the delivery.",
-                                  });
-                                }}
-                              />
-                              {/* Arrival Scan Reminder */}
-                              {selectedDeliveryForScan === delivery.id && (
-                                <ArrivalScanReminder
-                                  deliveryId={delivery.id}
-                                  orderId={delivery.purchase_order_id}
-                                  isDarkMode={isDarkMode}
-                                  onNavigateToScanner={() => {
-                                    setSelectedDeliveryForScan(delivery.id);
-                                    setActiveTab('scanning');
-                                  }}
-                                  onScanComplete={() => {
-                                    toast({
-                                      title: "🎉 Delivery Complete!",
-                                      description: "All items have been scanned and confirmed.",
-                                    });
-                                    setSelectedDeliveryForScan(null);
-                                    refetchData();
-                                  }}
-                                />
-                              )}
-                            </div>
+                            <Card key={delivery.id} className={isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-2 border-purple-100'}>
+                              <CardContent className="p-6">
+                                <div className="space-y-4">
+                                  {/* Delivery Header */}
+                                  <div className="flex items-start justify-between">
+                                    <div>
+                                      <h3 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                        {delivery.material_type}
+                                      </h3>
+                                      <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                        Being delivered to: {delivery.delivery_location}
+                                      </p>
+                                    </div>
+                                    <Badge className="bg-purple-100 text-purple-700 border-purple-300">
+                                      <Truck className="h-3 w-3 mr-1" />
+                                      In Transit
+                                    </Badge>
+                                  </div>
+
+                                  {/* Delivery Location & Navigation */}
+                                  <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-gray-700' : 'bg-green-50'} border border-green-200`}>
+                                    <div className="flex items-center justify-between">
+                                      <div>
+                                        <div className="flex items-center gap-2 mb-2">
+                                          <MapPin className="h-4 w-4 text-green-600" />
+                                          <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Delivery Location</span>
+                                        </div>
+                                        <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{delivery.delivery_location}</p>
+                                        {delivery.distance > 0 && (
+                                          <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                            📍 {delivery.distance} km away • Est. {delivery.estimated_time}
+                                          </p>
+                                        )}
+                                      </div>
+                                      <Button 
+                                        variant="outline" 
+                                        size="sm"
+                                        onClick={() => {
+                                          const address = encodeURIComponent(delivery.delivery_location);
+                                          window.open(`https://www.google.com/maps/search/?api=1&query=${address}`, '_blank');
+                                        }}
+                                      >
+                                        <NavigationIcon className="h-4 w-4 mr-2" />
+                                        Navigate
+                                      </Button>
+                                    </div>
+                                  </div>
+
+                                  {/* Actions */}
+                                  <div className="flex gap-2 pt-2 border-t">
+                                    <Button 
+                                      className="flex-1 bg-green-600 hover:bg-green-700"
+                                      onClick={() => {
+                                        setSelectedDeliveryForScan(delivery.id);
+                                        setActiveTab('scanning');
+                                        toast({
+                                          title: "📍 Ready to Scan",
+                                          description: "Scan QR codes when you arrive at the delivery location.",
+                                        });
+                                      }}
+                                    >
+                                      <Scan className="h-4 w-4 mr-2" />
+                                      Scan QR to Complete Delivery
+                                    </Button>
+                                    {delivery.customer_phone && (
+                                      <Button 
+                                        variant="outline" 
+                                        size="sm"
+                                        onClick={() => window.open(`tel:${delivery.customer_phone}`, '_blank')}
+                                      >
+                                        <Phone className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
                           ))}
                         </div>
                       ) : (
@@ -1347,7 +1296,7 @@ const DeliveryDashboard = () => {
                     Delivery Receiving Scanner
                   </CardTitle>
                   <CardDescription className={isDarkMode ? 'text-gray-400' : ''}>
-                    Scan QR codes when receiving materials from suppliers and delivering to customers
+                    Scan QR codes to confirm delivery completion when you arrive at the destination
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -1369,34 +1318,25 @@ const DeliveryDashboard = () => {
 
                   {/* Scanning Instructions */}
                   <div className={`mt-6 p-4 rounded-lg ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
-                    <h4 className={`font-semibold mb-3 ${isDarkMode ? 'text-white' : ''}`}>📋 How to Use the Scanner</h4>
-                    <div className="grid md:grid-cols-2 gap-6 text-sm">
-                      <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-green-900/30' : 'bg-green-50'}`}>
-                        <p className={`font-medium text-green-600 mb-2 flex items-center gap-2`}>
-                          <Package className="h-4 w-4" />
-                          When Picking Up from Supplier:
-                        </p>
-                        <ol className={`list-decimal list-inside space-y-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                          <li>Arrive at supplier location</li>
-                          <li>Verify materials match the order</li>
-                          <li>Scan QR code on package/invoice</li>
-                          <li>Check material condition</li>
-                          <li>Confirm pickup in app</li>
-                        </ol>
-                      </div>
-                      <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-teal-900/30' : 'bg-teal-50'}`}>
-                        <p className={`font-medium text-teal-600 mb-2 flex items-center gap-2`}>
-                          <Truck className="h-4 w-4" />
-                          When Delivering to Customer:
-                        </p>
-                        <ol className={`list-decimal list-inside space-y-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                          <li>Arrive at delivery location</li>
-                          <li>Hand over materials to customer</li>
-                          <li>Scan QR code for delivery proof</li>
-                          <li>Get customer signature if needed</li>
-                          <li>Take photo proof of delivery</li>
-                        </ol>
-                      </div>
+                    <h4 className={`font-semibold mb-3 ${isDarkMode ? 'text-white' : ''}`}>📋 How to Complete Delivery</h4>
+                    <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-teal-900/30' : 'bg-teal-50'} border border-teal-200`}>
+                      <p className={`font-medium text-teal-600 mb-3 flex items-center gap-2`}>
+                        <Truck className="h-4 w-4" />
+                        Delivery Completion Process:
+                      </p>
+                      <ol className={`list-decimal list-inside space-y-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                        <li>Navigate to the delivery location using the "Navigate" button in your "In Transit" deliveries</li>
+                        <li>Arrive at the destination and hand over materials to the customer</li>
+                        <li>Scan each QR code on the materials to confirm receipt</li>
+                        <li>Once all items are scanned, the delivery status will automatically update to "Delivered"</li>
+                        <li>The builder and supplier dashboards will be updated in real-time</li>
+                      </ol>
+                      <Alert className="mt-4 bg-amber-50 border-amber-200">
+                        <AlertCircle className="h-4 w-4 text-amber-600" />
+                        <AlertDescription className="text-amber-700 text-sm">
+                          <strong>Note:</strong> This scanner is only for confirming delivery completion. Pickup confirmation happens automatically when the supplier dispatches materials.
+                        </AlertDescription>
+                      </Alert>
                     </div>
                   </div>
                 </CardContent>
