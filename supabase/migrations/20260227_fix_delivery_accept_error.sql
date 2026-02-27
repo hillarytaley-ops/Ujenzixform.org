@@ -3,12 +3,16 @@
 -- This fixes the "column delivery_provider_phone does not exist" error
 -- ============================================================
 
--- Drop ALL triggers on delivery_requests that might be causing issues
+-- Drop ALL triggers on delivery_requests (both BEFORE and AFTER)
 DROP TRIGGER IF EXISTS trigger_update_order_in_transit ON delivery_requests;
 DROP TRIGGER IF EXISTS trigger_update_order_on_provider_accept ON delivery_requests;
 DROP TRIGGER IF EXISTS trigger_create_tracking_on_delivery_accept ON delivery_requests;
 DROP TRIGGER IF EXISTS trigger_create_tracking_on_accept ON delivery_requests;
 DROP TRIGGER IF EXISTS trigger_create_tracking_on_insert ON delivery_requests;
+DROP TRIGGER IF EXISTS trigger_update_delivery_requests_updated_at ON delivery_requests;
+
+-- Drop the problematic function that might be trying to set NEW columns
+DROP FUNCTION IF EXISTS public.create_tracking_on_delivery_accept() CASCADE;
 
 -- Drop the problematic function completely
 DROP FUNCTION IF EXISTS public.update_order_in_transit() CASCADE;
