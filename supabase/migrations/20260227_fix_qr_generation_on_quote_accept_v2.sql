@@ -21,12 +21,18 @@ BEGIN
   -- Get supplier ID
   supplier_uuid := NEW.supplier_id;
 
-  -- Early exit if QR codes already exist
-  IF EXISTS (SELECT 1 FROM material_items WHERE purchase_order_id = NEW.id LIMIT 1) THEN
-    -- Just mark as generated if needed
+  -- CRITICAL: Check if QR codes already exist FIRST - prevent any duplicate inserts
+  -- This check must happen before any generation logic
+  IF EXISTS (SELECT 1 FROM material_items WHERE purchase_order_id = NEW.id) THEN
+    -- QR codes already exist - just ensure flag is set and exit immediately
     IF (NEW.qr_code_generated IS NULL OR NEW.qr_code_generated = FALSE) THEN
       UPDATE purchase_orders SET qr_code_generated = true WHERE id = NEW.id;
     END IF;
+    RETURN NEW;
+  END IF;
+
+  -- Double-check: If qr_code_generated is already true, don't generate
+  IF NEW.qr_code_generated = TRUE THEN
     RETURN NEW;
   END IF;
 
@@ -45,8 +51,8 @@ BEGIN
     );
   END IF;
 
-  -- Generate QR codes if needed
-  IF should_generate AND NEW.items IS NOT NULL THEN
+  -- Final check: Make sure QR codes don't exist before generating
+  IF should_generate AND NEW.items IS NOT NULL AND NOT EXISTS (SELECT 1 FROM material_items WHERE purchase_order_id = NEW.id) THEN
     FOR item IN SELECT * FROM jsonb_array_elements(NEW.items)
     LOOP
       item_index := item_index + 1;
