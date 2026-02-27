@@ -4,18 +4,34 @@
 -- ============================================================
 
 -- Drop ALL triggers on delivery_requests (both BEFORE and AFTER)
-DROP TRIGGER IF EXISTS trigger_update_order_in_transit ON delivery_requests;
-DROP TRIGGER IF EXISTS trigger_update_order_on_provider_accept ON delivery_requests;
-DROP TRIGGER IF EXISTS trigger_create_tracking_on_delivery_accept ON delivery_requests;
-DROP TRIGGER IF EXISTS trigger_create_tracking_on_accept ON delivery_requests;
-DROP TRIGGER IF EXISTS trigger_create_tracking_on_insert ON delivery_requests;
-DROP TRIGGER IF EXISTS trigger_update_delivery_requests_updated_at ON delivery_requests;
+-- Use CASCADE to drop dependent objects
+DROP TRIGGER IF EXISTS trigger_update_order_in_transit ON delivery_requests CASCADE;
+DROP TRIGGER IF EXISTS trigger_update_order_on_provider_accept ON delivery_requests CASCADE;
+DROP TRIGGER IF EXISTS trigger_create_tracking_on_delivery_accept ON delivery_requests CASCADE;
+DROP TRIGGER IF EXISTS trigger_create_tracking_on_accept ON delivery_requests CASCADE;
+DROP TRIGGER IF EXISTS trigger_create_tracking_on_insert ON delivery_requests CASCADE;
+DROP TRIGGER IF EXISTS trigger_update_delivery_requests_updated_at ON delivery_requests CASCADE;
+DROP TRIGGER IF EXISTS trigger_update_purchase_order_on_delivery_accept ON delivery_requests CASCADE;
 
--- Drop the problematic function that might be trying to set NEW columns
+-- Drop ALL functions that might be problematic
 DROP FUNCTION IF EXISTS public.create_tracking_on_delivery_accept() CASCADE;
-
--- Drop the problematic function completely
 DROP FUNCTION IF EXISTS public.update_order_in_transit() CASCADE;
+DROP FUNCTION IF EXISTS public.update_purchase_order_on_delivery_accept() CASCADE;
+
+-- List all remaining triggers for debugging (will show in logs)
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT tgname, tgrelid::regclass
+        FROM pg_trigger
+        WHERE tgrelid = 'delivery_requests'::regclass
+        AND tgname NOT LIKE 'RI_%'  -- Exclude foreign key triggers
+    LOOP
+        RAISE NOTICE 'Found trigger: % on %', r.tgname, r.tgrelid;
+    END LOOP;
+END $$;
 
 -- Create a NEW simple function that ONLY updates purchase_orders
 -- This function will NOT try to set any columns on delivery_requests
