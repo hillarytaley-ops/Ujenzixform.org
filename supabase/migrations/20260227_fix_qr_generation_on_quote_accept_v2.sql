@@ -113,10 +113,12 @@ END;
 $$;
 
 -- Recreate triggers
+-- Only fire on UPDATE to prevent duplicate generation on INSERT
 DROP TRIGGER IF EXISTS trigger_auto_generate_item_qr_codes ON purchase_orders;
 CREATE TRIGGER trigger_auto_generate_item_qr_codes
-  AFTER INSERT OR UPDATE ON purchase_orders
+  AFTER UPDATE ON purchase_orders
   FOR EACH ROW
+  WHEN (OLD.status IS DISTINCT FROM NEW.status OR OLD.qr_code_generated IS DISTINCT FROM NEW.qr_code_generated)
   EXECUTE FUNCTION public.auto_generate_item_qr_codes();
 
 DROP TRIGGER IF EXISTS trigger_auto_generate_qr_on_confirm ON purchase_orders;
