@@ -3,14 +3,21 @@
 -- This will immediately fix the delivery acceptance error
 -- ============================================================
 
--- Step 1: Drop ALL triggers on delivery_requests
-DROP TRIGGER IF EXISTS trigger_update_order_in_transit ON delivery_requests CASCADE;
-DROP TRIGGER IF EXISTS trigger_update_order_on_provider_accept ON delivery_requests CASCADE;
-DROP TRIGGER IF EXISTS trigger_create_tracking_on_delivery_accept ON delivery_requests CASCADE;
-DROP TRIGGER IF EXISTS trigger_create_tracking_on_accept ON delivery_requests CASCADE;
-DROP TRIGGER IF EXISTS trigger_create_tracking_on_insert ON delivery_requests CASCADE;
-DROP TRIGGER IF EXISTS trigger_update_delivery_requests_updated_at ON delivery_requests CASCADE;
-DROP TRIGGER IF EXISTS trigger_update_purchase_order_on_delivery_accept ON delivery_requests CASCADE;
+-- Step 1: Drop ALL triggers on delivery_requests (including any we don't know about)
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN 
+        SELECT tgname, tgrelid::regclass
+        FROM pg_trigger
+        WHERE tgrelid = 'delivery_requests'::regclass
+        AND tgname NOT LIKE 'RI_%'  -- Exclude foreign key triggers
+    LOOP
+        EXECUTE 'DROP TRIGGER IF EXISTS ' || quote_ident(r.tgname) || ' ON delivery_requests CASCADE';
+        RAISE NOTICE 'Dropped trigger: %', r.tgname;
+    END LOOP;
+END $$;
 
 -- Step 2: Drop ALL problematic functions
 DROP FUNCTION IF EXISTS public.create_tracking_on_delivery_accept() CASCADE;
