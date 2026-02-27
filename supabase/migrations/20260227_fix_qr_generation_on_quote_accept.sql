@@ -92,7 +92,7 @@ BEGIN
         qr_code_value, 
         COALESCE(item->>'name', item->>'material_name', 'Unknown'), 
         NEW.po_number,
-        v_current_status;
+        NEW.status;
     END LOOP;
     
     -- Mark QR codes as generated in the database
@@ -100,7 +100,7 @@ BEGIN
     SET qr_code_generated = true
     WHERE id = NEW.id;
     
-    RAISE NOTICE 'QR codes generated for purchase order % (status: %)', NEW.id, v_current_status;
+    RAISE NOTICE 'QR codes generated for purchase order % (status: %)', NEW.id, NEW.status;
   END IF;
   
   RETURN NEW;
