@@ -1,0 +1,117 @@
+-- ============================================================
+-- Fix QR Code Generation for Accepted Quotes (V2 - Simplified)
+-- Created: February 27, 2026
+-- ============================================================
+
+-- Drop and recreate the function with proper syntax
+CREATE OR REPLACE FUNCTION public.auto_generate_item_qr_codes()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  item JSONB;
+  item_index INTEGER := 0;
+  qr_code_value TEXT;
+  supplier_uuid UUID;
+  material_category TEXT;
+  should_generate BOOLEAN := FALSE;
+BEGIN
+  -- Get supplier ID
+  supplier_uuid := NEW.supplier_id;
+
+  -- Early exit if QR codes already exist
+  IF EXISTS (SELECT 1 FROM material_items WHERE purchase_order_id = NEW.id LIMIT 1) THEN
+    -- Just mark as generated if needed
+    IF (NEW.qr_code_generated IS NULL OR NEW.qr_code_generated = FALSE) THEN
+      UPDATE purchase_orders SET qr_code_generated = true WHERE id = NEW.id;
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  -- Check if we should generate QR codes
+  should_generate := (
+    NEW.status IN ('confirmed', 'quote_accepted', 'order_created', 'awaiting_delivery_request') AND
+    (NEW.qr_code_generated IS NULL OR NEW.qr_code_generated = FALSE)
+  );
+
+  -- Also check if status changed to one of these
+  IF NOT should_generate AND OLD.status IS NOT NULL THEN
+    should_generate := (
+      NEW.status IN ('confirmed', 'quote_accepted', 'order_created', 'awaiting_delivery_request') AND
+      OLD.status NOT IN ('confirmed', 'quote_accepted', 'order_created', 'awaiting_delivery_request') AND
+      (NEW.qr_code_generated IS NULL OR NEW.qr_code_generated = FALSE)
+    );
+  END IF;
+
+  -- Generate QR codes if needed
+  IF should_generate AND NEW.items IS NOT NULL THEN
+    FOR item IN SELECT * FROM jsonb_array_elements(NEW.items)
+    LOOP
+      item_index := item_index + 1;
+      
+      material_category := UPPER(SPLIT_PART(COALESCE(item->>'name', item->>'material_name', 'GENERAL'), ' ', 1));
+      
+      qr_code_value := 'UJP-' || 
+                       material_category || '-' ||
+                       COALESCE(NEW.po_number, SUBSTRING(NEW.id::TEXT, 1, 8)) || '-' ||
+                       'ITEM' || LPAD(item_index::TEXT, 3, '0') || '-' ||
+                       TO_CHAR(NOW(), 'YYYYMMDD') || '-' ||
+                       LPAD(FLOOR(RANDOM() * 10000)::TEXT, 4, '0');
+      
+      INSERT INTO public.material_items (
+        purchase_order_id, qr_code, item_sequence, material_type, category,
+        quantity, unit, supplier_id, status
+      ) VALUES (
+        NEW.id, qr_code_value, item_index,
+        COALESCE(item->>'name', item->>'material_name', 'Unknown Material'),
+        material_category,
+        COALESCE((item->>'quantity')::NUMERIC, 1),
+        COALESCE(item->>'unit', 'units'),
+        supplier_uuid,
+        'pending'
+      )
+      ON CONFLICT (purchase_order_id, item_sequence) DO NOTHING;
+    END LOOP;
+    
+    UPDATE purchase_orders SET qr_code_generated = true WHERE id = NEW.id;
+  END IF;
+  
+  RETURN NEW;
+END;
+$$;
+
+-- Update the confirm function
+CREATE OR REPLACE FUNCTION public.auto_generate_qr_codes_on_confirm()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+    IF NEW.status IN ('confirmed', 'quote_accepted', 'order_created', 'awaiting_delivery_request') AND 
+       (OLD.status IS NULL OR OLD.status NOT IN ('confirmed', 'quote_accepted', 'order_created', 'awaiting_delivery_request')) AND
+       (NEW.qr_code_generated IS NULL OR NEW.qr_code_generated = false) THEN
+        
+        IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'generate_qr_codes_for_purchase_order') THEN
+            PERFORM public.generate_qr_codes_for_purchase_order(NEW.id);
+        END IF;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$;
+
+-- Recreate triggers
+DROP TRIGGER IF EXISTS trigger_auto_generate_item_qr_codes ON purchase_orders;
+CREATE TRIGGER trigger_auto_generate_item_qr_codes
+  AFTER INSERT OR UPDATE ON purchase_orders
+  FOR EACH ROW
+  EXECUTE FUNCTION public.auto_generate_item_qr_codes();
+
+DROP TRIGGER IF EXISTS trigger_auto_generate_qr_on_confirm ON purchase_orders;
+CREATE TRIGGER trigger_auto_generate_qr_on_confirm
+    AFTER UPDATE ON purchase_orders
+    FOR EACH ROW
+    EXECUTE FUNCTION public.auto_generate_qr_codes_on_confirm();
