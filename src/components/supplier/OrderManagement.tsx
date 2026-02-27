@@ -1082,7 +1082,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
                         )}
                         {selectedOrder.delivery_accepted_at && (
                           <p className="text-xs text-green-600">
-                            ✓ Accepted on {format(new Date(selectedOrder.delivery_accepted_at), 'MMM dd, HH:mm')}
+                            ✓ Delivery Confirmed on {format(new Date(selectedOrder.delivery_accepted_at), 'MMM dd, HH:mm')}
                           </p>
                         )}
                       </div>
