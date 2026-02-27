@@ -15,7 +15,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { QrCode, Package, Download, DownloadCloud, Maximize2, Truck, Clock, CheckCircle, RefreshCw, User, Mail, Phone, AlertCircle, ShieldCheck, ShieldX, Printer, CheckSquare, Square } from 'lucide-react';
+import { QrCode, Package, Download, DownloadCloud, Maximize2, Truck, Clock, CheckCircle, RefreshCw, User, Mail, Phone, AlertCircle, ShieldCheck, ShieldX, Printer, CheckSquare, Square, Scan } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -86,16 +87,20 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
   const [clientGroups, setClientGroups] = useState<ClientGroup[]>([]);
   const [orderGroups, setOrderGroups] = useState<OrderGroup[]>([]);
   const [dispatchedOrders, setDispatchedOrders] = useState<OrderGroup[]>([]); // Orders with dispatched items
-  const [unconfirmedOrders, setUnconfirmedOrders] = useState<OrderGroup[]>([]); // Orders not yet dispatched
+  const [awaitingDispatchOrders, setAwaitingDispatchOrders] = useState<OrderGroup[]>([]); // Orders awaiting dispatch (renamed from unconfirmed)
+  const [inTransitOrders, setInTransitOrders] = useState<OrderGroup[]>([]); // Orders in transit
+  const [deliveredOrders, setDeliveredOrders] = useState<OrderGroup[]>([]); // Orders delivered
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<MaterialItem | null>(null);
   const [showQRDialog, setShowQRDialog] = useState(false);
-  const [viewMode, setViewMode] = useState<'dispatched' | 'unconfirmed' | 'all' | 'by-client' | 'by-order'>('unconfirmed'); // Default to unconfirmed for suppliers
+  const [viewMode, setViewMode] = useState<'awaiting_dispatch' | 'dispatched' | 'in_transit' | 'delivered' | 'all'>('awaiting_dispatch'); // Default to awaiting_dispatch for suppliers
+  const [printingProgress, setPrintingProgress] = useState<{ orderId: string; current: number; total: number } | null>(null); // Track print progress
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [selectionMode, setSelectionMode] = useState(false);
   const [resolvedSupplierId, setResolvedSupplierId] = useState<string | null>(propSupplierId || null);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   // Toggle item selection
   const toggleItemSelection = (itemId: string) => {
@@ -693,29 +698,44 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
     console.log('📦 Order groups:', sortedGroups.length, '- sorted by most recent order');
     
     // ═══════════════════════════════════════════════════════════════════════════════
-    // SEPARATE INTO DISPATCHED AND UNCONFIRMED ORDERS
-    // Dispatched: Orders where ANY item has been dispatch_scanned
-    // Unconfirmed: Orders where NO items have been dispatch_scanned yet
+    // SEPARATE INTO STATUS-BASED ORDER GROUPS
+    // Status flow: awaiting_dispatch → dispatched → in_transit → materials_received
     // ═══════════════════════════════════════════════════════════════════════════════
+    const awaitingDispatch: OrderGroup[] = [];
     const dispatched: OrderGroup[] = [];
-    const unconfirmed: OrderGroup[] = [];
+    const inTransit: OrderGroup[] = [];
+    const delivered: OrderGroup[] = [];
     
     sortedGroups.forEach(group => {
-      // Check if ANY item in this order has been dispatched (scanned for dispatch)
       const hasDispatchedItems = group.items.some(item => item.dispatch_scanned === true);
+      const hasReceivedItems = group.items.some(item => item.receive_scanned === true);
+      const allItemsDispatched = group.items.every(item => item.dispatch_scanned === true);
+      const allItemsReceived = group.items.every(item => item.receive_scanned === true);
       
-      if (hasDispatchedItems) {
+      if (allItemsReceived) {
+        // All items received = delivered
+        delivered.push(group);
+      } else if (allItemsDispatched && hasReceivedItems) {
+        // All dispatched, some received = in transit
+        inTransit.push(group);
+      } else if (hasDispatchedItems) {
+        // Some or all dispatched, none received = dispatched
         dispatched.push(group);
       } else {
-        unconfirmed.push(group);
+        // No items dispatched = awaiting dispatch
+        awaitingDispatch.push(group);
       }
     });
     
+    setAwaitingDispatchOrders(awaitingDispatch);
     setDispatchedOrders(dispatched);
-    setUnconfirmedOrders(unconfirmed);
+    setInTransitOrders(inTransit);
+    setDeliveredOrders(delivered);
     
+    console.log('⏳ Awaiting Dispatch orders:', awaitingDispatch.length);
     console.log('🚚 Dispatched orders:', dispatched.length);
-    console.log('⏳ Unconfirmed orders:', unconfirmed.length);
+    console.log('🚛 In Transit orders:', inTransit.length);
+    console.log('✅ Delivered orders:', delivered.length);
   };
 
   const downloadQRCode = async (qrCode: string, materialType: string, itemSeq: number) => {
@@ -964,26 +984,151 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
     }
   };
 
-  // Print QR codes for a specific order
+  // Sequential print QR codes for a specific order with progress tracking
   const printOrderQRCodes = async (orderGroup: OrderGroup, selectedOnly: boolean = false) => {
     const itemsToPrint = selectedOnly 
       ? orderGroup.items.filter(item => selectedItems.has(item.id))
-      : orderGroup.items;
+      : orderGroup.items.filter(item => !item.dispatch_scanned); // Only print pending items
 
     if (itemsToPrint.length === 0) {
       toast({
         title: "No items to print",
-        description: selectedOnly ? "Please select QR codes to print" : "No items found",
+        description: selectedOnly ? "Please select QR codes to print" : "All items already dispatched",
         variant: "destructive",
       });
       return;
     }
 
-    await printItemsList(
-      itemsToPrint, 
-      `Order #${orderGroup.order_number} - ${orderGroup.buyer_name}`,
-      `${itemsToPrint.length} items • ${orderGroup.buyer_email || ''} ${orderGroup.buyer_phone ? '• ' + orderGroup.buyer_phone : ''}`
-    );
+    // Set printing progress
+    setPrintingProgress({ orderId: orderGroup.order_id, current: 0, total: itemsToPrint.length });
+
+    // Sequential printing - one at a time
+    for (let i = 0; i < itemsToPrint.length; i++) {
+      const item = itemsToPrint[i];
+      setPrintingProgress({ orderId: orderGroup.order_id, current: i + 1, total: itemsToPrint.length });
+
+      // Generate QR code for this item
+      const qrDataUrl = await QRCodeLib.toDataURL(item.qr_code, {
+        width: 200,
+        margin: 2,
+        errorCorrectionLevel: 'H',
+      });
+
+      // Create print window for single item
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        toast({
+          title: "Error",
+          description: "Please allow popups to print QR codes",
+          variant: "destructive",
+        });
+        setPrintingProgress(null);
+        return;
+      }
+
+      // Build print HTML for single item
+      const printHTML = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>QR Code ${item.item_sequence}</title>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { font-family: Arial, sans-serif; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+            .qr-item { 
+              border: 2px solid #000; 
+              text-align: center; 
+              border-radius: 8px;
+              background: #fff;
+              width: 300px;
+              overflow: hidden;
+            }
+            .qr-number-header {
+              background: #0891b2;
+              color: white;
+              padding: 10px 8px;
+            }
+            .qr-number {
+              font-size: 18px;
+              font-weight: bold;
+              margin-bottom: 4px;
+            }
+            .qr-code-text { 
+              font-family: monospace; 
+              font-size: 8px; 
+              color: #e0f2fe; 
+              word-break: break-all; 
+            }
+            .qr-image-container {
+              padding: 15px;
+              background: white;
+            }
+            .qr-item img { width: 200px; height: 200px; }
+            .product-footer {
+              background: #f8fafc;
+              padding: 12px 8px;
+              border-top: 1px solid #e5e7eb;
+            }
+            .product-name { 
+              font-size: 14px; 
+              font-weight: bold; 
+              color: #1e293b;
+              text-transform: uppercase;
+              margin-bottom: 4px;
+            }
+            .scan-me {
+              font-size: 10px;
+              color: #059669;
+              font-weight: bold;
+            }
+            @media print {
+              body { padding: 0; }
+              .qr-item { border: 2px solid #000; }
+              .qr-number-header { background: #333 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="qr-item">
+            <div class="qr-number-header">
+              <div class="qr-number">QR #${item.item_sequence}</div>
+              <div class="qr-code-text">${item.qr_code}</div>
+            </div>
+            <div class="qr-image-container">
+              <img src="${qrDataUrl}" alt="QR Code" />
+            </div>
+            <div class="product-footer">
+              <div class="product-name">${item.material_type}</div>
+              <div class="scan-me">📱 SCAN TO DISPATCH</div>
+            </div>
+          </div>
+          <script>
+            window.onload = function() { 
+              window.print(); 
+              setTimeout(() => window.close(), 1000);
+            }
+          </script>
+        </body>
+        </html>
+      `;
+
+      printWindow.document.write(printHTML);
+      printWindow.document.close();
+
+      // Wait a bit before printing next item (allows printer to process)
+      if (i < itemsToPrint.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+
+    // Clear progress after all items printed
+    setTimeout(() => {
+      setPrintingProgress(null);
+      toast({
+        title: "✅ All Labels Printed",
+        description: `Successfully printed ${itemsToPrint.length} label(s) for Order #${orderGroup.order_number}`,
+      });
+    }, 2000);
   };
 
   // Generic print function for a list of items
@@ -1415,7 +1560,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
             QR Codes Management
           </h2>
           <p className="text-muted-foreground mt-1">
-            {unconfirmedOrders.length} unconfirmed • {dispatchedOrders.length} dispatched • {items.length} total items
+            {awaitingDispatchOrders.length} awaiting dispatch • {dispatchedOrders.length} dispatched • {inTransitOrders.length} in transit • {deliveredOrders.length} delivered
           </p>
         </div>
         <div className="flex gap-2 flex-wrap items-center">
@@ -1448,17 +1593,27 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
             {selectionMode ? `Selected (${selectedItems.size})` : 'Select'}
           </Button>
 
-          {/* View Mode Toggle - Dispatched vs Unconfirmed */}
+          {/* Primary Action: Scan to Dispatch */}
+          <Button 
+            size="lg"
+            onClick={() => navigate('/supplier-dispatch-scanner')}
+            className="bg-green-600 hover:bg-green-700 text-white shadow-lg"
+          >
+            <Scan className="h-5 w-5 mr-2" />
+            Scan to Dispatch
+          </Button>
+
+          {/* View Mode Toggle - Status-based sections */}
           <div className="flex rounded-lg border overflow-hidden">
             <Button 
-              variant={viewMode === 'unconfirmed' ? 'default' : 'ghost'}
+              variant={viewMode === 'awaiting_dispatch' ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => setViewMode('unconfirmed')}
-              className={viewMode === 'unconfirmed' ? 'bg-amber-600' : ''}
-              title="Orders not yet dispatched - QR codes not scanned"
+              onClick={() => setViewMode('awaiting_dispatch')}
+              className={viewMode === 'awaiting_dispatch' ? 'bg-amber-600' : ''}
+              title="Orders awaiting dispatch - Print labels and scan QR codes"
             >
               <Clock className="h-4 w-4 mr-1" />
-              Unconfirmed ({unconfirmedOrders.length})
+              Awaiting Dispatch ({awaitingDispatchOrders.length})
             </Button>
             <Button 
               variant={viewMode === 'dispatched' ? 'default' : 'ghost'}
@@ -1471,59 +1626,41 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
               Dispatched ({dispatchedOrders.length})
             </Button>
             <Button 
-              variant={viewMode === 'by-order' ? 'default' : 'ghost'}
+              variant={viewMode === 'in_transit' ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => setViewMode('by-order')}
-              className={viewMode === 'by-order' ? 'bg-cyan-600' : ''}
-              title="All orders grouped by order number"
+              onClick={() => setViewMode('in_transit')}
+              className={viewMode === 'in_transit' ? 'bg-blue-600' : ''}
+              title="Orders in transit to destination"
             >
               <Package className="h-4 w-4 mr-1" />
-              All Orders
+              In Transit ({inTransitOrders.length})
+            </Button>
+            <Button 
+              variant={viewMode === 'delivered' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('delivered')}
+              className={viewMode === 'delivered' ? 'bg-purple-600' : ''}
+              title="Orders delivered and received"
+            >
+              <CheckCircle className="h-4 w-4 mr-1" />
+              Delivered ({deliveredOrders.length})
             </Button>
           </div>
-
-          {/* Selection Actions */}
-          {selectionMode && selectedItems.size > 0 && (
-            <>
-              <Button onClick={printSelectedQRCodes} size="sm" variant="outline" className="border-green-300 text-green-700 hover:bg-green-50">
-                <Printer className="h-4 w-4 mr-2" />
-                Print Selected ({selectedItems.size})
-              </Button>
-              <Button onClick={downloadSelectedQRCodes} size="sm" className="bg-green-600 hover:bg-green-700">
-                <DownloadCloud className="h-4 w-4 mr-2" />
-                Download Selected ({selectedItems.size})
-              </Button>
-            </>
-          )}
-
-          {/* All Actions */}
-          {items.length > 0 && !selectionMode && (
-            <>
-              <Button onClick={printAllQRCodes} size="sm" variant="outline" className="border-cyan-300 text-cyan-700 hover:bg-cyan-50">
-                <Printer className="h-4 w-4 mr-2" />
-                Print All ({items.length})
-              </Button>
-              <Button onClick={downloadAllQRCodes} size="sm" className="bg-cyan-600 hover:bg-cyan-700">
-                <DownloadCloud className="h-4 w-4 mr-2" />
-                Download All ({items.length})
-              </Button>
-            </>
-          )}
         </div>
       </div>
 
-      {/* Summary Cards - Dispatched vs Unconfirmed Focus */}
+      {/* Summary Cards - Status-based sections */}
       {items.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card 
-            className={`border-2 cursor-pointer transition-all ${viewMode === 'unconfirmed' ? 'bg-amber-100 border-amber-400 ring-2 ring-amber-300' : 'bg-amber-50 border-amber-200 hover:border-amber-400'}`}
-            onClick={() => setViewMode('unconfirmed')}
+            className={`border-2 cursor-pointer transition-all ${viewMode === 'awaiting_dispatch' ? 'bg-amber-100 border-amber-400 ring-2 ring-amber-300' : 'bg-amber-50 border-amber-200 hover:border-amber-400'}`}
+            onClick={() => setViewMode('awaiting_dispatch')}
           >
             <CardContent className="p-4 text-center">
               <Clock className="h-8 w-8 mx-auto text-amber-600 mb-2" />
-              <p className="text-2xl font-bold text-amber-700">{unconfirmedOrders.length}</p>
-              <p className="text-sm text-amber-600 font-medium">Unconfirmed Orders</p>
-              <p className="text-xs text-amber-500">Awaiting dispatch</p>
+              <p className="text-2xl font-bold text-amber-700">{awaitingDispatchOrders.length}</p>
+              <p className="text-sm text-amber-600 font-medium">Awaiting Dispatch</p>
+              <p className="text-xs text-amber-500">Ready for processing</p>
             </CardContent>
           </Card>
           <Card 
@@ -1568,9 +1705,9 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
             </p>
           </CardContent>
         </Card>
-      ) : viewMode === 'unconfirmed' ? (
+      ) : viewMode === 'awaiting_dispatch' ? (
         /* ═══════════════════════════════════════════════════════════════════════════════
-           UNCONFIRMED ORDERS VIEW - Orders not yet dispatched
+           AWAITING DISPATCH ORDERS VIEW - Orders ready for processing
            These are materials that need QR codes printed and scanned for dispatch
            ═══════════════════════════════════════════════════════════════════════════════ */
         <div className="space-y-6">
@@ -1581,15 +1718,15 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
                 <Clock className="h-6 w-6 text-white" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-amber-800">Unconfirmed Orders</h3>
+                <h3 className="text-xl font-bold text-amber-800">Awaiting Dispatch</h3>
                 <p className="text-amber-600 text-sm">
-                  {unconfirmedOrders.length} orders awaiting dispatch • Print QR codes and scan to dispatch
+                  {awaitingDispatchOrders.length} orders ready for processing • Print labels and scan to dispatch
                 </p>
               </div>
             </div>
           </div>
           
-          {unconfirmedOrders.length === 0 ? (
+          {awaitingDispatchOrders.length === 0 ? (
             <Card className="border-amber-200">
               <CardContent className="text-center py-12">
                 <CheckCircle className="h-16 w-16 mx-auto text-green-500 mb-4" />
@@ -1598,8 +1735,8 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
               </CardContent>
             </Card>
           ) : (
-            <Accordion type="multiple" className="space-y-4" defaultValue={unconfirmedOrders.slice(0, 2).map(g => g.order_id)}>
-              {unconfirmedOrders.map((group) => (
+            <Accordion type="multiple" className="space-y-4" defaultValue={awaitingDispatchOrders.slice(0, 2).map(g => g.order_id)}>
+              {awaitingDispatchOrders.map((group) => (
                 <OrderAccordionItem 
                   key={group.order_id}
                   group={group}
@@ -1616,6 +1753,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
                   setShowQRDialog={setShowQRDialog}
                   downloadQRCode={downloadQRCode}
                   toggleItemSelection={toggleItemSelection}
+                  printingProgress={printingProgress}
                   headerColor="from-amber-50 via-orange-50 to-amber-50"
                   headerHoverColor="hover:from-amber-100 hover:to-orange-100"
                   iconBgColor="from-amber-500 to-orange-600"
@@ -1673,11 +1811,110 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
                   setShowQRDialog={setShowQRDialog}
                   downloadQRCode={downloadQRCode}
                   toggleItemSelection={toggleItemSelection}
+                  printingProgress={printingProgress}
                   headerColor="from-green-50 via-emerald-50 to-green-50"
                   headerHoverColor="hover:from-green-100 hover:to-emerald-100"
                   iconBgColor="from-green-500 to-emerald-600"
                   badgeColor="from-green-600 to-emerald-600"
                   showShippedBadge={true}
+                />
+              ))}
+            </Accordion>
+          )}
+        </div>
+      ) : viewMode === 'in_transit' ? (
+        <div className="space-y-6">
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-blue-500 rounded-xl">
+                <Package className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-blue-800">In Transit</h3>
+                <p className="text-blue-600 text-sm">{inTransitOrders.length} orders being delivered</p>
+              </div>
+            </div>
+          </div>
+          {inTransitOrders.length === 0 ? (
+            <Card className="border-blue-200">
+              <CardContent className="text-center py-12">
+                <Package className="h-16 w-16 mx-auto text-gray-400 mb-4" />
+                <h3 className="text-lg font-semibold text-gray-600">No Orders In Transit</h3>
+              </CardContent>
+            </Card>
+          ) : (
+            <Accordion type="multiple" className="space-y-4">
+              {inTransitOrders.map((group) => (
+                <OrderAccordionItem 
+                  key={group.order_id}
+                  group={group}
+                  selectionMode={false}
+                  selectedItems={new Set()}
+                  areAllOrderItemsSelected={areAllOrderItemsSelected}
+                  deselectAllOrderItems={deselectAllOrderItems}
+                  selectAllOrderItems={selectAllOrderItems}
+                  getSelectedCountForOrder={getSelectedCountForOrder}
+                  printOrderQRCodes={printOrderQRCodes}
+                  downloadOrderQRCodes={downloadOrderQRCodes}
+                  getStatusColor={getStatusColor}
+                  setSelectedItem={setSelectedItem}
+                  setShowQRDialog={setShowQRDialog}
+                  downloadQRCode={downloadQRCode}
+                  toggleItemSelection={toggleItemSelection}
+                  printingProgress={printingProgress}
+                  headerColor="from-blue-50 via-indigo-50 to-blue-50"
+                  headerHoverColor="hover:from-blue-100 hover:to-indigo-100"
+                  iconBgColor="from-blue-500 to-indigo-600"
+                  badgeColor="from-blue-600 to-indigo-600"
+                />
+              ))}
+            </Accordion>
+          )}
+        </div>
+      ) : viewMode === 'delivered' ? (
+        <div className="space-y-6">
+          <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-purple-500 rounded-xl">
+                <CheckCircle className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-purple-800">Delivered</h3>
+                <p className="text-purple-600 text-sm">{deliveredOrders.length} orders delivered</p>
+              </div>
+            </div>
+          </div>
+          {deliveredOrders.length === 0 ? (
+            <Card className="border-purple-200">
+              <CardContent className="text-center py-12">
+                <CheckCircle className="h-16 w-16 mx-auto text-gray-400 mb-4" />
+                <h3 className="text-lg font-semibold text-gray-600">No Delivered Orders Yet</h3>
+              </CardContent>
+            </Card>
+          ) : (
+            <Accordion type="multiple" className="space-y-4">
+              {deliveredOrders.map((group) => (
+                <OrderAccordionItem 
+                  key={group.order_id}
+                  group={group}
+                  selectionMode={false}
+                  selectedItems={new Set()}
+                  areAllOrderItemsSelected={areAllOrderItemsSelected}
+                  deselectAllOrderItems={deselectAllOrderItems}
+                  selectAllOrderItems={selectAllOrderItems}
+                  getSelectedCountForOrder={getSelectedCountForOrder}
+                  printOrderQRCodes={printOrderQRCodes}
+                  downloadOrderQRCodes={downloadOrderQRCodes}
+                  getStatusColor={getStatusColor}
+                  setSelectedItem={setSelectedItem}
+                  setShowQRDialog={setShowQRDialog}
+                  downloadQRCode={downloadQRCode}
+                  toggleItemSelection={toggleItemSelection}
+                  printingProgress={printingProgress}
+                  headerColor="from-purple-50 via-pink-50 to-purple-50"
+                  headerHoverColor="hover:from-purple-100 hover:to-pink-100"
+                  iconBgColor="from-purple-500 to-pink-600"
+                  badgeColor="from-purple-600 to-pink-600"
                 />
               ))}
             </Accordion>
@@ -1755,59 +1992,24 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
                       <Badge className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-bold px-3">
                         {group.total_items} items
                       </Badge>
-                      {selectionMode && getSelectedCountForOrder(group) > 0 ? (
-                        <>
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            className="ml-2 border-green-300 text-green-700 hover:bg-green-50"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              printOrderQRCodes(group, true);
-                            }}
-                          >
-                            <Printer className="h-4 w-4 mr-1" />
-                            Print Selected
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            className="border-cyan-300 text-cyan-700 hover:bg-cyan-50"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              downloadOrderQRCodes(group, true);
-                            }}
-                          >
-                            <DownloadCloud className="h-4 w-4 mr-1" />
-                            Download Selected
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <Button 
-                            size="sm" 
-                            className="ml-2 bg-green-600 hover:bg-green-700 text-white"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              printOrderQRCodes(group);
-                            }}
-                          >
-                            <Printer className="h-4 w-4 mr-1" />
-                            Print Order
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            className="bg-cyan-600 hover:bg-cyan-700 text-white"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              downloadOrderQRCodes(group);
-                            }}
-                          >
-                            <DownloadCloud className="h-4 w-4 mr-1" />
-                            Download
-                          </Button>
-                        </>
-                      )}
+            {/* Print Labels Button with Progress - Only show for awaiting dispatch orders */}
+            {group.pending_items > 0 && (
+              <Button 
+                size="sm" 
+                className="ml-2 bg-green-600 hover:bg-green-700 text-white"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  printOrderQRCodes(group);
+                }}
+                disabled={printingProgress?.orderId === group.order_id}
+              >
+                <Printer className="h-4 w-4 mr-1" />
+                {printingProgress?.orderId === group.order_id 
+                  ? `Printing ${printingProgress.current} of ${printingProgress.total}`
+                  : 'Print Labels'
+                }
+              </Button>
+            )}
                     </div>
                   </div>
                 </AccordionTrigger>
@@ -2481,6 +2683,7 @@ const OrderAccordionItem: React.FC<{
   setShowQRDialog,
   downloadQRCode,
   toggleItemSelection,
+  printingProgress,
   headerColor = "from-blue-50 via-cyan-50 to-blue-50",
   headerHoverColor = "hover:from-blue-100 hover:to-cyan-100",
   iconBgColor = "from-blue-500 to-cyan-600",
@@ -2546,76 +2749,48 @@ const OrderAccordionItem: React.FC<{
                 {getSelectedCountForOrder(group)} selected
               </Badge>
             )}
-            <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-300">
-              {group.pending_items} pending
-            </Badge>
-            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300">
-              {group.dispatched_items} dispatched
-            </Badge>
-            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
-              {group.received_items} received
-            </Badge>
-            {group.invalid_items > 0 && (
-              <Badge variant="outline" className="bg-red-100 text-red-700 border-red-300">
-                <ShieldX className="h-3 w-3 mr-1" />
-                {group.invalid_items} invalid
+            {/* Single clear status badge */}
+            {group.pending_items > 0 && (
+              <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300 font-semibold">
+                <Clock className="h-3 w-3 mr-1" />
+                Awaiting Dispatch ({group.pending_items})
               </Badge>
             )}
-            <Badge className={`bg-gradient-to-r ${badgeColor} text-white font-bold px-3`}>
-              {group.total_items} items
-            </Badge>
-            {selectionMode && getSelectedCountForOrder(group) > 0 ? (
-              <>
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  className="ml-2 border-green-300 text-green-700 hover:bg-green-50"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    printOrderQRCodes(group, true);
-                  }}
-                >
-                  <Printer className="h-4 w-4 mr-1" />
-                  Print Selected
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  className="border-cyan-300 text-cyan-700 hover:bg-cyan-50"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    downloadOrderQRCodes(group, true);
-                  }}
-                >
-                  <DownloadCloud className="h-4 w-4 mr-1" />
-                  Download Selected
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button 
-                  size="sm" 
-                  className="ml-2 bg-green-600 hover:bg-green-700 text-white"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    printOrderQRCodes(group);
-                  }}
-                >
-                  <Printer className="h-4 w-4 mr-1" />
-                  Print Order
-                </Button>
-                <Button 
-                  size="sm" 
-                  className="bg-cyan-600 hover:bg-cyan-700 text-white"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    downloadOrderQRCodes(group);
-                  }}
-                >
-                  <DownloadCloud className="h-4 w-4 mr-1" />
-                  Download
-                </Button>
-              </>
+            {group.pending_items === 0 && group.dispatched_items > 0 && group.received_items === 0 && (
+              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300 font-semibold">
+                <Truck className="h-3 w-3 mr-1" />
+                Dispatched ({group.dispatched_items})
+              </Badge>
+            )}
+            {group.received_items > 0 && group.received_items < group.total_items && (
+              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300 font-semibold">
+                <Package className="h-3 w-3 mr-1" />
+                In Transit ({group.received_items}/{group.total_items})
+              </Badge>
+            )}
+            {group.received_items === group.total_items && (
+              <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-300 font-semibold">
+                <CheckCircle className="h-3 w-3 mr-1" />
+                Delivered ({group.total_items})
+              </Badge>
+            )}
+            {/* Print Labels Button with Progress - Only show for awaiting dispatch orders */}
+            {group.pending_items > 0 && (
+              <Button 
+                size="sm" 
+                className="ml-2 bg-green-600 hover:bg-green-700 text-white"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  printOrderQRCodes(group);
+                }}
+                disabled={printingProgress?.orderId === group.order_id}
+              >
+                <Printer className="h-4 w-4 mr-1" />
+                {printingProgress?.orderId === group.order_id 
+                  ? `Printing ${printingProgress.current} of ${printingProgress.total}`
+                  : 'Print Labels'
+                }
+              </Button>
             )}
           </div>
         </div>
