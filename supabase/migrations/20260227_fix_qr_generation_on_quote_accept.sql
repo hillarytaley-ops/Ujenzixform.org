@@ -92,11 +92,15 @@ BEGIN
         qr_code_value, 
         COALESCE(item->>'name', item->>'material_name', 'Unknown'), 
         NEW.po_number,
-        NEW.status;
+        v_current_status;
     END LOOP;
     
-    -- Mark QR codes as generated
-    NEW.qr_code_generated := true;
+    -- Mark QR codes as generated in the database
+    UPDATE purchase_orders
+    SET qr_code_generated = true
+    WHERE id = NEW.id;
+    
+    RAISE NOTICE 'QR codes generated for purchase order % (status: %)', NEW.id, v_current_status;
   END IF;
   
   RETURN NEW;
@@ -131,9 +135,10 @@ END;
 $$;
 
 -- Ensure triggers are in place
+-- Use AFTER trigger so it fires after convert_quote_to_order has finished
 DROP TRIGGER IF EXISTS trigger_auto_generate_item_qr_codes ON purchase_orders;
 CREATE TRIGGER trigger_auto_generate_item_qr_codes
-  BEFORE INSERT OR UPDATE ON purchase_orders
+  AFTER INSERT OR UPDATE ON purchase_orders
   FOR EACH ROW
   EXECUTE FUNCTION public.auto_generate_item_qr_codes();
 
