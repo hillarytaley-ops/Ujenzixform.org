@@ -617,7 +617,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
             ) : (
               <>
                 <p className={`font-semibold ${isAccepted ? 'text-green-700' : 'text-blue-700'} mb-1`}>
-                  {isAccepted ? '✅ Accepted' : '📋 Assigned'}
+                  {isAccepted ? '✅ Delivery Confirmed' : '📋 Assigned'}
                 </p>
                 <p className="font-medium text-gray-800 mt-1">
                   Delivered by:
@@ -634,7 +634,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
             {status === 'pending' && '⏳ Pending'}
             {status === 'requested' && '📤 Requested'}
             {status === 'assigned' && '📋 Assigned'}
-            {status === 'accepted' && '✅ Accepted'}
+            {status === 'accepted' && '✅ Delivery Confirmed'}
             {status === 'picked_up' && '📦 Picked Up'}
             {status === 'in_transit' && '🚚 In Transit'}
             {status === 'delivered' && '✓ Delivered'}
@@ -1066,7 +1066,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
                                 : 'bg-blue-100 text-blue-700 border-blue-300'
                             }
                           >
-                            {selectedOrder.delivery_status === 'accepted' && '✅ Accepted'}
+                            {selectedOrder.delivery_status === 'accepted' && '✅ Delivery Confirmed'}
                             {selectedOrder.delivery_status === 'assigned' && '📋 Assigned'}
                             {selectedOrder.delivery_status === 'picked_up' && '📦 Picked Up'}
                             {selectedOrder.delivery_status === 'in_transit' && '🚚 In Transit'}
