@@ -12,7 +12,7 @@
  * Updated: Feb 17, 2026 - Added robust getUserId() fallback for localStorage
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -320,6 +320,7 @@ export const useSupplierData = () => {
 export const useDeliveryProviderData = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
+  const acceptingRef = useRef<string | null>(null); // Track which delivery is being accepted
   const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<any>(null);
   const [activeDeliveries, setActiveDeliveries] = useState<any[]>([]);
@@ -578,6 +579,15 @@ export const useDeliveryProviderData = () => {
 
   // Function to accept a delivery request
   const acceptDelivery = async (deliveryId: string) => {
+    // Prevent double-click using ref (immediate check, no state delay)
+    if (acceptingRef.current === deliveryId || acceptingRef.current !== null) {
+      console.log('🛑 Already accepting delivery, ignoring click:', deliveryId);
+      return { success: false, error: 'Already processing acceptance' };
+    }
+    
+    // Set accepting state IMMEDIATELY (both ref and state)
+    acceptingRef.current = deliveryId;
+    
     // Get userId from context or localStorage fallback
     let userId = user?.id;
     if (!userId) {
@@ -592,6 +602,7 @@ export const useDeliveryProviderData = () => {
     
     if (!userId) {
       console.error('❌ acceptDelivery: No userId available');
+      acceptingRef.current = null; // Clear on error
       return { success: false, error: 'Not authenticated' };
     }
 
@@ -617,6 +628,11 @@ export const useDeliveryProviderData = () => {
     } catch (err: any) {
       console.error('❌ acceptDelivery error:', err);
       return { success: false, error: err.message };
+    } finally {
+      // Clear accepting state after a delay to prevent rapid re-clicks
+      setTimeout(() => {
+        acceptingRef.current = null;
+      }, 2000); // 2 second delay
     }
   };
 

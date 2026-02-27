@@ -381,9 +381,11 @@ export const DeliveryProviderNotifications: React.FC<{ providerId: string }> = (
         variant: 'destructive'
       });
     } finally {
-      // Clear accepting state
-      acceptingRef.current = null;
-      setAcceptingId(null);
+      // Clear accepting state after delay to prevent rapid re-clicks
+      setTimeout(() => {
+        acceptingRef.current = null;
+        setAcceptingId(null);
+      }, 3000); // 3 second delay to prevent rapid re-clicks
     }
   };
 

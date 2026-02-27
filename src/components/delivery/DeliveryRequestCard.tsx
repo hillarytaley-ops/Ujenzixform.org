@@ -179,10 +179,11 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
     } finally {
       // Only reset if the delivery is still pending (operation might have changed status)
       // This prevents re-enabling if the delivery was successfully accepted
+      // Use longer delay to prevent rapid re-clicks
       setTimeout(() => {
         acceptingRef.current = false;
         setIsAccepting(false);
-      }, 1000); // Small delay to prevent rapid re-clicks
+      }, 3000); // 3 second delay to prevent rapid re-clicks
     }
   };
 

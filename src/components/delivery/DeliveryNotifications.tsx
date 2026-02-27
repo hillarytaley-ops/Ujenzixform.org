@@ -666,8 +666,11 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       });
     } finally {
       console.log('🚚 handleAcceptDelivery: END - clearing acceptingId');
-      acceptingRef.current = null;
-      setAcceptingId(null);
+      // Use longer delay to prevent rapid re-clicks
+      setTimeout(() => {
+        acceptingRef.current = null;
+        setAcceptingId(null);
+      }, 3000); // 3 second delay to prevent rapid re-clicks
     }
   };
 
