@@ -3,6 +3,16 @@
 -- Created: February 27, 2026
 -- ============================================================
 
+-- First, ensure delivery_provider_id column exists
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'purchase_orders' AND column_name = 'delivery_provider_id') THEN
+        ALTER TABLE purchase_orders ADD COLUMN delivery_provider_id UUID;
+        RAISE NOTICE 'Added delivery_provider_id column to purchase_orders';
+    END IF;
+END $$;
+
 -- Drop existing policy if it exists
 DROP POLICY IF EXISTS "purchase_orders_delivery_provider_view" ON purchase_orders;
 
