@@ -1005,20 +1005,35 @@ const DeliveryDashboard = () => {
                               }}
                               isDarkMode={isDarkMode}
                               onAccept={async (id) => {
-                                const result = await handleAcceptDelivery(id);
-                                if (result.success) {
-                                  toast({
-                                    title: "✅ Delivery Accepted!",
-                                    description: "You got the job! Navigate to pickup location.",
-                                  });
-                                  refetchData();
-                                } else {
-                                  toast({
-                                    title: "❌ Could not accept",
-                                    description: result.error || "Someone else may have accepted this delivery.",
-                                    variant: "destructive"
-                                  });
-                                  refetchData();
+                                // Prevent double-click at parent level
+                                if (acceptingDeliveryRef.current === id || acceptingDeliveryRef.current !== null) {
+                                  console.log('🛑 Already accepting delivery, ignoring:', id);
+                                  return;
+                                }
+                                
+                                acceptingDeliveryRef.current = id;
+                                
+                                try {
+                                  const result = await handleAcceptDelivery(id);
+                                  if (result.success) {
+                                    toast({
+                                      title: "✅ Delivery Accepted!",
+                                      description: "You got the job! Navigate to pickup location.",
+                                    });
+                                    refetchData();
+                                  } else {
+                                    toast({
+                                      title: "❌ Could not accept",
+                                      description: result.error || "Someone else may have accepted this delivery.",
+                                      variant: "destructive"
+                                    });
+                                    refetchData();
+                                  }
+                                } finally {
+                                  // Clear after delay
+                                  setTimeout(() => {
+                                    acceptingDeliveryRef.current = null;
+                                  }, 3000);
                                 }
                               }}
                               onReject={(id) => {
