@@ -810,9 +810,27 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
   // Not Yet Dispatched: pending, confirmed, processing
   // Shipped: shipped (dispatched but not delivered)
   // Delivered: delivered (confirmed arrival at site)
-  const notDispatchedOrders = filteredOrders.filter(o => 
-    ['pending', 'confirmed', 'processing'].includes(o.status)
-  );
+  // Not Dispatched: All orders that haven't been shipped yet
+  // This includes accepted quotes converted to orders (quote_accepted, order_created, awaiting_delivery_request, etc.)
+  const notDispatchedOrders = filteredOrders.filter(o => {
+    // Exclude shipped and delivered
+    if (o.status === 'shipped' || o.status === 'delivered') return false;
+    
+    // Include all order statuses from quote acceptance onwards
+    return [
+      'quote_accepted',
+      'order_created',
+      'awaiting_delivery_request',
+      'delivery_requested',
+      'awaiting_delivery_provider',
+      'delivery_assigned',
+      'ready_for_dispatch',
+      'confirmed',
+      'processing',
+      'pending',
+      'cancelled'
+    ].includes(o.status);
+  });
   const shippedOrders = filteredOrders.filter(o => o.status === 'shipped');
   const deliveredOrders = filteredOrders.filter(o => o.status === 'delivered');
 
