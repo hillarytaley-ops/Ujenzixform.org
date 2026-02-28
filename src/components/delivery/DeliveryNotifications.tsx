@@ -549,8 +549,28 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       });
 
       console.log(`🔔 FINAL DEDUPLICATED: ${allNotifications.length} → ${finalDeduplicated.length} unique notifications (removed ${allNotifications.length - finalDeduplicated.length} duplicates)`);
-      setNotifications(finalDeduplicated);
-      setUnreadCount(finalDeduplicated.filter(n => !n.read).length);
+      
+      // ABSOLUTE FINAL FILTER: Remove ANY duplicates by purchase_order_id, no matter what
+      const absoluteFinal: Notification[] = [];
+      const finalSeenPOIds = new Set<string>();
+      const finalSeenIds = new Set<string>();
+      
+      finalDeduplicated.forEach((notif: Notification & { purchase_order_id?: string }) => {
+        if (notif.purchase_order_id) {
+          if (!finalSeenPOIds.has(notif.purchase_order_id)) {
+            finalSeenPOIds.add(notif.purchase_order_id);
+            absoluteFinal.push(notif);
+          }
+        } else if (!finalSeenIds.has(notif.id)) {
+          finalSeenIds.add(notif.id);
+          absoluteFinal.push(notif);
+        }
+      });
+      
+      console.log(`🛡️ ABSOLUTE FINAL: ${finalDeduplicated.length} → ${absoluteFinal.length} (removed ${finalDeduplicated.length - absoluteFinal.length} more duplicates)`);
+      
+      setNotifications(absoluteFinal);
+      setUnreadCount(absoluteFinal.filter(n => !n.read).length);
     } catch (error: any) {
       console.error('❌ Error loading notifications:', error.message || error);
     } finally {
@@ -558,50 +578,34 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     }
   }, []);
 
-  // CONTINUOUS DEDUPLICATION: Run deduplication whenever notifications change
+  // ABSOLUTE BULLETPROOF DEDUPLICATION: Run on EVERY render to catch ANY duplicates
   useEffect(() => {
-    if (notifications.length === 0) return;
-    
-    const seenPOIds = new Set<string>();
-    const seenIds = new Set<string>();
-    const seenByAddressMaterial = new Map<string, Notification>();
-    const deduplicated: Notification[] = [];
-    
-    notifications.forEach((notification: Notification & { purchase_order_id?: string; source?: string }) => {
-      // Strategy 1: By purchase_order_id (STRICTEST)
-      if (notification.purchase_order_id) {
-        if (!seenPOIds.has(notification.purchase_order_id)) {
-          seenPOIds.add(notification.purchase_order_id);
-          deduplicated.push(notification);
-        } else {
-          console.log(`🛡️ CONTINUOUS DEDUP: Removed duplicate for po_id: ${notification.purchase_order_id}`);
-        }
-      } else {
-        // Strategy 2: By delivery address + material type
-        const key = `${(notification.deliveryAddress || '').toLowerCase().trim()}|${(notification.materialType || '').toLowerCase().trim()}`;
-        if (key !== '|' && seenByAddressMaterial.has(key)) {
-          console.log(`🛡️ CONTINUOUS DEDUP: Removed duplicate by address+material: ${key}`);
-        } else if (key !== '|') {
-          seenByAddressMaterial.set(key, notification);
-          deduplicated.push(notification);
-        } else {
-          // Strategy 3: By notification id
-          if (!seenIds.has(notification.id)) {
-            seenIds.add(notification.id);
-            deduplicated.push(notification);
-          } else {
-            console.log(`🛡️ CONTINUOUS DEDUP: Removed duplicate by id: ${notification.id}`);
+    setNotifications(prev => {
+      if (prev.length === 0) return prev;
+      
+      const seenPOIds = new Set<string>();
+      const seenIds = new Set<string>();
+      const filtered: Notification[] = [];
+      
+      prev.forEach((notif: Notification & { purchase_order_id?: string }) => {
+        // ONLY ONE per purchase_order_id - PERIOD
+        if (notif.purchase_order_id) {
+          if (!seenPOIds.has(notif.purchase_order_id)) {
+            seenPOIds.add(notif.purchase_order_id);
+            filtered.push(notif);
           }
+        } else if (!seenIds.has(notif.id)) {
+          seenIds.add(notif.id);
+          filtered.push(notif);
         }
+      });
+      
+      if (filtered.length !== prev.length) {
+        console.log(`🛡️ BULLETPROOF FILTER: ${prev.length} → ${filtered.length} (removed ${prev.length - filtered.length} duplicates)`);
+        return filtered;
       }
+      return prev;
     });
-    
-    // Only update if we removed duplicates
-    if (deduplicated.length !== notifications.length) {
-      console.log(`🛡️ CONTINUOUS DEDUP: ${notifications.length} → ${deduplicated.length} (removed ${notifications.length - deduplicated.length})`);
-      setNotifications(deduplicated);
-      setUnreadCount(deduplicated.filter(n => !n.read).length);
-    }
   }, [notifications]);
 
   // Load notifications on mount and set up real-time subscription
