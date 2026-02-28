@@ -558,78 +558,66 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     }
   }, []);
 
+  // CONTINUOUS DEDUPLICATION: Run deduplication whenever notifications change
+  useEffect(() => {
+    if (notifications.length === 0) return;
+    
+    const seenPOIds = new Set<string>();
+    const seenIds = new Set<string>();
+    const seenByAddressMaterial = new Map<string, Notification>();
+    const deduplicated: Notification[] = [];
+    
+    notifications.forEach((notification: Notification & { purchase_order_id?: string; source?: string }) => {
+      // Strategy 1: By purchase_order_id (STRICTEST)
+      if (notification.purchase_order_id) {
+        if (!seenPOIds.has(notification.purchase_order_id)) {
+          seenPOIds.add(notification.purchase_order_id);
+          deduplicated.push(notification);
+        } else {
+          console.log(`🛡️ CONTINUOUS DEDUP: Removed duplicate for po_id: ${notification.purchase_order_id}`);
+        }
+      } else {
+        // Strategy 2: By delivery address + material type
+        const key = `${(notification.deliveryAddress || '').toLowerCase().trim()}|${(notification.materialType || '').toLowerCase().trim()}`;
+        if (key !== '|' && seenByAddressMaterial.has(key)) {
+          console.log(`🛡️ CONTINUOUS DEDUP: Removed duplicate by address+material: ${key}`);
+        } else if (key !== '|') {
+          seenByAddressMaterial.set(key, notification);
+          deduplicated.push(notification);
+        } else {
+          // Strategy 3: By notification id
+          if (!seenIds.has(notification.id)) {
+            seenIds.add(notification.id);
+            deduplicated.push(notification);
+          } else {
+            console.log(`🛡️ CONTINUOUS DEDUP: Removed duplicate by id: ${notification.id}`);
+          }
+        }
+      }
+    });
+    
+    // Only update if we removed duplicates
+    if (deduplicated.length !== notifications.length) {
+      console.log(`🛡️ CONTINUOUS DEDUP: ${notifications.length} → ${deduplicated.length} (removed ${notifications.length - deduplicated.length})`);
+      setNotifications(deduplicated);
+      setUnreadCount(deduplicated.filter(n => !n.read).length);
+    }
+  }, [notifications]);
+
   // Load notifications on mount and set up real-time subscription
   useEffect(() => {
     loadNotifications();
 
     // Set up real-time subscription for new delivery requests
+    // IMPORTANT: Instead of adding directly, reload all notifications to ensure deduplication
     const requestsSubscription = supabase
       .channel('delivery-requests-notifications')
       .on('postgres_changes', 
         { event: 'INSERT', schema: 'public', table: 'delivery_requests' }, 
         (payload: any) => {
-          console.log('🔔 New delivery request received:', payload.new);
-          
-          // CRITICAL: Check for duplicates before adding
-          setNotifications(prev => {
-            // Check if notification with same purchase_order_id already exists
-            if (payload.new.purchase_order_id) {
-              const existingByPO = prev.find((n: any) => n.purchase_order_id === payload.new.purchase_order_id);
-              if (existingByPO) {
-                console.log(`🔍 Real-time: Duplicate detected for purchase_order_id ${payload.new.purchase_order_id}, skipping`);
-                return prev; // Don't add duplicate
-              }
-            }
-            
-            // Also check by delivery address + material type if purchase_order_id is missing
-            const addressMaterialKey = `${(payload.new.delivery_address || '').toLowerCase().trim()}|${(payload.new.material_type || '').toLowerCase().trim()}`;
-            if (addressMaterialKey !== '|') {
-              const existingByAddress = prev.find((n: any) => {
-                const nKey = `${(n.deliveryAddress || '').toLowerCase().trim()}|${(n.materialType || '').toLowerCase().trim()}`;
-                return nKey === addressMaterialKey;
-              });
-              if (existingByAddress) {
-                console.log(`🔍 Real-time: Duplicate detected by address+material, skipping`);
-                return prev; // Don't add duplicate
-              }
-            }
-            
-            // Check by notification id as final check
-            const existingById = prev.find(n => n.id === payload.new.id);
-            if (existingById) {
-              console.log(`🔍 Real-time: Duplicate detected by id ${payload.new.id}, skipping`);
-              return prev; // Don't add duplicate
-            }
-            
-            // No duplicate found - add the new notification
-            const newNotification: Notification & { purchase_order_id?: string; source?: string } = {
-              id: payload.new.id,
-              type: 'new_delivery',
-              title: '🚚 New Delivery Request!',
-              message: `${payload.new.material_type || 'Materials'} to ${payload.new.delivery_address || 'Unknown'}`,
-              timestamp: new Date(payload.new.created_at || Date.now()),
-              read: false,
-              priority: payload.new.priority_level === 'urgent' ? 'high' : 'medium',
-              actionUrl: `/delivery-dashboard?request=${payload.new.id}`,
-              status: payload.new.status || 'pending',
-              pickupAddress: payload.new.pickup_address || payload.new.pickup_location || '',
-              deliveryAddress: payload.new.delivery_address || payload.new.delivery_location || '',
-              materialType: payload.new.material_type || '',
-              quantity: payload.new.quantity || '',
-              estimatedCost: payload.new.estimated_cost || 0,
-              purchase_order_id: payload.new.purchase_order_id, // CRITICAL for deduplication
-              source: 'delivery_requests'
-            };
-            
-            return [newNotification, ...prev];
-          });
-          
-          // Only increment unread count if we actually added a notification
-          setNotifications(prev => {
-            // Check was done above, so if we're here, notification was added
-            setUnreadCount(prevCount => prevCount + 1);
-            return prev;
-          });
+          console.log('🔔 New delivery request received (RELOADING ALL):', payload.new);
+          // RELOAD ALL notifications instead of adding - this ensures deduplication runs
+          loadNotifications();
           
           // Show toast
           toast({
@@ -657,8 +645,8 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           filter: 'status=in.(quote_accepted,order_created,awaiting_delivery_request,delivery_requested,awaiting_delivery_provider,delivery_assigned,ready_for_dispatch)'
         },
         (payload: any) => {
-          console.log('🔔 Purchase order status changed:', payload.new);
-          // Reload notifications to get the updated order
+          console.log('🔔 Purchase order status changed (RELOADING ALL):', payload.new);
+          // Reload ALL notifications to ensure deduplication
           loadNotifications();
         }
       )
@@ -671,8 +659,21 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           filter: 'status=in.(quote_accepted,order_created,awaiting_delivery_request,delivery_requested,awaiting_delivery_provider,delivery_assigned,ready_for_dispatch)'
         },
         (payload: any) => {
-          console.log('🔔 New purchase order created:', payload.new);
-          // Reload notifications to get the new order
+          console.log('🔔 New purchase order created (RELOADING ALL):', payload.new);
+          // Reload ALL notifications to ensure deduplication
+          loadNotifications();
+        }
+      )
+      // Also listen for UPDATE on delivery_requests (status changes)
+      .on('postgres_changes',
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'delivery_requests'
+        },
+        (payload: any) => {
+          console.log('🔔 Delivery request updated (RELOADING ALL):', payload.new);
+          // Reload ALL notifications to ensure deduplication
           loadNotifications();
         }
       )
