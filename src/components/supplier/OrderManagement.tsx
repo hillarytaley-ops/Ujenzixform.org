@@ -1097,31 +1097,30 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
   // Delivered: delivered (confirmed arrival at site)
   // Not Dispatched: All orders that haven't been shipped yet
   // This includes accepted quotes converted to orders (quote_accepted, order_created, awaiting_delivery_request, etc.)
-  // IMPORTANT: Exclude orders that have delivery_provider_id set (already assigned) from "awaiting delivery provider" status
+  // IMPORTANT: Include orders with delivery_provider_id - they still need to be dispatched by supplier
   const notDispatchedOrders = filteredOrders.filter(o => {
     // Exclude shipped and delivered
     if (o.status === 'shipped' || o.status === 'delivered') return false;
     
-    // Exclude orders that already have a delivery provider assigned
-    // These should show as "Delivery Confirmed" not "Awaiting Delivery Provider"
-    if (o.delivery_provider_id) {
-      // Only include if status is ready_for_dispatch or dispatched (waiting for supplier to dispatch)
-      return ['ready_for_dispatch', 'dispatched', 'in_transit'].includes(o.status);
-    }
-    
-    // Include all order statuses from quote acceptance onwards (only if no delivery provider assigned)
-    return [
+    // Include all order statuses from quote acceptance onwards
+    // This includes orders with delivery_provider_id (they still need supplier dispatch)
+    const validStatuses = [
       'quote_accepted',
       'order_created',
       'awaiting_delivery_request',
       'delivery_requested',
       'awaiting_delivery_provider',
       'delivery_assigned',
+      'ready_for_dispatch',
+      'dispatched',
+      'in_transit',
       'confirmed',
       'processing',
       'pending',
       'cancelled'
-    ].includes(o.status);
+    ];
+    
+    return validStatuses.includes(o.status);
   });
   const shippedOrders = filteredOrders.filter(o => o.status === 'shipped');
   const deliveredOrders = filteredOrders.filter(o => o.status === 'delivered');
