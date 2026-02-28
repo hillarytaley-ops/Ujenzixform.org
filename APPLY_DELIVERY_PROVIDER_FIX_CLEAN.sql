@@ -49,19 +49,77 @@ BEGIN
     END IF;
 END $$;
 
--- Step 0.5: Prevent duplicate delivery_requests per purchase_order
+-- Step 0.5: Clean up duplicate delivery_requests per purchase_order BEFORE creating unique index
+-- Keep only the most recent or accepted delivery_request per purchase_order
+DO $$
+DECLARE
+    duplicate_count INTEGER;
+BEGIN
+    -- Find and count duplicates
+    SELECT COUNT(*) INTO duplicate_count
+    FROM (
+        SELECT purchase_order_id, COUNT(*) as cnt
+        FROM delivery_requests
+        WHERE purchase_order_id IS NOT NULL
+        GROUP BY purchase_order_id
+        HAVING COUNT(*) > 1
+    ) duplicates;
+    
+    IF duplicate_count > 0 THEN
+        RAISE NOTICE 'Found % purchase_orders with duplicate delivery_requests. Cleaning up...', duplicate_count;
+        
+        -- Delete duplicates, keeping only the most recent or accepted one
+        DELETE FROM delivery_requests dr
+        WHERE dr.purchase_order_id IS NOT NULL
+          AND dr.id NOT IN (
+              -- Keep the best delivery_request for each purchase_order_id
+              SELECT DISTINCT ON (purchase_order_id) id
+              FROM delivery_requests
+              WHERE purchase_order_id = dr.purchase_order_id
+              ORDER BY purchase_order_id,
+                       -- Prefer accepted/assigned over pending
+                       CASE 
+                           WHEN status IN ('accepted', 'assigned', 'in_transit') THEN 1
+                           WHEN status = 'pending' THEN 2
+                           ELSE 3
+                       END,
+                       -- Prefer ones with provider_id
+                       CASE WHEN provider_id IS NOT NULL THEN 1 ELSE 2 END,
+                       -- Prefer most recent
+                       created_at DESC
+          );
+        
+        RAISE NOTICE 'Cleaned up duplicate delivery_requests';
+    ELSE
+        RAISE NOTICE 'No duplicate delivery_requests found';
+    END IF;
+END $$;
+
+-- Step 0.6: Prevent duplicate delivery_requests per purchase_order
 -- Add unique constraint to ensure only ONE delivery_request per purchase_order (when purchase_order_id is not null)
 DO $$
 BEGIN
-    -- Check if constraint already exists
+    -- Drop existing index if it exists (in case it was partially created)
+    DROP INDEX IF EXISTS unique_delivery_request_per_purchase_order;
+    
+    -- Check if there are still duplicates (shouldn't be after cleanup, but check anyway)
     IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint 
-        WHERE conname = 'unique_delivery_request_per_purchase_order'
+        SELECT 1 FROM (
+            SELECT purchase_order_id, COUNT(*) as cnt
+            FROM delivery_requests
+            WHERE purchase_order_id IS NOT NULL
+            GROUP BY purchase_order_id
+            HAVING COUNT(*) > 1
+        ) duplicates
     ) THEN
         -- Create unique partial index (only applies when purchase_order_id is not null)
-        CREATE UNIQUE INDEX IF NOT EXISTS unique_delivery_request_per_purchase_order 
+        CREATE UNIQUE INDEX unique_delivery_request_per_purchase_order 
         ON delivery_requests(purchase_order_id) 
         WHERE purchase_order_id IS NOT NULL AND status IN ('pending', 'accepted', 'assigned', 'in_transit');
+        
+        RAISE NOTICE 'Created unique index to prevent duplicate delivery_requests per purchase_order';
+    ELSE
+        RAISE WARNING 'Cannot create unique index: duplicates still exist. Please clean up manually.';
     END IF;
 END $$;
 
