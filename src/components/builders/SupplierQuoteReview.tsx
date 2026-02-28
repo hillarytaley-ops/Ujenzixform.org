@@ -378,6 +378,68 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
     const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
     const headers = getAuthHeaders();
     
+    // Helper function to clean up duplicate QR codes
+    const cleanupDuplicateQRCodes = async (orderId: string): Promise<void> => {
+      try {
+        console.log('🧹 Cleaning up duplicate QR codes for order:', orderId);
+        // Call a function to clean up duplicates (we'll create this in the migration)
+        const cleanupResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/rpc/cleanup_duplicate_qr_codes`,
+          {
+            method: 'POST',
+            headers: {
+              ...headers,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ p_order_id: orderId })
+          }
+        );
+        
+        if (cleanupResponse.ok) {
+          console.log('✅ Duplicate QR codes cleaned up');
+        } else {
+          console.warn('⚠️ Could not clean up duplicates via RPC, trying direct delete');
+          // Fallback: Direct delete of duplicates
+          const { data: items } = await supabase
+            .from('material_items')
+            .select('id, purchase_order_id, item_sequence, created_at')
+            .eq('purchase_order_id', orderId)
+            .order('created_at', { ascending: true });
+          
+          if (items && items.length > 0) {
+            // Group by item_sequence and keep only the first one
+            const seen = new Set<number>();
+            const toDelete: string[] = [];
+            
+            for (const item of items) {
+              if (seen.has(item.item_sequence)) {
+                toDelete.push(item.id);
+              } else {
+                seen.add(item.item_sequence);
+              }
+            }
+            
+            if (toDelete.length > 0) {
+              await supabase
+                .from('material_items')
+                .delete()
+                .in('id', toDelete);
+              console.log(`✅ Deleted ${toDelete.length} duplicate QR codes`);
+            }
+          }
+          
+          // Reset the flag
+          await supabase
+            .from('purchase_orders')
+            .update({ qr_code_generated: false })
+            .eq('id', orderId);
+        }
+      } catch (error) {
+        console.warn('⚠️ Error cleaning up duplicates:', error);
+        // Continue anyway - the ON CONFLICT should handle it
+      }
+    };
+    
     try {
       // First, mark as viewed if not already viewed
       if (quote.status === 'quote_responded' || quote.status === 'quote_revised') {
@@ -395,6 +457,18 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
         }
       }
       
+      // Check if QR codes already exist and clean them up if needed
+      const { data: existingItems } = await supabase
+        .from('material_items')
+        .select('id, item_sequence')
+        .eq('purchase_order_id', quote.id)
+        .limit(1);
+      
+      if (existingItems && existingItems.length > 0) {
+        console.log('⚠️ QR codes already exist, cleaning up before accepting...');
+        await cleanupDuplicateQRCodes(quote.id);
+      }
+      
       // Update purchase order to 'quote_accepted' - trigger will convert to order
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
@@ -408,7 +482,7 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
       
       console.log('🔄 Accepting quote:', quote.id, 'with payload:', updatePayload);
       
-      const response = await fetch(
+      let response = await fetch(
         `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${quote.id}`,
         {
           method: 'PATCH',
@@ -423,10 +497,53 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
       );
       clearTimeout(timeoutId);
       
+      // If we get a duplicate key error, clean up and retry once
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('❌ Accept quote failed:', response.status, errorText);
-        throw new Error(`Failed to accept quote: ${response.status}`);
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { message: errorText };
+        }
+        
+        // Check if it's a duplicate QR code error
+        if (response.status === 409 && 
+            (errorData.message?.includes('duplicate key') || 
+             errorData.message?.includes('material_items_purchase_order_id_item_sequence_key'))) {
+          console.log('🔄 Duplicate QR code detected, cleaning up and retrying...');
+          
+          // Clean up duplicates
+          await cleanupDuplicateQRCodes(quote.id);
+          
+          // Wait a moment for cleanup to complete
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Retry the update
+          const retryController = new AbortController();
+          const retryTimeoutId = setTimeout(() => retryController.abort(), 10000);
+          
+          response = await fetch(
+            `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${quote.id}`,
+            {
+              method: 'PATCH',
+              headers: {
+                ...headers,
+                'Prefer': 'return=representation'
+              },
+              body: JSON.stringify(updatePayload),
+              signal: retryController.signal,
+              cache: 'no-store'
+            }
+          );
+          clearTimeout(retryTimeoutId);
+        }
+        
+        if (!response.ok) {
+          const finalErrorText = await response.text();
+          console.error('❌ Accept quote failed after retry:', response.status, finalErrorText);
+          throw new Error(`Failed to accept quote: ${response.status}`);
+        }
       }
       
       const poDataArray = await response.json();

@@ -128,3 +128,45 @@ CREATE TRIGGER trigger_auto_generate_qr_on_confirm
     AFTER UPDATE ON purchase_orders
     FOR EACH ROW
     EXECUTE FUNCTION public.auto_generate_qr_codes_on_confirm();
+
+-- ============================================================
+-- Helper function to clean up duplicate QR codes
+-- ============================================================
+CREATE OR REPLACE FUNCTION public.cleanup_duplicate_qr_codes(p_order_id UUID)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_deleted_count INTEGER := 0;
+BEGIN
+  -- Delete duplicate material_items, keeping the first one (by created_at)
+  WITH duplicates AS (
+    SELECT id,
+           ROW_NUMBER() OVER (PARTITION BY purchase_order_id, item_sequence ORDER BY created_at) as rn
+    FROM material_items
+    WHERE purchase_order_id = p_order_id
+  )
+  DELETE FROM material_items
+  WHERE id IN (
+    SELECT id FROM duplicates WHERE rn > 1
+  );
+  
+  GET DIAGNOSTICS v_deleted_count = ROW_COUNT;
+  
+  -- Reset the qr_code_generated flag so it can regenerate
+  UPDATE purchase_orders 
+  SET qr_code_generated = false 
+  WHERE id = p_order_id;
+  
+  RETURN jsonb_build_object(
+    'success', true,
+    'deleted_count', v_deleted_count,
+    'order_id', p_order_id
+  );
+END;
+$$;
+
+-- Grant execute permission
+GRANT EXECUTE ON FUNCTION public.cleanup_duplicate_qr_codes TO authenticated;
