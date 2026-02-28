@@ -378,6 +378,17 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
     const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
     const headers = getAuthHeaders();
     
+    // Safety timeout: Always clear processing state after 30 seconds max
+    const safetyTimeout = setTimeout(() => {
+      console.warn('⚠️ Accept quote operation timed out, clearing loading state');
+      setProcessingId(null);
+      toast({
+        title: 'Operation Timeout',
+        description: 'The operation took too long. Please refresh and try again.',
+        variant: 'destructive',
+      });
+    }, 30000);
+    
     // Helper function to clean up duplicate QR codes with timeout
     const cleanupDuplicateQRCodes = async (orderId: string): Promise<void> => {
       const cleanupTimeout = new Promise<void>((resolve) => {
@@ -646,7 +657,12 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
         variant: 'destructive',
       });
     } finally {
-      setProcessingId(null);
+      // Clear safety timeout
+      clearTimeout(safetyTimeout);
+      // Always clear processing state, even if there was an error
+      setTimeout(() => {
+        setProcessingId(null);
+      }, 100);
     }
   };
 
