@@ -318,11 +318,17 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
     };
   }, [supplierId]);
   
-  // Polling fallback: Check for delivery provider updates every 10 seconds
+  // Polling fallback: Check for delivery provider updates every 15 seconds
   // This ensures we catch updates even if real-time subscription misses them
-  // Use ref to prevent infinite loops
+  // Use refs to prevent infinite loops and track polling state
   const lastPollTimeRef = useRef<number>(0);
   const isPollingRef = useRef<boolean>(false);
+  const ordersRef = useRef<Order[]>([]);
+  
+  // Keep ordersRef in sync with orders state
+  useEffect(() => {
+    ordersRef.current = orders;
+  }, [orders]);
   
   useEffect(() => {
     if (!supplierId) return;
@@ -330,39 +336,37 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
     const pollInterval = setInterval(async () => {
       // Prevent concurrent polling
       if (isPollingRef.current) {
-        console.log('⏸️ Polling already in progress, skipping...');
         return;
       }
       
-      // Only poll if at least 10 seconds have passed since last poll
+      // Only poll if at least 15 seconds have passed since last poll
       const now = Date.now();
-      if (now - lastPollTimeRef.current < 10000) {
+      if (now - lastPollTimeRef.current < 15000) {
         return;
       }
       
-      // Check current orders state (use functional update to get latest)
-      setOrders(currentOrders => {
-        const awaitingProvider = currentOrders.filter(o => 
-          o.delivery_required && 
-          !o.delivery_provider_id && 
-          (o.status === 'confirmed' || o.status === 'quote_accepted' || o.status === 'order_created' || 
-           o.status === 'awaiting_delivery_request' || o.status === 'delivery_requested')
-        );
+      // Check current orders from ref (doesn't trigger re-render)
+      const currentOrders = ordersRef.current;
+      const awaitingProvider = currentOrders.filter(o => 
+        o.delivery_required && 
+        !o.delivery_provider_id && 
+        (o.status === 'confirmed' || o.status === 'quote_accepted' || o.status === 'order_created' || 
+         o.status === 'awaiting_delivery_request' || o.status === 'delivery_requested')
+      );
+      
+      if (awaitingProvider.length > 0) {
+        console.log('🔄 Polling: Checking for delivery provider updates...', awaitingProvider.length, 'orders awaiting');
+        isPollingRef.current = true;
+        lastPollTimeRef.current = now;
         
-        if (awaitingProvider.length > 0) {
-          console.log('🔄 Polling: Checking for delivery provider updates...', awaitingProvider.length, 'orders awaiting');
-          isPollingRef.current = true;
-          lastPollTimeRef.current = now;
-          
-          // Load orders asynchronously
-          loadOrders().finally(() => {
-            isPollingRef.current = false;
-          });
+        // Load orders asynchronously
+        try {
+          await loadOrders();
+        } finally {
+          isPollingRef.current = false;
         }
-        
-        return currentOrders; // Return unchanged to avoid triggering setState
-      });
-    }, 10000); // Poll every 10 seconds (increased to reduce load)
+      }
+    }, 15000); // Poll every 15 seconds (increased to reduce load)
     
     return () => clearInterval(pollInterval);
   }, [supplierId]); // Only depend on supplierId to avoid infinite loops
