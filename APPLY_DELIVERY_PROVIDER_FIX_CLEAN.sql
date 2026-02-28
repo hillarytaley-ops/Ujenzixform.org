@@ -117,33 +117,98 @@ BEGIN
     END IF;
 END $$;
 
--- Step 0.6: Prevent duplicate delivery_requests per purchase_order
--- Add unique constraint to ensure only ONE delivery_request per purchase_order (when purchase_order_id is not null)
+-- Step 0.6: AGGRESSIVE cleanup - Delete ALL duplicates, keep only ONE per purchase_order
 DO $$
+DECLARE
+    deleted_count INTEGER;
 BEGIN
-    -- Drop existing index if it exists (in case it was partially created)
-    DROP INDEX IF EXISTS unique_delivery_request_per_purchase_order;
+    -- Delete duplicates for purchase_orders with purchase_order_id set
+    WITH ranked_requests AS (
+        SELECT 
+            id,
+            purchase_order_id,
+            ROW_NUMBER() OVER (
+                PARTITION BY purchase_order_id 
+                ORDER BY 
+                    CASE WHEN status IN ('accepted', 'assigned', 'in_transit') THEN 1 ELSE 2 END,
+                    CASE WHEN provider_id IS NOT NULL THEN 1 ELSE 2 END,
+                    created_at DESC
+            ) as rn
+        FROM delivery_requests
+        WHERE purchase_order_id IS NOT NULL
+    )
+    DELETE FROM delivery_requests
+    WHERE id IN (
+        SELECT id FROM ranked_requests WHERE rn > 1
+    );
     
-    -- Check if there are still duplicates (shouldn't be after cleanup, but check anyway)
-    IF NOT EXISTS (
-        SELECT 1 FROM (
-            SELECT purchase_order_id, COUNT(*) as cnt
-            FROM delivery_requests
-            WHERE purchase_order_id IS NOT NULL
-            GROUP BY purchase_order_id
-            HAVING COUNT(*) > 1
-        ) duplicates
-    ) THEN
-        -- Create unique partial index (only applies when purchase_order_id is not null)
-        CREATE UNIQUE INDEX unique_delivery_request_per_purchase_order 
-        ON delivery_requests(purchase_order_id) 
-        WHERE purchase_order_id IS NOT NULL AND status IN ('pending', 'accepted', 'assigned', 'in_transit');
-        
-        RAISE NOTICE 'Created unique index to prevent duplicate delivery_requests per purchase_order';
-    ELSE
-        RAISE WARNING 'Cannot create unique index: duplicates still exist. Please clean up manually.';
-    END IF;
+    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+    RAISE NOTICE 'Deleted % duplicate delivery_requests with purchase_order_id', deleted_count;
+    
+    -- Also delete duplicates where purchase_order_id is NULL but they match on builder_id + delivery_address + same hour
+    WITH null_po_ranked AS (
+        SELECT 
+            id,
+            ROW_NUMBER() OVER (
+                PARTITION BY builder_id, delivery_address, DATE_TRUNC('hour', created_at)
+                ORDER BY created_at DESC
+            ) as rn
+        FROM delivery_requests
+        WHERE purchase_order_id IS NULL
+          AND builder_id IS NOT NULL
+          AND delivery_address IS NOT NULL
+          AND status = 'pending'
+    )
+    DELETE FROM delivery_requests
+    WHERE id IN (
+        SELECT id FROM null_po_ranked WHERE rn > 1
+    );
+    
+    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+    RAISE NOTICE 'Deleted % duplicate delivery_requests with NULL purchase_order_id', deleted_count;
 END $$;
+
+-- Step 0.7: Create trigger to PREVENT duplicates at database level
+CREATE OR REPLACE FUNCTION prevent_duplicate_delivery_requests()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    existing_count INTEGER;
+BEGIN
+    -- If purchase_order_id is set, check for existing delivery_request
+    IF NEW.purchase_order_id IS NOT NULL THEN
+        SELECT COUNT(*) INTO existing_count
+        FROM delivery_requests
+        WHERE purchase_order_id = NEW.purchase_order_id
+          AND id != NEW.id  -- Exclude current row if updating
+          AND status IN ('pending', 'accepted', 'assigned', 'in_transit');
+        
+        IF existing_count > 0 THEN
+            RAISE EXCEPTION 'Duplicate delivery request: A delivery request already exists for purchase_order_id %', NEW.purchase_order_id;
+        END IF;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$;
+
+-- Drop existing trigger if it exists
+DROP TRIGGER IF EXISTS trigger_prevent_duplicate_delivery_requests ON delivery_requests;
+
+-- Create trigger BEFORE INSERT or UPDATE
+CREATE TRIGGER trigger_prevent_duplicate_delivery_requests
+    BEFORE INSERT OR UPDATE ON delivery_requests
+    FOR EACH ROW
+    EXECUTE FUNCTION prevent_duplicate_delivery_requests();
+
+-- Step 0.8: Create unique index (after cleanup)
+DROP INDEX IF EXISTS unique_delivery_request_per_purchase_order;
+CREATE UNIQUE INDEX unique_delivery_request_per_purchase_order 
+ON delivery_requests(purchase_order_id) 
+WHERE purchase_order_id IS NOT NULL AND status IN ('pending', 'accepted', 'assigned', 'in_transit');
+
+RAISE NOTICE 'Created unique index and trigger to prevent duplicate delivery_requests';
 
 -- Step 1: Update the trigger function to handle delivery provider acceptance
 CREATE OR REPLACE FUNCTION public.update_order_in_transit()

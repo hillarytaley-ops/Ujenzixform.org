@@ -237,16 +237,20 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
               }
             }
 
-            // DEDUPLICATE: Group by purchase_order_id and keep only the best one
+            // AGGRESSIVE DEDUPLICATE: Multiple strategies to catch all duplicates
+            const seenIds = new Set<string>();
             const deliveryRequestsByPO = new Map<string, any>();
+            const deliveryRequestsByKey = new Map<string, any>(); // For NULL purchase_order_id cases
+            
             deliveryRequests.forEach((req: any) => {
+              // Strategy 1: Deduplicate by purchase_order_id
               if (req.purchase_order_id) {
                 const existing = deliveryRequestsByPO.get(req.purchase_order_id);
                 if (!existing) {
-                  // First one for this purchase_order_id
                   deliveryRequestsByPO.set(req.purchase_order_id, req);
+                  seenIds.add(req.id);
                 } else {
-                  // Keep the best one: prefer accepted/assigned over pending, prefer with provider_id, prefer most recent
+                  // Keep the best one
                   const existingScore = (existing.status === 'accepted' || existing.status === 'assigned' ? 10 : 0) +
                                        (existing.provider_id ? 5 : 0) +
                                        (new Date(existing.created_at).getTime() / 1000000);
@@ -254,18 +258,38 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                                   (req.provider_id ? 5 : 0) +
                                   (new Date(req.created_at).getTime() / 1000000);
                   if (newScore > existingScore) {
+                    seenIds.delete(existing.id);
                     deliveryRequestsByPO.set(req.purchase_order_id, req);
+                    seenIds.add(req.id);
                   }
                 }
               } else {
-                // No purchase_order_id, add it (might be standalone request)
-                deliveryRequestsByPO.set(req.id, req);
+                // Strategy 2: For NULL purchase_order_id, deduplicate by builder_id + delivery_address + same hour
+                const key = `${req.builder_id || 'no-builder'}|${(req.delivery_address || '').toLowerCase().trim()}|${req.created_at ? new Date(req.created_at).toISOString().slice(0, 13) : 'no-date'}`;
+                const existing = deliveryRequestsByKey.get(key);
+                if (!existing && !seenIds.has(req.id)) {
+                  deliveryRequestsByKey.set(key, req);
+                  seenIds.add(req.id);
+                } else if (existing && !seenIds.has(req.id)) {
+                  // Keep the most recent one
+                  const existingTime = new Date(existing.created_at).getTime();
+                  const newTime = new Date(req.created_at).getTime();
+                  if (newTime > existingTime) {
+                    seenIds.delete(existing.id);
+                    deliveryRequestsByKey.set(key, req);
+                    seenIds.add(req.id);
+                  }
+                }
               }
             });
             
-            // Convert map back to array (deduplicated)
-            const deduplicatedRequests = Array.from(deliveryRequestsByPO.values());
-            console.log(`🔍 Deduplicated ${deliveryRequests.length} delivery_requests to ${deduplicatedRequests.length} unique requests`);
+            // Combine both maps and filter out duplicates
+            const deduplicatedRequests = [
+              ...Array.from(deliveryRequestsByPO.values()),
+              ...Array.from(deliveryRequestsByKey.values())
+            ].filter(req => seenIds.has(req.id));
+            
+            console.log(`🔍 AGGRESSIVE DEDUPLICATION: ${deliveryRequests.length} → ${deduplicatedRequests.length} unique requests (removed ${deliveryRequests.length - deduplicatedRequests.length} duplicates)`);
             
             deduplicatedRequests.forEach((req: any) => {
               // Determine the pickup address - use supplier address from cache, or existing pickup_address

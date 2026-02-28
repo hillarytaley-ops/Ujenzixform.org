@@ -144,33 +144,69 @@ const handler = async (req: Request): Promise<Response> => {
     // Create delivery request record in delivery_requests table (using service role bypasses RLS)
     let deliveryRequestId = null;
     try {
-      const deliveryRequestPayload: Record<string, any> = {
-        builder_id: builder_id || null,
-        purchase_order_id: request_id,
-        pickup_address,
-        delivery_address,
-        material_type: material_type || material_details?.[0]?.name || 'Construction Materials',
-        quantity: material_details?.reduce((sum: number, m: any) => sum + (m.quantity || 1), 0) || 1,
-        special_instructions,
-        status: 'pending'
-      };
-      
-      // Add pickup_date if provided
-      if (pickup_date) {
-        deliveryRequestPayload.pickup_date = pickup_date;
+      // CRITICAL: Check if delivery request already exists for this purchase_order_id
+      if (request_id) {
+        const { data: existing } = await supabaseClient
+          .from('delivery_requests')
+          .select('id')
+          .eq('purchase_order_id', request_id)
+          .in('status', ['pending', 'accepted', 'assigned', 'in_transit'])
+          .limit(1)
+          .single();
+        
+        if (existing) {
+          console.log('⚠️ Delivery request already exists for purchase_order_id:', request_id, 'using existing:', existing.id);
+          deliveryRequestId = existing.id;
+        }
       }
+      
+      // Only create if it doesn't exist
+      if (!deliveryRequestId) {
+        const deliveryRequestPayload: Record<string, any> = {
+          builder_id: builder_id || null,
+          purchase_order_id: request_id,
+          pickup_address,
+          delivery_address,
+          material_type: material_type || material_details?.[0]?.name || 'Construction Materials',
+          quantity: material_details?.reduce((sum: number, m: any) => sum + (m.quantity || 1), 0) || 1,
+          special_instructions,
+          status: 'pending'
+        };
+        
+        // Add pickup_date if provided
+        if (pickup_date) {
+          deliveryRequestPayload.pickup_date = pickup_date;
+        }
 
-      const { data: deliveryRequest, error: drError } = await supabaseClient
-        .from('delivery_requests')
-        .insert(deliveryRequestPayload)
-        .select('id')
-        .single();
+        const { data: deliveryRequest, error: drError } = await supabaseClient
+          .from('delivery_requests')
+          .insert(deliveryRequestPayload)
+          .select('id')
+          .single();
 
-      if (drError) {
-        console.log('Error creating delivery_request:', drError.message);
-      } else {
-        deliveryRequestId = deliveryRequest?.id;
-        console.log('✅ Delivery request created:', deliveryRequestId);
+        if (drError) {
+          // If duplicate error, try to find existing
+          if (drError.message.includes('unique') || drError.message.includes('duplicate')) {
+            console.log('⚠️ Duplicate detected, finding existing delivery request...');
+            if (request_id) {
+              const { data: existing } = await supabaseClient
+                .from('delivery_requests')
+                .select('id')
+                .eq('purchase_order_id', request_id)
+                .limit(1)
+                .single();
+              if (existing) {
+                deliveryRequestId = existing.id;
+                console.log('✅ Found existing delivery request:', deliveryRequestId);
+              }
+            }
+          } else {
+            console.log('Error creating delivery_request:', drError.message);
+          }
+        } else {
+          deliveryRequestId = deliveryRequest?.id;
+          console.log('✅ Delivery request created:', deliveryRequestId);
+        }
       }
     } catch (e) {
       console.log('Could not create delivery_request:', e);
