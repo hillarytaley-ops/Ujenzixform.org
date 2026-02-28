@@ -1018,7 +1018,7 @@ const SupplierDashboard = () => {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
         
-        const response = await fetch(
+        let response = await fetch(
           `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${quoteId}`,
           {
             method: 'PATCH',
@@ -1035,7 +1035,56 @@ const SupplierDashboard = () => {
         
         clearTimeout(timeoutId);
         
-        if (!response.ok) {
+        // Handle JWT expiration - refresh token and retry
+        if (response.status === 401) {
+          console.log('🔄 JWT expired, refreshing token and retrying...');
+          try {
+            // Refresh session using Supabase client
+            const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
+            
+            if (refreshError) {
+              console.error('❌ Token refresh failed:', refreshError);
+              throw new Error('Session expired. Please refresh the page and try again.');
+            }
+            
+            if (newSession?.access_token) {
+              // Retry with new token
+              const retryController = new AbortController();
+              const retryTimeoutId = setTimeout(() => retryController.abort(), 10000);
+              
+              response = await fetch(
+                `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${quoteId}`,
+                {
+                  method: 'PATCH',
+                  headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${newSession.access_token}`,
+                    'Content-Type': 'application/json',
+                    'Prefer': 'return=representation'
+                  },
+                  body: JSON.stringify(updateData),
+                  signal: retryController.signal
+                }
+              );
+              
+              clearTimeout(retryTimeoutId);
+              
+              if (!response.ok) {
+                const errorText = await response.text();
+                console.error('❌ Error updating purchase order after retry:', response.status, errorText);
+                throw new Error(`Failed to update quote: ${response.status}`);
+              }
+            } else {
+              throw new Error('Session expired. Please refresh the page and try again.');
+            }
+          } catch (retryError: any) {
+            console.error('❌ Retry failed:', retryError);
+            if (retryError.message) {
+              throw retryError;
+            }
+            throw new Error('Session expired. Please refresh the page and try again.');
+          }
+        } else if (!response.ok) {
           const errorText = await response.text();
           console.error('❌ Error updating purchase order:', response.status, errorText);
           throw new Error(`Failed to update quote: ${response.status}`);
