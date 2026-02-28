@@ -600,10 +600,11 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     
     const seenPOIds = new Set<string>();
     const seenIds = new Set<string>();
+    const seenByAddressMaterial = new Map<string, Notification>(); // For cases without purchase_order_id
     const filtered: Notification[] = [];
     
     notifications.forEach((notif: Notification & { purchase_order_id?: string }) => {
-      // ONLY ONE per purchase_order_id - PERIOD. NO EXCEPTIONS.
+      // Strategy 1: ONLY ONE per purchase_order_id - PERIOD. NO EXCEPTIONS.
       if (notif.purchase_order_id) {
         if (!seenPOIds.has(notif.purchase_order_id)) {
           seenPOIds.add(notif.purchase_order_id);
@@ -611,14 +612,31 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         } else {
           console.log(`🛡️ REMOVED DUPLICATE: purchase_order_id ${notif.purchase_order_id}`);
         }
-      } else if (!seenIds.has(notif.id)) {
-        seenIds.add(notif.id);
-        filtered.push(notif);
+      } else {
+        // Strategy 2: If no purchase_order_id, deduplicate by delivery address + material type
+        const addressMaterialKey = `${(notif.deliveryAddress || '').toLowerCase().trim()}|${(notif.materialType || '').toLowerCase().trim()}`;
+        if (addressMaterialKey !== '|' && seenByAddressMaterial.has(addressMaterialKey)) {
+          console.log(`🛡️ REMOVED DUPLICATE: Same delivery address + material type: ${addressMaterialKey}`);
+        } else if (addressMaterialKey !== '|') {
+          seenByAddressMaterial.set(addressMaterialKey, notif);
+          filtered.push(notif);
+        } else if (!seenIds.has(notif.id)) {
+          // Strategy 3: Fallback - by notification id
+          seenIds.add(notif.id);
+          filtered.push(notif);
+        }
       }
     });
     
     if (filtered.length !== notifications.length) {
       console.log(`🛡️ BULLETPROOF FILTER: ${notifications.length} → ${filtered.length} (removed ${notifications.length - filtered.length} duplicates)`);
+      console.log(`🛡️ DUPLICATES REMOVED - Details:`, {
+        original: notifications.length,
+        filtered: filtered.length,
+        byPO: Array.from(seenPOIds).length,
+        byAddressMaterial: seenByAddressMaterial.size,
+        byId: Array.from(seenIds).length
+      });
     }
     
     return filtered;
