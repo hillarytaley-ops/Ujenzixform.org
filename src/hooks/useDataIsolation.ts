@@ -700,18 +700,26 @@ export const useDeliveryProviderData = () => {
     console.log('✅ acceptDelivery: Accepting delivery', deliveryId, 'for provider', userId);
 
     try {
+      // Generate tracking number
+      const trackingNumber = 'TRK-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + 
+        Math.random().toString(36).substring(2, 7).toUpperCase();
+      
       const { error } = await supabase
         .from('delivery_requests')
         .update({ 
           provider_id: userId,
-          status: 'assigned',
-          accepted_at: new Date().toISOString()
+          status: 'accepted', // CRITICAL: Must be 'accepted' to trigger update_order_in_transit() function
+          tracking_number: trackingNumber,
+          accepted_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         })
         .eq('id', deliveryId)
         .eq('status', 'pending') // Only accept pending requests
         .is('provider_id', null); // Only accept unassigned requests
 
       if (error) throw error;
+
+      console.log('✅ Delivery request accepted - trigger should update purchase_orders');
 
       // Refresh data
       await fetchData();
