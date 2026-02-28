@@ -138,6 +138,21 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       const deliveryRequestsByKey = new Map<string, any>(); // For NULL purchase_order_id cases
       let duplicatesRemoved = 0;
       let nullPORequests = 0;
+      const poIdCounts = new Map<string, number>(); // Track how many times each PO ID appears
+      
+      // First pass: count occurrences of each purchase_order_id
+      deliveryRequests.forEach((dr: any) => {
+        if (dr.purchase_order_id) {
+          poIdCounts.set(dr.purchase_order_id, (poIdCounts.get(dr.purchase_order_id) || 0) + 1);
+        }
+      });
+      
+      // Log any purchase_order_ids that appear multiple times
+      poIdCounts.forEach((count, poId) => {
+        if (count > 1) {
+          console.log(`⚠️ DUPLICATE DETECTED: purchase_order_id ${poId} appears ${count} times!`);
+        }
+      });
       
       deliveryRequests.forEach((dr: any) => {
         if (dr.purchase_order_id) {
@@ -157,9 +172,9 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                             (new Date(dr.created_at).getTime() / 1000000);
             if (newScore > existingScore) {
               deliveryRequestsByPO.set(dr.purchase_order_id, dr);
-              console.log(`🔄 Replaced duplicate for PO ${dr.purchase_order_id} (better score)`);
+              console.log(`🔄 Replaced duplicate for PO ${dr.purchase_order_id} (better score) - DR IDs: ${existing.id} → ${dr.id}`);
             } else {
-              console.log(`🗑️ Removed duplicate for PO ${dr.purchase_order_id} (keeping existing)`);
+              console.log(`🗑️ Removed duplicate for PO ${dr.purchase_order_id} (keeping existing) - DR ID: ${dr.id}`);
             }
           }
         } else {
@@ -177,9 +192,9 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             const newTime = new Date(dr.created_at).getTime();
             if (newTime > existingTime) {
               deliveryRequestsByKey.set(key, dr);
-              console.log(`🔄 Replaced duplicate NULL PO request (newer): ${key}`);
+              console.log(`🔄 Replaced duplicate NULL PO request (newer): ${key} - DR IDs: ${existing.id} → ${dr.id}`);
             } else {
-              console.log(`🗑️ Removed duplicate NULL PO request (keeping older): ${key}`);
+              console.log(`🗑️ Removed duplicate NULL PO request (keeping older): ${key} - DR ID: ${dr.id}`);
             }
           }
         }
@@ -187,6 +202,12 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       
       const totalUnique = deliveryRequestsByPO.size + deliveryRequestsByKey.size;
       console.log(`🔍 Deduplicated delivery_requests: ${deliveryRequests.length} → ${totalUnique} unique (removed ${duplicatesRemoved} duplicates, ${nullPORequests} had NULL purchase_order_id)`);
+      
+      // Final check: ensure we only have one notification per purchase_order_id
+      const finalPOIds = new Set<string>();
+      const finalNotificationsByPO = new Map<string, Notification>();
+      
+      // This will be used later to ensure no duplicates in finalNotifications
       
       // STEP 3: Create notifications from unique delivery_requests
       for (const [poId, dr] of deliveryRequestsByPO.entries()) {
@@ -366,8 +387,13 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         }
       );
       
+      let result: any[] = [];
+      if (updateResponse.ok) {
+        result = await updateResponse.json().catch(() => []);
+      }
+      
       // If that didn't work (no rows updated), try with provider_id matching this provider
-      if (!updateResponse.ok || (updateResponse.ok && (await updateResponse.json().catch(() => [])).length === 0)) {
+      if (!updateResponse.ok || result.length === 0) {
         const queryParams2 = new URLSearchParams({
           id: `eq.${requestId}`,
           status: `in.(pending,assigned)`,
@@ -388,22 +414,28 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             })
           }
         );
+        
+        if (updateResponse.ok) {
+          result = await updateResponse.json().catch(() => []);
+        }
       }
       
-      if (updateResponse.ok) {
-        const result = await updateResponse.json();
-        if (result && result.length > 0) {
-          toast({
-            title: '✅ Delivery Accepted!',
-            description: `Tracking: ${trackingNumber}`,
-          });
-          loadNotifications();
-        } else {
-          throw new Error('Failed to accept delivery');
-        }
+      if (updateResponse.ok && result && result.length > 0) {
+        toast({
+          title: '✅ Delivery Accepted!',
+          description: `Tracking: ${trackingNumber}`,
+        });
+        loadNotifications();
       } else {
-        const errorData = await updateResponse.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Failed to accept delivery');
+        const errorText = await updateResponse.text().catch(() => 'Unknown error');
+        let errorMessage = 'Failed to accept delivery';
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.message || errorMessage;
+        } catch {
+          errorMessage = errorText || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
     } catch (error: any) {
       console.error('❌ Error accepting delivery:', error);
