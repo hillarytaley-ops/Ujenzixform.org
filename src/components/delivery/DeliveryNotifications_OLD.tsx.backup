@@ -1,0 +1,1419 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { 
+  Bell, BellOff, Volume2, VolumeX, Vibrate, 
+  Package, Truck, AlertTriangle, CheckCircle, X,
+  Clock, MapPin, DollarSign, Star, RefreshCw,
+  Check, XCircle, Loader2, Copy, Navigation, ExternalLink
+} from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+
+interface Notification {
+  id: string;
+  type: 'new_delivery' | 'status_update' | 'payment' | 'rating' | 'urgent' | 'system';
+  title: string;
+  message: string;
+  timestamp: Date;
+  read: boolean;
+  actionUrl?: string;
+  priority: 'low' | 'medium' | 'high';
+  status?: string; // The actual delivery status (pending, assigned, in_transit, etc.)
+  pickupAddress?: string;
+  deliveryAddress?: string;
+  materialType?: string;
+  quantity?: string;
+  estimatedCost?: number;
+}
+
+interface NotificationSettings {
+  pushEnabled: boolean;
+  soundEnabled: boolean;
+  vibrationEnabled: boolean;
+  newDeliveryAlerts: boolean;
+  statusUpdates: boolean;
+  paymentNotifications: boolean;
+  ratingNotifications: boolean;
+  urgentOnly: boolean;
+}
+
+interface DeliveryNotificationsProps {
+  userId: string;
+  onNotificationClick?: (notification: Notification) => void;
+  onAcceptDelivery?: (requestId: string) => void;
+  onRejectDelivery?: (requestId: string) => void;
+}
+
+export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
+  userId,
+  onNotificationClick,
+  onAcceptDelivery,
+  onRejectDelivery
+}) => {
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [acceptingId, setAcceptingId] = useState<string | null>(null);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const acceptingRef = useRef<string | null>(null); // Use ref for immediate click prevention
+  const [settings, setSettings] = useState<NotificationSettings>({
+    pushEnabled: false,
+    soundEnabled: true,
+    vibrationEnabled: true,
+    newDeliveryAlerts: true,
+    statusUpdates: true,
+    paymentNotifications: true,
+    ratingNotifications: true,
+    urgentOnly: false
+  });
+  const [showSettings, setShowSettings] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const { toast } = useToast();
+
+  // Request notification permission
+  const requestNotificationPermission = async () => {
+    if (!('Notification' in window)) {
+      toast({
+        title: "Not supported",
+        description: "Push notifications are not supported in this browser",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+      setSettings(prev => ({ ...prev, pushEnabled: true }));
+      toast({
+        title: "Notifications enabled",
+        description: "You'll receive push notifications for deliveries",
+      });
+      
+      // Register service worker for push notifications
+      if ('serviceWorker' in navigator) {
+        try {
+          const registration = await navigator.serviceWorker.ready;
+          console.log('Service Worker ready for push notifications');
+        } catch (error) {
+          console.error('Service Worker error:', error);
+        }
+      }
+    } else {
+      toast({
+        title: "Permission denied",
+        description: "Enable notifications in browser settings",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Send local notification
+  const sendLocalNotification = (notification: Notification) => {
+    if (settings.pushEnabled && Notification.permission === 'granted') {
+      new Notification(notification.title, {
+        body: notification.message,
+        icon: '/icons/icon-192x192.png',
+        badge: '/icons/icon-72x72.png',
+        tag: notification.id,
+        requireInteraction: notification.priority === 'high'
+      });
+    }
+
+    if (settings.soundEnabled) {
+      playNotificationSound(notification.priority);
+    }
+
+    if (settings.vibrationEnabled && navigator.vibrate) {
+      const pattern = notification.priority === 'high' ? [200, 100, 200] : [100];
+      navigator.vibrate(pattern);
+    }
+  };
+
+  // Play notification sound
+  const playNotificationSound = (priority: string) => {
+    const audio = new Audio(
+      priority === 'high' 
+        ? '/sounds/urgent-notification.mp3' 
+        : '/sounds/notification.mp3'
+    );
+    audio.volume = 0.5;
+    audio.play().catch(console.error);
+  };
+
+  const [loading, setLoading] = useState(true);
+
+  // Helper to get auth token from localStorage
+  const getAuthHeaders = () => {
+    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+    
+    let accessToken = SUPABASE_ANON_KEY;
+    try {
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        if (parsed.access_token) {
+          accessToken = parsed.access_token;
+        }
+      }
+    } catch (e) {
+      console.warn('Could not get auth token from localStorage');
+    }
+    
+    return {
+      url: SUPABASE_URL,
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    };
+  };
+
+  // Fetch supplier address by ID
+  const fetchSupplierAddress = async (supplierId: string): Promise<string> => {
+    try {
+      const { url, headers } = getAuthHeaders();
+      const response = await fetch(
+        `${url}/rest/v1/suppliers?id=eq.${supplierId}&select=company_name,address,location`,
+        { headers, cache: 'no-store' }
+      );
+      if (response.ok) {
+        const suppliers = await response.json();
+        if (suppliers?.[0]) {
+          const s = suppliers[0];
+          // Return the actual address, or company name + location, or just company name
+          return s.address || (s.location ? `${s.company_name}, ${s.location}` : s.company_name) || 'Supplier location';
+        }
+      }
+    } catch (e) {
+      console.warn('Could not fetch supplier address');
+    }
+    return 'Supplier location';
+  };
+
+  // Fetch real delivery requests from database
+  const loadNotifications = useCallback(async () => {
+    try {
+      setLoading(true);
+      console.log('🔔 DeliveryNotifications: Starting to load notifications...');
+      const allNotifications: Notification[] = [];
+      const supplierAddressCache: Record<string, string> = {};
+
+      const { url, headers } = getAuthHeaders();
+
+      // Fetch ALL delivery requests using direct REST API (bypasses potential RLS issues)
+      // Focus on pending requests that delivery providers should see
+      let deliveryRequests: any[] = [];
+      try {
+        const reqResponse = await fetch(
+          `${url}/rest/v1/delivery_requests?order=created_at.desc&limit=50`,
+          { headers, cache: 'no-store' }
+        );
+        
+        if (reqResponse.ok) {
+          deliveryRequests = await reqResponse.json();
+          console.log('📦 delivery_requests query result:', { data: deliveryRequests, count: deliveryRequests?.length });
+          
+          if (deliveryRequests && deliveryRequests.length > 0) {
+            // Fetch supplier addresses for requests that have supplier_id
+            const supplierIds = [...new Set(deliveryRequests.filter((r: any) => r.supplier_id).map((r: any) => r.supplier_id))];
+            if (supplierIds.length > 0) {
+              try {
+                const suppliersResponse = await fetch(
+                  `${url}/rest/v1/suppliers?id=in.(${supplierIds.join(',')})&select=id,company_name,address,location`,
+                  { headers, cache: 'no-store' }
+                );
+                if (suppliersResponse.ok) {
+                  const suppliers = await suppliersResponse.json();
+                  suppliers.forEach((s: any) => {
+                    supplierAddressCache[s.id] = s.address || (s.location ? `${s.company_name}, ${s.location}` : s.company_name) || 'Supplier location';
+                  });
+                }
+              } catch (e) {
+                console.warn('Could not batch fetch supplier addresses');
+              }
+            }
+
+            // AGGRESSIVE DEDUPLICATE: Multiple strategies to catch all duplicates
+            const seenIds = new Set<string>();
+            const deliveryRequestsByPO = new Map<string, any>();
+            const deliveryRequestsByKey = new Map<string, any>(); // For NULL purchase_order_id cases
+            
+            deliveryRequests.forEach((req: any) => {
+              // Strategy 1: Deduplicate by purchase_order_id
+              if (req.purchase_order_id) {
+                const existing = deliveryRequestsByPO.get(req.purchase_order_id);
+                if (!existing) {
+                  deliveryRequestsByPO.set(req.purchase_order_id, req);
+                  seenIds.add(req.id);
+                } else {
+                  // Keep the best one
+                  const existingScore = (existing.status === 'accepted' || existing.status === 'assigned' ? 10 : 0) +
+                                       (existing.provider_id ? 5 : 0) +
+                                       (new Date(existing.created_at).getTime() / 1000000);
+                  const newScore = (req.status === 'accepted' || req.status === 'assigned' ? 10 : 0) +
+                                  (req.provider_id ? 5 : 0) +
+                                  (new Date(req.created_at).getTime() / 1000000);
+                  if (newScore > existingScore) {
+                    seenIds.delete(existing.id);
+                    deliveryRequestsByPO.set(req.purchase_order_id, req);
+                    seenIds.add(req.id);
+                  }
+                }
+              } else {
+                // Strategy 2: For NULL purchase_order_id, deduplicate by builder_id + delivery_address + same hour
+                const key = `${req.builder_id || 'no-builder'}|${(req.delivery_address || '').toLowerCase().trim()}|${req.created_at ? new Date(req.created_at).toISOString().slice(0, 13) : 'no-date'}`;
+                const existing = deliveryRequestsByKey.get(key);
+                if (!existing && !seenIds.has(req.id)) {
+                  deliveryRequestsByKey.set(key, req);
+                  seenIds.add(req.id);
+                } else if (existing && !seenIds.has(req.id)) {
+                  // Keep the most recent one
+                  const existingTime = new Date(existing.created_at).getTime();
+                  const newTime = new Date(req.created_at).getTime();
+                  if (newTime > existingTime) {
+                    seenIds.delete(existing.id);
+                    deliveryRequestsByKey.set(key, req);
+                    seenIds.add(req.id);
+                  }
+                }
+              }
+            });
+            
+            // Combine both maps and filter out duplicates
+            const deduplicatedRequests = [
+              ...Array.from(deliveryRequestsByPO.values()),
+              ...Array.from(deliveryRequestsByKey.values())
+            ].filter(req => seenIds.has(req.id));
+            
+            console.log(`🔍 AGGRESSIVE DEDUPLICATION: ${deliveryRequests.length} → ${deduplicatedRequests.length} unique requests (removed ${deliveryRequests.length - deduplicatedRequests.length} duplicates)`);
+            
+            deduplicatedRequests.forEach((req: any) => {
+              // Determine the pickup address - use supplier address from cache, or existing pickup_address
+              let pickupAddr = req.pickup_address || req.pickup_location || '';
+              if (req.supplier_id && supplierAddressCache[req.supplier_id]) {
+                pickupAddr = supplierAddressCache[req.supplier_id];
+              }
+              // If pickup address is generic "Supplier location", try to enrich it
+              if (pickupAddr === 'Supplier location' && req.supplier_name) {
+                pickupAddr = `${req.supplier_name} - Pickup`;
+              }
+
+              allNotifications.push({
+                id: req.id,
+                type: 'new_delivery',
+                title: req.status === 'pending' ? '🚚 New Delivery Request!' : `Delivery ${req.status}`,
+                message: `${req.material_type || 'Materials'} delivery to ${req.delivery_address || 'Unknown location'}`,
+                timestamp: new Date(req.created_at),
+                read: req.status !== 'pending',
+                priority: req.priority_level === 'urgent' || req.status === 'pending' ? 'high' : 'medium',
+                actionUrl: `/delivery-dashboard?request=${req.id}`,
+                status: req.status,
+                pickupAddress: pickupAddr,
+                deliveryAddress: req.delivery_address || req.delivery_location || '',
+                materialType: req.material_type || '',
+                quantity: req.quantity || '',
+                estimatedCost: req.estimated_cost || req.budget_range || 0,
+                purchase_order_id: req.purchase_order_id, // CRITICAL: Store for final deduplication
+                source: 'delivery_requests' // Mark as coming from delivery_requests
+              } as Notification & { purchase_order_id?: string; source?: string });
+            });
+            console.log(`✅ Loaded ${deliveryRequests.length} delivery_requests`);
+          } else {
+            console.log('⚠️ No delivery_requests found in database');
+          }
+        } else {
+          console.error('❌ delivery_requests fetch failed:', reqResponse.status, reqResponse.statusText);
+        }
+      } catch (e: any) {
+        console.error('❌ Error fetching delivery_requests:', e.message);
+      }
+
+      // ALSO fetch from purchase_orders for orders that are awaiting delivery providers
+      // These are orders where quotes were accepted and delivery was requested
+      try {
+        // Include ALL statuses where orders need delivery providers
+        // This includes quote_accepted (just accepted) and awaiting_delivery_request (waiting for builder to request delivery)
+        // Also include legacy statuses that might still be in use
+        const statuses = [
+          'quote_accepted',
+          'order_created',
+          'awaiting_delivery_request',
+          'delivery_requested',
+          'awaiting_delivery_provider',
+          'delivery_assigned',
+          'ready_for_dispatch',
+          'dispatched',
+          'in_transit',
+          // Legacy statuses
+          'pending',
+          'quoted',
+          'confirmed',
+          'accepted'
+        ].join(',');
+        
+        const poResponse = await fetch(
+          `${url}/rest/v1/purchase_orders?status=in.(${statuses})&order=created_at.desc&limit=100`,
+          { headers, cache: 'no-store' }
+        );
+        
+        console.log('📦 purchase_orders fetch status:', poResponse.status, poResponse.statusText);
+        
+        if (poResponse.ok) {
+          const purchaseOrders = await poResponse.json();
+          console.log('📦 purchase_orders query result:', { data: purchaseOrders, count: purchaseOrders?.length });
+          
+          if (!purchaseOrders || purchaseOrders.length === 0) {
+            console.log('⚠️ No purchase_orders found - this might be an RLS issue. Check RLS policies.');
+          }
+          
+          if (purchaseOrders && purchaseOrders.length > 0) {
+            // Get unique supplier IDs for address lookup
+            const supplierIds = [...new Set(purchaseOrders.filter((po: any) => po.supplier_id).map((po: any) => po.supplier_id))];
+            if (supplierIds.length > 0) {
+              try {
+                const suppliersResponse = await fetch(
+                  `${url}/rest/v1/suppliers?id=in.(${supplierIds.join(',')})&select=id,company_name,address,location`,
+                  { headers, cache: 'no-store' }
+                );
+                if (suppliersResponse.ok) {
+                  const suppliers = await suppliersResponse.json();
+                  suppliers.forEach((s: any) => {
+                    supplierAddressCache[s.id] = s.address || (s.location ? `${s.company_name}, ${s.location}` : s.company_name) || 'Supplier location';
+                  });
+                }
+              } catch (e) {
+                console.warn('Could not batch fetch supplier addresses for purchase orders');
+              }
+            }
+
+            // Convert purchase_orders to notifications
+            purchaseOrders.forEach((po: any) => {
+              // Skip if there's already a delivery_request for this purchase_order
+              // Check if any notification has this purchase_order_id or if delivery_requests already has this purchase_order_id
+              const hasDeliveryRequest = allNotifications.some(n => {
+                const notif = n as any;
+                return notif.purchase_order_id === po.id;
+              });
+              
+              // Also check if delivery_requests already has a record for this purchase_order
+              const deliveryRequestExists = deliveryRequests.some((dr: any) => 
+                dr.purchase_order_id === po.id
+              );
+              
+              if (hasDeliveryRequest || deliveryRequestExists) {
+                console.log('⏭️ Skipping purchase_order (already has delivery_request):', po.id);
+                return;
+              }
+
+              // Determine pickup address
+              let pickupAddr = po.supplier_address || '';
+              if (po.supplier_id && supplierAddressCache[po.supplier_id]) {
+                pickupAddr = supplierAddressCache[po.supplier_id];
+              }
+              if (!pickupAddr && po.supplier_name) {
+                pickupAddr = `${po.supplier_name} - Pickup Location`;
+              }
+              if (!pickupAddr) {
+                pickupAddr = 'Supplier location';
+              }
+
+              // Determine material type from items
+              const materialType = po.items && po.items.length > 0
+                ? po.items.map((item: any) => item.material_name || item.name).join(', ')
+                : 'Construction Materials';
+
+              // Determine status for notification
+              let notificationStatus = 'pending';
+              let notificationTitle = '🚚 New Delivery Request!';
+              if (po.status === 'delivery_assigned' || po.status === 'ready_for_dispatch') {
+                notificationStatus = 'assigned';
+                notificationTitle = '📦 Order Ready for Dispatch';
+              } else if (po.status === 'delivery_requested') {
+                notificationStatus = 'pending';
+                notificationTitle = '🚚 Delivery Requested';
+              } else if (po.status === 'awaiting_delivery_provider') {
+                notificationStatus = 'pending';
+                notificationTitle = '⏳ Awaiting Delivery Provider';
+              } else if (po.status === 'quote_accepted' || po.status === 'order_created' || po.status === 'awaiting_delivery_request') {
+                notificationStatus = 'pending';
+                notificationTitle = '✅ Quote Accepted - Awaiting Delivery Request';
+              }
+
+              allNotifications.push({
+                id: `po-${po.id}`, // Prefix to avoid conflicts
+                type: 'new_delivery',
+                title: notificationTitle,
+                message: `${materialType} delivery to ${po.delivery_address || 'Unknown location'}`,
+                timestamp: new Date(po.delivery_requested_at || po.order_created_at || po.created_at),
+                read: po.status !== 'delivery_requested' && po.status !== 'awaiting_delivery_provider',
+                priority: po.status === 'ready_for_dispatch' ? 'high' : 'medium',
+                actionUrl: `/delivery-dashboard?order=${po.id}`,
+                status: notificationStatus,
+                pickupAddress: pickupAddr,
+                deliveryAddress: po.delivery_address || '',
+                materialType: materialType,
+                quantity: po.items?.length || 1,
+                estimatedCost: po.total_amount || po.estimated_cost || 0,
+                purchase_order_id: po.id, // Store for reference
+                source: 'purchase_orders' // Mark as coming from purchase_orders
+              } as Notification & { purchase_order_id?: string; source?: string });
+            });
+            console.log(`✅ Loaded ${purchaseOrders.length} purchase_orders awaiting delivery`);
+          }
+        } else {
+          const errorText = await poResponse.text().catch(() => 'Could not read error');
+          console.error('❌ purchase_orders fetch failed:', poResponse.status, poResponse.statusText, errorText);
+          
+          if (poResponse.status === 403) {
+            console.error('🔒 RLS POLICY ISSUE: Delivery provider may not have permission to view purchase_orders. Run migration: 20260227_allow_delivery_providers_view_purchase_orders.sql');
+          }
+        }
+      } catch (e: any) {
+        console.error('❌ Error fetching purchase_orders:', e.message);
+      }
+
+      // NOTE: We use both delivery_requests and purchase_orders as sources
+      // delivery_requests are created when builder explicitly requests delivery
+      // purchase_orders with delivery statuses are orders that need delivery providers
+
+      // FINAL AGGRESSIVE DEDUPLICATION: Remove duplicates by purchase_order_id at notification level
+      // This ensures only ONE notification per purchase_order_id, even if they came from different sources
+      const finalDeduplicated: Notification[] = [];
+      const seenPurchaseOrderIds = new Set<string>();
+      const seenNotificationIds = new Set<string>();
+      
+      // Sort by timestamp descending first
+      allNotifications.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+      
+      // Also deduplicate by delivery address + material type for cases where purchase_order_id might be missing
+      const seenByAddressAndMaterial = new Map<string, Notification>();
+      
+      allNotifications.forEach((notification: Notification & { purchase_order_id?: string; source?: string }) => {
+        // Strategy 1: If notification has purchase_order_id, deduplicate by it (STRICTEST)
+        if (notification.purchase_order_id) {
+          if (!seenPurchaseOrderIds.has(notification.purchase_order_id)) {
+            seenPurchaseOrderIds.add(notification.purchase_order_id);
+            finalDeduplicated.push(notification);
+          } else {
+            // Duplicate found - prefer delivery_requests over purchase_orders
+            const existingIndex = finalDeduplicated.findIndex(n => {
+              const notif = n as any;
+              return notif.purchase_order_id === notification.purchase_order_id;
+            });
+            if (existingIndex >= 0) {
+              const existing = finalDeduplicated[existingIndex] as any;
+              // If new one is from delivery_requests and existing is from purchase_orders, replace it
+              if (notification.source === 'delivery_requests' && existing.source === 'purchase_orders') {
+                console.log(`🔍 Replacing purchase_order notification with delivery_request for po_id: ${notification.purchase_order_id}`);
+                finalDeduplicated[existingIndex] = notification;
+              } else {
+                console.log(`🔍 Removed duplicate notification for purchase_order_id: ${notification.purchase_order_id} (keeping existing)`);
+              }
+            }
+          }
+        } else {
+          // Strategy 2: No purchase_order_id - deduplicate by delivery address + material type (for same delivery)
+          const addressMaterialKey = `${(notification.deliveryAddress || '').toLowerCase().trim()}|${(notification.materialType || '').toLowerCase().trim()}`;
+          if (addressMaterialKey !== '|' && seenByAddressAndMaterial.has(addressMaterialKey)) {
+            // Duplicate by address + material - keep the first one (or most recent)
+            const existing = seenByAddressAndMaterial.get(addressMaterialKey)!;
+            const existingTime = existing.timestamp.getTime();
+            const newTime = notification.timestamp.getTime();
+            if (newTime > existingTime) {
+              // Replace with newer one
+              const existingIndex = finalDeduplicated.findIndex(n => n.id === existing.id);
+              if (existingIndex >= 0) {
+                console.log(`🔍 Replacing duplicate by address+material: ${addressMaterialKey}`);
+                finalDeduplicated[existingIndex] = notification;
+                seenByAddressAndMaterial.set(addressMaterialKey, notification);
+              }
+            } else {
+              console.log(`🔍 Removed duplicate by address+material (keeping older): ${addressMaterialKey}`);
+            }
+          } else if (addressMaterialKey !== '|') {
+            // New unique address+material combination
+            seenByAddressAndMaterial.set(addressMaterialKey, notification);
+            finalDeduplicated.push(notification);
+          } else {
+            // Strategy 3: Fallback - deduplicate by notification id only
+            if (!seenNotificationIds.has(notification.id)) {
+              seenNotificationIds.add(notification.id);
+              finalDeduplicated.push(notification);
+            }
+          }
+        }
+      });
+
+      console.log(`🔔 FINAL DEDUPLICATED: ${allNotifications.length} → ${finalDeduplicated.length} unique notifications (removed ${allNotifications.length - finalDeduplicated.length} duplicates)`);
+      
+      // ABSOLUTE FINAL FILTER: Remove ANY duplicates by purchase_order_id, no matter what
+      const absoluteFinal: Notification[] = [];
+      const finalSeenPOIds = new Set<string>();
+      const finalSeenIds = new Set<string>();
+      
+      finalDeduplicated.forEach((notif: Notification & { purchase_order_id?: string }) => {
+        if (notif.purchase_order_id) {
+          if (!finalSeenPOIds.has(notif.purchase_order_id)) {
+            finalSeenPOIds.add(notif.purchase_order_id);
+            absoluteFinal.push(notif);
+          }
+        } else if (!finalSeenIds.has(notif.id)) {
+          finalSeenIds.add(notif.id);
+          absoluteFinal.push(notif);
+        }
+      });
+      
+      console.log(`🛡️ ABSOLUTE FINAL: ${finalDeduplicated.length} → ${absoluteFinal.length} (removed ${finalDeduplicated.length - absoluteFinal.length} more duplicates)`);
+      
+      // ONE MORE TIME: Final check before setting state
+      const ultimateFinal: Notification[] = [];
+      const ultimateSeenPO = new Set<string>();
+      absoluteFinal.forEach((n: Notification & { purchase_order_id?: string }) => {
+        if (n.purchase_order_id) {
+          if (!ultimateSeenPO.has(n.purchase_order_id)) {
+            ultimateSeenPO.add(n.purchase_order_id);
+            ultimateFinal.push(n);
+          }
+        } else {
+          ultimateFinal.push(n);
+        }
+      });
+      
+      console.log(`🛡️ ULTIMATE FINAL: ${absoluteFinal.length} → ${ultimateFinal.length}`);
+      
+      setNotifications(ultimateFinal);
+      setUnreadCount(ultimateFinal.filter(n => !n.read).length);
+    } catch (error: any) {
+      console.error('❌ Error loading notifications:', error.message || error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // ABSOLUTE BULLETPROOF DEDUPLICATION: Use useMemo to filter duplicates before rendering
+  const deduplicatedNotifications = React.useMemo(() => {
+    if (notifications.length === 0) return notifications;
+    
+    const seenPOIds = new Set<string>();
+    const seenIds = new Set<string>();
+    const seenByAddressMaterial = new Map<string, Notification>(); // For cases without purchase_order_id
+    const filtered: Notification[] = [];
+    
+    notifications.forEach((notif: Notification & { purchase_order_id?: string }) => {
+      // Strategy 1: ONLY ONE per purchase_order_id - PERIOD. NO EXCEPTIONS.
+      if (notif.purchase_order_id) {
+        if (!seenPOIds.has(notif.purchase_order_id)) {
+          seenPOIds.add(notif.purchase_order_id);
+          filtered.push(notif);
+        } else {
+          console.log(`🛡️ REMOVED DUPLICATE: purchase_order_id ${notif.purchase_order_id}`);
+        }
+      } else {
+        // Strategy 2: If no purchase_order_id, deduplicate by delivery address + material type
+        const addressMaterialKey = `${(notif.deliveryAddress || '').toLowerCase().trim()}|${(notif.materialType || '').toLowerCase().trim()}`;
+        if (addressMaterialKey !== '|' && seenByAddressMaterial.has(addressMaterialKey)) {
+          console.log(`🛡️ REMOVED DUPLICATE: Same delivery address + material type: ${addressMaterialKey}`);
+        } else if (addressMaterialKey !== '|') {
+          seenByAddressMaterial.set(addressMaterialKey, notif);
+          filtered.push(notif);
+        } else if (!seenIds.has(notif.id)) {
+          // Strategy 3: Fallback - by notification id
+          seenIds.add(notif.id);
+          filtered.push(notif);
+        }
+      }
+    });
+    
+    if (filtered.length !== notifications.length) {
+      console.log(`🛡️ BULLETPROOF FILTER: ${notifications.length} → ${filtered.length} (removed ${notifications.length - filtered.length} duplicates)`);
+      console.log(`🛡️ DUPLICATES REMOVED - Details:`, {
+        original: notifications.length,
+        filtered: filtered.length,
+        byPO: Array.from(seenPOIds).length,
+        byAddressMaterial: seenByAddressMaterial.size,
+        byId: Array.from(seenIds).length
+      });
+    }
+    
+    return filtered;
+  }, [notifications]);
+
+  // Load notifications on mount and set up real-time subscription
+  useEffect(() => {
+    loadNotifications();
+
+    // Set up real-time subscription for new delivery requests
+    // IMPORTANT: Instead of adding directly, reload all notifications to ensure deduplication
+    const requestsSubscription = supabase
+      .channel('delivery-requests-notifications')
+      .on('postgres_changes', 
+        { event: 'INSERT', schema: 'public', table: 'delivery_requests' }, 
+        (payload: any) => {
+          console.log('🔔 New delivery request received (RELOADING ALL):', payload.new);
+          // RELOAD ALL notifications instead of adding - this ensures deduplication runs
+          loadNotifications();
+          
+          // Show toast
+          toast({
+            title: '🚚 New Delivery Request!',
+            description: newNotification.message,
+            duration: 10000,
+          });
+
+          // Play sound and browser notification
+          if (settings.soundEnabled) {
+            playNotificationSound('high');
+          }
+          if (settings.pushEnabled) {
+            sendLocalNotification(newNotification);
+          }
+        }
+      )
+      // Also listen to purchase_orders status changes for delivery-related statuses
+      // Include quote_accepted and awaiting_delivery_request so we see orders immediately after quote acceptance
+      .on('postgres_changes',
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'purchase_orders',
+          filter: 'status=in.(quote_accepted,order_created,awaiting_delivery_request,delivery_requested,awaiting_delivery_provider,delivery_assigned,ready_for_dispatch)'
+        },
+        (payload: any) => {
+          console.log('🔔 Purchase order status changed (RELOADING ALL):', payload.new);
+          // Reload ALL notifications to ensure deduplication
+          loadNotifications();
+        }
+      )
+      // Also listen for INSERT events (new orders created)
+      .on('postgres_changes',
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'purchase_orders',
+          filter: 'status=in.(quote_accepted,order_created,awaiting_delivery_request,delivery_requested,awaiting_delivery_provider,delivery_assigned,ready_for_dispatch)'
+        },
+        (payload: any) => {
+          console.log('🔔 New purchase order created (RELOADING ALL):', payload.new);
+          // Reload ALL notifications to ensure deduplication
+          loadNotifications();
+        }
+      )
+      // Also listen for UPDATE on delivery_requests (status changes)
+      .on('postgres_changes',
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'delivery_requests'
+        },
+        (payload: any) => {
+          console.log('🔔 Delivery request updated (RELOADING ALL):', payload.new);
+          // Reload ALL notifications to ensure deduplication
+          loadNotifications();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      requestsSubscription.unsubscribe();
+    };
+  }, [loadNotifications, settings.soundEnabled, settings.pushEnabled, toast]);
+
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'new_delivery': return <Package className="h-5 w-5 text-blue-500" />;
+      case 'status_update': return <Truck className="h-5 w-5 text-teal-500" />;
+      case 'payment': return <DollarSign className="h-5 w-5 text-green-500" />;
+      case 'rating': return <Star className="h-5 w-5 text-yellow-500" />;
+      case 'urgent': return <AlertTriangle className="h-5 w-5 text-red-500" />;
+      default: return <Bell className="h-5 w-5 text-gray-500" />;
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high': return 'bg-red-100 text-red-800 border-red-200';
+      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const markAsRead = (id: string) => {
+    setNotifications(prev => 
+      prev.map(n => n.id === id ? { ...n, read: true } : n)
+    );
+    setUnreadCount(prev => Math.max(0, prev - 1));
+  };
+
+  const markAllAsRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    setUnreadCount(0);
+  };
+
+  const deleteNotification = (id: string) => {
+    const notification = notifications.find(n => n.id === id);
+    setNotifications(prev => prev.filter(n => n.id !== id));
+    if (notification && !notification.read) {
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    }
+  };
+
+  // Accept a delivery request - SINGLE CLICK
+  const handleAcceptDelivery = async (requestId: string) => {
+    // Prevent double-click - check if already accepting THIS specific request
+    if (acceptingId === requestId) {
+      console.log('🛑 Already processing this accept request, ignoring click');
+      return;
+    }
+    
+    // Prevent accepting multiple requests simultaneously
+    if (acceptingId && acceptingId !== requestId) {
+      console.log('🛑 Already processing another accept request, ignoring click');
+      return;
+    }
+    
+    // Validate userId before making request
+    let providerId = userId;
+    if (!providerId || providerId === '') {
+      // Try to get from localStorage as fallback
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          providerId = parsed.user?.id || '';
+        }
+      } catch (e) {}
+    }
+    
+    if (!providerId || providerId === '') {
+      console.error('❌ handleAcceptDelivery: No valid userId available');
+      toast({
+        title: 'Error',
+        description: 'User not authenticated. Please refresh the page.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    console.log('🚚 handleAcceptDelivery: START - Accepting with providerId:', providerId, 'requestId:', requestId);
+    
+    // Set accepting state IMMEDIATELY to disable button (both ref and state)
+    acceptingRef.current = requestId;
+    setAcceptingId(requestId);
+    
+    // Generate tracking number upfront
+    const trackingNumber = 'TRK-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + 
+      Math.random().toString(36).substring(2, 7).toUpperCase();
+    
+    try {
+      const { url, headers } = getAuthHeaders();
+      
+      console.log('🚚 Making PATCH request to update delivery_requests...');
+      
+      // Update the delivery request to assign this provider
+      // NOTE: Only update columns that exist in delivery_requests table
+      // delivery_provider_name is in purchase_orders, not delivery_requests
+      const updatePayload: any = {
+        provider_id: providerId,
+        status: 'accepted',
+        tracking_number: trackingNumber,
+        updated_at: new Date().toISOString()
+      };
+      
+      // Explicitly remove any delivery_provider_name or delivery_provider_phone if they somehow got added
+      // These columns only exist in purchase_orders, NOT delivery_requests
+      delete updatePayload.delivery_provider_name;
+      delete updatePayload.delivery_provider_phone;
+      
+      // First check current state
+      const checkResponse = await fetch(
+        `${url}/rest/v1/delivery_requests?id=eq.${requestId}&select=id,status,provider_id`,
+        { headers, cache: 'no-store' }
+      );
+      
+      if (checkResponse.ok) {
+        const currentState = await checkResponse.json().catch(() => []);
+        if (currentState && currentState.length > 0) {
+          const dr = currentState[0];
+          // If already accepted by this provider, just return success
+          if (dr.provider_id === providerId && dr.status === 'accepted') {
+            console.log('✅ Delivery already accepted by this provider');
+            setNotifications(prev => prev.filter(n => n.id !== requestId));
+            setUnreadCount(prev => Math.max(0, prev - 1));
+            toast({
+              title: '✅ Already Accepted',
+              description: 'This delivery was already accepted.',
+            });
+            if (onAcceptDelivery) onAcceptDelivery(requestId);
+            return;
+          }
+          // If accepted by another provider, show error
+          if (dr.provider_id && dr.provider_id !== providerId) {
+            throw new Error('This delivery has already been accepted by another provider');
+          }
+        }
+      }
+      
+      // Build query with less restrictive conditions
+      // PostgREST syntax: use separate filters and combine with AND logic
+      // We'll check status and provider_id separately
+      const queryParams = new URLSearchParams({
+        id: `eq.${requestId}`,
+        status: `in.(pending,assigned)`
+      });
+      
+      // First try with provider_id null (unassigned)
+      let response = await fetch(
+        `${url}/rest/v1/delivery_requests?${queryParams.toString()}&provider_id=is.null`,
+        {
+          method: 'PATCH',
+          headers: { ...headers, 'Prefer': 'return=representation' },
+          body: JSON.stringify(updatePayload)
+        }
+      );
+      
+      // If that didn't work (no rows updated), try with provider_id matching this provider
+      if (!response.ok || (response.ok && (await response.json().catch(() => [])).length === 0)) {
+        const queryParams2 = new URLSearchParams({
+          id: `eq.${requestId}`,
+          status: `in.(pending,assigned)`,
+          provider_id: `eq.${providerId}`
+        });
+        
+        response = await fetch(
+          `${url}/rest/v1/delivery_requests?${queryParams2.toString()}`,
+          {
+            method: 'PATCH',
+            headers: { ...headers, 'Prefer': 'return=representation' },
+            body: JSON.stringify(updatePayload)
+          }
+        );
+      }
+      
+      console.log('🚚 PATCH response status:', response.status);
+      
+      if (response.ok) {
+        const result = await response.json().catch(() => []);
+        console.log('✅ Delivery accepted successfully:', result);
+        
+        // Verify update actually happened
+        if (!result || result.length === 0) {
+          // Check again - might have been a race condition
+          const verifyResponse = await fetch(
+            `${url}/rest/v1/delivery_requests?id=eq.${requestId}&select=provider_id,status`,
+            { headers, cache: 'no-store' }
+          );
+          if (verifyResponse.ok) {
+            const verify = await verifyResponse.json().catch(() => []);
+            if (verify && verify.length > 0 && verify[0].provider_id === providerId) {
+              console.log('✅ Verified: Delivery accepted (race condition handled)');
+            } else {
+              throw new Error('Failed to accept delivery. It may have been accepted by another provider.');
+            }
+          }
+        }
+        
+        // NOW remove from notifications list (after confirmed success)
+        setNotifications(prev => prev.filter(n => n.id !== requestId));
+        setUnreadCount(prev => Math.max(0, prev - 1));
+        
+        toast({
+          title: '✅ Delivery Accepted!',
+          description: `Tracking: ${trackingNumber}. Check Active tab for details.`,
+        });
+        
+        // Call parent callback if provided
+        if (onAcceptDelivery) onAcceptDelivery(requestId);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('❌ Accept failed:', response.status, errorData);
+        throw new Error(errorData.message || errorData.details || `Server error: ${response.status}`);
+      }
+    } catch (error: any) {
+      console.error('❌ Error accepting delivery:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Could not accept delivery. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      console.log('🚚 handleAcceptDelivery: END - clearing acceptingId');
+      // Use longer delay to prevent rapid re-clicks
+      setTimeout(() => {
+        acceptingRef.current = null;
+        setAcceptingId(null);
+      }, 3000); // 3 second delay to prevent rapid re-clicks
+    }
+  };
+
+  // Reject/decline a delivery request (just removes from view)
+  const handleRejectDelivery = async (requestId: string) => {
+    setRejectingId(requestId);
+    try {
+      // Just remove from local notifications - don't update database
+      // This allows other providers to still see and accept it
+      setNotifications(prev => prev.filter(n => n.id !== requestId));
+      setUnreadCount(prev => Math.max(0, prev - 1));
+      
+      toast({
+        title: 'Delivery Declined',
+        description: 'Request removed from your list. Other providers can still accept it.',
+      });
+      
+      if (onRejectDelivery) onRejectDelivery(requestId);
+    } catch (error: any) {
+      console.error('Error rejecting delivery:', error);
+      toast({
+        title: 'Error',
+        description: 'Could not decline delivery.',
+        variant: 'destructive'
+      });
+    } finally {
+      setRejectingId(null);
+    }
+  };
+
+  const formatTime = (date: Date) => {
+    const diff = Date.now() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    return date.toLocaleDateString();
+  };
+
+  // Copy address to clipboard
+  const copyAddress = async (address: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(address);
+      toast({
+        title: '📋 Copied!',
+        description: `${label} address copied to clipboard`,
+        duration: 2000
+      });
+    } catch (error) {
+      toast({
+        title: 'Copy failed',
+        description: 'Could not copy address',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  // Open address in Google Maps
+  const openInMaps = (address: string) => {
+    // Check if address contains coordinates
+    const coordMatch = address.match(/(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)/);
+    
+    let mapsUrl: string;
+    if (coordMatch) {
+      // If coordinates found, use them directly
+      const [, lat, lng] = coordMatch;
+      mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+    } else {
+      // Otherwise, search for the address
+      mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
+    }
+    
+    window.open(mapsUrl, '_blank');
+  };
+
+  // Open navigation with both pickup and delivery
+  const openNavigation = (pickup: string, delivery: string) => {
+    // Try to extract coordinates or use address
+    const getCoordOrAddress = (addr: string) => {
+      const coordMatch = addr.match(/(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)/);
+      if (coordMatch) {
+        return `${coordMatch[1]},${coordMatch[2]}`;
+      }
+      return encodeURIComponent(addr);
+    };
+
+    const pickupParam = getCoordOrAddress(pickup);
+    const deliveryParam = getCoordOrAddress(delivery);
+    
+    // Google Maps directions URL with waypoints
+    const mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=My+Location&waypoints=${pickupParam}&destination=${deliveryParam}&travelmode=driving`;
+    window.open(mapsUrl, '_blank');
+  };
+
+  const updateSetting = (key: keyof NotificationSettings, value: boolean) => {
+    setSettings(prev => ({ ...prev, [key]: value }));
+  };
+
+  return (
+    <Card className="shadow-lg">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Bell className="h-5 w-5 text-teal-600" />
+            Notifications
+            {unreadCount > 0 && (
+              <Badge className="bg-red-500 text-white">{unreadCount}</Badge>
+            )}
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={loadNotifications}
+              disabled={loading}
+            >
+              <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+            {unreadCount > 0 && (
+              <Button variant="ghost" size="sm" onClick={markAllAsRead}>
+                <CheckCircle className="h-4 w-4 mr-1" />
+                Mark all read
+              </Button>
+            )}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Notification Settings */}
+        {showSettings && (
+          <div className="p-4 bg-gray-50 rounded-lg space-y-4 mb-4">
+            <h4 className="font-semibold text-sm">Notification Settings</h4>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="push" className="flex items-center gap-2">
+                  <Bell className="h-4 w-4" />
+                  Push Notifications
+                </Label>
+                <Switch
+                  id="push"
+                  checked={settings.pushEnabled}
+                  onCheckedChange={() => {
+                    if (!settings.pushEnabled) {
+                      requestNotificationPermission();
+                    } else {
+                      updateSetting('pushEnabled', false);
+                    }
+                  }}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <Label htmlFor="sound" className="flex items-center gap-2">
+                  {settings.soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+                  Sound
+                </Label>
+                <Switch
+                  id="sound"
+                  checked={settings.soundEnabled}
+                  onCheckedChange={(v) => updateSetting('soundEnabled', v)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <Label htmlFor="vibration" className="flex items-center gap-2">
+                  <Vibrate className="h-4 w-4" />
+                  Vibration
+                </Label>
+                <Switch
+                  id="vibration"
+                  checked={settings.vibrationEnabled}
+                  onCheckedChange={(v) => updateSetting('vibrationEnabled', v)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <Label htmlFor="urgent" className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  Urgent Only
+                </Label>
+                <Switch
+                  id="urgent"
+                  checked={settings.urgentOnly}
+                  onCheckedChange={(v) => updateSetting('urgentOnly', v)}
+                />
+              </div>
+            </div>
+
+            <div className="border-t pt-4 mt-4">
+              <h5 className="text-sm font-medium mb-3">Notification Types</h5>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="newDelivery" className="text-sm">New Deliveries</Label>
+                  <Switch
+                    id="newDelivery"
+                    checked={settings.newDeliveryAlerts}
+                    onCheckedChange={(v) => updateSetting('newDeliveryAlerts', v)}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="status" className="text-sm">Status Updates</Label>
+                  <Switch
+                    id="status"
+                    checked={settings.statusUpdates}
+                    onCheckedChange={(v) => updateSetting('statusUpdates', v)}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="payment" className="text-sm">Payments</Label>
+                  <Switch
+                    id="payment"
+                    checked={settings.paymentNotifications}
+                    onCheckedChange={(v) => updateSetting('paymentNotifications', v)}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="ratings" className="text-sm">Ratings</Label>
+                  <Switch
+                    id="ratings"
+                    checked={settings.ratingNotifications}
+                    onCheckedChange={(v) => updateSetting('ratingNotifications', v)}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Notifications List */}
+        <div className="space-y-2 max-h-96 overflow-y-auto">
+          {loading ? (
+            <div className="text-center py-8">
+              <RefreshCw className="h-12 w-12 text-teal-500 mx-auto mb-3 animate-spin" />
+              <p className="text-gray-500">Loading delivery requests...</p>
+            </div>
+          ) : deduplicatedNotifications.length === 0 ? (
+            <div className="text-center py-8">
+              <BellOff className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500">No active delivery requests</p>
+              <p className="text-xs text-gray-400 mt-2">New requests will appear here in real-time</p>
+            </div>
+          ) : (
+            deduplicatedNotifications.map((notification) => (
+              <div
+                key={notification.id}
+                className={`p-2.5 rounded-lg border transition-colors ${
+                  notification.read 
+                    ? 'bg-white border-gray-200' 
+                    : 'bg-teal-50 border-teal-200'
+                }`}
+              >
+                <div className="flex items-start gap-2">
+                  <div className="flex-shrink-0 mt-0.5">
+                    {getNotificationIcon(notification.type)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="font-medium text-sm truncate">{notification.title}</p>
+                      <Badge 
+                        variant="outline" 
+                        className={`text-xs px-1.5 py-0 ${getPriorityColor(notification.priority)}`}
+                      >
+                        {notification.priority}
+                      </Badge>
+                    </div>
+                    
+                    {/* Material and quantity info */}
+                    {notification.materialType && (
+                      <p className="text-xs text-gray-700 font-medium flex items-center gap-1 mb-1.5">
+                        <Package className="h-3 w-3 text-blue-500" />
+                        {notification.materialType}
+                        {notification.quantity && <span className="text-gray-500">({notification.quantity})</span>}
+                      </p>
+                    )}
+                    
+                    {/* Pickup Address - More compact */}
+                    {notification.pickupAddress && (
+                      <div className="bg-green-50 rounded-md p-1.5 mb-1.5 border border-green-100">
+                        <div className="flex items-start justify-between gap-1.5">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-green-700 mb-0.5 flex items-center gap-1">
+                              <MapPin className="h-2.5 w-2.5" />
+                              📦 PICKUP
+                            </p>
+                            <p className="text-xs text-green-800 break-words leading-tight">{notification.pickupAddress}</p>
+                          </div>
+                          <div className="flex gap-0.5 flex-shrink-0">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                copyAddress(notification.pickupAddress!, 'Pickup');
+                              }}
+                              className="p-1 bg-green-100 hover:bg-green-200 rounded text-green-700 transition-colors"
+                              title="Copy pickup address"
+                            >
+                              <Copy className="h-3 w-3" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openInMaps(notification.pickupAddress!);
+                              }}
+                              className="p-1 bg-green-100 hover:bg-green-200 rounded text-green-700 transition-colors"
+                              title="Open in Google Maps"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Delivery Address - More compact */}
+                    {notification.deliveryAddress && (
+                      <div className="bg-orange-50 rounded-md p-1.5 mb-1.5 border border-orange-100">
+                        <div className="flex items-start justify-between gap-1.5">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-orange-700 mb-0.5 flex items-center gap-1">
+                              <Truck className="h-2.5 w-2.5" />
+                              🏠 DELIVERY
+                            </p>
+                            <p className="text-xs text-orange-800 break-words leading-tight">{notification.deliveryAddress}</p>
+                          </div>
+                          <div className="flex gap-0.5 flex-shrink-0">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                copyAddress(notification.deliveryAddress!, 'Delivery');
+                              }}
+                              className="p-1 bg-orange-100 hover:bg-orange-200 rounded text-orange-700 transition-colors"
+                              title="Copy delivery address"
+                            >
+                              <Copy className="h-3 w-3" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openInMaps(notification.deliveryAddress!);
+                              }}
+                              className="p-1 bg-orange-100 hover:bg-orange-200 rounded text-orange-700 transition-colors"
+                              title="Open in Google Maps"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Action Buttons - Compact and side by side */}
+                    <div className="flex gap-1.5 mt-1.5">
+                      {/* Start Navigation Button - Compact */}
+                      {notification.pickupAddress && notification.deliveryAddress && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openNavigation(notification.pickupAddress!, notification.deliveryAddress!);
+                          }}
+                          className="flex-1 py-1.5 px-2 bg-blue-500 hover:bg-blue-600 text-white text-xs font-medium rounded-md flex items-center justify-center gap-1.5 transition-colors"
+                        >
+                          <Navigation className="h-3 w-3" />
+                          <span className="truncate">Start Navigation</span>
+                        </button>
+                      )}
+                      
+                      {/* Accept Button - Compact, only for pending */}
+                      {notification.status === 'pending' && (
+                        <button
+                          type="button"
+                          className={`flex-1 py-1.5 px-2 rounded-md text-white text-xs font-medium flex items-center justify-center gap-1.5 transition-colors ${
+                            acceptingId === notification.id
+                              ? 'bg-blue-500 cursor-wait' 
+                              : acceptingId
+                              ? 'bg-gray-400 cursor-not-allowed' 
+                              : 'bg-green-600 hover:bg-green-700 active:bg-green-800'
+                          }`}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            console.log('🔘 Accept button clicked for:', notification.id, 'acceptingId:', acceptingId, 'acceptingRef:', acceptingRef.current);
+                            
+                            // Prevent double-click using ref (immediate check, no state delay)
+                            if (acceptingRef.current || acceptingId) {
+                              console.log('🛑 Already accepting, ignoring click');
+                              return;
+                            }
+                            
+                            // Process the acceptance
+                            handleAcceptDelivery(notification.id);
+                          }}
+                          disabled={!!acceptingRef.current || !!acceptingId}
+                        >
+                          {acceptingId === notification.id ? (
+                            <>
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                              <span className="truncate">Accepting...</span>
+                            </>
+                          ) : acceptingId ? (
+                            <>
+                              <Clock className="h-3 w-3" />
+                              <span className="truncate">Wait...</span>
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle className="h-3 w-3" />
+                              <span className="truncate">Accept</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                    
+                    {/* Estimated cost and timestamp - Compact */}
+                    <div className="flex items-center justify-between mt-1.5">
+                      {notification.estimatedCost && notification.estimatedCost > 0 && (
+                        <p className="text-xs text-gray-600 flex items-center gap-1">
+                          <DollarSign className="h-3 w-3 text-green-600" />
+                          KES {notification.estimatedCost.toLocaleString()}
+                        </p>
+                      )}
+                      <p className="text-xs text-gray-400 flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {formatTime(notification.timestamp)}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteNotification(notification.id);
+                    }}
+                    className="flex-shrink-0 p-0.5 hover:bg-gray-200 rounded mt-0.5"
+                  >
+                    <X className="h-3.5 w-3.5 text-gray-400" />
+                  </button>
+                </div>
+                
+                {/* Status indicator for non-pending deliveries - Compact */}
+                {notification.status && notification.status !== 'pending' && (
+                  <div className="mt-1.5 pt-1.5 border-t border-gray-100">
+                    <Badge 
+                      variant="outline" 
+                      className={`text-xs px-1.5 py-0 ${
+                        notification.status === 'assigned' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                        notification.status === 'in_transit' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
+                        notification.status === 'delivered' ? 'bg-green-50 text-green-700 border-green-200' :
+                        'bg-gray-50 text-gray-700 border-gray-200'
+                      }`}
+                    >
+                      {notification.status?.replace('_', ' ')}
+                    </Badge>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+export default DeliveryNotifications;
+
+
+
+
