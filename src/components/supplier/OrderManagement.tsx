@@ -190,40 +190,94 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
         (payload) => {
           console.log('🔄 OrderManagement: Order change detected:', payload.eventType, payload.new?.po_number);
           
-          // Refresh orders when any change occurs
-          loadOrders();
-          
-          // Show toast notification for important status changes
+          // IMMEDIATELY update local state when delivery provider accepts (no waiting for full reload)
           if (payload.eventType === 'UPDATE' && payload.new) {
-            const newStatus = payload.new.status;
-            const oldStatus = payload.old?.status;
+            const orderId = payload.new.id;
+            const oldProviderId = payload.old?.delivery_provider_id;
+            const newProviderId = payload.new.delivery_provider_id;
+            const oldDeliveryStatus = payload.old?.delivery_status;
+            const newDeliveryStatus = payload.new.delivery_status;
+            
+            // If delivery provider was just assigned (accepted), update immediately
+            if (!oldProviderId && newProviderId) {
+              console.log('✅ Delivery provider accepted - updating order immediately:', orderId);
+              
+              // Update the order in local state immediately
+              setOrders(prevOrders => prevOrders.map(order => {
+                if (order.id === orderId) {
+                  return {
+                    ...order,
+                    delivery_provider_id: newProviderId,
+                    delivery_provider_name: payload.new.delivery_provider_name || order.delivery_provider_name,
+                    delivery_provider_phone: payload.new.delivery_provider_phone || order.delivery_provider_phone,
+                    delivery_status: newDeliveryStatus || 'accepted',
+                    delivery_assigned_at: payload.new.delivery_assigned_at || order.delivery_assigned_at,
+                    delivery_accepted_at: payload.new.delivery_accepted_at || new Date().toISOString(),
+                    updated_at: payload.new.updated_at || order.updated_at
+                  };
+                }
+                return order;
+              }));
+              
+              toast({
+                title: '✅ Delivery Provider Accepted',
+                description: `Delivery provider ${payload.new.delivery_provider_name || ''} accepted order ${payload.new.po_number || ''}. Status updated.`,
+              });
+              
+              // Also refresh in background to ensure consistency
+              setTimeout(() => loadOrders(), 1000);
+              return; // Skip the general refresh below
+            }
+            
+            // If delivery status changed (e.g., to 'accepted', 'in_transit', etc.)
+            if (oldDeliveryStatus !== newDeliveryStatus && newDeliveryStatus) {
+              console.log('🔄 Delivery status changed - updating immediately:', orderId, oldDeliveryStatus, '→', newDeliveryStatus);
+              
+              // Update the order in local state immediately
+              setOrders(prevOrders => prevOrders.map(order => {
+                if (order.id === orderId) {
+                  return {
+                    ...order,
+                    delivery_status: newDeliveryStatus,
+                    delivery_provider_id: newProviderId || order.delivery_provider_id,
+                    delivery_provider_name: payload.new.delivery_provider_name || order.delivery_provider_name,
+                    updated_at: payload.new.updated_at || order.updated_at
+                  };
+                }
+                return order;
+              }));
+              
+              // Show appropriate toast
+              if (newDeliveryStatus === 'accepted') {
+                toast({
+                  title: '✅ Delivery Confirmed',
+                  description: `Delivery provider accepted order ${payload.new.po_number || ''}`,
+                });
+              } else if (newDeliveryStatus === 'in_transit') {
+                toast({
+                  title: '🚚 Order In Transit',
+                  description: `Order ${payload.new.po_number || ''} is now in transit`,
+                });
+              }
+              
+              // Also refresh in background
+              setTimeout(() => loadOrders(), 1000);
+              return; // Skip the general refresh below
+            }
             
             // Notify when builder accepts order
+            const newStatus = payload.new.status;
+            const oldStatus = payload.old?.status;
             if (oldStatus === 'pending' && (newStatus === 'confirmed' || newStatus === 'pending')) {
               toast({
                 title: '✅ Order Accepted',
                 description: `Builder accepted order ${payload.new.po_number || ''}`,
               });
             }
-            
-            // Notify when delivery provider is assigned
-            if (!payload.old?.delivery_provider_id && payload.new.delivery_provider_id) {
-              toast({
-                title: '✅ Delivery Provider Assigned',
-                description: `Delivery provider ${payload.new.delivery_provider_name || ''} assigned to order ${payload.new.po_number || ''}. Order will move to "Ready for Dispatch".`,
-              });
-              // Refresh orders to update the display immediately
-              setTimeout(() => loadOrders(), 500);
-            }
-            
-            // Notify when order goes in transit
-            if (payload.new.delivery_status === 'in_transit' && payload.old?.delivery_status !== 'in_transit') {
-              toast({
-                title: '🚚 Order In Transit',
-                description: `Order ${payload.new.po_number || ''} is now in transit`,
-              });
-            }
           }
+          
+          // Refresh orders for other changes
+          loadOrders();
         }
       )
       .subscribe();
