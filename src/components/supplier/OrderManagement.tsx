@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -321,8 +321,8 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
   // Polling fallback: Check for delivery provider updates every 10 seconds
   // This ensures we catch updates even if real-time subscription misses them
   // Use ref to prevent infinite loops
-  const lastPollTimeRef = React.useRef<number>(0);
-  const isPollingRef = React.useRef<boolean>(false);
+  const lastPollTimeRef = useRef<number>(0);
+  const isPollingRef = useRef<boolean>(false);
   
   useEffect(() => {
     if (!supplierId) return;
