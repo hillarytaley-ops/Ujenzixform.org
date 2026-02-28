@@ -1131,179 +1131,215 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
     }, 2000);
   };
 
-  // Generic print function for a list of items
+  // Generic print function for a list of items - SEQUENTIAL (one at a time)
   const printItemsList = async (itemsToPrint: MaterialItem[], title: string, subtitle: string) => {
-    toast({
-      title: "Preparing Print",
-      description: `Generating ${itemsToPrint.length} QR codes for printing...`,
-    });
-
-    // Create a new window for printing
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
+    if (itemsToPrint.length === 0) {
       toast({
-        title: "Error",
-        description: "Please allow popups to print QR codes",
+        title: "No items to print",
+        description: "Please select items to print",
         variant: "destructive",
       });
       return;
     }
 
-    // Generate QR codes as data URLs
-    const qrPromises = itemsToPrint.map(async (item) => {
+    toast({
+      title: "Preparing Sequential Print",
+      description: `Will print ${itemsToPrint.length} QR code(s) one at a time...`,
+    });
+
+    // Sequential printing - one QR code at a time
+    for (let i = 0; i < itemsToPrint.length; i++) {
+      const item = itemsToPrint[i];
+      
+      // Show progress
+      toast({
+        title: `Printing ${i + 1} of ${itemsToPrint.length}`,
+        description: `Printing QR code for ${item.material_type}...`,
+      });
+
+      // Generate QR code for this item
       const qrDataUrl = await QRCodeLib.toDataURL(item.qr_code, {
         width: 200,
         margin: 2,
         errorCorrectionLevel: 'H',
       });
-      return { item, qrDataUrl };
-    });
 
-    const qrResults = await Promise.all(qrPromises);
+      // Create print window for single item
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        toast({
+          title: "Error",
+          description: "Please allow popups to print QR codes",
+          variant: "destructive",
+        });
+        return;
+      }
 
-    // Build print HTML with QR Number at top, QR image in middle, Product name below
-    const printHTML = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>${title}</title>
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: Arial, sans-serif; padding: 20px; }
-          .header { 
-            text-align: center; 
-            margin-bottom: 20px; 
-            border-bottom: 3px solid #0891b2; 
-            padding-bottom: 15px; 
-            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-            border-radius: 10px;
-            padding: 20px;
-          }
-          .header h1 { font-size: 24px; margin-bottom: 5px; color: #0891b2; }
-          .header p { color: #666; }
-          .qr-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 20px; }
-          .qr-item { 
-            border: 2px solid #ddd; 
-            text-align: center; 
-            page-break-inside: avoid; 
-            border-radius: 8px;
-            background: #fff;
-            overflow: hidden;
-          }
-          .qr-item.completed { 
-            border-color: #22c55e; 
-            background: #f0fdf4; 
-            opacity: 0.7;
-          }
-          .qr-item.invalidated { 
-            border-color: #ef4444; 
-            background: #fef2f2; 
-            opacity: 0.5;
-          }
-          /* QR Number Header - at top */
-          .qr-number-header {
-            background: #0891b2;
-            color: white;
-            padding: 10px 8px;
-          }
-          .qr-number {
-            font-size: 16px;
-            font-weight: bold;
-            margin-bottom: 4px;
-          }
-          .qr-code-text { 
-            font-family: monospace; 
-            font-size: 8px; 
-            color: #e0f2fe; 
-            word-break: break-all; 
-          }
-          /* QR Image - in middle */
-          .qr-image-container {
-            padding: 15px;
-            background: white;
-          }
-          .qr-item img { width: 150px; height: 150px; }
-          /* Product Name Footer - below image */
-          .product-footer {
-            background: #f8fafc;
-            padding: 12px 8px;
-            border-top: 1px solid #e5e7eb;
-          }
-          .product-name { 
-            font-size: 14px; 
-            font-weight: bold; 
-            color: #1e293b;
-            text-transform: uppercase;
-            margin-bottom: 4px;
-          }
-          .scan-me {
-            font-size: 10px;
-            color: #059669;
-            font-weight: bold;
-          }
-          .status-badge { 
-            display: inline-block; 
-            padding: 3px 8px; 
-            border-radius: 4px; 
-            font-size: 9px; 
-            font-weight: bold; 
-            margin-top: 6px; 
-          }
-          .completed-badge { background: #22c55e; color: white; }
-          .pending-badge { background: #eab308; color: white; }
-          .dispatched-badge { background: #3b82f6; color: white; }
-          @media print {
-            .qr-grid { grid-template-columns: repeat(3, 1fr); }
-            .qr-item { border: 2px solid #000; }
-            .qr-number-header { background: #333 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>📦 ${title}</h1>
-          <p>${subtitle}</p>
-          <p>Total Items: ${itemsToPrint.length} | Generated: ${new Date().toLocaleDateString()}</p>
-        </div>
-        <div class="qr-grid">
-          ${qrResults.map(({ item, qrDataUrl }) => {
-            const isCompleted = item.dispatch_scanned && item.receive_scanned;
-            const isDispatched = item.dispatch_scanned && !item.receive_scanned;
-            return `
-              <div class="qr-item ${isCompleted ? 'completed' : ''}">
-                <!-- QR Number at top -->
-                <div class="qr-number-header">
-                  <div class="qr-number">QR #${item.item_sequence}</div>
-                  <div class="qr-code-text">${item.qr_code}</div>
-                </div>
-                <!-- QR Image in middle -->
-                <div class="qr-image-container">
-                  <img src="${qrDataUrl}" alt="QR Code" />
-                </div>
-                <!-- Product name below image -->
-                <div class="product-footer">
-                  <div class="product-name">${item.material_type}</div>
-                  <div class="scan-me">📱 SCAN TO VERIFY</div>
-                  ${isCompleted 
-                    ? '<span class="status-badge completed-badge">✅ COMPLETED</span>' 
-                    : isDispatched 
-                      ? '<span class="status-badge dispatched-badge">🚚 DISPATCHED</span>'
-                      : '<span class="status-badge pending-badge">⏳ PENDING</span>'
-                  }
-                </div>
+      // Build print HTML for single item (one QR code per page)
+      const isCompleted = item.dispatch_scanned && item.receive_scanned;
+      const isDispatched = item.dispatch_scanned && !item.receive_scanned;
+      
+      const printHTML = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>QR Code - ${item.material_type}</title>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { 
+              font-family: Arial, sans-serif; 
+              padding: 40px; 
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              min-height: 100vh;
+            }
+            .qr-container {
+              width: 100%;
+              max-width: 400px;
+              border: 3px solid #0891b2;
+              border-radius: 12px;
+              overflow: hidden;
+              background: white;
+              box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            }
+            .qr-number-header {
+              background: #0891b2;
+              color: white;
+              padding: 15px;
+              text-align: center;
+            }
+            .qr-number {
+              font-size: 20px;
+              font-weight: bold;
+              margin-bottom: 8px;
+            }
+            .qr-code-text { 
+              font-family: monospace; 
+              font-size: 10px; 
+              color: #e0f2fe; 
+              word-break: break-all; 
+            }
+            .qr-image-container {
+              padding: 30px;
+              background: white;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+            }
+            .qr-image-container img { 
+              width: 300px; 
+              height: 300px; 
+            }
+            .product-footer {
+              background: #f8fafc;
+              padding: 20px;
+              border-top: 2px solid #e5e7eb;
+              text-align: center;
+            }
+            .product-name { 
+              font-size: 18px; 
+              font-weight: bold; 
+              color: #1e293b;
+              text-transform: uppercase;
+              margin-bottom: 10px;
+            }
+            .scan-me {
+              font-size: 14px;
+              color: #059669;
+              font-weight: bold;
+              margin-bottom: 10px;
+            }
+            .status-badge { 
+              display: inline-block; 
+              padding: 6px 12px; 
+              border-radius: 6px; 
+              font-size: 12px; 
+              font-weight: bold; 
+            }
+            .completed-badge { background: #22c55e; color: white; }
+            .pending-badge { background: #eab308; color: white; }
+            .dispatched-badge { background: #3b82f6; color: white; }
+            .client-info {
+              margin-top: 20px;
+              padding: 15px;
+              background: #f0f9ff;
+              border-radius: 8px;
+              text-align: center;
+            }
+            .client-name {
+              font-size: 16px;
+              font-weight: bold;
+              color: #0891b2;
+              margin-bottom: 5px;
+            }
+            @media print {
+              body { padding: 0; }
+              .qr-container { 
+                max-width: 100%;
+                border: 2px solid #000;
+                page-break-after: always;
+              }
+              .qr-number-header { background: #333 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="qr-container">
+            <div class="qr-number-header">
+              <div class="qr-number">QR #${item.item_sequence}</div>
+              <div class="qr-code-text">${item.qr_code}</div>
+            </div>
+            <div class="qr-image-container">
+              <img src="${qrDataUrl}" alt="QR Code" />
+            </div>
+            <div class="product-footer">
+              <div class="product-name">${item.material_type}</div>
+              <div class="scan-me">📱 SCAN TO VERIFY</div>
+              ${isCompleted 
+                ? '<span class="status-badge completed-badge">✅ COMPLETED</span>' 
+                : isDispatched 
+                  ? '<span class="status-badge dispatched-badge">🚚 DISPATCHED</span>'
+                  : '<span class="status-badge pending-badge">⏳ PENDING</span>'
+              }
+            </div>
+            ${item.buyer_name && item.buyer_name !== 'Unknown Client' ? `
+              <div class="client-info">
+                <div class="client-name">Client: ${item.buyer_name}</div>
               </div>
-            `;
-          }).join('')}
-        </div>
-        <script>
-          window.onload = function() { window.print(); }
-        </script>
-      </body>
-      </html>
-    `;
+            ` : ''}
+          </div>
+          <script>
+            window.onload = function() { 
+              setTimeout(() => {
+                window.print();
+                window.onafterprint = function() {
+                  window.close();
+                };
+              }, 500);
+            }
+          </script>
+        </body>
+        </html>
+      `;
 
-    printWindow.document.write(printHTML);
-    printWindow.document.close();
+      printWindow.document.write(printHTML);
+      printWindow.document.close();
+
+      // Wait before printing next item (allows printer to process)
+      if (i < itemsToPrint.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay between prints
+      }
+    }
+
+    // Show completion message
+    setTimeout(() => {
+      toast({
+        title: "✅ All QR Codes Printed",
+        description: `Successfully printed ${itemsToPrint.length} QR code(s) sequentially`,
+      });
+    }, 1000);
   };
 
   // Print all QR codes - grouped by client with page breaks
