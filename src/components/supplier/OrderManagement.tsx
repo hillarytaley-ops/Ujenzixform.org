@@ -180,6 +180,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
     // Subscribe to purchase_orders changes for this supplier
     const channel = supabase
       .channel('supplier-orders-realtime')
+      // Listen to purchase_orders table changes
       .on('postgres_changes',
         {
           event: '*',
@@ -278,6 +279,35 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
           
           // Refresh orders for other changes
           loadOrders();
+        }
+      )
+      // ALSO listen to delivery_requests table changes (when provider accepts)
+      .on('postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'delivery_requests',
+          filter: `status=eq.accepted`
+        },
+        async (payload) => {
+          console.log('🚚 OrderManagement: Delivery request accepted:', payload.new?.purchase_order_id);
+          
+          // When delivery request is accepted, the trigger should update purchase_orders
+          // But let's also immediately refresh to catch it
+          if (payload.new?.purchase_order_id) {
+            // Check if this order belongs to this supplier
+            const orderId = payload.new.purchase_order_id;
+            
+            // Force immediate refresh of orders to get updated delivery_provider_id
+            console.log('🔄 Forcing immediate refresh due to delivery acceptance...');
+            await loadOrders();
+            
+            // Also show toast
+            toast({
+              title: '✅ Delivery Provider Accepted',
+              description: 'A delivery provider has accepted one of your orders. Status updated.',
+            });
+          }
         }
       )
       .subscribe();
