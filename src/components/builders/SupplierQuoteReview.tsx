@@ -700,45 +700,86 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
         }
       }
 
-      // Create delivery request using native fetch
-      const deliveryController = new AbortController();
-      const deliveryTimeout = setTimeout(() => deliveryController.abort(), 10000);
+      // Check if delivery request already exists for this purchase order
+      const checkController = new AbortController();
+      const checkTimeout = setTimeout(() => checkController.abort(), 5000);
       
-      const deliveryPayload = {
-        builder_id: effectiveBuilderId,
-        purchase_order_id: acceptedPurchaseOrder.id,
-        pickup_address: pickupAddress,
-        delivery_address: acceptedPurchaseOrder.delivery_address,
-        pickup_date: acceptedPurchaseOrder.delivery_date,
-        material_type: detectMaterialType(acceptedPurchaseOrder.items?.[0]?.material_name || ''),
-        quantity: acceptedPurchaseOrder.items?.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0) || 1,
-        weight_kg: (acceptedPurchaseOrder.items?.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0) || 1) * 50,
-        special_instructions: acceptedPurchaseOrder.special_instructions || null,
-        budget_range: '10000-20000',
-        status: 'pending',
-        created_at: new Date().toISOString()
-      };
-      
-      console.log('🚚 Creating delivery request:', deliveryPayload);
-      
-      const deliveryResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/delivery_requests`,
-        {
-          method: 'POST',
-          headers: { ...headers, 'Prefer': 'return=representation' },
-          body: JSON.stringify(deliveryPayload),
-          signal: deliveryController.signal
-        }
+      const checkResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${acceptedPurchaseOrder.id}&select=id,status&limit=1`,
+        { headers, signal: checkController.signal, cache: 'no-store' }
       );
-      clearTimeout(deliveryTimeout);
+      clearTimeout(checkTimeout);
       
+      let existingDeliveryRequest = null;
+      if (checkResponse.ok) {
+        const existing = await checkResponse.json();
+        if (existing && existing.length > 0) {
+          existingDeliveryRequest = existing[0];
+          console.log('⚠️ Delivery request already exists for this order:', existingDeliveryRequest.id);
+        }
+      }
+      
+      // Only create if no existing delivery request
       let deliveryRequest = null;
-      if (deliveryResponse.ok) {
-        const deliveryData = await deliveryResponse.json();
-        deliveryRequest = deliveryData?.[0];
-        console.log('✅ Delivery request created:', deliveryRequest?.id);
+      if (!existingDeliveryRequest) {
+        // Create delivery request using native fetch
+        const deliveryController = new AbortController();
+        const deliveryTimeout = setTimeout(() => deliveryController.abort(), 10000);
+        
+        const deliveryPayload = {
+          builder_id: effectiveBuilderId,
+          purchase_order_id: acceptedPurchaseOrder.id,
+          pickup_address: pickupAddress,
+          delivery_address: acceptedPurchaseOrder.delivery_address,
+          pickup_date: acceptedPurchaseOrder.delivery_date,
+          material_type: detectMaterialType(acceptedPurchaseOrder.items?.[0]?.material_name || ''),
+          quantity: acceptedPurchaseOrder.items?.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0) || 1,
+          weight_kg: (acceptedPurchaseOrder.items?.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0) || 1) * 50,
+          special_instructions: acceptedPurchaseOrder.special_instructions || null,
+          budget_range: '10000-20000',
+          status: 'pending',
+          created_at: new Date().toISOString()
+        };
+        
+        console.log('🚚 Creating delivery request:', deliveryPayload);
+        
+        const deliveryResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/delivery_requests`,
+          {
+            method: 'POST',
+            headers: { ...headers, 'Prefer': 'return=representation' },
+            body: JSON.stringify(deliveryPayload),
+            signal: deliveryController.signal
+          }
+        );
+        clearTimeout(deliveryTimeout);
+      
+        if (deliveryResponse.ok) {
+          const deliveryData = await deliveryResponse.json();
+          deliveryRequest = deliveryData?.[0];
+          console.log('✅ Delivery request created:', deliveryRequest?.id);
+        } else {
+          const errorText = await deliveryResponse.text();
+          console.error('Error creating delivery request:', errorText);
+          // If error is about duplicate, try to get existing request
+          if (errorText.includes('unique') || errorText.includes('duplicate')) {
+            const retryCheck = await fetch(
+              `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${acceptedPurchaseOrder.id}&select=id&limit=1`,
+              { headers, cache: 'no-store' }
+            );
+            if (retryCheck.ok) {
+              const existing = await retryCheck.json();
+              if (existing && existing.length > 0) {
+                deliveryRequest = existing[0];
+                console.log('✅ Using existing delivery request:', deliveryRequest.id);
+              }
+            }
+          }
+        }
       } else {
-        console.error('Error creating delivery request:', await deliveryResponse.text());
+        // Use existing delivery request
+        deliveryRequest = existingDeliveryRequest;
+        console.log('✅ Using existing delivery request:', deliveryRequest.id);
       }
 
       // Notify delivery providers (non-blocking)
