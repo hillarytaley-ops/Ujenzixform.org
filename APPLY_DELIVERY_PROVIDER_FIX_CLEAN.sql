@@ -62,6 +62,29 @@ BEGIN
         
         po_id := NEW.purchase_order_id;
         
+        -- If purchase_order_id is null, try to find matching purchase_order
+        IF po_id IS NULL THEN
+            SELECT id INTO po_id
+            FROM purchase_orders
+            WHERE buyer_id = NEW.builder_id
+              AND delivery_address IS NOT NULL
+              AND (
+                (NEW.delivery_address IS NOT NULL AND LOWER(TRIM(delivery_address)) = LOWER(TRIM(NEW.delivery_address)))
+                OR ABS(EXTRACT(EPOCH FROM (created_at - NEW.created_at))) < 86400
+              )
+              AND (delivery_required = true OR delivery_required IS NULL)
+              AND delivery_provider_id IS NULL
+            ORDER BY created_at DESC
+            LIMIT 1;
+            
+            -- If found, update the delivery_request with the purchase_order_id
+            IF po_id IS NOT NULL THEN
+                UPDATE delivery_requests
+                SET purchase_order_id = po_id
+                WHERE id = NEW.id;
+            END IF;
+        END IF;
+        
         IF po_id IS NOT NULL THEN
             -- Get provider name and phone from profiles or delivery_providers
             BEGIN
