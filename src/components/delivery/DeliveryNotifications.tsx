@@ -135,6 +135,9 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       
       // STEP 2: Process delivery_requests - ONE notification per purchase_order_id
       const deliveryRequestsByPO = new Map<string, any>();
+      const deliveryRequestsByKey = new Map<string, any>(); // For NULL purchase_order_id cases
+      let duplicatesRemoved = 0;
+      let nullPORequests = 0;
       
       deliveryRequests.forEach((dr: any) => {
         if (dr.purchase_order_id) {
@@ -143,7 +146,8 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             deliveryRequestsByPO.set(dr.purchase_order_id, dr);
             seenPurchaseOrderIds.add(dr.purchase_order_id);
           } else {
-            // Duplicate - keep the best one (prefer accepted/assigned, with provider_id, most recent)
+            // Duplicate found! Keep the best one
+            duplicatesRemoved++;
             const existing = deliveryRequestsByPO.get(dr.purchase_order_id);
             const existingScore = (existing.status === 'accepted' || existing.status === 'assigned' ? 10 : 0) +
                                  (existing.provider_id ? 5 : 0) +
@@ -153,12 +157,36 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                             (new Date(dr.created_at).getTime() / 1000000);
             if (newScore > existingScore) {
               deliveryRequestsByPO.set(dr.purchase_order_id, dr);
+              console.log(`🔄 Replaced duplicate for PO ${dr.purchase_order_id} (better score)`);
+            } else {
+              console.log(`🗑️ Removed duplicate for PO ${dr.purchase_order_id} (keeping existing)`);
+            }
+          }
+        } else {
+          // NULL purchase_order_id - deduplicate by builder_id + delivery_address + material_type + same hour
+          nullPORequests++;
+          const key = `${dr.builder_id || 'no-builder'}|${(dr.delivery_address || '').toLowerCase().trim()}|${(dr.material_type || '').toLowerCase().trim()}|${dr.created_at ? new Date(dr.created_at).toISOString().slice(0, 13) : 'no-date'}`;
+          
+          if (!deliveryRequestsByKey.has(key)) {
+            deliveryRequestsByKey.set(key, dr);
+          } else {
+            // Duplicate found for NULL PO case
+            duplicatesRemoved++;
+            const existing = deliveryRequestsByKey.get(key);
+            const existingTime = new Date(existing.created_at).getTime();
+            const newTime = new Date(dr.created_at).getTime();
+            if (newTime > existingTime) {
+              deliveryRequestsByKey.set(key, dr);
+              console.log(`🔄 Replaced duplicate NULL PO request (newer): ${key}`);
+            } else {
+              console.log(`🗑️ Removed duplicate NULL PO request (keeping older): ${key}`);
             }
           }
         }
       });
       
-      console.log(`🔍 Deduplicated delivery_requests: ${deliveryRequests.length} → ${deliveryRequestsByPO.size} unique`);
+      const totalUnique = deliveryRequestsByPO.size + deliveryRequestsByKey.size;
+      console.log(`🔍 Deduplicated delivery_requests: ${deliveryRequests.length} → ${totalUnique} unique (removed ${duplicatesRemoved} duplicates, ${nullPORequests} had NULL purchase_order_id)`);
       
       // STEP 3: Create notifications from unique delivery_requests
       for (const [poId, dr] of deliveryRequestsByPO.entries()) {
@@ -178,6 +206,28 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           quantity: dr.quantity || '',
           estimatedCost: dr.estimated_cost || dr.budget_range || 0,
           purchase_order_id: poId, // CRITICAL
+          delivery_request_id: dr.id // For accepting
+        });
+      }
+      
+      // Also add notifications from NULL purchase_order_id requests (deduplicated)
+      for (const [key, dr] of deliveryRequestsByKey.entries()) {
+        finalNotifications.push({
+          id: dr.id,
+          type: 'new_delivery',
+          title: dr.status === 'pending' ? '🚚 New Delivery Request!' : `Delivery ${dr.status}`,
+          message: `${dr.material_type || 'Materials'} delivery to ${dr.delivery_address || 'Unknown location'}`,
+          timestamp: new Date(dr.created_at),
+          read: dr.status !== 'pending',
+          priority: dr.priority_level === 'urgent' || dr.status === 'pending' ? 'high' : 'medium',
+          actionUrl: `/delivery-dashboard?request=${dr.id}`,
+          status: dr.status,
+          pickupAddress: dr.pickup_address || dr.pickup_location || '',
+          deliveryAddress: dr.delivery_address || dr.delivery_location || '',
+          materialType: dr.material_type || '',
+          quantity: dr.quantity || '',
+          estimatedCost: dr.estimated_cost || dr.budget_range || 0,
+          purchase_order_id: undefined, // NULL purchase_order_id
           delivery_request_id: dr.id // For accepting
         });
       }
