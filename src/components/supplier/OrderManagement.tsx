@@ -317,6 +317,29 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
       supabase.removeChannel(channel);
     };
   }, [supplierId]);
+  
+  // Polling fallback: Check for delivery provider updates every 5 seconds
+  // This ensures we catch updates even if real-time subscription misses them
+  useEffect(() => {
+    if (!supplierId) return;
+    
+    const pollInterval = setInterval(async () => {
+      // Only poll if we have orders that are awaiting delivery provider
+      const awaitingProvider = orders.filter(o => 
+        o.delivery_required && 
+        !o.delivery_provider_id && 
+        (o.status === 'confirmed' || o.status === 'quote_accepted' || o.status === 'order_created' || 
+         o.status === 'awaiting_delivery_request' || o.status === 'delivery_requested')
+      );
+      
+      if (awaitingProvider.length > 0) {
+        console.log('🔄 Polling: Checking for delivery provider updates...', awaitingProvider.length, 'orders awaiting');
+        await loadOrders();
+      }
+    }, 5000); // Poll every 5 seconds
+    
+    return () => clearInterval(pollInterval);
+  }, [supplierId, orders.length]); // Only depend on orders.length to avoid infinite loops
 
   const loadOrders = async () => {
     // Use native fetch API (same as dashboard) for reliability
