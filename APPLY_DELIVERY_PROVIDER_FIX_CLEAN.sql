@@ -203,12 +203,15 @@ CREATE TRIGGER trigger_prevent_duplicate_delivery_requests
     EXECUTE FUNCTION prevent_duplicate_delivery_requests();
 
 -- Step 0.8: Create unique index (after cleanup)
-DROP INDEX IF EXISTS unique_delivery_request_per_purchase_order;
-CREATE UNIQUE INDEX unique_delivery_request_per_purchase_order 
-ON delivery_requests(purchase_order_id) 
-WHERE purchase_order_id IS NOT NULL AND status IN ('pending', 'accepted', 'assigned', 'in_transit');
-
-RAISE NOTICE 'Created unique index and trigger to prevent duplicate delivery_requests';
+DO $$
+BEGIN
+    DROP INDEX IF EXISTS unique_delivery_request_per_purchase_order;
+    CREATE UNIQUE INDEX unique_delivery_request_per_purchase_order 
+    ON delivery_requests(purchase_order_id) 
+    WHERE purchase_order_id IS NOT NULL AND status IN ('pending', 'accepted', 'assigned', 'in_transit');
+    
+    RAISE NOTICE 'Created unique index and trigger to prevent duplicate delivery_requests';
+END $$;
 
 -- Step 1: Update the trigger function to handle delivery provider acceptance
 CREATE OR REPLACE FUNCTION public.update_order_in_transit()
