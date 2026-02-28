@@ -318,58 +318,8 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
     };
   }, [supplierId]);
   
-  // Polling fallback: Check for delivery provider updates every 15 seconds
-  // This ensures we catch updates even if real-time subscription misses them
-  // Use refs to prevent infinite loops and track polling state
-  const lastPollTimeRef = useRef<number>(0);
-  const isPollingRef = useRef<boolean>(false);
-  const ordersRef = useRef<Order[]>([]);
-  
-  // Keep ordersRef in sync with orders state
-  useEffect(() => {
-    ordersRef.current = orders;
-  }, [orders]);
-  
-  useEffect(() => {
-    if (!supplierId) return;
-    
-    const pollInterval = setInterval(async () => {
-      // Prevent concurrent polling
-      if (isPollingRef.current) {
-        return;
-      }
-      
-      // Only poll if at least 15 seconds have passed since last poll
-      const now = Date.now();
-      if (now - lastPollTimeRef.current < 15000) {
-        return;
-      }
-      
-      // Check current orders from ref (doesn't trigger re-render)
-      const currentOrders = ordersRef.current;
-      const awaitingProvider = currentOrders.filter(o => 
-        o.delivery_required && 
-        !o.delivery_provider_id && 
-        (o.status === 'confirmed' || o.status === 'quote_accepted' || o.status === 'order_created' || 
-         o.status === 'awaiting_delivery_request' || o.status === 'delivery_requested')
-      );
-      
-      if (awaitingProvider.length > 0) {
-        console.log('🔄 Polling: Checking for delivery provider updates...', awaitingProvider.length, 'orders awaiting');
-        isPollingRef.current = true;
-        lastPollTimeRef.current = now;
-        
-        // Load orders asynchronously
-        try {
-          await loadOrders();
-        } finally {
-          isPollingRef.current = false;
-        }
-      }
-    }, 15000); // Poll every 15 seconds (increased to reduce load)
-    
-    return () => clearInterval(pollInterval);
-  }, [supplierId]); // Only depend on supplierId to avoid infinite loops
+  // Polling disabled - Real-time subscriptions handle delivery provider updates
+  // Polling was causing continuous loading state issues
 
   const loadOrders = async () => {
     // Use native fetch API (same as dashboard) for reliability
