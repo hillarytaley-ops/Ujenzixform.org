@@ -569,8 +569,24 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       
       console.log(`🛡️ ABSOLUTE FINAL: ${finalDeduplicated.length} → ${absoluteFinal.length} (removed ${finalDeduplicated.length - absoluteFinal.length} more duplicates)`);
       
-      setNotifications(absoluteFinal);
-      setUnreadCount(absoluteFinal.filter(n => !n.read).length);
+      // ONE MORE TIME: Final check before setting state
+      const ultimateFinal: Notification[] = [];
+      const ultimateSeenPO = new Set<string>();
+      absoluteFinal.forEach((n: Notification & { purchase_order_id?: string }) => {
+        if (n.purchase_order_id) {
+          if (!ultimateSeenPO.has(n.purchase_order_id)) {
+            ultimateSeenPO.add(n.purchase_order_id);
+            ultimateFinal.push(n);
+          }
+        } else {
+          ultimateFinal.push(n);
+        }
+      });
+      
+      console.log(`🛡️ ULTIMATE FINAL: ${absoluteFinal.length} → ${ultimateFinal.length}`);
+      
+      setNotifications(ultimateFinal);
+      setUnreadCount(ultimateFinal.filter(n => !n.read).length);
     } catch (error: any) {
       console.error('❌ Error loading notifications:', error.message || error);
     } finally {
@@ -578,34 +594,34 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     }
   }, []);
 
-  // ABSOLUTE BULLETPROOF DEDUPLICATION: Run on EVERY render to catch ANY duplicates
-  useEffect(() => {
-    setNotifications(prev => {
-      if (prev.length === 0) return prev;
-      
-      const seenPOIds = new Set<string>();
-      const seenIds = new Set<string>();
-      const filtered: Notification[] = [];
-      
-      prev.forEach((notif: Notification & { purchase_order_id?: string }) => {
-        // ONLY ONE per purchase_order_id - PERIOD
-        if (notif.purchase_order_id) {
-          if (!seenPOIds.has(notif.purchase_order_id)) {
-            seenPOIds.add(notif.purchase_order_id);
-            filtered.push(notif);
-          }
-        } else if (!seenIds.has(notif.id)) {
-          seenIds.add(notif.id);
+  // ABSOLUTE BULLETPROOF DEDUPLICATION: Use useMemo to filter duplicates before rendering
+  const deduplicatedNotifications = React.useMemo(() => {
+    if (notifications.length === 0) return notifications;
+    
+    const seenPOIds = new Set<string>();
+    const seenIds = new Set<string>();
+    const filtered: Notification[] = [];
+    
+    notifications.forEach((notif: Notification & { purchase_order_id?: string }) => {
+      // ONLY ONE per purchase_order_id - PERIOD. NO EXCEPTIONS.
+      if (notif.purchase_order_id) {
+        if (!seenPOIds.has(notif.purchase_order_id)) {
+          seenPOIds.add(notif.purchase_order_id);
           filtered.push(notif);
+        } else {
+          console.log(`🛡️ REMOVED DUPLICATE: purchase_order_id ${notif.purchase_order_id}`);
         }
-      });
-      
-      if (filtered.length !== prev.length) {
-        console.log(`🛡️ BULLETPROOF FILTER: ${prev.length} → ${filtered.length} (removed ${prev.length - filtered.length} duplicates)`);
-        return filtered;
+      } else if (!seenIds.has(notif.id)) {
+        seenIds.add(notif.id);
+        filtered.push(notif);
       }
-      return prev;
     });
+    
+    if (filtered.length !== notifications.length) {
+      console.log(`🛡️ BULLETPROOF FILTER: ${notifications.length} → ${filtered.length} (removed ${notifications.length - filtered.length} duplicates)`);
+    }
+    
+    return filtered;
   }, [notifications]);
 
   // Load notifications on mount and set up real-time subscription
