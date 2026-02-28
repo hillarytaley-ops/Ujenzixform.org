@@ -63,25 +63,37 @@ BEGIN
         po_id := NEW.purchase_order_id;
         
         -- If purchase_order_id is null, try to find matching purchase_order
-        IF po_id IS NULL THEN
+        -- Match by: builder_id, delivery_address, and creation date proximity
+        IF po_id IS NULL AND NEW.builder_id IS NOT NULL THEN
             SELECT id INTO po_id
             FROM purchase_orders
             WHERE buyer_id = NEW.builder_id
               AND delivery_address IS NOT NULL
               AND (
+                -- Match by exact delivery address
                 (NEW.delivery_address IS NOT NULL AND LOWER(TRIM(delivery_address)) = LOWER(TRIM(NEW.delivery_address)))
-                OR ABS(EXTRACT(EPOCH FROM (created_at - NEW.created_at))) < 86400
+                -- OR match by creation date within 24 hours (same order flow)
+                OR (ABS(EXTRACT(EPOCH FROM (created_at - NEW.created_at))) < 86400)
               )
               AND (delivery_required = true OR delivery_required IS NULL)
-              AND delivery_provider_id IS NULL
-            ORDER BY created_at DESC
+              AND (delivery_provider_id IS NULL OR delivery_provider_id = NEW.provider_id)
+              AND status NOT IN ('cancelled', 'rejected')
+            ORDER BY 
+              -- Prefer exact address matches
+              CASE WHEN NEW.delivery_address IS NOT NULL AND LOWER(TRIM(delivery_address)) = LOWER(TRIM(NEW.delivery_address)) THEN 1 ELSE 2 END,
+              created_at DESC
             LIMIT 1;
             
-            -- If found, update the delivery_request with the purchase_order_id
+            -- If found, update the delivery_request with the purchase_order_id for future reference
             IF po_id IS NOT NULL THEN
-                UPDATE delivery_requests
-                SET purchase_order_id = po_id
-                WHERE id = NEW.id;
+                BEGIN
+                    UPDATE delivery_requests
+                    SET purchase_order_id = po_id
+                    WHERE id = NEW.id;
+                EXCEPTION WHEN OTHERS THEN
+                    -- If update fails, continue anyway - we still have po_id
+                    NULL;
+                END;
             END IF;
         END IF;
         
