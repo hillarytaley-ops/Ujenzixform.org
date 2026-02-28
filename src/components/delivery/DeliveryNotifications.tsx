@@ -316,8 +316,10 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                 deliveryAddress: req.delivery_address || req.delivery_location || '',
                 materialType: req.material_type || '',
                 quantity: req.quantity || '',
-                estimatedCost: req.estimated_cost || req.budget_range || 0
-              });
+                estimatedCost: req.estimated_cost || req.budget_range || 0,
+                purchase_order_id: req.purchase_order_id, // CRITICAL: Store for final deduplication
+                source: 'delivery_requests' // Mark as coming from delivery_requests
+              } as Notification & { purchase_order_id?: string; source?: string });
             });
             console.log(`✅ Loaded ${deliveryRequests.length} delivery_requests`);
           } else {
@@ -478,12 +480,36 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       // delivery_requests are created when builder explicitly requests delivery
       // purchase_orders with delivery statuses are orders that need delivery providers
 
-      // Sort by timestamp descending
+      // FINAL AGGRESSIVE DEDUPLICATION: Remove duplicates by purchase_order_id at notification level
+      // This ensures only ONE notification per purchase_order_id, even if they came from different sources
+      const finalDeduplicated: Notification[] = [];
+      const seenPurchaseOrderIds = new Set<string>();
+      const seenNotificationIds = new Set<string>();
+      
+      // Sort by timestamp descending first
       allNotifications.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+      
+      allNotifications.forEach((notification: Notification & { purchase_order_id?: string; source?: string }) => {
+        // If notification has purchase_order_id, deduplicate by it
+        if (notification.purchase_order_id) {
+          if (!seenPurchaseOrderIds.has(notification.purchase_order_id)) {
+            seenPurchaseOrderIds.add(notification.purchase_order_id);
+            finalDeduplicated.push(notification);
+          } else {
+            console.log(`🔍 Removed duplicate notification for purchase_order_id: ${notification.purchase_order_id}`);
+          }
+        } else {
+          // No purchase_order_id, deduplicate by notification id
+          if (!seenNotificationIds.has(notification.id)) {
+            seenNotificationIds.add(notification.id);
+            finalDeduplicated.push(notification);
+          }
+        }
+      });
 
-      console.log(`🔔 FINAL: Total notifications loaded: ${allNotifications.length}`, allNotifications);
-      setNotifications(allNotifications);
-      setUnreadCount(allNotifications.filter(n => !n.read).length);
+      console.log(`🔔 FINAL DEDUPLICATED: ${allNotifications.length} → ${finalDeduplicated.length} unique notifications (removed ${allNotifications.length - finalDeduplicated.length} duplicates)`);
+      setNotifications(finalDeduplicated);
+      setUnreadCount(finalDeduplicated.filter(n => !n.read).length);
     } catch (error: any) {
       console.error('❌ Error loading notifications:', error.message || error);
     } finally {
