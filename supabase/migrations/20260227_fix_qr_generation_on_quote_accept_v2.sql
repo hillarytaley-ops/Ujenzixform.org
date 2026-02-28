@@ -40,20 +40,26 @@ BEGIN
   supplier_uuid := NEW.supplier_id;
 
   -- Check if we should generate QR codes
+  -- Generate QR codes when order is created OR when delivery is requested
   should_generate := (
-    NEW.status IN ('confirmed', 'quote_accepted', 'order_created', 'awaiting_delivery_request') AND
+    NEW.status IN ('confirmed', 'quote_accepted', 'order_created', 'awaiting_delivery_request', 'delivery_requested') AND
     (NEW.qr_code_generated IS NULL OR NEW.qr_code_generated = FALSE)
   );
 
-  -- Also check if status changed to one of these
+  -- Also check if status changed to one of these (from a non-order status)
   IF NOT should_generate AND OLD.status IS NOT NULL THEN
     should_generate := (
-      NEW.status IN ('confirmed', 'quote_accepted', 'order_created', 'awaiting_delivery_request') AND
-      OLD.status NOT IN ('confirmed', 'quote_accepted', 'order_created', 'awaiting_delivery_request') AND
+      NEW.status IN ('confirmed', 'quote_accepted', 'order_created', 'awaiting_delivery_request', 'delivery_requested') AND
+      OLD.status NOT IN ('confirmed', 'quote_accepted', 'order_created', 'awaiting_delivery_request', 'delivery_requested') AND
       (NEW.qr_code_generated IS NULL OR NEW.qr_code_generated = FALSE)
     );
   END IF;
 
+  -- CRITICAL: Generate QR codes when order is created (quote_accepted → order_created → awaiting_delivery_request)
+  -- OR when delivery is requested (status becomes delivery_requested)
+  -- This ensures QR codes are generated IMMEDIATELY when the order is converted from quote to order
+  -- AND when delivery is requested by the builder
+  
   -- Final check: Make sure QR codes don't exist before generating
   IF should_generate AND NEW.items IS NOT NULL AND NOT EXISTS (SELECT 1 FROM material_items WHERE purchase_order_id = NEW.id) THEN
     FOR item IN SELECT * FROM jsonb_array_elements(NEW.items)
@@ -115,11 +121,19 @@ DROP TRIGGER IF EXISTS trigger_auto_generate_qr_codes ON purchase_orders;
 DROP TRIGGER IF EXISTS trigger_auto_generate_individual_qr_on_confirm ON purchase_orders;
 
 -- Recreate ONLY the main trigger
--- Only fire on UPDATE to prevent duplicate generation on INSERT
+-- Fire on UPDATE when status changes to order statuses OR when qr_code_generated flag changes
+-- This ensures QR codes are generated:
+-- 1. When quote is accepted (status → quote_accepted → order_created → awaiting_delivery_request)
+-- 2. When delivery is requested (status → delivery_requested)
 CREATE TRIGGER trigger_auto_generate_item_qr_codes
   AFTER UPDATE ON purchase_orders
   FOR EACH ROW
-  WHEN (OLD.status IS DISTINCT FROM NEW.status OR OLD.qr_code_generated IS DISTINCT FROM NEW.qr_code_generated)
+  WHEN (
+    (OLD.status IS DISTINCT FROM NEW.status AND 
+     NEW.status IN ('confirmed', 'quote_accepted', 'order_created', 'awaiting_delivery_request', 'delivery_requested'))
+    OR 
+    (OLD.qr_code_generated IS DISTINCT FROM NEW.qr_code_generated)
+  )
   EXECUTE FUNCTION public.auto_generate_item_qr_codes();
 
 -- Keep the disabled trigger (it's now a no-op) to prevent old migrations from recreating it
