@@ -180,101 +180,156 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
     // Subscribe to purchase_orders changes for this supplier
     const channel = supabase
       .channel('supplier-orders-realtime')
-      // Listen to purchase_orders table changes
+      // Listen to purchase_orders table changes - listen to ALL updates and filter client-side
+      // This ensures we catch updates even if supplier_id changes or trigger updates
       .on('postgres_changes',
         {
-          event: '*',
+          event: 'UPDATE',
           schema: 'public',
-          table: 'purchase_orders',
-          filter: `supplier_id=eq.${supplierId}`
+          table: 'purchase_orders'
         },
-        (payload) => {
-          console.log('🔄 OrderManagement: Order change detected:', payload.eventType, payload.new?.po_number);
+        async (payload) => {
+          console.log('🔄 OrderManagement: Purchase order UPDATE detected:', payload.new?.po_number, 'supplier_id:', payload.new?.supplier_id);
           
-          // IMMEDIATELY update local state when delivery provider accepts (no waiting for full reload)
-          if (payload.eventType === 'UPDATE' && payload.new) {
-            const orderId = payload.new.id;
-            const oldProviderId = payload.old?.delivery_provider_id;
-            const newProviderId = payload.new.delivery_provider_id;
-            const oldDeliveryStatus = payload.old?.delivery_status;
-            const newDeliveryStatus = payload.new.delivery_status;
+          // Check if this order belongs to this supplier (client-side filter)
+          const orderSupplierId = payload.new?.supplier_id;
+          if (!orderSupplierId || orderSupplierId !== supplierId) {
+            // Also check if it matches any related supplier IDs
+            const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
             
-            // If delivery provider was just assigned (accepted), update immediately
-            if (!oldProviderId && newProviderId) {
-              console.log('✅ Delivery provider accepted - updating order immediately:', orderId);
-              
-              // Update the order in local state immediately
-              setOrders(prevOrders => prevOrders.map(order => {
-                if (order.id === orderId) {
-                  return {
-                    ...order,
-                    delivery_provider_id: newProviderId,
-                    delivery_provider_name: payload.new.delivery_provider_name || order.delivery_provider_name,
-                    delivery_provider_phone: payload.new.delivery_provider_phone || order.delivery_provider_phone,
-                    delivery_status: newDeliveryStatus || 'accepted',
-                    delivery_assigned_at: payload.new.delivery_assigned_at || order.delivery_assigned_at,
-                    delivery_accepted_at: payload.new.delivery_accepted_at || new Date().toISOString(),
-                    updated_at: payload.new.updated_at || order.updated_at
-                  };
-                }
-                return order;
-              }));
-              
-              toast({
-                title: '✅ Delivery Provider Accepted',
-                description: `Delivery provider ${payload.new.delivery_provider_name || ''} accepted order ${payload.new.po_number || ''}. Status updated.`,
-              });
-              
-              // Also refresh in background to ensure consistency
-              setTimeout(() => loadOrders(), 1000);
-              return; // Skip the general refresh below
-            }
-            
-            // If delivery status changed (e.g., to 'accepted', 'in_transit', etc.)
-            if (oldDeliveryStatus !== newDeliveryStatus && newDeliveryStatus) {
-              console.log('🔄 Delivery status changed - updating immediately:', orderId, oldDeliveryStatus, '→', newDeliveryStatus);
-              
-              // Update the order in local state immediately
-              setOrders(prevOrders => prevOrders.map(order => {
-                if (order.id === orderId) {
-                  return {
-                    ...order,
-                    delivery_status: newDeliveryStatus,
-                    delivery_provider_id: newProviderId || order.delivery_provider_id,
-                    delivery_provider_name: payload.new.delivery_provider_name || order.delivery_provider_name,
-                    updated_at: payload.new.updated_at || order.updated_at
-                  };
-                }
-                return order;
-              }));
-              
-              // Show appropriate toast
-              if (newDeliveryStatus === 'accepted') {
-                toast({
-                  title: '✅ Delivery Confirmed',
-                  description: `Delivery provider accepted order ${payload.new.po_number || ''}`,
-                });
-              } else if (newDeliveryStatus === 'in_transit') {
-                toast({
-                  title: '🚚 Order In Transit',
-                  description: `Order ${payload.new.po_number || ''} is now in transit`,
-                });
+            try {
+              const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+              let accessToken = '';
+              if (stored) {
+                const parsed = JSON.parse(stored);
+                accessToken = parsed.access_token || '';
               }
               
-              // Also refresh in background
-              setTimeout(() => loadOrders(), 1000);
-              return; // Skip the general refresh below
+              const headers: Record<string, string> = {
+                'apikey': SUPABASE_ANON_KEY,
+                'Content-Type': 'application/json'
+              };
+              if (accessToken) {
+                headers['Authorization'] = `Bearer ${accessToken}`;
+              }
+              
+              // Check if this supplier_id is related to our supplier
+              const supplierResponse = await fetch(
+                `${SUPABASE_URL}/rest/v1/suppliers?or=(user_id.eq.${supplierId},id.eq.${supplierId})&select=id,user_id`,
+                { headers, cache: 'no-store' }
+              );
+              
+              if (supplierResponse.ok) {
+                const supplierData = await supplierResponse.json();
+                const relatedSupplierIds = [supplierId];
+                supplierData.forEach((s: any) => {
+                  if (s.id && !relatedSupplierIds.includes(s.id)) relatedSupplierIds.push(s.id);
+                  if (s.user_id && !relatedSupplierIds.includes(s.user_id)) relatedSupplierIds.push(s.user_id);
+                });
+                
+                if (!relatedSupplierIds.includes(orderSupplierId)) {
+                  console.log('⚠️ OrderManagement: Order does not belong to this supplier, ignoring');
+                  return;
+                }
+              } else {
+                // If we can't verify, only process if supplier_id matches exactly
+                if (orderSupplierId !== supplierId) {
+                  return;
+                }
+              }
+            } catch (e) {
+              console.log('⚠️ Could not verify supplier relationship, using exact match');
+              if (orderSupplierId !== supplierId) {
+                return;
+              }
             }
+          }
+          
+          // This order belongs to our supplier - process the update
+          const orderId = payload.new.id;
+          const oldProviderId = payload.old?.delivery_provider_id;
+          const newProviderId = payload.new.delivery_provider_id;
+          const oldDeliveryStatus = payload.old?.delivery_status;
+          const newDeliveryStatus = payload.new.delivery_status;
+          
+          console.log('✅ OrderManagement: Processing update for order:', orderId, 'oldProvider:', oldProviderId, 'newProvider:', newProviderId);
+          
+          // If delivery provider was just assigned (accepted), update immediately
+          if (!oldProviderId && newProviderId) {
+            console.log('✅ Delivery provider accepted - updating order immediately:', orderId);
             
-            // Notify when builder accepts order
-            const newStatus = payload.new.status;
-            const oldStatus = payload.old?.status;
-            if (oldStatus === 'pending' && (newStatus === 'confirmed' || newStatus === 'pending')) {
+            // Update the order in local state immediately
+            setOrders(prevOrders => prevOrders.map(order => {
+              if (order.id === orderId) {
+                return {
+                  ...order,
+                  delivery_provider_id: newProviderId,
+                  delivery_provider_name: payload.new.delivery_provider_name || order.delivery_provider_name,
+                  delivery_provider_phone: payload.new.delivery_provider_phone || order.delivery_provider_phone,
+                  delivery_status: newDeliveryStatus || 'accepted',
+                  delivery_assigned_at: payload.new.delivery_assigned_at || order.delivery_assigned_at,
+                  delivery_accepted_at: payload.new.delivery_accepted_at || new Date().toISOString(),
+                  updated_at: payload.new.updated_at || order.updated_at
+                };
+              }
+              return order;
+            }));
+            
+            toast({
+              title: '✅ Delivery Provider Accepted',
+              description: `Delivery provider ${payload.new.delivery_provider_name || ''} accepted order ${payload.new.po_number || ''}. Status updated.`,
+            });
+            
+            // Also refresh in background to ensure consistency
+            setTimeout(() => loadOrders(), 1000);
+            return; // Skip the general refresh below
+          }
+          
+          // If delivery status changed (e.g., to 'accepted', 'in_transit', etc.)
+          if (oldDeliveryStatus !== newDeliveryStatus && newDeliveryStatus) {
+            console.log('🔄 Delivery status changed - updating immediately:', orderId, oldDeliveryStatus, '→', newDeliveryStatus);
+            
+            // Update the order in local state immediately
+            setOrders(prevOrders => prevOrders.map(order => {
+              if (order.id === orderId) {
+                return {
+                  ...order,
+                  delivery_status: newDeliveryStatus,
+                  delivery_provider_id: newProviderId || order.delivery_provider_id,
+                  delivery_provider_name: payload.new.delivery_provider_name || order.delivery_provider_name,
+                  updated_at: payload.new.updated_at || order.updated_at
+                };
+              }
+              return order;
+            }));
+            
+            // Show appropriate toast
+            if (newDeliveryStatus === 'accepted') {
               toast({
-                title: '✅ Order Accepted',
-                description: `Builder accepted order ${payload.new.po_number || ''}`,
+                title: '✅ Delivery Confirmed',
+                description: `Delivery provider accepted order ${payload.new.po_number || ''}`,
+              });
+            } else if (newDeliveryStatus === 'in_transit') {
+              toast({
+                title: '🚚 Order In Transit',
+                description: `Order ${payload.new.po_number || ''} is now in transit`,
               });
             }
+            
+            // Also refresh in background
+            setTimeout(() => loadOrders(), 1000);
+            return; // Skip the general refresh below
+          }
+          
+          // Notify when builder accepts order
+          const newStatus = payload.new.status;
+          const oldStatus = payload.old?.status;
+          if (oldStatus === 'pending' && (newStatus === 'confirmed' || newStatus === 'pending')) {
+            toast({
+              title: '✅ Order Accepted',
+              description: `Builder accepted order ${payload.new.po_number || ''}`,
+            });
           }
           
           // Refresh orders for other changes
@@ -292,21 +347,101 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
         async (payload) => {
           console.log('🚚 OrderManagement: Delivery request accepted:', payload.new?.purchase_order_id);
           
-          // When delivery request is accepted, the trigger should update purchase_orders
-          // But let's also immediately refresh to catch it
-          if (payload.new?.purchase_order_id) {
-            // Check if this order belongs to this supplier
+          // When delivery request is accepted, fetch the purchase order to check if it belongs to this supplier
+          if (payload.new?.purchase_order_id && payload.new?.provider_id) {
             const orderId = payload.new.purchase_order_id;
+            const providerId = payload.new.provider_id;
             
-            // Force immediate refresh of orders to get updated delivery_provider_id
-            console.log('🔄 Forcing immediate refresh due to delivery acceptance...');
-            await loadOrders();
-            
-            // Also show toast
-            toast({
-              title: '✅ Delivery Provider Accepted',
-              description: 'A delivery provider has accepted one of your orders. Status updated.',
-            });
+            try {
+              // Fetch the purchase order to check if it belongs to this supplier
+              const { data: purchaseOrder, error: poError } = await supabase
+                .from('purchase_orders')
+                .select('id, supplier_id, po_number, delivery_provider_id, delivery_provider_name, delivery_provider_phone, delivery_status')
+                .eq('id', orderId)
+                .single();
+              
+              if (poError || !purchaseOrder) {
+                console.log('❌ OrderManagement: Purchase order not found or error:', poError);
+                return;
+              }
+              
+              // Check if this order belongs to this supplier
+              const supplierIds = [supplierId];
+              // Also check if supplier_id matches any of the supplier IDs we're tracking
+              if (!supplierIds.includes(purchaseOrder.supplier_id)) {
+                console.log('⚠️ OrderManagement: Order does not belong to this supplier, ignoring');
+                return;
+              }
+              
+              // Fetch delivery provider details
+              let providerName = 'Delivery Provider';
+              let providerPhone = '';
+              
+              try {
+                // Try to get from delivery_providers table
+                const { data: providerData } = await supabase
+                  .from('delivery_providers')
+                  .select('provider_name, company_name, phone')
+                  .eq('id', providerId)
+                  .single();
+                
+                if (providerData) {
+                  providerName = providerData.provider_name || providerData.company_name || 'Delivery Provider';
+                  providerPhone = providerData.phone || '';
+                } else {
+                  // Try to get from profiles table
+                  const { data: profileData } = await supabase
+                    .from('profiles')
+                    .select('full_name, phone')
+                    .eq('user_id', providerId)
+                    .single();
+                  
+                  if (profileData) {
+                    providerName = profileData.full_name || 'Delivery Provider';
+                    providerPhone = profileData.phone || '';
+                  }
+                }
+              } catch (e) {
+                console.log('⚠️ Could not fetch provider details, using defaults');
+              }
+              
+              // Update the order in local state immediately
+              console.log('✅ OrderManagement: Updating order with delivery provider info:', orderId);
+              setOrders(prevOrders => prevOrders.map(order => {
+                if (order.id === orderId) {
+                  return {
+                    ...order,
+                    delivery_provider_id: providerId,
+                    delivery_provider_name: purchaseOrder.delivery_provider_name || providerName,
+                    delivery_provider_phone: purchaseOrder.delivery_provider_phone || providerPhone,
+                    delivery_status: purchaseOrder.delivery_status || 'accepted',
+                    delivery_assigned_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                  };
+                }
+                return order;
+              }));
+              
+              // Show toast notification
+              toast({
+                title: '✅ Delivery Provider Accepted',
+                description: `Delivery provider ${purchaseOrder.delivery_provider_name || providerName} accepted order ${purchaseOrder.po_number || ''}. Status updated.`,
+              });
+              
+              // Also refresh in background to ensure consistency (but don't show loading)
+              setTimeout(async () => {
+                try {
+                  await loadOrders();
+                } catch (e) {
+                  console.log('Background refresh failed:', e);
+                }
+              }, 2000);
+              
+            } catch (error) {
+              console.error('❌ OrderManagement: Error handling delivery acceptance:', error);
+              // Fallback: just refresh orders
+              setTimeout(() => loadOrders(), 1000);
+            }
           }
         }
       )
