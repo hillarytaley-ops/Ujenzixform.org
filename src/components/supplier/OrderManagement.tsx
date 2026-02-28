@@ -345,12 +345,56 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
           filter: `status=eq.accepted`
         },
         async (payload) => {
-          console.log('🚚 OrderManagement: Delivery request accepted:', payload.new?.purchase_order_id);
+          console.log('🚚 OrderManagement: Delivery request accepted:', payload.new?.purchase_order_id, 'provider_id:', payload.new?.provider_id);
           
           // When delivery request is accepted, fetch the purchase order to check if it belongs to this supplier
-          if (payload.new?.purchase_order_id && payload.new?.provider_id) {
-            const orderId = payload.new.purchase_order_id;
+          if (payload.new?.provider_id) {
+            let orderId = payload.new.purchase_order_id;
             const providerId = payload.new.provider_id;
+            
+            // If purchase_order_id is null, try to find matching purchase_order
+            if (!orderId && payload.new.builder_id) {
+              console.log('🔍 OrderManagement: purchase_order_id is null, searching for matching purchase_order...');
+              try {
+                const { data: matchingPOs, error: searchError } = await supabase
+                  .from('purchase_orders')
+                  .select('id, supplier_id, po_number')
+                  .eq('buyer_id', payload.new.builder_id)
+                  .eq('delivery_required', true)
+                  .is('delivery_provider_id', null)
+                  .order('created_at', { ascending: false })
+                  .limit(5);
+                
+                if (!searchError && matchingPOs && matchingPOs.length > 0) {
+                  // Try to match by delivery address
+                  const deliveryAddress = payload.new.delivery_address;
+                  if (deliveryAddress) {
+                    const exactMatch = matchingPOs.find(po => 
+                      po.delivery_address && 
+                      po.delivery_address.toLowerCase().trim() === deliveryAddress.toLowerCase().trim()
+                    );
+                    if (exactMatch) {
+                      orderId = exactMatch.id;
+                      console.log('✅ OrderManagement: Found matching purchase_order by address:', orderId);
+                    } else if (matchingPOs.length === 1) {
+                      // If only one match, use it
+                      orderId = matchingPOs[0].id;
+                      console.log('✅ OrderManagement: Found single matching purchase_order:', orderId);
+                    }
+                  } else if (matchingPOs.length === 1) {
+                    orderId = matchingPOs[0].id;
+                    console.log('✅ OrderManagement: Found single matching purchase_order (no address match):', orderId);
+                  }
+                }
+              } catch (e) {
+                console.log('⚠️ OrderManagement: Error searching for purchase_order:', e);
+              }
+            }
+            
+            if (!orderId) {
+              console.log('⚠️ OrderManagement: No purchase_order_id found, cannot update supplier dashboard');
+              return;
+            }
             
             try {
               // Fetch the purchase order to check if it belongs to this supplier
