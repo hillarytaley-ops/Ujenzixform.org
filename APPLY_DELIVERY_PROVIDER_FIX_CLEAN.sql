@@ -97,10 +97,18 @@ BEGIN
                 updated_at = NOW()
             WHERE id = po_id;
             
-            -- Log the status change
-            INSERT INTO order_status_history (order_id, status, notes, created_at)
-            VALUES (po_id, 'accepted', 'Delivery provider accepted - ' || v_provider_name, NOW())
-            ON CONFLICT DO NOTHING;
+            -- Log the status change (only if order_status_history table exists)
+            BEGIN
+                IF EXISTS (SELECT 1 FROM information_schema.tables 
+                          WHERE table_schema = 'public' AND table_name = 'order_status_history') THEN
+                    INSERT INTO order_status_history (order_id, status, notes, created_at)
+                    VALUES (po_id, 'accepted', 'Delivery provider accepted - ' || v_provider_name, NOW())
+                    ON CONFLICT DO NOTHING;
+                END IF;
+            EXCEPTION WHEN OTHERS THEN
+                -- Table doesn't exist or other error, skip logging
+                NULL;
+            END;
             
             RAISE NOTICE 'Updated purchase_order % with delivery provider % (%)', po_id, v_provider_name, NEW.provider_id;
         END IF;
