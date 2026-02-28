@@ -70,20 +70,20 @@ BEGIN
                        LPAD(FLOOR(RANDOM() * 10000)::TEXT, 4, '0');
       
       -- Check if this specific item already exists before inserting
-      IF NOT EXISTS (SELECT 1 FROM material_items WHERE purchase_order_id = NEW.id AND item_sequence = item_index) THEN
-        INSERT INTO public.material_items (
-          purchase_order_id, qr_code, item_sequence, material_type, category,
-          quantity, unit, supplier_id, status
-        ) VALUES (
-          NEW.id, qr_code_value, item_index,
-          COALESCE(item->>'name', item->>'material_name', 'Unknown Material'),
-          material_category,
-          COALESCE((item->>'quantity')::NUMERIC, 1),
-          COALESCE(item->>'unit', 'units'),
-          supplier_uuid,
-          'pending'
-        );
-      END IF;
+      -- Use ON CONFLICT as a safety net even though we check first
+      INSERT INTO public.material_items (
+        purchase_order_id, qr_code, item_sequence, material_type, category,
+        quantity, unit, supplier_id, status
+      ) VALUES (
+        NEW.id, qr_code_value, item_index,
+        COALESCE(item->>'name', item->>'material_name', 'Unknown Material'),
+        material_category,
+        COALESCE((item->>'quantity')::NUMERIC, 1),
+        COALESCE(item->>'unit', 'units'),
+        supplier_uuid,
+        'pending'
+      )
+      ON CONFLICT (purchase_order_id, item_sequence) DO NOTHING;
     END LOOP;
     
     UPDATE purchase_orders SET qr_code_generated = true WHERE id = NEW.id;
@@ -108,15 +108,21 @@ BEGIN
 END;
 $$;
 
--- Recreate triggers
--- Only fire on UPDATE to prevent duplicate generation on INSERT
+-- Drop ALL possible triggers that might generate QR codes
 DROP TRIGGER IF EXISTS trigger_auto_generate_item_qr_codes ON purchase_orders;
+DROP TRIGGER IF EXISTS trigger_auto_generate_qr_on_confirm ON purchase_orders;
+DROP TRIGGER IF EXISTS trigger_auto_generate_qr_codes ON purchase_orders;
+DROP TRIGGER IF EXISTS trigger_auto_generate_individual_qr_on_confirm ON purchase_orders;
+
+-- Recreate ONLY the main trigger
+-- Only fire on UPDATE to prevent duplicate generation on INSERT
 CREATE TRIGGER trigger_auto_generate_item_qr_codes
   AFTER UPDATE ON purchase_orders
   FOR EACH ROW
   WHEN (OLD.status IS DISTINCT FROM NEW.status OR OLD.qr_code_generated IS DISTINCT FROM NEW.qr_code_generated)
   EXECUTE FUNCTION public.auto_generate_item_qr_codes();
 
+-- Keep the disabled trigger (it's now a no-op) to prevent old migrations from recreating it
 DROP TRIGGER IF EXISTS trigger_auto_generate_qr_on_confirm ON purchase_orders;
 CREATE TRIGGER trigger_auto_generate_qr_on_confirm
     AFTER UPDATE ON purchase_orders
