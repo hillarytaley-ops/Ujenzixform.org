@@ -3,6 +3,46 @@
 -- Run this in Supabase SQL Editor to fix supplier dashboard updates
 -- ============================================================
 
+-- Step 0: Ensure delivery provider columns exist in purchase_orders table
+DO $$ 
+BEGIN
+    -- Delivery provider ID
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'purchase_orders' AND column_name = 'delivery_provider_id') THEN
+        ALTER TABLE purchase_orders ADD COLUMN delivery_provider_id UUID;
+    END IF;
+    
+    -- Delivery provider name
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'purchase_orders' AND column_name = 'delivery_provider_name') THEN
+        ALTER TABLE purchase_orders ADD COLUMN delivery_provider_name TEXT;
+    END IF;
+    
+    -- Delivery provider phone
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'purchase_orders' AND column_name = 'delivery_provider_phone') THEN
+        ALTER TABLE purchase_orders ADD COLUMN delivery_provider_phone TEXT;
+    END IF;
+    
+    -- Delivery status
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'purchase_orders' AND column_name = 'delivery_status') THEN
+        ALTER TABLE purchase_orders ADD COLUMN delivery_status TEXT DEFAULT 'pending';
+    END IF;
+    
+    -- Delivery assigned at
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'purchase_orders' AND column_name = 'delivery_assigned_at') THEN
+        ALTER TABLE purchase_orders ADD COLUMN delivery_assigned_at TIMESTAMPTZ;
+    END IF;
+    
+    -- Delivery accepted at
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'purchase_orders' AND column_name = 'delivery_accepted_at') THEN
+        ALTER TABLE purchase_orders ADD COLUMN delivery_accepted_at TIMESTAMPTZ;
+    END IF;
+END $$;
+
 -- Step 1: Update the trigger function to handle delivery provider acceptance
 CREATE OR REPLACE FUNCTION public.update_order_in_transit()
 RETURNS TRIGGER
@@ -93,7 +133,32 @@ SELECT
 FROM information_schema.triggers
 WHERE trigger_name = 'trigger_update_order_in_transit';
 
--- Step 5: Check for any delivery_requests that should have updated purchase_orders
+-- Step 5: Fix existing delivery requests that were accepted but didn't update purchase_orders
+UPDATE purchase_orders po
+SET 
+    delivery_provider_id = dr.provider_id,
+    delivery_provider_name = COALESCE(
+        (SELECT full_name FROM profiles WHERE user_id = dr.provider_id LIMIT 1),
+        (SELECT provider_name FROM delivery_providers WHERE id = dr.provider_id LIMIT 1),
+        (SELECT company_name FROM delivery_providers WHERE id = dr.provider_id LIMIT 1),
+        'Delivery Provider'
+    ),
+    delivery_provider_phone = COALESCE(
+        (SELECT phone FROM profiles WHERE user_id = dr.provider_id LIMIT 1),
+        (SELECT phone FROM delivery_providers WHERE id = dr.provider_id LIMIT 1),
+        po.delivery_provider_phone
+    ),
+    delivery_status = 'accepted',
+    delivery_assigned_at = COALESCE(po.delivery_assigned_at, dr.accepted_at, NOW()),
+    delivery_accepted_at = COALESCE(po.delivery_accepted_at, dr.accepted_at, NOW()),
+    updated_at = NOW()
+FROM delivery_requests dr
+WHERE dr.purchase_order_id = po.id
+  AND dr.provider_id IS NOT NULL
+  AND dr.status IN ('accepted', 'assigned')
+  AND (po.delivery_provider_id IS NULL OR po.delivery_provider_id != dr.provider_id);
+
+-- Step 6: Verify the fix - check for any remaining issues
 SELECT 
     dr.id as delivery_request_id,
     dr.purchase_order_id,
