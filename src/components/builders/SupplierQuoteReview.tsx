@@ -378,33 +378,62 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
     const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
     const headers = getAuthHeaders();
     
-    // Helper function to clean up duplicate QR codes
+    // Helper function to clean up duplicate QR codes with timeout
     const cleanupDuplicateQRCodes = async (orderId: string): Promise<void> => {
-      try {
-        console.log('🧹 Cleaning up duplicate QR codes for order:', orderId);
-        // Call a function to clean up duplicates (we'll create this in the migration)
-        const cleanupResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/rpc/cleanup_duplicate_qr_codes`,
-          {
-            method: 'POST',
-            headers: {
-              ...headers,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ p_order_id: orderId })
+      const cleanupTimeout = new Promise<void>((resolve) => {
+        setTimeout(() => {
+          console.warn('⚠️ Cleanup timeout, continuing anyway');
+          resolve();
+        }, 5000); // 5 second timeout
+      });
+
+      const cleanupTask = async (): Promise<void> => {
+        try {
+          console.log('🧹 Cleaning up duplicate QR codes for order:', orderId);
+          
+          // Try RPC first with timeout
+          try {
+            const cleanupController = new AbortController();
+            const cleanupTimeoutId = setTimeout(() => cleanupController.abort(), 3000);
+            
+            const cleanupResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/rpc/cleanup_duplicate_qr_codes`,
+              {
+                method: 'POST',
+                headers: {
+                  ...headers,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ p_order_id: orderId }),
+                signal: cleanupController.signal
+              }
+            );
+            clearTimeout(cleanupTimeoutId);
+            
+            if (cleanupResponse.ok) {
+              console.log('✅ Duplicate QR codes cleaned up via RPC');
+              return;
+            }
+          } catch (rpcError) {
+            console.warn('⚠️ RPC cleanup failed, trying direct delete:', rpcError);
           }
-        );
-        
-        if (cleanupResponse.ok) {
-          console.log('✅ Duplicate QR codes cleaned up');
-        } else {
-          console.warn('⚠️ Could not clean up duplicates via RPC, trying direct delete');
-          // Fallback: Direct delete of duplicates
-          const { data: items } = await supabase
-            .from('material_items')
-            .select('id, purchase_order_id, item_sequence, created_at')
-            .eq('purchase_order_id', orderId)
-            .order('created_at', { ascending: true });
+          
+          // Fallback: Direct delete of duplicates with timeout
+          const { data: items, error: selectError } = await Promise.race([
+            supabase
+              .from('material_items')
+              .select('id, purchase_order_id, item_sequence, created_at')
+              .eq('purchase_order_id', orderId)
+              .order('created_at', { ascending: true }),
+            new Promise<{ data: null, error: { message: 'timeout' } }>((resolve) => 
+              setTimeout(() => resolve({ data: null, error: { message: 'timeout' } }), 3000)
+            )
+          ]) as any;
+          
+          if (selectError && selectError.message === 'timeout') {
+            console.warn('⚠️ Cleanup query timeout, continuing');
+            return;
+          }
           
           if (items && items.length > 0) {
             // Group by item_sequence and keep only the first one
@@ -420,24 +449,33 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
             }
             
             if (toDelete.length > 0) {
-              await supabase
-                .from('material_items')
-                .delete()
-                .in('id', toDelete);
+              await Promise.race([
+                supabase
+                  .from('material_items')
+                  .delete()
+                  .in('id', toDelete),
+                new Promise((resolve) => setTimeout(() => resolve({ error: null }), 3000))
+              ]);
               console.log(`✅ Deleted ${toDelete.length} duplicate QR codes`);
             }
           }
           
-          // Reset the flag
-          await supabase
-            .from('purchase_orders')
-            .update({ qr_code_generated: false })
-            .eq('id', orderId);
+          // Reset the flag with timeout
+          await Promise.race([
+            supabase
+              .from('purchase_orders')
+              .update({ qr_code_generated: false })
+              .eq('id', orderId),
+            new Promise((resolve) => setTimeout(() => resolve({ error: null }), 2000))
+          ]);
+        } catch (error) {
+          console.warn('⚠️ Error cleaning up duplicates:', error);
+          // Continue anyway - the ON CONFLICT should handle it
         }
-      } catch (error) {
-        console.warn('⚠️ Error cleaning up duplicates:', error);
-        // Continue anyway - the ON CONFLICT should handle it
-      }
+      };
+
+      // Race between cleanup and timeout
+      await Promise.race([cleanupTask(), cleanupTimeout]);
     };
     
     try {
@@ -457,16 +495,27 @@ export const SupplierQuoteReview: React.FC<SupplierQuoteReviewProps> = ({
         }
       }
       
-      // Check if QR codes already exist and clean them up if needed
-      const { data: existingItems } = await supabase
-        .from('material_items')
-        .select('id, item_sequence')
-        .eq('purchase_order_id', quote.id)
-        .limit(1);
-      
-      if (existingItems && existingItems.length > 0) {
-        console.log('⚠️ QR codes already exist, cleaning up before accepting...');
-        await cleanupDuplicateQRCodes(quote.id);
+      // Check if QR codes already exist and clean them up if needed (with timeout)
+      try {
+        const checkPromise = supabase
+          .from('material_items')
+          .select('id, item_sequence')
+          .eq('purchase_order_id', quote.id)
+          .limit(1);
+        
+        const timeoutPromise = new Promise<{ data: null, error: null }>((resolve) => 
+          setTimeout(() => resolve({ data: null, error: null }), 2000)
+        );
+        
+        const { data: existingItems } = await Promise.race([checkPromise, timeoutPromise]) as any;
+        
+        if (existingItems && existingItems.length > 0) {
+          console.log('⚠️ QR codes already exist, cleaning up before accepting...');
+          await cleanupDuplicateQRCodes(quote.id);
+        }
+      } catch (checkError) {
+        console.warn('⚠️ Could not check for existing QR codes, continuing:', checkError);
+        // Continue anyway
       }
       
       // Update purchase order to 'quote_accepted' - trigger will convert to order
