@@ -1167,14 +1167,14 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
               <RefreshCw className="h-12 w-12 text-teal-500 mx-auto mb-3 animate-spin" />
               <p className="text-gray-500">Loading delivery requests...</p>
             </div>
-          ) : notifications.length === 0 ? (
+          ) : deduplicatedNotifications.length === 0 ? (
             <div className="text-center py-8">
               <BellOff className="h-12 w-12 text-gray-300 mx-auto mb-3" />
               <p className="text-gray-500">No active delivery requests</p>
               <p className="text-xs text-gray-400 mt-2">New requests will appear here in real-time</p>
             </div>
           ) : (
-            notifications.map((notification) => (
+            deduplicatedNotifications.map((notification) => (
               <div
                 key={notification.id}
                 className={`p-2.5 rounded-lg border transition-colors ${
