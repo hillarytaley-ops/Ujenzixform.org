@@ -41,6 +41,28 @@ BEGIN
                    WHERE table_name = 'purchase_orders' AND column_name = 'delivery_accepted_at') THEN
         ALTER TABLE purchase_orders ADD COLUMN delivery_accepted_at TIMESTAMPTZ;
     END IF;
+    
+    -- Tracking number (for client dashboard access)
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'purchase_orders' AND column_name = 'tracking_number') THEN
+        ALTER TABLE purchase_orders ADD COLUMN tracking_number TEXT;
+    END IF;
+END $$;
+
+-- Step 0.5: Prevent duplicate delivery_requests per purchase_order
+-- Add unique constraint to ensure only ONE delivery_request per purchase_order (when purchase_order_id is not null)
+DO $$
+BEGIN
+    -- Check if constraint already exists
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint 
+        WHERE conname = 'unique_delivery_request_per_purchase_order'
+    ) THEN
+        -- Create unique partial index (only applies when purchase_order_id is not null)
+        CREATE UNIQUE INDEX IF NOT EXISTS unique_delivery_request_per_purchase_order 
+        ON delivery_requests(purchase_order_id) 
+        WHERE purchase_order_id IS NOT NULL AND status IN ('pending', 'accepted', 'assigned', 'in_transit');
+    END IF;
 END $$;
 
 -- Step 1: Update the trigger function to handle delivery provider acceptance
@@ -113,7 +135,7 @@ BEGIN
                 v_provider_phone := NULL;
             END;
             
-            -- Update purchase order with delivery provider info
+            -- Update purchase order with delivery provider info AND tracking number
             UPDATE purchase_orders
             SET 
                 delivery_provider_id = NEW.provider_id,
@@ -129,6 +151,7 @@ BEGIN
                     WHEN NEW.status = 'accepted' THEN COALESCE(delivery_accepted_at, NOW())
                     ELSE delivery_accepted_at
                 END,
+                tracking_number = COALESCE(NEW.tracking_number, tracking_number), -- Store tracking number in purchase_orders for client access
                 updated_at = NOW()
             WHERE id = po_id;
             
