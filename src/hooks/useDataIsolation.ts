@@ -700,11 +700,38 @@ export const useDeliveryProviderData = () => {
     console.log('✅ acceptDelivery: Accepting delivery', deliveryId, 'for provider', userId);
 
     try {
+      // First, check if this delivery is already accepted by someone else
+      const { data: existingRequest, error: checkError } = await supabase
+        .from('delivery_requests')
+        .select('id, status, provider_id')
+        .eq('id', deliveryId)
+        .single();
+
+      if (checkError) throw checkError;
+
+      // If already accepted by this provider, return success
+      if (existingRequest.provider_id === userId && existingRequest.status === 'accepted') {
+        console.log('✅ Delivery already accepted by this provider');
+        await fetchData();
+        return { success: true };
+      }
+
+      // If already accepted by another provider, return error
+      if (existingRequest.provider_id && existingRequest.provider_id !== userId) {
+        throw new Error('This delivery has already been accepted by another provider');
+      }
+
+      // If status is not pending, check if we can still accept
+      if (existingRequest.status !== 'pending' && existingRequest.status !== 'assigned') {
+        throw new Error(`Cannot accept delivery with status: ${existingRequest.status}`);
+      }
+
       // Generate tracking number
       const trackingNumber = 'TRK-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + 
         Math.random().toString(36).substring(2, 7).toUpperCase();
       
-      const { error } = await supabase
+      // Update with less restrictive conditions - allow accepting if status is pending OR assigned
+      const { data: updatedData, error } = await supabase
         .from('delivery_requests')
         .update({ 
           provider_id: userId,
@@ -714,10 +741,29 @@ export const useDeliveryProviderData = () => {
           updated_at: new Date().toISOString()
         })
         .eq('id', deliveryId)
-        .eq('status', 'pending') // Only accept pending requests
-        .is('provider_id', null); // Only accept unassigned requests
+        .in('status', ['pending', 'assigned']) // Allow accepting from pending or assigned
+        .or(`provider_id.is.null,provider_id.eq.${userId}`) // Allow if unassigned OR already assigned to this provider
+        .select(); // Return updated row to verify
 
       if (error) throw error;
+
+      // Check if update actually succeeded (updatedData should have at least one row)
+      if (!updatedData || updatedData.length === 0) {
+        // Check again what the current state is
+        const { data: currentState } = await supabase
+          .from('delivery_requests')
+          .select('status, provider_id')
+          .eq('id', deliveryId)
+          .single();
+        
+        if (currentState?.provider_id === userId) {
+          console.log('✅ Delivery already accepted by this provider (race condition)');
+          await fetchData();
+          return { success: true };
+        }
+        
+        throw new Error('Failed to accept delivery. It may have been accepted by another provider.');
+      }
 
       console.log('✅ Delivery request accepted - trigger should update purchase_orders');
 

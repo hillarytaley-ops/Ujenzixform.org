@@ -626,8 +626,44 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       delete updatePayload.delivery_provider_name;
       delete updatePayload.delivery_provider_phone;
       
+      // First check current state
+      const checkResponse = await fetch(
+        `${url}/rest/v1/delivery_requests?id=eq.${requestId}&select=id,status,provider_id`,
+        { headers, cache: 'no-store' }
+      );
+      
+      if (checkResponse.ok) {
+        const currentState = await checkResponse.json().catch(() => []);
+        if (currentState && currentState.length > 0) {
+          const dr = currentState[0];
+          // If already accepted by this provider, just return success
+          if (dr.provider_id === providerId && dr.status === 'accepted') {
+            console.log('✅ Delivery already accepted by this provider');
+            setNotifications(prev => prev.filter(n => n.id !== requestId));
+            setUnreadCount(prev => Math.max(0, prev - 1));
+            toast({
+              title: '✅ Already Accepted',
+              description: 'This delivery was already accepted.',
+            });
+            if (onAcceptDelivery) onAcceptDelivery(requestId);
+            return;
+          }
+          // If accepted by another provider, show error
+          if (dr.provider_id && dr.provider_id !== providerId) {
+            throw new Error('This delivery has already been accepted by another provider');
+          }
+        }
+      }
+      
+      // Build query with less restrictive conditions
+      const queryParams = new URLSearchParams({
+        id: `eq.${requestId}`,
+        status: `in.(pending,assigned)`,
+        or: `provider_id.is.null,provider_id.eq.${providerId}`
+      });
+      
       const response = await fetch(
-        `${url}/rest/v1/delivery_requests?id=eq.${requestId}`,
+        `${url}/rest/v1/delivery_requests?${queryParams.toString()}`,
         {
           method: 'PATCH',
           headers: { ...headers, 'Prefer': 'return=representation' },
@@ -640,6 +676,23 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       if (response.ok) {
         const result = await response.json().catch(() => []);
         console.log('✅ Delivery accepted successfully:', result);
+        
+        // Verify update actually happened
+        if (!result || result.length === 0) {
+          // Check again - might have been a race condition
+          const verifyResponse = await fetch(
+            `${url}/rest/v1/delivery_requests?id=eq.${requestId}&select=provider_id,status`,
+            { headers, cache: 'no-store' }
+          );
+          if (verifyResponse.ok) {
+            const verify = await verifyResponse.json().catch(() => []);
+            if (verify && verify.length > 0 && verify[0].provider_id === providerId) {
+              console.log('✅ Verified: Delivery accepted (race condition handled)');
+            } else {
+              throw new Error('Failed to accept delivery. It may have been accepted by another provider.');
+            }
+          }
+        }
         
         // NOW remove from notifications list (after confirmed success)
         setNotifications(prev => prev.filter(n => n.id !== requestId));
