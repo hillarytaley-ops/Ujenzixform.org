@@ -496,7 +496,21 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             seenPurchaseOrderIds.add(notification.purchase_order_id);
             finalDeduplicated.push(notification);
           } else {
-            console.log(`🔍 Removed duplicate notification for purchase_order_id: ${notification.purchase_order_id}`);
+            // Duplicate found - prefer delivery_requests over purchase_orders
+            const existingIndex = finalDeduplicated.findIndex(n => {
+              const notif = n as any;
+              return notif.purchase_order_id === notification.purchase_order_id;
+            });
+            if (existingIndex >= 0) {
+              const existing = finalDeduplicated[existingIndex] as any;
+              // If new one is from delivery_requests and existing is from purchase_orders, replace it
+              if (notification.source === 'delivery_requests' && existing.source === 'purchase_orders') {
+                console.log(`🔍 Replacing purchase_order notification with delivery_request for po_id: ${notification.purchase_order_id}`);
+                finalDeduplicated[existingIndex] = notification;
+              } else {
+                console.log(`🔍 Removed duplicate notification for purchase_order_id: ${notification.purchase_order_id} (keeping existing)`);
+              }
+            }
           }
         } else {
           // No purchase_order_id, deduplicate by notification id
