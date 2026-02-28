@@ -489,8 +489,11 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       // Sort by timestamp descending first
       allNotifications.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
       
+      // Also deduplicate by delivery address + material type for cases where purchase_order_id might be missing
+      const seenByAddressAndMaterial = new Map<string, Notification>();
+      
       allNotifications.forEach((notification: Notification & { purchase_order_id?: string; source?: string }) => {
-        // If notification has purchase_order_id, deduplicate by it
+        // Strategy 1: If notification has purchase_order_id, deduplicate by it (STRICTEST)
         if (notification.purchase_order_id) {
           if (!seenPurchaseOrderIds.has(notification.purchase_order_id)) {
             seenPurchaseOrderIds.add(notification.purchase_order_id);
@@ -513,10 +516,34 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             }
           }
         } else {
-          // No purchase_order_id, deduplicate by notification id
-          if (!seenNotificationIds.has(notification.id)) {
-            seenNotificationIds.add(notification.id);
+          // Strategy 2: No purchase_order_id - deduplicate by delivery address + material type (for same delivery)
+          const addressMaterialKey = `${(notification.deliveryAddress || '').toLowerCase().trim()}|${(notification.materialType || '').toLowerCase().trim()}`;
+          if (addressMaterialKey !== '|' && seenByAddressAndMaterial.has(addressMaterialKey)) {
+            // Duplicate by address + material - keep the first one (or most recent)
+            const existing = seenByAddressAndMaterial.get(addressMaterialKey)!;
+            const existingTime = existing.timestamp.getTime();
+            const newTime = notification.timestamp.getTime();
+            if (newTime > existingTime) {
+              // Replace with newer one
+              const existingIndex = finalDeduplicated.findIndex(n => n.id === existing.id);
+              if (existingIndex >= 0) {
+                console.log(`🔍 Replacing duplicate by address+material: ${addressMaterialKey}`);
+                finalDeduplicated[existingIndex] = notification;
+                seenByAddressAndMaterial.set(addressMaterialKey, notification);
+              }
+            } else {
+              console.log(`🔍 Removed duplicate by address+material (keeping older): ${addressMaterialKey}`);
+            }
+          } else if (addressMaterialKey !== '|') {
+            // New unique address+material combination
+            seenByAddressAndMaterial.set(addressMaterialKey, notification);
             finalDeduplicated.push(notification);
+          } else {
+            // Strategy 3: Fallback - deduplicate by notification id only
+            if (!seenNotificationIds.has(notification.id)) {
+              seenNotificationIds.add(notification.id);
+              finalDeduplicated.push(notification);
+            }
           }
         }
       });
@@ -542,25 +569,67 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         { event: 'INSERT', schema: 'public', table: 'delivery_requests' }, 
         (payload: any) => {
           console.log('🔔 New delivery request received:', payload.new);
-          const newNotification: Notification = {
-            id: payload.new.id,
-            type: 'new_delivery',
-            title: '🚚 New Delivery Request!',
-            message: `${payload.new.material_type || 'Materials'} to ${payload.new.delivery_address || 'Unknown'}`,
-            timestamp: new Date(payload.new.created_at || Date.now()),
-            read: false,
-            priority: payload.new.priority_level === 'urgent' ? 'high' : 'medium',
-            actionUrl: `/delivery-dashboard?request=${payload.new.id}`,
-            status: payload.new.status || 'pending',
-            pickupAddress: payload.new.pickup_address || payload.new.pickup_location || '',
-            deliveryAddress: payload.new.delivery_address || payload.new.delivery_location || '',
-            materialType: payload.new.material_type || '',
-            quantity: payload.new.quantity || '',
-            estimatedCost: payload.new.estimated_cost || 0
-          };
           
-          setNotifications(prev => [newNotification, ...prev]);
-          setUnreadCount(prev => prev + 1);
+          // CRITICAL: Check for duplicates before adding
+          setNotifications(prev => {
+            // Check if notification with same purchase_order_id already exists
+            if (payload.new.purchase_order_id) {
+              const existingByPO = prev.find((n: any) => n.purchase_order_id === payload.new.purchase_order_id);
+              if (existingByPO) {
+                console.log(`🔍 Real-time: Duplicate detected for purchase_order_id ${payload.new.purchase_order_id}, skipping`);
+                return prev; // Don't add duplicate
+              }
+            }
+            
+            // Also check by delivery address + material type if purchase_order_id is missing
+            const addressMaterialKey = `${(payload.new.delivery_address || '').toLowerCase().trim()}|${(payload.new.material_type || '').toLowerCase().trim()}`;
+            if (addressMaterialKey !== '|') {
+              const existingByAddress = prev.find((n: any) => {
+                const nKey = `${(n.deliveryAddress || '').toLowerCase().trim()}|${(n.materialType || '').toLowerCase().trim()}`;
+                return nKey === addressMaterialKey;
+              });
+              if (existingByAddress) {
+                console.log(`🔍 Real-time: Duplicate detected by address+material, skipping`);
+                return prev; // Don't add duplicate
+              }
+            }
+            
+            // Check by notification id as final check
+            const existingById = prev.find(n => n.id === payload.new.id);
+            if (existingById) {
+              console.log(`🔍 Real-time: Duplicate detected by id ${payload.new.id}, skipping`);
+              return prev; // Don't add duplicate
+            }
+            
+            // No duplicate found - add the new notification
+            const newNotification: Notification & { purchase_order_id?: string; source?: string } = {
+              id: payload.new.id,
+              type: 'new_delivery',
+              title: '🚚 New Delivery Request!',
+              message: `${payload.new.material_type || 'Materials'} to ${payload.new.delivery_address || 'Unknown'}`,
+              timestamp: new Date(payload.new.created_at || Date.now()),
+              read: false,
+              priority: payload.new.priority_level === 'urgent' ? 'high' : 'medium',
+              actionUrl: `/delivery-dashboard?request=${payload.new.id}`,
+              status: payload.new.status || 'pending',
+              pickupAddress: payload.new.pickup_address || payload.new.pickup_location || '',
+              deliveryAddress: payload.new.delivery_address || payload.new.delivery_location || '',
+              materialType: payload.new.material_type || '',
+              quantity: payload.new.quantity || '',
+              estimatedCost: payload.new.estimated_cost || 0,
+              purchase_order_id: payload.new.purchase_order_id, // CRITICAL for deduplication
+              source: 'delivery_requests'
+            };
+            
+            return [newNotification, ...prev];
+          });
+          
+          // Only increment unread count if we actually added a notification
+          setNotifications(prev => {
+            // Check was done above, so if we're here, notification was added
+            setUnreadCount(prevCount => prevCount + 1);
+            return prev;
+          });
           
           // Show toast
           toast({
