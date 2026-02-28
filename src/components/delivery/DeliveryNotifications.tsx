@@ -656,20 +656,40 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       }
       
       // Build query with less restrictive conditions
+      // PostgREST syntax: use separate filters and combine with AND logic
+      // We'll check status and provider_id separately
       const queryParams = new URLSearchParams({
         id: `eq.${requestId}`,
-        status: `in.(pending,assigned)`,
-        or: `provider_id.is.null,provider_id.eq.${providerId}`
+        status: `in.(pending,assigned)`
       });
       
-      const response = await fetch(
-        `${url}/rest/v1/delivery_requests?${queryParams.toString()}`,
+      // First try with provider_id null (unassigned)
+      let response = await fetch(
+        `${url}/rest/v1/delivery_requests?${queryParams.toString()}&provider_id=is.null`,
         {
           method: 'PATCH',
           headers: { ...headers, 'Prefer': 'return=representation' },
           body: JSON.stringify(updatePayload)
         }
       );
+      
+      // If that didn't work (no rows updated), try with provider_id matching this provider
+      if (!response.ok || (response.ok && (await response.json().catch(() => [])).length === 0)) {
+        const queryParams2 = new URLSearchParams({
+          id: `eq.${requestId}`,
+          status: `in.(pending,assigned)`,
+          provider_id: `eq.${providerId}`
+        });
+        
+        response = await fetch(
+          `${url}/rest/v1/delivery_requests?${queryParams2.toString()}`,
+          {
+            method: 'PATCH',
+            headers: { ...headers, 'Prefer': 'return=representation' },
+            body: JSON.stringify(updatePayload)
+          }
+        );
+      }
       
       console.log('🚚 PATCH response status:', response.status);
       

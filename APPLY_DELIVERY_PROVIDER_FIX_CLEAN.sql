@@ -69,25 +69,26 @@ BEGIN
         RAISE NOTICE 'Found % purchase_orders with duplicate delivery_requests. Cleaning up...', duplicate_count;
         
         -- Delete duplicates, keeping only the most recent or accepted one
+        -- Use a CTE to identify which ones to keep, then delete the rest
+        WITH duplicates_to_keep AS (
+            SELECT DISTINCT ON (purchase_order_id) id
+            FROM delivery_requests
+            WHERE purchase_order_id IS NOT NULL
+            ORDER BY purchase_order_id,
+                     -- Prefer accepted/assigned over pending
+                     CASE 
+                         WHEN status IN ('accepted', 'assigned', 'in_transit') THEN 1
+                         WHEN status = 'pending' THEN 2
+                         ELSE 3
+                     END,
+                     -- Prefer ones with provider_id
+                     CASE WHEN provider_id IS NOT NULL THEN 1 ELSE 2 END,
+                     -- Prefer most recent
+                     created_at DESC
+        )
         DELETE FROM delivery_requests dr
         WHERE dr.purchase_order_id IS NOT NULL
-          AND dr.id NOT IN (
-              -- Keep the best delivery_request for each purchase_order_id
-              SELECT DISTINCT ON (purchase_order_id) id
-              FROM delivery_requests
-              WHERE purchase_order_id = dr.purchase_order_id
-              ORDER BY purchase_order_id,
-                       -- Prefer accepted/assigned over pending
-                       CASE 
-                           WHEN status IN ('accepted', 'assigned', 'in_transit') THEN 1
-                           WHEN status = 'pending' THEN 2
-                           ELSE 3
-                       END,
-                       -- Prefer ones with provider_id
-                       CASE WHEN provider_id IS NOT NULL THEN 1 ELSE 2 END,
-                       -- Prefer most recent
-                       created_at DESC
-          );
+          AND dr.id NOT IN (SELECT id FROM duplicates_to_keep);
         
         RAISE NOTICE 'Cleaned up duplicate delivery_requests';
     ELSE
