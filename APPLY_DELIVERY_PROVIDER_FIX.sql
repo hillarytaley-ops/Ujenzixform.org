@@ -66,7 +66,7 @@ BEGIN
             -- Get provider name and phone from profiles or delivery_providers
             BEGIN
                 SELECT 
-                    COALESCE(p.full_name, dp.provider_name, dp.company_name, 'Delivery Provider'),
+                    COALESCE(p.full_name, dp.provider_name, 'Delivery Provider'),
                     COALESCE(p.phone, dp.phone, NULL)
                 INTO v_provider_name, v_provider_phone
                 FROM profiles p
@@ -140,7 +140,6 @@ SET
     delivery_provider_name = COALESCE(
         (SELECT full_name FROM profiles WHERE user_id = dr.provider_id LIMIT 1),
         (SELECT provider_name FROM delivery_providers WHERE id = dr.provider_id LIMIT 1),
-        (SELECT company_name FROM delivery_providers WHERE id = dr.provider_id LIMIT 1),
         'Delivery Provider'
     ),
     delivery_provider_phone = COALESCE(
