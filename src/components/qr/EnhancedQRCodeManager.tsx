@@ -76,6 +76,12 @@ interface OrderGroup {
   invalid_items: number;
   items: MaterialItem[];
   created_at: string;
+  // Delivery provider information
+  delivery_provider_id?: string;
+  delivery_provider_name?: string;
+  delivery_provider_phone?: string;
+  delivery_status?: string;
+  delivery_required?: boolean;
 }
 
 interface EnhancedQRCodeManagerProps {
@@ -183,6 +189,7 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
     
     // Delay real-time subscription setup to not block initial load
     let subscription: any = null;
+    let purchaseOrdersSubscription: any = null;
     const subscriptionTimeout = setTimeout(() => {
       subscription = supabase
         .channel('qr-codes-realtime')
@@ -216,7 +223,97 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
         )
         .subscribe();
       
-      console.log('📡 QR Manager: Real-time subscription active');
+      // Also listen to purchase_orders for delivery provider updates
+      purchaseOrdersSubscription = supabase
+        .channel('qr-purchase-orders-realtime')
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'purchase_orders'
+          },
+          async (payload) => {
+            console.log('🚚 QR Manager: Purchase order updated with delivery provider:', payload.new?.po_number);
+            
+            // Update order groups with delivery provider information
+            if (payload.new?.id) {
+              setOrderGroups(prevGroups => prevGroups.map(group => {
+                if (group.order_id === payload.new.id) {
+                  return {
+                    ...group,
+                    delivery_provider_id: payload.new.delivery_provider_id,
+                    delivery_provider_name: payload.new.delivery_provider_name,
+                    delivery_provider_phone: payload.new.delivery_provider_phone,
+                    delivery_status: payload.new.delivery_status,
+                    delivery_required: payload.new.delivery_required || false
+                  };
+                }
+                return group;
+              }));
+              
+              // Also update awaiting dispatch, dispatched, in transit, and delivered orders
+              setAwaitingDispatchOrders(prev => prev.map(group => {
+                if (group.order_id === payload.new.id) {
+                  return {
+                    ...group,
+                    delivery_provider_id: payload.new.delivery_provider_id,
+                    delivery_provider_name: payload.new.delivery_provider_name,
+                    delivery_provider_phone: payload.new.delivery_provider_phone,
+                    delivery_status: payload.new.delivery_status,
+                    delivery_required: payload.new.delivery_required || false
+                  };
+                }
+                return group;
+              }));
+              
+              setDispatchedOrders(prev => prev.map(group => {
+                if (group.order_id === payload.new.id) {
+                  return {
+                    ...group,
+                    delivery_provider_id: payload.new.delivery_provider_id,
+                    delivery_provider_name: payload.new.delivery_provider_name,
+                    delivery_provider_phone: payload.new.delivery_provider_phone,
+                    delivery_status: payload.new.delivery_status,
+                    delivery_required: payload.new.delivery_required || false
+                  };
+                }
+                return group;
+              }));
+              
+              setInTransitOrders(prev => prev.map(group => {
+                if (group.order_id === payload.new.id) {
+                  return {
+                    ...group,
+                    delivery_provider_id: payload.new.delivery_provider_id,
+                    delivery_provider_name: payload.new.delivery_provider_name,
+                    delivery_provider_phone: payload.new.delivery_provider_phone,
+                    delivery_status: payload.new.delivery_status,
+                    delivery_required: payload.new.delivery_required || false
+                  };
+                }
+                return group;
+              }));
+              
+              setDeliveredOrders(prev => prev.map(group => {
+                if (group.order_id === payload.new.id) {
+                  return {
+                    ...group,
+                    delivery_provider_id: payload.new.delivery_provider_id,
+                    delivery_provider_name: payload.new.delivery_provider_name,
+                    delivery_provider_phone: payload.new.delivery_provider_phone,
+                    delivery_status: payload.new.delivery_status,
+                    delivery_required: payload.new.delivery_required || false
+                  };
+                }
+                return group;
+              }));
+            }
+          }
+        )
+        .subscribe();
+      
+      console.log('📡 QR Manager: Real-time subscriptions active');
     }, 2000); // Delay subscription by 2 seconds
     
     return () => {
@@ -225,6 +322,10 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
       if (subscription) {
         subscription.unsubscribe();
         console.log('📡 QR Manager: Real-time subscription closed');
+      }
+      if (purchaseOrdersSubscription) {
+        purchaseOrdersSubscription.unsubscribe();
+        console.log('📡 QR Manager: Purchase orders subscription closed');
       }
     };
   }, []);
@@ -631,13 +732,13 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
     setClientGroups(sortedGroups);
     console.log('📊 Client groups:', sortedGroups.length, '- sorted by most recent activity');
     
-    // Also group by order
-    groupItemsByOrder(materialItems);
+    // Also group by order (async - fetches delivery provider info)
+    groupItemsByOrder(materialItems).catch(err => console.log('Error grouping by order:', err));
   };
 
   // Group items by purchase order - sorted by most recent first
   // Also separates into dispatched and unconfirmed orders
-  const groupItemsByOrder = (materialItems: MaterialItem[]) => {
+  const groupItemsByOrder = async (materialItems: MaterialItem[]) => {
     const groups: Record<string, OrderGroup> = {};
     
     materialItems.forEach(item => {
@@ -657,7 +758,12 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
           received_items: 0,
           invalid_items: 0,
           items: [],
-          created_at: item.created_at || ''
+          created_at: item.created_at || '',
+          delivery_provider_id: undefined,
+          delivery_provider_name: undefined,
+          delivery_provider_phone: undefined,
+          delivery_status: undefined,
+          delivery_required: false
         };
       }
       
@@ -683,6 +789,46 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
         groups[orderId].received_items++;
       }
     });
+    
+    // Fetch purchase order data with delivery provider information
+    const orderIds = Object.keys(groups).filter(id => id !== 'unknown');
+    if (orderIds.length > 0) {
+      try {
+        const stored = getUserFromStorage();
+        const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+        
+        const headers: Record<string, string> = {
+          'apikey': SUPABASE_ANON_KEY,
+          'Content-Type': 'application/json'
+        };
+        if (stored?.accessToken) {
+          headers['Authorization'] = `Bearer ${stored.accessToken}`;
+        }
+        
+        // Fetch purchase orders with delivery provider info
+        const purchaseOrdersResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/purchase_orders?id=in.(${orderIds.join(',')})&select=id,po_number,delivery_provider_id,delivery_provider_name,delivery_provider_phone,delivery_status,delivery_required`,
+          { headers, cache: 'no-store' }
+        );
+        
+        if (purchaseOrdersResponse.ok) {
+          const purchaseOrders = await purchaseOrdersResponse.json();
+          purchaseOrders.forEach((po: any) => {
+            if (groups[po.id]) {
+              groups[po.id].order_number = po.po_number || groups[po.id].order_number;
+              groups[po.id].delivery_provider_id = po.delivery_provider_id;
+              groups[po.id].delivery_provider_name = po.delivery_provider_name;
+              groups[po.id].delivery_provider_phone = po.delivery_provider_phone;
+              groups[po.id].delivery_status = po.delivery_status;
+              groups[po.id].delivery_required = po.delivery_required || false;
+            }
+          });
+        }
+      } catch (error) {
+        console.log('⚠️ Could not fetch purchase order data:', error);
+      }
+    }
     
     // Sort groups by most recent order (newest first)
     const sortedGroups = Object.values(groups).sort((a, b) => {
@@ -2070,6 +2216,30 @@ export const EnhancedQRCodeManager: React.FC<EnhancedQRCodeManagerProps> = ({ su
                         </span>
                       )}
                     </div>
+                    {/* Delivery Provider Information */}
+                    {group.delivery_required && (
+                      <div className="mt-2 pt-2 border-t border-blue-200">
+                        {group.delivery_provider_id ? (
+                          <div className="flex items-center gap-2">
+                            <Truck className="h-4 w-4 text-green-600" />
+                            <span className="text-sm font-medium text-green-700">
+                              ✅ Delivery Confirmed
+                            </span>
+                            <span className="text-sm text-slate-600">
+                              Provider: {group.delivery_provider_name || 'Delivery Provider'}
+                              {group.delivery_provider_phone && ` (${group.delivery_provider_phone})`}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-4 w-4 text-yellow-600" />
+                            <span className="text-sm font-medium text-yellow-700">
+                              Awaiting Delivery Provider
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
                     {group.items.map((item) => (
