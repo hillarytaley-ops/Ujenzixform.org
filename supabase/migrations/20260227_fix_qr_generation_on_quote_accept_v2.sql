@@ -17,6 +17,12 @@ DECLARE
   supplier_uuid UUID;
   material_category TEXT;
   should_generate BOOLEAN := FALSE;
+  v_buyer_id UUID;
+  v_buyer_name TEXT;
+  v_buyer_email TEXT;
+  v_buyer_phone TEXT;
+  v_item_quantity INTEGER;
+  v_unit_index INTEGER;
 BEGIN
   -- CRITICAL: Use advisory lock to prevent concurrent execution for same order
   -- This ensures only one trigger execution can generate QR codes at a time
@@ -62,34 +68,97 @@ BEGIN
   
   -- Final check: Make sure QR codes don't exist before generating
   IF should_generate AND NEW.items IS NOT NULL AND NOT EXISTS (SELECT 1 FROM material_items WHERE purchase_order_id = NEW.id) THEN
+    -- Get buyer_id from purchase order
+    v_buyer_id := NEW.buyer_id;
+    
+    -- Fetch buyer details from profiles table
+    IF v_buyer_id IS NOT NULL THEN
+      BEGIN
+        SELECT 
+          COALESCE(full_name, company_name, email, 'Unknown Client'),
+          COALESCE(email, ''),
+          COALESCE(phone, '')
+        INTO v_buyer_name, v_buyer_email, v_buyer_phone
+        FROM profiles
+        WHERE id = v_buyer_id OR user_id = v_buyer_id
+        LIMIT 1;
+        
+        -- If not found in profiles, try to get from auth.users
+        IF v_buyer_name IS NULL OR v_buyer_name = 'Unknown Client' THEN
+          BEGIN
+            SELECT 
+              COALESCE(raw_user_meta_data->>'full_name', raw_user_meta_data->>'name', email, 'Unknown Client'),
+              COALESCE(email, ''),
+              COALESCE(raw_user_meta_data->>'phone', '')
+            INTO v_buyer_name, v_buyer_email, v_buyer_phone
+            FROM auth.users
+            WHERE id = v_buyer_id
+            LIMIT 1;
+          EXCEPTION WHEN OTHERS THEN
+            -- If query fails, use defaults
+            v_buyer_name := 'Unknown Client';
+            v_buyer_email := '';
+            v_buyer_phone := '';
+          END;
+        END IF;
+      EXCEPTION WHEN OTHERS THEN
+        -- If query fails, use defaults
+        v_buyer_name := 'Unknown Client';
+        v_buyer_email := '';
+        v_buyer_phone := '';
+      END;
+    END IF;
+    
+    -- Default values if buyer info not found
+    IF v_buyer_name IS NULL OR v_buyer_name = '' THEN
+      v_buyer_name := 'Unknown Client';
+    END IF;
+    
+    -- Generate QR codes for EACH item in the order
     FOR item IN SELECT * FROM jsonb_array_elements(NEW.items)
     LOOP
       item_index := item_index + 1;
-      
+      v_item_quantity := COALESCE((item->>'quantity')::INTEGER, 1);
       material_category := UPPER(SPLIT_PART(COALESCE(item->>'name', item->>'material_name', 'GENERAL'), ' ', 1));
       
-      qr_code_value := 'UJP-' || 
-                       material_category || '-' ||
-                       COALESCE(NEW.po_number, SUBSTRING(NEW.id::TEXT, 1, 8)) || '-' ||
-                       'ITEM' || LPAD(item_index::TEXT, 3, '0') || '-' ||
-                       TO_CHAR(NOW(), 'YYYYMMDD') || '-' ||
-                       LPAD(FLOOR(RANDOM() * 10000)::TEXT, 4, '0');
-      
-      -- Check if this specific item already exists before inserting
-      -- Use ON CONFLICT as a safety net even though we check first
-      INSERT INTO public.material_items (
-        purchase_order_id, qr_code, item_sequence, material_type, category,
-        quantity, unit, supplier_id, status
-      ) VALUES (
-        NEW.id, qr_code_value, item_index,
-        COALESCE(item->>'name', item->>'material_name', 'Unknown Material'),
-        material_category,
-        COALESCE((item->>'quantity')::NUMERIC, 1),
-        COALESCE(item->>'unit', 'units'),
-        supplier_uuid,
-        'pending'
-      )
-      ON CONFLICT (purchase_order_id, item_sequence) DO NOTHING;
+      -- CRITICAL: Generate ONE QR code for EACH UNIT of the item
+      -- If quantity = 2, generate 2 separate QR codes (one for each piece)
+      FOR v_unit_index IN 1..v_item_quantity
+      LOOP
+        qr_code_value := 'UJP-' || 
+                         material_category || '-' ||
+                         COALESCE(NEW.po_number, SUBSTRING(NEW.id::TEXT, 1, 8)) || '-' ||
+                         'ITEM' || LPAD(item_index::TEXT, 3, '0') || '-' ||
+                         'UNIT' || LPAD(v_unit_index::TEXT, 3, '0') || '-' ||
+                         TO_CHAR(NOW(), 'YYYYMMDD') || '-' ||
+                         LPAD(FLOOR(RANDOM() * 10000)::TEXT, 4, '0');
+        
+        -- Insert ONE QR code per unit with buyer information
+        INSERT INTO public.material_items (
+          purchase_order_id, qr_code, item_sequence, material_type, category,
+          quantity, unit, supplier_id, status,
+          buyer_id, buyer_name, buyer_email, buyer_phone,
+          item_unit_price, item_total_price, item_description
+        ) VALUES (
+          NEW.id, 
+          qr_code_value, 
+          (item_index - 1) * 1000 + v_unit_index, -- Unique sequence: item_index * 1000 + unit_index
+          COALESCE(item->>'name', item->>'material_name', 'Unknown Material'),
+          material_category,
+          1, -- Each QR represents 1 unit
+          COALESCE(item->>'unit', 'units'),
+          supplier_uuid,
+          'pending',
+          v_buyer_id,
+          v_buyer_name,
+          v_buyer_email,
+          v_buyer_phone,
+          COALESCE((item->>'unit_price')::NUMERIC, 0),
+          COALESCE((item->>'unit_price')::NUMERIC, 0), -- Per unit price
+          COALESCE(item->>'description', 'Item ' || item_index || ', Unit ' || v_unit_index || ' of ' || v_item_quantity)
+        )
+        ON CONFLICT (purchase_order_id, item_sequence) DO NOTHING;
+      END LOOP;
     END LOOP;
     
     UPDATE purchase_orders SET qr_code_generated = true WHERE id = NEW.id;
