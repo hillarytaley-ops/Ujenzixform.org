@@ -237,7 +237,37 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
               }
             }
 
+            // DEDUPLICATE: Group by purchase_order_id and keep only the best one
+            const deliveryRequestsByPO = new Map<string, any>();
             deliveryRequests.forEach((req: any) => {
+              if (req.purchase_order_id) {
+                const existing = deliveryRequestsByPO.get(req.purchase_order_id);
+                if (!existing) {
+                  // First one for this purchase_order_id
+                  deliveryRequestsByPO.set(req.purchase_order_id, req);
+                } else {
+                  // Keep the best one: prefer accepted/assigned over pending, prefer with provider_id, prefer most recent
+                  const existingScore = (existing.status === 'accepted' || existing.status === 'assigned' ? 10 : 0) +
+                                       (existing.provider_id ? 5 : 0) +
+                                       (new Date(existing.created_at).getTime() / 1000000);
+                  const newScore = (req.status === 'accepted' || req.status === 'assigned' ? 10 : 0) +
+                                  (req.provider_id ? 5 : 0) +
+                                  (new Date(req.created_at).getTime() / 1000000);
+                  if (newScore > existingScore) {
+                    deliveryRequestsByPO.set(req.purchase_order_id, req);
+                  }
+                }
+              } else {
+                // No purchase_order_id, add it (might be standalone request)
+                deliveryRequestsByPO.set(req.id, req);
+              }
+            });
+            
+            // Convert map back to array (deduplicated)
+            const deduplicatedRequests = Array.from(deliveryRequestsByPO.values());
+            console.log(`🔍 Deduplicated ${deliveryRequests.length} delivery_requests to ${deduplicatedRequests.length} unique requests`);
+            
+            deduplicatedRequests.forEach((req: any) => {
               // Determine the pickup address - use supplier address from cache, or existing pickup_address
               let pickupAddr = req.pickup_address || req.pickup_location || '';
               if (req.supplier_id && supplierAddressCache[req.supplier_id]) {

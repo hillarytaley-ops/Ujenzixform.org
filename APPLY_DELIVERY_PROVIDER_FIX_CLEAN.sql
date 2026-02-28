@@ -90,6 +90,27 @@ BEGIN
         WHERE dr.purchase_order_id IS NOT NULL
           AND dr.id NOT IN (SELECT id FROM duplicates_to_keep);
         
+        -- Also delete duplicates where purchase_order_id is NULL but they have same builder_id, delivery_address, and created within 1 hour
+        -- This handles cases where purchase_order_id wasn't set but they're clearly duplicates
+        WITH null_po_duplicates AS (
+            SELECT DISTINCT ON (builder_id, delivery_address, DATE_TRUNC('hour', created_at)) id
+            FROM delivery_requests
+            WHERE purchase_order_id IS NULL
+              AND builder_id IS NOT NULL
+              AND delivery_address IS NOT NULL
+              AND status = 'pending'
+            ORDER BY builder_id, 
+                     delivery_address, 
+                     DATE_TRUNC('hour', created_at),
+                     created_at DESC
+        )
+        DELETE FROM delivery_requests dr
+        WHERE dr.purchase_order_id IS NULL
+          AND dr.builder_id IS NOT NULL
+          AND dr.delivery_address IS NOT NULL
+          AND dr.status = 'pending'
+          AND dr.id NOT IN (SELECT id FROM null_po_duplicates);
+        
         RAISE NOTICE 'Cleaned up duplicate delivery_requests';
     ELSE
         RAISE NOTICE 'No duplicate delivery_requests found';
