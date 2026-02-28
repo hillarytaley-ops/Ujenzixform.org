@@ -300,9 +300,9 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         }
       }
       
-      // Update delivery request
-      const updateResponse = await fetch(
-        `${url}/rest/v1/delivery_requests?id=eq.${requestId}&status=in.(pending,assigned)&or=provider_id.is.null,provider_id.eq.${providerId}`,
+      // Update delivery request - try with provider_id null first, then with provider_id matching
+      let updateResponse = await fetch(
+        `${url}/rest/v1/delivery_requests?id=eq.${requestId}&status=in.(pending,assigned)&provider_id=is.null`,
         {
           method: 'PATCH',
           headers: { ...headers, 'Prefer': 'return=representation' },
@@ -315,6 +315,30 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           })
         }
       );
+      
+      // If that didn't work (no rows updated), try with provider_id matching this provider
+      if (!updateResponse.ok || (updateResponse.ok && (await updateResponse.json().catch(() => [])).length === 0)) {
+        const queryParams2 = new URLSearchParams({
+          id: `eq.${requestId}`,
+          status: `in.(pending,assigned)`,
+          provider_id: `eq.${providerId}`
+        });
+        
+        updateResponse = await fetch(
+          `${url}/rest/v1/delivery_requests?${queryParams2.toString()}`,
+          {
+            method: 'PATCH',
+            headers: { ...headers, 'Prefer': 'return=representation' },
+            body: JSON.stringify({
+              provider_id: providerId,
+              status: 'accepted',
+              tracking_number: trackingNumber,
+              accepted_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
+          }
+        );
+      }
       
       if (updateResponse.ok) {
         const result = await updateResponse.json();
