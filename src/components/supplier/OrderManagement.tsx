@@ -798,7 +798,10 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
         }
       }
       
-      // Delivery provider is assigned
+      // When delivery provider is assigned, show their name instead of "Awaiting Delivery Provider"
+      // This is the key change: display provider name when provider_id exists
+      
+      // Delivery provider is assigned - show provider name instead of "Awaiting Delivery Provider"
       const deliveryStatusColors: Record<string, string> = {
         pending: 'bg-gray-100 text-gray-700 border-gray-300',
         requested: 'bg-yellow-100 text-yellow-700 border-yellow-300',
@@ -815,9 +818,12 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
       const isAccepted = status === 'accepted' || status === 'picked_up' || status === 'in_transit' || status === 'delivered';
       const isDelivered = status === 'delivered';
       
+      // Get provider name - use delivery_provider_name if available, otherwise show a placeholder
+      const providerName = order.delivery_provider_name || 'Delivery Provider';
+      
       return (
         <div className="space-y-1 min-w-[160px]">
-          {/* Show delivery provider information */}
+          {/* Show delivery provider name - replaces "Awaiting Delivery Provider" */}
           <div className={`text-xs p-2 rounded ${
             isDelivered ? 'bg-emerald-50 border border-emerald-200' :
             isInTransit ? 'bg-indigo-50 border border-indigo-200' :
@@ -829,14 +835,14 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
                 <p className="font-semibold text-indigo-700 mb-1">
                   🚚 In Transit to Destination
                 </p>
-                <p className="font-bold text-indigo-600">{order.delivery_provider_name}</p>
+                <p className="font-bold text-indigo-600">{providerName}</p>
               </>
             ) : isDelivered ? (
               <>
                 <p className="font-semibold text-emerald-700 mb-1">
                   ✓ Delivered by:
                 </p>
-                <p className="font-bold text-emerald-600">{order.delivery_provider_name}</p>
+                <p className="font-bold text-emerald-600">{providerName}</p>
               </>
             ) : (
               <>
@@ -844,9 +850,8 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
                   {isAccepted ? '✅ Delivery Confirmed' : '📋 Assigned'}
                 </p>
                 <p className="font-medium text-gray-800 mt-1">
-                  Delivered by:
+                  {providerName}
                 </p>
-                <p className="font-bold text-blue-600">{order.delivery_provider_name}</p>
               </>
             )}
             {order.delivery_provider_phone && (
@@ -931,10 +936,18 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
                   </TableCell>
                   <TableCell>
                     <div className="space-y-1">
-                      <Badge className={`${statusConfig.color} flex items-center gap-1 w-fit`}>
-                        <StatusIcon className="h-3 w-3" />
-                        {statusConfig.label}
-                      </Badge>
+                      {/* When delivery provider accepts, show "Confirmed" instead of "Pending" */}
+                      {order.delivery_provider_id && (order.status === 'pending' || order.status === 'quote_accepted' || order.status === 'order_created' || order.status === 'awaiting_delivery_request') ? (
+                        <Badge className="bg-blue-100 text-blue-800 flex items-center gap-1 w-fit">
+                          <CheckCircle className="h-3 w-3" />
+                          Confirmed
+                        </Badge>
+                      ) : (
+                        <Badge className={`${statusConfig.color} flex items-center gap-1 w-fit`}>
+                          <StatusIcon className="h-3 w-3" />
+                          {statusConfig.label}
+                        </Badge>
+                      )}
                       {/* Show if builder accepted the order */}
                       {(order.status === 'confirmed' || (order.status === 'pending' && order.order_type === 'quote_request')) && (
                         <p className="text-[10px] text-green-600 mt-1">✓ Builder Accepted</p>
@@ -942,6 +955,10 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
                       {/* Show if delivery was requested */}
                       {order.delivery_required && !order.delivery_provider_id && (
                         <p className="text-[10px] text-blue-600 mt-1">📦 Delivery Requested</p>
+                      )}
+                      {/* Show when delivery provider accepted */}
+                      {order.delivery_provider_id && order.delivery_status === 'accepted' && (
+                        <p className="text-[10px] text-green-600 mt-1">✓ Delivery Provider Accepted</p>
                       )}
                     </div>
                   </TableCell>
