@@ -557,14 +557,14 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
               : `notif-${notification.id}`;
             
             return (
-            <div
-              key={uniqueKey}
-              className={`p-3 rounded-lg border ${
-                notification.read 
-                  ? 'bg-white border-gray-200' 
-                  : 'bg-teal-50 border-teal-200'
-              }`}
-            >
+              <div
+                key={uniqueKey}
+                className={`p-3 rounded-lg border ${
+                  notification.read 
+                    ? 'bg-white border-gray-200' 
+                    : 'bg-teal-50 border-teal-200'
+                }`}
+              >
               <div className="flex items-start justify-between mb-2">
                 <div className="flex-1">
                   <p className="font-medium text-sm">{notification.title}</p>
