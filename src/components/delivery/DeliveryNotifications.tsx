@@ -409,7 +409,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       const absolutelyFinal: Notification[] = [];
       const finalSeenPOIds = new Set<string>();
       const finalSeenIds = new Set<string>();
-      const finalSeenByContent = new Map<string, Notification>(); // Also deduplicate by content similarity
+      const finalSeenByAddress = new Map<string, Notification>(); // For NULL purchase_order_id deduplication
       
       // Sort by timestamp first (most recent first), then prefer delivery_request over purchase_order
       finalNotifications.sort((a, b) => {
@@ -436,6 +436,8 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         }
         
         // ABSOLUTE RULE: ONE notification per purchase_order_id, NO EXCEPTIONS
+        // Different purchase orders are ALWAYS unique, even if they have the same content
+        // (e.g., same address/materials but different purchase orders are legitimate)
         if (notif.purchase_order_id) {
           if (finalSeenPOIds.has(notif.purchase_order_id)) {
             // DUPLICATE DETECTED - REMOVE IT IMMEDIATELY
@@ -444,20 +446,9 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           }
           finalSeenPOIds.add(notif.purchase_order_id);
           
-          // ALSO check content similarity for purchase_order_id notifications
-          // This catches cases where purchase_order_id might be different but content is the same
-          const contentKey = `${(notif.pickupAddress || '').toLowerCase().trim()}|${(notif.deliveryAddress || '').toLowerCase().trim()}|${(notif.materialType || '').toLowerCase().trim()}`;
-          const existingByContent = finalSeenByContent.get(contentKey);
-          if (existingByContent && existingByContent.purchase_order_id !== notif.purchase_order_id) {
-            // Same content but different purchase_order_id - check if timestamps are close (within 5 minutes)
-            const timeDiff = Math.abs(notif.timestamp.getTime() - existingByContent.timestamp.getTime());
-            if (timeDiff < 300000) { // 5 minutes
-              console.error(`🚫 DELETED: Duplicate by content (same material/address, different PO ID) - removed: ${notif.id}, existing: ${existingByContent.id}`);
-              return; // DELETE IT
-            }
-          }
-          
-          finalSeenByContent.set(contentKey, notif);
+          // CRITICAL: Do NOT deduplicate by content when purchase_order_id exists
+          // Different purchase orders can legitimately have the same content (address, materials)
+          // Each purchase_order_id is unique and should have its own notification
           absolutelyFinal.push(notif);
         } 
         // Strategy 2: No purchase_order_id - ONLY THEN deduplicate by delivery_address + material_type
