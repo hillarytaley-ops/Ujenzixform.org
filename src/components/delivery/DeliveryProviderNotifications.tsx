@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { trackingNumberService } from '@/services/TrackingNumberService';
 import {
   Bell,
   Truck,
@@ -351,22 +352,23 @@ export const DeliveryProviderNotifications: React.FC<{ providerId: string }> = (
         return;
       }
 
-      // Update the delivery request status
-      const { error: updateError } = await supabase
-        .from('delivery_requests')
-        .update({ 
-          status: 'accepted',
-          provider_id: providerId 
-        })
-        .eq('id', requestId);
-
-      if (updateError) {
-        throw updateError;
+      // Use the proper TrackingNumberService which handles:
+      // 1. First-come-first-served validation
+      // 2. Date-based scheduling checks
+      // 3. Tracking number generation
+      // 4. Creating tracking_numbers table entry
+      // 5. Builder notifications
+      console.log('🚚 Using TrackingNumberService to accept delivery:', requestId);
+      
+      const result = await trackingNumberService.onProviderAcceptsDelivery(requestId, providerId);
+      
+      if (!result || !result.trackingNumber) {
+        throw new Error('Failed to accept delivery - no tracking number generated');
       }
 
       toast({
         title: '✅ Delivery Accepted',
-        description: 'You have accepted this delivery request. Navigate to pickup location.',
+        description: `Tracking: ${result.trackingNumber}. Navigate to pickup location!`,
       });
       
       setNotifications(prev => 

@@ -557,102 +557,25 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       return;
     }
     
-    // Generate tracking number using the proper service (ensures consistent format)
-    const trackingNumber = trackingNumberService.generateTrackingNumber();
-    
     try {
-      const { url, headers } = getAuthHeaders();
+      // Use the proper TrackingNumberService which handles:
+      // 1. First-come-first-served validation
+      // 2. Date-based scheduling checks
+      // 3. Tracking number generation
+      // 4. Creating tracking_numbers table entry
+      // 5. Builder notifications
+      console.log('🚚 Using TrackingNumberService to accept delivery:', requestId);
       
-      // First check current state
-      const checkResponse = await fetch(
-        `${url}/rest/v1/delivery_requests?id=eq.${requestId}&select=id,status,provider_id,purchase_order_id`,
-        { headers, cache: 'no-store' }
-      );
+      const result = await trackingNumberService.onProviderAcceptsDelivery(requestId, providerId);
       
-      if (checkResponse.ok) {
-        const current = await checkResponse.json();
-        if (current && current.length > 0) {
-          const dr = current[0];
-          if (dr.provider_id === providerId && dr.status === 'accepted') {
-            console.log('✅ Already accepted by this provider');
-            toast({
-              title: '✅ Already Accepted',
-              description: 'This delivery was already accepted.',
-            });
-            loadNotifications();
-            return;
-          }
-          if (dr.provider_id && dr.provider_id !== providerId) {
-            throw new Error('This delivery has already been accepted by another provider');
-          }
-        }
-      }
-      
-      // Update delivery request - try with provider_id null first, then with provider_id matching
-      let updateResponse = await fetch(
-        `${url}/rest/v1/delivery_requests?id=eq.${requestId}&status=in.(pending,assigned)&provider_id=is.null`,
-        {
-          method: 'PATCH',
-          headers: { ...headers, 'Prefer': 'return=representation' },
-          body: JSON.stringify({
-            provider_id: providerId,
-            status: 'accepted',
-            tracking_number: trackingNumber,
-            accepted_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
-        }
-      );
-      
-      let result: any[] = [];
-      if (updateResponse.ok) {
-        result = await updateResponse.json().catch(() => []);
-      }
-      
-      // If that didn't work (no rows updated), try with provider_id matching this provider
-      if (!updateResponse.ok || result.length === 0) {
-        const queryParams2 = new URLSearchParams({
-          id: `eq.${requestId}`,
-          status: `in.(pending,assigned)`,
-          provider_id: `eq.${providerId}`
-        });
-        
-        updateResponse = await fetch(
-          `${url}/rest/v1/delivery_requests?${queryParams2.toString()}`,
-          {
-            method: 'PATCH',
-            headers: { ...headers, 'Prefer': 'return=representation' },
-            body: JSON.stringify({
-              provider_id: providerId,
-              status: 'accepted',
-              tracking_number: trackingNumber,
-              accepted_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            })
-          }
-        );
-        
-        if (updateResponse.ok) {
-          result = await updateResponse.json().catch(() => []);
-        }
-      }
-      
-      if (updateResponse.ok && result && result.length > 0) {
+      if (result && result.trackingNumber) {
         toast({
           title: '✅ Delivery Accepted!',
-          description: `Tracking: ${trackingNumber}`,
+          description: `Tracking: ${result.trackingNumber}`,
         });
         loadNotifications();
       } else {
-        const errorText = await updateResponse.text().catch(() => 'Unknown error');
-        let errorMessage = 'Failed to accept delivery';
-        try {
-          const errorData = JSON.parse(errorText);
-          errorMessage = errorData.message || errorMessage;
-        } catch {
-          errorMessage = errorText || errorMessage;
-        }
-        throw new Error(errorMessage);
+        throw new Error('Failed to accept delivery - no tracking number generated');
       }
     } catch (error: any) {
       console.error('❌ Error accepting delivery:', error);

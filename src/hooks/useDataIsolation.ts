@@ -727,25 +727,22 @@ export const useDeliveryProviderData = () => {
         throw new Error(`Cannot accept delivery with status: ${existingRequest.status}`);
       }
 
-      // Generate tracking number using the proper service (ensures consistent format)
-      const trackingNumber = trackingNumberService.generateTrackingNumber();
+      // Use the proper TrackingNumberService which handles:
+      // 1. First-come-first-served validation
+      // 2. Date-based scheduling checks
+      // 3. Tracking number generation
+      // 4. Creating tracking_numbers table entry
+      // 5. Builder notifications
+      console.log('🚚 Using TrackingNumberService to accept delivery:', deliveryId);
       
-      // Update with less restrictive conditions - allow accepting if status is pending OR assigned
-      const { data: updatedData, error } = await supabase
-        .from('delivery_requests')
-        .update({ 
-          provider_id: userId,
-          status: 'accepted', // CRITICAL: Must be 'accepted' to trigger update_order_in_transit() function
-          tracking_number: trackingNumber,
-          accepted_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', deliveryId)
-        .in('status', ['pending', 'assigned']) // Allow accepting from pending or assigned
-        .or(`provider_id.is.null,provider_id.eq.${userId}`) // Allow if unassigned OR already assigned to this provider
-        .select(); // Return updated row to verify
-
-      if (error) throw error;
+      const result = await trackingNumberService.onProviderAcceptsDelivery(deliveryId, userId);
+      
+      if (!result || !result.trackingNumber) {
+        throw new Error('Failed to accept delivery - no tracking number generated');
+      }
+      
+      // The service already updated the delivery_requests table, so we just need to refresh
+      const updatedData = [{ id: deliveryId, tracking_number: result.trackingNumber, status: 'accepted' }];
 
       // Check if update actually succeeded (updatedData should have at least one row)
       if (!updatedData || updatedData.length === 0) {

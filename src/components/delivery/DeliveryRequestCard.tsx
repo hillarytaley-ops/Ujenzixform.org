@@ -146,29 +146,22 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
       if (onAccept) {
         await onAccept(delivery.id);
       } else {
-        // Fallback: If no onAccept callback, do direct update
+        // Fallback: If no onAccept callback, use TrackingNumberService
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('User not authenticated');
 
-        // Generate tracking number using the proper service (ensures consistent format)
-        const trackingNumber = trackingNumberService.generateTrackingNumber();
-
-        const { error: updateError } = await supabase
-          .from('delivery_requests')
-          .update({
-            provider_id: user.id,
-            status: 'accepted',
-            tracking_number: trackingNumber,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', delivery.id);
-
-        if (updateError) throw updateError;
-
-        toast({
-          title: "✅ Delivery Accepted!",
-          description: `Tracking: ${trackingNumber}. Navigate to pickup location!`,
-        });
+        // Use the proper TrackingNumberService which handles everything
+        console.log('🚚 Using TrackingNumberService to accept delivery:', delivery.id);
+        const result = await trackingNumberService.onProviderAcceptsDelivery(delivery.id, user.id);
+        
+        if (result && result.trackingNumber) {
+          toast({
+            title: "✅ Delivery Accepted!",
+            description: `Tracking: ${result.trackingNumber}. Navigate to pickup location!`,
+          });
+        } else {
+          throw new Error('Failed to accept delivery - no tracking number generated');
+        }
       }
     } catch (error: any) {
       console.error('Error accepting delivery:', error);
