@@ -711,69 +711,60 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     return date.toLocaleDateString();
   };
 
-  // FINAL RENDER-LEVEL DEDUPLICATION using useMemo
+  // FINAL RENDER-LEVEL DEDUPLICATION using useMemo - ABSOLUTE STRICT
   const uniqueNotifications = useMemo(() => {
-    // First, log all purchase_order_ids to detect duplicates
-    const poIdCounts = new Map<string, number>();
-    const poIdToNotifications = new Map<string, Notification[]>();
-    
-    notifications.forEach((notification) => {
-      if (notification.purchase_order_id) {
-        const count = poIdCounts.get(notification.purchase_order_id) || 0;
-        poIdCounts.set(notification.purchase_order_id, count + 1);
-        
-        if (!poIdToNotifications.has(notification.purchase_order_id)) {
-          poIdToNotifications.set(notification.purchase_order_id, []);
-        }
-        poIdToNotifications.get(notification.purchase_order_id)!.push(notification);
-      }
-    });
-    
-    // Log any purchase_order_ids that appear multiple times in notifications array
-    let renderDuplicates = 0;
-    poIdCounts.forEach((count, poId) => {
-      if (count > 1) {
-        renderDuplicates += count - 1;
-        const notifs = poIdToNotifications.get(poId)!;
-        console.error(`🚨 RENDER DUPLICATE: purchase_order_id ${poId} appears ${count} times in notifications array:`, 
-          notifs.map(n => ({ id: n.id, title: n.title, delivery_request_id: n.delivery_request_id })));
-      }
-    });
-    
-    if (renderDuplicates > 0) {
-      console.error(`🚨 RENDER DUPLICATES FOUND: ${renderDuplicates} duplicate notifications in array (before deduplication)`);
-    }
-    
+    // AGGRESSIVE DEDUPLICATION: Check by purchase_order_id, delivery_request_id, AND content similarity
     const renderedKeys = new Set<string>();
+    const renderedByContent = new Map<string, Notification>(); // Track by content similarity
+    
     const unique = notifications.filter((notification) => {
-      let uniqueKey: string;
+      // PRIORITY 1: Check by purchase_order_id (most reliable)
       if (notification.purchase_order_id) {
-        uniqueKey = `po-${notification.purchase_order_id}`;
-      } else {
-        const isPlaceholder = (notification.deliveryAddress || '').toLowerCase().includes('to be provided') || 
-                             (notification.deliveryAddress || '').trim() === '';
-        const addressMaterialKey = `${(notification.deliveryAddress || '').toLowerCase().trim()}|${(notification.materialType || '').toLowerCase().trim()}`;
-        
-        if (!isPlaceholder && addressMaterialKey !== '|') {
-          uniqueKey = `addr-${addressMaterialKey}`;
-        } else {
-          uniqueKey = `notif-${notification.id}`;
+        const key = `po-${notification.purchase_order_id}`;
+        if (renderedKeys.has(key)) {
+          console.error(`🚫 RENDER DELETE: Duplicate purchase_order_id ${notification.purchase_order_id} (removed: ${notification.id})`);
+          return false; // DELETE IT
+        }
+        renderedKeys.add(key);
+        return true;
+      }
+      
+      // PRIORITY 2: Check by delivery_request_id
+      if (notification.delivery_request_id) {
+        const key = `dr-${notification.delivery_request_id}`;
+        if (renderedKeys.has(key)) {
+          console.error(`🚫 RENDER DELETE: Duplicate delivery_request_id ${notification.delivery_request_id} (removed: ${notification.id})`);
+          return false; // DELETE IT
+        }
+        renderedKeys.add(key);
+        return true;
+      }
+      
+      // PRIORITY 3: Check by content similarity (pickup + delivery + material + timestamp within 5 minutes)
+      const contentKey = `${(notification.pickupAddress || '').toLowerCase().trim()}|${(notification.deliveryAddress || '').toLowerCase().trim()}|${(notification.materialType || '').toLowerCase().trim()}|${Math.floor(notification.timestamp.getTime() / 300000)}`; // 5-minute buckets
+      
+      const existing = renderedByContent.get(contentKey);
+      if (existing) {
+        // Check if timestamps are very close (within 5 minutes) - likely duplicates
+        const timeDiff = Math.abs(notification.timestamp.getTime() - existing.timestamp.getTime());
+        if (timeDiff < 300000) { // 5 minutes
+          console.error(`🚫 RENDER DELETE: Duplicate by content similarity (removed: ${notification.id}, existing: ${existing.id})`);
+          return false; // DELETE IT
         }
       }
       
-      if (renderedKeys.has(uniqueKey)) {
-        console.error(`🚫 RENDER BLOCK: Duplicate notification blocked at render time: ${uniqueKey} (ID: ${notification.id}, title: ${notification.title})`);
-        return false;
-      }
-      renderedKeys.add(uniqueKey);
+      renderedByContent.set(contentKey, notification);
+      renderedKeys.add(`notif-${notification.id}`);
       return true;
     });
     
-    if (notifications.length !== unique.length) {
-      console.log(`🎨 RENDERING: ${notifications.length} notifications → ${unique.length} unique (blocked ${notifications.length - unique.length} duplicates at render)`);
-    } else if (renderDuplicates === 0) {
-      console.log(`✅ RENDER CHECK: All ${notifications.length} notifications are unique (no duplicates found)`);
+    const removed = notifications.length - unique.length;
+    if (removed > 0) {
+      console.error(`🚫 RENDER DELETED ${removed} duplicate notifications - showing only ${unique.length} unique`);
+    } else {
+      console.log(`✅ RENDER: All ${notifications.length} notifications are unique`);
     }
+    
     return unique;
   }, [notifications]);
 
