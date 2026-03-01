@@ -557,16 +557,28 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       return;
     }
     
+    // Safety timeout: Always clear loading state after 15 seconds max (even if service hangs)
+    const safetyTimeout = setTimeout(() => {
+      console.warn('⚠️ Accept delivery timeout - clearing loading state');
+      acceptingRef.current = null;
+      setAcceptingId(null);
+    }, 15000);
+    
     try {
-      // Use the proper TrackingNumberService which handles:
-      // 1. First-come-first-served validation
-      // 2. Date-based scheduling checks
-      // 3. Tracking number generation
-      // 4. Creating tracking_numbers table entry
-      // 5. Builder notifications
+      // Wrap the service call with a timeout to prevent hanging
+      const acceptPromise = trackingNumberService.onProviderAcceptsDelivery(requestId, providerId);
+      
+      // Race the accept promise against a timeout
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Accept delivery timed out after 10 seconds')), 10000);
+      });
+      
       console.log('🚚 Using TrackingNumberService to accept delivery:', requestId);
       
-      const result = await trackingNumberService.onProviderAcceptsDelivery(requestId, providerId);
+      const result = await Promise.race([acceptPromise, timeoutPromise]) as any;
+      
+      // Clear safety timeout if we got here
+      clearTimeout(safetyTimeout);
       
       if (result && result.trackingNumber) {
         toast({
@@ -579,6 +591,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       }
     } catch (error: any) {
       console.error('❌ Error accepting delivery:', error);
+      clearTimeout(safetyTimeout);
       toast({
         title: 'Error',
         description: error.message || 'Could not accept delivery',
@@ -588,11 +601,11 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       acceptingRef.current = null;
       setAcceptingId(null);
     } finally {
-      // Clear after a short delay, but only if not already cleared
+      // Always clear after a short delay (independent of promise resolution)
       setTimeout(() => {
         acceptingRef.current = null;
         setAcceptingId(null);
-      }, 1000); // Reduced to 1 second
+      }, 500); // Short delay to prevent rapid re-clicks
     }
   };
 

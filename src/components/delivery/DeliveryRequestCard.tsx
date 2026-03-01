@@ -140,31 +140,54 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
     setIsAccepting(true);
     console.log('🔘 DeliveryRequestCard: Accept clicked for:', delivery.id);
     
+    // Safety timeout: Always clear loading state after 15 seconds max (even if service hangs)
+    const safetyTimeout = setTimeout(() => {
+      console.warn('⚠️ Accept delivery timeout - clearing loading state');
+      acceptingRef.current = false;
+      setIsAccepting(false);
+    }, 15000);
+    
     try {
-      // Just call the parent callback - let the parent handle the database update
-      // This prevents double database updates
-      if (onAccept) {
-        await onAccept(delivery.id);
-      } else {
-        // Fallback: If no onAccept callback, use TrackingNumberService
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error('User not authenticated');
-
-        // Use the proper TrackingNumberService which handles everything
-        console.log('🚚 Using TrackingNumberService to accept delivery:', delivery.id);
-        const result = await trackingNumberService.onProviderAcceptsDelivery(delivery.id, user.id);
-        
-        if (result && result.trackingNumber) {
-          toast({
-            title: "✅ Delivery Accepted!",
-            description: `Tracking: ${result.trackingNumber}. Navigate to pickup location!`,
-          });
+      // Wrap the service call with a timeout to prevent hanging
+      const acceptPromise = (async () => {
+        // Just call the parent callback - let the parent handle the database update
+        // This prevents double database updates
+        if (onAccept) {
+          return await onAccept(delivery.id);
         } else {
-          throw new Error('Failed to accept delivery - no tracking number generated');
+          // Fallback: If no onAccept callback, use TrackingNumberService
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) throw new Error('User not authenticated');
+
+          // Use the proper TrackingNumberService which handles everything
+          console.log('🚚 Using TrackingNumberService to accept delivery:', delivery.id);
+          const result = await trackingNumberService.onProviderAcceptsDelivery(delivery.id, user.id);
+          
+          if (result && result.trackingNumber) {
+            toast({
+              title: "✅ Delivery Accepted!",
+              description: `Tracking: ${result.trackingNumber}. Navigate to pickup location!`,
+            });
+            return result;
+          } else {
+            throw new Error('Failed to accept delivery - no tracking number generated');
+          }
         }
-      }
+      })();
+      
+      // Race the accept promise against a timeout
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Accept delivery timed out after 10 seconds')), 10000);
+      });
+      
+      await Promise.race([acceptPromise, timeoutPromise]);
+      
+      // Clear safety timeout if we got here
+      clearTimeout(safetyTimeout);
+      
     } catch (error: any) {
       console.error('Error accepting delivery:', error);
+      clearTimeout(safetyTimeout);
       toast({
         title: "Error",
         description: error.message || "Failed to accept delivery. Please try again.",
@@ -174,20 +197,11 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
       acceptingRef.current = false;
       setIsAccepting(false);
     } finally {
-      // Only reset if the delivery is still pending (operation might have changed status)
-      // Check if delivery status changed to 'accepted' - if so, don't reset (it's been accepted)
-      // Otherwise, clear after a short delay
+      // Always clear after a short delay (independent of promise resolution)
       setTimeout(() => {
-        // Double-check delivery status before clearing
-        if (delivery.status === 'pending' || delivery.status === 'assigned') {
-          acceptingRef.current = false;
-          setIsAccepting(false);
-        } else {
-          // Delivery was accepted - keep button disabled but clear loading state
-          acceptingRef.current = false;
-          setIsAccepting(false);
-        }
-      }, 1000); // Reduced to 1 second
+        acceptingRef.current = false;
+        setIsAccepting(false);
+      }, 500); // Short delay to prevent rapid re-clicks
     }
   };
 
