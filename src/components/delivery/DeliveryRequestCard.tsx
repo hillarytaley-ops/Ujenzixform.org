@@ -140,12 +140,12 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
     setIsAccepting(true);
     console.log('🔘 DeliveryRequestCard: Accept clicked for:', delivery.id);
     
-    // Safety timeout: Always clear loading state after 15 seconds max (even if service hangs)
+    // Safety timeout: Always clear loading state after 35 seconds max (even if service hangs)
     const safetyTimeout = setTimeout(() => {
-      console.warn('⚠️ Accept delivery timeout - clearing loading state');
+      console.warn('⚠️ Accept delivery safety timeout - clearing loading state');
       acceptingRef.current = false;
       setIsAccepting(false);
-    }, 15000);
+    }, 35000);
     
     try {
       // Wrap the service call with a timeout to prevent hanging
@@ -175,9 +175,9 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
         }
       })();
       
-      // Race the accept promise against a timeout
+      // Race the accept promise against a timeout (30 seconds for multiple DB operations)
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Accept delivery timed out after 10 seconds')), 10000);
+        setTimeout(() => reject(new Error('Accept delivery timed out after 30 seconds. Please try again.')), 30000);
       });
       
       await Promise.race([acceptPromise, timeoutPromise]);

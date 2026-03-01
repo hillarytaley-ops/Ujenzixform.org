@@ -217,51 +217,52 @@ class TrackingNumberService {
           .maybeSingle();
 
         if (!existingTracking) {
-          // Get builder's user_id (builder_id might be profile.id)
+          // Parallelize these database calls to speed up the process
           let builderUserId = existingRequest.builder_id;
-          try {
-            const { data: profile } = await supabase
+          let supplierId = null;
+          let providerName = 'Delivery Provider';
+          let providerPhone = null;
+
+          // Run all lookups in parallel
+          const [builderProfileResult, poResult, providerResult] = await Promise.allSettled([
+            // Get builder's user_id (builder_id might be profile.id)
+            supabase
               .from('profiles')
               .select('user_id')
               .eq('id', existingRequest.builder_id)
-              .maybeSingle();
-            if (profile?.user_id) {
-              builderUserId = profile.user_id;
-            }
-          } catch (e) {
-            // builder_id might already be user_id, use it as-is
-          }
-
-          // Get supplier_id from purchase_order if exists
-          let supplierId = null;
-          if (existingRequest.purchase_order_id) {
-            try {
-              const { data: po } = await supabase
-                .from('purchase_orders')
-                .select('supplier_id')
-                .eq('id', existingRequest.purchase_order_id)
-                .maybeSingle();
-              supplierId = po?.supplier_id || null;
-            } catch (e) {
-              // Ignore errors
-            }
-          }
-
-          // Get provider info
-          let providerName = 'Delivery Provider';
-          let providerPhone = null;
-          try {
-            const { data: provider } = await supabase
+              .maybeSingle(),
+            // Get supplier_id from purchase_order if exists
+            existingRequest.purchase_order_id
+              ? supabase
+                  .from('purchase_orders')
+                  .select('supplier_id')
+                  .eq('id', existingRequest.purchase_order_id)
+                  .maybeSingle()
+              : Promise.resolve({ data: null, error: null }),
+            // Get provider info
+            supabase
               .from('delivery_providers')
               .select('provider_name, phone, company_name')
               .eq('id', providerId)
-              .maybeSingle();
-            if (provider) {
-              providerName = provider.company_name || provider.provider_name || 'Delivery Provider';
-              providerPhone = provider.phone;
-            }
-          } catch (e) {
-            // Try profiles table
+              .maybeSingle()
+          ]);
+
+          // Process builder profile result
+          if (builderProfileResult.status === 'fulfilled' && builderProfileResult.value.data?.user_id) {
+            builderUserId = builderProfileResult.value.data.user_id;
+          }
+
+          // Process purchase order result
+          if (poResult.status === 'fulfilled' && poResult.value.data?.supplier_id) {
+            supplierId = poResult.value.data.supplier_id;
+          }
+
+          // Process provider result
+          if (providerResult.status === 'fulfilled' && providerResult.value.data) {
+            providerName = providerResult.value.data.company_name || providerResult.value.data.provider_name || 'Delivery Provider';
+            providerPhone = providerResult.value.data.phone;
+          } else {
+            // Fallback: Try profiles table if delivery_providers didn't work
             try {
               const { data: profile } = await supabase
                 .from('profiles')
