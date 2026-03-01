@@ -731,27 +731,31 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     // AGGRESSIVE DEDUPLICATION: Check by purchase_order_id, delivery_request_id, AND content similarity
     const renderedKeys = new Set<string>();
     const renderedByContent = new Map<string, Notification>(); // Track by content similarity
+    const renderedByPO = new Map<string, Notification>(); // Track by purchase_order_id
+    const renderedByDR = new Map<string, Notification>(); // Track by delivery_request_id
     
     const unique = notifications.filter((notification) => {
       // PRIORITY 1: Check by purchase_order_id (most reliable)
       if (notification.purchase_order_id) {
-        const key = `po-${notification.purchase_order_id}`;
-        if (renderedKeys.has(key)) {
-          console.error(`🚫 RENDER DELETE: Duplicate purchase_order_id ${notification.purchase_order_id} (removed: ${notification.id})`);
+        const existing = renderedByPO.get(notification.purchase_order_id);
+        if (existing) {
+          console.error(`🚫 RENDER DELETE: Duplicate purchase_order_id ${notification.purchase_order_id} (removed: ${notification.id}, kept: ${existing.id})`);
           return false; // DELETE IT
         }
-        renderedKeys.add(key);
+        renderedByPO.set(notification.purchase_order_id, notification);
+        renderedKeys.add(`po-${notification.purchase_order_id}`);
         return true;
       }
       
       // PRIORITY 2: Check by delivery_request_id
       if (notification.delivery_request_id) {
-        const key = `dr-${notification.delivery_request_id}`;
-        if (renderedKeys.has(key)) {
-          console.error(`🚫 RENDER DELETE: Duplicate delivery_request_id ${notification.delivery_request_id} (removed: ${notification.id})`);
+        const existing = renderedByDR.get(notification.delivery_request_id);
+        if (existing) {
+          console.error(`🚫 RENDER DELETE: Duplicate delivery_request_id ${notification.delivery_request_id} (removed: ${notification.id}, kept: ${existing.id})`);
           return false; // DELETE IT
         }
-        renderedKeys.add(key);
+        renderedByDR.set(notification.delivery_request_id, notification);
+        renderedKeys.add(`dr-${notification.delivery_request_id}`);
         return true;
       }
       
@@ -763,7 +767,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         // Check if timestamps are very close (within 5 minutes) - likely duplicates
         const timeDiff = Math.abs(notification.timestamp.getTime() - existing.timestamp.getTime());
         if (timeDiff < 300000) { // 5 minutes
-          console.error(`🚫 RENDER DELETE: Duplicate by content similarity (removed: ${notification.id}, existing: ${existing.id})`);
+          console.error(`🚫 RENDER DELETE: Duplicate by content similarity (removed: ${notification.id}, existing: ${existing.id}, timeDiff: ${Math.round(timeDiff/1000)}s)`);
           return false; // DELETE IT
         }
       }
@@ -775,7 +779,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     
     const removed = notifications.length - unique.length;
     if (removed > 0) {
-      console.error(`🚫 RENDER DELETED ${removed} duplicate notifications - showing only ${unique.length} unique`);
+      console.error(`🚫 RENDER DELETED ${removed} duplicate notifications - showing only ${unique.length} unique (was ${notifications.length})`);
     } else {
       console.log(`✅ RENDER: All ${notifications.length} notifications are unique`);
     }
