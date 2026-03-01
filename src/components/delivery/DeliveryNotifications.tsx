@@ -291,9 +291,19 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       console.log(`🔍 Deduplicated delivery_requests: ${deliveryRequests.length} → ${totalUnique} unique (removed ${duplicatesRemoved} duplicates, ${nullPORequests} had NULL purchase_order_id)`);
       
       // STEP 3: Create notifications from unique delivery_requests
+      // CRITICAL: Use a Set to track purchase_order_ids we've already added
+      const addedPOIds = new Set<string>();
+      
       for (const [poId, dr] of deliveryRequestsByPO.entries()) {
+        // ABSOLUTE GUARANTEE: Only add if we haven't seen this purchase_order_id yet
+        if (addedPOIds.has(poId)) {
+          console.error(`🚫 BLOCKED: Already added notification for purchase_order_id ${poId}, skipping delivery_request ${dr.id}`);
+          continue;
+        }
+        
+        addedPOIds.add(poId);
         finalNotifications.push({
-          id: dr.id,
+          id: `dr-${dr.id}`, // Use delivery_request id as notification id
           type: 'new_delivery',
           title: dr.status === 'pending' ? '🚚 New Delivery Request!' : `Delivery ${dr.status}`,
           message: `${dr.material_type || 'Materials'} delivery to ${dr.delivery_address || 'Unknown location'}`,
@@ -313,9 +323,15 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       }
       
       // Also add notifications from NULL purchase_order_id requests (deduplicated)
+      const addedNullPOIds = new Set<string>();
       for (const [key, dr] of deliveryRequestsByKey.entries()) {
+        if (addedNullPOIds.has(dr.id)) {
+          console.error(`🚫 BLOCKED: Already added notification for NULL PO delivery_request ${dr.id}`);
+          continue;
+        }
+        addedNullPOIds.add(dr.id);
         finalNotifications.push({
-          id: dr.id,
+          id: `dr-${dr.id}`,
           type: 'new_delivery',
           title: dr.status === 'pending' ? '🚚 New Delivery Request!' : `Delivery ${dr.status}`,
           message: `${dr.material_type || 'Materials'} delivery to ${dr.delivery_address || 'Unknown location'}`,
@@ -335,6 +351,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       }
       
       // STEP 4: Fetch purchase_orders that DON'T have a delivery_request yet
+      // CRITICAL: Only add if purchase_order_id is NOT already in addedPOIds
       const poResponse = await fetch(
         `${url}/rest/v1/purchase_orders?status=in.(quote_accepted,order_created,awaiting_delivery_request,delivery_requested,awaiting_delivery_provider,delivery_assigned,ready_for_dispatch)&order=created_at.desc&limit=100&select=*`,
         { headers, cache: 'no-store' }
@@ -344,13 +361,22 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         const purchaseOrders = await poResponse.json();
         console.log(`✅ Loaded ${purchaseOrders.length} purchase_orders`);
         
-        // Only add purchase_orders that DON'T have a delivery_request
+        let skippedCount = 0;
+        // Only add purchase_orders that DON'T have a delivery_request AND haven't been added yet
         purchaseOrders.forEach((po: any) => {
+          // ABSOLUTE CHECK: If we already added a notification for this purchase_order_id, SKIP IT
+          if (addedPOIds.has(po.id)) {
+            skippedCount++;
+            console.log(`🚫 SKIPPED: Purchase order ${po.id} already has a notification from delivery_request, not adding duplicate`);
+            return;
+          }
+          
           if (!seenPurchaseOrderIds.has(po.id) && (po.delivery_required || po.delivery_address)) {
             const materialType = po.items && po.items.length > 0
               ? po.items.map((item: any) => item.material_name || item.name).join(', ')
               : 'Construction Materials';
             
+            addedPOIds.add(po.id); // Mark as added
             finalNotifications.push({
               id: `po-${po.id}`,
               type: 'new_delivery',
@@ -373,30 +399,30 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             seenPurchaseOrderIds.add(po.id);
           }
         });
+        
+        if (skippedCount > 0) {
+          console.log(`🚫 SKIPPED ${skippedCount} purchase_orders that already have delivery_request notifications`);
+        }
       }
       
-      // STEP 5: FINAL DEDUPLICATION - ONLY by purchase_order_id
-      // CRITICAL: Do NOT deduplicate by address+material when purchase_order_id exists!
-      // Different purchase orders can have the same placeholder "to be provided" - they're still unique orders!
+      // STEP 5: ABSOLUTE FINAL DEDUPLICATION - ONE notification per purchase_order_id, PERIOD
       const absolutelyFinal: Notification[] = [];
       const finalSeenPOIds = new Set<string>();
       const finalSeenIds = new Set<string>();
-      const finalSeenByAddress = new Map<string, Notification>(); // ONLY for NULL PO cases
       
       // Sort by timestamp first (most recent first)
       finalNotifications.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
       
       finalNotifications.forEach((notif) => {
-        // Strategy 1: If has purchase_order_id, ONLY deduplicate by purchase_order_id
-        // Each purchase_order_id is unique - even if address is "to be provided"
+        // ABSOLUTE RULE: ONE notification per purchase_order_id, NO EXCEPTIONS
         if (notif.purchase_order_id) {
-          if (!finalSeenPOIds.has(notif.purchase_order_id)) {
-            finalSeenPOIds.add(notif.purchase_order_id);
-            absolutelyFinal.push(notif);
-          } else {
-            // This is a TRUE duplicate - same purchase_order_id appearing twice
-            console.error(`🚫 TRUE DUPLICATE: Removed duplicate notification for PO ${notif.purchase_order_id} (ID: ${notif.id})`);
+          if (finalSeenPOIds.has(notif.purchase_order_id)) {
+            // DUPLICATE DETECTED - REMOVE IT
+            console.error(`🚫 ABSOLUTE DUPLICATE REMOVED: purchase_order_id ${notif.purchase_order_id} already has a notification (keeping first, removing: ${notif.id})`);
+            return; // Skip this notification
           }
+          finalSeenPOIds.add(notif.purchase_order_id);
+          absolutelyFinal.push(notif);
         } 
         // Strategy 2: No purchase_order_id - ONLY THEN deduplicate by delivery_address + material_type
         // This catches cases where delivery_requests were created without linking to purchase_orders
