@@ -311,7 +311,6 @@ $$;
 DO $$
 DECLARE
     func_exists BOOLEAN;
-    func_definition TEXT;
 BEGIN
     -- Check if function exists
     SELECT EXISTS (
@@ -321,28 +320,28 @@ BEGIN
     ) INTO func_exists;
     
     IF func_exists THEN
-        -- Try to get the function definition from pg_get_functiondef
-        -- Note: This requires the function to be recreated with search_path
+        -- Recreate the function with search_path using EXECUTE
         -- Since we don't have the original definition, we'll create a generic one
         -- that prevents duplicates based on purchase_order_id
+        EXECUTE '
         CREATE OR REPLACE FUNCTION prevent_duplicate_delivery_requests()
         RETURNS TRIGGER
         LANGUAGE plpgsql
         SET search_path = public
-        AS $$
+        AS $func$
         BEGIN
             -- Prevent duplicate delivery requests for the same purchase_order_id
             IF EXISTS (
                 SELECT 1 FROM delivery_requests
                 WHERE purchase_order_id = NEW.purchase_order_id
                 AND id != NEW.id
-                AND status NOT IN ('cancelled', 'rejected', 'completed')
+                AND status NOT IN (''cancelled'', ''rejected'', ''completed'')
             ) THEN
-                RAISE EXCEPTION 'A delivery request already exists for purchase order %', NEW.purchase_order_id;
+                RAISE EXCEPTION ''A delivery request already exists for purchase order %'', NEW.purchase_order_id;
             END IF;
             RETURN NEW;
         END;
-        $$;
+        $func$';
         
         RAISE NOTICE 'Function prevent_duplicate_delivery_requests recreated with search_path';
     END IF;
