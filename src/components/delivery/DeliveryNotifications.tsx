@@ -581,6 +581,39 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     return date.toLocaleDateString();
   };
 
+  // FINAL RENDER-LEVEL DEDUPLICATION using useMemo
+  const uniqueNotifications = useMemo(() => {
+    const renderedKeys = new Set<string>();
+    const unique = notifications.filter((notification) => {
+      let uniqueKey: string;
+      if (notification.purchase_order_id) {
+        uniqueKey = `po-${notification.purchase_order_id}`;
+      } else {
+        const isPlaceholder = (notification.deliveryAddress || '').toLowerCase().includes('to be provided') || 
+                             (notification.deliveryAddress || '').trim() === '';
+        const addressMaterialKey = `${(notification.deliveryAddress || '').toLowerCase().trim()}|${(notification.materialType || '').toLowerCase().trim()}`;
+        
+        if (!isPlaceholder && addressMaterialKey !== '|') {
+          uniqueKey = `addr-${addressMaterialKey}`;
+        } else {
+          uniqueKey = `notif-${notification.id}`;
+        }
+      }
+      
+      if (renderedKeys.has(uniqueKey)) {
+        console.error(`🚫 RENDER BLOCK: Duplicate notification blocked at render time: ${uniqueKey} (ID: ${notification.id})`);
+        return false;
+      }
+      renderedKeys.add(uniqueKey);
+      return true;
+    });
+    
+    if (notifications.length !== unique.length) {
+      console.log(`🎨 RENDERING: ${notifications.length} notifications → ${unique.length} unique (blocked ${notifications.length - unique.length} duplicates at render)`);
+    }
+    return unique;
+  }, [notifications]);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -615,39 +648,8 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             <BellOff className="h-12 w-12 text-gray-300 mx-auto mb-3" />
             <p className="text-gray-500">No active delivery requests</p>
           </div>
-        ) : (() => {
-          // Use useMemo for consistent deduplication
-          const uniqueNotifications = useMemo(() => {
-            const renderedKeys = new Set<string>();
-            const unique = notifications.filter((notification) => {
-              let uniqueKey: string;
-              if (notification.purchase_order_id) {
-                uniqueKey = `po-${notification.purchase_order_id}`;
-              } else {
-                const isPlaceholder = (notification.deliveryAddress || '').toLowerCase().includes('to be provided') || 
-                                     (notification.deliveryAddress || '').trim() === '';
-                const addressMaterialKey = `${(notification.deliveryAddress || '').toLowerCase().trim()}|${(notification.materialType || '').toLowerCase().trim()}`;
-                
-                if (!isPlaceholder && addressMaterialKey !== '|') {
-                  uniqueKey = `addr-${addressMaterialKey}`;
-                } else {
-                  uniqueKey = `notif-${notification.id}`;
-                }
-              }
-              
-              if (renderedKeys.has(uniqueKey)) {
-                console.error(`🚫 RENDER BLOCK: Duplicate notification blocked at render time: ${uniqueKey} (ID: ${notification.id})`);
-                return false;
-              }
-              renderedKeys.add(uniqueKey);
-              return true;
-            });
-            
-            console.log(`🎨 RENDERING: ${notifications.length} notifications → ${unique.length} unique (blocked ${notifications.length - unique.length} duplicates at render)`);
-            return unique;
-          }, [notifications]);
-          
-          return uniqueNotifications.map((notification, index) => {
+        ) : (
+          uniqueNotifications.map((notification, index) => {
             // React key: Use purchase_order_id as primary key (each PO is unique)
             // Only use address+material for NULL purchase_order_id cases with real addresses
             let uniqueKey: string;
@@ -746,8 +748,8 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
               </p>
             </div>
             );
-          });
-        })()}
+          })
+        )}
       </div>
     </div>
   );
