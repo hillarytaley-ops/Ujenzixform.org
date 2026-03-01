@@ -133,9 +133,10 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         console.log(`✅ Loaded ${deliveryRequests.length} delivery_requests`);
       }
       
-      // STEP 2: Process delivery_requests - ONE notification per purchase_order_id
+      // STEP 2: AGGRESSIVE DEDUPLICATION - Multiple strategies
       const deliveryRequestsByPO = new Map<string, any>();
       const deliveryRequestsByKey = new Map<string, any>(); // For NULL purchase_order_id cases
+      const deliveryRequestsByAddress = new Map<string, any>(); // Also deduplicate by address+material
       let duplicatesRemoved = 0;
       let nullPORequests = 0;
       const poIdCounts = new Map<string, number>(); // Track how many times each PO ID appears
@@ -150,13 +151,13 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       // Log any purchase_order_ids that appear multiple times
       poIdCounts.forEach((count, poId) => {
         if (count > 1) {
-          console.log(`⚠️ DUPLICATE DETECTED: purchase_order_id ${poId} appears ${count} times!`);
+          console.error(`🚨 CRITICAL DUPLICATE: purchase_order_id ${poId} appears ${count} times in database!`);
         }
       });
       
       deliveryRequests.forEach((dr: any) => {
         if (dr.purchase_order_id) {
-          // If we haven't seen this purchase_order_id, add it
+          // Strategy 1: Deduplicate by purchase_order_id (PRIMARY)
           if (!deliveryRequestsByPO.has(dr.purchase_order_id)) {
             deliveryRequestsByPO.set(dr.purchase_order_id, dr);
             seenPurchaseOrderIds.add(dr.purchase_order_id);
@@ -164,17 +165,38 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             // Duplicate found! Keep the best one
             duplicatesRemoved++;
             const existing = deliveryRequestsByPO.get(dr.purchase_order_id);
-            const existingScore = (existing.status === 'accepted' || existing.status === 'assigned' ? 10 : 0) +
+            const existingScore = (existing.status === 'accepted' || existing.status === 'assigned' || existing.status === 'in_transit' ? 10 : 0) +
                                  (existing.provider_id ? 5 : 0) +
                                  (new Date(existing.created_at).getTime() / 1000000);
-            const newScore = (dr.status === 'accepted' || dr.status === 'assigned' ? 10 : 0) +
+            const newScore = (dr.status === 'accepted' || dr.status === 'assigned' || dr.status === 'in_transit' ? 10 : 0) +
                             (dr.provider_id ? 5 : 0) +
                             (new Date(dr.created_at).getTime() / 1000000);
             if (newScore > existingScore) {
               deliveryRequestsByPO.set(dr.purchase_order_id, dr);
-              console.log(`🔄 Replaced duplicate for PO ${dr.purchase_order_id} (better score) - DR IDs: ${existing.id} → ${dr.id}`);
+              console.error(`🔄 Replaced duplicate for PO ${dr.purchase_order_id} (better score) - DR IDs: ${existing.id} → ${dr.id}`);
             } else {
-              console.log(`🗑️ Removed duplicate for PO ${dr.purchase_order_id} (keeping existing) - DR ID: ${dr.id}`);
+              console.error(`🗑️ Removed duplicate for PO ${dr.purchase_order_id} (keeping existing) - DR ID: ${dr.id}`);
+            }
+          }
+          
+          // Strategy 2: ALSO deduplicate by delivery_address + material_type (SECONDARY)
+          // This catches cases where same delivery appears with different purchase_order_ids
+          const addressMaterialKey = `${(dr.delivery_address || '').toLowerCase().trim()}|${(dr.material_type || '').toLowerCase().trim()}`;
+          if (addressMaterialKey !== '|' && !deliveryRequestsByAddress.has(addressMaterialKey)) {
+            deliveryRequestsByAddress.set(addressMaterialKey, dr);
+          } else if (addressMaterialKey !== '|') {
+            // Check if this is a better match than existing
+            const existingByAddr = deliveryRequestsByAddress.get(addressMaterialKey);
+            if (existingByAddr && existingByAddr.purchase_order_id && dr.purchase_order_id) {
+              // Both have purchase_order_id - prefer the one we already have in deliveryRequestsByPO
+              if (deliveryRequestsByPO.has(existingByAddr.purchase_order_id)) {
+                // Keep existing
+                console.log(`📍 Address+Material duplicate: Keeping existing for ${addressMaterialKey}`);
+              } else if (deliveryRequestsByPO.has(dr.purchase_order_id)) {
+                // Replace with new one
+                deliveryRequestsByAddress.set(addressMaterialKey, dr);
+                console.log(`📍 Address+Material duplicate: Replaced with new for ${addressMaterialKey}`);
+              }
             }
           }
         } else {
