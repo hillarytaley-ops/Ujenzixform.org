@@ -443,6 +443,21 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             return; // Skip this notification - DELETE IT
           }
           finalSeenPOIds.add(notif.purchase_order_id);
+          
+          // ALSO check content similarity for purchase_order_id notifications
+          // This catches cases where purchase_order_id might be different but content is the same
+          const contentKey = `${(notif.pickupAddress || '').toLowerCase().trim()}|${(notif.deliveryAddress || '').toLowerCase().trim()}|${(notif.materialType || '').toLowerCase().trim()}`;
+          const existingByContent = finalSeenByContent.get(contentKey);
+          if (existingByContent && existingByContent.purchase_order_id !== notif.purchase_order_id) {
+            // Same content but different purchase_order_id - check if timestamps are close (within 5 minutes)
+            const timeDiff = Math.abs(notif.timestamp.getTime() - existingByContent.timestamp.getTime());
+            if (timeDiff < 300000) { // 5 minutes
+              console.error(`🚫 DELETED: Duplicate by content (same material/address, different PO ID) - removed: ${notif.id}, existing: ${existingByContent.id}`);
+              return; // DELETE IT
+            }
+          }
+          
+          finalSeenByContent.set(contentKey, notif);
           absolutelyFinal.push(notif);
         } 
         // Strategy 2: No purchase_order_id - ONLY THEN deduplicate by delivery_address + material_type
