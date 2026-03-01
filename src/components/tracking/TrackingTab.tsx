@@ -123,6 +123,25 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
     return '';
   }, []);
 
+  // Helper function to map delivery status to tracking status
+  const mapDeliveryStatusToTrackingStatus = (status: string): TrackingNumber['status'] => {
+    const statusMap: Record<string, TrackingNumber['status']> = {
+      'pending': 'pending',
+      'requested': 'pending',
+      'assigned': 'accepted',
+      'accepted': 'accepted',
+      'picked_up': 'picked_up',
+      'in_transit': 'in_transit',
+      'near_destination': 'near_destination',
+      'delivered': 'delivered',
+      'completed': 'delivered',
+      'shipped': 'in_transit',
+      'cancelled': 'cancelled',
+      'rejected': 'cancelled',
+    };
+    return statusMap[status] || 'pending';
+  };
+
   const fetchTrackingNumbers = useCallback(async () => {
     setLoading(true);
     try {
@@ -287,25 +306,6 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
     }
   }, [userId, userRole, propUserId, getAccessToken]);
 
-  // Helper function to map delivery status to tracking status
-  const mapDeliveryStatusToTrackingStatus = (status: string): TrackingNumber['status'] => {
-    const statusMap: Record<string, TrackingNumber['status']> = {
-      'pending': 'pending',
-      'requested': 'pending',
-      'assigned': 'accepted',
-      'accepted': 'accepted',
-      'picked_up': 'picked_up',
-      'in_transit': 'in_transit',
-      'near_destination': 'near_destination',
-      'delivered': 'delivered',
-      'completed': 'delivered',
-      'shipped': 'in_transit',
-      'cancelled': 'cancelled',
-      'rejected': 'cancelled',
-    };
-    return statusMap[status] || 'pending';
-  };
-
   useEffect(() => {
     if (userId) {
       fetchTrackingNumbers();
@@ -439,25 +439,6 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
       cleanup.then(cleanupFn => cleanupFn && cleanupFn());
     };
   }, [userId, userRole, propUserId, fetchTrackingNumbers, toast]);
-  
-  // Helper function to map delivery status to tracking status
-  const mapDeliveryStatusToTrackingStatus = (status: string): TrackingNumber['status'] => {
-    const statusMap: Record<string, TrackingNumber['status']> = {
-      'pending': 'pending',
-      'requested': 'pending',
-      'assigned': 'accepted',
-      'accepted': 'accepted',
-      'picked_up': 'picked_up',
-      'in_transit': 'in_transit',
-      'near_destination': 'near_destination',
-      'delivered': 'delivered',
-      'completed': 'delivered',
-      'shipped': 'in_transit',
-      'cancelled': 'cancelled',
-      'rejected': 'cancelled',
-    };
-    return statusMap[status] || 'pending';
-  };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
