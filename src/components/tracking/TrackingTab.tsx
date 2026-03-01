@@ -308,6 +308,7 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
 
   useEffect(() => {
     if (userId) {
+      console.log('📦 TrackingTab: Fetching tracking numbers on mount...');
       fetchTrackingNumbers();
     } else {
       console.log('📦 TrackingTab: Waiting for userId...');
@@ -321,6 +322,19 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
       return () => clearTimeout(retryTimeout);
     }
   }, [propUserId, userRole, fetchTrackingNumbers, userId]);
+
+  // Force refresh when component becomes visible (handles tab switching)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && userId) {
+        console.log('📦 Page became visible, refreshing tracking numbers...');
+        fetchTrackingNumbers();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [userId, fetchTrackingNumbers]);
 
   // Real-time subscription for tracking number updates
   useEffect(() => {
