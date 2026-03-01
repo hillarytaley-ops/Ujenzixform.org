@@ -205,9 +205,6 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
       // Order by updated_at first (most recently updated), then created_at (newest first)
       let url = `${SUPABASE_URL}/rest/v1/tracking_numbers?order=updated_at.desc,created_at.desc&select=*`;
       
-      // Add cache-busting to ensure fresh data
-      const cacheBuster = `&_t=${Date.now()}`;
-      
       if (userRole === 'admin') {
         // Admin sees all tracking numbers - no filter needed
         console.log('📦 Admin mode: fetching ALL tracking numbers');
@@ -221,7 +218,6 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
         console.log('📦 Builder mode: filtering by userId:', userId, 'and profileId:', profileId);
       }
 
-      url += cacheBuster;
       console.log('📦 Fetching tracking numbers from:', url);
 
       const response = await fetch(url, {
