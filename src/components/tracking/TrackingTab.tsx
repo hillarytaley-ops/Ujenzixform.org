@@ -38,7 +38,8 @@ import {
   Calendar,
   Building,
   User,
-  ArrowRight
+  ArrowRight,
+  X
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
