@@ -584,11 +584,15 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         description: error.message || 'Could not accept delivery',
         variant: 'destructive'
       });
+      // Clear accepting state immediately on error
+      acceptingRef.current = null;
+      setAcceptingId(null);
     } finally {
+      // Clear after a short delay, but only if not already cleared
       setTimeout(() => {
         acceptingRef.current = null;
         setAcceptingId(null);
-      }, 2000);
+      }, 1000); // Reduced to 1 second
     }
   };
 
@@ -643,13 +647,20 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
 
   // FINAL RENDER-LEVEL DEDUPLICATION using useMemo - ABSOLUTE STRICT
   const uniqueNotifications = useMemo(() => {
-    // AGGRESSIVE DEDUPLICATION: Check by purchase_order_id, delivery_request_id, AND content similarity
+    // AGGRESSIVE DEDUPLICATION: Check by purchase_order_id, delivery_request_id, AND notification id
     const renderedKeys = new Set<string>();
-    const renderedByContent = new Map<string, Notification>(); // Track by content similarity
     const renderedByPO = new Map<string, Notification>(); // Track by purchase_order_id
     const renderedByDR = new Map<string, Notification>(); // Track by delivery_request_id
+    const renderedById = new Set<string>(); // Track by notification id
     
     const unique = notifications.filter((notification) => {
+      // PRIORITY 0: Check by notification id first (most specific)
+      if (renderedById.has(notification.id)) {
+        console.error(`🚫 RENDER DELETE: Duplicate notification id ${notification.id}`);
+        return false; // DELETE IT
+      }
+      renderedById.add(notification.id);
+      
       // PRIORITY 1: Check by purchase_order_id (most reliable)
       if (notification.purchase_order_id) {
         const existing = renderedByPO.get(notification.purchase_order_id);

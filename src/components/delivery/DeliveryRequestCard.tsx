@@ -170,14 +170,24 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
         description: error.message || "Failed to accept delivery. Please try again.",
         variant: "destructive"
       });
+      // Clear accepting state immediately on error
+      acceptingRef.current = false;
+      setIsAccepting(false);
     } finally {
       // Only reset if the delivery is still pending (operation might have changed status)
-      // This prevents re-enabling if the delivery was successfully accepted
-      // Use longer delay to prevent rapid re-clicks
+      // Check if delivery status changed to 'accepted' - if so, don't reset (it's been accepted)
+      // Otherwise, clear after a short delay
       setTimeout(() => {
-        acceptingRef.current = false;
-        setIsAccepting(false);
-      }, 3000); // 3 second delay to prevent rapid re-clicks
+        // Double-check delivery status before clearing
+        if (delivery.status === 'pending' || delivery.status === 'assigned') {
+          acceptingRef.current = false;
+          setIsAccepting(false);
+        } else {
+          // Delivery was accepted - keep button disabled but clear loading state
+          acceptingRef.current = false;
+          setIsAccepting(false);
+        }
+      }, 1000); // Reduced to 1 second
     }
   };
 
