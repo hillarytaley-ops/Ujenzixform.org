@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -112,141 +112,7 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
 
   const userId = getUserId();
 
-  useEffect(() => {
-    if (userId) {
-      fetchTrackingNumbers();
-    } else {
-      console.log('📦 TrackingTab: Waiting for userId...');
-      // Retry after a short delay
-      const retryTimeout = setTimeout(() => {
-        const newUserId = getUserId();
-        if (newUserId) {
-          fetchTrackingNumbers();
-        }
-      }, 1000);
-      return () => clearTimeout(retryTimeout);
-    }
-  }, [propUserId, userRole]);
-
-  // Real-time subscription for tracking number updates
-  useEffect(() => {
-    if (!userId) return;
-
-    console.log('📦 Setting up real-time subscription for tracking_numbers...');
-    
-    // Get profile ID for filtering
-    let profileId = userId;
-    const setupSubscription = async () => {
-      if (userRole === 'professional_builder' || userRole === 'private_client') {
-        try {
-          const profileResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${userId}&select=id`,
-            {
-              headers: {
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${getAccessToken() || SUPABASE_ANON_KEY}`,
-              }
-            }
-          );
-          if (profileResponse.ok) {
-            const profiles = await profileResponse.json();
-            if (profiles && profiles.length > 0) {
-              profileId = profiles[0].id;
-            }
-          }
-        } catch (e) {
-          console.log('📦 Could not fetch profile for subscription');
-        }
-      }
-
-      // Subscribe to INSERT and UPDATE events on tracking_numbers table
-      // Note: Supabase realtime doesn't support OR filters, so we'll filter in the callback
-      // For builders, subscribe to all updates and filter by builder_id in callback
-      const channel = supabase
-        .channel(`tracking-numbers-${userId}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'tracking_numbers',
-            // For admin, no filter. For others, we'll filter in callback
-            filter: userRole === 'admin' ? undefined : undefined
-          },
-          (payload) => {
-            console.log('🔴 Real-time tracking update:', payload.eventType, payload.new);
-            
-            // For builders, check if this tracking number belongs to them
-            const trackingBuilderId = payload.new.builder_id;
-            const belongsToUser = userRole === 'admin' || 
-              trackingBuilderId === userId || 
-              trackingBuilderId === profileId ||
-              (userRole === 'supplier' && payload.new.supplier_id === userId);
-
-            if (!belongsToUser && userRole !== 'admin') {
-              console.log('📦 Tracking number does not belong to this user, ignoring update');
-              return;
-            }
-
-            if (payload.eventType === 'INSERT') {
-              // New tracking number created - refresh the list
-              console.log('📦 New tracking number created, refreshing list...');
-              fetchTrackingNumbers();
-              toast({
-                title: "📦 New Tracking Number",
-                description: `Tracking number ${payload.new.tracking_number} has been generated for your delivery!`,
-              });
-            } else if (payload.eventType === 'UPDATE') {
-              // Tracking number updated - update the specific item
-              setTrackingNumbers(prev => {
-                const index = prev.findIndex(tn => tn.id === payload.new.id);
-                if (index >= 0) {
-                  const updated = [...prev];
-                  updated[index] = { ...updated[index], ...payload.new };
-                  return updated;
-                }
-                // If not found, might be a new one - refresh to be safe
-                fetchTrackingNumbers();
-                return prev;
-              });
-              
-              // Show toast for status changes
-              if (payload.old?.status !== payload.new.status) {
-                const statusLabels: Record<string, string> = {
-                  'pending': 'Pending',
-                  'accepted': 'Accepted',
-                  'picked_up': 'Picked Up',
-                  'in_transit': 'In Transit',
-                  'near_destination': 'Near Destination',
-                  'delivered': 'Delivered',
-                  'cancelled': 'Cancelled'
-                };
-                toast({
-                  title: "📍 Status Updated",
-                  description: `Tracking ${payload.new.tracking_number}: ${statusLabels[payload.old?.status] || payload.old?.status} → ${statusLabels[payload.new.status] || payload.new.status}`,
-                });
-              }
-            }
-          }
-        )
-        .subscribe((status) => {
-          console.log('📦 Real-time subscription status:', status);
-        });
-
-      return () => {
-        console.log('📦 Cleaning up real-time subscription');
-        channel.unsubscribe();
-      };
-    };
-
-    const cleanup = setupSubscription();
-    
-    return () => {
-      cleanup.then(cleanupFn => cleanupFn && cleanupFn());
-    };
-  }, [userId, userRole, propUserId]);
-
-  const getAccessToken = () => {
+  const getAccessToken = useCallback(() => {
     try {
       const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
       if (storedSession) {
@@ -255,9 +121,9 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
       }
     } catch (e) {}
     return '';
-  };
+  }, []);
 
-  const fetchTrackingNumbers = async () => {
+  const fetchTrackingNumbers = useCallback(async () => {
     setLoading(true);
     try {
       const accessToken = getAccessToken();
@@ -419,7 +285,160 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
     } finally {
       setLoading(false);
     }
+  }, [userId, userRole, propUserId, getAccessToken]);
+
+  // Helper function to map delivery status to tracking status
+  const mapDeliveryStatusToTrackingStatus = (status: string): TrackingNumber['status'] => {
+    const statusMap: Record<string, TrackingNumber['status']> = {
+      'pending': 'pending',
+      'requested': 'pending',
+      'assigned': 'accepted',
+      'accepted': 'accepted',
+      'picked_up': 'picked_up',
+      'in_transit': 'in_transit',
+      'near_destination': 'near_destination',
+      'delivered': 'delivered',
+      'completed': 'delivered',
+      'shipped': 'in_transit',
+      'cancelled': 'cancelled',
+      'rejected': 'cancelled',
+    };
+    return statusMap[status] || 'pending';
   };
+
+  useEffect(() => {
+    if (userId) {
+      fetchTrackingNumbers();
+    } else {
+      console.log('📦 TrackingTab: Waiting for userId...');
+      // Retry after a short delay
+      const retryTimeout = setTimeout(() => {
+        const newUserId = getUserId();
+        if (newUserId) {
+          fetchTrackingNumbers();
+        }
+      }, 1000);
+      return () => clearTimeout(retryTimeout);
+    }
+  }, [propUserId, userRole, fetchTrackingNumbers, userId]);
+
+  // Real-time subscription for tracking number updates
+  useEffect(() => {
+    if (!userId) return;
+
+    console.log('📦 Setting up real-time subscription for tracking_numbers...');
+    
+    // Get profile ID for filtering
+    let profileId = userId;
+    const setupSubscription = async () => {
+      if (userRole === 'professional_builder' || userRole === 'private_client') {
+        try {
+          const profileResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${userId}&select=id`,
+            {
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${getAccessToken() || SUPABASE_ANON_KEY}`,
+              }
+            }
+          );
+          if (profileResponse.ok) {
+            const profiles = await profileResponse.json();
+            if (profiles && profiles.length > 0) {
+              profileId = profiles[0].id;
+            }
+          }
+        } catch (e) {
+          console.log('📦 Could not fetch profile for subscription');
+        }
+      }
+
+      // Subscribe to INSERT and UPDATE events on tracking_numbers table
+      // Note: Supabase realtime doesn't support OR filters, so we'll filter in the callback
+      // For builders, subscribe to all updates and filter by builder_id in callback
+      const channel = supabase
+        .channel(`tracking-numbers-${userId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'tracking_numbers',
+            // For admin, no filter. For others, we'll filter in callback
+            filter: userRole === 'admin' ? undefined : undefined
+          },
+          (payload) => {
+            console.log('🔴 Real-time tracking update:', payload.eventType, payload.new);
+            
+            // For builders, check if this tracking number belongs to them
+            const trackingBuilderId = payload.new.builder_id;
+            const belongsToUser = userRole === 'admin' || 
+              trackingBuilderId === userId || 
+              trackingBuilderId === profileId ||
+              (userRole === 'supplier' && payload.new.supplier_id === userId);
+
+            if (!belongsToUser && userRole !== 'admin') {
+              console.log('📦 Tracking number does not belong to this user, ignoring update');
+              return;
+            }
+
+            if (payload.eventType === 'INSERT') {
+              // New tracking number created - refresh the list
+              console.log('📦 New tracking number created, refreshing list...');
+              fetchTrackingNumbers();
+              toast({
+                title: "📦 New Tracking Number",
+                description: `Tracking number ${payload.new.tracking_number} has been generated for your delivery!`,
+              });
+            } else if (payload.eventType === 'UPDATE') {
+              // Tracking number updated - update the specific item
+              setTrackingNumbers(prev => {
+                const index = prev.findIndex(tn => tn.id === payload.new.id);
+                if (index >= 0) {
+                  const updated = [...prev];
+                  updated[index] = { ...updated[index], ...payload.new };
+                  return updated;
+                }
+                // If not found, might be a new one - refresh to be safe
+                fetchTrackingNumbers();
+                return prev;
+              });
+              
+              // Show toast for status changes
+              if (payload.old?.status !== payload.new.status) {
+                const statusLabels: Record<string, string> = {
+                  'pending': 'Pending',
+                  'accepted': 'Accepted',
+                  'picked_up': 'Picked Up',
+                  'in_transit': 'In Transit',
+                  'near_destination': 'Near Destination',
+                  'delivered': 'Delivered',
+                  'cancelled': 'Cancelled'
+                };
+                toast({
+                  title: "📍 Status Updated",
+                  description: `Tracking ${payload.new.tracking_number}: ${statusLabels[payload.old?.status] || payload.old?.status} → ${statusLabels[payload.new.status] || payload.new.status}`,
+                });
+              }
+            }
+          }
+        )
+        .subscribe((status) => {
+          console.log('📦 Real-time subscription status:', status);
+        });
+
+      return () => {
+        console.log('📦 Cleaning up real-time subscription');
+        channel.unsubscribe();
+      };
+    };
+
+    const cleanup = setupSubscription();
+    
+    return () => {
+      cleanup.then(cleanupFn => cleanupFn && cleanupFn());
+    };
+  }, [userId, userRole, propUserId, fetchTrackingNumbers, toast]);
   
   // Helper function to map delivery status to tracking status
   const mapDeliveryStatusToTrackingStatus = (status: string): TrackingNumber['status'] => {
