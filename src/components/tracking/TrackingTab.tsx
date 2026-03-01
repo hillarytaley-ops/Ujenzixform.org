@@ -574,9 +574,35 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
     return matchesSearch && matchesStatus;
   });
 
-  const activeDeliveries = trackingNumbers.filter(tn => ['accepted', 'picked_up', 'in_transit', 'near_destination'].includes(tn.status));
-  const completedDeliveries = trackingNumbers.filter(tn => tn.status === 'delivered');
-  const pendingDeliveries = trackingNumbers.filter(tn => tn.status === 'pending');
+  // Calculate statistics - use useMemo to ensure they update when trackingNumbers changes
+  const activeDeliveries = React.useMemo(() => {
+    const active = trackingNumbers.filter(tn => ['accepted', 'picked_up', 'in_transit', 'near_destination'].includes(tn.status));
+    console.log('📊 Calculating activeDeliveries:', active.length, 'from', trackingNumbers.length, 'total');
+    return active;
+  }, [trackingNumbers]);
+  
+  const completedDeliveries = React.useMemo(() => {
+    const completed = trackingNumbers.filter(tn => tn.status === 'delivered');
+    console.log('📊 Calculating completedDeliveries:', completed.length);
+    return completed;
+  }, [trackingNumbers]);
+  
+  const pendingDeliveries = React.useMemo(() => {
+    const pending = trackingNumbers.filter(tn => tn.status === 'pending');
+    console.log('📊 Calculating pendingDeliveries:', pending.length);
+    return pending;
+  }, [trackingNumbers]);
+  
+  // Debug: Log when trackingNumbers changes
+  useEffect(() => {
+    console.log('📊 trackingNumbers state changed:', {
+      count: trackingNumbers.length,
+      active: activeDeliveries.length,
+      completed: completedDeliveries.length,
+      pending: pendingDeliveries.length,
+      statuses: trackingNumbers.map(tn => tn.status).slice(0, 5) // First 5 statuses
+    });
+  }, [trackingNumbers, activeDeliveries.length, completedDeliveries.length, pendingDeliveries.length]);
   
   // Handle category button clicks
   const handleCategoryClick = (category: string) => {
