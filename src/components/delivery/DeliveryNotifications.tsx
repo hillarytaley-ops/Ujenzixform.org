@@ -424,6 +424,17 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       });
       
       finalNotifications.forEach((notif) => {
+        // RULE 0: If it has delivery_request_id, check for duplicates by delivery_request_id FIRST
+        // This catches cases where the same delivery_request creates multiple notifications
+        if (notif.delivery_request_id) {
+          const drKey = `dr-${notif.delivery_request_id}`;
+          if (finalSeenIds.has(drKey)) {
+            console.error(`🚫 DELETED: Duplicate notification with delivery_request_id ${notif.delivery_request_id} (removed: ${notif.id}, title: ${notif.title})`);
+            return; // DELETE IT IMMEDIATELY
+          }
+          finalSeenIds.add(drKey);
+        }
+        
         // ABSOLUTE RULE: ONE notification per purchase_order_id, NO EXCEPTIONS
         if (notif.purchase_order_id) {
           if (finalSeenPOIds.has(notif.purchase_order_id)) {
