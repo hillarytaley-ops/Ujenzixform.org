@@ -179,26 +179,8 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             }
           }
           
-          // Strategy 2: ALSO deduplicate by delivery_address + material_type (SECONDARY)
-          // This catches cases where same delivery appears with different purchase_order_ids
-          const addressMaterialKey = `${(dr.delivery_address || '').toLowerCase().trim()}|${(dr.material_type || '').toLowerCase().trim()}`;
-          if (addressMaterialKey !== '|' && !deliveryRequestsByAddress.has(addressMaterialKey)) {
-            deliveryRequestsByAddress.set(addressMaterialKey, dr);
-          } else if (addressMaterialKey !== '|') {
-            // Check if this is a better match than existing
-            const existingByAddr = deliveryRequestsByAddress.get(addressMaterialKey);
-            if (existingByAddr && existingByAddr.purchase_order_id && dr.purchase_order_id) {
-              // Both have purchase_order_id - prefer the one we already have in deliveryRequestsByPO
-              if (deliveryRequestsByPO.has(existingByAddr.purchase_order_id)) {
-                // Keep existing
-                console.log(`📍 Address+Material duplicate: Keeping existing for ${addressMaterialKey}`);
-              } else if (deliveryRequestsByPO.has(dr.purchase_order_id)) {
-                // Replace with new one
-                deliveryRequestsByAddress.set(addressMaterialKey, dr);
-                console.log(`📍 Address+Material duplicate: Replaced with new for ${addressMaterialKey}`);
-              }
-            }
-          }
+          // NOTE: We do NOT deduplicate by address+material when purchase_order_id exists
+          // Different purchase orders can have the same placeholder "to be provided" - they're still unique!
         } else {
           // NULL purchase_order_id - deduplicate by builder_id + delivery_address + material_type + same hour
           nullPORequests++;
@@ -310,46 +292,52 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         });
       }
       
-      // STEP 5: ULTRA-AGGRESSIVE FINAL DEDUPLICATION
-      // Use multiple strategies to catch ALL duplicates
+      // STEP 5: FINAL DEDUPLICATION - ONLY by purchase_order_id
+      // CRITICAL: Do NOT deduplicate by address+material when purchase_order_id exists!
+      // Different purchase orders can have the same placeholder "to be provided" - they're still unique orders!
       const absolutelyFinal: Notification[] = [];
       const finalSeenPOIds = new Set<string>();
       const finalSeenIds = new Set<string>();
-      const finalSeenByAddress = new Map<string, Notification>(); // For NULL PO cases
+      const finalSeenByAddress = new Map<string, Notification>(); // ONLY for NULL PO cases
       
       // Sort by timestamp first (most recent first)
       finalNotifications.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
       
       finalNotifications.forEach((notif) => {
-        // Strategy 1: If has purchase_order_id, deduplicate by it (STRICTEST)
+        // Strategy 1: If has purchase_order_id, ONLY deduplicate by purchase_order_id
+        // Each purchase_order_id is unique - even if address is "to be provided"
         if (notif.purchase_order_id) {
           if (!finalSeenPOIds.has(notif.purchase_order_id)) {
             finalSeenPOIds.add(notif.purchase_order_id);
             absolutelyFinal.push(notif);
-            console.log(`✅ Added notification for PO ${notif.purchase_order_id} (ID: ${notif.id})`);
           } else {
-            console.error(`🚫 FINAL FILTER: Removed duplicate notification for PO ${notif.purchase_order_id} (ID: ${notif.id})`);
+            // This is a TRUE duplicate - same purchase_order_id appearing twice
+            console.error(`🚫 TRUE DUPLICATE: Removed duplicate notification for PO ${notif.purchase_order_id} (ID: ${notif.id})`);
           }
         } 
-        // Strategy 2: No purchase_order_id - deduplicate by delivery_address + material_type
+        // Strategy 2: No purchase_order_id - ONLY THEN deduplicate by delivery_address + material_type
+        // This catches cases where delivery_requests were created without linking to purchase_orders
         else {
           const addressMaterialKey = `${(notif.deliveryAddress || '').toLowerCase().trim()}|${(notif.materialType || '').toLowerCase().trim()}`;
           
-          if (addressMaterialKey !== '|') {
-            // Has address and material - deduplicate by this key
+          // Only deduplicate if address is NOT a placeholder
+          // "to be provided" is a placeholder - don't group those together
+          const isPlaceholder = (notif.deliveryAddress || '').toLowerCase().includes('to be provided') || 
+                               (notif.deliveryAddress || '').trim() === '';
+          
+          if (!isPlaceholder && addressMaterialKey !== '|') {
+            // Has real address and material - deduplicate by this key
             if (!finalSeenByAddress.has(addressMaterialKey)) {
               finalSeenByAddress.set(addressMaterialKey, notif);
               absolutelyFinal.push(notif);
-              console.log(`✅ Added notification by address+material: ${addressMaterialKey} (ID: ${notif.id})`);
             } else {
               console.error(`🚫 FINAL FILTER: Removed duplicate by address+material: ${addressMaterialKey} (ID: ${notif.id})`);
             }
           } 
-          // Strategy 3: Fallback - deduplicate by notification id only
+          // Strategy 3: Placeholder address or no address - deduplicate by notification id only
           else if (!finalSeenIds.has(notif.id)) {
             finalSeenIds.add(notif.id);
             absolutelyFinal.push(notif);
-            console.log(`✅ Added notification by ID only: ${notif.id}`);
           } else {
             console.error(`🚫 FINAL FILTER: Removed duplicate notification (ID: ${notif.id})`);
           }
@@ -608,16 +596,22 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           </div>
         ) : (
           notifications.map((notification, index) => {
-            // ULTRA-AGGRESSIVE KEY: Use purchase_order_id if available, 
-            // otherwise use delivery_address + material_type to prevent duplicate renders
+            // React key: Use purchase_order_id as primary key (each PO is unique)
+            // Only use address+material for NULL purchase_order_id cases with real addresses
             let uniqueKey: string;
             if (notification.purchase_order_id) {
+              // Each purchase_order_id is unique - use it directly
               uniqueKey = `po-${notification.purchase_order_id}`;
             } else {
+              // No purchase_order_id - use address+material only if NOT a placeholder
+              const isPlaceholder = (notification.deliveryAddress || '').toLowerCase().includes('to be provided') || 
+                                   (notification.deliveryAddress || '').trim() === '';
               const addressMaterialKey = `${(notification.deliveryAddress || '').toLowerCase().trim()}|${(notification.materialType || '').toLowerCase().trim()}`;
-              if (addressMaterialKey !== '|') {
+              
+              if (!isPlaceholder && addressMaterialKey !== '|') {
                 uniqueKey = `addr-${addressMaterialKey}`;
               } else {
+                // Placeholder or no address - use notification id
                 uniqueKey = `notif-${notification.id}`;
               }
             }
