@@ -310,35 +310,71 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         });
       }
       
-      // STEP 5: FINAL DEDUPLICATION - Ensure absolutely no duplicates by purchase_order_id
+      // STEP 5: ULTRA-AGGRESSIVE FINAL DEDUPLICATION
+      // Use multiple strategies to catch ALL duplicates
       const absolutelyFinal: Notification[] = [];
       const finalSeenPOIds = new Set<string>();
       const finalSeenIds = new Set<string>();
+      const finalSeenByAddress = new Map<string, Notification>(); // For NULL PO cases
       
-      // Sort by timestamp first
+      // Sort by timestamp first (most recent first)
       finalNotifications.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
       
       finalNotifications.forEach((notif) => {
+        // Strategy 1: If has purchase_order_id, deduplicate by it (STRICTEST)
         if (notif.purchase_order_id) {
           if (!finalSeenPOIds.has(notif.purchase_order_id)) {
             finalSeenPOIds.add(notif.purchase_order_id);
             absolutelyFinal.push(notif);
+            console.log(`✅ Added notification for PO ${notif.purchase_order_id} (ID: ${notif.id})`);
           } else {
-            console.log(`🚫 FINAL FILTER: Removed duplicate notification for PO ${notif.purchase_order_id} (ID: ${notif.id})`);
+            console.error(`🚫 FINAL FILTER: Removed duplicate notification for PO ${notif.purchase_order_id} (ID: ${notif.id})`);
           }
-        } else if (!finalSeenIds.has(notif.id)) {
-          finalSeenIds.add(notif.id);
-          absolutelyFinal.push(notif);
-        } else {
-          console.log(`🚫 FINAL FILTER: Removed duplicate notification (ID: ${notif.id})`);
+        } 
+        // Strategy 2: No purchase_order_id - deduplicate by delivery_address + material_type
+        else {
+          const addressMaterialKey = `${(notif.deliveryAddress || '').toLowerCase().trim()}|${(notif.materialType || '').toLowerCase().trim()}`;
+          
+          if (addressMaterialKey !== '|') {
+            // Has address and material - deduplicate by this key
+            if (!finalSeenByAddress.has(addressMaterialKey)) {
+              finalSeenByAddress.set(addressMaterialKey, notif);
+              absolutelyFinal.push(notif);
+              console.log(`✅ Added notification by address+material: ${addressMaterialKey} (ID: ${notif.id})`);
+            } else {
+              console.error(`🚫 FINAL FILTER: Removed duplicate by address+material: ${addressMaterialKey} (ID: ${notif.id})`);
+            }
+          } 
+          // Strategy 3: Fallback - deduplicate by notification id only
+          else if (!finalSeenIds.has(notif.id)) {
+            finalSeenIds.add(notif.id);
+            absolutelyFinal.push(notif);
+            console.log(`✅ Added notification by ID only: ${notif.id}`);
+          } else {
+            console.error(`🚫 FINAL FILTER: Removed duplicate notification (ID: ${notif.id})`);
+          }
         }
       });
       
-      // Log all purchase_order_ids to help debug
+      // Final verification: Check for any remaining duplicates
       const poIds = absolutelyFinal.map(n => n.purchase_order_id).filter(Boolean);
       const duplicatePOIds = poIds.filter((id, index) => poIds.indexOf(id) !== index);
       if (duplicatePOIds.length > 0) {
-        console.error(`🚨 CRITICAL: Found duplicate purchase_order_ids in final array:`, duplicatePOIds);
+        console.error(`🚨 CRITICAL ERROR: Still found duplicate purchase_order_ids after all deduplication:`, duplicatePOIds);
+        // Emergency cleanup - remove duplicates manually
+        const emergencyFinal: Notification[] = [];
+        const emergencySeen = new Set<string>();
+        absolutelyFinal.forEach(n => {
+          const key = n.purchase_order_id || n.id;
+          if (!emergencySeen.has(key)) {
+            emergencySeen.add(key);
+            emergencyFinal.push(n);
+          }
+        });
+        console.error(`🚨 EMERGENCY CLEANUP: ${absolutelyFinal.length} → ${emergencyFinal.length}`);
+        setNotifications(emergencyFinal);
+        setUnreadCount(emergencyFinal.filter(n => !n.read).length);
+        return;
       }
       
       console.log(`✅ FINAL: ${finalNotifications.length} → ${absolutelyFinal.length} absolutely unique notifications (removed ${finalNotifications.length - absolutelyFinal.length} final duplicates)`);
@@ -572,11 +608,19 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           </div>
         ) : (
           notifications.map((notification, index) => {
-            // Use purchase_order_id as key if available, otherwise use id
-            // This ensures only ONE notification per purchase_order_id is rendered
-            const uniqueKey = notification.purchase_order_id 
-              ? `po-${notification.purchase_order_id}` 
-              : `notif-${notification.id}`;
+            // ULTRA-AGGRESSIVE KEY: Use purchase_order_id if available, 
+            // otherwise use delivery_address + material_type to prevent duplicate renders
+            let uniqueKey: string;
+            if (notification.purchase_order_id) {
+              uniqueKey = `po-${notification.purchase_order_id}`;
+            } else {
+              const addressMaterialKey = `${(notification.deliveryAddress || '').toLowerCase().trim()}|${(notification.materialType || '').toLowerCase().trim()}`;
+              if (addressMaterialKey !== '|') {
+                uniqueKey = `addr-${addressMaterialKey}`;
+              } else {
+                uniqueKey = `notif-${notification.id}`;
+              }
+            }
             
             return (
               <div
