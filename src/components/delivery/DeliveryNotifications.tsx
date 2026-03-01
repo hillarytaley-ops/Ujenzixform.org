@@ -1,7 +1,7 @@
 // COMPLETELY RESTRUCTURED: Simple, clear approach - ONE notification per purchase_order_id
 // This replaces the complex deduplication logic with a straightforward approach
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -616,33 +616,36 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             <p className="text-gray-500">No active delivery requests</p>
           </div>
         ) : (() => {
-          // FINAL RENDER-LEVEL DEDUPLICATION - Absolutely prevent duplicate renders
-          const renderedKeys = new Set<string>();
-          const uniqueNotifications = notifications.filter((notification, index) => {
-            let uniqueKey: string;
-            if (notification.purchase_order_id) {
-              uniqueKey = `po-${notification.purchase_order_id}`;
-            } else {
-              const isPlaceholder = (notification.deliveryAddress || '').toLowerCase().includes('to be provided') || 
-                                   (notification.deliveryAddress || '').trim() === '';
-              const addressMaterialKey = `${(notification.deliveryAddress || '').toLowerCase().trim()}|${(notification.materialType || '').toLowerCase().trim()}`;
-              
-              if (!isPlaceholder && addressMaterialKey !== '|') {
-                uniqueKey = `addr-${addressMaterialKey}`;
+          // Use useMemo for consistent deduplication
+          const uniqueNotifications = useMemo(() => {
+            const renderedKeys = new Set<string>();
+            const unique = notifications.filter((notification) => {
+              let uniqueKey: string;
+              if (notification.purchase_order_id) {
+                uniqueKey = `po-${notification.purchase_order_id}`;
               } else {
-                uniqueKey = `notif-${notification.id}`;
+                const isPlaceholder = (notification.deliveryAddress || '').toLowerCase().includes('to be provided') || 
+                                     (notification.deliveryAddress || '').trim() === '';
+                const addressMaterialKey = `${(notification.deliveryAddress || '').toLowerCase().trim()}|${(notification.materialType || '').toLowerCase().trim()}`;
+                
+                if (!isPlaceholder && addressMaterialKey !== '|') {
+                  uniqueKey = `addr-${addressMaterialKey}`;
+                } else {
+                  uniqueKey = `notif-${notification.id}`;
+                }
               }
-            }
+              
+              if (renderedKeys.has(uniqueKey)) {
+                console.error(`🚫 RENDER BLOCK: Duplicate notification blocked at render time: ${uniqueKey} (ID: ${notification.id})`);
+                return false;
+              }
+              renderedKeys.add(uniqueKey);
+              return true;
+            });
             
-            if (renderedKeys.has(uniqueKey)) {
-              console.error(`🚫 RENDER BLOCK: Duplicate notification blocked at render time: ${uniqueKey} (ID: ${notification.id})`);
-              return false;
-            }
-            renderedKeys.add(uniqueKey);
-            return true;
-          });
-          
-          console.log(`🎨 RENDERING: ${notifications.length} notifications → ${uniqueNotifications.length} unique (blocked ${notifications.length - uniqueNotifications.length} duplicates at render)`);
+            console.log(`🎨 RENDERING: ${notifications.length} notifications → ${unique.length} unique (blocked ${notifications.length - unique.length} duplicates at render)`);
+            return unique;
+          }, [notifications]);
           
           return uniqueNotifications.map((notification, index) => {
             // React key: Use purchase_order_id as primary key (each PO is unique)
