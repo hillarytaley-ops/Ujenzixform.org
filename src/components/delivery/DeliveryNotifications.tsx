@@ -409,17 +409,27 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       const absolutelyFinal: Notification[] = [];
       const finalSeenPOIds = new Set<string>();
       const finalSeenIds = new Set<string>();
+      const finalSeenByContent = new Map<string, Notification>(); // Also deduplicate by content similarity
       
-      // Sort by timestamp first (most recent first)
-      finalNotifications.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+      // Sort by timestamp first (most recent first), then prefer delivery_request over purchase_order
+      finalNotifications.sort((a, b) => {
+        // First, sort by timestamp (most recent first)
+        const timeDiff = b.timestamp.getTime() - a.timestamp.getTime();
+        if (Math.abs(timeDiff) < 60000) { // Within 1 minute - might be duplicates
+          // Prefer delivery_request_id over undefined (delivery_request is more specific)
+          if (a.delivery_request_id && !b.delivery_request_id) return -1;
+          if (!a.delivery_request_id && b.delivery_request_id) return 1;
+        }
+        return timeDiff;
+      });
       
       finalNotifications.forEach((notif) => {
         // ABSOLUTE RULE: ONE notification per purchase_order_id, NO EXCEPTIONS
         if (notif.purchase_order_id) {
           if (finalSeenPOIds.has(notif.purchase_order_id)) {
-            // DUPLICATE DETECTED - REMOVE IT
-            console.error(`🚫 ABSOLUTE DUPLICATE REMOVED: purchase_order_id ${notif.purchase_order_id} already has a notification (keeping first, removing: ${notif.id})`);
-            return; // Skip this notification
+            // DUPLICATE DETECTED - REMOVE IT IMMEDIATELY
+            console.error(`🚫 DELETED: Duplicate notification for purchase_order_id ${notif.purchase_order_id} (removed: ${notif.id}, title: ${notif.title})`);
+            return; // Skip this notification - DELETE IT
           }
           finalSeenPOIds.add(notif.purchase_order_id);
           absolutelyFinal.push(notif);
