@@ -312,7 +312,16 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         }
       });
       
+      // Log all purchase_order_ids to help debug
+      const poIds = absolutelyFinal.map(n => n.purchase_order_id).filter(Boolean);
+      const duplicatePOIds = poIds.filter((id, index) => poIds.indexOf(id) !== index);
+      if (duplicatePOIds.length > 0) {
+        console.error(`🚨 CRITICAL: Found duplicate purchase_order_ids in final array:`, duplicatePOIds);
+      }
+      
       console.log(`✅ FINAL: ${finalNotifications.length} → ${absolutelyFinal.length} absolutely unique notifications (removed ${finalNotifications.length - absolutelyFinal.length} final duplicates)`);
+      console.log(`📊 Final notification breakdown: ${poIds.length} with purchase_order_id, ${absolutelyFinal.length - poIds.length} without`);
+      
       setNotifications(absolutelyFinal);
       setUnreadCount(absolutelyFinal.filter(n => !n.read).length);
       
@@ -540,9 +549,16 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             <p className="text-gray-500">No active delivery requests</p>
           </div>
         ) : (
-          notifications.map((notification) => (
+          notifications.map((notification, index) => {
+            // Use purchase_order_id as key if available, otherwise use id
+            // This ensures only ONE notification per purchase_order_id is rendered
+            const uniqueKey = notification.purchase_order_id 
+              ? `po-${notification.purchase_order_id}` 
+              : `notif-${notification.id}`;
+            
+            return (
             <div
-              key={notification.id}
+              key={uniqueKey}
               className={`p-3 rounded-lg border ${
                 notification.read 
                   ? 'bg-white border-gray-200' 
