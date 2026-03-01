@@ -324,15 +324,22 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
         return bCreated - aCreated; // Most recent first
       });
       
+      console.log('📦 Setting tracking numbers state with', trackingData.length, 'items');
       setTrackingNumbers(trackingData);
-      console.log('📦 Final tracking numbers:', trackingData.length);
-      console.log('📦 Status breakdown:', {
+      
+      const statusBreakdown = {
         accepted: trackingData.filter(t => t.status === 'accepted').length,
         in_transit: trackingData.filter(t => t.status === 'in_transit').length,
         picked_up: trackingData.filter(t => t.status === 'picked_up').length,
         delivered: trackingData.filter(t => t.status === 'delivered').length,
-        pending: trackingData.filter(t => t.status === 'pending').length
-      });
+        pending: trackingData.filter(t => t.status === 'pending').length,
+        cancelled: trackingData.filter(t => t.status === 'cancelled').length
+      };
+      
+      console.log('📦 Final tracking numbers:', trackingData.length);
+      console.log('📦 Status breakdown:', statusBreakdown);
+      console.log('📦 Active deliveries (accepted+picked_up+in_transit+near_destination):', 
+        trackingData.filter(t => ['accepted', 'picked_up', 'in_transit', 'near_destination'].includes(t.status)).length);
       
     } catch (error) {
       console.error('📦 Error fetching tracking numbers:', error);
