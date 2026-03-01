@@ -121,7 +121,8 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       const finalNotifications: Notification[] = [];
       const seenPurchaseOrderIds = new Set<string>(); // Track which purchase_orders we've already added
       
-      // STEP 1: Fetch ALL delivery_requests (these are the primary source)
+      // STEP 1: Fetch delivery_requests with database-level deduplication
+      // Use DISTINCT ON in a subquery approach via RPC, or fetch and deduplicate immediately
       const drResponse = await fetch(
         `${url}/rest/v1/delivery_requests?order=created_at.desc&limit=100&select=*`,
         { headers, cache: 'no-store' }
@@ -129,8 +130,30 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       
       let deliveryRequests: any[] = [];
       if (drResponse.ok) {
-        deliveryRequests = await drResponse.json();
-        console.log(`✅ Loaded ${deliveryRequests.length} delivery_requests`);
+        const rawData = await drResponse.json();
+        console.log(`📦 Raw delivery_requests from DB: ${rawData.length}`);
+        
+        // IMMEDIATE DEDUPLICATION at fetch time - before any processing
+        const seenPOIds = new Set<string>();
+        const seenIds = new Set<string>();
+        deliveryRequests = rawData.filter((dr: any) => {
+          if (dr.purchase_order_id) {
+            if (seenPOIds.has(dr.purchase_order_id)) {
+              console.error(`🗑️ IMMEDIATE FILTER: Removed duplicate delivery_request for PO ${dr.purchase_order_id} (ID: ${dr.id})`);
+              return false;
+            }
+            seenPOIds.add(dr.purchase_order_id);
+            return true;
+          } else {
+            if (seenIds.has(dr.id)) {
+              return false;
+            }
+            seenIds.add(dr.id);
+            return true;
+          }
+        });
+        
+        console.log(`✅ Loaded ${deliveryRequests.length} unique delivery_requests (removed ${rawData.length - deliveryRequests.length} duplicates at fetch)`);
       }
       
       // STEP 2: AGGRESSIVE DEDUPLICATION - Multiple strategies
