@@ -203,12 +203,6 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       const totalUnique = deliveryRequestsByPO.size + deliveryRequestsByKey.size;
       console.log(`🔍 Deduplicated delivery_requests: ${deliveryRequests.length} → ${totalUnique} unique (removed ${duplicatesRemoved} duplicates, ${nullPORequests} had NULL purchase_order_id)`);
       
-      // Final check: ensure we only have one notification per purchase_order_id
-      const finalPOIds = new Set<string>();
-      const finalNotificationsByPO = new Map<string, Notification>();
-      
-      // This will be used later to ensure no duplicates in finalNotifications
-      
       // STEP 3: Create notifications from unique delivery_requests
       for (const [poId, dr] of deliveryRequestsByPO.entries()) {
         finalNotifications.push({
@@ -294,12 +288,33 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         });
       }
       
-      // STEP 5: Sort by timestamp and set state
+      // STEP 5: FINAL DEDUPLICATION - Ensure absolutely no duplicates by purchase_order_id
+      const absolutelyFinal: Notification[] = [];
+      const finalSeenPOIds = new Set<string>();
+      const finalSeenIds = new Set<string>();
+      
+      // Sort by timestamp first
       finalNotifications.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
       
-      console.log(`✅ FINAL: ${finalNotifications.length} unique notifications (ONE per purchase_order_id)`);
-      setNotifications(finalNotifications);
-      setUnreadCount(finalNotifications.filter(n => !n.read).length);
+      finalNotifications.forEach((notif) => {
+        if (notif.purchase_order_id) {
+          if (!finalSeenPOIds.has(notif.purchase_order_id)) {
+            finalSeenPOIds.add(notif.purchase_order_id);
+            absolutelyFinal.push(notif);
+          } else {
+            console.log(`🚫 FINAL FILTER: Removed duplicate notification for PO ${notif.purchase_order_id} (ID: ${notif.id})`);
+          }
+        } else if (!finalSeenIds.has(notif.id)) {
+          finalSeenIds.add(notif.id);
+          absolutelyFinal.push(notif);
+        } else {
+          console.log(`🚫 FINAL FILTER: Removed duplicate notification (ID: ${notif.id})`);
+        }
+      });
+      
+      console.log(`✅ FINAL: ${finalNotifications.length} → ${absolutelyFinal.length} absolutely unique notifications (removed ${finalNotifications.length - absolutelyFinal.length} final duplicates)`);
+      setNotifications(absolutelyFinal);
+      setUnreadCount(absolutelyFinal.filter(n => !n.read).length);
       
     } catch (error: any) {
       console.error('❌ Error loading notifications:', error.message || error);
