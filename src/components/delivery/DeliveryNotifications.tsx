@@ -133,27 +133,50 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         const rawData = await drResponse.json();
         console.log(`📦 Raw delivery_requests from DB: ${rawData.length}`);
         
-        // IMMEDIATE DEDUPLICATION at fetch time - before any processing
-        const seenPOIds = new Set<string>();
-        const seenIds = new Set<string>();
-        deliveryRequests = rawData.filter((dr: any) => {
+        // PRIVATE BUILDER APPROACH: Deduplicate by purchase_order_id (prefer accepted/assigned/in_transit, then most recent)
+        // This matches the Edge Function logic that prevents duplicates for private builders
+        const deliveryRequestsByPO = new Map<string, any>();
+        const deliveryRequestsById = new Map<string, any>(); // For NULL purchase_order_id
+        
+        rawData.forEach((dr: any) => {
           if (dr.purchase_order_id) {
-            if (seenPOIds.has(dr.purchase_order_id)) {
-              console.error(`🗑️ IMMEDIATE FILTER: Removed duplicate delivery_request for PO ${dr.purchase_order_id} (ID: ${dr.id})`);
-              return false;
+            const existing = deliveryRequestsByPO.get(dr.purchase_order_id);
+            
+            // Priority: accepted > assigned > in_transit > pending > others
+            const statusPriority = {
+              'accepted': 5,
+              'assigned': 4,
+              'in_transit': 3,
+              'pending': 2,
+              'completed': 1,
+              'cancelled': 0
+            };
+            
+            const currentPriority = statusPriority[dr.status as keyof typeof statusPriority] || 0;
+            const existingPriority = existing ? (statusPriority[existing.status as keyof typeof statusPriority] || 0) : -1;
+            
+            // Keep the one with higher priority status, or if same priority, keep the most recent
+            if (!existing || currentPriority > existingPriority || 
+                (currentPriority === existingPriority && new Date(dr.created_at) > new Date(existing.created_at))) {
+              if (existing) {
+                console.log(`🔄 REPLACING: PO ${dr.purchase_order_id} - keeping ${dr.status} (ID: ${dr.id}) over ${existing.status} (ID: ${existing.id})`);
+              }
+              deliveryRequestsByPO.set(dr.purchase_order_id, dr);
+            } else {
+              console.log(`🗑️ SKIPPING: PO ${dr.purchase_order_id} - keeping ${existing.status} (ID: ${existing.id}) over ${dr.status} (ID: ${dr.id})`);
             }
-            seenPOIds.add(dr.purchase_order_id);
-            return true;
           } else {
-            if (seenIds.has(dr.id)) {
-              return false;
+            // For NULL purchase_order_id, keep by ID (shouldn't have duplicates, but just in case)
+            if (!deliveryRequestsById.has(dr.id)) {
+              deliveryRequestsById.set(dr.id, dr);
             }
-            seenIds.add(dr.id);
-            return true;
           }
         });
         
-        console.log(`✅ Loaded ${deliveryRequests.length} unique delivery_requests (removed ${rawData.length - deliveryRequests.length} duplicates at fetch)`);
+        // Combine both maps into array
+        deliveryRequests = [...deliveryRequestsByPO.values(), ...deliveryRequestsById.values()];
+        
+        console.log(`✅ PRIVATE BUILDER APPROACH: ${rawData.length} → ${deliveryRequests.length} unique (removed ${rawData.length - deliveryRequests.length} duplicates)`);
       }
       
       // STEP 2: AGGRESSIVE DEDUPLICATION - Multiple strategies
