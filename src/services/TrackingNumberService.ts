@@ -34,8 +34,9 @@ class TrackingNumberService {
   /**
    * Generate a unique tracking number
    * Format: TRK-YYYYMMDD-XXXXX (e.g., TRK-20251213-A7B3C)
+   * Public method for use across the application
    */
-  private generateTrackingNumber(): string {
+  generateTrackingNumber(): string {
     const date = new Date();
     const dateStr = date.getFullYear().toString() +
       (date.getMonth() + 1).toString().padStart(2, '0') +

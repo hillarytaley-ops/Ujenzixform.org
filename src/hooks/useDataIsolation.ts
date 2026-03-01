@@ -15,6 +15,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { trackingNumberService } from '@/services/TrackingNumberService';
 
 export interface UserContext {
   userId: string;
@@ -726,9 +727,8 @@ export const useDeliveryProviderData = () => {
         throw new Error(`Cannot accept delivery with status: ${existingRequest.status}`);
       }
 
-      // Generate tracking number
-      const trackingNumber = 'TRK-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + 
-        Math.random().toString(36).substring(2, 7).toUpperCase();
+      // Generate tracking number using the proper service (ensures consistent format)
+      const trackingNumber = trackingNumberService.generateTrackingNumber();
       
       // Update with less restrictive conditions - allow accepting if status is pending OR assigned
       const { data: updatedData, error } = await supabase

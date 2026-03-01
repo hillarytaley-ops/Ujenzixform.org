@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { trackingNumberService } from '@/services/TrackingNumberService';
 
 interface Notification {
   id: string;
@@ -556,8 +557,8 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       return;
     }
     
-    const trackingNumber = 'TRK-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + 
-      Math.random().toString(36).substring(2, 7).toUpperCase();
+    // Generate tracking number using the proper service (ensures consistent format)
+    const trackingNumber = trackingNumberService.generateTrackingNumber();
     
     try {
       const { url, headers } = getAuthHeaders();

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { trackingNumberService } from '@/services/TrackingNumberService';
 
 interface DeliveryRequest {
   id: string;
@@ -149,8 +150,8 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('User not authenticated');
 
-        const trackingNumber = 'TRK-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + 
-          Math.random().toString(36).substring(2, 7).toUpperCase();
+        // Generate tracking number using the proper service (ensures consistent format)
+        const trackingNumber = trackingNumberService.generateTrackingNumber();
 
         const { error: updateError } = await supabase
           .from('delivery_requests')
