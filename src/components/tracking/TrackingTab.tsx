@@ -368,8 +368,7 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
       }
 
       // Subscribe to INSERT and UPDATE events on tracking_numbers table
-      // Note: Supabase realtime doesn't support OR filters, so we'll filter in the callback
-      // For builders, subscribe to all updates and filter by builder_id in callback
+      // Also subscribe to delivery_requests changes (since trigger updates tracking_numbers)
       const channel = supabase
         .channel(`tracking-numbers-${userId}`)
         .on(
