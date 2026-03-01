@@ -666,6 +666,37 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
 
   // FINAL RENDER-LEVEL DEDUPLICATION using useMemo
   const uniqueNotifications = useMemo(() => {
+    // First, log all purchase_order_ids to detect duplicates
+    const poIdCounts = new Map<string, number>();
+    const poIdToNotifications = new Map<string, Notification[]>();
+    
+    notifications.forEach((notification) => {
+      if (notification.purchase_order_id) {
+        const count = poIdCounts.get(notification.purchase_order_id) || 0;
+        poIdCounts.set(notification.purchase_order_id, count + 1);
+        
+        if (!poIdToNotifications.has(notification.purchase_order_id)) {
+          poIdToNotifications.set(notification.purchase_order_id, []);
+        }
+        poIdToNotifications.get(notification.purchase_order_id)!.push(notification);
+      }
+    });
+    
+    // Log any purchase_order_ids that appear multiple times in notifications array
+    let renderDuplicates = 0;
+    poIdCounts.forEach((count, poId) => {
+      if (count > 1) {
+        renderDuplicates += count - 1;
+        const notifs = poIdToNotifications.get(poId)!;
+        console.error(`🚨 RENDER DUPLICATE: purchase_order_id ${poId} appears ${count} times in notifications array:`, 
+          notifs.map(n => ({ id: n.id, title: n.title, delivery_request_id: n.delivery_request_id })));
+      }
+    });
+    
+    if (renderDuplicates > 0) {
+      console.error(`🚨 RENDER DUPLICATES FOUND: ${renderDuplicates} duplicate notifications in array (before deduplication)`);
+    }
+    
     const renderedKeys = new Set<string>();
     const unique = notifications.filter((notification) => {
       let uniqueKey: string;
@@ -684,7 +715,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       }
       
       if (renderedKeys.has(uniqueKey)) {
-        console.error(`🚫 RENDER BLOCK: Duplicate notification blocked at render time: ${uniqueKey} (ID: ${notification.id})`);
+        console.error(`🚫 RENDER BLOCK: Duplicate notification blocked at render time: ${uniqueKey} (ID: ${notification.id}, title: ${notification.title})`);
         return false;
       }
       renderedKeys.add(uniqueKey);
@@ -693,6 +724,8 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
     
     if (notifications.length !== unique.length) {
       console.log(`🎨 RENDERING: ${notifications.length} notifications → ${unique.length} unique (blocked ${notifications.length - unique.length} duplicates at render)`);
+    } else if (renderDuplicates === 0) {
+      console.log(`✅ RENDER CHECK: All ${notifications.length} notifications are unique (no duplicates found)`);
     }
     return unique;
   }, [notifications]);
