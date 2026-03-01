@@ -133,6 +133,38 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         const rawData = await drResponse.json();
         console.log(`📦 Raw delivery_requests from DB: ${rawData.length}`);
         
+        // FIRST: Check for duplicates in raw data BEFORE deduplication
+        const poIdCounts = new Map<string, number>();
+        const poIdToRequests = new Map<string, any[]>();
+        rawData.forEach((dr: any) => {
+          if (dr.purchase_order_id) {
+            const count = poIdCounts.get(dr.purchase_order_id) || 0;
+            poIdCounts.set(dr.purchase_order_id, count + 1);
+            
+            if (!poIdToRequests.has(dr.purchase_order_id)) {
+              poIdToRequests.set(dr.purchase_order_id, []);
+            }
+            poIdToRequests.get(dr.purchase_order_id)!.push(dr);
+          }
+        });
+        
+        // Log duplicates found in raw data
+        let duplicateCount = 0;
+        poIdCounts.forEach((count, poId) => {
+          if (count > 1) {
+            duplicateCount += count - 1; // Number of duplicates (total - 1)
+            const requests = poIdToRequests.get(poId)!;
+            console.error(`🚨 DUPLICATE FOUND: purchase_order_id ${poId} has ${count} delivery_requests:`, 
+              requests.map(r => ({ id: r.id, status: r.status, created_at: r.created_at })));
+          }
+        });
+        
+        if (duplicateCount > 0) {
+          console.error(`🚨 TOTAL DUPLICATES IN RAW DATA: ${duplicateCount} duplicate delivery_requests found!`);
+        } else {
+          console.log(`✅ No duplicates found in raw data - all ${rawData.length} delivery_requests have unique purchase_order_ids`);
+        }
+        
         // PRIVATE BUILDER APPROACH: Deduplicate by purchase_order_id (prefer accepted/assigned/in_transit, then most recent)
         // This matches the Edge Function logic that prevents duplicates for private builders
         const deliveryRequestsByPO = new Map<string, any>();
@@ -176,7 +208,12 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         // Combine both maps into array
         deliveryRequests = [...deliveryRequestsByPO.values(), ...deliveryRequestsById.values()];
         
-        console.log(`✅ PRIVATE BUILDER APPROACH: ${rawData.length} → ${deliveryRequests.length} unique (removed ${rawData.length - deliveryRequests.length} duplicates)`);
+        const removed = rawData.length - deliveryRequests.length;
+        console.log(`✅ PRIVATE BUILDER APPROACH: ${rawData.length} → ${deliveryRequests.length} unique (removed ${removed} duplicates)`);
+        
+        if (removed > 0 && duplicateCount === 0) {
+          console.warn(`⚠️ WARNING: Removed ${removed} duplicates but duplicate check found 0. This might indicate a logic issue.`);
+        }
       }
       
       // STEP 2: AGGRESSIVE DEDUPLICATION - Multiple strategies
