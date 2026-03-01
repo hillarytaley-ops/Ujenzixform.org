@@ -816,7 +816,7 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             <RefreshCw className="h-12 w-12 text-teal-500 mx-auto mb-3 animate-spin" />
             <p className="text-gray-500">Loading...</p>
           </div>
-        ) : notifications.length === 0 ? (
+        ) : uniqueNotifications.length === 0 ? (
           <div className="text-center py-8">
             <BellOff className="h-12 w-12 text-gray-300 mx-auto mb-3" />
             <p className="text-gray-500">No active delivery requests</p>
@@ -824,28 +824,26 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         ) : (
           uniqueNotifications.map((notification, index) => {
             // React key: Use purchase_order_id as primary key (each PO is unique)
-            // Only use address+material for NULL purchase_order_id cases with real addresses
+            // CRITICAL: Must match the key used in deduplication logic
             let uniqueKey: string;
             if (notification.purchase_order_id) {
               // Each purchase_order_id is unique - use it directly
               uniqueKey = `po-${notification.purchase_order_id}`;
+            } else if (notification.delivery_request_id) {
+              // Use delivery_request_id as fallback
+              uniqueKey = `dr-${notification.delivery_request_id}`;
             } else {
-              // No purchase_order_id - use address+material only if NOT a placeholder
-              const isPlaceholder = (notification.deliveryAddress || '').toLowerCase().includes('to be provided') || 
-                                   (notification.deliveryAddress || '').trim() === '';
-              const addressMaterialKey = `${(notification.deliveryAddress || '').toLowerCase().trim()}|${(notification.materialType || '').toLowerCase().trim()}`;
-              
-              if (!isPlaceholder && addressMaterialKey !== '|') {
-                uniqueKey = `addr-${addressMaterialKey}`;
-              } else {
-                // Placeholder or no address - use notification id
-                uniqueKey = `notif-${notification.id}`;
-              }
+              // No purchase_order_id or delivery_request_id - use notification id
+              uniqueKey = `notif-${notification.id}`;
             }
+            
+            // FINAL SAFETY CHECK: Ensure key is truly unique by adding index if needed
+            // (This should never happen if deduplication worked, but just in case)
+            const finalKey = `${uniqueKey}-${index}`;
             
             return (
               <div
-                key={uniqueKey}
+                key={finalKey}
                 className={`p-3 rounded-lg border ${
                   notification.read 
                     ? 'bg-white border-gray-200' 
