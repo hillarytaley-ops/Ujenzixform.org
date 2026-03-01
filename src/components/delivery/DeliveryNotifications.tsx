@@ -349,17 +349,27 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       const duplicatePOIds = poIds.filter((id, index) => poIds.indexOf(id) !== index);
       if (duplicatePOIds.length > 0) {
         console.error(`🚨 CRITICAL ERROR: Still found duplicate purchase_order_ids after all deduplication:`, duplicatePOIds);
-        // Emergency cleanup - remove duplicates manually
+        // Emergency cleanup - remove duplicates manually using a Map to ensure uniqueness
         const emergencyFinal: Notification[] = [];
-        const emergencySeen = new Set<string>();
+        const emergencySeenPO = new Map<string, Notification>();
+        const emergencySeenIds = new Set<string>();
+        
+        // First pass: Keep only one per purchase_order_id
         absolutelyFinal.forEach(n => {
-          const key = n.purchase_order_id || n.id;
-          if (!emergencySeen.has(key)) {
-            emergencySeen.add(key);
+          if (n.purchase_order_id) {
+            if (!emergencySeenPO.has(n.purchase_order_id)) {
+              emergencySeenPO.set(n.purchase_order_id, n);
+            }
+          } else if (!emergencySeenIds.has(n.id)) {
+            emergencySeenIds.add(n.id);
             emergencyFinal.push(n);
           }
         });
-        console.error(`🚨 EMERGENCY CLEANUP: ${absolutelyFinal.length} → ${emergencyFinal.length}`);
+        
+        // Add all unique purchase_order_id notifications
+        emergencySeenPO.forEach(n => emergencyFinal.push(n));
+        
+        console.error(`🚨 EMERGENCY CLEANUP: ${absolutelyFinal.length} → ${emergencyFinal.length} (removed ${absolutelyFinal.length - emergencyFinal.length} duplicates)`);
         setNotifications(emergencyFinal);
         setUnreadCount(emergencyFinal.filter(n => !n.read).length);
         return;
