@@ -615,8 +615,36 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
             <BellOff className="h-12 w-12 text-gray-300 mx-auto mb-3" />
             <p className="text-gray-500">No active delivery requests</p>
           </div>
-        ) : (
-          notifications.map((notification, index) => {
+        ) : (() => {
+          // FINAL RENDER-LEVEL DEDUPLICATION - Absolutely prevent duplicate renders
+          const renderedKeys = new Set<string>();
+          const uniqueNotifications = notifications.filter((notification, index) => {
+            let uniqueKey: string;
+            if (notification.purchase_order_id) {
+              uniqueKey = `po-${notification.purchase_order_id}`;
+            } else {
+              const isPlaceholder = (notification.deliveryAddress || '').toLowerCase().includes('to be provided') || 
+                                   (notification.deliveryAddress || '').trim() === '';
+              const addressMaterialKey = `${(notification.deliveryAddress || '').toLowerCase().trim()}|${(notification.materialType || '').toLowerCase().trim()}`;
+              
+              if (!isPlaceholder && addressMaterialKey !== '|') {
+                uniqueKey = `addr-${addressMaterialKey}`;
+              } else {
+                uniqueKey = `notif-${notification.id}`;
+              }
+            }
+            
+            if (renderedKeys.has(uniqueKey)) {
+              console.error(`🚫 RENDER BLOCK: Duplicate notification blocked at render time: ${uniqueKey} (ID: ${notification.id})`);
+              return false;
+            }
+            renderedKeys.add(uniqueKey);
+            return true;
+          });
+          
+          console.log(`🎨 RENDERING: ${notifications.length} notifications → ${uniqueNotifications.length} unique (blocked ${notifications.length - uniqueNotifications.length} duplicates at render)`);
+          
+          return uniqueNotifications.map((notification, index) => {
             // React key: Use purchase_order_id as primary key (each PO is unique)
             // Only use address+material for NULL purchase_order_id cases with real addresses
             let uniqueKey: string;
