@@ -202,7 +202,11 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
       }
       
       // Build query based on user role
-      let url = `${SUPABASE_URL}/rest/v1/tracking_numbers?order=created_at.desc&select=*`;
+      // Order by updated_at first (most recently updated), then created_at (newest first)
+      let url = `${SUPABASE_URL}/rest/v1/tracking_numbers?order=updated_at.desc,created_at.desc&select=*`;
+      
+      // Add cache-busting to ensure fresh data
+      const cacheBuster = `&_t=${Date.now()}`;
       
       if (userRole === 'admin') {
         // Admin sees all tracking numbers - no filter needed
@@ -217,12 +221,15 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
         console.log('📦 Builder mode: filtering by userId:', userId, 'and profileId:', profileId);
       }
 
+      url += cacheBuster;
       console.log('📦 Fetching tracking numbers from:', url);
 
       const response = await fetch(url, {
         headers: {
           'apikey': SUPABASE_ANON_KEY,
           'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
         }
       });
 
@@ -231,6 +238,16 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
       if (response.ok) {
         trackingData = await response.json() || [];
         console.log('📦 Tracking numbers loaded from tracking_numbers table:', trackingData.length);
+        
+        // Log the first few tracking numbers to debug
+        if (trackingData.length > 0) {
+          console.log('📦 First 3 tracking numbers:', trackingData.slice(0, 3).map(tn => ({
+            tracking_number: tn.tracking_number,
+            status: tn.status,
+            created_at: tn.created_at,
+            updated_at: tn.updated_at
+          })));
+        }
       } else {
         const errorText = await response.text();
         console.error('📦 Failed to fetch tracking numbers:', response.status, errorText);
@@ -295,8 +312,27 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
         }
       }
       
+      // Sort by updated_at desc, then created_at desc to ensure most recent are first
+      trackingData.sort((a, b) => {
+        const aUpdated = new Date(a.updated_at || a.created_at).getTime();
+        const bUpdated = new Date(b.updated_at || b.created_at).getTime();
+        if (aUpdated !== bUpdated) {
+          return bUpdated - aUpdated; // Most recent first
+        }
+        const aCreated = new Date(a.created_at).getTime();
+        const bCreated = new Date(b.created_at).getTime();
+        return bCreated - aCreated; // Most recent first
+      });
+      
       setTrackingNumbers(trackingData);
       console.log('📦 Final tracking numbers:', trackingData.length);
+      console.log('📦 Status breakdown:', {
+        accepted: trackingData.filter(t => t.status === 'accepted').length,
+        in_transit: trackingData.filter(t => t.status === 'in_transit').length,
+        picked_up: trackingData.filter(t => t.status === 'picked_up').length,
+        delivered: trackingData.filter(t => t.status === 'delivered').length,
+        pending: trackingData.filter(t => t.status === 'pending').length
+      });
       
     } catch (error) {
       console.error('📦 Error fetching tracking numbers:', error);
