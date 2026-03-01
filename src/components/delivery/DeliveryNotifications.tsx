@@ -633,7 +633,8 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                 {formatTime(notification.timestamp)}
               </p>
             </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
