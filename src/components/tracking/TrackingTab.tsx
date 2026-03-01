@@ -43,6 +43,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
 
 interface TrackingNumber {
   id: string;
@@ -126,6 +127,124 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
       return () => clearTimeout(retryTimeout);
     }
   }, [propUserId, userRole]);
+
+  // Real-time subscription for tracking number updates
+  useEffect(() => {
+    if (!userId) return;
+
+    console.log('📦 Setting up real-time subscription for tracking_numbers...');
+    
+    // Get profile ID for filtering
+    let profileId = userId;
+    const setupSubscription = async () => {
+      if (userRole === 'professional_builder' || userRole === 'private_client') {
+        try {
+          const profileResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${userId}&select=id`,
+            {
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${getAccessToken() || SUPABASE_ANON_KEY}`,
+              }
+            }
+          );
+          if (profileResponse.ok) {
+            const profiles = await profileResponse.json();
+            if (profiles && profiles.length > 0) {
+              profileId = profiles[0].id;
+            }
+          }
+        } catch (e) {
+          console.log('📦 Could not fetch profile for subscription');
+        }
+      }
+
+      // Subscribe to INSERT and UPDATE events on tracking_numbers table
+      // Note: Supabase realtime doesn't support OR filters, so we'll filter in the callback
+      // For builders, subscribe to all updates and filter by builder_id in callback
+      const channel = supabase
+        .channel(`tracking-numbers-${userId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'tracking_numbers',
+            // For admin, no filter. For others, we'll filter in callback
+            filter: userRole === 'admin' ? undefined : undefined
+          },
+          (payload) => {
+            console.log('🔴 Real-time tracking update:', payload.eventType, payload.new);
+            
+            // For builders, check if this tracking number belongs to them
+            const trackingBuilderId = payload.new.builder_id;
+            const belongsToUser = userRole === 'admin' || 
+              trackingBuilderId === userId || 
+              trackingBuilderId === profileId ||
+              (userRole === 'supplier' && payload.new.supplier_id === userId);
+
+            if (!belongsToUser && userRole !== 'admin') {
+              console.log('📦 Tracking number does not belong to this user, ignoring update');
+              return;
+            }
+
+            if (payload.eventType === 'INSERT') {
+              // New tracking number created - refresh the list
+              console.log('📦 New tracking number created, refreshing list...');
+              fetchTrackingNumbers();
+              toast({
+                title: "📦 New Tracking Number",
+                description: `Tracking number ${payload.new.tracking_number} has been generated for your delivery!`,
+              });
+            } else if (payload.eventType === 'UPDATE') {
+              // Tracking number updated - update the specific item
+              setTrackingNumbers(prev => {
+                const index = prev.findIndex(tn => tn.id === payload.new.id);
+                if (index >= 0) {
+                  const updated = [...prev];
+                  updated[index] = { ...updated[index], ...payload.new };
+                  return updated;
+                }
+                // If not found, might be a new one - refresh to be safe
+                fetchTrackingNumbers();
+                return prev;
+              });
+              
+              // Show toast for status changes
+              if (payload.old?.status !== payload.new.status) {
+                const statusLabels: Record<string, string> = {
+                  'pending': 'Pending',
+                  'accepted': 'Accepted',
+                  'picked_up': 'Picked Up',
+                  'in_transit': 'In Transit',
+                  'near_destination': 'Near Destination',
+                  'delivered': 'Delivered',
+                  'cancelled': 'Cancelled'
+                };
+                toast({
+                  title: "📍 Status Updated",
+                  description: `Tracking ${payload.new.tracking_number}: ${statusLabels[payload.old?.status] || payload.old?.status} → ${statusLabels[payload.new.status] || payload.new.status}`,
+                });
+              }
+            }
+          }
+        )
+        .subscribe((status) => {
+          console.log('📦 Real-time subscription status:', status);
+        });
+
+      return () => {
+        console.log('📦 Cleaning up real-time subscription');
+        channel.unsubscribe();
+      };
+    };
+
+    const cleanup = setupSubscription();
+    
+    return () => {
+      cleanup.then(cleanupFn => cleanupFn && cleanupFn());
+    };
+  }, [userId, userRole, propUserId]);
 
   const getAccessToken = () => {
     try {
