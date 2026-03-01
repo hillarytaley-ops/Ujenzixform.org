@@ -536,27 +536,38 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
   useEffect(() => {
     loadNotifications();
     
+    // Debounce real-time updates to prevent rapid reloads
+    let reloadTimeout: NodeJS.Timeout;
+    const debouncedReload = () => {
+      clearTimeout(reloadTimeout);
+      reloadTimeout = setTimeout(() => {
+        console.log('🔄 Real-time update: Reloading notifications...');
+        loadNotifications();
+      }, 500); // Wait 500ms before reloading
+    };
+    
     const subscription = supabase
       .channel('delivery-notifications-realtime')
       .on('postgres_changes', 
         { event: 'INSERT', schema: 'public', table: 'delivery_requests' },
-        () => loadNotifications()
+        debouncedReload
       )
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'delivery_requests' },
-        () => loadNotifications()
+        debouncedReload
       )
       .on('postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'purchase_orders' },
-        () => loadNotifications()
+        debouncedReload
       )
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'purchase_orders' },
-        () => loadNotifications()
+        debouncedReload
       )
       .subscribe();
     
     return () => {
+      clearTimeout(reloadTimeout);
       subscription.unsubscribe();
     };
   }, [loadNotifications]);

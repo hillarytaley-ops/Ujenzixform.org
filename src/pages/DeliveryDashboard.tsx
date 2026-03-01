@@ -400,19 +400,34 @@ const DeliveryDashboard = () => {
         'Authorization': `Bearer ${accessToken}`
       };
 
-      // Count only PENDING delivery requests
+      // Count only UNIQUE PENDING delivery requests (deduplicate by purchase_order_id)
       const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/delivery_requests?select=id,status&status=eq.pending`,
+        `${SUPABASE_URL}/rest/v1/delivery_requests?select=id,status,purchase_order_id&status=eq.pending`,
         { headers, cache: 'no-store' }
       );
       
       if (response.ok) {
         const data = await response.json();
-        const pendingCount = data?.length || 0;
+        
+        // Deduplicate by purchase_order_id - count only unique purchase orders
+        const uniquePOIds = new Set<string>();
+        const nullPORequests = new Set<string>(); // Track NULL purchase_order_id requests by id
+        
+        data.forEach((dr: any) => {
+          if (dr.purchase_order_id) {
+            uniquePOIds.add(dr.purchase_order_id);
+          } else {
+            // For NULL purchase_order_id, count each unique request
+            nullPORequests.add(dr.id);
+          }
+        });
+        
+        const pendingCount = uniquePOIds.size + nullPORequests.size;
+        
+        console.log(`🔔 Notification counts: ${data.length} total → ${pendingCount} unique (${uniquePOIds.size} with PO, ${nullPORequests.size} without PO)`);
         
         setNotificationCount(pendingCount);
         setPendingNotificationCount(pendingCount);
-        console.log('🔔 Notification counts loaded:', { pending: pendingCount });
       }
     } catch (error) {
       console.error('Error loading notification counts:', error);
