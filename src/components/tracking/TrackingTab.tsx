@@ -436,6 +436,28 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
             }
           }
         )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'delivery_requests',
+            // Filter in callback for builders
+            filter: userRole === 'admin' ? undefined : undefined
+          },
+          (payload) => {
+            console.log('🚚 Delivery request status updated:', payload.new.status, 'for delivery_request_id:', payload.new.id);
+            
+            // Check if status changed - trigger will update tracking_numbers
+            if (payload.old?.status !== payload.new.status) {
+              console.log('📦 Delivery request status changed from', payload.old?.status, 'to', payload.new.status, '- refreshing tracking numbers...');
+              // Small delay to allow trigger to complete
+              setTimeout(() => {
+                fetchTrackingNumbers();
+              }, 500);
+            }
+          }
+        )
         .subscribe((status) => {
           console.log('📦 Real-time subscription status:', status);
         });
