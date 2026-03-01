@@ -207,6 +207,127 @@ class TrackingNumberService {
 
       console.log(`✅ Provider ${providerId} successfully accepted delivery ${deliveryRequestId} (First-come-first-served)`);
 
+      // Explicitly create/update tracking_numbers entry (backup to database trigger)
+      // This ensures the entry exists even if the trigger fails
+      try {
+        const { data: existingTracking } = await supabase
+          .from('tracking_numbers')
+          .select('id')
+          .eq('delivery_request_id', deliveryRequestId)
+          .maybeSingle();
+
+        if (!existingTracking) {
+          // Get builder's user_id (builder_id might be profile.id)
+          let builderUserId = existingRequest.builder_id;
+          try {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('user_id')
+              .eq('id', existingRequest.builder_id)
+              .maybeSingle();
+            if (profile?.user_id) {
+              builderUserId = profile.user_id;
+            }
+          } catch (e) {
+            // builder_id might already be user_id, use it as-is
+          }
+
+          // Get supplier_id from purchase_order if exists
+          let supplierId = null;
+          if (existingRequest.purchase_order_id) {
+            try {
+              const { data: po } = await supabase
+                .from('purchase_orders')
+                .select('supplier_id')
+                .eq('id', existingRequest.purchase_order_id)
+                .maybeSingle();
+              supplierId = po?.supplier_id || null;
+            } catch (e) {
+              // Ignore errors
+            }
+          }
+
+          // Get provider info
+          let providerName = 'Delivery Provider';
+          let providerPhone = null;
+          try {
+            const { data: provider } = await supabase
+              .from('delivery_providers')
+              .select('provider_name, phone, company_name')
+              .eq('id', providerId)
+              .maybeSingle();
+            if (provider) {
+              providerName = provider.company_name || provider.provider_name || 'Delivery Provider';
+              providerPhone = provider.phone;
+            }
+          } catch (e) {
+            // Try profiles table
+            try {
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('full_name, phone')
+                .or(`user_id.eq.${providerId},id.eq.${providerId}`)
+                .maybeSingle();
+              if (profile) {
+                providerName = profile.full_name || 'Delivery Provider';
+                providerPhone = profile.phone;
+              }
+            } catch (e2) {
+              // Use defaults
+            }
+          }
+
+          // Insert tracking number entry
+          const { error: trackingError } = await supabase
+            .from('tracking_numbers')
+            .insert({
+              tracking_number: trackingNumber,
+              delivery_request_id: deliveryRequestId,
+              purchase_order_id: existingRequest.purchase_order_id || null,
+              builder_id: builderUserId,
+              delivery_provider_id: providerId,
+              supplier_id: supplierId,
+              status: 'accepted',
+              delivery_address: existingRequest.delivery_address || 'Address not specified',
+              pickup_address: existingRequest.pickup_address || null,
+              materials_description: existingRequest.material_type || 'Materials',
+              estimated_delivery_date: existingRequest.delivery_date || existingRequest.expected_delivery_date || existingRequest.pickup_date || null,
+              provider_name: providerName,
+              provider_phone: providerPhone,
+              accepted_at: new Date().toISOString()
+            });
+
+          if (trackingError) {
+            console.error('⚠️ Error creating tracking_numbers entry (trigger should handle it):', trackingError);
+            // Don't throw - trigger might have already created it
+          } else {
+            console.log('✅ Explicitly created tracking_numbers entry:', trackingNumber);
+          }
+        } else {
+          // Update existing entry
+          const { error: updateError } = await supabase
+            .from('tracking_numbers')
+            .update({
+              delivery_provider_id: providerId,
+              status: 'accepted',
+              provider_name: providerName,
+              provider_phone: providerPhone,
+              accepted_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
+            .eq('delivery_request_id', deliveryRequestId);
+
+          if (updateError) {
+            console.error('⚠️ Error updating tracking_numbers entry:', updateError);
+          } else {
+            console.log('✅ Updated existing tracking_numbers entry:', trackingNumber);
+          }
+        }
+      } catch (error) {
+        console.error('⚠️ Error ensuring tracking_numbers entry exists:', error);
+        // Don't throw - continue with notification
+      }
+
       // Fetch builder info and provider info for notification
       const [builderResult, providerResult] = await Promise.all([
         supabase
