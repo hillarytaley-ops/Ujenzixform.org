@@ -353,7 +353,7 @@ export const DispatchScanner: React.FC = () => {
       // This is where delivery confirmation actually happens
       console.log('📦 Fetching delivery_requests with accepted status...');
       const deliveryRequestsResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.(accepted,assigned)&select=id,purchase_order_id,status,provider_id,accepted_at,supplier_id&order=created_at.desc&limit=1000`,
+        `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.(accepted,assigned)&select=id,purchase_order_id,status,provider_id,accepted_at&order=created_at.desc&limit=1000`,
         { headers, signal: controller.signal, cache: 'no-store' }
       );
       
@@ -367,30 +367,16 @@ export const DispatchScanner: React.FC = () => {
         console.error('⚠️ Failed to fetch delivery requests:', deliveryRequestsResponse.status, errorText);
       }
       
-      // Get userId for filtering
-      let userId: string | null = null;
-      try {
-        const stored = getUserFromStorage();
-        userId = stored?.id || null;
-      } catch {
-        // Ignore
-      }
+      // Get all purchase_order_ids from delivery_requests
+      // We'll filter by supplier_id when we fetch the purchase_orders themselves
+      const allDeliveryRequestPOIds = Array.from(
+        new Set(deliveryRequestsData.map((dr: any) => dr.purchase_order_id).filter(Boolean))
+      );
       
-      // Filter delivery_requests by supplier_id to get only this supplier's orders
-      // Try multiple supplier_id variations since the lookup might have timing issues
-      const supplierDeliveryRequests = deliveryRequestsData.filter((dr: any) => {
-        if (!dr.supplier_id) return false;
-        // Check if supplier_id matches (could be user_id or actual supplier_id)
-        return dr.supplier_id === supplierId || 
-               (userId && dr.supplier_id === userId);
-      });
+      console.log('📦 Total purchase_order_ids from delivery_requests:', allDeliveryRequestPOIds.length);
       
-      // If no matches, use all delivery_requests (they might be linked differently)
-      const finalDeliveryRequests = supplierDeliveryRequests.length > 0 
-        ? supplierDeliveryRequests 
-        : deliveryRequestsData;
-      
-      console.log('📦 Delivery requests for this supplier:', finalDeliveryRequests.length, 'out of', deliveryRequestsData.length);
+      // Use all delivery_requests - we'll filter by supplier when fetching purchase_orders
+      const finalDeliveryRequests = deliveryRequestsData;
       
       // Get unique purchase_order_ids from delivery_requests
       const confirmedDeliveryOrderIds = Array.from(
