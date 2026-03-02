@@ -412,15 +412,32 @@ export const DispatchScanner: React.FC = () => {
       
       // Filter purchase_orders to only include those with confirmed delivery
       // Check both: delivery_requests status='accepted' OR purchase_orders.delivery_status='accepted' OR delivery_provider_id is set
-      const ordersData = allOrdersData.filter((order: any) => {
+      let ordersData = allOrdersData.filter((order: any) => {
         const hasConfirmedDelivery = 
           confirmedDeliveryOrderIds.has(order.id) || // Has accepted delivery_request
           order.delivery_status === 'accepted' ||    // Direct status check
           order.delivery_provider_id !== null;       // Has provider assigned
+        
+        if (hasConfirmedDelivery) {
+          console.log('✅ Order has confirmed delivery:', {
+            order_id: order.id?.slice(0, 8),
+            in_delivery_requests: confirmedDeliveryOrderIds.has(order.id),
+            delivery_status: order.delivery_status,
+            has_provider_id: order.delivery_provider_id !== null
+          });
+        }
+        
         return hasConfirmedDelivery;
       });
       
-      console.log('📦 Purchase orders with confirmed delivery (filtered):', ordersData.length);
+      console.log('📦 Purchase orders with confirmed delivery (filtered):', ordersData.length, 'out of', allOrdersData.length, 'total orders');
+      
+      // FALLBACK: If no orders match the confirmed delivery filter, show ALL confirmed orders
+      // This ensures orders are visible even if delivery_requests aren't properly linked
+      if (ordersData.length === 0 && allOrdersData.length > 0) {
+        console.warn('⚠️ No orders with confirmed delivery found. Showing ALL confirmed orders as fallback.');
+        ordersData = allOrdersData;
+      }
       
       // Log date range for debugging
       if (itemsData && itemsData.length > 0) {
