@@ -93,46 +93,55 @@ class TrackingNumberService {
         console.warn('Could not get session, using anon key');
       }
       
-      // Use direct fetch with timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      // Use direct fetch with timeout - wrap in Promise.race for extra safety
+      console.log('🌐 Starting fetch request for delivery request...');
+      const fetchPromise = fetch(
+        `${SUPABASE_URL}/rest/v1/delivery_requests?id=eq.${deliveryRequestId}&select=id,pickup_date,preferred_date,status,provider_id`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          },
+          cache: 'no-store'
+        }
+      );
+      
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          console.error('⏱️ Step 1 fetch timeout after 5 seconds');
+          reject(new Error('Query timeout after 5 seconds'));
+        }, 5000);
+      });
       
       let requestToAccept: any;
       let requestError: any;
       
       try {
-        const response = await fetch(
-          `${SUPABASE_URL}/rest/v1/delivery_requests?id=eq.${deliveryRequestId}&select=id,pickup_date,preferred_date,status,provider_id`,
-          {
-            headers: {
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${accessToken}`,
-              'Content-Type': 'application/json',
-              'Prefer': 'return=representation'
-            },
-            signal: controller.signal,
-            cache: 'no-store'
-          }
-        );
-        
-        clearTimeout(timeoutId);
+        console.log('⏳ Waiting for fetch response...');
+        const response = await Promise.race([fetchPromise, timeoutPromise]);
+        console.log('✅ Fetch response received:', response.status);
         
         if (!response.ok) {
           const errorText = await response.text();
           requestError = { message: `HTTP ${response.status}: ${errorText}`, code: response.status.toString() };
+          console.error('❌ Fetch response not OK:', response.status, errorText);
         } else {
           const data = await response.json();
+          console.log('✅ Fetch data received:', data);
           requestToAccept = Array.isArray(data) && data.length > 0 ? data[0] : null;
           if (!requestToAccept) {
             requestError = { message: 'Delivery request not found', code: '404' };
+            console.error('❌ No delivery request found in response');
           }
         }
       } catch (error: any) {
-        clearTimeout(timeoutId);
-        if (error.name === 'AbortError') {
+        console.error('❌ Fetch error caught:', error);
+        if (error.message?.includes('timeout')) {
           requestError = { message: 'Query timeout after 5 seconds', code: 'TIMEOUT' };
         } else {
-          requestError = error;
+          requestError = { message: error.message || 'Network error', code: error.name || 'NETWORK_ERROR' };
         }
       }
 
