@@ -76,18 +76,72 @@ class TrackingNumberService {
     
     try {
       // First, get the delivery request to check its expected delivery date
+      // Use direct REST API call with timeout to avoid Supabase client hanging
       console.log('📦 Step 1: Fetching delivery request...');
-      const { data: requestToAccept, error: requestError } = await supabase
-        .from('delivery_requests')
-        .select('id, pickup_date, preferred_date, status, provider_id')
-        .eq('id', deliveryRequestId)
-        .single();
+      
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      
+      // Get access token
+      let accessToken = SUPABASE_ANON_KEY;
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          accessToken = session.access_token;
+        }
+      } catch (e) {
+        console.warn('Could not get session, using anon key');
+      }
+      
+      // Use direct fetch with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
+      let requestToAccept: any;
+      let requestError: any;
+      
+      try {
+        const response = await fetch(
+          `${SUPABASE_URL}/rest/v1/delivery_requests?id=eq.${deliveryRequestId}&select=id,pickup_date,preferred_date,status,provider_id`,
+          {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation'
+            },
+            signal: controller.signal,
+            cache: 'no-store'
+          }
+        );
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          requestError = { message: `HTTP ${response.status}: ${errorText}`, code: response.status.toString() };
+        } else {
+          const data = await response.json();
+          requestToAccept = Array.isArray(data) && data.length > 0 ? data[0] : null;
+          if (!requestToAccept) {
+            requestError = { message: 'Delivery request not found', code: '404' };
+          }
+        }
+      } catch (error: any) {
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+          requestError = { message: 'Query timeout after 5 seconds', code: 'TIMEOUT' };
+        } else {
+          requestError = error;
+        }
+      }
 
       if (requestError) {
         console.error('❌ Error fetching delivery request:', requestError);
-        throw requestError;
+        throw new Error(requestError.message || 'Failed to fetch delivery request');
       }
-      console.log('✅ Step 1 complete: Delivery request fetched');
+      
+      console.log('✅ Step 1 complete: Delivery request fetched', { id: requestToAccept.id, status: requestToAccept.status });
 
       // Determine the delivery date for the request being accepted
       // Priority: preferred_date > pickup_date > today
