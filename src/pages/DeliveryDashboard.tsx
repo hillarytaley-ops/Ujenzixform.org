@@ -99,7 +99,7 @@ interface DeliveryHistory {
 }
 
 const DeliveryDashboard = () => {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const { t } = useLanguage();
   const { toast } = useToast();
   
@@ -751,6 +751,17 @@ const DeliveryDashboard = () => {
               >
                 <LogOut className="h-4 w-4 mr-2" />
                 Exit Dashboard
+              </Button>
+              <Button 
+                variant="outline" 
+                className="bg-red-500/20 border-red-300/50 text-white hover:bg-red-500/30"
+                onClick={async () => {
+                  await signOut();
+                  window.location.href = '/auth';
+                }}
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
               </Button>
             </div>
           </div>

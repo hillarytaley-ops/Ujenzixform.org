@@ -70,7 +70,7 @@ import { MapLocationPicker } from "@/components/location/MapLocationPicker";
 
 const ProfessionalBuilderDashboardPage = () => {
   // Use AuthContext for reliable user data
-  const { user: authUser, isAuthenticated } = useAuth();
+  const { user: authUser, isAuthenticated, signOut } = useAuth();
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -1361,6 +1361,25 @@ const ProfessionalBuilderDashboardPage = () => {
               >
                 <User className="h-4 w-4 mr-2" />
                 Profile
+              </Button>
+              <Button 
+                variant="outline"
+                className="bg-white/90 text-blue-700 hover:bg-white border-white/30"
+                onClick={handleExitDashboard}
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Exit Dashboard
+              </Button>
+              <Button 
+                variant="outline"
+                className="bg-red-500/20 text-white hover:bg-red-500/30 border-red-300/50"
+                onClick={async () => {
+                  await signOut();
+                  navigate('/auth');
+                }}
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
               </Button>
             </div>
           </div>

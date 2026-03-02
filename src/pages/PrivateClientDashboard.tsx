@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import Footer from "@/components/Footer";
 import { 
@@ -81,6 +82,7 @@ interface DeliveryRequest {
 }
 
 const PrivateClientDashboard = () => {
+  const { signOut } = useAuth();
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -643,6 +645,25 @@ const PrivateClientDashboard = () => {
                   Monitoring
                 </Button>
               </Link>
+              <Button 
+                variant="outline"
+                className="bg-white/90 text-green-700 hover:bg-white border-white/30"
+                onClick={handleExitDashboard}
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Exit Dashboard
+              </Button>
+              <Button 
+                variant="outline"
+                className="bg-red-500/20 text-white hover:bg-red-500/30 border-red-300/50"
+                onClick={async () => {
+                  await signOut();
+                  navigate('/auth');
+                }}
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </Button>
               <Button 
                 className="bg-white/90 text-green-700 hover:bg-white"
                 onClick={() => setShowProfileView(true)}

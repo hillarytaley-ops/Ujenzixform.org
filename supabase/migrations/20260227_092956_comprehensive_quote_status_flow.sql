@@ -891,9 +891,15 @@ CREATE INDEX IF NOT EXISTS idx_purchase_orders_provider_unavailable_at ON purcha
 -- These columns only exist in purchase_orders, not delivery_requests
 -- ============================================================
 
--- Drop ALL triggers that might be trying to set delivery_provider_name or delivery_provider_phone on delivery_requests
+-- Drop ALL triggers on delivery_requests that might reference delivery_provider columns
 DROP TRIGGER IF EXISTS trigger_update_order_in_transit ON delivery_requests;
 DROP TRIGGER IF EXISTS trigger_update_order_on_provider_accept ON delivery_requests;
+DROP TRIGGER IF EXISTS trigger_create_tracking_on_delivery_accept ON delivery_requests;
+DROP TRIGGER IF EXISTS trigger_create_tracking_on_accept ON delivery_requests;
+DROP TRIGGER IF EXISTS trigger_create_tracking_on_insert ON delivery_requests;
+
+-- Also drop the function that might be causing issues and recreate it cleanly
+DROP FUNCTION IF EXISTS public.update_order_in_transit() CASCADE;
 
 -- Recreate update_order_in_transit function to ensure it doesn't try to set NEW columns
 -- This function should ONLY update purchase_orders, never delivery_requests

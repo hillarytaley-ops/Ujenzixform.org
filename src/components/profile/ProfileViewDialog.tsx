@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
+import { useAuth } from '@/contexts/AuthContext';
 import { 
   User, 
   Mail, 
@@ -40,6 +41,7 @@ export const ProfileViewDialog: React.FC<ProfileViewDialogProps> = ({
   onEditProfile,
   onExitDashboard
 }) => {
+  const { signOut } = useAuth();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -331,6 +333,18 @@ export const ProfileViewDialog: React.FC<ProfileViewDialogProps> = ({
               >
                 <LogOut className="h-4 w-4 mr-2" />
                 Exit Dashboard
+              </Button>
+              <Button 
+                variant="outline" 
+                className="flex-1 border-red-300 text-red-600 hover:bg-red-50"
+                onClick={async () => {
+                  onClose();
+                  await signOut();
+                  window.location.href = '/auth';
+                }}
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
               </Button>
             </div>
           </div>

@@ -577,7 +577,7 @@ const SupplierReportsTab: React.FC<SupplierReportsTabProps> = ({
 };
 
 const SupplierDashboard = () => {
-  const { user, userRole } = useAuth();
+  const { user, userRole, signOut } = useAuth();
   const { t } = useLanguage();
   
   // NOTE: Role check is already done by RoleProtectedRoute in App.tsx
@@ -1686,6 +1686,17 @@ const SupplierDashboard = () => {
               >
                 <LogOut className="h-4 w-4 mr-2" />
                 Exit Dashboard
+              </Button>
+              <Button 
+                variant="outline" 
+                className="bg-red-500/20 border-red-300/50 text-white hover:bg-red-500/30"
+                onClick={async () => {
+                  await signOut();
+                  window.location.href = '/auth';
+                }}
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
               </Button>
             </div>
           </div>
