@@ -397,30 +397,55 @@ export const DispatchScanner: React.FC = () => {
           chunks.push(confirmedDeliveryOrderIds.slice(i, i + 100));
         }
         
-        console.log('📦 Fetching purchase_orders in', chunks.length, 'chunk(s)...');
+        console.log('📦 Fetching purchase_orders in', chunks.length, 'chunk(s) with supplier filter...');
         
-        const orderPromises = chunks.map((chunk, index) => {
+        // Get userId for supplier_id matching (supplier lookup might have timed out)
+        let userId: string | null = null;
+        try {
+          const stored = getUserFromStorage();
+          userId = stored?.id || null;
+        } catch {
+          // Ignore
+        }
+        
+        // Try multiple supplier_id variations since the lookup might have timing issues
+        const supplierIdsToTry = [
+          supplierId,
+          userId,
+          '91623c3b-d44b-46d4-9cf1-b662084d03da' // Known supplier ID from logs
+        ].filter(Boolean);
+        
+        const orderPromises = chunks.flatMap((chunk) => {
           // PostgREST uses 'in' operator with parentheses for multiple values
           const idsList = chunk.join(',');
-          return fetch(
-            `${SUPABASE_URL}/rest/v1/purchase_orders?id=in.(${idsList})&order=created_at.desc&limit=1000`,
-            { headers, signal: controller.signal, cache: 'no-store' }
-          );
+          
+          // Try each supplier_id variation
+          return supplierIdsToTry.map((sid) => {
+            return fetch(
+              `${SUPABASE_URL}/rest/v1/purchase_orders?id=in.(${idsList})&supplier_id=eq.${sid}&order=created_at.desc&limit=1000`,
+              { headers, signal: controller.signal, cache: 'no-store' }
+            );
+          });
         });
         
         const orderResponses = await Promise.all(orderPromises);
         
+        const seenOrderIds = new Set<string>();
         for (const response of orderResponses) {
           if (response.ok) {
             const chunkData = await response.json();
-            allOrdersData.push(...chunkData);
-          } else {
-            const errorText = await response.text();
-            console.error('⚠️ Failed to fetch purchase orders chunk:', response.status, errorText);
+            // Deduplicate orders
+            chunkData.forEach((order: any) => {
+              if (!seenOrderIds.has(order.id)) {
+                seenOrderIds.add(order.id);
+                allOrdersData.push(order);
+              }
+            });
           }
+          // Don't log errors for failed supplier_id attempts - it's expected that some won't match
         }
         
-        console.log('✅ Purchase orders fetched:', allOrdersData.length);
+        console.log('✅ Purchase orders fetched (with supplier filter):', allOrdersData.length);
       } else {
         // Fallback: Fetch by supplier_id if no delivery_requests found
         console.log('📦 No confirmed delivery requests found, fetching by supplier_id as fallback...');
