@@ -67,6 +67,7 @@ interface TrackingNumber {
   vehicle_type: string | null;
   vehicle_registration: string | null;
   created_at: string;
+  updated_at?: string | null; // Added for proper sorting
   accepted_at: string | null;
   picked_up_at: string | null;
   delivered_at: string | null;
@@ -393,6 +394,18 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
     
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [userId, fetchTrackingNumbers]);
+
+  // Periodic refresh to catch new tracking numbers and status updates (every 30 seconds)
+  useEffect(() => {
+    if (!userId) return;
+    
+    const intervalId = setInterval(() => {
+      console.log('🔄 Periodic refresh: fetching latest tracking numbers...');
+      fetchTrackingNumbers();
+    }, 30000); // Refresh every 30 seconds
+    
+    return () => clearInterval(intervalId);
   }, [userId, fetchTrackingNumbers]);
 
   // Real-time subscription for tracking number updates
