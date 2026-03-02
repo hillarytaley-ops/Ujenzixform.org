@@ -896,6 +896,182 @@ class TrackingNumberService {
   }
 }
 
+  /**
+   * Generate missing tracking numbers for accepted delivery requests
+   * This is a utility function to fix tracking numbers that weren't created
+   * when deliveries were accepted (e.g., due to errors or timing issues)
+   */
+  async generateMissingTrackingNumbers(builderId?: string): Promise<{ created: number; errors: number }> {
+    console.log('🔧 Generating missing tracking numbers...', builderId ? `for builder: ${builderId}` : 'for all builders');
+    
+    const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+    
+    // Get access token
+    let accessToken = SUPABASE_ANON_KEY;
+    try {
+      const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        if (parsed.access_token) {
+          accessToken = parsed.access_token;
+        }
+      }
+    } catch (e) {
+      // Use anon key
+    }
+    
+    try {
+      // Fetch all accepted delivery requests
+      let drUrl = `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.(accepted,assigned)&select=id,purchase_order_id,builder_id,provider_id,delivery_address,pickup_address,material_type,preferred_date,pickup_date,tracking_number&order=created_at.desc&limit=1000`;
+      if (builderId) {
+        drUrl += `&builder_id=eq.${builderId}`;
+      }
+      
+      const drResponse = await fetch(drUrl, {
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${accessToken}`,
+          'Cache-Control': 'no-cache'
+        }
+      });
+      
+      if (!drResponse.ok) {
+        throw new Error(`Failed to fetch delivery requests: ${drResponse.status}`);
+      }
+      
+      const deliveryRequests = await drResponse.json();
+      console.log(`📦 Found ${deliveryRequests.length} accepted delivery requests`);
+      
+      // Fetch existing tracking numbers
+      const tnResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/tracking_numbers?select=delivery_request_id&limit=1000`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+            'Cache-Control': 'no-cache'
+          }
+        }
+      );
+      
+      const existingTracking = tnResponse.ok ? await tnResponse.json() : [];
+      const existingDrIds = new Set(existingTracking.map((tn: any) => tn.delivery_request_id));
+      
+      // Find delivery requests without tracking numbers
+      const missingTracking = deliveryRequests.filter((dr: any) => !existingDrIds.has(dr.id));
+      console.log(`⚠️ Found ${missingTracking.length} delivery requests without tracking numbers`);
+      
+      if (missingTracking.length === 0) {
+        return { created: 0, errors: 0 };
+      }
+      
+      // Generate tracking numbers for missing ones
+      let created = 0;
+      let errors = 0;
+      
+      for (const dr of missingTracking) {
+        try {
+          // Generate tracking number
+          const trackingNumber = dr.tracking_number || this.generateTrackingNumber();
+          
+          // Resolve builder_id (might be profile.id, need user_id)
+          let builderUserId = dr.builder_id;
+          try {
+            const profileResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/profiles?or=(id.eq.${dr.builder_id},user_id.eq.${dr.builder_id})&select=user_id,id&limit=1`,
+              {
+                headers: {
+                  'apikey': SUPABASE_ANON_KEY,
+                  'Authorization': `Bearer ${accessToken}`
+                }
+              }
+            );
+            if (profileResponse.ok) {
+              const profiles = await profileResponse.json();
+              if (profiles && profiles.length > 0 && profiles[0].user_id) {
+                builderUserId = profiles[0].user_id;
+              }
+            }
+          } catch (e) {
+            // Use builder_id as-is
+          }
+          
+          // Get supplier_id from purchase_order if exists
+          let supplierId = null;
+          if (dr.purchase_order_id) {
+            try {
+              const poResponse = await fetch(
+                `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${dr.purchase_order_id}&select=supplier_id&limit=1`,
+                {
+                  headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${accessToken}`
+                  }
+                }
+              );
+              if (poResponse.ok) {
+                const pos = await poResponse.json();
+                if (pos && pos.length > 0) {
+                  supplierId = pos[0].supplier_id;
+                }
+              }
+            } catch (e) {
+              // Ignore
+            }
+          }
+          
+          // Create tracking number entry
+          const insertResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/tracking_numbers`,
+            {
+              method: 'POST',
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=representation'
+              },
+              body: JSON.stringify({
+                tracking_number: trackingNumber,
+                delivery_request_id: dr.id,
+                purchase_order_id: dr.purchase_order_id || null,
+                builder_id: builderUserId,
+                delivery_provider_id: dr.provider_id || null,
+                supplier_id: supplierId,
+                status: 'accepted',
+                delivery_address: dr.delivery_address || 'Address not specified',
+                pickup_address: dr.pickup_address || null,
+                materials_description: dr.material_type || 'Materials',
+                estimated_delivery_date: dr.preferred_date || dr.pickup_date || null,
+                accepted_at: dr.accepted_at || new Date().toISOString()
+              })
+            }
+          );
+          
+          if (insertResponse.ok) {
+            created++;
+            console.log(`✅ Created tracking number ${trackingNumber} for delivery_request ${dr.id.slice(0, 8)}`);
+          } else {
+            errors++;
+            const errorText = await insertResponse.text();
+            console.error(`❌ Failed to create tracking number for ${dr.id.slice(0, 8)}:`, errorText);
+          }
+        } catch (error: any) {
+          errors++;
+          console.error(`❌ Error processing delivery_request ${dr.id?.slice(0, 8)}:`, error);
+        }
+      }
+      
+      console.log(`✅ Generated ${created} tracking numbers, ${errors} errors`);
+      return { created, errors };
+    } catch (error: any) {
+      console.error('❌ Error generating missing tracking numbers:', error);
+      throw error;
+    }
+  }
+}
+
 export const trackingNumberService = new TrackingNumberService();
 export default trackingNumberService;
 
