@@ -157,15 +157,48 @@ class TrackingNumberService {
       // CHECK: Does this provider already have an active delivery FOR THE SAME DATE?
       // Provider CAN accept future deliveries while having active deliveries for today
       console.log('📦 Step 2: Checking active deliveries...');
-      const { data: activeDeliveries, error: activeError } = await supabase
-        .from('delivery_requests')
-        .select('id, status, tracking_number, pickup_date, preferred_date')
-        .eq('provider_id', providerId)
-        .in('status', ['accepted', 'picked_up', 'in_transit', 'assigned'])
-        .neq('id', deliveryRequestId); // Exclude the current request
+      
+      // Use direct REST API with timeout
+      const controller2 = new AbortController();
+      const timeoutId2 = setTimeout(() => controller2.abort(), 5000);
+      
+      let activeDeliveries: any[] = [];
+      let activeError: any = null;
+      
+      try {
+        const response = await fetch(
+          `${SUPABASE_URL}/rest/v1/delivery_requests?provider_id=eq.${providerId}&id=neq.${deliveryRequestId}&status=in.(accepted,picked_up,in_transit,assigned)&select=id,status,tracking_number,pickup_date,preferred_date`,
+          {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            signal: controller2.signal,
+            cache: 'no-store'
+          }
+        );
+        
+        clearTimeout(timeoutId2);
+        
+        if (response.ok) {
+          activeDeliveries = await response.json();
+        } else {
+          activeError = { message: `HTTP ${response.status}`, code: response.status.toString() };
+        }
+      } catch (error: any) {
+        clearTimeout(timeoutId2);
+        if (error.name === 'AbortError') {
+          console.warn('⚠️ Step 2 timeout - continuing anyway');
+          activeDeliveries = []; // Continue without blocking
+        } else {
+          activeError = error;
+        }
+      }
 
       if (activeError) {
-        console.error('Error checking active deliveries:', activeError);
+        console.warn('⚠️ Error checking active deliveries (non-critical):', activeError);
+        // Don't throw - this is not critical, continue
       }
 
       // Check if any active delivery conflicts with the same date
@@ -190,16 +223,54 @@ class TrackingNumberService {
 
       // First, check if this delivery request is still available (FIRST-COME-FIRST-SERVED check)
       console.log('📦 Step 3: Fetching existing request for first-come-first-served check...');
-      const { data: existingRequest, error: fetchError } = await supabase
-        .from('delivery_requests')
-        .select('*, tracking_number, builder_id, status, provider_id')
-        .eq('id', deliveryRequestId)
-        .single();
+      
+      // Use direct REST API with timeout
+      const controller3 = new AbortController();
+      const timeoutId3 = setTimeout(() => controller3.abort(), 5000);
+      
+      let existingRequest: any;
+      let fetchError: any;
+      
+      try {
+        const response = await fetch(
+          `${SUPABASE_URL}/rest/v1/delivery_requests?id=eq.${deliveryRequestId}&select=*`,
+          {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            signal: controller3.signal,
+            cache: 'no-store'
+          }
+        );
+        
+        clearTimeout(timeoutId3);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          fetchError = { message: `HTTP ${response.status}: ${errorText}`, code: response.status.toString() };
+        } else {
+          const data = await response.json();
+          existingRequest = Array.isArray(data) && data.length > 0 ? data[0] : null;
+          if (!existingRequest) {
+            fetchError = { message: 'Delivery request not found', code: '404' };
+          }
+        }
+      } catch (error: any) {
+        clearTimeout(timeoutId3);
+        if (error.name === 'AbortError') {
+          fetchError = { message: 'Query timeout after 5 seconds', code: 'TIMEOUT' };
+        } else {
+          fetchError = error;
+        }
+      }
 
       if (fetchError) {
         console.error('❌ Error fetching delivery request:', fetchError);
-        throw fetchError;
+        throw new Error(fetchError.message || 'Failed to fetch delivery request');
       }
+      
       console.log('✅ Step 3 complete: Existing request fetched');
 
       // FIRST-COME-FIRST-SERVED: Check if another provider already accepted

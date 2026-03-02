@@ -597,15 +597,15 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
         description: error.message || 'Could not accept delivery',
         variant: 'destructive'
       });
-      // Clear accepting state immediately on error
+      // Clear accepting state IMMEDIATELY on error (don't wait)
       acceptingRef.current = null;
       setAcceptingId(null);
     } finally {
-      // Always clear after a short delay (independent of promise resolution)
+      // Always clear after a short delay as backup (independent of promise resolution)
       setTimeout(() => {
         acceptingRef.current = null;
         setAcceptingId(null);
-      }, 500); // Short delay to prevent rapid re-clicks
+      }, 1000); // 1 second delay as backup
     }
   };
 
