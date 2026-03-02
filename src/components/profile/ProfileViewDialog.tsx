@@ -337,10 +337,24 @@ export const ProfileViewDialog: React.FC<ProfileViewDialogProps> = ({
               <Button 
                 variant="outline" 
                 className="flex-1 border-red-300 text-red-600 hover:bg-red-50"
-                onClick={async () => {
+                onClick={() => {
+                  console.log('🚪 Logout: Starting sign out process...');
                   onClose();
-                  await signOut();
-                  window.location.href = '/auth';
+                  // Clear auth data immediately
+                  localStorage.removeItem('user_role');
+                  localStorage.removeItem('user_role_id');
+                  localStorage.removeItem('user_role_verified');
+                  localStorage.removeItem('user_security_key');
+                  localStorage.removeItem('user_email');
+                  localStorage.removeItem('user_name');
+                  localStorage.removeItem('user_id');
+                  localStorage.removeItem('supplier_id');
+                  localStorage.removeItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+                  sessionStorage.clear();
+                  // Redirect immediately - don't wait for Supabase signOut
+                  window.location.replace('/auth');
+                  // Sign out from Supabase in background (non-blocking)
+                  signOut().catch(() => {});
                 }}
               >
                 <LogOut className="h-4 w-4 mr-2" />

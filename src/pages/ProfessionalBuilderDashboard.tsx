@@ -1373,9 +1373,22 @@ const ProfessionalBuilderDashboardPage = () => {
               <Button 
                 variant="outline"
                 className="bg-red-500/20 text-white hover:bg-red-500/30 border-red-300/50"
-                onClick={async () => {
-                  await signOut();
-                  navigate('/auth');
+                onClick={() => {
+                  console.log('🚪 Logout: Starting sign out process...');
+                  // Clear auth data immediately
+                  localStorage.removeItem('user_role');
+                  localStorage.removeItem('user_role_id');
+                  localStorage.removeItem('user_role_verified');
+                  localStorage.removeItem('user_security_key');
+                  localStorage.removeItem('user_email');
+                  localStorage.removeItem('user_name');
+                  localStorage.removeItem('user_id');
+                  localStorage.removeItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+                  sessionStorage.clear();
+                  // Redirect immediately - don't wait for Supabase signOut
+                  window.location.replace('/auth');
+                  // Sign out from Supabase in background (non-blocking)
+                  signOut().catch(() => {});
                 }}
               >
                 <LogOut className="h-4 w-4 mr-2" />
