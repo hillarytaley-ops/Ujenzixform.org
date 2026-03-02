@@ -351,6 +351,9 @@ export const DispatchScanner: React.FC = () => {
       
       // FIRST: Fetch delivery_requests with accepted status to get purchase_order_ids
       // This is where delivery confirmation actually happens
+      // NOTE: No date filters - this query will fetch ALL orders with confirmed delivery,
+      // including future orders as they are created. Orders are sorted by created_at.desc
+      // so newest orders appear first.
       console.log('📦 Fetching delivery_requests with accepted status...');
       const deliveryRequestsResponse = await fetch(
         `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.(accepted,assigned)&select=id,purchase_order_id,status,provider_id,accepted_at&order=created_at.desc&limit=1000`,
