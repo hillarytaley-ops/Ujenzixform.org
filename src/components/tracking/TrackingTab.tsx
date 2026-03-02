@@ -239,12 +239,15 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
         
         // Log the first few tracking numbers to debug
         if (trackingData.length > 0) {
-          console.log('📦 First 3 tracking numbers:', trackingData.slice(0, 3).map(tn => ({
+          console.log('📦 First 5 tracking numbers (most recent):', trackingData.slice(0, 5).map(tn => ({
             tracking_number: tn.tracking_number,
             status: tn.status,
             created_at: tn.created_at,
-            updated_at: tn.updated_at
+            updated_at: tn.updated_at,
+            builder_id: tn.builder_id?.slice(0, 8)
           })));
+        } else {
+          console.warn('⚠️ No tracking numbers found! Check builder_id filter:', { userId, profileId });
         }
       } else {
         const errorText = await response.text();
@@ -311,6 +314,7 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
       }
       
       // Sort by updated_at desc, then created_at desc to ensure most recent are first
+      // This ensures all future orders will appear at the top
       trackingData.sort((a, b) => {
         const aUpdated = new Date(a.updated_at || a.created_at).getTime();
         const bUpdated = new Date(b.updated_at || b.created_at).getTime();
@@ -321,6 +325,19 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
         const bCreated = new Date(b.created_at).getTime();
         return bCreated - aCreated; // Most recent first
       });
+      
+      // Log date range for debugging
+      if (trackingData.length > 0) {
+        const dates = trackingData.map(tn => tn.updated_at || tn.created_at).filter(Boolean);
+        if (dates.length > 0) {
+          const sortedDates = dates.sort();
+          console.log('📅 Tracking numbers date range:', {
+            oldest: sortedDates[0],
+            newest: sortedDates[sortedDates.length - 1],
+            total: trackingData.length
+          });
+        }
+      }
       
       console.log('📦 Setting tracking numbers state with', trackingData.length, 'items');
       setTrackingNumbers(trackingData);
