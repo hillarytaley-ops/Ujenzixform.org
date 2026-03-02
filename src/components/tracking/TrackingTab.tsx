@@ -218,8 +218,35 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
         console.log('📦 Supplier mode: filtering by userId:', userId, 'and supplierId:', supplierId);
       } else {
         // Builders see their own tracking numbers - check both user_id and profile_id
+        // Also try without filter to see if there are any tracking numbers we're missing
         url += `&or=(builder_id.eq.${userId},builder_id.eq.${profileId})`;
         console.log('📦 Builder mode: filtering by userId:', userId, 'and profileId:', profileId);
+        
+        // DEBUG: Also fetch ALL tracking numbers to see what we might be missing
+        const allTrackingUrl = `${SUPABASE_URL}/rest/v1/tracking_numbers?order=created_at.desc&select=tracking_number,created_at,builder_id,status&limit=50`;
+        fetch(allTrackingUrl, {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+            'Cache-Control': 'no-cache',
+          }
+        }).then(async (debugResponse) => {
+          if (debugResponse.ok) {
+            const allTracking = await debugResponse.json();
+            console.log('🔍 DEBUG: All tracking numbers in database (last 50):', allTracking.length);
+            if (allTracking.length > 0) {
+              const recentOnes = allTracking.slice(0, 10);
+              console.log('🔍 DEBUG: Most recent 10 tracking numbers:', recentOnes.map((tn: any) => ({
+                tracking_number: tn.tracking_number,
+                created_at: tn.created_at,
+                builder_id: tn.builder_id?.slice(0, 8),
+                status: tn.status,
+                matches_user: tn.builder_id === userId,
+                matches_profile: tn.builder_id === profileId
+              })));
+            }
+          }
+        }).catch(() => {});
       }
 
       console.log('📦 Fetching tracking numbers from:', url);
