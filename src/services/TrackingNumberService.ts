@@ -338,7 +338,7 @@ class TrackingNumberService {
             provider_id: providerId,
             status: 'accepted',
             provider_response: 'accepted',
-            response_date: new Date().toISOString(),
+            accepted_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           }),
           cache: 'no-store'
