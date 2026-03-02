@@ -429,13 +429,16 @@ class TrackingNumberService {
           let providerName = 'Delivery Provider';
           let providerPhone = null;
 
+          console.log('📦 Step 5: Resolving builder_id - existingRequest.builder_id:', existingRequest.builder_id);
+
           // Run all lookups in parallel
           const [builderProfileResult, poResult, providerResult] = await Promise.allSettled([
             // Get builder's user_id (builder_id might be profile.id)
+            // Try both as id and as user_id
             supabase
               .from('profiles')
-              .select('user_id')
-              .eq('id', existingRequest.builder_id)
+              .select('id, user_id')
+              .or(`id.eq.${existingRequest.builder_id},user_id.eq.${existingRequest.builder_id}`)
               .maybeSingle(),
             // Get supplier_id from purchase_order if exists
             existingRequest.purchase_order_id
@@ -453,10 +456,34 @@ class TrackingNumberService {
               .maybeSingle()
           ]);
 
-          // Process builder profile result
-          if (builderProfileResult.status === 'fulfilled' && builderProfileResult.value.data?.user_id) {
-            builderUserId = builderProfileResult.value.data.user_id;
+          // Process builder profile result - CRITICAL: Use user_id, not profile.id
+          if (builderProfileResult.status === 'fulfilled' && builderProfileResult.value.data) {
+            const profileData = builderProfileResult.value.data;
+            // Prefer user_id if available, otherwise check if builder_id is already a user_id
+            if (profileData.user_id) {
+              builderUserId = profileData.user_id;
+              console.log('✅ Step 5: Got builder user_id from profile:', builderUserId);
+            } else if (profileData.id === existingRequest.builder_id) {
+              // Profile found but no user_id - builder_id might already be user_id
+              // Check if it looks like a UUID (user_id format)
+              if (existingRequest.builder_id && existingRequest.builder_id.length === 36) {
+                builderUserId = existingRequest.builder_id;
+                console.log('✅ Step 5: Using builder_id as user_id (UUID format):', builderUserId);
+              } else {
+                console.warn('⚠️ Step 5: Profile found but no user_id, and builder_id is not UUID format');
+              }
+            }
+          } else {
+            // No profile found - builder_id might already be user_id
+            if (existingRequest.builder_id && existingRequest.builder_id.length === 36) {
+              builderUserId = existingRequest.builder_id;
+              console.log('✅ Step 5: No profile found, using builder_id as user_id:', builderUserId);
+            } else {
+              console.warn('⚠️ Step 5: Could not resolve builder_id - using as-is:', existingRequest.builder_id);
+            }
           }
+          
+          console.log('📦 Step 5: Final builderUserId for tracking_numbers:', builderUserId);
 
           // Process purchase order result
           if (poResult.status === 'fulfilled' && poResult.value.data?.supplier_id) {
