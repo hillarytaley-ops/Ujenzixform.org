@@ -519,6 +519,8 @@ export const DispatchScanner: React.FC = () => {
       // Group items by purchase_order_id
       const orderMap: Record<string, Order> = {};
       
+      console.log('📦 Grouping items by purchase_order_id. Total items:', itemsData.length);
+      
       (itemsData || []).forEach((item: any) => {
         const orderId = item.purchase_order_id || 'unknown';
         
@@ -560,6 +562,9 @@ export const DispatchScanner: React.FC = () => {
           orderMap[orderId].pending_items++;
         }
       });
+      
+      console.log('📦 Orders grouped:', Object.keys(orderMap).length);
+      console.log('📦 Orders with pending items:', Object.values(orderMap).filter(o => o.pending_items > 0).length);
 
       // Convert to array and sort by pending items (orders with pending items first)
       const ordersArray = Object.values(orderMap)
