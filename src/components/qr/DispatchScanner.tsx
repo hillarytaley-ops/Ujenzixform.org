@@ -402,9 +402,18 @@ export const DispatchScanner: React.FC = () => {
       // Create a set of purchase_order_ids that have material_items
       const ordersWithItems = new Set(itemsData.map((item: any) => item.purchase_order_id).filter(Boolean));
       
-      // For purchase_orders that don't have material_items yet, create placeholder entries
-      const missingOrders = ordersData.filter((order: any) => !ordersWithItems.has(order.id));
-      console.log('📦 Purchase orders without material_items:', missingOrders.length);
+      // Filter orders to only include those with confirmed delivery (delivery_status='accepted' or delivery_provider_id set)
+      // This links Orders sub-tab to Dispatch sub-tab - only orders with confirmed delivery appear here
+      const confirmedDeliveryOrders = ordersData.filter((order: any) => {
+        const hasConfirmedDelivery = order.delivery_status === 'accepted' || order.delivery_provider_id !== null;
+        return hasConfirmedDelivery;
+      });
+      
+      console.log('📦 Purchase orders with confirmed delivery:', confirmedDeliveryOrders.length);
+      
+      // For purchase_orders with confirmed delivery that don't have material_items yet, create placeholder entries
+      const missingOrders = confirmedDeliveryOrders.filter((order: any) => !ordersWithItems.has(order.id));
+      console.log('📦 Confirmed delivery orders without material_items:', missingOrders.length);
       
       if (missingOrders.length > 0) {
         // Create placeholder material_items from purchase_orders
@@ -433,7 +442,7 @@ export const DispatchScanner: React.FC = () => {
             });
           }
         });
-        console.log('✅ Added placeholder items for orders without material_items');
+        console.log('✅ Added placeholder items for confirmed delivery orders without material_items');
       }
 
       // Group items by purchase_order_id
