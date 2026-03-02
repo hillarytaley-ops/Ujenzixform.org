@@ -338,25 +338,40 @@ export const DispatchScanner: React.FC = () => {
         'Content-Type': 'application/json'
       };
       
-      // Fetch material items with timeout - no limit to get all orders
+      // Fetch BOTH material_items AND purchase_orders to ensure we get all orders
+      // Some orders might not have material_items created yet
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      const timeoutId = setTimeout(() => controller.abort(), 20000);
       
-      // Fetch ALL material items for this supplier, ordered by most recent first
-      // Remove any implicit limits by explicitly requesting all records
-      const response = await fetch(
+      // Fetch material items for this supplier
+      const itemsResponse = await fetch(
         `${SUPABASE_URL}/rest/v1/material_items?supplier_id=eq.${supplierId}&order=created_at.desc&limit=1000`,
         { headers, signal: controller.signal, cache: 'no-store' }
       );
+      
+      // Also fetch purchase_orders for this supplier (confirmed or ready_for_dispatch)
+      const ordersResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=eq.${supplierId}&status=in.(confirmed,quote_accepted,ready_for_dispatch,order_created)&order=created_at.desc&limit=1000`,
+        { headers, signal: controller.signal, cache: 'no-store' }
+      );
+      
       clearTimeout(timeoutId);
       
-      if (!response.ok) {
-        console.error('❌ Failed to fetch material items:', response.status);
-        throw new Error(`HTTP ${response.status}`);
+      if (!itemsResponse.ok) {
+        console.error('❌ Failed to fetch material items:', itemsResponse.status);
+        throw new Error(`HTTP ${itemsResponse.status}`);
       }
       
-      const itemsData = await response.json();
+      if (!ordersResponse.ok) {
+        console.error('⚠️ Failed to fetch purchase orders:', ordersResponse.status);
+        // Don't throw - continue with material_items only
+      }
+      
+      const itemsData = await itemsResponse.json();
+      const ordersData = ordersResponse.ok ? await ordersResponse.json() : [];
+      
       console.log('✅ Material items fetched:', itemsData?.length || 0);
+      console.log('✅ Purchase orders fetched:', ordersData?.length || 0);
       
       // Log date range for debugging
       if (itemsData && itemsData.length > 0) {
@@ -369,6 +384,55 @@ export const DispatchScanner: React.FC = () => {
             total: itemsData.length
           });
         }
+      }
+      
+      if (ordersData && ordersData.length > 0) {
+        const orderDates = ordersData.map((order: any) => order.created_at).filter(Boolean);
+        if (orderDates.length > 0) {
+          const sortedOrderDates = orderDates.sort();
+          console.log('📅 Date range in purchase_orders:', {
+            oldest: sortedOrderDates[0],
+            newest: sortedOrderDates[sortedOrderDates.length - 1],
+            total: ordersData.length
+          });
+        }
+      }
+      
+      // Create a set of purchase_order_ids that have material_items
+      const ordersWithItems = new Set(itemsData.map((item: any) => item.purchase_order_id).filter(Boolean));
+      
+      // For purchase_orders that don't have material_items yet, create placeholder entries
+      const missingOrders = ordersData.filter((order: any) => !ordersWithItems.has(order.id));
+      console.log('📦 Purchase orders without material_items:', missingOrders.length);
+      
+      if (missingOrders.length > 0) {
+        // Create placeholder material_items from purchase_orders
+        missingOrders.forEach((order: any) => {
+          if (order.items && Array.isArray(order.items) && order.items.length > 0) {
+            order.items.forEach((item: any, index: number) => {
+              const placeholderItem = {
+                id: `placeholder-${order.id}-${index}`,
+                purchase_order_id: order.id,
+                qr_code: `PLACEHOLDER-${order.id}-${index}`,
+                item_sequence: index + 1,
+                material_type: item.name || item.material_name || 'Unknown Material',
+                category: item.category || 'General',
+                quantity: item.quantity || 1,
+                unit: item.unit || 'units',
+                supplier_id: supplierId,
+                buyer_id: order.buyer_id || order.builder_id,
+                buyer_name: order.builder_name || 'Unknown Client',
+                buyer_email: order.builder_email || '',
+                buyer_phone: order.builder_phone || '',
+                status: 'pending',
+                dispatch_scanned: false,
+                created_at: order.created_at || new Date().toISOString()
+              };
+              itemsData.push(placeholderItem);
+            });
+          }
+        });
+        console.log('✅ Added placeholder items for orders without material_items');
       }
 
       // Group items by purchase_order_id
