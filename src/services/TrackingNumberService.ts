@@ -76,6 +76,7 @@ class TrackingNumberService {
     
     try {
       // First, get the delivery request to check its expected delivery date
+      console.log('📦 Step 1: Fetching delivery request...');
       const { data: requestToAccept, error: requestError } = await supabase
         .from('delivery_requests')
         .select('id, pickup_date, preferred_date, status, provider_id')
@@ -83,9 +84,10 @@ class TrackingNumberService {
         .single();
 
       if (requestError) {
-        console.error('Error fetching delivery request:', requestError);
+        console.error('❌ Error fetching delivery request:', requestError);
         throw requestError;
       }
+      console.log('✅ Step 1 complete: Delivery request fetched');
 
       // Determine the delivery date for the request being accepted
       // Priority: preferred_date > pickup_date > today
@@ -100,6 +102,7 @@ class TrackingNumberService {
 
       // CHECK: Does this provider already have an active delivery FOR THE SAME DATE?
       // Provider CAN accept future deliveries while having active deliveries for today
+      console.log('📦 Step 2: Checking active deliveries...');
       const { data: activeDeliveries, error: activeError } = await supabase
         .from('delivery_requests')
         .select('id, status, tracking_number, pickup_date, preferred_date')
@@ -129,8 +132,10 @@ class TrackingNumberService {
         // Provider has active deliveries but for different dates - allow acceptance
         console.log(`✅ Provider has ${activeDeliveries.length} active deliveries but none for ${requestDateStr} - allowing acceptance`);
       }
+      console.log('✅ Step 2 complete: Active deliveries checked');
 
       // First, check if this delivery request is still available (FIRST-COME-FIRST-SERVED check)
+      console.log('📦 Step 3: Fetching existing request for first-come-first-served check...');
       const { data: existingRequest, error: fetchError } = await supabase
         .from('delivery_requests')
         .select('*, tracking_number, builder_id, status, provider_id')
@@ -138,19 +143,20 @@ class TrackingNumberService {
         .single();
 
       if (fetchError) {
-        console.error('Error fetching delivery request:', fetchError);
+        console.error('❌ Error fetching delivery request:', fetchError);
         throw fetchError;
       }
+      console.log('✅ Step 3 complete: Existing request fetched');
 
       // FIRST-COME-FIRST-SERVED: Check if another provider already accepted
       if (existingRequest.status === 'accepted' && existingRequest.provider_id && existingRequest.provider_id !== providerId) {
-        console.log(`Delivery ${deliveryRequestId} already accepted by provider ${existingRequest.provider_id}`);
+        console.log(`❌ Delivery ${deliveryRequestId} already accepted by provider ${existingRequest.provider_id}`);
         throw new Error('This delivery has already been accepted by another provider. First-come-first-served!');
       }
 
       // Also check if status is not pending (could be cancelled, completed, etc.)
       if (!['pending', 'assigned', 'accepted'].includes(existingRequest.status)) {
-        console.log(`Delivery ${deliveryRequestId} is no longer available (status: ${existingRequest.status})`);
+        console.log(`❌ Delivery ${deliveryRequestId} is no longer available (status: ${existingRequest.status})`);
         throw new Error(`This delivery is no longer available (status: ${existingRequest.status})`);
       }
 
@@ -160,17 +166,18 @@ class TrackingNumberService {
       if (existingRequest.tracking_number) {
         // Reuse existing tracking number (provider may have changed due to reassignment)
         trackingNumber = existingRequest.tracking_number;
-        console.log(`Reusing existing tracking number: ${trackingNumber}`);
+        console.log(`✅ Reusing existing tracking number: ${trackingNumber}`);
       } else {
         // Generate new tracking number
         trackingNumber = this.generateTrackingNumber();
         isNew = true;
-        console.log(`Generated new tracking number: ${trackingNumber}`);
+        console.log(`✅ Generated new tracking number: ${trackingNumber}`);
       }
 
       // ATOMIC UPDATE: Use a conditional update to ensure first-come-first-served
       // Only update if the status is still 'pending' or 'assigned' OR if we're the same provider
       // Build the OR clause safely - only include provider_id check if providerId is valid
+      console.log('📦 Step 4: Updating delivery request...');
       const orConditions = ['status.eq.pending', 'status.eq.assigned'];
       if (providerId && providerId.length > 10) {
         orConditions.push(`provider_id.eq.${providerId}`);
@@ -192,21 +199,22 @@ class TrackingNumberService {
 
       // Check if update was successful (row was actually updated)
       if (!updateResult || updateResult.length === 0) {
-        console.log(`Failed to accept delivery ${deliveryRequestId} - likely already accepted by another provider`);
+        console.log(`❌ Failed to accept delivery ${deliveryRequestId} - likely already accepted by another provider`);
         throw new Error('This delivery has already been accepted by another provider. First-come-first-served!');
       }
 
       const { error: checkError } = { error: updateError };
 
       if (checkError) {
-        console.error('Error updating delivery request:', checkError);
+        console.error('❌ Error updating delivery request:', checkError);
         throw checkError;
       }
 
-      console.log(`✅ Provider ${providerId} successfully accepted delivery ${deliveryRequestId} (First-come-first-served)`);
+      console.log(`✅ Step 4 complete: Provider ${providerId} successfully accepted delivery ${deliveryRequestId} (First-come-first-served)`);
 
       // Explicitly create/update tracking_numbers entry (backup to database trigger)
       // This ensures the entry exists even if the trigger fails
+      console.log('📦 Step 5: Creating/updating tracking_numbers entry...');
       try {
         const { data: existingTracking } = await supabase
           .from('tracking_numbers')
@@ -326,8 +334,10 @@ class TrackingNumberService {
         console.error('⚠️ Error ensuring tracking_numbers entry exists:', error);
         // Don't throw - continue with notification
       }
+      console.log('✅ Step 5 complete: Tracking numbers entry ensured');
 
       // Fetch builder info and provider info for notification
+      console.log('📦 Step 6: Fetching builder and provider info for notification...');
       const [builderResult, providerResult] = await Promise.all([
         supabase
           .from('profiles')
@@ -350,7 +360,10 @@ class TrackingNumberService {
         builderEmail = userData?.user?.email || '';
       }
 
+      console.log('✅ Step 6 complete: Builder and provider info fetched');
+      
       // Send notification to builder
+      console.log('📦 Step 7: Sending notification to builder...');
       await this.notifyBuilder({
         builderId: existingRequest.builder_id,
         builderEmail,
@@ -362,19 +375,29 @@ class TrackingNumberService {
         materialType: existingRequest.material_type,
         estimatedPickupDate: existingRequest.pickup_date
       });
+      console.log('✅ Step 7 complete: Notification sent');
 
       // Create a delivery tracking entry (initialize GPS tracking)
+      console.log('📦 Step 8: Initializing delivery tracking...');
       await this.initializeDeliveryTracking(deliveryRequestId, providerId, trackingNumber);
+      console.log('✅ Step 8 complete: Delivery tracking initialized');
 
+      console.log('🎉 onProviderAcceptsDelivery COMPLETE:', { trackingNumber, isNew, deliveryRequestId });
       return {
         trackingNumber,
         isNew,
         deliveryRequestId
       };
 
-    } catch (error) {
-      console.error('Error in onProviderAcceptsDelivery:', error);
-      return null;
+    } catch (error: any) {
+      console.error('❌ Error in onProviderAcceptsDelivery:', error);
+      console.error('❌ Error details:', {
+        message: error?.message,
+        code: error?.code,
+        details: error?.details,
+        hint: error?.hint
+      });
+      throw error; // Re-throw so the caller can handle it
     }
   }
 
