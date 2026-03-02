@@ -82,15 +82,25 @@ class TrackingNumberService {
       const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
       const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
       
-      // Get access token
+      // Get access token - with timeout to prevent hanging
       let accessToken = SUPABASE_ANON_KEY;
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        console.log('🔑 Getting session token...');
+        const sessionPromise = supabase.auth.getSession();
+        const sessionTimeout = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Session timeout')), 2000);
+        });
+        
+        const { data: { session } } = await Promise.race([sessionPromise, sessionTimeout]) as any;
         if (session?.access_token) {
           accessToken = session.access_token;
+          console.log('✅ Session token obtained');
+        } else {
+          console.log('⚠️ No session token, using anon key');
         }
       } catch (e) {
-        console.warn('Could not get session, using anon key');
+        console.warn('⚠️ Could not get session (using anon key):', e);
+        // Continue with anon key - this is fine for read operations
       }
       
       // Use direct fetch with timeout - wrap in Promise.race for extra safety
