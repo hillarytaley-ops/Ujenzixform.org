@@ -1020,6 +1020,53 @@ class TrackingNumberService {
             }
           }
           
+          // Get provider information (name and phone)
+          let providerName = null;
+          let providerPhone = null;
+          if (dr.provider_id) {
+            try {
+              // Try delivery_providers table first
+              const providerResponse = await fetch(
+                `${SUPABASE_URL}/rest/v1/delivery_providers?id=eq.${dr.provider_id}&select=provider_name,company_name,phone&limit=1`,
+                {
+                  headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${accessToken}`
+                  }
+                }
+              );
+              if (providerResponse.ok) {
+                const providers = await providerResponse.json();
+                if (providers && providers.length > 0) {
+                  providerName = providers[0].company_name || providers[0].provider_name || null;
+                  providerPhone = providers[0].phone || null;
+                }
+              }
+              
+              // If not found in delivery_providers, try profiles table
+              if (!providerName) {
+                const profileResponse = await fetch(
+                  `${SUPABASE_URL}/rest/v1/profiles?or=(user_id.eq.${dr.provider_id},id.eq.${dr.provider_id})&select=full_name,phone&limit=1`,
+                  {
+                    headers: {
+                      'apikey': SUPABASE_ANON_KEY,
+                      'Authorization': `Bearer ${accessToken}`
+                    }
+                  }
+                );
+                if (profileResponse.ok) {
+                  const profiles = await profileResponse.json();
+                  if (profiles && profiles.length > 0) {
+                    providerName = profiles[0].full_name || null;
+                    providerPhone = profiles[0].phone || null;
+                  }
+                }
+              }
+            } catch (e) {
+              console.warn(`⚠️ Could not fetch provider info for ${dr.provider_id}:`, e);
+            }
+          }
+          
           // Create tracking number entry
           const insertResponse = await fetch(
             `${SUPABASE_URL}/rest/v1/tracking_numbers`,
@@ -1043,6 +1090,8 @@ class TrackingNumberService {
                 pickup_address: dr.pickup_address || null,
                 materials_description: dr.material_type || 'Materials',
                 estimated_delivery_date: dr.preferred_date || dr.pickup_date || null,
+                provider_name: providerName,
+                provider_phone: providerPhone,
                 accepted_at: dr.accepted_at || new Date().toISOString()
               })
             }
