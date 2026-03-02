@@ -349,10 +349,16 @@ export const DispatchScanner: React.FC = () => {
         { headers, signal: controller.signal, cache: 'no-store' }
       );
       
-      // Fetch purchase_orders for this supplier where delivery is confirmed
-      // This links Orders sub-tab to Dispatch sub-tab - orders with confirmed delivery appear here
-      const ordersResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=eq.${supplierId}&or=(delivery_status.eq.accepted,delivery_provider_id.not.is.null)&order=created_at.desc&limit=1000`,
+      // Fetch purchase_orders for this supplier (all confirmed orders)
+      const allOrdersResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=eq.${supplierId}&status=in.(confirmed,quote_accepted,ready_for_dispatch,order_created)&order=created_at.desc&limit=1000`,
+        { headers, signal: controller.signal, cache: 'no-store' }
+      );
+      
+      // ALSO fetch delivery_requests with accepted status to find orders with confirmed delivery
+      // This is where delivery confirmation actually happens
+      const deliveryRequestsResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.(accepted,assigned)&select=id,purchase_order_id,status,provider_id,accepted_at&order=created_at.desc&limit=1000`,
         { headers, signal: controller.signal, cache: 'no-store' }
       );
       
@@ -363,16 +369,44 @@ export const DispatchScanner: React.FC = () => {
         throw new Error(`HTTP ${itemsResponse.status}`);
       }
       
-      if (!ordersResponse.ok) {
-        console.error('⚠️ Failed to fetch purchase orders:', ordersResponse.status);
+      if (!allOrdersResponse.ok) {
+        console.error('⚠️ Failed to fetch purchase orders:', allOrdersResponse.status);
         // Don't throw - continue with material_items only
       }
       
+      if (!deliveryRequestsResponse.ok) {
+        console.error('⚠️ Failed to fetch delivery requests:', deliveryRequestsResponse.status);
+        // Don't throw - continue
+      }
+      
       const itemsData = await itemsResponse.json();
-      const ordersData = ordersResponse.ok ? await ordersResponse.json() : [];
+      const allOrdersData = allOrdersResponse.ok ? await allOrdersResponse.json() : [];
+      const deliveryRequestsData = deliveryRequestsResponse.ok ? await deliveryRequestsResponse.json() : [];
       
       console.log('✅ Material items fetched:', itemsData?.length || 0);
-      console.log('✅ Purchase orders fetched:', ordersData?.length || 0);
+      console.log('✅ Purchase orders fetched:', allOrdersData?.length || 0);
+      console.log('✅ Delivery requests with accepted status:', deliveryRequestsData?.length || 0);
+      
+      // Create a set of purchase_order_ids that have confirmed delivery (from delivery_requests)
+      const confirmedDeliveryOrderIds = new Set(
+        deliveryRequestsData
+          .map((dr: any) => dr.purchase_order_id)
+          .filter(Boolean)
+      );
+      
+      console.log('📦 Purchase order IDs with confirmed delivery:', confirmedDeliveryOrderIds.size);
+      
+      // Filter purchase_orders to only include those with confirmed delivery
+      // Check both: delivery_requests status='accepted' OR purchase_orders.delivery_status='accepted' OR delivery_provider_id is set
+      const ordersData = allOrdersData.filter((order: any) => {
+        const hasConfirmedDelivery = 
+          confirmedDeliveryOrderIds.has(order.id) || // Has accepted delivery_request
+          order.delivery_status === 'accepted' ||    // Direct status check
+          order.delivery_provider_id !== null;       // Has provider assigned
+        return hasConfirmedDelivery;
+      });
+      
+      console.log('📦 Purchase orders with confirmed delivery (filtered):', ordersData.length);
       
       // Log date range for debugging
       if (itemsData && itemsData.length > 0) {
