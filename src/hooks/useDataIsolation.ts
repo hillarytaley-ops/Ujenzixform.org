@@ -398,21 +398,10 @@ export const useDeliveryProviderData = () => {
       
       // 2. Also fetch from purchase_orders where this provider is assigned
       // These are orders that were converted from quotes and accepted by builders
+      // Simplified query without relationship lookups to avoid schema cache issues
       const { data: purchaseOrdersData, error: poError } = await supabase
         .from('purchase_orders')
-        .select(`
-          *,
-          supplier:supplier_id (
-            company_name,
-            address,
-            location
-          ),
-          buyer:buyer_id (
-            full_name,
-            phone,
-            email
-          )
-        `)
+        .select('*')
         .eq('delivery_provider_id', userId)
         .in('status', [
           'quote_accepted',
@@ -432,6 +421,38 @@ export const useDeliveryProviderData = () => {
         console.warn('Error fetching purchase_orders for delivery provider:', poError);
       }
       
+      // Fetch supplier and buyer info separately if needed
+      let enrichedPurchaseOrders = purchaseOrdersData || [];
+      if (enrichedPurchaseOrders.length > 0) {
+        try {
+          const supplierIds = [...new Set(enrichedPurchaseOrders.map((po: any) => po.supplier_id).filter(Boolean))];
+          const buyerIds = [...new Set(enrichedPurchaseOrders.map((po: any) => po.buyer_id).filter(Boolean))];
+          
+          const [suppliersResult, buyersResult] = await Promise.allSettled([
+            supplierIds.length > 0
+              ? supabase.from('suppliers').select('id, company_name, address, location').in('id', supplierIds)
+              : Promise.resolve({ data: [], error: null }),
+            buyerIds.length > 0
+              ? supabase.from('profiles').select('id, full_name, phone, email').in('id', buyerIds)
+              : Promise.resolve({ data: [], error: null })
+          ]);
+          
+          const suppliers = suppliersResult.status === 'fulfilled' ? (suppliersResult.value.data || []) : [];
+          const buyers = buyersResult.status === 'fulfilled' ? (buyersResult.value.data || []) : [];
+          
+          const suppliersMap = new Map(suppliers.map((s: any) => [s.id, s]));
+          const buyersMap = new Map(buyers.map((b: any) => [b.id, b]));
+          
+          enrichedPurchaseOrders = enrichedPurchaseOrders.map((po: any) => ({
+            ...po,
+            supplier: suppliersMap.get(po.supplier_id) || null,
+            buyer: buyersMap.get(po.buyer_id) || null
+          }));
+        } catch (e) {
+          console.warn('Error enriching purchase orders with supplier/buyer info:', e);
+        }
+      }
+      
       // Combine both sources and transform to consistent format
       const allActiveDeliveries: any[] = [];
       
@@ -447,8 +468,8 @@ export const useDeliveryProviderData = () => {
       }
       
       // Add purchase_orders (convert to delivery_requests format)
-      if (purchaseOrdersData) {
-        purchaseOrdersData.forEach((po: any) => {
+      if (enrichedPurchaseOrders) {
+        enrichedPurchaseOrders.forEach((po: any) => {
           // Check if this purchase_order already exists in delivery_requests
           const existing = allActiveDeliveries.find(d => d.purchase_order_id === po.id);
           if (!existing) {

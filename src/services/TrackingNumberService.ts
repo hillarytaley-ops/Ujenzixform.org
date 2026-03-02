@@ -78,7 +78,7 @@ class TrackingNumberService {
       // First, get the delivery request to check its expected delivery date
       const { data: requestToAccept, error: requestError } = await supabase
         .from('delivery_requests')
-        .select('id, pickup_date, delivery_date, expected_delivery_date, status, provider_id')
+        .select('id, pickup_date, preferred_date, status, provider_id')
         .eq('id', deliveryRequestId)
         .single();
 
@@ -88,9 +88,8 @@ class TrackingNumberService {
       }
 
       // Determine the delivery date for the request being accepted
-      // Priority: delivery_date > expected_delivery_date > pickup_date > today
-      const requestDeliveryDate = requestToAccept.delivery_date 
-        || requestToAccept.expected_delivery_date 
+      // Priority: preferred_date > pickup_date > today
+      const requestDeliveryDate = requestToAccept.preferred_date 
         || requestToAccept.pickup_date 
         || new Date().toISOString().split('T')[0];
       
@@ -103,7 +102,7 @@ class TrackingNumberService {
       // Provider CAN accept future deliveries while having active deliveries for today
       const { data: activeDeliveries, error: activeError } = await supabase
         .from('delivery_requests')
-        .select('id, status, tracking_number, pickup_date, delivery_date, expected_delivery_date')
+        .select('id, status, tracking_number, pickup_date, preferred_date')
         .eq('provider_id', providerId)
         .in('status', ['accepted', 'picked_up', 'in_transit', 'assigned'])
         .neq('id', deliveryRequestId); // Exclude the current request
@@ -115,8 +114,7 @@ class TrackingNumberService {
       // Check if any active delivery conflicts with the same date
       if (activeDeliveries && activeDeliveries.length > 0) {
         for (const activeDelivery of activeDeliveries) {
-          const activeDeliveryDate = activeDelivery.delivery_date 
-            || activeDelivery.expected_delivery_date 
+          const activeDeliveryDate = activeDelivery.preferred_date 
             || activeDelivery.pickup_date 
             || todayStr;
           const activeDateStr = new Date(activeDeliveryDate).toISOString().split('T')[0];
@@ -292,7 +290,7 @@ class TrackingNumberService {
               delivery_address: existingRequest.delivery_address || 'Address not specified',
               pickup_address: existingRequest.pickup_address || null,
               materials_description: existingRequest.material_type || 'Materials',
-              estimated_delivery_date: existingRequest.delivery_date || existingRequest.expected_delivery_date || existingRequest.pickup_date || null,
+              estimated_delivery_date: existingRequest.preferred_date || existingRequest.pickup_date || null,
               provider_name: providerName,
               provider_phone: providerPhone,
               accepted_at: new Date().toISOString()
