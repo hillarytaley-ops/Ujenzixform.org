@@ -298,12 +298,29 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
           
           // Check if we're missing any recent ones by comparing dates
           const today = new Date();
+          console.log('📅 Current date:', today.toISOString());
           const recentCutoff = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000); // Last 7 days
+          console.log('📅 Recent cutoff (7 days ago):', recentCutoff.toISOString());
           const recentOnes = trackingData.filter(tn => {
             const created = new Date(tn.created_at);
             return created >= recentCutoff;
           });
           console.log('📦 Tracking numbers from last 7 days:', recentOnes.length, 'out of', trackingData.length);
+          
+          // Show the actual newest tracking number details
+          if (trackingData.length > 0) {
+            const newest = trackingData[0];
+            const daysAgo = Math.floor((today.getTime() - new Date(newest.created_at).getTime()) / (24 * 60 * 60 * 1000));
+            console.log('📦 NEWEST tracking number details:', {
+              tracking_number: newest.tracking_number,
+              created_at: newest.created_at,
+              updated_at: newest.updated_at,
+              builder_id: newest.builder_id,
+              status: newest.status,
+              days_ago: daysAgo,
+              is_recent: daysAgo <= 7
+            });
+          }
           
           // Show builder_id distribution
           const builderIdCounts: Record<string, number> = {};
