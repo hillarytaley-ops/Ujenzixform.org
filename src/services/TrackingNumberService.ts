@@ -894,7 +894,6 @@ class TrackingNumberService {
       return [];
     }
   }
-}
 
   /**
    * Generate missing tracking numbers for accepted delivery requests
