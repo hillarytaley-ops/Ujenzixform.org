@@ -511,31 +511,60 @@ class TrackingNumberService {
             }
           }
 
-          // Insert tracking number entry
-          const { error: trackingError } = await supabase
-            .from('tracking_numbers')
-            .insert({
-              tracking_number: trackingNumber,
-              delivery_request_id: deliveryRequestId,
-              purchase_order_id: existingRequest.purchase_order_id || null,
-              builder_id: builderUserId,
-              delivery_provider_id: providerId,
-              supplier_id: supplierId,
-              status: 'accepted',
-              delivery_address: existingRequest.delivery_address || 'Address not specified',
-              pickup_address: existingRequest.pickup_address || null,
-              materials_description: existingRequest.material_type || 'Materials',
-              estimated_delivery_date: existingRequest.preferred_date || existingRequest.pickup_date || null,
-              provider_name: providerName,
-              provider_phone: providerPhone,
-              accepted_at: new Date().toISOString()
-            });
-
-          if (trackingError) {
-            console.error('⚠️ Error creating tracking_numbers entry (trigger should handle it):', trackingError);
+          // Insert tracking number entry using direct REST API with timeout
+          console.log('📦 Step 5: Creating tracking_numbers entry with builder_id:', builderUserId);
+          
+          const trackingInsertPromise = fetch(
+            `${SUPABASE_URL}/rest/v1/tracking_numbers`,
+            {
+              method: 'POST',
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=representation'
+              },
+              body: JSON.stringify({
+                tracking_number: trackingNumber,
+                delivery_request_id: deliveryRequestId,
+                purchase_order_id: existingRequest.purchase_order_id || null,
+                builder_id: builderUserId,
+                delivery_provider_id: providerId,
+                supplier_id: supplierId,
+                status: 'accepted',
+                delivery_address: existingRequest.delivery_address || 'Address not specified',
+                pickup_address: existingRequest.pickup_address || null,
+                materials_description: existingRequest.material_type || 'Materials',
+                estimated_delivery_date: existingRequest.preferred_date || existingRequest.pickup_date || null,
+                provider_name: providerName,
+                provider_phone: providerPhone,
+                accepted_at: new Date().toISOString()
+              }),
+              cache: 'no-store'
+            }
+          );
+          
+          const trackingInsertTimeout = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error('Tracking insert timeout')), 5000);
+          });
+          
+          try {
+            const trackingResponse = await Promise.race([trackingInsertPromise, trackingInsertTimeout]);
+            if (!trackingResponse.ok) {
+              const errorText = await trackingResponse.text();
+              console.error('⚠️ Error creating tracking_numbers entry:', trackingResponse.status, errorText);
+              // Don't throw - trigger might have already created it
+            } else {
+              const insertedData = await trackingResponse.json();
+              console.log('✅ Explicitly created tracking_numbers entry:', trackingNumber, 'with builder_id:', builderUserId);
+            }
+          } catch (error: any) {
+            if (error.message?.includes('timeout')) {
+              console.error('⚠️ Tracking insert timeout - trigger may have created it');
+            } else {
+              console.error('⚠️ Error creating tracking_numbers entry:', error);
+            }
             // Don't throw - trigger might have already created it
-          } else {
-            console.log('✅ Explicitly created tracking_numbers entry:', trackingNumber);
           }
         } else {
           // Update existing entry
