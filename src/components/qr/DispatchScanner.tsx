@@ -414,9 +414,10 @@ export const DispatchScanner: React.FC = () => {
         console.log('📦 Fetching purchase_orders in', chunks.length, 'chunk(s)...');
         
         const orderPromises = chunks.map((chunk, index) => {
-          const idsFilter = chunk.map(id => `id=eq.${id}`).join(',');
+          // PostgREST uses 'in' operator with parentheses for multiple values
+          const idsList = chunk.join(',');
           return fetch(
-            `${SUPABASE_URL}/rest/v1/purchase_orders?or=(${idsFilter})&order=created_at.desc&limit=1000`,
+            `${SUPABASE_URL}/rest/v1/purchase_orders?id=in.(${idsList})&order=created_at.desc&limit=1000`,
             { headers, signal: controller.signal, cache: 'no-store' }
           );
         });
