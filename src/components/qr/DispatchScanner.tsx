@@ -349,9 +349,10 @@ export const DispatchScanner: React.FC = () => {
         { headers, signal: controller.signal, cache: 'no-store' }
       );
       
-      // Also fetch purchase_orders for this supplier (confirmed or ready_for_dispatch)
+      // Fetch purchase_orders for this supplier where delivery is confirmed
+      // This links Orders sub-tab to Dispatch sub-tab - orders with confirmed delivery appear here
       const ordersResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=eq.${supplierId}&status=in.(confirmed,quote_accepted,ready_for_dispatch,order_created)&order=created_at.desc&limit=1000`,
+        `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=eq.${supplierId}&or=(delivery_status.eq.accepted,delivery_provider_id.not.is.null)&order=created_at.desc&limit=1000`,
         { headers, signal: controller.signal, cache: 'no-store' }
       );
       
