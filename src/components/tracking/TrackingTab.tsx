@@ -957,19 +957,57 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
             {status === 'all' ? 'All' : status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
           </Button>
         ))}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            setLoading(true);
-            fetchTrackingNumbers();
-          }}
-          className="ml-auto"
-          disabled={loading}
-        >
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
+        <div className="flex gap-2 ml-auto">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              console.log('🔧 Generating missing tracking numbers...');
+              setLoading(true);
+              try {
+                const { trackingNumberService } = await import('@/services/TrackingNumberService');
+                const userId = getUserId();
+                const result = await trackingNumberService.generateMissingTrackingNumbers(userId);
+                toast({
+                  title: result.created > 0 ? "✅ Tracking Numbers Generated" : "ℹ️ No Missing Tracking Numbers",
+                  description: result.created > 0 
+                    ? `Created ${result.created} missing tracking number${result.created > 1 ? 's' : ''}. ${result.errors > 0 ? `${result.errors} error${result.errors > 1 ? 's' : ''} occurred.` : ''}`
+                    : "All accepted deliveries already have tracking numbers.",
+                });
+                if (result.created > 0) {
+                  setTimeout(() => fetchTrackingNumbers(), 1000);
+                } else {
+                  setLoading(false);
+                }
+              } catch (error: any) {
+                console.error('Error generating missing tracking numbers:', error);
+                toast({
+                  title: "❌ Error",
+                  description: error.message || "Failed to generate missing tracking numbers",
+                  variant: "destructive"
+                });
+                setLoading(false);
+              }
+            }}
+            disabled={loading}
+            className="bg-blue-500/20 border-blue-300/50 text-blue-700 hover:bg-blue-500/30"
+          >
+            <Package className="h-4 w-4 mr-2" />
+            Fix Missing
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setLoading(true);
+              fetchTrackingNumbers();
+            }}
+            disabled={loading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Tracking Numbers Table */}
