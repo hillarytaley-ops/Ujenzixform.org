@@ -203,7 +203,9 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
       
       // Build query based on user role
       // Order by updated_at first (most recently updated), then created_at (newest first)
-      let url = `${SUPABASE_URL}/rest/v1/tracking_numbers?order=updated_at.desc,created_at.desc&select=*`;
+      // NOTE: No date filters - this query will fetch ALL tracking numbers, including future ones
+      // Limit set to 1000 to ensure we get all records
+      let url = `${SUPABASE_URL}/rest/v1/tracking_numbers?order=updated_at.desc,created_at.desc&select=*&limit=1000`;
       
       if (userRole === 'admin') {
         // Admin sees all tracking numbers - no filter needed
