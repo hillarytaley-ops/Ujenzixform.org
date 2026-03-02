@@ -349,20 +349,107 @@ export const DispatchScanner: React.FC = () => {
         { headers, signal: controller.signal, cache: 'no-store' }
       );
       
-      // Fetch purchase_orders for this supplier (all confirmed orders)
-      console.log('📦 Fetching purchase_orders for supplier:', supplierId);
-      const allOrdersResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=eq.${supplierId}&status=in.(confirmed,quote_accepted,ready_for_dispatch,order_created)&order=created_at.desc&limit=1000`,
-        { headers, signal: controller.signal, cache: 'no-store' }
-      );
-      
-      // ALSO fetch delivery_requests with accepted status to find orders with confirmed delivery
+      // FIRST: Fetch delivery_requests with accepted status to get purchase_order_ids
       // This is where delivery confirmation actually happens
       console.log('📦 Fetching delivery_requests with accepted status...');
       const deliveryRequestsResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.(accepted,assigned)&select=id,purchase_order_id,status,provider_id,accepted_at&order=created_at.desc&limit=1000`,
+        `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.(accepted,assigned)&select=id,purchase_order_id,status,provider_id,accepted_at,supplier_id&order=created_at.desc&limit=1000`,
         { headers, signal: controller.signal, cache: 'no-store' }
       );
+      
+      // Wait for delivery_requests to complete before fetching purchase_orders
+      let deliveryRequestsData: any[] = [];
+      if (deliveryRequestsResponse.ok) {
+        deliveryRequestsData = await deliveryRequestsResponse.json();
+        console.log('✅ Delivery requests with accepted status:', deliveryRequestsData?.length || 0);
+      } else {
+        const errorText = await deliveryRequestsResponse.text();
+        console.error('⚠️ Failed to fetch delivery requests:', deliveryRequestsResponse.status, errorText);
+      }
+      
+      // Get userId for filtering
+      let userId: string | null = null;
+      try {
+        const stored = getUserFromStorage();
+        userId = stored?.id || null;
+      } catch {
+        // Ignore
+      }
+      
+      // Filter delivery_requests by supplier_id to get only this supplier's orders
+      // Try multiple supplier_id variations since the lookup might have timing issues
+      const supplierDeliveryRequests = deliveryRequestsData.filter((dr: any) => {
+        if (!dr.supplier_id) return false;
+        // Check if supplier_id matches (could be user_id or actual supplier_id)
+        return dr.supplier_id === supplierId || 
+               (userId && dr.supplier_id === userId);
+      });
+      
+      // If no matches, use all delivery_requests (they might be linked differently)
+      const finalDeliveryRequests = supplierDeliveryRequests.length > 0 
+        ? supplierDeliveryRequests 
+        : deliveryRequestsData;
+      
+      console.log('📦 Delivery requests for this supplier:', finalDeliveryRequests.length, 'out of', deliveryRequestsData.length);
+      
+      // Get unique purchase_order_ids from delivery_requests
+      const confirmedDeliveryOrderIds = Array.from(
+        new Set(finalDeliveryRequests.map((dr: any) => dr.purchase_order_id).filter(Boolean))
+      );
+      
+      console.log('📦 Purchase order IDs with confirmed delivery for this supplier:', confirmedDeliveryOrderIds.length);
+      
+      // NOW fetch purchase_orders using the purchase_order_ids from delivery_requests
+      // This ensures we get the correct orders regardless of supplier_id matching issues
+      let allOrdersData: any[] = [];
+      
+      if (confirmedDeliveryOrderIds.length > 0) {
+        // Build query with OR conditions for multiple IDs (PostgREST supports up to 100 in a single query)
+        // Split into chunks of 100 if needed
+        const chunks: string[][] = [];
+        for (let i = 0; i < confirmedDeliveryOrderIds.length; i += 100) {
+          chunks.push(confirmedDeliveryOrderIds.slice(i, i + 100));
+        }
+        
+        console.log('📦 Fetching purchase_orders in', chunks.length, 'chunk(s)...');
+        
+        const orderPromises = chunks.map((chunk, index) => {
+          const idsFilter = chunk.map(id => `id=eq.${id}`).join(',');
+          return fetch(
+            `${SUPABASE_URL}/rest/v1/purchase_orders?or=(${idsFilter})&order=created_at.desc&limit=1000`,
+            { headers, signal: controller.signal, cache: 'no-store' }
+          );
+        });
+        
+        const orderResponses = await Promise.all(orderPromises);
+        
+        for (const response of orderResponses) {
+          if (response.ok) {
+            const chunkData = await response.json();
+            allOrdersData.push(...chunkData);
+          } else {
+            const errorText = await response.text();
+            console.error('⚠️ Failed to fetch purchase orders chunk:', response.status, errorText);
+          }
+        }
+        
+        console.log('✅ Purchase orders fetched:', allOrdersData.length);
+      } else {
+        // Fallback: Fetch by supplier_id if no delivery_requests found
+        console.log('📦 No confirmed delivery requests found, fetching by supplier_id as fallback...');
+        const allOrdersResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/purchase_orders?supplier_id=eq.${supplierId}&status=in.(confirmed,quote_accepted,ready_for_dispatch,order_created)&order=created_at.desc&limit=1000`,
+          { headers, signal: controller.signal, cache: 'no-store' }
+        );
+        
+        if (allOrdersResponse.ok) {
+          allOrdersData = await allOrdersResponse.json();
+          console.log('✅ Purchase orders fetched (fallback):', allOrdersData.length);
+        } else {
+          const errorText = await allOrdersResponse.text();
+          console.error('⚠️ Failed to fetch purchase orders:', allOrdersResponse.status, errorText);
+        }
+      }
       
       clearTimeout(timeoutId);
       
