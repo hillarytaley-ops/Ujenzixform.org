@@ -82,25 +82,47 @@ class TrackingNumberService {
       const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
       const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
       
-      // Get access token - with timeout to prevent hanging
+      // Get access token - try localStorage first (faster), then getSession as fallback
       let accessToken = SUPABASE_ANON_KEY;
       try {
-        console.log('🔑 Getting session token...');
-        const sessionPromise = supabase.auth.getSession();
-        const sessionTimeout = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error('Session timeout')), 2000);
-        });
+        console.log('🔑 Getting access token...');
         
-        const { data: { session } } = await Promise.race([sessionPromise, sessionTimeout]) as any;
-        if (session?.access_token) {
-          accessToken = session.access_token;
-          console.log('✅ Session token obtained');
-        } else {
-          console.log('⚠️ No session token, using anon key');
+        // Try localStorage first (much faster, no async call)
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          try {
+            const parsed = JSON.parse(storedSession);
+            if (parsed.access_token) {
+              accessToken = parsed.access_token;
+              console.log('✅ Access token obtained from localStorage');
+            }
+          } catch (e) {
+            console.warn('⚠️ Could not parse stored session');
+          }
+        }
+        
+        // If localStorage didn't work, try getSession (with timeout)
+        if (accessToken === SUPABASE_ANON_KEY) {
+          console.log('🔑 Trying getSession() as fallback...');
+          const sessionPromise = supabase.auth.getSession();
+          const sessionTimeout = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error('Session timeout')), 2000);
+          });
+          
+          const { data: { session } } = await Promise.race([sessionPromise, sessionTimeout]) as any;
+          if (session?.access_token) {
+            accessToken = session.access_token;
+            console.log('✅ Session token obtained from getSession()');
+          }
         }
       } catch (e) {
-        console.warn('⚠️ Could not get session (using anon key):', e);
-        // Continue with anon key - this is fine for read operations
+        console.warn('⚠️ Could not get session token:', e);
+        // If we still have anon key, this will fail on UPDATE operations due to RLS
+        // But we'll try anyway and show a clear error
+      }
+      
+      if (accessToken === SUPABASE_ANON_KEY) {
+        console.warn('⚠️ Using anon key - UPDATE operations may fail due to RLS policies');
       }
       
       // Use direct fetch with timeout - wrap in Promise.race for extra safety
