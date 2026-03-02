@@ -357,6 +357,19 @@ export const DispatchScanner: React.FC = () => {
       
       const itemsData = await response.json();
       console.log('✅ Material items fetched:', itemsData?.length || 0);
+      
+      // Log date range for debugging
+      if (itemsData && itemsData.length > 0) {
+        const dates = itemsData.map((item: any) => item.created_at).filter(Boolean);
+        if (dates.length > 0) {
+          const sortedDates = dates.sort();
+          console.log('📅 Date range in material_items:', {
+            oldest: sortedDates[0],
+            newest: sortedDates[sortedDates.length - 1],
+            total: itemsData.length
+          });
+        }
+      }
 
       // Group items by purchase_order_id
       const orderMap: Record<string, Order> = {};
