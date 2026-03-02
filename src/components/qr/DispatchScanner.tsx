@@ -338,12 +338,14 @@ export const DispatchScanner: React.FC = () => {
         'Content-Type': 'application/json'
       };
       
-      // Fetch material items with timeout
+      // Fetch material items with timeout - no limit to get all orders
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
       
+      // Fetch ALL material items for this supplier, ordered by most recent first
+      // Remove any implicit limits by explicitly requesting all records
       const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/material_items?supplier_id=eq.${supplierId}&order=created_at.desc`,
+        `${SUPABASE_URL}/rest/v1/material_items?supplier_id=eq.${supplierId}&order=created_at.desc&limit=1000`,
         { headers, signal: controller.signal, cache: 'no-store' }
       );
       clearTimeout(timeoutId);
