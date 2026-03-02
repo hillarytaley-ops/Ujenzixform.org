@@ -320,38 +320,72 @@ class TrackingNumberService {
 
       // ATOMIC UPDATE: Use a conditional update to ensure first-come-first-served
       // Only update if the status is still 'pending' or 'assigned' OR if we're the same provider
-      // Build the OR clause safely - only include provider_id check if providerId is valid
       console.log('📦 Step 4: Updating delivery request...');
-      const orConditions = ['status.eq.pending', 'status.eq.assigned'];
-      if (providerId && providerId.length > 10) {
-        orConditions.push(`provider_id.eq.${providerId}`);
-      }
       
-      const { data: updateResult, error: updateError } = await supabase
-        .from('delivery_requests')
-        .update({
-          tracking_number: trackingNumber,
-          provider_id: providerId,
-          status: 'accepted',
-          provider_response: 'accepted',
-          response_date: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', deliveryRequestId)
-        .or(orConditions.join(','))
-        .select();
+      // Use direct REST API with timeout for the update
+      const updatePromise = fetch(
+        `${SUPABASE_URL}/rest/v1/delivery_requests?id=eq.${deliveryRequestId}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify({
+            tracking_number: trackingNumber,
+            provider_id: providerId,
+            status: 'accepted',
+            provider_response: 'accepted',
+            response_date: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }),
+          cache: 'no-store'
+        }
+      );
+      
+      const updateTimeout = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          console.error('⏱️ Step 4 update timeout after 5 seconds');
+          reject(new Error('Update timeout after 5 seconds'));
+        }, 5000);
+      });
+      
+      let updateResult: any[] = [];
+      let updateError: any = null;
+      
+      try {
+        console.log('⏳ Waiting for update response...');
+        const response = await Promise.race([updatePromise, updateTimeout]);
+        console.log('✅ Update response received:', response.status);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          updateError = { message: `HTTP ${response.status}: ${errorText}`, code: response.status.toString() };
+          console.error('❌ Update response not OK:', response.status, errorText);
+        } else {
+          updateResult = await response.json();
+          console.log('✅ Update data received:', updateResult);
+        }
+      } catch (error: any) {
+        console.error('❌ Update error caught:', error);
+        if (error.message?.includes('timeout')) {
+          updateError = { message: 'Update timeout after 5 seconds', code: 'TIMEOUT' };
+        } else {
+          updateError = { message: error.message || 'Network error', code: error.name || 'NETWORK_ERROR' };
+        }
+      }
 
       // Check if update was successful (row was actually updated)
+      if (updateError) {
+        console.error('❌ Error updating delivery request:', updateError);
+        throw new Error(updateError.message || 'Failed to update delivery request');
+      }
+      
       if (!updateResult || updateResult.length === 0) {
         console.log(`❌ Failed to accept delivery ${deliveryRequestId} - likely already accepted by another provider`);
         throw new Error('This delivery has already been accepted by another provider. First-come-first-served!');
-      }
-
-      const { error: checkError } = { error: updateError };
-
-      if (checkError) {
-        console.error('❌ Error updating delivery request:', checkError);
-        throw checkError;
       }
 
       console.log(`✅ Step 4 complete: Provider ${providerId} successfully accepted delivery ${deliveryRequestId} (First-come-first-served)`);
