@@ -462,7 +462,8 @@ export const DispatchScanner: React.FC = () => {
       const itemsData = await itemsResponse.json();
       console.log('✅ Material items fetched:', itemsData?.length || 0);
       
-      // allOrdersData is already fetched above using purchase_order_ids from delivery_requests
+      // allOrdersData and deliveryRequestsData are already fetched above
+      // allOrdersData was fetched using purchase_order_ids from delivery_requests
       // Since we already filtered delivery_requests by supplier_id, all orders should be relevant
       const ordersData = allOrdersData;
       
