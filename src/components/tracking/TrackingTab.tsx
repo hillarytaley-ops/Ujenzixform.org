@@ -222,63 +222,6 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
         // Also try without filter to see if there are any tracking numbers we're missing
         url += `&or=(builder_id.eq.${userId},builder_id.eq.${profileId})`;
         console.log('📦 Builder mode: filtering by userId:', userId, 'and profileId:', profileId);
-        
-        // DEBUG: Check for accepted delivery_requests that don't have tracking numbers yet
-        // This will help identify if new orders are being accepted but tracking numbers aren't being created
-        const deliveryRequestsUrl = `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.(accepted,assigned)&select=id,purchase_order_id,builder_id,status,accepted_at,created_at&order=created_at.desc&limit=50`;
-        fetch(deliveryRequestsUrl, {
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
-            'Cache-Control': 'no-cache',
-          }
-        }).then(async (drResponse) => {
-          if (drResponse.ok) {
-            const deliveryRequests = await drResponse.json();
-            console.log('🔍 DEBUG: Accepted delivery_requests (last 50):', deliveryRequests.length);
-            
-            // Filter for this builder's delivery requests
-            const builderDeliveryRequests = deliveryRequests.filter((dr: any) => 
-              dr.builder_id === userId || dr.builder_id === profileId
-            );
-            console.log('🔍 DEBUG: Delivery requests for this builder:', builderDeliveryRequests.length);
-            
-            if (builderDeliveryRequests.length > 0) {
-              // Check which ones have tracking numbers
-              const trackingNumbersSet = new Set(trackingData.map(tn => tn.delivery_request_id));
-              const missingTracking = builderDeliveryRequests.filter((dr: any) => 
-                !trackingNumbersSet.has(dr.id)
-              );
-              
-              if (missingTracking.length > 0) {
-                console.warn('⚠️ DEBUG: Found', missingTracking.length, 'accepted delivery requests WITHOUT tracking numbers!');
-                console.log('⚠️ DEBUG: Missing tracking numbers for:', missingTracking.slice(0, 5).map((dr: any) => ({
-                  delivery_request_id: dr.id,
-                  purchase_order_id: dr.purchase_order_id?.slice(0, 8),
-                  builder_id: dr.builder_id?.slice(0, 8),
-                  status: dr.status,
-                  accepted_at: dr.accepted_at,
-                  created_at: dr.created_at
-                })));
-              } else {
-                console.log('✅ All accepted delivery requests have tracking numbers');
-              }
-              
-              // Show recent delivery requests
-              const recentDRs = builderDeliveryRequests.slice(0, 5);
-              console.log('🔍 DEBUG: Most recent delivery requests for this builder:', recentDRs.map((dr: any) => ({
-                delivery_request_id: dr.id?.slice(0, 8),
-                purchase_order_id: dr.purchase_order_id?.slice(0, 8),
-                status: dr.status,
-                accepted_at: dr.accepted_at,
-                created_at: dr.created_at,
-                has_tracking: trackingNumbersSet.has(dr.id)
-              })));
-            }
-          }
-        }).catch((e) => {
-          console.error('🔍 DEBUG: Error fetching delivery requests:', e);
-        });
       }
 
       console.log('📦 Fetching tracking numbers from:', url);
