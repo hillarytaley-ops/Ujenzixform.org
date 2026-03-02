@@ -273,8 +273,26 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
             status: tn.status,
             created_at: tn.created_at,
             updated_at: tn.updated_at,
-            builder_id: tn.builder_id?.slice(0, 8)
+            builder_id: tn.builder_id,
+            builder_id_short: tn.builder_id?.slice(0, 8)
           })));
+          
+          // Check if we're missing any recent ones by comparing dates
+          const today = new Date();
+          const recentCutoff = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000); // Last 7 days
+          const recentOnes = trackingData.filter(tn => {
+            const created = new Date(tn.created_at);
+            return created >= recentCutoff;
+          });
+          console.log('📦 Tracking numbers from last 7 days:', recentOnes.length, 'out of', trackingData.length);
+          
+          // Show builder_id distribution
+          const builderIdCounts: Record<string, number> = {};
+          trackingData.forEach(tn => {
+            const bid = tn.builder_id || 'null';
+            builderIdCounts[bid] = (builderIdCounts[bid] || 0) + 1;
+          });
+          console.log('📦 Builder ID distribution in fetched tracking numbers:', builderIdCounts);
         } else {
           console.warn('⚠️ No tracking numbers found! Check builder_id filter:', { userId, profileId });
         }
