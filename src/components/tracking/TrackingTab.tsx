@@ -223,7 +223,7 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
         console.log('📦 Builder mode: filtering by userId:', userId, 'and profileId:', profileId);
         
         // DEBUG: Also fetch ALL tracking numbers to see what we might be missing
-        const allTrackingUrl = `${SUPABASE_URL}/rest/v1/tracking_numbers?order=created_at.desc&select=tracking_number,created_at,builder_id,status&limit=50`;
+        const allTrackingUrl = `${SUPABASE_URL}/rest/v1/tracking_numbers?order=created_at.desc&select=tracking_number,created_at,builder_id,status,updated_at&limit=50`;
         fetch(allTrackingUrl, {
           headers: {
             'apikey': SUPABASE_ANON_KEY,
@@ -236,17 +236,36 @@ export const TrackingTab: React.FC<TrackingTabProps> = ({ userId: propUserId, us
             console.log('🔍 DEBUG: All tracking numbers in database (last 50):', allTracking.length);
             if (allTracking.length > 0) {
               const recentOnes = allTracking.slice(0, 10);
-              console.log('🔍 DEBUG: Most recent 10 tracking numbers:', recentOnes.map((tn: any) => ({
+              console.log('🔍 DEBUG: Most recent 10 tracking numbers in database:', recentOnes.map((tn: any) => ({
                 tracking_number: tn.tracking_number,
                 created_at: tn.created_at,
-                builder_id: tn.builder_id?.slice(0, 8),
+                updated_at: tn.updated_at,
+                builder_id: tn.builder_id,
+                builder_id_short: tn.builder_id?.slice(0, 8),
                 status: tn.status,
                 matches_user: tn.builder_id === userId,
-                matches_profile: tn.builder_id === profileId
+                matches_profile: tn.builder_id === profileId,
+                user_id: userId,
+                profile_id: profileId
               })));
+              
+              // Check if there are any with different builder_ids
+              const differentBuilderIds = allTracking.filter((tn: any) => 
+                tn.builder_id !== userId && tn.builder_id !== profileId
+              );
+              if (differentBuilderIds.length > 0) {
+                console.warn('⚠️ DEBUG: Found tracking numbers with different builder_ids:', differentBuilderIds.length);
+                console.log('⚠️ DEBUG: Sample different builder_ids:', differentBuilderIds.slice(0, 5).map((tn: any) => ({
+                  tracking_number: tn.tracking_number,
+                  builder_id: tn.builder_id,
+                  created_at: tn.created_at
+                })));
+              }
             }
           }
-        }).catch(() => {});
+        }).catch((e) => {
+          console.error('🔍 DEBUG: Error fetching all tracking numbers:', e);
+        });
       }
 
       console.log('📦 Fetching tracking numbers from:', url);
