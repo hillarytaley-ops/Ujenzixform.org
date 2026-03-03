@@ -59,7 +59,15 @@ BEGIN
   current_user_id := auth.uid();
   
   -- Verify QR code exists
-  SELECT * INTO item_record
+  -- Use explicit column selection to handle cases where is_invalidated might not exist
+  SELECT 
+    id, qr_code, purchase_order_id, material_type, category, quantity, unit,
+    status, dispatch_scanned, dispatch_scanned_at, dispatch_scanned_by,
+    receive_scanned, receive_scanned_at, receive_scanned_by,
+    COALESCE(is_invalidated, FALSE) as is_invalidated,
+    invalidated_at,
+    created_at, updated_at
+  INTO item_record
   FROM material_items
   WHERE qr_code = _qr_code;
   
@@ -78,7 +86,7 @@ BEGIN
   -- ============================================================
   -- CHECK IF QR CODE IS ALREADY INVALIDATED
   -- ============================================================
-  IF item_record.is_invalidated = TRUE THEN
+  IF COALESCE(item_record.is_invalidated, FALSE) = TRUE THEN
     RETURN jsonb_build_object(
       'success', false,
       'error', 'This QR code has been invalidated. Both dispatch and receiving have been completed.',
@@ -269,7 +277,15 @@ BEGIN
   END IF;
   
   -- Refresh item record to get updated values
-  SELECT * INTO item_record
+  -- Use explicit column selection with COALESCE for optional columns
+  SELECT 
+    id, qr_code, purchase_order_id, material_type, category, quantity, unit,
+    status, dispatch_scanned, dispatch_scanned_at, dispatch_scanned_by,
+    receive_scanned, receive_scanned_at, receive_scanned_by,
+    COALESCE(is_invalidated, FALSE) as is_invalidated,
+    invalidated_at,
+    created_at, updated_at
+  INTO item_record
   FROM material_items
   WHERE qr_code = _qr_code;
   
@@ -290,10 +306,10 @@ BEGIN
     'new_status', item_record.status,
     'dispatch_scanned', item_record.dispatch_scanned,
     'receive_scanned', item_record.receive_scanned,
-    'is_invalidated', item_record.is_invalidated,
+    'is_invalidated', COALESCE(item_record.is_invalidated, FALSE),
     'order_id', order_id,
     'message', CASE
-      WHEN item_record.is_invalidated = TRUE THEN 'QR code completed and invalidated. Both dispatch and receive are done.'
+      WHEN COALESCE(item_record.is_invalidated, FALSE) = TRUE THEN 'QR code completed and invalidated. Both dispatch and receive are done.'
       WHEN _scan_type = 'dispatch' THEN 'Item dispatched successfully. Order status updated to SHIPPED. Awaiting receiving scan.'
       WHEN _scan_type = 'receiving' THEN 'Item received successfully.'
       ELSE 'Scan recorded successfully.'
