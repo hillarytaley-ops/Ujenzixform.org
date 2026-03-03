@@ -476,6 +476,25 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       });
 
       console.log('📦 Orders with items:', ordersWithItems.length);
+      
+      // Log summary of provider information
+      const ordersWithProviders = ordersWithItems.filter(o => o.delivery_provider_id || o.delivery_provider_name);
+      const ordersWithProviderNames = ordersWithItems.filter(o => o.delivery_provider_name && o.delivery_provider_name !== 'Delivery Provider');
+      const ordersWithProviderPhones = ordersWithItems.filter(o => o.delivery_provider_phone);
+      console.log('👤 Provider Info Summary:', {
+        total_orders: ordersWithItems.length,
+        orders_with_provider_id: ordersWithProviders.length,
+        orders_with_provider_name: ordersWithProviderNames.length,
+        orders_with_provider_phone: ordersWithProviderPhones.length,
+        sample_orders_with_provider: ordersWithProviderNames.slice(0, 5).map(o => ({
+          po_number: o.po_number,
+          provider_name: o.delivery_provider_name,
+          provider_phone: o.delivery_provider_phone,
+          delivery_status: o.delivery_status,
+          order_status: o.status
+        }))
+      });
+      
       setOrders(ordersWithItems);
     } catch (error: any) {
       console.error('❌ Error fetching orders:', error?.message || error);
