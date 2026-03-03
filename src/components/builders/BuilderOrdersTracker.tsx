@@ -371,38 +371,29 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
           const providersTimeoutId = setTimeout(() => providersController.abort(), 5000);
           
           // Fetch provider names and phone from delivery_providers table
-          // PostgREST requires proper formatting for 'in' operator with UUIDs
+          // PostgREST 'in' operator syntax: id=in.(uuid1,uuid2,uuid3) - no quotes needed for UUIDs
           const providerIdsArray = Array.from(allProviderIds);
           let providersRes: Response | null = null;
           
-          // Try fetching providers one by one if batch fails, or use proper PostgREST syntax
           try {
-            // First try: Use proper PostgREST 'in' syntax
-            const providersUrl = `${SUPABASE_URL}/rest/v1/delivery_providers?select=id,provider_name,company_name,phone`;
-            const providersBody = JSON.stringify({
-              id: { $in: providerIdsArray }
-            });
+            // Build PostgREST filter: id=in.(uuid1,uuid2,uuid3)
+            // UUIDs don't need quotes in PostgREST
+            const idFilter = providerIdsArray.join(',');
+            const providersUrl = `${SUPABASE_URL}/rest/v1/delivery_providers?id=in.(${idFilter})&select=id,provider_name,company_name,phone`;
             
-            // PostgREST doesn't support JSON body for filters, use URL params instead
-            // Build filter: id=in.(id1,id2,id3)
-            const idFilter = providerIdsArray.map(id => `"${id}"`).join(',');
-            const finalUrl = `${providersUrl}&id=in.(${idFilter})`;
+            console.log('👤 Fetching providers from delivery_providers:', providerIdsArray.length, 'provider IDs');
             
-            providersRes = await fetch(finalUrl, {
-              headers: {
-                ...headers,
-                'Prefer': 'return=representation'
-              },
+            providersRes = await fetch(providersUrl, {
+              headers,
               signal: providersController.signal,
               cache: 'no-store'
             });
           } catch (e) {
-            console.log('⚠️ Batch provider fetch failed, trying individual fetches');
-            // Fallback: fetch individually
+            console.error('❌ Error fetching delivery_providers:', e);
             providersRes = null;
           }
           
-          if (providersRes.ok) {
+          if (providersRes && providersRes.ok) {
             const providers = await providersRes.json();
             providers.forEach((p: any) => {
               providerNamesMap.set(p.id, p.provider_name || p.company_name || 'Delivery Provider');
