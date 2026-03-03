@@ -330,9 +330,9 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
         const drController = new AbortController();
         const drTimeoutId = setTimeout(() => drController.abort(), 5000);
         
-        // Fetch delivery requests that are accepted/assigned for these orders
+        // Fetch delivery requests that are accepted/assigned for these orders - include provider_id to get provider details
         const drResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${orderIdsParam})&status=in.(accepted,assigned,picked_up,in_transit,delivered)&provider_id=not.is.null&select=purchase_order_id,provider_id,status`,
+          `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=in.(${orderIdsParam})&status=in.(accepted,assigned,picked_up,in_transit,delivered)&provider_id=not.is.null&select=purchase_order_id,provider_id,status,accepted_at`,
           { headers, signal: drController.signal, cache: 'no-store' }
         );
         clearTimeout(drTimeoutId);
@@ -427,21 +427,30 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
         let providerName = order.delivery_provider_name;
         if (!providerName && providerId) {
           providerName = providerNamesMap.get(providerId) || null;
+          if (providerName) {
+            console.log(`✅ Found provider name for order ${order.po_number}: ${providerName} (providerId: ${providerId})`);
+          } else {
+            console.log(`⚠️ No provider name found for providerId: ${providerId} in order ${order.po_number}`);
+          }
         }
         
         // Get provider phone - prioritize purchase_order, then lookup
         let providerPhone = order.delivery_provider_phone;
         if (!providerPhone && providerId) {
           providerPhone = providerPhonesMap.get(providerId) || null;
+          if (providerPhone) {
+            console.log(`✅ Found provider phone for order ${order.po_number}: ${providerPhone}`);
+          }
         }
         
         // Update delivery_status if delivery_request has more recent status
         let deliveryStatus = order.delivery_status;
         if (dr?.status && ['accepted', 'assigned', 'picked_up', 'in_transit', 'delivered'].includes(dr.status)) {
           deliveryStatus = dr.status;
+          console.log(`📦 Order ${order.po_number}: Updated delivery_status from ${order.delivery_status} to ${deliveryStatus} from delivery_request`);
         }
         
-        return {
+        const enrichedOrder = {
           ...order,
           material_items: itemsByOrder.get(order.id) || [],
           // Enrich with provider information
@@ -450,6 +459,20 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
           delivery_provider_phone: providerPhone || order.delivery_provider_phone,
           delivery_status: deliveryStatus || order.delivery_status
         };
+        
+        // Log final state for confirmed orders
+        if (enrichedOrder.delivery_status === 'accepted' || enrichedOrder.delivery_status === 'assigned' || 
+            ['confirmed', 'dispatched', 'in_transit', 'delivered', 'received'].includes(enrichedOrder.status)) {
+          console.log(`📦 Order ${enrichedOrder.po_number} - Provider Info:`, {
+            provider_id: enrichedOrder.delivery_provider_id,
+            provider_name: enrichedOrder.delivery_provider_name,
+            provider_phone: enrichedOrder.delivery_provider_phone,
+            delivery_status: enrichedOrder.delivery_status,
+            order_status: enrichedOrder.status
+          });
+        }
+        
+        return enrichedOrder;
       });
 
       console.log('📦 Orders with items:', ordersWithItems.length);
@@ -1175,23 +1198,30 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
               </Badge>
               
               {/* Show provider details for confirmed deliveries - visible even when collapsed */}
-              {(order.delivery_provider_id || order.delivery_provider_name) && 
+              {/* Check multiple conditions: delivery_status, order status, or if provider is assigned */}
+              {((order.delivery_provider_id || order.delivery_provider_name) && 
                (order.delivery_status === 'accepted' || order.delivery_status === 'assigned' || 
-                ['confirmed', 'dispatched', 'in_transit', 'delivered', 'received'].includes(order.status)) && (
-                <div className="text-[10px] text-gray-600 text-right">
+                order.delivery_status === 'picked_up' || order.delivery_status === 'in_transit' || order.delivery_status === 'delivered' ||
+                ['confirmed', 'dispatched', 'in_transit', 'delivered', 'received'].includes(order.status) ||
+                (order.delivery_provider_id && order.status === 'confirmed'))) && (
+                <div className="text-[10px] text-gray-600 text-right max-w-[150px]">
                   {order.delivery_provider_name && order.delivery_provider_name !== 'Delivery Provider' ? (
                     <>
-                      <div className="font-medium">{order.delivery_provider_name}</div>
-                      {order.delivery_provider_phone && (
-                        <div className="text-[9px] text-gray-500 flex items-center justify-end gap-1">
-                          <Phone className="h-3 w-3" />
-                          {order.delivery_provider_phone}
+                      <div className="font-medium truncate" title={order.delivery_provider_name}>
+                        {order.delivery_provider_name}
+                      </div>
+                      {order.delivery_provider_phone ? (
+                        <div className="text-[9px] text-gray-500 flex items-center justify-end gap-1 mt-0.5">
+                          <Phone className="h-3 w-3 flex-shrink-0" />
+                          <span className="truncate">{order.delivery_provider_phone}</span>
                         </div>
+                      ) : (
+                        <div className="text-[9px] text-gray-400 mt-0.5">Phone: Not available</div>
                       )}
                     </>
-                  ) : (
-                    <div className="text-gray-500">Provider Assigned</div>
-                  )}
+                  ) : order.delivery_provider_id ? (
+                    <div className="text-gray-500 text-[9px]">Provider Assigned<br/>(Details loading...)</div>
+                  ) : null}
                 </div>
               )}
             </div>
