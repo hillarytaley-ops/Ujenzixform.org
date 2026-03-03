@@ -259,52 +259,122 @@ export const DispatchScanner: React.FC = () => {
         const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
         
-        // Get fresh access token
-        let accessToken = SUPABASE_ANON_KEY;
-        try {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session?.access_token) {
-            accessToken = session.access_token;
-          } else {
-            // Try localStorage as fallback
+        // Helper function to get fresh access token with refresh
+        const getFreshAccessToken = async (): Promise<string> => {
+          try {
+            // First, try to get current session
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            
+            if (session?.access_token && !sessionError) {
+              // Check if token is expired (with 5 minute buffer)
+              const tokenExp = session.expires_at ? new Date(session.expires_at * 1000) : null;
+              const now = new Date();
+              const buffer = 5 * 60 * 1000; // 5 minutes
+              
+              if (tokenExp && tokenExp.getTime() > now.getTime() + buffer) {
+                // Token is still valid
+                return session.access_token;
+              } else {
+                // Token is expired or expiring soon, refresh it
+                console.log('🔄 Token expired or expiring soon, refreshing...');
+                const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
+                
+                if (newSession?.access_token && !refreshError) {
+                  console.log('✅ Token refreshed successfully');
+                  return newSession.access_token;
+                } else {
+                  console.warn('⚠️ Token refresh failed, trying localStorage...', refreshError);
+                }
+              }
+            } else {
+              // No session, try to refresh
+              console.log('🔄 No session found, attempting refresh...');
+              const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
+              
+              if (newSession?.access_token && !refreshError) {
+                console.log('✅ Session refreshed successfully');
+                return newSession.access_token;
+              } else {
+                console.warn('⚠️ Session refresh failed, trying localStorage...', refreshError);
+              }
+            }
+          } catch (e) {
+            console.warn('⚠️ Error getting/refreshing session:', e);
+          }
+          
+          // Fallback to localStorage
+          try {
             const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
             if (stored) {
               const parsed = JSON.parse(stored);
-              accessToken = parsed.access_token || SUPABASE_ANON_KEY;
+              if (parsed.access_token) {
+                console.log('📦 Using token from localStorage');
+                return parsed.access_token;
+              }
             }
+          } catch (e) {
+            console.warn('⚠️ Could not get token from localStorage:', e);
           }
-        } catch (e) {
-          console.warn('Could not get session, using anon key');
-        }
-        
-        const headers: Record<string, string> = {
-          'apikey': SUPABASE_ANON_KEY,
-          'Content-Type': 'application/json'
+          
+          // Final fallback: anon key
+          console.warn('⚠️ Using anon key as final fallback');
+          return SUPABASE_ANON_KEY;
         };
-        if (accessToken) {
-          headers['Authorization'] = `Bearer ${accessToken}`;
-        }
+        
+        // Get fresh access token
+        let accessToken = await getFreshAccessToken();
+        
+        // Helper function to make supplier lookup request with retry on 401
+        const lookupSupplierWithRetry = async (url: string, methodName: string): Promise<any[]> => {
+          const headers: Record<string, string> = {
+            'apikey': SUPABASE_ANON_KEY,
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`
+          };
+          
+          try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 5000);
+            
+            let response = await fetch(url, { headers, signal: controller.signal, cache: 'no-store' });
+            clearTimeout(timeout);
+            
+            // If 401, refresh token and retry once
+            if (response.status === 401) {
+              console.log(`🔄 Got 401 for ${methodName}, refreshing token and retrying...`);
+              accessToken = await getFreshAccessToken();
+              
+              // Retry with fresh token
+              const retryController = new AbortController();
+              const retryTimeout = setTimeout(() => retryController.abort(), 5000);
+              
+              headers['Authorization'] = `Bearer ${accessToken}`;
+              response = await fetch(url, { headers, signal: retryController.signal, cache: 'no-store' });
+              clearTimeout(retryTimeout);
+            }
+            
+            if (response.ok) {
+              return await response.json();
+            } else {
+              const errorText = await response.text();
+              console.warn(`⚠️ ${methodName} failed: ${response.status}`, errorText);
+              return [];
+            }
+          } catch (e) {
+            console.log(`⚠️ ${methodName} error:`, e);
+            return [];
+          }
+        };
         
         // Method 1: Look up supplier by user_id
-        try {
-          const supplierController = new AbortController();
-          const supplierTimeout = setTimeout(() => supplierController.abort(), 5000);
-          
-          const supplierResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${userId}&select=id,user_id,email,company_name`,
-            { headers, signal: supplierController.signal, cache: 'no-store' }
-          );
-          clearTimeout(supplierTimeout);
-          
-          if (supplierResponse.ok) {
-            const supplierData = await supplierResponse.json();
-            if (supplierData && supplierData.length > 0) {
-              foundSupplierId = supplierData[0].id;
-              console.log('📦 Found supplier by user_id:', supplierData[0]);
-            }
-          }
-        } catch (e) {
-          console.log('⚠️ Supplier lookup by user_id failed:', e);
+        const supplierData1 = await lookupSupplierWithRetry(
+          `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${userId}&select=id,user_id,email,company_name`,
+          'Supplier lookup by user_id'
+        );
+        
+        if (supplierData1 && supplierData1.length > 0) {
+          foundSupplierId = supplierData1[0].id;
+          console.log('📦 Found supplier by user_id:', supplierData1[0]);
         }
         
         // Method 2: Try by email if we have user email
@@ -314,21 +384,14 @@ export const DispatchScanner: React.FC = () => {
             const userEmail = user?.email;
             
             if (userEmail) {
-              const emailController = new AbortController();
-              const emailTimeout = setTimeout(() => emailController.abort(), 5000);
-              
-              const emailResponse = await fetch(
+              const emailData = await lookupSupplierWithRetry(
                 `${SUPABASE_URL}/rest/v1/suppliers?email=eq.${encodeURIComponent(userEmail)}&select=id,user_id,email,company_name`,
-                { headers, signal: emailController.signal, cache: 'no-store' }
+                'Supplier lookup by email'
               );
-              clearTimeout(emailTimeout);
               
-              if (emailResponse.ok) {
-                const emailData = await emailResponse.json();
-                if (emailData && emailData.length > 0) {
-                  foundSupplierId = emailData[0].id;
-                  console.log('📦 Found supplier by email:', emailData[0]);
-                }
+              if (emailData && emailData.length > 0) {
+                foundSupplierId = emailData[0].id;
+                console.log('📦 Found supplier by email:', emailData[0]);
               }
             }
           } catch (e) {
@@ -338,25 +401,14 @@ export const DispatchScanner: React.FC = () => {
         
         // Method 3: Try by id (in case userId IS the supplier.id)
         if (!foundSupplierId) {
-          try {
-            const directController = new AbortController();
-            const directTimeout = setTimeout(() => directController.abort(), 5000);
-            
-            const directResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/suppliers?id=eq.${userId}&select=id,user_id,email,company_name`,
-              { headers, signal: directController.signal, cache: 'no-store' }
-            );
-            clearTimeout(directTimeout);
-            
-            if (directResponse.ok) {
-              const directData = await directResponse.json();
-              if (directData && directData.length > 0) {
-                foundSupplierId = directData[0].id;
-                console.log('📦 Found supplier by id:', directData[0]);
-              }
-            }
-          } catch (e) {
-            console.log('⚠️ Supplier lookup by id failed:', e);
+          const directData = await lookupSupplierWithRetry(
+            `${SUPABASE_URL}/rest/v1/suppliers?id=eq.${userId}&select=id,user_id,email,company_name`,
+            'Supplier lookup by id'
+          );
+          
+          if (directData && directData.length > 0) {
+            foundSupplierId = directData[0].id;
+            console.log('📦 Found supplier by id:', directData[0]);
           }
         }
 
@@ -395,32 +447,63 @@ export const DispatchScanner: React.FC = () => {
       const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
       const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
       
-      // Get fresh access token (refresh if expired)
-      let accessToken = ANON_KEY;
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.access_token) {
-          accessToken = session.access_token;
-        } else {
-          // Try to refresh the session
-          const { data: { session: newSession } } = await supabase.auth.refreshSession();
-          if (newSession?.access_token) {
-            accessToken = newSession.access_token;
+      // Helper function to get fresh access token with refresh
+      const getFreshAccessToken = async (): Promise<string> => {
+        try {
+          // First, try to get current session
+          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+          
+          if (session?.access_token && !sessionError) {
+            // Check if token is expired (with 5 minute buffer)
+            const tokenExp = session.expires_at ? new Date(session.expires_at * 1000) : null;
+            const now = new Date();
+            const buffer = 5 * 60 * 1000; // 5 minutes
+            
+            if (tokenExp && tokenExp.getTime() > now.getTime() + buffer) {
+              // Token is still valid
+              return session.access_token;
+            } else {
+              // Token is expired or expiring soon, refresh it
+              console.log('🔄 Token expired or expiring soon, refreshing...');
+              const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
+              
+              if (newSession?.access_token && !refreshError) {
+                console.log('✅ Token refreshed successfully');
+                return newSession.access_token;
+              } else {
+                console.warn('⚠️ Token refresh failed, trying localStorage...', refreshError);
+              }
+            }
           } else {
-            // Fallback to localStorage
-            const stored = getUserFromStorage();
-            if (stored?.accessToken) {
-              accessToken = stored.accessToken;
+            // No session, try to refresh
+            console.log('🔄 No session found, attempting refresh...');
+            const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
+            
+            if (newSession?.access_token && !refreshError) {
+              console.log('✅ Session refreshed successfully');
+              return newSession.access_token;
+            } else {
+              console.warn('⚠️ Session refresh failed, trying localStorage...', refreshError);
             }
           }
+        } catch (e) {
+          console.warn('⚠️ Error getting/refreshing session:', e);
         }
-      } catch (e) {
-        console.warn('Could not get session, trying localStorage...');
+        
+        // Fallback to localStorage
         const stored = getUserFromStorage();
         if (stored?.accessToken) {
-          accessToken = stored.accessToken;
+          console.log('📦 Using token from localStorage');
+          return stored.accessToken;
         }
-      }
+        
+        // Final fallback: anon key
+        console.warn('⚠️ Using anon key as final fallback');
+        return ANON_KEY;
+      };
+      
+      // Get fresh access token
+      let accessToken = await getFreshAccessToken();
       
       const headers: Record<string, string> = {
         'apikey': ANON_KEY,
@@ -932,37 +1015,96 @@ export const DispatchScanner: React.FC = () => {
         const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
         const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
         
-        // Get fresh access token (refresh if expired)
-        let accessToken = ANON_KEY;
-        try {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session?.access_token) {
-            accessToken = session.access_token;
-          } else {
-            // Try to refresh the session
-            const { data: { session: newSession } } = await supabase.auth.refreshSession();
-            if (newSession?.access_token) {
-              accessToken = newSession.access_token;
+        // Helper function to get fresh access token with refresh
+        const getFreshAccessToken = async (): Promise<string> => {
+          try {
+            // First, try to get current session
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            
+            if (session?.access_token && !sessionError) {
+              // Check if token is expired (with 5 minute buffer)
+              const tokenExp = session.expires_at ? new Date(session.expires_at * 1000) : null;
+              const now = new Date();
+              const buffer = 5 * 60 * 1000; // 5 minutes
+              
+              if (tokenExp && tokenExp.getTime() > now.getTime() + buffer) {
+                // Token is still valid
+                return session.access_token;
+              } else {
+                // Token is expired or expiring soon, refresh it
+                console.log('🔄 Token expired or expiring soon, refreshing...');
+                const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
+                
+                if (newSession?.access_token && !refreshError) {
+                  console.log('✅ Token refreshed successfully');
+                  return newSession.access_token;
+                } else {
+                  console.warn('⚠️ Token refresh failed, trying localStorage...', refreshError);
+                }
+              }
             } else {
-              // Fallback to localStorage
-              const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-              if (stored) {
-                const parsed = JSON.parse(stored);
-                accessToken = parsed.access_token || ANON_KEY;
+              // No session, try to refresh
+              console.log('🔄 No session found, attempting refresh...');
+              const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
+              
+              if (newSession?.access_token && !refreshError) {
+                console.log('✅ Session refreshed successfully');
+                return newSession.access_token;
+              } else {
+                console.warn('⚠️ Session refresh failed, trying localStorage...', refreshError);
               }
             }
+          } catch (e) {
+            console.warn('⚠️ Error getting/refreshing session:', e);
           }
-        } catch (e) {
-          console.warn('Could not get session for QR verification, using localStorage...');
-          const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-          if (stored) {
-            const parsed = JSON.parse(stored);
-            accessToken = parsed.access_token || ANON_KEY;
+          
+          // Fallback to localStorage
+          try {
+            const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              if (parsed.access_token) {
+                console.log('📦 Using token from localStorage');
+                return parsed.access_token;
+              }
+            }
+          } catch (e) {
+            console.warn('⚠️ Could not get token from localStorage:', e);
           }
-        }
+          
+          // Final fallback: anon key
+          console.warn('⚠️ Using anon key as final fallback');
+          return ANON_KEY;
+        };
+        
+        // Get fresh access token
+        let accessToken = await getFreshAccessToken();
+        
+        // Helper function to make request with retry on 401
+        const makeRequestWithRetry = async (url: string, options: RequestInit): Promise<Response> => {
+          let response = await fetch(url, options);
+          
+          // If 401, refresh token and retry once
+          if (response.status === 401) {
+            console.log('🔄 Got 401, refreshing token and retrying...');
+            accessToken = await getFreshAccessToken();
+            
+            // Retry with fresh token
+            const newOptions = {
+              ...options,
+              headers: {
+                ...options.headers,
+                'Authorization': `Bearer ${accessToken}`
+              }
+            };
+            response = await fetch(url, newOptions);
+          }
+          
+          return response;
+        };
         
         // Check database to see what order this QR code belongs to
-        const verifyResponse = await fetch(
+        const verifyResponse = await makeRequestWithRetry(
           `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${qrCode}&select=id,purchase_order_id,qr_code,material_type,item_sequence,dispatch_scanned&limit=1`,
           {
             headers: {
@@ -1006,7 +1148,7 @@ export const DispatchScanner: React.FC = () => {
               // QR code belongs to a different order - fetch the actual order to show better error
               let actualOrderNumber = 'Unknown';
               try {
-                const orderResponse = await fetch(
+                const orderResponse = await makeRequestWithRetry(
                   `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${dbItem.purchase_order_id}&select=po_number&limit=1`,
                   {
                     headers: {
@@ -1112,30 +1254,110 @@ export const DispatchScanner: React.FC = () => {
       const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
       const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
       
-      let accessToken = ANON_KEY;
-      try {
-        const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          accessToken = parsed.access_token || ANON_KEY;
+      // Helper function to get fresh access token with refresh
+      const getFreshAccessToken = async (): Promise<string> => {
+        try {
+          // First, try to get current session
+          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+          
+          if (session?.access_token && !sessionError) {
+            // Check if token is expired (with 5 minute buffer)
+            const tokenExp = session.expires_at ? new Date(session.expires_at * 1000) : null;
+            const now = new Date();
+            const buffer = 5 * 60 * 1000; // 5 minutes
+            
+            if (tokenExp && tokenExp.getTime() > now.getTime() + buffer) {
+              // Token is still valid
+              return session.access_token;
+            } else {
+              // Token is expired or expiring soon, refresh it
+              console.log('🔄 Token expired or expiring soon, refreshing...');
+              const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
+              
+              if (newSession?.access_token && !refreshError) {
+                console.log('✅ Token refreshed successfully');
+                return newSession.access_token;
+              } else {
+                console.warn('⚠️ Token refresh failed, trying localStorage...', refreshError);
+              }
+            }
+          } else {
+            // No session, try to refresh
+            console.log('🔄 No session found, attempting refresh...');
+            const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
+            
+            if (newSession?.access_token && !refreshError) {
+              console.log('✅ Session refreshed successfully');
+              return newSession.access_token;
+            } else {
+              console.warn('⚠️ Session refresh failed, trying localStorage...', refreshError);
+            }
+          }
+        } catch (e) {
+          console.warn('⚠️ Error getting/refreshing session:', e);
         }
-      } catch (e) {}
+        
+        // Fallback to localStorage
+        try {
+          const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (parsed.access_token) {
+              console.log('📦 Using token from localStorage');
+              return parsed.access_token;
+            }
+          }
+        } catch (e) {
+          console.warn('⚠️ Could not get token from localStorage:', e);
+        }
+        
+        // Final fallback: anon key
+        console.warn('⚠️ Using anon key as final fallback');
+        return ANON_KEY;
+      };
       
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/record_qr_scan`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': ANON_KEY,
-          'Authorization': `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
-          _qr_code: qrCode,
-          _scan_type: 'dispatch',
-          _scanner_device_id: navigator.userAgent.substring(0, 100),
-          _scanner_type: scannerType,
-          _material_condition: materialCondition,
-          _notes: notes || null
-        })
+      // Get fresh access token
+      let accessToken = await getFreshAccessToken();
+      
+      // Helper function to make RPC call with retry on 401
+      const makeRPCWithRetry = async (url: string, body: any): Promise<Response> => {
+        let response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify(body)
+        });
+        
+        // If 401, refresh token and retry once
+        if (response.status === 401) {
+          console.log('🔄 Got 401 for record_qr_scan, refreshing token and retrying...');
+          accessToken = await getFreshAccessToken();
+          
+          // Retry with fresh token
+          response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify(body)
+          });
+        }
+        
+        return response;
+      };
+      
+      const response = await makeRPCWithRetry(`${SUPABASE_URL}/rest/v1/rpc/record_qr_scan`, {
+        _qr_code: qrCode,
+        _scan_type: 'dispatch',
+        _scanner_device_id: navigator.userAgent.substring(0, 100),
+        _scanner_type: scannerType,
+        _material_condition: materialCondition,
+        _notes: notes || null
       });
 
       const data = await response.json();
