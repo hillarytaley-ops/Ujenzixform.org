@@ -579,22 +579,7 @@ export const useDeliveryProviderData = () => {
       // Fetch ALL pending requests from multiple tables for testing
       // All registered providers can see and accept any pending request
       // Use direct REST API to bypass potential RLS issues
-      
-      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-      
-      let accessToken = SUPABASE_ANON_KEY;
-      try {
-        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        if (storedSession) {
-          const parsed = JSON.parse(storedSession);
-          if (parsed.access_token) {
-            accessToken = parsed.access_token;
-          }
-        }
-      } catch (e) {
-        console.warn('Could not get auth token');
-      }
+      // Note: SUPABASE_URL, SUPABASE_ANON_KEY, and accessToken are already declared above
       
       const restHeaders = {
         'apikey': SUPABASE_ANON_KEY,
