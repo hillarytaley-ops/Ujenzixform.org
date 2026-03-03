@@ -245,14 +245,30 @@ BEGIN
     
     -- ============================================================
     -- AUTO-INVALIDATE IF BOTH DISPATCH AND RECEIVE ARE DONE
+    -- Only if is_invalidated column exists
     -- ============================================================
-    UPDATE material_items
-    SET is_invalidated = TRUE,
-        invalidated_at = NOW(),
-        status = 'verified'
-    WHERE qr_code = _qr_code
-      AND dispatch_scanned = TRUE
-      AND receive_scanned = TRUE;
+    -- Check if is_invalidated column exists before updating
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns 
+      WHERE table_schema = 'public' 
+        AND table_name = 'material_items' 
+        AND column_name = 'is_invalidated'
+    ) THEN
+      UPDATE material_items
+      SET is_invalidated = TRUE,
+          invalidated_at = NOW(),
+          status = 'verified'
+      WHERE qr_code = _qr_code
+        AND dispatch_scanned = TRUE
+        AND receive_scanned = TRUE;
+    ELSE
+      -- Column doesn't exist, just update status
+      UPDATE material_items
+      SET status = 'verified'
+      WHERE qr_code = _qr_code
+        AND dispatch_scanned = TRUE
+        AND receive_scanned = TRUE;
+    END IF;
     
     -- ============================================================
     -- CHECK IF ALL ITEMS IN ORDER ARE RECEIVED - UPDATE TO 'delivered'
