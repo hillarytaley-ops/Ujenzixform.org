@@ -140,8 +140,9 @@ class TrackingNumberService {
         }
       );
       
+      let timeoutId1: NodeJS.Timeout | null = null;
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => {
+        timeoutId1 = setTimeout(() => {
           console.error('⏱️ Step 1 fetch timeout after 5 seconds');
           reject(new Error('Query timeout after 5 seconds'));
         }, 5000);
@@ -153,6 +154,7 @@ class TrackingNumberService {
       try {
         console.log('⏳ Waiting for fetch response...');
         const response = await Promise.race([fetchPromise, timeoutPromise]);
+        if (timeoutId1) clearTimeout(timeoutId1);
         console.log('✅ Fetch response received:', response.status);
         
         if (!response.ok) {
@@ -169,6 +171,7 @@ class TrackingNumberService {
           }
         }
       } catch (error: any) {
+        if (timeoutId1) clearTimeout(timeoutId1);
         console.error('❌ Fetch error caught:', error);
         if (error.message?.includes('timeout')) {
           requestError = { message: 'Query timeout after 5 seconds', code: 'TIMEOUT' };
@@ -367,8 +370,9 @@ class TrackingNumberService {
         }
       );
       
+      let timeoutId4: NodeJS.Timeout | null = null;
       const updateTimeout = new Promise<never>((_, reject) => {
-        setTimeout(() => {
+        timeoutId4 = setTimeout(() => {
           console.error('⏱️ Step 4 update timeout after 5 seconds');
           reject(new Error('Update timeout after 5 seconds'));
         }, 5000);
@@ -380,6 +384,7 @@ class TrackingNumberService {
       try {
         console.log('⏳ Waiting for update response...');
         const response = await Promise.race([updatePromise, updateTimeout]);
+        if (timeoutId4) clearTimeout(timeoutId4);
         console.log('✅ Update response received:', response.status);
         
         if (!response.ok) {
@@ -391,6 +396,7 @@ class TrackingNumberService {
           console.log('✅ Update data received:', updateResult);
         }
       } catch (error: any) {
+        if (timeoutId4) clearTimeout(timeoutId4);
         console.error('❌ Update error caught:', error);
         if (error.message?.includes('timeout')) {
           updateError = { message: 'Update timeout after 5 seconds', code: 'TIMEOUT' };
@@ -412,15 +418,158 @@ class TrackingNumberService {
 
       console.log(`✅ Step 4 complete: Provider ${providerId} successfully accepted delivery ${deliveryRequestId} (First-come-first-served)`);
 
+      // Step 4.5: Update purchase_order with delivery provider information (if purchase_order_id exists)
+      if (existingRequest.purchase_order_id) {
+        console.log('📦 Step 4.5: Updating purchase_order with delivery provider info...');
+        try {
+          // Get provider info first
+          let providerName = 'Delivery Provider';
+          let providerPhone = null;
+          
+          const providerInfoPromise = fetch(
+            `${SUPABASE_URL}/rest/v1/delivery_providers?id=eq.${providerId}&select=provider_name,phone,company_name&limit=1`,
+            {
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+              },
+              cache: 'no-store'
+            }
+          );
+          
+          const providerInfoTimeout = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error('Provider info timeout')), 3000);
+          });
+          
+          try {
+            const providerInfoResponse = await Promise.race([providerInfoPromise, providerInfoTimeout]);
+            if (providerInfoResponse.ok) {
+              const providerData = await providerInfoResponse.json();
+              if (Array.isArray(providerData) && providerData.length > 0) {
+                providerName = providerData[0].company_name || providerData[0].provider_name || 'Delivery Provider';
+                providerPhone = providerData[0].phone;
+              }
+            }
+          } catch (e) {
+            // Fallback: Try profiles table
+            try {
+              const profilePromise = fetch(
+                `${SUPABASE_URL}/rest/v1/profiles?or=(user_id.eq.${providerId},id.eq.${providerId})&select=full_name,phone&limit=1`,
+                {
+                  headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                  },
+                  cache: 'no-store'
+                }
+              );
+              
+              const profileTimeout = new Promise<never>((_, reject) => {
+                setTimeout(() => reject(new Error('Profile lookup timeout')), 2000);
+              });
+              
+              const profileResponse = await Promise.race([profilePromise, profileTimeout]);
+              if (profileResponse.ok) {
+                const profiles = await profileResponse.json();
+                if (Array.isArray(profiles) && profiles.length > 0) {
+                  providerName = profiles[0].full_name || 'Delivery Provider';
+                  providerPhone = profiles[0].phone;
+                }
+              }
+            } catch (e2) {
+              // Use defaults
+            }
+          }
+          
+          // Update purchase_order with delivery provider info
+          const updatePOPromise = fetch(
+            `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${existingRequest.purchase_order_id}`,
+            {
+              method: 'PATCH',
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=representation'
+              },
+              body: JSON.stringify({
+                delivery_provider_id: providerId,
+                delivery_provider_name: providerName,
+                delivery_provider_phone: providerPhone,
+                delivery_status: 'accepted',
+                delivery_accepted_at: new Date().toISOString(),
+                delivery_assigned_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              }),
+              cache: 'no-store'
+            }
+          );
+          
+          const updatePOTimeout = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error('Update PO timeout')), 5000);
+          });
+          
+          try {
+            const updatePOResponse = await Promise.race([updatePOPromise, updatePOTimeout]);
+            if (updatePOResponse.ok) {
+              const poUpdateResult = await updatePOResponse.json();
+              console.log('✅ Step 4.5 complete: Purchase order updated with delivery provider:', providerName);
+            } else {
+              const errorText = await updatePOResponse.text();
+              console.warn('⚠️ Step 4.5: Could not update purchase_order:', updatePOResponse.status, errorText);
+            }
+          } catch (error: any) {
+            if (error.message?.includes('timeout')) {
+              console.warn('⚠️ Step 4.5: Update purchase_order timeout');
+            } else {
+              console.warn('⚠️ Step 4.5: Error updating purchase_order:', error);
+            }
+            // Don't throw - continue with tracking number creation
+          }
+        } catch (error) {
+          console.warn('⚠️ Step 4.5: Error in purchase_order update:', error);
+          // Don't throw - continue with tracking number creation
+        }
+      } else {
+        console.log('📦 Step 4.5: No purchase_order_id - skipping purchase_order update');
+      }
+
       // Explicitly create/update tracking_numbers entry (backup to database trigger)
       // This ensures the entry exists even if the trigger fails
       console.log('📦 Step 5: Creating/updating tracking_numbers entry...');
       try {
-        const { data: existingTracking } = await supabase
-          .from('tracking_numbers')
-          .select('id')
-          .eq('delivery_request_id', deliveryRequestId)
-          .maybeSingle();
+        // Use direct REST API with timeout instead of supabase client
+        const checkTrackingPromise = fetch(
+          `${SUPABASE_URL}/rest/v1/tracking_numbers?delivery_request_id=eq.${deliveryRequestId}&select=id&limit=1`,
+          {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            cache: 'no-store'
+          }
+        );
+        
+        const checkTrackingTimeout = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Check tracking timeout')), 5000);
+        });
+        
+        let existingTracking: any = null;
+        try {
+          const checkResponse = await Promise.race([checkTrackingPromise, checkTrackingTimeout]);
+          if (checkResponse.ok) {
+            const data = await checkResponse.json();
+            existingTracking = Array.isArray(data) && data.length > 0 ? data[0] : null;
+          }
+        } catch (error: any) {
+          if (!error.message?.includes('timeout')) {
+            console.warn('⚠️ Error checking existing tracking:', error);
+          }
+          // Continue - will try to create anyway
+        }
 
         if (!existingTracking) {
           // Parallelize these database calls to speed up the process
@@ -431,34 +580,58 @@ class TrackingNumberService {
 
           console.log('📦 Step 5: Resolving builder_id - existingRequest.builder_id:', existingRequest.builder_id);
 
-          // Run all lookups in parallel
+          // Run all lookups in parallel with timeouts
+          const lookupTimeout = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error('Lookup timeout')), 5000);
+          });
+          
+          const builderProfilePromise = fetch(
+            `${SUPABASE_URL}/rest/v1/profiles?or=(id.eq.${existingRequest.builder_id},user_id.eq.${existingRequest.builder_id})&select=id,user_id&limit=1`,
+            {
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+              },
+              cache: 'no-store'
+            }
+          ).then(r => r.ok ? r.json() : []).then(d => Array.isArray(d) && d.length > 0 ? d[0] : null).catch(() => null);
+          
+          const poPromise = existingRequest.purchase_order_id
+            ? fetch(
+                `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${existingRequest.purchase_order_id}&select=supplier_id&limit=1`,
+                {
+                  headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                  },
+                  cache: 'no-store'
+                }
+              ).then(r => r.ok ? r.json() : []).then(d => Array.isArray(d) && d.length > 0 ? d[0] : null).catch(() => null)
+            : Promise.resolve(null);
+          
+          const providerPromise = fetch(
+            `${SUPABASE_URL}/rest/v1/delivery_providers?id=eq.${providerId}&select=provider_name,phone,company_name&limit=1`,
+            {
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+              },
+              cache: 'no-store'
+            }
+          ).then(r => r.ok ? r.json() : []).then(d => Array.isArray(d) && d.length > 0 ? d[0] : null).catch(() => null);
+          
           const [builderProfileResult, poResult, providerResult] = await Promise.allSettled([
-            // Get builder's user_id (builder_id might be profile.id)
-            // Try both as id and as user_id
-            supabase
-              .from('profiles')
-              .select('id, user_id')
-              .or(`id.eq.${existingRequest.builder_id},user_id.eq.${existingRequest.builder_id}`)
-              .maybeSingle(),
-            // Get supplier_id from purchase_order if exists
-            existingRequest.purchase_order_id
-              ? supabase
-                  .from('purchase_orders')
-                  .select('supplier_id')
-                  .eq('id', existingRequest.purchase_order_id)
-                  .maybeSingle()
-              : Promise.resolve({ data: null, error: null }),
-            // Get provider info
-            supabase
-              .from('delivery_providers')
-              .select('provider_name, phone, company_name')
-              .eq('id', providerId)
-              .maybeSingle()
+            Promise.race([builderProfilePromise, lookupTimeout]),
+            Promise.race([poPromise, lookupTimeout]),
+            Promise.race([providerPromise, lookupTimeout])
           ]);
 
           // Process builder profile result - CRITICAL: Use user_id, not profile.id
-          if (builderProfileResult.status === 'fulfilled' && builderProfileResult.value.data) {
-            const profileData = builderProfileResult.value.data;
+          if (builderProfileResult.status === 'fulfilled' && builderProfileResult.value) {
+            const profileData = builderProfileResult.value;
             // Prefer user_id if available, otherwise check if builder_id is already a user_id
             if (profileData.user_id) {
               builderUserId = profileData.user_id;
@@ -486,25 +659,40 @@ class TrackingNumberService {
           console.log('📦 Step 5: Final builderUserId for tracking_numbers:', builderUserId);
 
           // Process purchase order result
-          if (poResult.status === 'fulfilled' && poResult.value.data?.supplier_id) {
-            supplierId = poResult.value.data.supplier_id;
+          if (poResult.status === 'fulfilled' && poResult.value?.supplier_id) {
+            supplierId = poResult.value.supplier_id;
           }
 
           // Process provider result
-          if (providerResult.status === 'fulfilled' && providerResult.value.data) {
-            providerName = providerResult.value.data.company_name || providerResult.value.data.provider_name || 'Delivery Provider';
-            providerPhone = providerResult.value.data.phone;
+          if (providerResult.status === 'fulfilled' && providerResult.value) {
+            providerName = providerResult.value.company_name || providerResult.value.provider_name || 'Delivery Provider';
+            providerPhone = providerResult.value.phone;
           } else {
             // Fallback: Try profiles table if delivery_providers didn't work
             try {
-              const { data: profile } = await supabase
-                .from('profiles')
-                .select('full_name, phone')
-                .or(`user_id.eq.${providerId},id.eq.${providerId}`)
-                .maybeSingle();
-              if (profile) {
-                providerName = profile.full_name || 'Delivery Provider';
-                providerPhone = profile.phone;
+              const profilePromise = fetch(
+                `${SUPABASE_URL}/rest/v1/profiles?or=(user_id.eq.${providerId},id.eq.${providerId})&select=full_name,phone&limit=1`,
+                {
+                  headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                  },
+                  cache: 'no-store'
+                }
+              );
+              
+              const profileTimeout = new Promise<never>((_, reject) => {
+                setTimeout(() => reject(new Error('Profile lookup timeout')), 3000);
+              });
+              
+              const profileResponse = await Promise.race([profilePromise, profileTimeout]);
+              if (profileResponse.ok) {
+                const profiles = await profileResponse.json();
+                if (Array.isArray(profiles) && profiles.length > 0) {
+                  providerName = profiles[0].full_name || 'Delivery Provider';
+                  providerPhone = profiles[0].phone;
+                }
               }
             } catch (e2) {
               // Use defaults
@@ -567,23 +755,47 @@ class TrackingNumberService {
             // Don't throw - trigger might have already created it
           }
         } else {
-          // Update existing entry
-          const { error: updateError } = await supabase
-            .from('tracking_numbers')
-            .update({
-              delivery_provider_id: providerId,
-              status: 'accepted',
-              provider_name: providerName,
-              provider_phone: providerPhone,
-              accepted_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            })
-            .eq('delivery_request_id', deliveryRequestId);
-
-          if (updateError) {
-            console.error('⚠️ Error updating tracking_numbers entry:', updateError);
-          } else {
-            console.log('✅ Updated existing tracking_numbers entry:', trackingNumber);
+          // Update existing entry using direct REST API with timeout
+          const updateTrackingPromise = fetch(
+            `${SUPABASE_URL}/rest/v1/tracking_numbers?delivery_request_id=eq.${deliveryRequestId}`,
+            {
+              method: 'PATCH',
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=representation'
+              },
+              body: JSON.stringify({
+                delivery_provider_id: providerId,
+                status: 'accepted',
+                provider_name: providerName,
+                provider_phone: providerPhone,
+                accepted_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              }),
+              cache: 'no-store'
+            }
+          );
+          
+          const updateTrackingTimeout = new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error('Update tracking timeout')), 5000);
+          });
+          
+          try {
+            const updateResponse = await Promise.race([updateTrackingPromise, updateTrackingTimeout]);
+            if (updateResponse.ok) {
+              console.log('✅ Updated existing tracking_numbers entry:', trackingNumber);
+            } else {
+              const errorText = await updateResponse.text();
+              console.error('⚠️ Error updating tracking_numbers entry:', updateResponse.status, errorText);
+            }
+          } catch (error: any) {
+            if (error.message?.includes('timeout')) {
+              console.error('⚠️ Update tracking timeout');
+            } else {
+              console.error('⚠️ Error updating tracking_numbers entry:', error);
+            }
           }
         }
       } catch (error) {
@@ -594,27 +806,53 @@ class TrackingNumberService {
 
       // Fetch builder info and provider info for notification
       console.log('📦 Step 6: Fetching builder and provider info for notification...');
-      const [builderResult, providerResult] = await Promise.all([
-        supabase
-          .from('profiles')
-          .select('id, full_name, phone, email:user_id')
-          .eq('id', existingRequest.builder_id)
-          .single(),
-        supabase
-          .from('delivery_providers')
-          .select('provider_name, phone, company_name')
-          .eq('id', providerId)
-          .single()
-      ]);
-
-      // Get builder's email from auth
-      let builderEmail = '';
-      if (builderResult.data) {
-        const { data: userData } = await supabase.auth.admin.getUserById(
-          builderResult.data.email as string
-        ).catch(() => ({ data: null }));
-        builderEmail = userData?.user?.email || '';
+      
+      const step6Timeout = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Step 6 timeout')), 5000);
+      });
+      
+      const builderPromise = fetch(
+        `${SUPABASE_URL}/rest/v1/profiles?id=eq.${existingRequest.builder_id}&select=id,full_name,phone,user_id&limit=1`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          cache: 'no-store'
+        }
+      ).then(r => r.ok ? r.json() : []).then(d => Array.isArray(d) && d.length > 0 ? d[0] : null).catch(() => null);
+      
+      const providerPromise = fetch(
+        `${SUPABASE_URL}/rest/v1/delivery_providers?id=eq.${providerId}&select=provider_name,phone,company_name&limit=1`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          cache: 'no-store'
+        }
+      ).then(r => r.ok ? r.json() : []).then(d => Array.isArray(d) && d.length > 0 ? d[0] : null).catch(() => null);
+      
+      let builderResult: any = null;
+      let providerResult: any = null;
+      
+      try {
+        [builderResult, providerResult] = await Promise.all([
+          Promise.race([builderPromise, step6Timeout]),
+          Promise.race([providerPromise, step6Timeout])
+        ]);
+      } catch (error: any) {
+        console.warn('⚠️ Step 6 timeout or error - continuing with defaults:', error);
+        // Continue with null values - notification will use defaults
       }
+
+      // Get builder's email - skip auth.admin call (requires admin privileges)
+      // Use builderResult.user_id if available, otherwise skip email
+      let builderEmail = '';
+      // Note: Getting email from auth.admin requires admin privileges
+      // We'll skip this for now and just use phone/notification
 
       console.log('✅ Step 6 complete: Builder and provider info fetched');
       
@@ -623,9 +861,9 @@ class TrackingNumberService {
       await this.notifyBuilder({
         builderId: existingRequest.builder_id,
         builderEmail,
-        builderPhone: builderResult.data?.phone || '',
+        builderPhone: builderResult?.phone || '',
         trackingNumber,
-        providerName: providerResult.data?.company_name || providerResult.data?.provider_name || 'Delivery Provider',
+        providerName: providerResult?.company_name || providerResult?.provider_name || 'Delivery Provider',
         pickupAddress: existingRequest.pickup_address,
         deliveryAddress: existingRequest.delivery_address,
         materialType: existingRequest.material_type,
@@ -797,36 +1035,119 @@ class TrackingNumberService {
     trackingNumber: string
   ): Promise<void> {
     try {
-      // Check if tracking entry already exists
-      const { data: existing } = await supabase
-        .from('delivery_tracking')
-        .select('id')
-        .eq('delivery_id', deliveryRequestId)
-        .maybeSingle();
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      
+      // Get access token
+      let accessToken = SUPABASE_ANON_KEY;
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          if (parsed.access_token) {
+            accessToken = parsed.access_token;
+          }
+        }
+      } catch (e) {
+        // Use anon key
+      }
+      
+      // Check if tracking entry already exists with timeout
+      const checkPromise = fetch(
+        `${SUPABASE_URL}/rest/v1/delivery_tracking?delivery_id=eq.${deliveryRequestId}&select=id&limit=1`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          cache: 'no-store'
+        }
+      );
+      
+      const checkTimeout = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Check tracking timeout')), 3000);
+      });
+      
+      let existing: any = null;
+      try {
+        const checkResponse = await Promise.race([checkPromise, checkTimeout]);
+        if (checkResponse.ok) {
+          const data = await checkResponse.json();
+          existing = Array.isArray(data) && data.length > 0 ? data[0] : null;
+        }
+      } catch (error) {
+        // Timeout or error - continue anyway
+        console.warn('⚠️ Error checking existing delivery tracking:', error);
+      }
 
       if (!existing) {
         // Create initial tracking entry (provider will update with actual GPS)
-        await supabase.from('delivery_tracking').insert({
-          delivery_id: deliveryRequestId,
-          provider_id: providerId,
-          current_latitude: 0,
-          current_longitude: 0,
-          delivery_status: 'accepted',
-          tracking_timestamp: new Date().toISOString()
+        const insertPromise = fetch(
+          `${SUPABASE_URL}/rest/v1/delivery_tracking`,
+          {
+            method: 'POST',
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify({
+              delivery_id: deliveryRequestId,
+              provider_id: providerId,
+              current_latitude: 0,
+              current_longitude: 0,
+              delivery_status: 'accepted',
+              tracking_timestamp: new Date().toISOString()
+            }),
+            cache: 'no-store'
+          }
+        );
+        
+        const insertTimeout = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Insert tracking timeout')), 3000);
         });
+        
+        try {
+          await Promise.race([insertPromise, insertTimeout]);
+        } catch (error) {
+          console.warn('⚠️ Error creating delivery tracking entry:', error);
+        }
       } else {
         // Update existing entry with new provider
-        await supabase
-          .from('delivery_tracking')
-          .update({
-            provider_id: providerId,
-            delivery_status: 'accepted',
-            tracking_timestamp: new Date().toISOString()
-          })
-          .eq('delivery_id', deliveryRequestId);
+        const updatePromise = fetch(
+          `${SUPABASE_URL}/rest/v1/delivery_tracking?delivery_id=eq.${deliveryRequestId}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify({
+              provider_id: providerId,
+              delivery_status: 'accepted',
+              tracking_timestamp: new Date().toISOString()
+            }),
+            cache: 'no-store'
+          }
+        );
+        
+        const updateTimeout = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Update tracking timeout')), 3000);
+        });
+        
+        try {
+          await Promise.race([updatePromise, updateTimeout]);
+        } catch (error) {
+          console.warn('⚠️ Error updating delivery tracking entry:', error);
+        }
       }
     } catch (error) {
       console.error('Error initializing delivery tracking:', error);
+      // Don't throw - this is non-critical
     }
   }
 
