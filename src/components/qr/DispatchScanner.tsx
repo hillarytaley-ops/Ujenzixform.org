@@ -834,9 +834,105 @@ export const DispatchScanner: React.FC = () => {
 
     // ═══════════════════════════════════════════════════════════════════════════
     // VALIDATE: Check if this QR code belongs to the selected order
+    // First check client-side cache, then verify with database if not found
     // ═══════════════════════════════════════════════════════════════════════════
-    const matchingItem = selectedOrder.items.find(item => item.qr_code === qrCode);
+    let matchingItem = selectedOrder.items.find(item => item.qr_code === qrCode);
     
+    // If not found in cache, verify with database (QR codes might have been generated after order was loaded)
+    if (!matchingItem) {
+      console.log('⚠️ QR code not found in cached items, verifying with database...');
+      try {
+        const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+        const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+        
+        let accessToken = ANON_KEY;
+        try {
+          const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            accessToken = parsed.access_token || ANON_KEY;
+          }
+        } catch (e) {}
+        
+        // Check database to see what order this QR code belongs to
+        const verifyResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${qrCode}&select=id,purchase_order_id,qr_code,material_type,item_sequence,dispatch_scanned&limit=1`,
+          {
+            headers: {
+              'apikey': ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            cache: 'no-store'
+          }
+        );
+        
+        if (verifyResponse.ok) {
+          const verifyData = await verifyResponse.json();
+          if (verifyData && verifyData.length > 0) {
+            const dbItem = verifyData[0];
+            
+            // Check if it belongs to the selected order
+            if (dbItem.purchase_order_id === selectedOrder.id) {
+              // QR code belongs to this order - create matching item from DB data
+              matchingItem = {
+                id: dbItem.id,
+                qr_code: dbItem.qr_code,
+                material_type: dbItem.material_type,
+                item_sequence: dbItem.item_sequence,
+                dispatch_scanned: dbItem.dispatch_scanned || false,
+                category: '',
+                quantity: 1,
+                unit: '',
+                status: dbItem.dispatch_scanned ? 'dispatched' : 'pending'
+              };
+              console.log('✅ QR code verified in database - belongs to selected order');
+            } else {
+              // QR code belongs to a different order
+              console.error('❌ QR code belongs to different order:', {
+                scanned_qr: qrCode,
+                selected_order_id: selectedOrder.id,
+                actual_order_id: dbItem.purchase_order_id
+              });
+              
+              // Play error sound
+              try {
+                const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                oscillator.frequency.value = 300;
+                oscillator.type = 'sine';
+                gainNode.gain.value = 0.3;
+                oscillator.start();
+                setTimeout(() => oscillator.stop(), 300);
+              } catch (e) {}
+
+              toast.error('❌ Wrong Order!', {
+                description: `This QR code belongs to a different order. Please scan items from Order #${selectedOrder.order_number} only.`,
+                duration: 5000
+              });
+              return;
+            }
+          } else {
+            // QR code not found in database at all
+            console.error('❌ QR code not found in database:', qrCode);
+            toast.error('❌ Invalid QR Code', {
+              description: 'This QR code is not registered in the system.',
+              duration: 5000
+            });
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('Error verifying QR code:', error);
+        // Continue anyway - let the database function handle validation
+        console.log('⚠️ Could not verify QR code, proceeding with database validation...');
+      }
+    }
+    
+    // Final check - if still no matching item, show error
     if (!matchingItem) {
       // Play error sound
       try {
