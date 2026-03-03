@@ -28,7 +28,8 @@ import {
   AlertCircle,
   Edit,
   XCircle,
-  FileText
+  FileText,
+  Phone
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -1271,15 +1272,36 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                 </div>
               </div>
               
-              {/* Delivery Provider Info */}
-              {(order.delivery_provider_id || order.delivery_provider_name) && (
+              {/* Delivery Provider Info - Always show when delivery is confirmed */}
+              {(order.delivery_provider_id || order.delivery_provider_name || order.delivery_status === 'accepted' || order.delivery_status === 'assigned' || ['confirmed', 'dispatched', 'in_transit', 'delivered', 'received'].includes(order.status)) && (
                 <div className="flex items-start gap-2 text-sm bg-blue-50 p-3 rounded-lg border border-blue-200">
                   <Truck className="h-4 w-4 text-blue-600 mt-0.5" />
-                  <div>
+                  <div className="flex-1">
                     <p className="font-medium text-blue-900">Delivery Provider</p>
-                    <p className="text-blue-700">{order.delivery_provider_name || 'Assigned Provider'}</p>
-                    {order.delivery_provider_phone && (
-                      <p className="text-xs text-blue-600 mt-1">Phone: {order.delivery_provider_phone}</p>
+                    {order.delivery_provider_name && order.delivery_provider_name !== 'Delivery Provider' ? (
+                      <>
+                        <p className="text-blue-700 font-semibold">{order.delivery_provider_name}</p>
+                        {order.delivery_provider_phone && (
+                          <div className="flex items-center gap-2 mt-1">
+                            <p className="text-xs text-blue-600">Phone: {order.delivery_provider_phone}</p>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2 text-blue-600 hover:text-blue-800 hover:bg-blue-100"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                window.open(`tel:${order.delivery_provider_phone}`, '_blank');
+                              }}
+                            >
+                              <Phone className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        )}
+                      </>
+                    ) : order.delivery_provider_id ? (
+                      <p className="text-blue-700">Provider Assigned (Details Loading...)</p>
+                    ) : (
+                      <p className="text-blue-700">Awaiting Provider Assignment</p>
                     )}
                   </div>
                 </div>
