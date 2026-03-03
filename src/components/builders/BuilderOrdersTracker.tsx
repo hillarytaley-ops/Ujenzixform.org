@@ -372,7 +372,6 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
           
           // Fetch provider names and phone from delivery_providers table
           // PostgREST 'in' operator syntax: id=in.(uuid1,uuid2,uuid3) - no quotes needed for UUIDs
-          const providerIdsArray = Array.from(allProviderIds);
           let providersRes: Response | null = null;
           
           try {
