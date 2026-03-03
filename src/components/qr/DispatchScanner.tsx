@@ -113,13 +113,13 @@ export const DispatchScanner: React.FC = () => {
     detectDeviceInfo();
     listAvailableCameras();
     
-    // Safety timeout - stop loading after 15 seconds
+    // Safety timeout - stop loading after 30 seconds (increased to allow supplier lookup to complete)
     const safetyTimeout = setTimeout(() => {
       if (loadingOrders) {
         console.log('⏱️ Dispatch Scanner safety timeout - forcing loading false');
         setLoadingOrders(false);
       }
-    }, 15000);
+    }, 30000);
     
     return () => {
       stopScanning();
@@ -366,41 +366,59 @@ export const DispatchScanner: React.FC = () => {
           }
         };
         
-        // Method 1: Look up supplier by user_id
-        const supplierData1 = await lookupSupplierWithRetry(
-          `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${userId}&select=id,user_id,email,company_name`,
-          'Supplier lookup by user_id'
-        );
-        
-        if (supplierData1 && supplierData1.length > 0) {
-          foundSupplierId = supplierData1[0].id;
-          console.log('📦 Found supplier by user_id:', supplierData1[0]);
+        // Get user email from localStorage first (faster than auth.getUser())
+        let userEmail: string | null = null;
+        try {
+          const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            userEmail = parsed.user?.email || null;
+          }
+        } catch (e) {
+          console.log('⚠️ Could not get email from localStorage');
         }
         
-        // Method 2: Try by email if we have user email
-        if (!foundSupplierId) {
+        // If email not in localStorage, try auth.getUser() with timeout
+        if (!userEmail) {
           try {
-            const { data: { user } } = await supabase.auth.getUser();
-            const userEmail = user?.email;
-            
-            if (userEmail) {
-              const emailData = await lookupSupplierWithRetry(
-                `${SUPABASE_URL}/rest/v1/suppliers?email=eq.${encodeURIComponent(userEmail)}&select=id,user_id,email,company_name`,
-                'Supplier lookup by email'
-              );
-              
-              if (emailData && emailData.length > 0) {
-                foundSupplierId = emailData[0].id;
-                console.log('📦 Found supplier by email:', emailData[0]);
-              }
-            }
+            const { data: { user } } = await withTimeout(supabase.auth.getUser(), 3000);
+            userEmail = user?.email || null;
           } catch (e) {
-            console.log('⚠️ Supplier lookup by email failed:', e);
+            console.log('⚠️ Could not get email from auth.getUser()');
+          }
+        }
+        
+        // Method 1: Try by email FIRST (this is what works in SupplierDashboard)
+        if (userEmail) {
+          console.log('📧 Trying supplier lookup by email first:', userEmail);
+          const emailData = await lookupSupplierWithRetry(
+            `${SUPABASE_URL}/rest/v1/suppliers?email=eq.${encodeURIComponent(userEmail)}&select=id,user_id,email,company_name`,
+            'Supplier lookup by email'
+          );
+          
+          if (emailData && emailData.length > 0) {
+            foundSupplierId = emailData[0].id;
+            console.log('📦 Found supplier by email:', emailData[0]);
+          }
+        }
+        
+        // Method 2: Look up supplier by user_id (if email lookup didn't work)
+        if (!foundSupplierId) {
+          console.log('🔍 Trying supplier lookup by user_id:', userId);
+          const supplierData1 = await lookupSupplierWithRetry(
+            `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${userId}&select=id,user_id,email,company_name`,
+            'Supplier lookup by user_id'
+          );
+          
+          if (supplierData1 && supplierData1.length > 0) {
+            foundSupplierId = supplierData1[0].id;
+            console.log('📦 Found supplier by user_id:', supplierData1[0]);
           }
         }
         
         // Method 3: Try by id (in case userId IS the supplier.id)
         if (!foundSupplierId) {
+          console.log('🔍 Trying supplier lookup by id:', userId);
           const directData = await lookupSupplierWithRetry(
             `${SUPABASE_URL}/rest/v1/suppliers?id=eq.${userId}&select=id,user_id,email,company_name`,
             'Supplier lookup by id'
