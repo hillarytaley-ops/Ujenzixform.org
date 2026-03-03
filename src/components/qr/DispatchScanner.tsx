@@ -255,47 +255,114 @@ export const DispatchScanner: React.FC = () => {
       if (role === 'supplier') {
         let foundSupplierId: string | null = null;
         
-        // Try profile chain with timeout
+        // Use REST API with proper token handling (same approach as SupplierDashboard)
+        const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+        
+        // Get fresh access token
+        let accessToken = SUPABASE_ANON_KEY;
         try {
-          const { data: profileData } = await withTimeout(
-            supabase.from('profiles').select('id').eq('user_id', userId).maybeSingle(),
-            3000
-          );
-          console.log('📋 Profile lookup:', profileData);
-
-          if (profileData) {
-            const { data: supplierData } = await withTimeout(
-              supabase.from('suppliers').select('id').eq('user_id', profileData.id).maybeSingle(),
-              3000
-            );
-            console.log('📦 Supplier by profile.id:', supplierData);
-            if (supplierData) {
-              foundSupplierId = supplierData.id;
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.access_token) {
+            accessToken = session.access_token;
+          } else {
+            // Try localStorage as fallback
+            const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              accessToken = parsed.access_token || SUPABASE_ANON_KEY;
             }
           }
-        } catch {
-          console.log('⚠️ Profile/supplier lookup timeout');
+        } catch (e) {
+          console.warn('Could not get session, using anon key');
         }
-
-        // Fallback: Try direct user_id match
+        
+        const headers: Record<string, string> = {
+          'apikey': SUPABASE_ANON_KEY,
+          'Content-Type': 'application/json'
+        };
+        if (accessToken) {
+          headers['Authorization'] = `Bearer ${accessToken}`;
+        }
+        
+        // Method 1: Look up supplier by user_id
+        try {
+          const supplierController = new AbortController();
+          const supplierTimeout = setTimeout(() => supplierController.abort(), 5000);
+          
+          const supplierResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${userId}&select=id,user_id,email,company_name`,
+            { headers, signal: supplierController.signal, cache: 'no-store' }
+          );
+          clearTimeout(supplierTimeout);
+          
+          if (supplierResponse.ok) {
+            const supplierData = await supplierResponse.json();
+            if (supplierData && supplierData.length > 0) {
+              foundSupplierId = supplierData[0].id;
+              console.log('📦 Found supplier by user_id:', supplierData[0]);
+            }
+          }
+        } catch (e) {
+          console.log('⚠️ Supplier lookup by user_id failed:', e);
+        }
+        
+        // Method 2: Try by email if we have user email
         if (!foundSupplierId) {
           try {
-            const { data: supplierByUserId } = await withTimeout(
-              supabase.from('suppliers').select('id').eq('user_id', userId).maybeSingle(),
-              3000
-            );
-            console.log('📦 Supplier by auth.uid:', supplierByUserId);
-            if (supplierByUserId) {
-              foundSupplierId = supplierByUserId.id;
+            const { data: { user } } = await supabase.auth.getUser();
+            const userEmail = user?.email;
+            
+            if (userEmail) {
+              const emailController = new AbortController();
+              const emailTimeout = setTimeout(() => emailController.abort(), 5000);
+              
+              const emailResponse = await fetch(
+                `${SUPABASE_URL}/rest/v1/suppliers?email=eq.${encodeURIComponent(userEmail)}&select=id,user_id,email,company_name`,
+                { headers, signal: emailController.signal, cache: 'no-store' }
+              );
+              clearTimeout(emailTimeout);
+              
+              if (emailResponse.ok) {
+                const emailData = await emailResponse.json();
+                if (emailData && emailData.length > 0) {
+                  foundSupplierId = emailData[0].id;
+                  console.log('📦 Found supplier by email:', emailData[0]);
+                }
+              }
             }
-          } catch {
-            console.log('⚠️ Direct supplier lookup timeout');
+          } catch (e) {
+            console.log('⚠️ Supplier lookup by email failed:', e);
+          }
+        }
+        
+        // Method 3: Try by id (in case userId IS the supplier.id)
+        if (!foundSupplierId) {
+          try {
+            const directController = new AbortController();
+            const directTimeout = setTimeout(() => directController.abort(), 5000);
+            
+            const directResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/suppliers?id=eq.${userId}&select=id,user_id,email,company_name`,
+              { headers, signal: directController.signal, cache: 'no-store' }
+            );
+            clearTimeout(directTimeout);
+            
+            if (directResponse.ok) {
+              const directData = await directResponse.json();
+              if (directData && directData.length > 0) {
+                foundSupplierId = directData[0].id;
+                console.log('📦 Found supplier by id:', directData[0]);
+              }
+            }
+          } catch (e) {
+            console.log('⚠️ Supplier lookup by id failed:', e);
           }
         }
 
-        // Final fallback: Use userId as supplier ID
+        // Final fallback: Use userId as supplier ID (should rarely happen)
         if (!foundSupplierId) {
-          console.log('📦 Using userId as supplier ID fallback:', userId);
+          console.log('⚠️ Using userId as supplier ID fallback:', userId);
           foundSupplierId = userId;
         }
 
@@ -328,11 +395,31 @@ export const DispatchScanner: React.FC = () => {
       const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
       const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
       
-      // Get access token
+      // Get fresh access token (refresh if expired)
       let accessToken = ANON_KEY;
-      const stored = getUserFromStorage();
-      if (stored?.accessToken) {
-        accessToken = stored.accessToken;
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          accessToken = session.access_token;
+        } else {
+          // Try to refresh the session
+          const { data: { session: newSession } } = await supabase.auth.refreshSession();
+          if (newSession?.access_token) {
+            accessToken = newSession.access_token;
+          } else {
+            // Fallback to localStorage
+            const stored = getUserFromStorage();
+            if (stored?.accessToken) {
+              accessToken = stored.accessToken;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Could not get session, trying localStorage...');
+        const stored = getUserFromStorage();
+        if (stored?.accessToken) {
+          accessToken = stored.accessToken;
+        }
       }
       
       const headers: Record<string, string> = {
@@ -845,14 +932,34 @@ export const DispatchScanner: React.FC = () => {
         const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
         const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
         
+        // Get fresh access token (refresh if expired)
         let accessToken = ANON_KEY;
         try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.access_token) {
+            accessToken = session.access_token;
+          } else {
+            // Try to refresh the session
+            const { data: { session: newSession } } = await supabase.auth.refreshSession();
+            if (newSession?.access_token) {
+              accessToken = newSession.access_token;
+            } else {
+              // Fallback to localStorage
+              const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+              if (stored) {
+                const parsed = JSON.parse(stored);
+                accessToken = parsed.access_token || ANON_KEY;
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Could not get session for QR verification, using localStorage...');
           const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
           if (stored) {
             const parsed = JSON.parse(stored);
             accessToken = parsed.access_token || ANON_KEY;
           }
-        } catch (e) {}
+        }
         
         // Check database to see what order this QR code belongs to
         const verifyResponse = await fetch(
