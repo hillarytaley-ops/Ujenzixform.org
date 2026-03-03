@@ -7,6 +7,27 @@
 -- ============================================================
 
 -- ============================================================
+-- Ensure is_invalidated column exists in material_items
+-- ============================================================
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'material_items' AND column_name = 'is_invalidated') THEN
+        ALTER TABLE material_items ADD COLUMN is_invalidated BOOLEAN DEFAULT FALSE;
+        RAISE NOTICE 'Added is_invalidated column to material_items';
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                   WHERE table_name = 'material_items' AND column_name = 'invalidated_at') THEN
+        ALTER TABLE material_items ADD COLUMN invalidated_at TIMESTAMPTZ;
+        RAISE NOTICE 'Added invalidated_at column to material_items';
+    END IF;
+END $$;
+
+-- Create index if it doesn't exist
+CREATE INDEX IF NOT EXISTS idx_material_items_is_invalidated ON material_items(is_invalidated);
+
+-- ============================================================
 -- Update record_qr_scan function to validate delivery provider
 -- ============================================================
 CREATE OR REPLACE FUNCTION public.record_qr_scan(
