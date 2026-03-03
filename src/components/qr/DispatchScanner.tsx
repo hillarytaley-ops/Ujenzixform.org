@@ -113,13 +113,15 @@ export const DispatchScanner: React.FC = () => {
     detectDeviceInfo();
     listAvailableCameras();
     
-    // Safety timeout - stop loading after 30 seconds (increased to allow supplier lookup to complete)
+    // Safety timeout - stop loading after 60 seconds (increased to allow fetchOrders to complete)
+    // Note: fetchOrders has its own timeout (20s) and will set loadingOrders(false) in finally block
     const safetyTimeout = setTimeout(() => {
       if (loadingOrders) {
-        console.log('⏱️ Dispatch Scanner safety timeout - forcing loading false');
+        console.log('⏱️ Dispatch Scanner safety timeout (60s) - forcing loading false');
+        console.log('⚠️ This should rarely happen - fetchOrders should complete within 20s');
         setLoadingOrders(false);
       }
-    }, 30000);
+    }, 60000);
     
     return () => {
       stopScanning();
@@ -502,10 +504,27 @@ export const DispatchScanner: React.FC = () => {
       const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
       
       // Helper function to get fresh access token with refresh
+      // Try localStorage FIRST to avoid auth.getSession() timeout
       const getFreshAccessToken = async (): Promise<string> => {
+        // First, try localStorage (fastest, no network call)
         try {
-          // First, try to get current session
-          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+          const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (parsed.access_token) {
+              return parsed.access_token;
+            }
+          }
+        } catch (e) {
+          console.warn('⚠️ Could not get token from localStorage:', e);
+        }
+        
+        // If localStorage doesn't have token, try session with timeout
+        try {
+          const { data: { session }, error: sessionError } = await withTimeout(
+            supabase.auth.getSession(),
+            2000
+          );
           
           if (session?.access_token && !sessionError) {
             // Check if token is expired (with 5 minute buffer)
@@ -519,35 +538,31 @@ export const DispatchScanner: React.FC = () => {
             } else {
               // Token is expired or expiring soon, refresh it
               console.log('🔄 Token expired or expiring soon, refreshing...');
-              const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
-              
-              if (newSession?.access_token && !refreshError) {
-                console.log('✅ Token refreshed successfully');
-                return newSession.access_token;
-              } else {
-                console.warn('⚠️ Token refresh failed, trying localStorage...', refreshError);
+              try {
+                const { data: { session: newSession }, error: refreshError } = await withTimeout(
+                  supabase.auth.refreshSession(),
+                  2000
+                );
+                
+                if (newSession?.access_token && !refreshError) {
+                  console.log('✅ Token refreshed successfully');
+                  return newSession.access_token;
+                } else {
+                  console.warn('⚠️ Token refresh failed, using localStorage...', refreshError);
+                }
+              } catch (refreshErr) {
+                console.warn('⚠️ Token refresh timeout, using localStorage...');
               }
-            }
-          } else {
-            // No session, try to refresh
-            console.log('🔄 No session found, attempting refresh...');
-            const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
-            
-            if (newSession?.access_token && !refreshError) {
-              console.log('✅ Session refreshed successfully');
-              return newSession.access_token;
-            } else {
-              console.warn('⚠️ Session refresh failed, trying localStorage...', refreshError);
             }
           }
         } catch (e) {
-          console.warn('⚠️ Error getting/refreshing session:', e);
+          console.warn('⚠️ Error getting session (timeout expected), using localStorage...');
         }
         
-        // Fallback to localStorage
+        // Fallback to localStorage again (in case session had token but we couldn't check expiry)
         const stored = getUserFromStorage();
         if (stored?.accessToken) {
-          console.log('📦 Using token from localStorage');
+          console.log('📦 Using token from localStorage (fallback)');
           return stored.accessToken;
         }
         
@@ -557,7 +572,9 @@ export const DispatchScanner: React.FC = () => {
       };
       
       // Get fresh access token
+      console.log('🔑 Getting access token for fetchOrders...');
       let accessToken = await getFreshAccessToken();
+      console.log('✅ Got access token for fetchOrders');
       
       const headers: Record<string, string> = {
         'apikey': ANON_KEY,
@@ -568,13 +585,18 @@ export const DispatchScanner: React.FC = () => {
       // Fetch BOTH material_items AND purchase_orders to ensure we get all orders
       // Some orders might not have material_items created yet
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000);
+      const timeoutId = setTimeout(() => {
+        console.warn('⏱️ Fetch orders timeout (20s) - aborting requests');
+        controller.abort();
+      }, 20000);
       
+      console.log('📦 Fetching material_items for supplier...');
       // Fetch material items for this supplier
       const itemsResponse = await fetch(
         `${SUPABASE_URL}/rest/v1/material_items?supplier_id=eq.${supplierId}&order=created_at.desc&limit=1000`,
         { headers, signal: controller.signal, cache: 'no-store' }
       );
+      console.log('✅ Material items response status:', itemsResponse.status);
       
       // FIRST: Fetch delivery_requests with accepted status to get purchase_order_ids
       // This is where delivery confirmation actually happens
