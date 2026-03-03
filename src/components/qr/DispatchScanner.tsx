@@ -872,7 +872,15 @@ export const DispatchScanner: React.FC = () => {
           if (verifyData && verifyData.length > 0) {
             const dbItem = verifyData[0];
             
-            // Check if it belongs to the selected order
+            console.log('🔍 Database verification result:', {
+              qr_code: qrCode,
+              db_purchase_order_id: dbItem.purchase_order_id,
+              selected_order_id: selectedOrder.id,
+              selected_order_number: selectedOrder.order_number,
+              match: dbItem.purchase_order_id === selectedOrder.id
+            });
+            
+            // Check if it belongs to the selected order (compare by UUID)
             if (dbItem.purchase_order_id === selectedOrder.id) {
               // QR code belongs to this order - create matching item from DB data
               matchingItem = {
@@ -888,11 +896,37 @@ export const DispatchScanner: React.FC = () => {
               };
               console.log('✅ QR code verified in database - belongs to selected order');
             } else {
+              // QR code belongs to a different order - fetch the actual order to show better error
+              let actualOrderNumber = 'Unknown';
+              try {
+                const orderResponse = await fetch(
+                  `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${dbItem.purchase_order_id}&select=po_number&limit=1`,
+                  {
+                    headers: {
+                      'apikey': ANON_KEY,
+                      'Authorization': `Bearer ${accessToken}`,
+                      'Content-Type': 'application/json'
+                    },
+                    cache: 'no-store'
+                  }
+                );
+                if (orderResponse.ok) {
+                  const orderData = await orderResponse.json();
+                  if (orderData && orderData.length > 0) {
+                    actualOrderNumber = orderData[0].po_number || 'Unknown';
+                  }
+                }
+              } catch (e) {
+                console.warn('Could not fetch actual order number:', e);
+              }
+              
               // QR code belongs to a different order
               console.error('❌ QR code belongs to different order:', {
                 scanned_qr: qrCode,
                 selected_order_id: selectedOrder.id,
-                actual_order_id: dbItem.purchase_order_id
+                selected_order_number: selectedOrder.order_number,
+                actual_order_id: dbItem.purchase_order_id,
+                actual_order_number: actualOrderNumber
               });
               
               // Play error sound
