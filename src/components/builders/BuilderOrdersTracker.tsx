@@ -1198,12 +1198,10 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
               </Badge>
               
               {/* Show provider details for confirmed deliveries - visible even when collapsed */}
-              {/* Check multiple conditions: delivery_status, order status, or if provider is assigned */}
-              {((order.delivery_provider_id || order.delivery_provider_name) && 
-               (order.delivery_status === 'accepted' || order.delivery_status === 'assigned' || 
-                order.delivery_status === 'picked_up' || order.delivery_status === 'in_transit' || order.delivery_status === 'delivered' ||
-                ['confirmed', 'dispatched', 'in_transit', 'delivered', 'received'].includes(order.status) ||
-                (order.delivery_provider_id && order.status === 'confirmed'))) && (
+              {/* Show whenever a provider is assigned (delivery_provider_id exists) OR delivery is confirmed */}
+              {(order.delivery_provider_id || order.delivery_provider_name || 
+                order.delivery_status === 'accepted' || order.delivery_status === 'assigned' || 
+                ['confirmed'].includes(order.status)) && (
                 <div className="text-[10px] text-gray-600 text-right max-w-[150px]">
                   {order.delivery_provider_name && order.delivery_provider_name !== 'Delivery Provider' ? (
                     <>
@@ -1215,13 +1213,15 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                           <Phone className="h-3 w-3 flex-shrink-0" />
                           <span className="truncate">{order.delivery_provider_phone}</span>
                         </div>
-                      ) : (
-                        <div className="text-[9px] text-gray-400 mt-0.5">Phone: Not available</div>
-                      )}
+                      ) : order.delivery_provider_id ? (
+                        <div className="text-[9px] text-gray-400 mt-0.5">Phone: Loading...</div>
+                      ) : null}
                     </>
                   ) : order.delivery_provider_id ? (
                     <div className="text-gray-500 text-[9px]">Provider Assigned<br/>(Details loading...)</div>
-                  ) : null}
+                  ) : (
+                    <div className="text-gray-500 text-[9px]">Delivery Confirmed</div>
+                  )}
                 </div>
               )}
             </div>
