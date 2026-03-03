@@ -45,6 +45,9 @@ interface Order {
   pending_items: number;
   created_at: string;
   items: OrderItem[];
+  delivery_provider_id?: string | null;
+  delivery_provider_name?: string | null;
+  delivery_required?: boolean;
 }
 
 interface ScanResult {
@@ -560,6 +563,12 @@ export const DispatchScanner: React.FC = () => {
         console.log('✅ Added placeholder items for confirmed delivery orders without material_items');
       }
 
+      // Create a map of purchase_orders by id for quick lookup
+      const purchaseOrderMap: Record<string, any> = {};
+      (ordersData || []).forEach((order: any) => {
+        purchaseOrderMap[order.id] = order;
+      });
+      
       // Group items by purchase_order_id
       const orderMap: Record<string, Order> = {};
       
@@ -567,20 +576,24 @@ export const DispatchScanner: React.FC = () => {
       
       (itemsData || []).forEach((item: any) => {
         const orderId = item.purchase_order_id || 'unknown';
+        const purchaseOrder = purchaseOrderMap[orderId];
         
         if (!orderMap[orderId]) {
           orderMap[orderId] = {
             id: orderId,
-            order_number: orderId.slice(0, 8).toUpperCase(),
-            buyer_id: item.buyer_id || 'unknown',
-            buyer_name: item.buyer_name || 'Unknown Client',
-            buyer_email: item.buyer_email || '',
-            buyer_phone: item.buyer_phone || '',
+            order_number: purchaseOrder?.po_number || orderId.slice(0, 8).toUpperCase(),
+            buyer_id: item.buyer_id || purchaseOrder?.buyer_id || 'unknown',
+            buyer_name: item.buyer_name || purchaseOrder?.builder_name || 'Unknown Client',
+            buyer_email: item.buyer_email || purchaseOrder?.builder_email || '',
+            buyer_phone: item.buyer_phone || purchaseOrder?.builder_phone || '',
             total_items: 0,
             dispatched_items: 0,
             pending_items: 0,
-            created_at: item.created_at || '',
-            items: []
+            created_at: item.created_at || purchaseOrder?.created_at || '',
+            items: [],
+            delivery_provider_id: purchaseOrder?.delivery_provider_id || null,
+            delivery_provider_name: purchaseOrder?.delivery_provider_name || null,
+            delivery_required: purchaseOrder?.delivery_required !== false // Default to true if not explicitly false
           };
         }
 
@@ -806,6 +819,20 @@ export const DispatchScanner: React.FC = () => {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
+    // VALIDATE: Delivery provider required before dispatch
+    // ═══════════════════════════════════════════════════════════════════════════
+    const deliveryRequired = selectedOrder.delivery_required !== false; // Default to true if not explicitly false
+    const hasDeliveryProvider = selectedOrder.delivery_provider_id && selectedOrder.delivery_provider_id.trim() !== '';
+    
+    if (deliveryRequired && !hasDeliveryProvider) {
+      toast.error('❌ Cannot Dispatch: No Delivery Provider Assigned', {
+        description: 'This order requires delivery service, but no delivery provider has been assigned yet. Please wait for a delivery provider to accept the delivery request before dispatching materials.',
+        duration: 8000
+      });
+      return;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
     // VALIDATE: Check if this QR code belongs to the selected order
     // ═══════════════════════════════════════════════════════════════════════════
     const matchingItem = selectedOrder.items.find(item => item.qr_code === qrCode);
@@ -944,6 +971,10 @@ export const DispatchScanner: React.FC = () => {
           case 'ALREADY_DISPATCHED':
             errorTitle = '⚠️ Already Scanned';
             errorDescription = 'This QR code has already been scanned and dispatched.';
+            break;
+          case 'NO_DELIVERY_PROVIDER':
+            errorTitle = '❌ No Delivery Provider Assigned';
+            errorDescription = 'Cannot dispatch materials: No delivery provider has been assigned to this order. Please wait for a delivery provider to accept the delivery request before dispatching.';
             break;
           case 'QR_INVALIDATED':
             errorTitle = '🚫 QR Code Invalidated';
@@ -1119,6 +1150,28 @@ export const DispatchScanner: React.FC = () => {
           <p className="text-sm text-muted-foreground">{selectedOrder.buyer_name}</p>
         </div>
       </div>
+
+      {/* Delivery Provider Warning */}
+      {selectedOrder.delivery_required !== false && !selectedOrder.delivery_provider_id && (
+        <Alert className="border-amber-300 bg-amber-50">
+          <AlertCircle className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="text-amber-800">
+            <strong>⚠️ Cannot Dispatch:</strong> This order requires delivery service, but no delivery provider has been assigned yet. 
+            Please wait for a delivery provider to accept the delivery request before scanning QR codes for dispatch.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Delivery Provider Info */}
+      {selectedOrder.delivery_provider_id && selectedOrder.delivery_provider_name && (
+        <Alert className="border-green-300 bg-green-50">
+          <Truck className="h-4 w-4 text-green-600" />
+          <AlertDescription className="text-green-800">
+            <strong>✅ Delivery Provider Assigned:</strong> {selectedOrder.delivery_provider_name}
+            {selectedOrder.delivery_provider_id && ` (ID: ${selectedOrder.delivery_provider_id.slice(0, 8)}...)`}
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Progress Card - Compact */}
       <Card className={allItemsScanned ? 'border-green-400 bg-green-50' : 'border-blue-200 bg-blue-50'}>
