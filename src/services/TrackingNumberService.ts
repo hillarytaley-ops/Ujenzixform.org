@@ -427,7 +427,7 @@ class TrackingNumberService {
           let providerPhone = null;
           
           const providerInfoPromise = fetch(
-            `${SUPABASE_URL}/rest/v1/delivery_providers?id=eq.${providerId}&select=provider_name,phone,company_name&limit=1`,
+            `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${providerId}&select=provider_name,phone,company_name&limit=1`,
             {
               headers: {
                 'apikey': SUPABASE_ANON_KEY,
@@ -612,7 +612,7 @@ class TrackingNumberService {
             : Promise.resolve(null);
           
           const providerPromise = fetch(
-            `${SUPABASE_URL}/rest/v1/delivery_providers?id=eq.${providerId}&select=provider_name,phone,company_name&limit=1`,
+            `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${providerId}&select=provider_name,phone,company_name&limit=1`,
             {
               headers: {
                 'apikey': SUPABASE_ANON_KEY,
@@ -858,7 +858,7 @@ class TrackingNumberService {
       
       // Send notification to builder
       console.log('📦 Step 7: Sending notification to builder...');
-      await this.notifyBuilder({
+      const notificationPromise = this.notifyBuilder({
         builderId: existingRequest.builder_id,
         builderEmail,
         builderPhone: builderResult?.phone || '',
@@ -869,7 +869,22 @@ class TrackingNumberService {
         materialType: existingRequest.material_type,
         estimatedPickupDate: existingRequest.pickup_date
       });
-      console.log('✅ Step 7 complete: Notification sent');
+      
+      const notificationTimeout = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Notification timeout')), 5000);
+      });
+      
+      try {
+        await Promise.race([notificationPromise, notificationTimeout]);
+        console.log('✅ Step 7 complete: Notification sent');
+      } catch (error: any) {
+        if (error.message === 'Notification timeout') {
+          console.warn('⚠️ Step 7 timeout - notification may not have been sent, but continuing...');
+        } else {
+          console.warn('⚠️ Step 7 error - notification may not have been sent:', error);
+        }
+        // Don't throw - notification is non-critical, continue with flow
+      }
 
       // Create a delivery tracking entry (initialize GPS tracking)
       console.log('📦 Step 8: Initializing delivery tracking...');
@@ -959,23 +974,72 @@ class TrackingNumberService {
    */
   private async notifyBuilder(notification: BuilderNotification): Promise<void> {
     try {
-      // Create in-app notification
-      await supabase.from('notifications').insert({
-        user_id: notification.builderId,
-        type: 'delivery_accepted',
-        title: '🚚 Delivery Provider Assigned!',
-        message: `Your delivery has been accepted! Track it with: ${notification.trackingNumber}`,
-        data: {
-          tracking_number: notification.trackingNumber,
-          provider_name: notification.providerName,
-          pickup_address: notification.pickupAddress,
-          delivery_address: notification.deliveryAddress,
-          material_type: notification.materialType,
-          estimated_pickup: notification.estimatedPickupDate
-        },
-        read: false,
-        created_at: new Date().toISOString()
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      
+      // Get access token
+      let accessToken = SUPABASE_ANON_KEY;
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          if (parsed.access_token) {
+            accessToken = parsed.access_token;
+          }
+        }
+      } catch (e) {
+        // Use anon key
+      }
+      
+      // Create in-app notification using direct REST API with timeout
+      const notificationPromise = fetch(
+        `${SUPABASE_URL}/rest/v1/notifications`,
+        {
+          method: 'POST',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify({
+            user_id: notification.builderId,
+            type: 'delivery_accepted',
+            title: '🚚 Delivery Provider Assigned!',
+            message: `Your delivery has been accepted! Track it with: ${notification.trackingNumber}`,
+            data: {
+              tracking_number: notification.trackingNumber,
+              provider_name: notification.providerName,
+              pickup_address: notification.pickupAddress,
+              delivery_address: notification.deliveryAddress,
+              material_type: notification.materialType,
+              estimated_pickup: notification.estimatedPickupDate
+            },
+            read: false,
+            created_at: new Date().toISOString()
+          }),
+          cache: 'no-store'
+        }
+      );
+      
+      const notificationTimeout = new Promise<Response>((_, reject) => {
+        setTimeout(() => reject(new Error('Notification insert timeout')), 3000);
       });
+      
+      try {
+        const response = await Promise.race([notificationPromise, notificationTimeout]);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.warn('⚠️ Notification insert failed:', response.status, errorText);
+        }
+      } catch (error: any) {
+        if (error.message === 'Notification insert timeout') {
+          console.warn('⚠️ Notification insert timed out after 3 seconds');
+        } else {
+          throw error;
+        }
+      }
 
       // Log the tracking number assignment
       console.log(`
