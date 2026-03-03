@@ -73,6 +73,7 @@ export const DispatchScanner: React.FC = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [supplierId, setSupplierId] = useState<string | null>(null);
+  const fetchOrdersRef = useRef<boolean>(false); // Prevent multiple simultaneous calls
 
   // ─────────────────────────────────────────────────────────────────────────────
   // STATE - Scanner
@@ -125,6 +126,17 @@ export const DispatchScanner: React.FC = () => {
       fetchOrders();
     }
   }, [supplierId]);
+
+  // Debug: Log when orders state changes
+  useEffect(() => {
+    console.log('📦 Orders state updated:', {
+      count: orders.length,
+      loading: loadingOrders,
+      pending: orders.filter(o => o.pending_items > 0).length,
+      completed: orders.filter(o => o.pending_items === 0).length,
+      sampleOrderIds: orders.slice(0, 3).map(o => o.id?.slice(0, 8))
+    });
+  }, [orders, loadingOrders]);
 
   // Check if all items are scanned when selectedOrder changes
   useEffect(() => {
@@ -441,7 +453,7 @@ export const DispatchScanner: React.FC = () => {
           }
           
           // Method 3: Try by id (in case userId IS the supplier.id)
-          if (!foundSupplierId) {
+        if (!foundSupplierId) {
             console.log('🔍 Trying supplier lookup by id:', userId);
             const directData = await lookupSupplierWithRetry(
               `${SUPABASE_URL}/rest/v1/suppliers?id=eq.${userId}&select=id,user_id,email,company_name`,
@@ -486,7 +498,14 @@ export const DispatchScanner: React.FC = () => {
       return;
     }
     
+    // Prevent multiple simultaneous calls
+    if (fetchOrdersRef.current) {
+      console.log('⚠️ fetchOrders already in progress, skipping...');
+      return;
+    }
+    
     console.log('📦 Fetching orders for supplier:', supplierId);
+    fetchOrdersRef.current = true;
     setLoadingOrders(true);
     
     try {
@@ -551,8 +570,8 @@ export const DispatchScanner: React.FC = () => {
         }
         
         // Fallback to localStorage again (in case session had token but we couldn't check expiry)
-        const stored = getUserFromStorage();
-        if (stored?.accessToken) {
+      const stored = getUserFromStorage();
+      if (stored?.accessToken) {
           console.log('📦 Using token from localStorage (fallback)');
           return stored.accessToken;
         }
@@ -805,7 +824,7 @@ export const DispatchScanner: React.FC = () => {
       (ordersData || []).forEach((order: any) => {
         purchaseOrderMap[order.id] = order;
       });
-      
+
       // Group items by purchase_order_id
       const orderMap: Record<string, Order> = {};
       
@@ -872,11 +891,15 @@ export const DispatchScanner: React.FC = () => {
 
       setOrders(ordersArray);
       console.log('📦 Fetched orders:', ordersArray.length);
+      console.log('✅ Orders state will be updated with', ordersArray.length, 'orders');
     } catch (error) {
       console.error('Error fetching orders:', error);
       toast.error('Failed to load orders');
+      // Don't clear orders on error - keep existing orders visible
     } finally {
       setLoadingOrders(false);
+      fetchOrdersRef.current = false;
+      console.log('✅ fetchOrders completed, loadingOrders set to false');
     }
   };
 
@@ -1365,10 +1388,10 @@ export const DispatchScanner: React.FC = () => {
         }
         
         // Fallback to localStorage
-        try {
-          const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-          if (stored) {
-            const parsed = JSON.parse(stored);
+      try {
+        const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (stored) {
+          const parsed = JSON.parse(stored);
             if (parsed.access_token) {
               console.log('📦 Using token from localStorage');
               return parsed.access_token;
@@ -1389,12 +1412,12 @@ export const DispatchScanner: React.FC = () => {
       // Helper function to make RPC call with retry on 401
       const makeRPCWithRetry = async (url: string, body: any): Promise<Response> => {
         let response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': ANON_KEY,
-            'Authorization': `Bearer ${accessToken}`,
-          },
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': ANON_KEY,
+          'Authorization': `Bearer ${accessToken}`,
+        },
           body: JSON.stringify(body)
         });
         
@@ -1419,12 +1442,12 @@ export const DispatchScanner: React.FC = () => {
       };
       
       const response = await makeRPCWithRetry(`${SUPABASE_URL}/rest/v1/rpc/record_qr_scan`, {
-        _qr_code: qrCode,
-        _scan_type: 'dispatch',
-        _scanner_device_id: navigator.userAgent.substring(0, 100),
-        _scanner_type: scannerType,
-        _material_condition: materialCondition,
-        _notes: notes || null
+          _qr_code: qrCode,
+          _scan_type: 'dispatch',
+          _scanner_device_id: navigator.userAgent.substring(0, 100),
+          _scanner_type: scannerType,
+          _material_condition: materialCondition,
+          _notes: notes || null
       });
 
       const data = await response.json();
@@ -1646,6 +1669,21 @@ export const DispatchScanner: React.FC = () => {
                 </h3>
                 {orders.filter(o => o.pending_items === 0).map(order => (
                   <OrderCard key={order.id} order={order} onSelect={selectOrder} isComplete />
+                ))}
+              </div>
+            )}
+
+            {/* Fallback: If orders exist but neither section shows (shouldn't happen, but just in case) */}
+            {orders.length > 0 && 
+             orders.filter(o => o.pending_items > 0).length === 0 && 
+             orders.filter(o => o.pending_items === 0).length === 0 && (
+              <div className="space-y-3">
+                <h3 className="font-semibold text-gray-700 flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  All Orders ({orders.length} orders)
+                </h3>
+                {orders.map(order => (
+                  <OrderCard key={order.id} order={order} onSelect={selectOrder} />
                 ))}
               </div>
             )}
