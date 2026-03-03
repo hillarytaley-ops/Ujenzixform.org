@@ -260,10 +260,28 @@ export const DispatchScanner: React.FC = () => {
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
         
         // Helper function to get fresh access token with refresh
+        // Try localStorage FIRST to avoid auth.getSession() timeout
         const getFreshAccessToken = async (): Promise<string> => {
+          // First, try localStorage (fastest, no network call)
           try {
-            // First, try to get current session
-            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              if (parsed.access_token) {
+                console.log('📦 Using token from localStorage (fast path)');
+                return parsed.access_token;
+              }
+            }
+          } catch (e) {
+            console.warn('⚠️ Could not get token from localStorage:', e);
+          }
+          
+          // If localStorage doesn't have token, try session with timeout
+          try {
+            const { data: { session }, error: sessionError } = await withTimeout(
+              supabase.auth.getSession(),
+              2000
+            );
             
             if (session?.access_token && !sessionError) {
               // Check if token is expired (with 5 minute buffer)
@@ -277,38 +295,34 @@ export const DispatchScanner: React.FC = () => {
               } else {
                 // Token is expired or expiring soon, refresh it
                 console.log('🔄 Token expired or expiring soon, refreshing...');
-                const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
-                
-                if (newSession?.access_token && !refreshError) {
-                  console.log('✅ Token refreshed successfully');
-                  return newSession.access_token;
-                } else {
-                  console.warn('⚠️ Token refresh failed, trying localStorage...', refreshError);
+                try {
+                  const { data: { session: newSession }, error: refreshError } = await withTimeout(
+                    supabase.auth.refreshSession(),
+                    2000
+                  );
+                  
+                  if (newSession?.access_token && !refreshError) {
+                    console.log('✅ Token refreshed successfully');
+                    return newSession.access_token;
+                  } else {
+                    console.warn('⚠️ Token refresh failed, using localStorage...', refreshError);
+                  }
+                } catch (refreshErr) {
+                  console.warn('⚠️ Token refresh timeout, using localStorage...');
                 }
-              }
-            } else {
-              // No session, try to refresh
-              console.log('🔄 No session found, attempting refresh...');
-              const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
-              
-              if (newSession?.access_token && !refreshError) {
-                console.log('✅ Session refreshed successfully');
-                return newSession.access_token;
-              } else {
-                console.warn('⚠️ Session refresh failed, trying localStorage...', refreshError);
               }
             }
           } catch (e) {
-            console.warn('⚠️ Error getting/refreshing session:', e);
+            console.warn('⚠️ Error getting session (timeout expected), using localStorage...');
           }
           
-          // Fallback to localStorage
+          // Fallback to localStorage again (in case session had token but we couldn't check expiry)
           try {
             const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
             if (stored) {
               const parsed = JSON.parse(stored);
               if (parsed.access_token) {
-                console.log('📦 Using token from localStorage');
+                console.log('📦 Using token from localStorage (fallback)');
                 return parsed.access_token;
               }
             }
@@ -321,8 +335,10 @@ export const DispatchScanner: React.FC = () => {
           return SUPABASE_ANON_KEY;
         };
         
-        // Get fresh access token
+        // Get fresh access token (with timeout protection)
+        console.log('🔑 Getting access token for supplier lookup...');
         let accessToken = await getFreshAccessToken();
+        console.log('✅ Got access token');
         
         // Helper function to make supplier lookup request with retry on 401
         const lookupSupplierWithRetry = async (url: string, methodName: string): Promise<any[]> => {
@@ -367,12 +383,16 @@ export const DispatchScanner: React.FC = () => {
         };
         
         // Get user email from localStorage first (faster than auth.getUser())
+        console.log('📧 Getting user email for supplier lookup...');
         let userEmail: string | null = null;
         try {
           const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
           if (stored) {
             const parsed = JSON.parse(stored);
             userEmail = parsed.user?.email || null;
+            if (userEmail) {
+              console.log('📧 Got email from localStorage:', userEmail);
+            }
           }
         } catch (e) {
           console.log('⚠️ Could not get email from localStorage');
@@ -381,53 +401,69 @@ export const DispatchScanner: React.FC = () => {
         // If email not in localStorage, try auth.getUser() with timeout
         if (!userEmail) {
           try {
-            const { data: { user } } = await withTimeout(supabase.auth.getUser(), 3000);
+            const { data: { user } } = await withTimeout(supabase.auth.getUser(), 2000);
             userEmail = user?.email || null;
+            if (userEmail) {
+              console.log('📧 Got email from auth.getUser():', userEmail);
+            }
           } catch (e) {
-            console.log('⚠️ Could not get email from auth.getUser()');
+            console.log('⚠️ Could not get email from auth.getUser() (timeout expected)');
           }
         }
         
-        // Method 1: Try by email FIRST (this is what works in SupplierDashboard)
-        if (userEmail) {
-          console.log('📧 Trying supplier lookup by email first:', userEmail);
-          const emailData = await lookupSupplierWithRetry(
-            `${SUPABASE_URL}/rest/v1/suppliers?email=eq.${encodeURIComponent(userEmail)}&select=id,user_id,email,company_name`,
-            'Supplier lookup by email'
-          );
-          
-          if (emailData && emailData.length > 0) {
-            foundSupplierId = emailData[0].id;
-            console.log('📦 Found supplier by email:', emailData[0]);
+        // Wrap supplier lookup in try-catch with timeout to ensure it completes
+        try {
+          // Method 1: Try by email FIRST (this is what works in SupplierDashboard)
+          if (userEmail) {
+            console.log('📧 Trying supplier lookup by email first:', userEmail);
+            const emailData = await lookupSupplierWithRetry(
+              `${SUPABASE_URL}/rest/v1/suppliers?email=eq.${encodeURIComponent(userEmail)}&select=id,user_id,email,company_name`,
+              'Supplier lookup by email'
+            );
+            
+            if (emailData && emailData.length > 0) {
+              foundSupplierId = emailData[0].id;
+              console.log('📦 Found supplier by email:', emailData[0]);
+            } else {
+              console.log('⚠️ No supplier found by email');
+            }
+          } else {
+            console.log('⚠️ No email available for supplier lookup');
           }
-        }
-        
-        // Method 2: Look up supplier by user_id (if email lookup didn't work)
-        if (!foundSupplierId) {
-          console.log('🔍 Trying supplier lookup by user_id:', userId);
-          const supplierData1 = await lookupSupplierWithRetry(
-            `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${userId}&select=id,user_id,email,company_name`,
-            'Supplier lookup by user_id'
-          );
           
-          if (supplierData1 && supplierData1.length > 0) {
-            foundSupplierId = supplierData1[0].id;
-            console.log('📦 Found supplier by user_id:', supplierData1[0]);
+          // Method 2: Look up supplier by user_id (if email lookup didn't work)
+          if (!foundSupplierId) {
+            console.log('🔍 Trying supplier lookup by user_id:', userId);
+            const supplierData1 = await lookupSupplierWithRetry(
+              `${SUPABASE_URL}/rest/v1/suppliers?user_id=eq.${userId}&select=id,user_id,email,company_name`,
+              'Supplier lookup by user_id'
+            );
+            
+            if (supplierData1 && supplierData1.length > 0) {
+              foundSupplierId = supplierData1[0].id;
+              console.log('📦 Found supplier by user_id:', supplierData1[0]);
+            } else {
+              console.log('⚠️ No supplier found by user_id');
+            }
           }
-        }
-        
-        // Method 3: Try by id (in case userId IS the supplier.id)
-        if (!foundSupplierId) {
-          console.log('🔍 Trying supplier lookup by id:', userId);
-          const directData = await lookupSupplierWithRetry(
-            `${SUPABASE_URL}/rest/v1/suppliers?id=eq.${userId}&select=id,user_id,email,company_name`,
-            'Supplier lookup by id'
-          );
           
-          if (directData && directData.length > 0) {
-            foundSupplierId = directData[0].id;
-            console.log('📦 Found supplier by id:', directData[0]);
+          // Method 3: Try by id (in case userId IS the supplier.id)
+          if (!foundSupplierId) {
+            console.log('🔍 Trying supplier lookup by id:', userId);
+            const directData = await lookupSupplierWithRetry(
+              `${SUPABASE_URL}/rest/v1/suppliers?id=eq.${userId}&select=id,user_id,email,company_name`,
+              'Supplier lookup by id'
+            );
+            
+            if (directData && directData.length > 0) {
+              foundSupplierId = directData[0].id;
+              console.log('📦 Found supplier by id:', directData[0]);
+            } else {
+              console.log('⚠️ No supplier found by id');
+            }
           }
+        } catch (lookupErr) {
+          console.error('❌ Supplier lookup error:', lookupErr);
         }
 
         // Final fallback: Use userId as supplier ID (should rarely happen)
