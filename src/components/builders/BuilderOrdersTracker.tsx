@@ -1168,10 +1168,33 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
             </div>
             
             {/* Status Badge */}
-            <Badge className={`${getStatusColor(order.status)} px-3 py-1 whitespace-nowrap`}>
-              {getStatusIcon(order.status)}
-              <span className="ml-1">{getStatusLabel(order)}</span>
-            </Badge>
+            <div className="flex flex-col items-end gap-1">
+              <Badge className={`${getStatusColor(order.status)} px-3 py-1 whitespace-nowrap`}>
+                {getStatusIcon(order.status)}
+                <span className="ml-1">{getStatusLabel(order)}</span>
+              </Badge>
+              
+              {/* Show provider details for confirmed deliveries - visible even when collapsed */}
+              {(order.delivery_provider_id || order.delivery_provider_name) && 
+               (order.delivery_status === 'accepted' || order.delivery_status === 'assigned' || 
+                ['confirmed', 'dispatched', 'in_transit', 'delivered', 'received'].includes(order.status)) && (
+                <div className="text-[10px] text-gray-600 text-right">
+                  {order.delivery_provider_name && order.delivery_provider_name !== 'Delivery Provider' ? (
+                    <>
+                      <div className="font-medium">{order.delivery_provider_name}</div>
+                      {order.delivery_provider_phone && (
+                        <div className="text-[9px] text-gray-500 flex items-center justify-end gap-1">
+                          <Phone className="h-3 w-3" />
+                          {order.delivery_provider_phone}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-gray-500">Provider Assigned</div>
+                  )}
+                </div>
+              )}
+            </div>
             
             {isExpanded ? (
               <ChevronUp className="h-5 w-5 text-gray-400" />
