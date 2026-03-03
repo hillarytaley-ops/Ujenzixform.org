@@ -113,19 +113,10 @@ export const DispatchScanner: React.FC = () => {
     detectDeviceInfo();
     listAvailableCameras();
     
-    // Safety timeout - stop loading after 60 seconds (increased to allow fetchOrders to complete)
     // Note: fetchOrders has its own timeout (20s) and will set loadingOrders(false) in finally block
-    const safetyTimeout = setTimeout(() => {
-      if (loadingOrders) {
-        console.log('⏱️ Dispatch Scanner safety timeout (60s) - forcing loading false');
-        console.log('⚠️ This should rarely happen - fetchOrders should complete within 20s');
-        setLoadingOrders(false);
-      }
-    }, 60000);
-    
+    // No need for safety timeout since fetchOrders handles its own completion
     return () => {
       stopScanning();
-      clearTimeout(safetyTimeout);
     };
   }, []);
 
