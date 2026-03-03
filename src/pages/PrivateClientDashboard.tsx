@@ -63,6 +63,10 @@ interface Order {
   delivery_address: string;
   project_name: string;
   items: any[];
+  delivery_required?: boolean;
+  delivery_provider_id?: string | null;
+  delivery_provider_name?: string | null;
+  delivery_status?: string;
 }
 
 interface DeliveryRequest {
@@ -102,6 +106,11 @@ const PrivateClientDashboard = () => {
   const [showDeliveryPrompt, setShowDeliveryPrompt] = useState(false);
   const [showMonitoringServicePrompt, setShowMonitoringServicePrompt] = useState(false);
   const [selectedOrderForDelivery, setSelectedOrderForDelivery] = useState<Order | null>(null);
+  // Order details modal state
+  const [selectedOrderForDetails, setSelectedOrderForDetails] = useState<Order | null>(null);
+  const [showOrderDetailsModal, setShowOrderDetailsModal] = useState(false);
+  const [orderDetailsItems, setOrderDetailsItems] = useState<any[]>([]);
+  const [loadingOrderDetails, setLoadingOrderDetails] = useState(false);
   const [monitoringRequest, setMonitoringRequest] = useState({
     projectName: '',
     projectLocation: '',
@@ -375,7 +384,14 @@ const PrivateClientDashboard = () => {
           const ordersData = await ordersResponse.json();
           console.log('📦 Private client orders loaded:', ordersData?.length || 0, ordersData);
           
-          const fetchedOrders = ordersData || [];
+          // Map orders and include delivery fields
+          const fetchedOrders = (ordersData || []).map((order: any) => ({
+            ...order,
+            delivery_required: order.delivery_required !== false, // Default to true if not explicitly false
+            delivery_provider_id: order.delivery_provider_id || null,
+            delivery_provider_name: order.delivery_provider_name || null,
+            delivery_status: order.delivery_status || null
+          }));
           setOrders(fetchedOrders);
           console.log('📦 Orders set to state:', fetchedOrders.length);
           
@@ -910,29 +926,118 @@ const PrivateClientDashboard = () => {
                               <Button 
                                 variant="outline" 
                                 size="sm"
-                                onClick={() => {
-                                  toast({
-                                    title: `Order #${order.po_number}`,
-                                    description: `Status: ${order.status}. Items: ${Array.isArray(order.items) ? order.items.map((i: any) => i.material_name).join(', ') : 'N/A'}`,
-                                  });
+                                onClick={async () => {
+                                  setSelectedOrderForDetails(order);
+                                  setLoadingOrderDetails(true);
+                                  setShowOrderDetailsModal(true);
+                                  
+                                  // Fetch items if not already loaded
+                                  if (!Array.isArray(order.items) || order.items.length === 0) {
+                                    try {
+                                      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+                                      const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+                                      let accessToken = '';
+                                      try {
+                                        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+                                        if (storedSession) {
+                                          const parsed = JSON.parse(storedSession);
+                                          accessToken = parsed.access_token || '';
+                                        }
+                                      } catch (e) {}
+                                      
+                                      const itemsResponse = await fetch(
+                                        `${SUPABASE_URL}/rest/v1/material_items?purchase_order_id=eq.${order.id}&order=item_sequence.asc`,
+                                        {
+                                          headers: {
+                                            'apikey': ANON_KEY,
+                                            'Authorization': `Bearer ${accessToken || ANON_KEY}`,
+                                            'Content-Type': 'application/json',
+                                          }
+                                        }
+                                      );
+                                      
+                                      if (itemsResponse.ok) {
+                                        const itemsData = await itemsResponse.json();
+                                        setOrderDetailsItems(itemsData.map((item: any) => ({
+                                          material_name: item.material_type,
+                                          name: item.material_type,
+                                          material_type: item.material_type,
+                                          quantity: item.quantity,
+                                          unit: item.unit,
+                                          unit_price: null, // material_items doesn't have unit_price
+                                          description: item.category
+                                        })));
+                                      } else {
+                                        // Try order_items table as fallback
+                                        const orderItemsResponse = await fetch(
+                                          `${SUPABASE_URL}/rest/v1/order_items?order_id=eq.${order.id}`,
+                                          {
+                                            headers: {
+                                              'apikey': ANON_KEY,
+                                              'Authorization': `Bearer ${accessToken || ANON_KEY}`,
+                                              'Content-Type': 'application/json',
+                                            }
+                                          }
+                                        );
+                                        
+                                        if (orderItemsResponse.ok) {
+                                          const orderItemsData = await orderItemsResponse.json();
+                                          setOrderDetailsItems(orderItemsData);
+                                        } else {
+                                          setOrderDetailsItems([]);
+                                        }
+                                      }
+                                    } catch (error) {
+                                      console.error('Error fetching order items:', error);
+                                      setOrderDetailsItems([]);
+                                    }
+                                  } else {
+                                    setOrderDetailsItems(order.items);
+                                  }
+                                  setLoadingOrderDetails(false);
                                 }}
                               >
                                 <Eye className="h-3 w-3 mr-1" />
                                 View Details
                               </Button>
-                              {/* Request Delivery Button - only for confirmed/pending orders */}
-                              {(order.status === 'confirmed' || order.status === 'pending' || order.status === 'quoted') && (
-                                <Button 
-                                  size="sm"
-                                  className="bg-blue-600 hover:bg-blue-700"
-                                  onClick={() => {
-                                    setSelectedOrderForDelivery(order);
-                                    setShowDeliveryPrompt(true);
-                                  }}
-                                >
-                                  <Truck className="h-3 w-3 mr-1" />
-                                  Request Delivery
-                                </Button>
+                              {/* Delivery Button - Check if delivery was already requested during order submission */}
+                              {(order.status === 'confirmed' || order.status === 'pending' || order.status === 'quoted' || order.status === 'processing' || order.status === 'shipped') && (
+                                // If delivery was requested during order submission (delivery_required = true), show "Check Delivery Status"
+                                // Otherwise, show "Request Delivery" button
+                                order.delivery_required !== false ? (
+                                  <Button 
+                                    size="sm"
+                                    variant="outline"
+                                    className="bg-green-50 hover:bg-green-100 text-green-700 border-green-300"
+                                    onClick={() => {
+                                      // Navigate to deliveries tab or show delivery status
+                                      setActiveTab('deliveries');
+                                      toast({
+                                        title: 'Delivery Status',
+                                        description: order.delivery_provider_name 
+                                          ? `Delivery provider: ${order.delivery_provider_name}. Status: ${order.delivery_status || 'assigned'}`
+                                          : order.delivery_provider_id
+                                          ? `Delivery provider assigned. Status: ${order.delivery_status || 'assigned'}`
+                                          : `Delivery has been requested. ${order.delivery_status ? `Status: ${order.delivery_status}` : 'Awaiting provider assignment'}`,
+                                      });
+                                    }}
+                                  >
+                                    <Truck className="h-3 w-3 mr-1" />
+                                    Check Delivery Status
+                                  </Button>
+                                ) : (
+                                  <Button 
+                                    size="sm"
+                                    className="bg-blue-600 hover:bg-blue-700"
+                                    onClick={() => {
+                                      setSelectedOrderForDelivery(order);
+                                      setShowDeliveryPrompt(true);
+                                    }}
+                                  >
+                                    <Truck className="h-3 w-3 mr-1" />
+                                    Request Delivery
+                                  </Button>
+                                )
                               )}
                             </div>
                           </div>
@@ -1791,6 +1896,134 @@ const PrivateClientDashboard = () => {
           }}
         />
       )}
+
+      {/* Order Details Modal */}
+      <Dialog open={showOrderDetailsModal} onOpenChange={(open) => {
+        setShowOrderDetailsModal(open);
+        if (!open) {
+          setSelectedOrderForDetails(null);
+          setOrderDetailsItems([]);
+          setLoadingOrderDetails(false);
+        }
+      }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5 text-green-600" />
+              Order Details
+            </DialogTitle>
+            <DialogDescription>
+              {selectedOrderForDetails?.po_number}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedOrderForDetails && (
+            <div className="space-y-6">
+              {/* Order Info */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-500">Order Status</p>
+                  <Badge 
+                    className={
+                      selectedOrderForDetails.status === 'completed' || selectedOrderForDetails.status === 'delivered' ? 'bg-green-100 text-green-800' :
+                      selectedOrderForDetails.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
+                      selectedOrderForDetails.status === 'pending' || selectedOrderForDetails.status === 'quoted' ? 'bg-amber-100 text-amber-800' :
+                      selectedOrderForDetails.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                      'bg-gray-100 text-gray-800'
+                    }
+                  >
+                    {selectedOrderForDetails.status.charAt(0).toUpperCase() + selectedOrderForDetails.status.slice(1)}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Order Date</p>
+                  <p className="font-medium">
+                    {new Date(selectedOrderForDetails.created_at).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Project Name</p>
+                  <p className="font-medium">{selectedOrderForDetails.project_name || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Total Amount</p>
+                  <p className="font-bold text-green-600 text-lg">
+                    KES {(selectedOrderForDetails.total_amount || 0).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+
+              {/* Delivery Address */}
+              {selectedOrderForDetails.delivery_address && (
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">Delivery Address</p>
+                  <p className="font-medium">{selectedOrderForDetails.delivery_address}</p>
+                </div>
+              )}
+
+              {/* Materials List */}
+              <div>
+                <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <ShoppingBag className="h-4 w-4" />
+                  Materials Ordered ({loadingOrderDetails ? '...' : (orderDetailsItems.length || (Array.isArray(selectedOrderForDetails.items) ? selectedOrderForDetails.items.length : 0))} items)
+                </h4>
+                <div className="space-y-2">
+                  {loadingOrderDetails ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <div className="animate-spin rounded-full h-8 w-8 border-4 border-green-500 border-t-transparent mx-auto mb-2"></div>
+                      <p>Loading materials...</p>
+                    </div>
+                  ) : (orderDetailsItems.length > 0 || (Array.isArray(selectedOrderForDetails.items) && selectedOrderForDetails.items.length > 0)) ? (
+                    (orderDetailsItems.length > 0 ? orderDetailsItems : selectedOrderForDetails.items).map((item: any, index: number) => (
+                      <div key={index} className="flex justify-between items-start p-4 bg-gray-50 rounded-lg border">
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-900">
+                            {item.material_name || item.name || item.material_type || `Item ${index + 1}`}
+                          </p>
+                          {item.description && (
+                            <p className="text-sm text-gray-600 mt-1">{item.description}</p>
+                          )}
+                          <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+                            <span>Quantity: <span className="font-medium text-gray-700">{item.quantity || 1}</span></span>
+                            {item.unit && (
+                              <span>Unit: <span className="font-medium text-gray-700">{item.unit}</span></span>
+                            )}
+                            {item.unit_price && (
+                              <span>Unit Price: <span className="font-medium text-gray-700">KES {item.unit_price.toLocaleString()}</span></span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right ml-4">
+                          {item.unit_price && (
+                            <p className="font-bold text-green-600">
+                              KES {((item.quantity || 1) * item.unit_price).toLocaleString()}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <Package className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                      <p>No items found for this order</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowOrderDetailsModal(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Monitoring Service Prompt */}
       {selectedOrderForDelivery && (
