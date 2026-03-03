@@ -360,8 +360,9 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
         if (dr?.provider_id) allProviderIds.add(dr.provider_id);
       });
       
-      // Fetch provider names for all provider IDs
+      // Fetch provider names and phone numbers for all provider IDs
       let providerNamesMap = new Map<string, string>();
+      let providerPhonesMap = new Map<string, string>();
       if (allProviderIds.size > 0) {
         try {
           const providerIdsArray = Array.from(allProviderIds);
@@ -369,9 +370,9 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
           const providersController = new AbortController();
           const providersTimeoutId = setTimeout(() => providersController.abort(), 5000);
           
-          // Fetch provider names from delivery_providers table
+          // Fetch provider names and phone from delivery_providers table
           const providersRes = await fetch(
-            `${SUPABASE_URL}/rest/v1/delivery_providers?id=in.(${providerIdsParam})&select=id,provider_name,company_name`,
+            `${SUPABASE_URL}/rest/v1/delivery_providers?id=in.(${providerIdsParam})&select=id,provider_name,company_name,phone`,
             { headers, signal: providersController.signal, cache: 'no-store' }
           );
           
@@ -379,21 +380,29 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
             const providers = await providersRes.json();
             providers.forEach((p: any) => {
               providerNamesMap.set(p.id, p.provider_name || p.company_name || 'Delivery Provider');
+              if (p.phone) {
+                providerPhonesMap.set(p.id, p.phone);
+              }
             });
-            console.log('👤 Provider names fetched:', providerNamesMap.size);
+            console.log('👤 Provider names and phones fetched:', providerNamesMap.size);
           }
           
           // Also try to get from profiles table (in case provider is a user)
           try {
             const profilesRes = await fetch(
-              `${SUPABASE_URL}/rest/v1/profiles?user_id=in.(${providerIdsParam})&select=user_id,full_name`,
+              `${SUPABASE_URL}/rest/v1/profiles?user_id=in.(${providerIdsParam})&select=user_id,full_name,phone`,
               { headers, signal: providersController.signal, cache: 'no-store' }
             );
             if (profilesRes.ok) {
               const profiles = await profilesRes.json();
               profiles.forEach((p: any) => {
-                if (p.user_id && p.full_name && !providerNamesMap.has(p.user_id)) {
-                  providerNamesMap.set(p.user_id, p.full_name);
+                if (p.user_id) {
+                  if (p.full_name && !providerNamesMap.has(p.user_id)) {
+                    providerNamesMap.set(p.user_id, p.full_name);
+                  }
+                  if (p.phone && !providerPhonesMap.has(p.user_id)) {
+                    providerPhonesMap.set(p.user_id, p.phone);
+                  }
                 }
               });
             }
@@ -420,6 +429,12 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
           providerName = providerNamesMap.get(providerId) || null;
         }
         
+        // Get provider phone - prioritize purchase_order, then lookup
+        let providerPhone = order.delivery_provider_phone;
+        if (!providerPhone && providerId) {
+          providerPhone = providerPhonesMap.get(providerId) || null;
+        }
+        
         // Update delivery_status if delivery_request has more recent status
         let deliveryStatus = order.delivery_status;
         if (dr?.status && ['accepted', 'assigned', 'picked_up', 'in_transit', 'delivered'].includes(dr.status)) {
@@ -432,6 +447,7 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
           // Enrich with provider information
           delivery_provider_id: providerId || order.delivery_provider_id,
           delivery_provider_name: providerName || order.delivery_provider_name,
+          delivery_provider_phone: providerPhone || order.delivery_provider_phone,
           delivery_status: deliveryStatus || order.delivery_status
         };
       });
@@ -1189,9 +1205,15 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
                       : 'Accepted'}
                   </span>
                   {order.delivery_provider_id || order.delivery_provider_name ? (
-                    <span className="text-[10px] text-green-600 mt-0.5 font-medium">
-                      To be delivered by: {order.delivery_provider_name || 'Provider'}
-                    </span>
+                    <div className="text-[10px] text-green-600 mt-0.5 font-medium text-center">
+                      <div>To be delivered by: {order.delivery_provider_name || 'Provider'}</div>
+                      {order.delivery_provider_phone && (
+                        <div className="text-[9px] text-green-500 mt-0.5 flex items-center justify-center gap-1">
+                          <Phone className="h-3 w-3" />
+                          {order.delivery_provider_phone}
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <span className="text-[10px] text-gray-500 mt-0.5">
                       Awaiting Provider
