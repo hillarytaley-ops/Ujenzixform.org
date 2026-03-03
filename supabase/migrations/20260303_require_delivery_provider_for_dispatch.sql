@@ -55,19 +55,12 @@ DECLARE
   order_record RECORD;
   delivery_required BOOLEAN;
   delivery_provider_id UUID;
+  is_invalidated_value BOOLEAN;
 BEGIN
   current_user_id := auth.uid();
   
   -- Verify QR code exists
-  -- Use explicit column selection to handle cases where is_invalidated might not exist
-  SELECT 
-    id, qr_code, purchase_order_id, material_type, category, quantity, unit,
-    status, dispatch_scanned, dispatch_scanned_at, dispatch_scanned_by,
-    receive_scanned, receive_scanned_at, receive_scanned_by,
-    COALESCE(is_invalidated, FALSE) as is_invalidated,
-    invalidated_at,
-    created_at, updated_at
-  INTO item_record
+  SELECT * INTO item_record
   FROM material_items
   WHERE qr_code = _qr_code;
   
@@ -83,10 +76,22 @@ BEGIN
   -- Store the purchase_order_id for later use
   order_id := item_record.purchase_order_id;
   
+  -- Check if is_invalidated column exists and get its value safely
+  -- Use dynamic SQL to avoid errors if column doesn't exist
+  BEGIN
+    EXECUTE format('SELECT is_invalidated FROM material_items WHERE qr_code = %L', _qr_code) INTO is_invalidated_value;
+  EXCEPTION WHEN undefined_column THEN
+    -- Column doesn't exist, default to FALSE
+    is_invalidated_value := FALSE;
+  WHEN OTHERS THEN
+    -- Any other error, default to FALSE
+    is_invalidated_value := FALSE;
+  END;
+  
   -- ============================================================
   -- CHECK IF QR CODE IS ALREADY INVALIDATED
   -- ============================================================
-  IF COALESCE(item_record.is_invalidated, FALSE) = TRUE THEN
+  IF is_invalidated_value = TRUE THEN
     RETURN jsonb_build_object(
       'success', false,
       'error', 'This QR code has been invalidated. Both dispatch and receiving have been completed.',
@@ -277,17 +282,18 @@ BEGIN
   END IF;
   
   -- Refresh item record to get updated values
-  -- Use explicit column selection with COALESCE for optional columns
-  SELECT 
-    id, qr_code, purchase_order_id, material_type, category, quantity, unit,
-    status, dispatch_scanned, dispatch_scanned_at, dispatch_scanned_by,
-    receive_scanned, receive_scanned_at, receive_scanned_by,
-    COALESCE(is_invalidated, FALSE) as is_invalidated,
-    invalidated_at,
-    created_at, updated_at
-  INTO item_record
+  SELECT * INTO item_record
   FROM material_items
   WHERE qr_code = _qr_code;
+  
+  -- Get is_invalidated value safely using dynamic SQL
+  BEGIN
+    EXECUTE format('SELECT is_invalidated FROM material_items WHERE qr_code = %L', _qr_code) INTO is_invalidated_value;
+  EXCEPTION WHEN undefined_column THEN
+    is_invalidated_value := FALSE;
+  WHEN OTHERS THEN
+    is_invalidated_value := FALSE;
+  END;
   
   -- Return success with item details
   RETURN jsonb_build_object(
@@ -306,10 +312,10 @@ BEGIN
     'new_status', item_record.status,
     'dispatch_scanned', item_record.dispatch_scanned,
     'receive_scanned', item_record.receive_scanned,
-    'is_invalidated', COALESCE(item_record.is_invalidated, FALSE),
+    'is_invalidated', is_invalidated_value,
     'order_id', order_id,
     'message', CASE
-      WHEN COALESCE(item_record.is_invalidated, FALSE) = TRUE THEN 'QR code completed and invalidated. Both dispatch and receive are done.'
+      WHEN is_invalidated_value = TRUE THEN 'QR code completed and invalidated. Both dispatch and receive are done.'
       WHEN _scan_type = 'dispatch' THEN 'Item dispatched successfully. Order status updated to SHIPPED. Awaiting receiving scan.'
       WHEN _scan_type = 'receiving' THEN 'Item received successfully.'
       ELSE 'Scan recorded successfully.'
