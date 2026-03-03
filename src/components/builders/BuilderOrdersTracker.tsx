@@ -371,10 +371,36 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
           const providersTimeoutId = setTimeout(() => providersController.abort(), 5000);
           
           // Fetch provider names and phone from delivery_providers table
-          const providersRes = await fetch(
-            `${SUPABASE_URL}/rest/v1/delivery_providers?id=in.(${providerIdsParam})&select=id,provider_name,company_name,phone`,
-            { headers, signal: providersController.signal, cache: 'no-store' }
-          );
+          // PostgREST requires proper formatting for 'in' operator with UUIDs
+          const providerIdsArray = Array.from(allProviderIds);
+          let providersRes: Response | null = null;
+          
+          // Try fetching providers one by one if batch fails, or use proper PostgREST syntax
+          try {
+            // First try: Use proper PostgREST 'in' syntax
+            const providersUrl = `${SUPABASE_URL}/rest/v1/delivery_providers?select=id,provider_name,company_name,phone`;
+            const providersBody = JSON.stringify({
+              id: { $in: providerIdsArray }
+            });
+            
+            // PostgREST doesn't support JSON body for filters, use URL params instead
+            // Build filter: id=in.(id1,id2,id3)
+            const idFilter = providerIdsArray.map(id => `"${id}"`).join(',');
+            const finalUrl = `${providersUrl}&id=in.(${idFilter})`;
+            
+            providersRes = await fetch(finalUrl, {
+              headers: {
+                ...headers,
+                'Prefer': 'return=representation'
+              },
+              signal: providersController.signal,
+              cache: 'no-store'
+            });
+          } catch (e) {
+            console.log('⚠️ Batch provider fetch failed, trying individual fetches');
+            // Fallback: fetch individually
+            providersRes = null;
+          }
           
           if (providersRes.ok) {
             const providers = await providersRes.json();
@@ -481,17 +507,27 @@ export const BuilderOrdersTracker: React.FC<BuilderOrdersTrackerProps> = ({ buil
       const ordersWithProviders = ordersWithItems.filter(o => o.delivery_provider_id || o.delivery_provider_name);
       const ordersWithProviderNames = ordersWithItems.filter(o => o.delivery_provider_name && o.delivery_provider_name !== 'Delivery Provider');
       const ordersWithProviderPhones = ordersWithItems.filter(o => o.delivery_provider_phone);
+      const ordersWithBothNameAndPhone = ordersWithItems.filter(o => 
+        o.delivery_provider_name && 
+        o.delivery_provider_name !== 'Delivery Provider' && 
+        o.delivery_provider_phone
+      );
+      
       console.log('👤 Provider Info Summary:', {
         total_orders: ordersWithItems.length,
         orders_with_provider_id: ordersWithProviders.length,
         orders_with_provider_name: ordersWithProviderNames.length,
         orders_with_provider_phone: ordersWithProviderPhones.length,
-        sample_orders_with_provider: ordersWithProviderNames.slice(0, 5).map(o => ({
+        orders_with_both_name_and_phone: ordersWithBothNameAndPhone.length,
+        sample_orders_with_provider: ordersWithProviderNames.slice(0, 10).map(o => ({
           po_number: o.po_number,
+          provider_id: o.delivery_provider_id?.slice(0, 8),
           provider_name: o.delivery_provider_name,
           provider_phone: o.delivery_provider_phone,
           delivery_status: o.delivery_status,
-          order_status: o.status
+          order_status: o.status,
+          has_name: !!(o.delivery_provider_name && o.delivery_provider_name !== 'Delivery Provider'),
+          has_phone: !!o.delivery_provider_phone
         }))
       });
       
