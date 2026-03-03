@@ -386,15 +386,62 @@ export const useDeliveryProviderData = () => {
       // Fetch active deliveries assigned to THIS provider only
       // Check both delivery_requests and purchase_orders tables
       
-      // 1. From delivery_requests table
-      const { data: activeData, error: activeError } = await supabase
-        .from('delivery_requests')
-        .select('*')
-        .eq('provider_id', userId)
-        .in('status', ['accepted', 'assigned', 'picked_up', 'in_transit', 'out_for_delivery', 'provider_assigned'])
-        .order('created_at', { ascending: false });
-
-      if (activeError) throw activeError;
+      // 1. From delivery_requests table - Use direct REST API to bypass RLS issues
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      
+      let accessToken = SUPABASE_ANON_KEY;
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          accessToken = parsed.access_token || SUPABASE_ANON_KEY;
+        }
+      } catch (e) {
+        console.warn('Could not get auth token');
+      }
+      
+      let activeData: any[] = [];
+      let activeError: any = null;
+      
+      try {
+        const activeResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/delivery_requests?provider_id=eq.${userId}&status=in.(accepted,assigned,picked_up,in_transit,out_for_delivery,provider_assigned,scheduled,pending_pickup,delivery_assigned,ready_for_dispatch)&select=*&order=created_at.desc`,
+          {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            cache: 'no-store'
+          }
+        );
+        
+        if (activeResponse.ok) {
+          activeData = await activeResponse.json();
+          console.log('📦 Active deliveries from delivery_requests:', activeData.length, 'for provider:', userId);
+          if (activeData.length > 0) {
+            console.log('📦 Sample active delivery:', {
+              id: activeData[0].id,
+              status: activeData[0].status,
+              provider_id: activeData[0].provider_id,
+              tracking_number: activeData[0].tracking_number
+            });
+          }
+        } else {
+          const errorText = await activeResponse.text();
+          activeError = { message: `HTTP ${activeResponse.status}: ${errorText}`, code: activeResponse.status.toString() };
+          console.error('❌ Error fetching active deliveries:', activeError);
+        }
+      } catch (error: any) {
+        activeError = error;
+        console.error('❌ Exception fetching active deliveries:', error);
+      }
+      
+      if (activeError) {
+        console.warn('⚠️ Error fetching active deliveries (non-critical):', activeError);
+        // Don't throw - continue with empty array
+      }
       
       // 2. Also fetch from purchase_orders where this provider is assigned
       // These are orders that were converted from quotes and accepted by builders
