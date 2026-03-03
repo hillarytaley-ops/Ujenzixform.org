@@ -322,17 +322,49 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
             return; // Skip the general refresh below
           }
           
-          // Notify when builder accepts order
+          // Handle status changes (especially 'shipped' status from QR dispatch)
           const newStatus = payload.new.status;
           const oldStatus = payload.old?.status;
-          if (oldStatus === 'pending' && (newStatus === 'confirmed' || newStatus === 'pending')) {
-            toast({
-              title: '✅ Order Accepted',
-              description: `Builder accepted order ${payload.new.po_number || ''}`,
-            });
+          
+          if (oldStatus !== newStatus) {
+            console.log('🔄 OrderManagement: Status changed:', orderId, oldStatus, '→', newStatus);
+            
+            // Update the order in local state immediately
+            setOrders(prevOrders => prevOrders.map(order => {
+              if (order.id === orderId) {
+                return {
+                  ...order,
+                  status: newStatus as Order['status'],
+                  updated_at: payload.new.updated_at || order.updated_at
+                };
+              }
+              return order;
+            }));
+            
+            // Show toast notifications for important status changes
+            if ((newStatus === 'shipped' || newStatus === 'dispatched') && oldStatus !== 'shipped' && oldStatus !== 'dispatched') {
+              toast({
+                title: '📦 Order Shipped',
+                description: `Order ${payload.new.po_number || orderId.slice(0, 8)} has been shipped and is ready for delivery.`,
+              });
+            } else if (newStatus === 'delivered' && oldStatus !== 'delivered') {
+              toast({
+                title: '✅ Order Delivered',
+                description: `Order ${payload.new.po_number || orderId.slice(0, 8)} has been delivered successfully.`,
+              });
+            } else if (oldStatus === 'pending' && (newStatus === 'confirmed' || newStatus === 'processing')) {
+              toast({
+                title: '✅ Order Accepted',
+                description: `Builder accepted order ${payload.new.po_number || ''}`,
+              });
+            }
+            
+            // Refresh in background to ensure consistency
+            setTimeout(() => loadOrders(), 1000);
+            return; // Skip the general refresh below
           }
           
-          // Refresh orders for other changes
+          // Refresh orders for other changes (non-status updates)
           loadOrders();
         }
       )
@@ -761,7 +793,7 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
     total: orders.length,
     pending: orders.filter(o => o.status === 'pending').length,
     processing: orders.filter(o => ['confirmed', 'processing'].includes(o.status)).length,
-    shipped: orders.filter(o => o.status === 'shipped').length,
+    shipped: orders.filter(o => o.status === 'shipped' || o.status === 'dispatched').length,
     delivered: orders.filter(o => o.status === 'delivered').length,
     totalRevenue: orders.filter(o => o.status !== 'cancelled').reduce((sum, o) => sum + o.total_amount, 0),
     // New stats for order types
@@ -1099,8 +1131,8 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
   // This includes accepted quotes converted to orders (quote_accepted, order_created, awaiting_delivery_request, etc.)
   // IMPORTANT: Include orders with delivery_provider_id - they still need to be dispatched by supplier
   const notDispatchedOrders = filteredOrders.filter(o => {
-    // Exclude shipped and delivered
-    if (o.status === 'shipped' || o.status === 'delivered') return false;
+    // Exclude shipped, dispatched, and delivered
+    if (o.status === 'shipped' || o.status === 'dispatched' || o.status === 'delivered') return false;
     
     // Include all order statuses from quote acceptance onwards
     // This includes orders with delivery_provider_id (they still need supplier dispatch)
@@ -1122,7 +1154,8 @@ export const OrderManagement: React.FC<OrderManagementProps> = ({ supplierId, is
     
     return validStatuses.includes(o.status);
   });
-  const shippedOrders = filteredOrders.filter(o => o.status === 'shipped');
+  // Shipped orders: includes both 'shipped' and 'dispatched' statuses (they mean the same thing)
+  const shippedOrders = filteredOrders.filter(o => o.status === 'shipped' || o.status === 'dispatched');
   const deliveredOrders = filteredOrders.filter(o => o.status === 'delivered');
 
   return (
