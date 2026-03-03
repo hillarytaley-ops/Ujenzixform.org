@@ -583,9 +583,16 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       if (result && result.trackingNumber) {
         toast({
           title: '✅ Delivery Accepted!',
-          description: `Tracking: ${result.trackingNumber}`,
+          description: `Tracking: ${result.trackingNumber}. Check "Scheduled" tab to see your accepted delivery!`,
         });
         loadNotifications();
+        // Notify parent component to refresh dashboard data after a short delay
+        // to ensure database update has completed
+        if (onAcceptDelivery) {
+          setTimeout(() => {
+            onAcceptDelivery(requestId);
+          }, 1000); // 1 second delay to ensure DB update is complete
+        }
       } else {
         throw new Error('Failed to accept delivery - no tracking number generated');
       }
