@@ -404,7 +404,12 @@ export const useDeliveryProviderData = () => {
       let activeData: any[] = [];
       let activeError: any = null;
       
+      console.log('📦 Starting to fetch active deliveries for provider:', userId);
+      
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+        
         const activeResponse = await fetch(
           `${SUPABASE_URL}/rest/v1/delivery_requests?provider_id=eq.${userId}&status=in.(accepted,assigned,picked_up,in_transit,out_for_delivery,provider_assigned,scheduled,pending_pickup,delivery_assigned,ready_for_dispatch)&select=*&order=created_at.desc`,
           {
@@ -413,9 +418,12 @@ export const useDeliveryProviderData = () => {
               'Authorization': `Bearer ${accessToken}`,
               'Content-Type': 'application/json'
             },
-            cache: 'no-store'
+            cache: 'no-store',
+            signal: controller.signal
           }
         );
+        
+        clearTimeout(timeoutId);
         
         if (activeResponse.ok) {
           activeData = await activeResponse.json();
@@ -427,6 +435,28 @@ export const useDeliveryProviderData = () => {
               provider_id: activeData[0].provider_id,
               tracking_number: activeData[0].tracking_number
             });
+          } else {
+            console.log('📦 No active deliveries found. Checking if any deliveries exist for this provider...');
+            // Debug: Check if there are ANY deliveries for this provider (any status)
+            try {
+              const debugResponse = await fetch(
+                `${SUPABASE_URL}/rest/v1/delivery_requests?provider_id=eq.${userId}&select=id,status,provider_id,tracking_number&limit=5`,
+                {
+                  headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                  },
+                  cache: 'no-store'
+                }
+              );
+              if (debugResponse.ok) {
+                const debugData = await debugResponse.json();
+                console.log('📦 DEBUG: All deliveries for this provider (any status):', debugData.length, debugData);
+              }
+            } catch (e) {
+              console.warn('⚠️ Debug query failed:', e);
+            }
           }
         } else {
           const errorText = await activeResponse.text();
@@ -434,8 +464,13 @@ export const useDeliveryProviderData = () => {
           console.error('❌ Error fetching active deliveries:', activeError);
         }
       } catch (error: any) {
-        activeError = error;
-        console.error('❌ Exception fetching active deliveries:', error);
+        if (error.name === 'AbortError') {
+          activeError = { message: 'Request timeout after 5 seconds', code: 'TIMEOUT' };
+          console.error('⏱️ Active deliveries fetch timed out');
+        } else {
+          activeError = error;
+          console.error('❌ Exception fetching active deliveries:', error);
+        }
       }
       
       if (activeError) {
