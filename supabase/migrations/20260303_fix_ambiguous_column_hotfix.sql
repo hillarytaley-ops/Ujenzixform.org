@@ -1,35 +1,8 @@
 -- ============================================================
--- Require Delivery Provider Before Dispatch
--- Created: March 3, 2026
--- 
--- Business Rule: Materials cannot be dispatched without a delivery provider
--- UNLESS the builder has explicitly indicated they don't need delivery service
+-- Hotfix: Fix ambiguous column reference in record_qr_scan
+-- This is a quick fix to resolve the 42702 error
 -- ============================================================
 
--- ============================================================
--- Ensure is_invalidated column exists in material_items
--- ============================================================
-DO $$ 
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                   WHERE table_name = 'material_items' AND column_name = 'is_invalidated') THEN
-        ALTER TABLE material_items ADD COLUMN is_invalidated BOOLEAN DEFAULT FALSE;
-        RAISE NOTICE 'Added is_invalidated column to material_items';
-    END IF;
-    
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                   WHERE table_name = 'material_items' AND column_name = 'invalidated_at') THEN
-        ALTER TABLE material_items ADD COLUMN invalidated_at TIMESTAMPTZ;
-        RAISE NOTICE 'Added invalidated_at column to material_items';
-    END IF;
-END $$;
-
--- Create index if it doesn't exist
-CREATE INDEX IF NOT EXISTS idx_material_items_is_invalidated ON material_items(is_invalidated);
-
--- ============================================================
--- Update record_qr_scan function to validate delivery provider
--- ============================================================
 CREATE OR REPLACE FUNCTION public.record_qr_scan(
   _qr_code TEXT,
   _scan_type TEXT,
@@ -53,8 +26,8 @@ DECLARE
   current_user_id UUID;
   order_id UUID;
   order_record RECORD;
-  v_delivery_required BOOLEAN;  -- Renamed to avoid ambiguity with column name
-  v_delivery_provider_id UUID;   -- Renamed to avoid ambiguity with column name
+  v_delivery_required BOOLEAN;  -- Renamed to avoid ambiguity
+  v_delivery_provider_id UUID;   -- Renamed to avoid ambiguity
   is_invalidated_value BOOLEAN;
 BEGIN
   current_user_id := auth.uid();
@@ -123,7 +96,7 @@ BEGIN
     -- ============================================================
     IF order_id IS NOT NULL THEN
       -- Fetch purchase order to check delivery requirements
-      -- Use table qualification to avoid ambiguity with variable names
+      -- Use table alias and rename variables to avoid ambiguity
       SELECT 
         po.delivery_required,
         po.delivery_provider_id
@@ -133,7 +106,7 @@ BEGIN
       
       IF FOUND THEN
         -- Assign to variables with different names to avoid ambiguity
-        v_delivery_required := COALESCE(order_record.delivery_required, TRUE); -- Default to TRUE if NULL
+        v_delivery_required := COALESCE(order_record.delivery_required, TRUE);
         v_delivery_provider_id := order_record.delivery_provider_id;
         
         -- If delivery is required but no provider is assigned, block dispatch
@@ -344,7 +317,3 @@ $$;
 
 -- Grant execute permission
 GRANT EXECUTE ON FUNCTION public.record_qr_scan TO authenticated;
-
--- ============================================================
--- Migration Complete
--- ============================================================
