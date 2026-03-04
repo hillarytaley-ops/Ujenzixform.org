@@ -541,53 +541,10 @@ export const useDeliveryProviderData = () => {
         console.warn('⚠️ purchase_orders fetch failed:', purchaseOrdersResult.reason);
       }
       
-      // Fetch supplier and buyer info separately if needed (with timeout to prevent blocking)
+      // Skip enrichment for now to avoid timeout - use basic data directly
+      // Enrichment can be done later if needed, but it's blocking the fetch
       let enrichedPurchaseOrders = purchaseOrdersData || [];
-      if (enrichedPurchaseOrders.length > 0) {
-        try {
-          console.log('📦 Enriching', enrichedPurchaseOrders.length, 'purchase orders with supplier/buyer info...');
-          const supplierIds = [...new Set(enrichedPurchaseOrders.map((po: any) => po.supplier_id).filter(Boolean))];
-          const buyerIds = [...new Set(enrichedPurchaseOrders.map((po: any) => po.buyer_id).filter(Boolean))];
-          
-          // Add timeout to enrichment to prevent blocking
-          const enrichmentPromise = Promise.allSettled([
-            supplierIds.length > 0
-              ? supabase.from('suppliers').select('id, company_name, address, location').in('id', supplierIds)
-              : Promise.resolve({ data: [], error: null }),
-            buyerIds.length > 0
-              ? supabase.from('profiles').select('id, full_name, phone, email').in('id', buyerIds)
-              : Promise.resolve({ data: [], error: null })
-          ]);
-          
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Enrichment timeout')), 5000)
-          );
-          
-          const [suppliersResult, buyersResult] = await Promise.race([
-            enrichmentPromise,
-            timeoutPromise
-          ]).catch(() => {
-            console.warn('⚠️ Enrichment timed out, using basic data');
-            return [{ status: 'rejected' }, { status: 'rejected' }];
-          }) as any[];
-          
-          const suppliers = suppliersResult?.status === 'fulfilled' ? (suppliersResult.value?.data || []) : [];
-          const buyers = buyersResult?.status === 'fulfilled' ? (buyersResult.value?.data || []) : [];
-          
-          const suppliersMap = new Map(suppliers.map((s: any) => [s.id, s]));
-          const buyersMap = new Map(buyers.map((b: any) => [b.id, b]));
-          
-          enrichedPurchaseOrders = enrichedPurchaseOrders.map((po: any) => ({
-            ...po,
-            supplier: suppliersMap.get(po.supplier_id) || null,
-            buyer: buyersMap.get(po.buyer_id) || null
-          }));
-          console.log('✅ Enrichment complete');
-        } catch (e) {
-          console.warn('⚠️ Error enriching purchase orders, using basic data:', e);
-          // Continue with unenriched data
-        }
-      }
+      console.log('📦 Using purchase orders without enrichment (to avoid timeout):', enrichedPurchaseOrders.length);
       
       // Combine both sources and transform to consistent format
       const allActiveDeliveries: any[] = [];
