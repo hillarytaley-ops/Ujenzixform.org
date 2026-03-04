@@ -1495,29 +1495,41 @@ export const DispatchScanner: React.FC = () => {
       const response = await makeRPCWithRetry(`${SUPABASE_URL}/rest/v1/rpc/record_qr_scan`, requestBody);
 
       let data: any;
+      let responseText = '';
       try {
-        const text = await response.text();
-        data = text ? JSON.parse(text) : {};
+        responseText = await response.text();
+        data = responseText ? JSON.parse(responseText) : {};
+        console.log('📥 Raw response text:', responseText);
+        console.log('📥 Parsed response data:', data);
       } catch (parseError) {
-        console.error('❌ Failed to parse response:', parseError);
-        data = { error: 'Failed to parse server response' };
+        console.error('❌ Failed to parse response:', {
+          error: parseError,
+          status: response.status,
+          statusText: response.statusText,
+          rawText: responseText
+        });
+        data = { error: 'Failed to parse server response', rawText: responseText };
       }
 
+      // Check for HTTP errors first
       if (!response.ok) {
-        console.error('❌ Dispatch scan error:', {
+        console.error('❌ Dispatch scan HTTP error:', {
           status: response.status,
           statusText: response.statusText,
           data: data,
-          qrCode: qrCode
+          qrCode: qrCode,
+          rawResponse: responseText
         });
         
         // Handle different error statuses
         if (response.status === 400) {
           // 400 usually means bad request - could be validation error or function error
-          const errorMsg = data.message || data.error || data.details || 'Invalid request. Please check the QR code format.';
+          // Supabase might return error in different formats
+          const errorMsg = data.message || data.error || data.details || data.hint || 
+                          (typeof data === 'string' ? data : 'Invalid request. Please check the QR code format.');
           toast.error('❌ Invalid Request', {
             description: errorMsg,
-            duration: 6000
+            duration: 8000
           });
         } else if (response.status === 401) {
           toast.error('🔐 Authentication Error', {
@@ -1538,9 +1550,43 @@ export const DispatchScanner: React.FC = () => {
         return;
       }
 
+      // Even if HTTP status is OK, check if the function returned an error
       const scanData = data as any;
+      if (scanData && scanData.success === false) {
+        console.error('❌ Dispatch scan function error:', scanData);
+        
+        // Handle specific error codes
+        const errorCode = scanData.error_code;
+        let errorTitle = 'Scan Failed';
+        let errorDescription = scanData.error || 'Invalid QR code';
+        
+        switch (errorCode) {
+          case 'ALREADY_DISPATCHED':
+            errorTitle = '⚠️ Already Scanned';
+            errorDescription = 'This QR code has already been scanned and dispatched.';
+            break;
+          case 'NO_DELIVERY_PROVIDER':
+            errorTitle = '❌ No Delivery Provider Assigned';
+            errorDescription = 'Cannot dispatch materials: No delivery provider has been assigned to this order. Please wait for a delivery provider to accept the delivery request before dispatching.';
+            break;
+          case 'QR_INVALIDATED':
+            errorTitle = '🚫 QR Code Invalidated';
+            errorDescription = 'This QR code is no longer valid.';
+            break;
+          case 'QR_NOT_FOUND':
+            errorTitle = '❓ QR Code Not Found';
+            errorDescription = 'This QR code is not registered in the system.';
+            break;
+          default:
+            errorTitle = '❌ Scan Failed';
+        }
+        
+        toast.error(errorTitle, { description: errorDescription, duration: 6000 });
+        return;
+      }
 
-      if (scanData.success) {
+      // If we get here, the scan was successful
+      if (scanData && scanData.success !== false) {
         // Update local state immediately
         setSelectedOrder(prev => {
           if (!prev) return prev;
@@ -1591,31 +1637,6 @@ export const DispatchScanner: React.FC = () => {
 
         setManualQRCode('');
         setNotes('');
-      } else {
-        const errorCode = scanData.error_code;
-        let errorTitle = 'Scan Failed';
-        let errorDescription = scanData.error || 'Invalid QR code';
-        
-        switch (errorCode) {
-          case 'ALREADY_DISPATCHED':
-            errorTitle = '⚠️ Already Scanned';
-            errorDescription = 'This QR code has already been scanned and dispatched.';
-            break;
-          case 'NO_DELIVERY_PROVIDER':
-            errorTitle = '❌ No Delivery Provider Assigned';
-            errorDescription = 'Cannot dispatch materials: No delivery provider has been assigned to this order. Please wait for a delivery provider to accept the delivery request before dispatching.';
-            break;
-          case 'QR_INVALIDATED':
-            errorTitle = '🚫 QR Code Invalidated';
-            errorDescription = 'This QR code is no longer valid.';
-            break;
-          case 'QR_NOT_FOUND':
-            errorTitle = '❓ QR Code Not Found';
-            errorDescription = 'This QR code is not registered in the system.';
-            break;
-        }
-        
-        toast.error(errorTitle, { description: errorDescription, duration: 5000 });
       }
     } catch (error) {
       console.error('Scan processing error:', error);

@@ -362,30 +362,41 @@ export const ReceivingScanner: React.FC = () => {
       console.log('📊 RPC Response status:', response.status);
       
       let data: any;
+      let responseText = '';
       try {
-        const text = await response.text();
-        data = text ? JSON.parse(text) : {};
-        console.log('📊 RPC Response data:', data);
+        responseText = await response.text();
+        data = responseText ? JSON.parse(responseText) : {};
+        console.log('📥 Raw response text:', responseText);
+        console.log('📥 Parsed response data:', data);
       } catch (parseError) {
-        console.error('❌ Failed to parse response:', parseError);
-        data = { error: 'Failed to parse server response' };
+        console.error('❌ Failed to parse response:', {
+          error: parseError,
+          status: response.status,
+          statusText: response.statusText,
+          rawText: responseText
+        });
+        data = { error: 'Failed to parse server response', rawText: responseText };
       }
 
+      // Check for HTTP errors first
       if (!response.ok) {
-        console.error('❌ Receiving scan error:', {
+        console.error('❌ Receiving scan HTTP error:', {
           status: response.status,
           statusText: response.statusText,
           data: data,
-          qrCode: qrCode
+          qrCode: qrCode,
+          rawResponse: responseText
         });
         
         // Handle different error statuses
         if (response.status === 400) {
           // 400 usually means bad request - could be validation error or function error
-          const errorMsg = data.message || data.error || data.details || 'Invalid request. Please check the QR code format.';
+          // Supabase might return error in different formats
+          const errorMsg = data.message || data.error || data.details || data.hint || 
+                          (typeof data === 'string' ? data : 'Invalid request. Please check the QR code format.');
           toast.error('❌ Invalid Request', {
             description: errorMsg,
-            duration: 6000
+            duration: 8000
           });
         } else if (response.status === 401) {
           toast.error('🔐 Authentication Error', {
@@ -405,13 +416,47 @@ export const ReceivingScanner: React.FC = () => {
         }
         return;
       }
-      
-      // Handle case where RPC returns error in the response body
-      const error = null;
 
+      // Even if HTTP status is OK, check if the function returned an error
       const scanData = data as any;
+      if (scanData && scanData.success === false) {
+        console.error('❌ Receiving scan function error:', scanData);
+        
+        // Handle specific error codes with appropriate messages
+        const errorCode = scanData.error_code;
+        let errorTitle = 'Scan Failed';
+        let errorDescription = scanData.error || 'Invalid QR code';
+        
+        switch (errorCode) {
+          case 'ALREADY_RECEIVED':
+            errorTitle = '⚠️ Already Scanned';
+            errorDescription = 'This QR code has already been scanned and confirmed for delivery.';
+            break;
+          case 'NOT_DISPATCHED':
+            errorTitle = '🚫 Not Dispatched Yet';
+            errorDescription = 'This item has not been dispatched by the supplier yet.';
+            break;
+          case 'QR_INVALIDATED':
+            errorTitle = '🚫 QR Code Invalidated';
+            errorDescription = 'This QR code is no longer valid.';
+            break;
+          case 'QR_NOT_FOUND':
+            errorTitle = '❓ QR Code Not Found';
+            errorDescription = 'This QR code is not registered in the system.';
+            break;
+          default:
+            errorTitle = '❌ Scan Failed';
+        }
+        
+        toast.error(errorTitle, {
+          description: errorDescription,
+          duration: 5000
+        });
+        return;
+      }
 
-      if (scanData.success) {
+      // If we get here, the scan was successful
+      if (scanData && scanData.success !== false) {
         const scanResult: ScanResult = {
           qr_code: scanData.qr_code,
           material_type: scanData.material_type,
