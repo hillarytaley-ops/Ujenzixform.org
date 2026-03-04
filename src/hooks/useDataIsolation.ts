@@ -486,17 +486,32 @@ export const useDeliveryProviderData = () => {
         // 2. Fetch from purchase_orders (this is where most data is!)
         (async () => {
           try {
-            const { data: allPurchaseOrders, error: poError } = await supabase
+            console.log('📦 Fetching purchase_orders for provider:', userId);
+            // Add timeout wrapper
+            const poQueryPromise = supabase
               .from('purchase_orders')
               .select('*')
               .eq('delivery_provider_id', userId)
               .order('created_at', { ascending: false })
               .limit(100);
             
+            const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Purchase orders timeout after 5s')), 5000)
+            );
+            
+            const result = await Promise.race([poQueryPromise, timeoutPromise]).catch((err) => {
+              console.warn('⚠️ purchase_orders query timed out:', err);
+              return { data: [], error: err };
+            });
+            
+            const { data: allPurchaseOrders, error: poError } = result as any;
+            
             if (poError) {
               console.warn('⚠️ Error fetching purchase_orders:', poError);
               return [];
             }
+            
+            console.log('📦 purchase_orders raw data:', allPurchaseOrders?.length || 0, 'records');
             
             // Filter out completed/delivered/cancelled orders
             const filtered = (allPurchaseOrders || []).filter((po: any) => 
