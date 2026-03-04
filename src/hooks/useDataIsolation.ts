@@ -402,128 +402,96 @@ export const useDeliveryProviderData = () => {
         console.warn('Could not get auth token');
       }
       
-      let activeData: any[] = [];
-      let activeError: any = null;
-      
       console.log('📦 Starting to fetch active deliveries for provider:', userId);
       
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-        
-        // Fetch ALL deliveries for this provider, then filter out completed ones
-        // This ensures we don't miss any deliveries due to status name mismatches
-        const activeResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/delivery_requests?provider_id=eq.${userId}&select=*&order=created_at.desc&limit=100`,
-          {
-            headers: {
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${accessToken}`,
-              'Content-Type': 'application/json'
-            },
-            cache: 'no-store',
-            signal: controller.signal
-          }
-        );
-        
-        clearTimeout(timeoutId);
-        
-        if (activeResponse.ok) {
-          const allDeliveries = await activeResponse.json();
-          // Filter out completed/delivered/cancelled deliveries
-          activeData = allDeliveries.filter((d: any) => 
-            d.status !== 'delivered' && 
-            d.status !== 'completed' && 
-            d.status !== 'cancelled'
-          );
-          console.log('📦 All deliveries from delivery_requests:', allDeliveries.length, 'Active (non-completed):', activeData.length, 'for provider:', userId);
-          if (allDeliveries.length > activeData.length) {
-            const filteredOut = allDeliveries.filter((d: any) => 
-              d.status === 'delivered' || 
-              d.status === 'completed' || 
-              d.status === 'cancelled'
-            );
-            console.log('📦 Filtered out completed deliveries:', filteredOut.map((d: any) => ({ id: d.id, status: d.status })));
-          }
-          if (activeData.length > 0) {
-            console.log('📦 Sample active delivery:', {
-              id: activeData[0].id,
-              status: activeData[0].status,
-              provider_id: activeData[0].provider_id,
-              tracking_number: activeData[0].tracking_number
-            });
-          } else {
-            console.log('📦 No active deliveries found. Checking if any deliveries exist for this provider...');
-            // Debug: Check if there are ANY deliveries for this provider (any status)
-            try {
-              const debugResponse = await fetch(
-                `${SUPABASE_URL}/rest/v1/delivery_requests?provider_id=eq.${userId}&select=id,status,provider_id,tracking_number&limit=5`,
-                {
-                  headers: {
-                    'apikey': SUPABASE_ANON_KEY,
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json'
-                  },
-                  cache: 'no-store'
-                }
-              );
-              if (debugResponse.ok) {
-                const debugData = await debugResponse.json();
-                console.log('📦 DEBUG: All deliveries for this provider (any status):', debugData.length, debugData);
+      // Fetch from BOTH tables in parallel for better performance
+      const [deliveryRequestsResult, purchaseOrdersResult] = await Promise.allSettled([
+        // 1. Fetch from delivery_requests
+        (async () => {
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+            
+            const activeResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/delivery_requests?provider_id=eq.${userId}&select=*&order=created_at.desc&limit=100`,
+              {
+                headers: {
+                  'apikey': SUPABASE_ANON_KEY,
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json'
+                },
+                cache: 'no-store',
+                signal: controller.signal
               }
-            } catch (e) {
-              console.warn('⚠️ Debug query failed:', e);
+            );
+            
+            clearTimeout(timeoutId);
+            
+            if (activeResponse.ok) {
+              const allDeliveries = await activeResponse.json();
+              const filtered = allDeliveries.filter((d: any) => 
+                d.status !== 'delivered' && 
+                d.status !== 'completed' && 
+                d.status !== 'cancelled'
+              );
+              console.log('📦 delivery_requests: Found', allDeliveries.length, 'total,', filtered.length, 'active');
+              return filtered;
+            } else {
+              const errorText = await activeResponse.text();
+              console.warn('⚠️ Error fetching delivery_requests:', activeResponse.status, errorText);
+              return [];
             }
+          } catch (error: any) {
+            if (error.name === 'AbortError') {
+              console.warn('⏱️ delivery_requests fetch timed out');
+            } else {
+              console.warn('⚠️ Error fetching delivery_requests:', error);
+            }
+            return [];
           }
-        } else {
-          const errorText = await activeResponse.text();
-          activeError = { message: `HTTP ${activeResponse.status}: ${errorText}`, code: activeResponse.status.toString() };
-          console.error('❌ Error fetching active deliveries:', activeError);
-        }
-      } catch (error: any) {
-        if (error.name === 'AbortError') {
-          activeError = { message: 'Request timeout after 5 seconds', code: 'TIMEOUT' };
-          console.error('⏱️ Active deliveries fetch timed out');
-        } else {
-          activeError = error;
-          console.error('❌ Exception fetching active deliveries:', error);
-        }
+        })(),
+        
+        // 2. Fetch from purchase_orders (this is where most data is!)
+        (async () => {
+          try {
+            const { data: allPurchaseOrders, error: poError } = await supabase
+              .from('purchase_orders')
+              .select('*')
+              .eq('delivery_provider_id', userId)
+              .order('created_at', { ascending: false })
+              .limit(100);
+            
+            if (poError) {
+              console.warn('⚠️ Error fetching purchase_orders:', poError);
+              return [];
+            }
+            
+            // Filter out completed/delivered/cancelled orders
+            const filtered = (allPurchaseOrders || []).filter((po: any) => 
+              po.status !== 'delivered' && 
+              po.status !== 'completed' && 
+              po.status !== 'cancelled' &&
+              po.status !== 'rejected' &&
+              po.status !== 'quote_rejected'
+            );
+            console.log('📦 purchase_orders: Found', allPurchaseOrders?.length || 0, 'total,', filtered.length, 'active');
+            return filtered;
+          } catch (error: any) {
+            console.warn('⚠️ Exception fetching purchase_orders:', error);
+            return [];
+          }
+        })()
+      ]);
+      
+      // Extract results
+      const activeData: any[] = deliveryRequestsResult.status === 'fulfilled' ? (deliveryRequestsResult.value || []) : [];
+      let purchaseOrdersData: any[] = purchaseOrdersResult.status === 'fulfilled' ? (purchaseOrdersResult.value || []) : [];
+      
+      if (deliveryRequestsResult.status === 'rejected') {
+        console.warn('⚠️ delivery_requests fetch failed:', deliveryRequestsResult.reason);
       }
-      
-      if (activeError) {
-        console.warn('⚠️ Error fetching active deliveries (non-critical):', activeError);
-        // Don't throw - continue with empty array
-      }
-      
-      // 2. Also fetch from purchase_orders where this provider is assigned
-      // These are orders that were converted from quotes and accepted by builders
-      // Fetch ALL orders for this provider, then filter out completed ones
-      // This ensures we don't miss any orders due to status name mismatches
-      const { data: allPurchaseOrders, error: poError } = await supabase
-        .from('purchase_orders')
-        .select('*')
-        .eq('delivery_provider_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(100);
-      
-      // Filter out completed/delivered/cancelled orders
-      const purchaseOrdersData = (allPurchaseOrders || []).filter((po: any) => 
-        po.status !== 'delivered' && 
-        po.status !== 'completed' && 
-        po.status !== 'cancelled' &&
-        po.status !== 'rejected' &&
-        po.status !== 'quote_rejected'
-      );
-      
-      if (allPurchaseOrders && allPurchaseOrders.length > purchaseOrdersData.length) {
-        console.log('📦 Filtered out completed purchase orders:', 
-          allPurchaseOrders.length - purchaseOrdersData.length, 
-          'completed out of', allPurchaseOrders.length, 'total'
-        );
-      }
-
-      if (poError) {
-        console.warn('Error fetching purchase_orders for delivery provider:', poError);
+      if (purchaseOrdersResult.status === 'rejected') {
+        console.warn('⚠️ purchase_orders fetch failed:', purchaseOrdersResult.reason);
       }
       
       // Fetch supplier and buyer info separately if needed
