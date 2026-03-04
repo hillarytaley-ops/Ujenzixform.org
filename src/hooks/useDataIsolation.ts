@@ -590,7 +590,9 @@ export const useDeliveryProviderData = () => {
       setActiveDeliveries(allActiveDeliveries);
 
       // Fetch completed deliveries for THIS provider only
-      // ORDER BY: Most recent deliveries first (completed_at or updated_at descending)
+      // Fetch from BOTH delivery_requests AND purchase_orders tables
+      
+      // 1. From delivery_requests table
       const { data: historyData, error: historyError } = await supabase
         .from('delivery_requests')
         .select('*')
@@ -599,16 +601,112 @@ export const useDeliveryProviderData = () => {
         .order('updated_at', { ascending: false }) // Most recent first
         .limit(100); // Increased limit for better history view
 
-      if (historyError) throw historyError;
+      if (historyError) {
+        console.warn('Error fetching delivery history from delivery_requests:', historyError);
+      }
+      
+      // 2. From purchase_orders table - fetch delivered items
+      const { data: deliveredPOs, error: poHistoryError } = await supabase
+        .from('purchase_orders')
+        .select('*')
+        .eq('delivery_provider_id', userId)
+        .in('status', ['delivered', 'completed', 'received']) // Include delivered statuses
+        .order('updated_at', { ascending: false })
+        .limit(100);
+
+      if (poHistoryError) {
+        console.warn('Error fetching delivery history from purchase_orders:', poHistoryError);
+      }
+      
+      // Enrich delivered purchase orders with supplier/buyer info
+      let enrichedDeliveredPOs = deliveredPOs || [];
+      if (enrichedDeliveredPOs.length > 0) {
+        try {
+          const supplierIds = [...new Set(enrichedDeliveredPOs.map((po: any) => po.supplier_id).filter(Boolean))];
+          const buyerIds = [...new Set(enrichedDeliveredPOs.map((po: any) => po.buyer_id).filter(Boolean))];
+          
+          const [suppliersResult, buyersResult] = await Promise.allSettled([
+            supplierIds.length > 0
+              ? supabase.from('suppliers').select('id, company_name, address, location').in('id', supplierIds)
+              : Promise.resolve({ data: [], error: null }),
+            buyerIds.length > 0
+              ? supabase.from('profiles').select('id, full_name, phone, email').in('id', buyerIds)
+              : Promise.resolve({ data: [], error: null })
+          ]);
+          
+          const suppliers = suppliersResult.status === 'fulfilled' ? (suppliersResult.value.data || []) : [];
+          const buyers = buyersResult.status === 'fulfilled' ? (buyersResult.value.data || []) : [];
+          
+          const suppliersMap = new Map(suppliers.map((s: any) => [s.id, s]));
+          const buyersMap = new Map(buyers.map((b: any) => [b.id, b]));
+          
+          enrichedDeliveredPOs = enrichedDeliveredPOs.map((po: any) => ({
+            ...po,
+            supplier: suppliersMap.get(po.supplier_id) || null,
+            buyer: buyersMap.get(po.buyer_id) || null
+          }));
+        } catch (e) {
+          console.warn('Error enriching delivered purchase orders:', e);
+        }
+      }
+      
+      // Transform purchase_orders to delivery_requests format for consistency
+      const deliveredFromPOs = (enrichedDeliveredPOs || []).map((po: any) => ({
+        id: po.id,
+        purchase_order_id: po.id,
+        provider_id: userId,
+        status: po.status,
+        pickup_location: po.supplier?.address || po.supplier?.location || 'Supplier location',
+        pickup_address: po.supplier?.address || po.supplier?.location || 'Supplier location',
+        delivery_location: po.delivery_address || 'Delivery location',
+        delivery_address: po.delivery_address || 'Delivery location',
+        material_type: Array.isArray(po.items) ? po.items.map((i: any) => i.name || i.material_type).join(', ') : 'Construction Materials',
+        quantity: Array.isArray(po.items) ? po.items.reduce((sum: number, i: any) => sum + (i.quantity || 1), 0) : 1,
+        builder_name: po.buyer?.full_name || 'Builder',
+        builder_phone: po.buyer?.phone || '',
+        builder_email: po.buyer?.email || '',
+        price: po.total_amount || 0,
+        estimated_cost: po.total_amount || 0,
+        completed_at: po.delivered_at || po.completed_at || po.updated_at,
+        delivered_at: po.delivered_at || po.completed_at || po.updated_at,
+        created_at: po.created_at,
+        updated_at: po.updated_at,
+        source: 'purchase_orders'
+      }));
+      
+      // Combine both sources and remove duplicates (prefer delivery_requests if both exist)
+      const allHistory: any[] = [];
+      const seenIds = new Set<string>();
+      
+      // Add delivery_requests first
+      (historyData || []).forEach((dr: any) => {
+        allHistory.push(dr);
+        seenIds.add(dr.id);
+        if (dr.purchase_order_id) {
+          seenIds.add(dr.purchase_order_id);
+        }
+      });
+      
+      // Add purchase_orders that aren't already in delivery_requests
+      deliveredFromPOs.forEach((po: any) => {
+        if (!seenIds.has(po.id) && !seenIds.has(po.purchase_order_id)) {
+          allHistory.push(po);
+          seenIds.add(po.id);
+        }
+      });
       
       // Sort by completed_at if available, otherwise by updated_at (most recent first)
-      const sortedHistory = (historyData || []).sort((a: any, b: any) => {
+      const sortedHistory = allHistory.sort((a: any, b: any) => {
         const dateA = new Date(a.completed_at || a.delivered_at || a.updated_at || a.created_at);
         const dateB = new Date(b.completed_at || b.delivered_at || b.updated_at || b.created_at);
         return dateB.getTime() - dateA.getTime(); // Descending (most recent first)
       });
       
-      console.log('📦 Delivery history loaded:', sortedHistory.length, 'items (most recent first)');
+      console.log('📦 Delivery history loaded:', {
+        from_delivery_requests: historyData?.length || 0,
+        from_purchase_orders: deliveredPOs?.length || 0,
+        total: sortedHistory.length
+      }, 'items (most recent first)');
       setDeliveryHistory(sortedHistory);
 
       // Fetch ALL pending requests from multiple tables for testing

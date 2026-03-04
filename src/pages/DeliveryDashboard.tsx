@@ -231,7 +231,7 @@ const DeliveryDashboard = () => {
         delivery_location: d.delivery_location || d.delivery_address || 'N/A',
         material_type: d.material_type || d.item_description || 'Materials',
         status: d.status,
-        completed_at: d.updated_at || d.completed_at || d.created_at,
+        completed_at: d.completed_at || d.delivered_at || d.updated_at || d.created_at,
         price: d.price || d.delivery_fee || d.estimated_cost || 0,
         rating: d.rating || 0
       }));
@@ -995,7 +995,12 @@ const DeliveryDashboard = () => {
                       d.status === 'scheduled' ||
                       d.status === 'pending_pickup' ||
                       d.status === 'delivery_assigned' ||
-                      d.status === 'ready_for_dispatch'
+                      d.status === 'ready_for_dispatch' ||
+                      d.status === 'provider_assigned' ||
+                      d.status === 'awaiting_delivery_provider' ||
+                      d.status === 'delivery_requested' ||
+                      d.status === 'quote_accepted' ||
+                      d.status === 'order_created'
                     ).length > 0 && (
                       <Badge className="ml-1 bg-blue-500 text-white text-xs">
                         {activeDeliveries.filter(d => 
@@ -1004,7 +1009,12 @@ const DeliveryDashboard = () => {
                           d.status === 'scheduled' ||
                           d.status === 'pending_pickup' ||
                           d.status === 'delivery_assigned' ||
-                          d.status === 'ready_for_dispatch'
+                          d.status === 'ready_for_dispatch' ||
+                          d.status === 'provider_assigned' ||
+                          d.status === 'awaiting_delivery_provider' ||
+                          d.status === 'delivery_requested' ||
+                          d.status === 'quote_accepted' ||
+                          d.status === 'order_created'
                         ).length}
                       </Badge>
                     )}
@@ -1049,7 +1059,12 @@ const DeliveryDashboard = () => {
                         d.status === 'scheduled' ||
                         d.status === 'pending_pickup' ||
                         d.status === 'delivery_assigned' ||
-                        d.status === 'ready_for_dispatch'
+                        d.status === 'ready_for_dispatch' ||
+                        d.status === 'provider_assigned' ||
+                        d.status === 'awaiting_delivery_provider' ||
+                        d.status === 'delivery_requested' ||
+                        d.status === 'quote_accepted' ||
+                        d.status === 'order_created'
                       );
                       
                       return scheduled.length > 0 ? (
@@ -1098,7 +1113,9 @@ const DeliveryDashboard = () => {
                         d.status === 'picked_up' ||
                         d.status === 'on_the_way' ||
                         d.status === 'near_destination' ||
-                        d.status === 'dispatched'
+                        d.status === 'dispatched' ||
+                        d.status === 'out_for_delivery' ||
+                        d.status === 'delivery_arrived'
                       );
                       
                       return inTransit.length > 0 ? (
