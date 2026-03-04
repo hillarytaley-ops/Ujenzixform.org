@@ -356,6 +356,7 @@ export const useDeliveryProviderData = () => {
     }
 
     console.log('📦 useDeliveryProviderData: Fetching data for userId:', userId);
+    console.log('💡 TIP: If no deliveries show, check console logs below for status breakdown and run diagnostic SQL: supabase/migrations/20260304_diagnose_delivery_dashboard.sql');
     setLoading(true);
     setError(null);
     
@@ -606,7 +607,8 @@ export const useDeliveryProviderData = () => {
       console.log('📦 Active deliveries loaded:', {
         from_delivery_requests: activeData?.length || 0,
         from_purchase_orders: purchaseOrdersData?.length || 0,
-        total: allActiveDeliveries.length
+        total: allActiveDeliveries.length,
+        userId: userId
       });
       
       // Debug: Log all statuses found
@@ -620,14 +622,15 @@ export const useDeliveryProviderData = () => {
           id: d.id,
           status: d.status,
           source: d.source,
-          material_type: d.material_type
+          material_type: d.material_type,
+          provider_id: d.provider_id
         })));
       } else {
         console.warn('⚠️ No active deliveries found! Checking all deliveries for this provider...');
         // Fetch ALL deliveries regardless of status to see what exists
         try {
           const allDeliveriesResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/delivery_requests?provider_id=eq.${userId}&select=id,status,provider_id,tracking_number,material_type&limit=20`,
+            `${SUPABASE_URL}/rest/v1/delivery_requests?provider_id=eq.${userId}&select=id,status,provider_id,tracking_number,material_type,delivery_address&limit=20`,
             {
               headers: {
                 'apikey': SUPABASE_ANON_KEY,
@@ -639,10 +642,32 @@ export const useDeliveryProviderData = () => {
           );
           if (allDeliveriesResponse.ok) {
             const allDeliveries = await allDeliveriesResponse.json();
-            console.log('🔍 ALL deliveries for provider (any status):', allDeliveries.length, allDeliveries);
+            console.log('🔍 ALL delivery_requests for provider (any status):', allDeliveries.length, allDeliveries);
             if (allDeliveries.length > 0) {
               const allStatuses = allDeliveries.map((d: any) => d.status);
-              console.log('📋 All statuses found:', [...new Set(allStatuses)]);
+              console.log('📋 All statuses found in delivery_requests:', [...new Set(allStatuses)]);
+            } else {
+              console.warn('⚠️ No delivery_requests found with provider_id =', userId);
+            }
+          } else {
+            const errorText = await allDeliveriesResponse.text();
+            console.error('❌ Error fetching all deliveries:', allDeliveriesResponse.status, errorText);
+          }
+          
+          // Also check purchase_orders
+          const { data: allPOs, error: poCheckError } = await supabase
+            .from('purchase_orders')
+            .select('id, status, delivery_provider_id, po_number, delivery_address')
+            .eq('delivery_provider_id', userId)
+            .limit(20);
+          
+          if (poCheckError) {
+            console.error('❌ Error fetching purchase_orders:', poCheckError);
+          } else {
+            console.log('🔍 ALL purchase_orders for provider:', allPOs?.length || 0, allPOs);
+            if (allPOs && allPOs.length > 0) {
+              const poStatuses = allPOs.map((po: any) => po.status);
+              console.log('📋 All statuses found in purchase_orders:', [...new Set(poStatuses)]);
             }
           }
         } catch (e) {
