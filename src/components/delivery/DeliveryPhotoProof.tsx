@@ -250,9 +250,9 @@ export const DeliveryPhotoProof: React.FC<DeliveryPhotoProofProps> = ({
           Capture photos and signature for {customerName}
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-4">
         {/* Photo Capture Section */}
-        <div className="space-y-3">
+        <div className="space-y-2">
           <Label className="flex items-center gap-2">
             <Image className="h-4 w-4" />
             Photos (Required)
@@ -315,7 +315,7 @@ export const DeliveryPhotoProof: React.FC<DeliveryPhotoProofProps> = ({
         </div>
 
         {/* Signature Section */}
-        <div className="space-y-3">
+        <div className="space-y-2">
           <Label className="flex items-center gap-2">
             <User className="h-4 w-4" />
             Customer Signature
@@ -325,7 +325,7 @@ export const DeliveryPhotoProof: React.FC<DeliveryPhotoProofProps> = ({
             <canvas
               ref={canvasRef}
               width={300}
-              height={150}
+              height={100}
               className="w-full touch-none cursor-crosshair bg-gray-50 rounded"
               onMouseDown={startSignature}
               onMouseMove={drawSignature}
@@ -376,12 +376,12 @@ export const DeliveryPhotoProof: React.FC<DeliveryPhotoProofProps> = ({
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Any additional notes about the delivery..."
-            rows={3}
+            rows={2}
           />
         </div>
 
         {/* Location Capture */}
-        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+        <div className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
           <div className="flex items-center gap-2">
             <MapPin className="h-4 w-4 text-gray-500" />
             <span className="text-sm">
