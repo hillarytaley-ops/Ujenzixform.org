@@ -557,44 +557,8 @@ export const useDeliveryProviderData = () => {
       if (deliveryRequestsResult.status === 'rejected') {
         console.warn('⚠️ delivery_requests fetch failed:', deliveryRequestsResult.reason);
       }
-      if (purchaseOrdersResult.status === 'rejected' || purchaseOrdersData.length === 0) {
-        console.warn('⚠️ purchase_orders fetch failed or empty, retrying with simpler query (only shipped/in_transit)...');
-        
-        // Retry purchase_orders fetch separately with simpler query - only fetch shipped/in_transit orders
-        try {
-          const retryQuery = supabase
-            .from('purchase_orders')
-            .select('id, status, delivery_provider_id, delivery_address, items, total_amount, created_at, updated_at, supplier_id, buyer_id, delivery_provider_name, delivery_assigned_at')
-            .eq('delivery_provider_id', userId)
-            .in('status', ['shipped', 'in_transit', 'dispatched', 'out_for_delivery', 'delivery_arrived', 'processing'])
-            .order('created_at', { ascending: false })
-            .limit(100);
-          
-          const retryTimeout = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Retry timeout')), 5000)
-          );
-          
-          const retryResult = await Promise.race([retryQuery, retryTimeout]).catch(() => {
-            console.warn('⚠️ Retry also timed out');
-            return { data: [], error: null };
-          }) as any;
-          
-          if (retryResult.data && retryResult.data.length > 0) {
-            purchaseOrdersData = retryResult.data;
-            console.log('✅ Retry successful! Found', purchaseOrdersData.length, 'shipped/in_transit orders');
-            
-            // Log status breakdown
-            const poStatusCounts = purchaseOrdersData.reduce((acc: any, po: any) => {
-              acc[po.status] = (acc[po.status] || 0) + 1;
-              return acc;
-            }, {});
-            console.log('📊 Retry purchase_orders status breakdown:', poStatusCounts);
-          } else {
-            console.warn('⚠️ Retry returned no data');
-          }
-        } catch (e) {
-          console.warn('⚠️ Retry failed:', e);
-        }
+      if (purchaseOrdersResult.status === 'rejected') {
+        console.warn('⚠️ purchase_orders fetch failed:', purchaseOrdersResult.reason);
       }
       
       // Skip enrichment for now to avoid timeout - use basic data directly
