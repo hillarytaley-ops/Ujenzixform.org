@@ -330,6 +330,20 @@ export const ReceivingScanner: React.FC = () => {
       
       console.log('🔐 Using access token:', accessToken ? 'Found' : 'Using anon key');
       
+      const requestBody = {
+        _qr_code: qrCode,
+        _scan_type: 'receiving',
+        _scanner_device_id: navigator.userAgent.substring(0, 100),
+        _scanner_type: scannerType,
+        _material_condition: materialCondition,
+        _notes: notes || null
+      };
+      
+      console.log('📤 Sending RPC request:', {
+        url: `${SUPABASE_URL}/rest/v1/rpc/record_qr_scan`,
+        body: requestBody
+      });
+      
       // Call the record_qr_scan function via REST API with timeout
       const response = await fetchWithTimeout(
         `${SUPABASE_URL}/rest/v1/rpc/record_qr_scan`,
@@ -340,26 +354,55 @@ export const ReceivingScanner: React.FC = () => {
             'apikey': ANON_KEY,
             'Authorization': `Bearer ${accessToken}`,
           },
-          body: JSON.stringify({
-            _qr_code: qrCode,
-            _scan_type: 'receiving',
-            _scanner_device_id: navigator.userAgent.substring(0, 100),
-            _scanner_type: scannerType,
-            _material_condition: materialCondition,
-            _notes: notes || null
-          })
+          body: JSON.stringify(requestBody)
         },
         10000 // 10 second timeout
       );
 
       console.log('📊 RPC Response status:', response.status);
       
-      const data = await response.json();
-      console.log('📊 RPC Response data:', data);
+      let data: any;
+      try {
+        const text = await response.text();
+        data = text ? JSON.parse(text) : {};
+        console.log('📊 RPC Response data:', data);
+      } catch (parseError) {
+        console.error('❌ Failed to parse response:', parseError);
+        data = { error: 'Failed to parse server response' };
+      }
 
       if (!response.ok) {
-        console.error('❌ Receiving scan error:', data);
-        toast.error(`Failed to record receiving scan: ${data.message || data.error || 'Unknown error'}`);
+        console.error('❌ Receiving scan error:', {
+          status: response.status,
+          statusText: response.statusText,
+          data: data,
+          qrCode: qrCode
+        });
+        
+        // Handle different error statuses
+        if (response.status === 400) {
+          // 400 usually means bad request - could be validation error or function error
+          const errorMsg = data.message || data.error || data.details || 'Invalid request. Please check the QR code format.';
+          toast.error('❌ Invalid Request', {
+            description: errorMsg,
+            duration: 6000
+          });
+        } else if (response.status === 401) {
+          toast.error('🔐 Authentication Error', {
+            description: 'Your session may have expired. Please refresh the page.',
+            duration: 6000
+          });
+        } else if (response.status === 403) {
+          toast.error('🚫 Permission Denied', {
+            description: 'You do not have permission to perform this action.',
+            duration: 6000
+          });
+        } else {
+          toast.error(`Failed to record receiving scan (${response.status})`, {
+            description: data.message || data.error || 'Unknown error occurred',
+            duration: 6000
+          });
+        }
         return;
       }
       

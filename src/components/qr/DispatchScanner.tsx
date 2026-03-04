@@ -1478,20 +1478,63 @@ export const DispatchScanner: React.FC = () => {
         return response;
       };
       
-      const response = await makeRPCWithRetry(`${SUPABASE_URL}/rest/v1/rpc/record_qr_scan`, {
+      const requestBody = {
           _qr_code: qrCode,
           _scan_type: 'dispatch',
           _scanner_device_id: navigator.userAgent.substring(0, 100),
           _scanner_type: scannerType,
           _material_condition: materialCondition,
           _notes: notes || null
+      };
+      
+      console.log('📤 Sending RPC request:', {
+        url: `${SUPABASE_URL}/rest/v1/rpc/record_qr_scan`,
+        body: requestBody
       });
+      
+      const response = await makeRPCWithRetry(`${SUPABASE_URL}/rest/v1/rpc/record_qr_scan`, requestBody);
 
-      const data = await response.json();
+      let data: any;
+      try {
+        const text = await response.text();
+        data = text ? JSON.parse(text) : {};
+      } catch (parseError) {
+        console.error('❌ Failed to parse response:', parseError);
+        data = { error: 'Failed to parse server response' };
+      }
 
       if (!response.ok) {
-        console.error('❌ Dispatch scan error:', data);
-        toast.error(`Failed to record dispatch scan: ${data.message || data.error || 'Unknown error'}`);
+        console.error('❌ Dispatch scan error:', {
+          status: response.status,
+          statusText: response.statusText,
+          data: data,
+          qrCode: qrCode
+        });
+        
+        // Handle different error statuses
+        if (response.status === 400) {
+          // 400 usually means bad request - could be validation error or function error
+          const errorMsg = data.message || data.error || data.details || 'Invalid request. Please check the QR code format.';
+          toast.error('❌ Invalid Request', {
+            description: errorMsg,
+            duration: 6000
+          });
+        } else if (response.status === 401) {
+          toast.error('🔐 Authentication Error', {
+            description: 'Your session may have expired. Please refresh the page.',
+            duration: 6000
+          });
+        } else if (response.status === 403) {
+          toast.error('🚫 Permission Denied', {
+            description: 'You do not have permission to perform this action.',
+            duration: 6000
+          });
+        } else {
+          toast.error(`Failed to record dispatch scan (${response.status})`, {
+            description: data.message || data.error || 'Unknown error occurred',
+            duration: 6000
+          });
+        }
         return;
       }
 
