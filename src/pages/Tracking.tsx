@@ -113,13 +113,16 @@ const DeliveryTrackingInput: React.FC = () => {
 
         if (Array.isArray(trackingNumberData) && trackingNumberData.length > 0) {
           console.log('✅ Found in tracking_numbers table:', trackingNumberData[0]);
-          setTrackingResult({
+          const result = {
             type: 'tracking_number',
             data: trackingNumberData[0]
-          });
+          };
+          setTrackingResult(result);
+          // Automatically open GPS map for real-time tracking
+          setShowGPSMap(true);
           toast({
             title: "✅ Delivery Found",
-            description: "Click 'View Live GPS Map' to see real-time location"
+            description: "Opening real-time GPS map..."
           });
           setTracking(false);
           return;
@@ -140,13 +143,16 @@ const DeliveryTrackingInput: React.FC = () => {
 
         if (trackingNumberDataIlike && trackingNumberDataIlike.length > 0) {
           console.log('✅ Found in tracking_numbers table (ILIKE):', trackingNumberDataIlike[0]);
-          setTrackingResult({
+          const result = {
             type: 'tracking_number',
             data: trackingNumberDataIlike[0]
-          });
+          };
+          setTrackingResult(result);
+          // Automatically open GPS map for real-time tracking
+          setShowGPSMap(true);
           toast({
             title: "✅ Delivery Found",
-            description: "Click 'View Live GPS Map' to see real-time location"
+            description: "Opening real-time GPS map..."
           });
           setTracking(false);
           return;
@@ -170,14 +176,24 @@ const DeliveryTrackingInput: React.FC = () => {
 
       if (trackingData) {
         console.log('✅ Found in delivery_requests table:', trackingData);
-        setTrackingResult({
+        const result = {
           type: 'delivery_request',
           data: trackingData
-        });
-        toast({
-          title: "✅ Delivery Found",
-          description: "Click 'View Live GPS Map' to see real-time location"
-        });
+        };
+        setTrackingResult(result);
+        // Automatically open GPS map if delivery is in progress
+        if (trackingData.status === 'accepted' || trackingData.status === 'picked_up' || trackingData.status === 'in_transit') {
+          setShowGPSMap(true);
+          toast({
+            title: "✅ Delivery Found",
+            description: "Opening real-time GPS map..."
+          });
+        } else {
+          toast({
+            title: "✅ Delivery Found",
+            description: "View delivery details below"
+          });
+        }
         setTracking(false);
         return;
       }
@@ -193,14 +209,24 @@ const DeliveryTrackingInput: React.FC = () => {
           .maybeSingle();
 
         if (emailData) {
-          setTrackingResult({
+          const result = {
             type: 'delivery_request',
             data: emailData
-          });
-          toast({
-            title: "✅ Delivery Found",
-            description: "Found delivery for this email"
-          });
+          };
+          setTrackingResult(result);
+          // Automatically open GPS map if delivery is in progress
+          if (emailData.status === 'accepted' || emailData.status === 'picked_up' || emailData.status === 'in_transit') {
+            setShowGPSMap(true);
+            toast({
+              title: "✅ Delivery Found",
+              description: "Opening real-time GPS map..."
+            });
+          } else {
+            toast({
+              title: "✅ Delivery Found",
+              description: "Found delivery for this email"
+            });
+          }
           setTracking(false);
           return;
         }
@@ -220,14 +246,24 @@ const DeliveryTrackingInput: React.FC = () => {
         }
 
         if (data) {
-          setTrackingResult({
+          const result = {
             type: 'delivery_request',
             data: data
-          });
-          toast({
-            title: "✅ Delivery Found",
-            description: "Click 'View Live GPS Map' to see real-time location"
-          });
+          };
+          setTrackingResult(result);
+          // Automatically open GPS map if delivery is in progress
+          if (data.status === 'accepted' || data.status === 'picked_up' || data.status === 'in_transit') {
+            setShowGPSMap(true);
+            toast({
+              title: "✅ Delivery Found",
+              description: "Opening real-time GPS map..."
+            });
+          } else {
+            toast({
+              title: "✅ Delivery Found",
+              description: "View delivery details below"
+            });
+          }
           setTracking(false);
           return;
         }
@@ -242,14 +278,24 @@ const DeliveryTrackingInput: React.FC = () => {
           .maybeSingle();
 
         if (legacyData) {
-          setTrackingResult({
+          const result = {
             type: 'delivery',
             data: legacyData
-          });
-          toast({
-            title: "✅ Delivery Found",
-            description: "Click 'View Live GPS Map' to see real-time location"
-          });
+          };
+          setTrackingResult(result);
+          // Automatically open GPS map if delivery is in progress
+          if (legacyData.status === 'accepted' || legacyData.status === 'picked_up' || legacyData.status === 'in_transit') {
+            setShowGPSMap(true);
+            toast({
+              title: "✅ Delivery Found",
+              description: "Opening real-time GPS map..."
+            });
+          } else {
+            toast({
+              title: "✅ Delivery Found",
+              description: "View delivery details below"
+            });
+          }
           setTracking(false);
           return;
         }
