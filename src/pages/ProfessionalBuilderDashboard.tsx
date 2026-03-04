@@ -49,6 +49,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -108,6 +115,7 @@ const ProfessionalBuilderDashboardPage = () => {
   const [creatingProject, setCreatingProject] = useState(false); // Separate state for creation
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [selectedProject, setSelectedProject] = useState<any>(null);
+  const [selectedProjectForOrder, setSelectedProjectForOrder] = useState<string | null>(null);
   const [gettingProjectLocation, setGettingProjectLocation] = useState(false);
   const [showMapPicker, setShowMapPicker] = useState(false);
   const [newProject, setNewProject] = useState({
@@ -1348,8 +1356,40 @@ const ProfessionalBuilderDashboardPage = () => {
                 <p className="text-blue-100">Professional Builder Dashboard</p>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Link to="/suppliers?from=dashboard">
+            <div className="flex flex-wrap gap-2 items-center">
+              {/* Project Selector for Ordering */}
+              {projects.length > 0 && (
+                <Select
+                  value={selectedProjectForOrder || ''}
+                  onValueChange={(value) => {
+                    setSelectedProjectForOrder(value || null);
+                    if (value) {
+                      localStorage.setItem('cart_project_id', value);
+                    } else {
+                      localStorage.removeItem('cart_project_id');
+                    }
+                  }}
+                >
+                  <SelectTrigger className="w-[200px] bg-white/90 border-blue-200 text-blue-700">
+                    <SelectValue placeholder="Select project (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">No project (general order)</SelectItem>
+                    {projects.map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-3 w-3 text-blue-600" />
+                          <span>{project.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <Link to={selectedProjectForOrder 
+                ? `/suppliers?from=dashboard&project_id=${selectedProjectForOrder}`
+                : '/suppliers?from=dashboard'
+              }>
                 <Button className="bg-white text-blue-700 hover:bg-blue-50">
                   <ShoppingCart className="h-4 w-4 mr-2" />
                   Order Materials
@@ -1544,12 +1584,13 @@ const ProfessionalBuilderDashboardPage = () => {
                     <CardDescription>Manage your construction projects</CardDescription>
                   </div>
                   <Dialog open={showCreateProject} onOpenChange={setShowCreateProject}>
-                    <DialogTrigger asChild>
-                      <Button className="bg-blue-600 hover:bg-blue-700">
-                        <Briefcase className="h-4 w-4 mr-2" />
-                        Create New Project
-                      </Button>
-                    </DialogTrigger>
+                    <Button 
+                      className="bg-blue-600 hover:bg-blue-700"
+                      onClick={() => setShowCreateProject(true)}
+                    >
+                      <Briefcase className="h-4 w-4 mr-2" />
+                      Create New Project
+                    </Button>
                     <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                       <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">

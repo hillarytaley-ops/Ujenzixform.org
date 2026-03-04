@@ -20,6 +20,7 @@ import {
   ShoppingCart, 
   FileText, 
   Building, 
+  Building2,
   Shield,
   Store,
   Truck,
@@ -48,6 +49,46 @@ const Suppliers = () => {
   
   // Check if user is coming from a dashboard (hide hero section)
   const isFromDashboard = searchParams.get('from') === 'dashboard';
+  
+  // Get project_id from URL if provided (for project-based ordering)
+  const projectIdFromUrl = searchParams.get('project_id');
+  const [selectedProjectName, setSelectedProjectName] = useState<string | null>(null);
+  
+  // Store project_id in localStorage so cart can use it and fetch project name
+  useEffect(() => {
+    if (projectIdFromUrl) {
+      localStorage.setItem('cart_project_id', projectIdFromUrl);
+      console.log('📁 Project ID from URL stored for cart:', projectIdFromUrl);
+      
+      // Fetch project name for display
+      const fetchProjectName = async () => {
+        try {
+          const response = await fetch(
+            `${SUPABASE_URL}/rest/v1/builder_projects?id=eq.${projectIdFromUrl}&select=name&limit=1`,
+            {
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Content-Type': 'application/json',
+              }
+            }
+          );
+          if (response.ok) {
+            const data = await response.json();
+            if (data && data.length > 0) {
+              setSelectedProjectName(data[0].name);
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching project name:', error);
+        }
+      };
+      fetchProjectName();
+    } else {
+      // Clear project_id if not in URL (user might be ordering without a project)
+      localStorage.removeItem('cart_project_id');
+      setSelectedProjectName(null);
+    }
+  }, [projectIdFromUrl]);
 
   // Detect mobile device
   useEffect(() => {
@@ -188,11 +229,23 @@ const Suppliers = () => {
                   Materials Marketplace
                 </h1>
                 <p className="text-sm text-white/70">
-                  {userRole === 'professional_builder' ? 'Request quotes for bulk orders' : 'Browse and purchase materials'}
+                  {selectedProjectName 
+                    ? `Ordering for: ${selectedProjectName}`
+                    : (userRole === 'professional_builder' ? 'Request quotes for bulk orders' : 'Browse and purchase materials')
+                  }
                 </p>
               </div>
               <div className="w-[140px]" /> {/* Spacer for centering */}
             </div>
+            {/* Project indicator banner */}
+            {selectedProjectName && (
+              <div className="mt-3 bg-blue-600/30 border border-blue-400/50 rounded-lg p-2 text-center">
+                <p className="text-sm text-white flex items-center justify-center gap-2">
+                  <Building2 className="h-4 w-4" />
+                  <span>All materials will be linked to <strong>{selectedProjectName}</strong> for cost tracking</span>
+                </p>
+              </div>
+            )}
           </div>
         </section>
       )}

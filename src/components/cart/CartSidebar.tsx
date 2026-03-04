@@ -128,6 +128,13 @@ export const CartSidebar: React.FC = () => {
         const projectsData = await response.json();
         console.log('📁 Cart: Loaded projects for order association:', projectsData.length);
         setProjects(projectsData || []);
+        
+        // Pre-select project from localStorage if available
+        const storedProjectId = localStorage.getItem('cart_project_id');
+        if (storedProjectId && projectsData.some((p: BuilderProject) => p.id === storedProjectId)) {
+          console.log('📁 Cart: Pre-selecting project from localStorage:', storedProjectId);
+          setSelectedProjectId(storedProjectId);
+        }
       }
     } catch (error) {
       console.error('Error loading projects:', error);
@@ -176,6 +183,13 @@ export const CartSidebar: React.FC = () => {
       checkUserRole();
       // Load projects for order association
       loadProjects();
+      
+      // Check if project_id is in localStorage (from URL parameter)
+      const storedProjectId = localStorage.getItem('cart_project_id');
+      if (storedProjectId && !selectedProjectId) {
+        console.log('📁 Cart: Pre-selecting project from URL:', storedProjectId);
+        setSelectedProjectId(storedProjectId);
+      }
     }
   }, [isCartOpen]);
 
