@@ -654,6 +654,18 @@ export const useDeliveryProviderData = () => {
           return acc;
         }, {});
         console.log('📊 Status breakdown:', statusCounts);
+        
+        // Specifically check for shipped/in_transit statuses
+        const shippedCount = allActiveDeliveries.filter(d => d.status === 'shipped').length;
+        const inTransitCount = allActiveDeliveries.filter(d => d.status === 'in_transit').length;
+        const dispatchedCount = allActiveDeliveries.filter(d => d.status === 'dispatched').length;
+        console.log('🚚 Dispatched/Shipped/In Transit counts:', {
+          shipped: shippedCount,
+          in_transit: inTransitCount,
+          dispatched: dispatchedCount,
+          total_dispatched: shippedCount + inTransitCount + dispatchedCount
+        });
+        
         console.log('📦 All active deliveries:', allActiveDeliveries.map((d: any) => ({
           id: d.id,
           status: d.status,

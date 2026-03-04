@@ -1140,8 +1140,23 @@ const DeliveryDashboard = () => {
                         d.status === 'shipped' ||
                         d.status === 'out_for_delivery' ||
                         d.status === 'delivery_arrived' ||
-                        d.status === 'ready_for_dispatch' // After supplier dispatches, status may be ready_for_dispatch
+                        d.status === 'ready_for_dispatch' ||
+                        d.status === 'processing' // Some orders may be in processing after dispatch
                       );
+                      
+                      // Debug logging
+                      if (activeDeliveries.length > 0 && inTransit.length === 0) {
+                        console.log('⚠️ In Transit filter: Found', activeDeliveries.length, 'active deliveries but 0 in transit');
+                        console.log('📋 All statuses in activeDeliveries:', [...new Set(activeDeliveries.map(d => d.status))]);
+                        console.log('📋 Sample deliveries:', activeDeliveries.slice(0, 3).map(d => ({
+                          id: d.id,
+                          status: d.status,
+                          source: d.source
+                        })));
+                      } else if (inTransit.length > 0) {
+                        console.log('✅ In Transit filter: Found', inTransit.length, 'in transit deliveries');
+                        console.log('📋 In Transit statuses:', [...new Set(inTransit.map(d => d.status))]);
+                      }
                       
                       return inTransit.length > 0 ? (
                         <div className="space-y-4">
