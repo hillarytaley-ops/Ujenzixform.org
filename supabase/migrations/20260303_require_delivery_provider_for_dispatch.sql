@@ -123,12 +123,13 @@ BEGIN
     -- ============================================================
     IF order_id IS NOT NULL THEN
       -- Fetch purchase order to check delivery requirements
+      -- Use table qualification to avoid ambiguity with variable names
       SELECT 
-        delivery_required,
-        delivery_provider_id
+        po.delivery_required,
+        po.delivery_provider_id
       INTO order_record
-      FROM purchase_orders
-      WHERE id = order_id;
+      FROM purchase_orders po
+      WHERE po.id = order_id;
       
       IF FOUND THEN
         delivery_required := COALESCE(order_record.delivery_required, TRUE); -- Default to TRUE if NULL
