@@ -278,23 +278,47 @@ const DeliveryTrackingInput: React.FC = () => {
         console.log('Purchase orders search skipped');
       }
 
-      // Nothing found
+      // Nothing found - ensure we show the error and clear loading state
+      console.log('❌ No tracking result found for:', searchTerm);
       toast({
         variant: "destructive",
         title: "Not Found",
         description: `No delivery found with tracking number "${trackingNumber}". Make sure you entered it correctly.`
       });
+      setTrackingResult(null);
     } catch (error: any) {
-      console.error('Tracking error:', error);
+      console.error('❌ Tracking error:', error);
       toast({
         variant: "destructive",
         title: "Tracking Failed",
         description: error.message || "Failed to track delivery"
       });
+      setTrackingResult(null);
     } finally {
+      // Always clear loading state, even if there was an error
       setTracking(false);
+      console.log('✅ Tracking search completed, loading state cleared');
     }
   };
+
+  // Handle URL parameters for tracking number (auto-search on page load)
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const numberParam = urlParams.get('number');
+    
+    if (numberParam && !trackingResult && !tracking) {
+      console.log('🔗 Found tracking number in URL:', numberParam);
+      setTrackingNumber(numberParam);
+      // Use a small delay to ensure state is updated before searching
+      const timer = setTimeout(() => {
+        // Call handleTrackDelivery directly - it's defined above
+        handleTrackDelivery();
+      }, 200);
+      
+      return () => clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount - handleTrackDelivery is stable
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
