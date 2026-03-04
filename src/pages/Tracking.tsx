@@ -75,8 +75,11 @@ const DeliveryTrackingInput: React.FC = () => {
     };
   }, [realtimeChannel]);
 
-  const handleTrackDelivery = async () => {
-    if (!trackingNumber.trim()) {
+  const handleTrackDelivery = async (overrideTrackingNumber?: string) => {
+    // Use override if provided, otherwise use state
+    const numberToSearch = overrideTrackingNumber || trackingNumber;
+    
+    if (!numberToSearch.trim()) {
       toast({
         variant: "destructive",
         title: "Tracking Number Required",
@@ -90,7 +93,7 @@ const DeliveryTrackingInput: React.FC = () => {
     setShowGPSMap(false);
 
     try {
-      const searchTerm = trackingNumber.trim().toUpperCase();
+      const searchTerm = numberToSearch.trim().toUpperCase();
       console.log('🔍 Searching for tracking number:', searchTerm);
 
       // PRIORITY 1: Search tracking_numbers table using direct REST API (more reliable)
@@ -180,11 +183,11 @@ const DeliveryTrackingInput: React.FC = () => {
       }
 
       // Search for delivery by builder_email if it looks like an email
-      if (trackingNumber.includes('@')) {
+      if (numberToSearch.includes('@')) {
         const { data: emailData } = await supabase
           .from('delivery_requests')
           .select('*')
-          .eq('builder_email', trackingNumber.toLowerCase())
+          .eq('builder_email', numberToSearch.toLowerCase())
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -205,11 +208,11 @@ const DeliveryTrackingInput: React.FC = () => {
 
       // Search for delivery by ID (UUID format)
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (uuidRegex.test(trackingNumber)) {
+      if (uuidRegex.test(numberToSearch)) {
         const { data, error } = await supabase
           .from('delivery_requests')
           .select('*')
-          .eq('id', trackingNumber)
+          .eq('id', numberToSearch)
           .maybeSingle();
 
         if (error && error.code !== 'PGRST116') {
@@ -235,7 +238,7 @@ const DeliveryTrackingInput: React.FC = () => {
         const { data: legacyData } = await supabase
           .from('deliveries')
           .select('*')
-          .eq('tracking_number', trackingNumber)
+          .eq('tracking_number', numberToSearch)
           .maybeSingle();
 
         if (legacyData) {
@@ -259,7 +262,7 @@ const DeliveryTrackingInput: React.FC = () => {
         const { data: poData } = await supabase
           .from('purchase_orders')
           .select('*')
-          .eq('po_number', trackingNumber)
+          .eq('po_number', numberToSearch)
           .maybeSingle();
 
         if (poData) {
@@ -283,7 +286,7 @@ const DeliveryTrackingInput: React.FC = () => {
       toast({
         variant: "destructive",
         title: "Not Found",
-        description: `No delivery found with tracking number "${trackingNumber}". Make sure you entered it correctly.`
+        description: `No delivery found with tracking number "${numberToSearch}". Make sure you entered it correctly.`
       });
       setTrackingResult(null);
     } catch (error: any) {
@@ -308,12 +311,12 @@ const DeliveryTrackingInput: React.FC = () => {
     
     if (numberParam && !trackingResult && !tracking) {
       console.log('🔗 Found tracking number in URL:', numberParam);
+      // Set the tracking number in state for display
       setTrackingNumber(numberParam);
-      // Use a small delay to ensure state is updated before searching
+      // Call handleTrackDelivery with the number directly to avoid state timing issues
       const timer = setTimeout(() => {
-        // Call handleTrackDelivery directly - it's defined above
-        handleTrackDelivery();
-      }, 200);
+        handleTrackDelivery(numberParam);
+      }, 100);
       
       return () => clearTimeout(timer);
     }
