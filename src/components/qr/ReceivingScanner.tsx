@@ -226,8 +226,21 @@ export const ReceivingScanner: React.FC = () => {
           processQRScan(decodedText, 'mobile_camera');
         },
         (errorMessage) => {
-          // Only log actual errors, not "QR code not found" messages
-          if (!errorMessage.includes('No QR code found') && !errorMessage.includes('NotFoundException')) {
+          // Filter out common expected errors that occur during normal scanning
+          const ignoredErrors = [
+            'No QR code found',
+            'NotFoundException',
+            'No MultiFormat Readers were able to detect the code',
+            'QR code parse error',
+            'QR code not found',
+            'No QR code detected'
+          ];
+          
+          const shouldIgnore = ignoredErrors.some(ignored => 
+            errorMessage.includes(ignored) || errorMessage.toLowerCase().includes(ignored.toLowerCase())
+          );
+          
+          if (!shouldIgnore) {
             console.log('📷 Scanner message:', errorMessage);
           }
         }
