@@ -1210,10 +1210,16 @@ const DeliveryDashboard = () => {
                                       <Button 
                                         variant="outline" 
                                         size="sm"
+                                        disabled={!['dispatched', 'shipped', 'in_transit', 'out_for_delivery', 'delivery_arrived', 'picked_up', 'on_the_way'].includes(delivery.status)}
                                         onClick={() => {
                                           const address = encodeURIComponent(delivery.delivery_location);
                                           window.open(`https://www.google.com/maps/search/?api=1&query=${address}`, '_blank');
                                         }}
+                                        title={
+                                          !['dispatched', 'shipped', 'in_transit', 'out_for_delivery', 'delivery_arrived', 'picked_up', 'on_the_way'].includes(delivery.status)
+                                            ? 'Navigation will be available after supplier dispatches the order'
+                                            : 'Navigate to delivery location'
+                                        }
                                       >
                                         <NavigationIcon className="h-4 w-4 mr-2" />
                                         Navigate
