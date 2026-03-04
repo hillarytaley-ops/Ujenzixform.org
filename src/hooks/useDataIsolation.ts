@@ -487,16 +487,16 @@ export const useDeliveryProviderData = () => {
         (async () => {
           try {
             console.log('📦 Fetching purchase_orders for provider:', userId);
-            // Add timeout wrapper
+            // Simplified query - only fetch essential columns to avoid timeout
             const poQueryPromise = supabase
               .from('purchase_orders')
-              .select('*')
+              .select('id, status, delivery_provider_id, delivery_address, items, total_amount, created_at, updated_at, supplier_id, buyer_id, delivery_provider_name, delivery_assigned_at')
               .eq('delivery_provider_id', userId)
               .order('created_at', { ascending: false })
               .limit(100);
             
             const timeoutPromise = new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Purchase orders timeout after 5s')), 5000)
+              setTimeout(() => reject(new Error('Purchase orders timeout after 8s')), 8000)
             );
             
             const result = await Promise.race([poQueryPromise, timeoutPromise]).catch((err) => {
@@ -522,6 +522,16 @@ export const useDeliveryProviderData = () => {
               po.status !== 'quote_rejected'
             );
             console.log('📦 purchase_orders: Found', allPurchaseOrders?.length || 0, 'total,', filtered.length, 'active');
+            
+            // Log status breakdown for purchase_orders
+            if (filtered.length > 0) {
+              const poStatusCounts = filtered.reduce((acc: any, po: any) => {
+                acc[po.status] = (acc[po.status] || 0) + 1;
+                return acc;
+              }, {});
+              console.log('📊 purchase_orders status breakdown:', poStatusCounts);
+            }
+            
             return filtered;
           } catch (error: any) {
             console.warn('⚠️ Exception fetching purchase_orders:', error);
