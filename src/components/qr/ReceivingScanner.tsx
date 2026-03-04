@@ -46,6 +46,31 @@ export const ReceivingScanner: React.FC = () => {
   const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
   const isAndroid = /Android/i.test(navigator.userAgent);
 
+  // Helper to add timeout to promises
+  const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Timeout')), ms))
+    ]);
+  };
+
+  // Helper to fetch with timeout
+  const fetchWithTimeout = async (url: string, options: RequestInit, timeout: number = 8000): Promise<Response> => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    try {
+      const response = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(timeoutId);
+      return response;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('Request timeout');
+      }
+      throw error;
+    }
+  };
+
   useEffect(() => {
     checkAuth();
     detectDeviceInfo();
@@ -292,23 +317,27 @@ export const ReceivingScanner: React.FC = () => {
       
       console.log('🔐 Using access token:', accessToken ? 'Found' : 'Using anon key');
       
-      // Call the record_qr_scan function via REST API
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/record_qr_scan`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': ANON_KEY,
-          'Authorization': `Bearer ${accessToken}`,
+      // Call the record_qr_scan function via REST API with timeout
+      const response = await fetchWithTimeout(
+        `${SUPABASE_URL}/rest/v1/rpc/record_qr_scan`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            _qr_code: qrCode,
+            _scan_type: 'receiving',
+            _scanner_device_id: navigator.userAgent.substring(0, 100),
+            _scanner_type: scannerType,
+            _material_condition: materialCondition,
+            _notes: notes || null
+          })
         },
-        body: JSON.stringify({
-          _qr_code: qrCode,
-          _scan_type: 'receiving',
-          _scanner_device_id: navigator.userAgent.substring(0, 100),
-          _scanner_type: scannerType,
-          _material_condition: materialCondition,
-          _notes: notes || null
-        })
-      });
+        10000 // 10 second timeout
+      );
 
       console.log('📊 RPC Response status:', response.status);
       
@@ -388,7 +417,18 @@ export const ReceivingScanner: React.FC = () => {
       }
     } catch (error) {
       console.error('Scan processing error:', error);
-      toast.error('Failed to process scan');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      if (errorMessage.includes('timeout') || errorMessage.includes('Timeout')) {
+        toast.error('Request Timeout', {
+          description: 'The scan request took too long. Please check your connection and try again.',
+          duration: 5000
+        });
+      } else {
+        toast.error('Failed to process scan', {
+          description: errorMessage,
+          duration: 5000
+        });
+      }
     }
   };
 

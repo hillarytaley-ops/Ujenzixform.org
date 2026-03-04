@@ -1345,10 +1345,28 @@ export const DispatchScanner: React.FC = () => {
       const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
       
       // Helper function to get fresh access token with refresh
+      // Try localStorage FIRST to avoid auth.getSession() timeout
       const getFreshAccessToken = async (): Promise<string> => {
+        // First, try localStorage (fastest, no network call)
         try {
-          // First, try to get current session
-          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+          const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (parsed.access_token) {
+              console.log('📦 Using token from localStorage (fast path)');
+              return parsed.access_token;
+            }
+          }
+        } catch (e) {
+          console.warn('⚠️ Could not get token from localStorage:', e);
+        }
+        
+        // If localStorage doesn't have token, try session with timeout
+        try {
+          const { data: { session }, error: sessionError } = await withTimeout(
+            supabase.auth.getSession(),
+            2000
+          );
           
           if (session?.access_token && !sessionError) {
             // Check if token is expired (with 5 minute buffer)
@@ -1360,45 +1378,34 @@ export const DispatchScanner: React.FC = () => {
               // Token is still valid
               return session.access_token;
             } else {
-              // Token is expired or expiring soon, refresh it
+              // Token is expired or expiring soon, refresh it with timeout
               console.log('🔄 Token expired or expiring soon, refreshing...');
-              const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
-              
-              if (newSession?.access_token && !refreshError) {
-                console.log('✅ Token refreshed successfully');
-                return newSession.access_token;
-              } else {
-                console.warn('⚠️ Token refresh failed, trying localStorage...', refreshError);
+              try {
+                const { data: { session: newSession }, error: refreshError } = await withTimeout(
+                  supabase.auth.refreshSession(),
+                  2000
+                );
+                
+                if (newSession?.access_token && !refreshError) {
+                  console.log('✅ Token refreshed successfully');
+                  return newSession.access_token;
+                } else {
+                  console.warn('⚠️ Token refresh failed, using localStorage...', refreshError);
+                }
+              } catch (refreshErr) {
+                console.warn('⚠️ Token refresh timeout, using localStorage...');
               }
             }
-          } else {
-            // No session, try to refresh
-            console.log('🔄 No session found, attempting refresh...');
-            const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
-            
-            if (newSession?.access_token && !refreshError) {
-              console.log('✅ Session refreshed successfully');
-              return newSession.access_token;
-            } else {
-              console.warn('⚠️ Session refresh failed, trying localStorage...', refreshError);
-            }
           }
         } catch (e) {
-          console.warn('⚠️ Error getting/refreshing session:', e);
+          console.warn('⚠️ Error getting session (timeout expected), using localStorage...');
         }
         
-        // Fallback to localStorage
-      try {
-        const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-            if (parsed.access_token) {
-              console.log('📦 Using token from localStorage');
-              return parsed.access_token;
-            }
-          }
-        } catch (e) {
-          console.warn('⚠️ Could not get token from localStorage:', e);
+        // Fallback to localStorage again (in case session had token but we couldn't check expiry)
+        const stored = getUserFromStorage();
+        if (stored?.accessToken) {
+          console.log('📦 Using token from localStorage (fallback)');
+          return stored.accessToken;
         }
         
         // Final fallback: anon key
@@ -1409,17 +1416,33 @@ export const DispatchScanner: React.FC = () => {
       // Get fresh access token
       let accessToken = await getFreshAccessToken();
       
-      // Helper function to make RPC call with retry on 401
+      // Helper function to make RPC call with retry on 401 and timeout
       const makeRPCWithRetry = async (url: string, body: any): Promise<Response> => {
-        let response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': ANON_KEY,
-          'Authorization': `Bearer ${accessToken}`,
-        },
+        const fetchWithTimeout = async (url: string, options: RequestInit, timeout: number = 10000): Promise<Response> => {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), timeout);
+          try {
+            const response = await fetch(url, { ...options, signal: controller.signal });
+            clearTimeout(timeoutId);
+            return response;
+          } catch (error) {
+            clearTimeout(timeoutId);
+            if (error instanceof Error && error.name === 'AbortError') {
+              throw new Error('Request timeout - please check your connection and try again');
+            }
+            throw error;
+          }
+        };
+
+        let response = await fetchWithTimeout(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+          },
           body: JSON.stringify(body)
-        });
+        }, 10000); // 10 second timeout
         
         // If 401, refresh token and retry once
         if (response.status === 401) {
@@ -1427,7 +1450,7 @@ export const DispatchScanner: React.FC = () => {
           accessToken = await getFreshAccessToken();
           
           // Retry with fresh token
-          response = await fetch(url, {
+          response = await fetchWithTimeout(url, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -1435,7 +1458,7 @@ export const DispatchScanner: React.FC = () => {
               'Authorization': `Bearer ${accessToken}`,
             },
             body: JSON.stringify(body)
-          });
+          }, 10000);
         }
         
         return response;
@@ -1539,7 +1562,18 @@ export const DispatchScanner: React.FC = () => {
       }
     } catch (error) {
       console.error('Scan processing error:', error);
-      toast.error('Failed to process scan');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      if (errorMessage.includes('timeout') || errorMessage.includes('Timeout')) {
+        toast.error('Request Timeout', {
+          description: 'The scan request took too long. Please check your connection and try again.',
+          duration: 5000
+        });
+      } else {
+        toast.error('Failed to process scan', {
+          description: errorMessage,
+          duration: 5000
+        });
+      }
     }
   };
 
