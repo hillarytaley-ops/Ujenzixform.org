@@ -367,28 +367,54 @@ export const useDeliveryProviderData = () => {
     }, 15000);
 
     try {
-      console.log('📦 Step 1: Fetching profile and registration...');
-      // Fetch delivery provider profile - ONLY for current user
-      const { data: profileData, error: profileError } = await supabase
+      console.log('📦 Step 1: Fetching profile and registration (with timeout)...');
+      
+      // Fetch profile and registration in parallel with timeout - don't block on these
+      const profilePromise = supabase
         .from('profiles')
         .select('*')
         .eq('user_id', userId)
         .maybeSingle();
-
-      if (profileError) {
-        console.warn('⚠️ Profile error (non-critical):', profileError);
-      }
-      setProfile(profileData);
-      console.log('✅ Step 1 complete: Profile loaded');
-
-      // Fetch provider registration - ONLY for current user (uses auth_user_id)
-      console.log('📦 Step 2: Fetching provider registration...');
-      const { data: providerReg } = await supabase
+      
+      const registrationPromise = supabase
         .from('delivery_provider_registrations')
         .select('*')
         .eq('auth_user_id', userId)
         .maybeSingle();
-      console.log('✅ Step 2 complete: Registration loaded');
+      
+      // Add 3 second timeout to profile/registration fetch
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Profile/registration timeout')), 3000)
+      );
+      
+      try {
+        const [profileResult, registrationResult] = await Promise.race([
+          Promise.allSettled([profilePromise, registrationPromise]),
+          timeoutPromise
+        ]).catch(() => {
+          console.warn('⚠️ Profile/registration fetch timed out, continuing without them');
+          return [{ status: 'rejected' }, { status: 'rejected' }];
+        }) as any[];
+        
+        if (profileResult?.status === 'fulfilled') {
+          const { data: profileData, error: profileError } = profileResult.value;
+          if (profileError) {
+            console.warn('⚠️ Profile error (non-critical):', profileError);
+          } else {
+            setProfile(profileData);
+            console.log('✅ Profile loaded');
+          }
+        }
+        
+        // Registration is not critical, just log it
+        if (registrationResult?.status === 'fulfilled') {
+          console.log('✅ Registration loaded');
+        }
+      } catch (e) {
+        console.warn('⚠️ Error fetching profile/registration (non-critical):', e);
+      }
+      
+      console.log('✅ Step 1 complete: Moving to deliveries...');
 
       // Fetch active deliveries assigned to THIS provider only
       // Check both delivery_requests and purchase_orders tables
