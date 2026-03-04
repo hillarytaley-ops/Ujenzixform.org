@@ -110,7 +110,7 @@ BEGIN
         v_delivery_provider_id := order_record.delivery_provider_id;
         
         -- If delivery is required but no provider is assigned, block dispatch
-        IF v_delivery_required = TRUE AND (v_delivery_provider_id IS NULL OR v_delivery_provider_id = ''::UUID) THEN
+        IF v_delivery_required = TRUE AND v_delivery_provider_id IS NULL THEN
           RETURN jsonb_build_object(
             'success', false,
             'error', 'Cannot dispatch materials: No delivery provider has been assigned to this order. Please wait for a delivery provider to accept the delivery request before dispatching.',
