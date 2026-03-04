@@ -360,11 +360,11 @@ export const useDeliveryProviderData = () => {
     setLoading(true);
     setError(null);
     
-    // Safety timeout - finish loading after 10 seconds max
+    // Safety timeout - finish loading after 15 seconds max (increased for enrichment)
     const safetyTimeout = setTimeout(() => {
-      console.log('📦 useDeliveryProviderData: Safety timeout reached');
+      console.log('📦 useDeliveryProviderData: Safety timeout reached - showing data even if incomplete');
       setLoading(false);
-    }, 10000);
+    }, 15000);
 
     try {
       // Fetch delivery provider profile - ONLY for current user
@@ -494,14 +494,16 @@ export const useDeliveryProviderData = () => {
         console.warn('⚠️ purchase_orders fetch failed:', purchaseOrdersResult.reason);
       }
       
-      // Fetch supplier and buyer info separately if needed
+      // Fetch supplier and buyer info separately if needed (with timeout to prevent blocking)
       let enrichedPurchaseOrders = purchaseOrdersData || [];
       if (enrichedPurchaseOrders.length > 0) {
         try {
+          console.log('📦 Enriching', enrichedPurchaseOrders.length, 'purchase orders with supplier/buyer info...');
           const supplierIds = [...new Set(enrichedPurchaseOrders.map((po: any) => po.supplier_id).filter(Boolean))];
           const buyerIds = [...new Set(enrichedPurchaseOrders.map((po: any) => po.buyer_id).filter(Boolean))];
           
-          const [suppliersResult, buyersResult] = await Promise.allSettled([
+          // Add timeout to enrichment to prevent blocking
+          const enrichmentPromise = Promise.allSettled([
             supplierIds.length > 0
               ? supabase.from('suppliers').select('id, company_name, address, location').in('id', supplierIds)
               : Promise.resolve({ data: [], error: null }),
@@ -510,8 +512,20 @@ export const useDeliveryProviderData = () => {
               : Promise.resolve({ data: [], error: null })
           ]);
           
-          const suppliers = suppliersResult.status === 'fulfilled' ? (suppliersResult.value.data || []) : [];
-          const buyers = buyersResult.status === 'fulfilled' ? (buyersResult.value.data || []) : [];
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Enrichment timeout')), 5000)
+          );
+          
+          const [suppliersResult, buyersResult] = await Promise.race([
+            enrichmentPromise,
+            timeoutPromise
+          ]).catch(() => {
+            console.warn('⚠️ Enrichment timed out, using basic data');
+            return [{ status: 'rejected' }, { status: 'rejected' }];
+          }) as any[];
+          
+          const suppliers = suppliersResult?.status === 'fulfilled' ? (suppliersResult.value?.data || []) : [];
+          const buyers = buyersResult?.status === 'fulfilled' ? (buyersResult.value?.data || []) : [];
           
           const suppliersMap = new Map(suppliers.map((s: any) => [s.id, s]));
           const buyersMap = new Map(buyers.map((b: any) => [b.id, b]));
@@ -521,8 +535,10 @@ export const useDeliveryProviderData = () => {
             supplier: suppliersMap.get(po.supplier_id) || null,
             buyer: buyersMap.get(po.buyer_id) || null
           }));
+          console.log('✅ Enrichment complete');
         } catch (e) {
-          console.warn('Error enriching purchase orders with supplier/buyer info:', e);
+          console.warn('⚠️ Error enriching purchase orders, using basic data:', e);
+          // Continue with unenriched data
         }
       }
       
@@ -541,8 +557,12 @@ export const useDeliveryProviderData = () => {
       }
       
       // Add purchase_orders (convert to delivery_requests format)
-      if (enrichedPurchaseOrders) {
-        enrichedPurchaseOrders.forEach((po: any) => {
+      // Use enrichedPurchaseOrders if available, otherwise use purchaseOrdersData (basic data)
+      const purchaseOrdersToProcess = enrichedPurchaseOrders.length > 0 ? enrichedPurchaseOrders : purchaseOrdersData;
+      
+      if (purchaseOrdersToProcess && purchaseOrdersToProcess.length > 0) {
+        console.log('📦 Processing', purchaseOrdersToProcess.length, 'purchase orders...');
+        purchaseOrdersToProcess.forEach((po: any) => {
           // Check if this purchase_order already exists in delivery_requests
           const existing = allActiveDeliveries.find(d => d.purchase_order_id === po.id);
           if (!existing) {
@@ -551,15 +571,15 @@ export const useDeliveryProviderData = () => {
               purchase_order_id: po.id,
               provider_id: userId,
               status: po.status,
-              pickup_location: po.supplier?.address || po.supplier?.location || 'Supplier location',
-              pickup_address: po.supplier?.address || po.supplier?.location || 'Supplier location',
-              delivery_location: po.delivery_address || po.delivery_address || 'Delivery location',
-              delivery_address: po.delivery_address || po.delivery_address || 'Delivery location',
+              pickup_location: po.supplier?.address || po.supplier?.location || po.pickup_address || 'Supplier location',
+              pickup_address: po.supplier?.address || po.supplier?.location || po.pickup_address || 'Supplier location',
+              delivery_location: po.delivery_address || 'Delivery location',
+              delivery_address: po.delivery_address || 'Delivery location',
               material_type: Array.isArray(po.items) ? po.items.map((i: any) => i.name || i.material_type).join(', ') : 'Construction Materials',
               quantity: Array.isArray(po.items) ? po.items.reduce((sum: number, i: any) => sum + (i.quantity || 1), 0) : 1,
-              builder_name: po.buyer?.full_name || 'Builder',
-              builder_phone: po.buyer?.phone || '',
-              builder_email: po.buyer?.email || '',
+              builder_name: po.buyer?.full_name || po.builder_name || 'Builder',
+              builder_phone: po.buyer?.phone || po.builder_phone || '',
+              builder_email: po.buyer?.email || po.builder_email || '',
               price: po.total_amount || 0,
               estimated_cost: po.total_amount || 0,
               created_at: po.created_at,
@@ -570,6 +590,7 @@ export const useDeliveryProviderData = () => {
             });
           }
         });
+        console.log('✅ Added', purchaseOrdersToProcess.length, 'purchase orders to active deliveries');
       }
       
       console.log('📦 Active deliveries loaded:', {
