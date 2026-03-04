@@ -1137,8 +1137,10 @@ const DeliveryDashboard = () => {
                         d.status === 'on_the_way' ||
                         d.status === 'near_destination' ||
                         d.status === 'dispatched' ||
+                        d.status === 'shipped' ||
                         d.status === 'out_for_delivery' ||
-                        d.status === 'delivery_arrived'
+                        d.status === 'delivery_arrived' ||
+                        d.status === 'ready_for_dispatch' // After supplier dispatches, status may be ready_for_dispatch
                       );
                       
                       return inTransit.length > 0 ? (
