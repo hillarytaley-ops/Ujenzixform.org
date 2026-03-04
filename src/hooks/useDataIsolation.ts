@@ -483,58 +483,68 @@ export const useDeliveryProviderData = () => {
           }
         })(),
         
-        // 2. Fetch from purchase_orders (this is where most data is!)
+        // 2. Fetch from purchase_orders using direct fetch (faster than supabase client)
+        // Only fetch shipped/in_transit orders to reduce query load
         (async () => {
           try {
-            console.log('📦 Fetching purchase_orders for provider:', userId);
-            // Simplified query - only fetch essential columns to avoid timeout
-            const poQueryPromise = supabase
-              .from('purchase_orders')
-              .select('id, status, delivery_provider_id, delivery_address, items, total_amount, created_at, updated_at, supplier_id, buyer_id, delivery_provider_name, delivery_assigned_at')
-              .eq('delivery_provider_id', userId)
-              .order('created_at', { ascending: false })
-              .limit(100);
+            console.log('📦 Fetching purchase_orders (shipped/in_transit only) for provider:', userId);
             
-            const timeoutPromise = new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Purchase orders timeout after 8s')), 8000)
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+            
+            // Use direct fetch with minimal columns and status filter
+            const poResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/purchase_orders?delivery_provider_id=eq.${userId}&status=in.(shipped,in_transit,dispatched,out_for_delivery,delivery_arrived,processing)&select=id,status,delivery_provider_id,delivery_address,items,total_amount,created_at,updated_at,supplier_id,buyer_id,delivery_provider_name,delivery_assigned_at&order=created_at.desc&limit=100`,
+              {
+                headers: {
+                  'apikey': SUPABASE_ANON_KEY,
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json',
+                  'Prefer': 'return=representation'
+                },
+                cache: 'no-store',
+                signal: controller.signal
+              }
             );
             
-            const result = await Promise.race([poQueryPromise, timeoutPromise]).catch((err) => {
-              console.warn('⚠️ purchase_orders query timed out:', err);
-              return { data: [], error: err };
-            });
+            clearTimeout(timeoutId);
             
-            const { data: allPurchaseOrders, error: poError } = result as any;
-            
-            if (poError) {
-              console.warn('⚠️ Error fetching purchase_orders:', poError);
+            if (poResponse.ok) {
+              const allPurchaseOrders = await poResponse.json() || [];
+              console.log('📦 purchase_orders raw data:', allPurchaseOrders.length, 'records');
+              
+              // Filter out completed/delivered/cancelled orders (shouldn't be needed with status filter, but just in case)
+              const filtered = allPurchaseOrders.filter((po: any) => 
+                po.status !== 'delivered' && 
+                po.status !== 'completed' && 
+                po.status !== 'cancelled' &&
+                po.status !== 'rejected' &&
+                po.status !== 'quote_rejected'
+              );
+              
+              console.log('📦 purchase_orders: Found', allPurchaseOrders.length, 'total,', filtered.length, 'active');
+              
+              // Log status breakdown for purchase_orders
+              if (filtered.length > 0) {
+                const poStatusCounts = filtered.reduce((acc: any, po: any) => {
+                  acc[po.status] = (acc[po.status] || 0) + 1;
+                  return acc;
+                }, {});
+                console.log('📊 purchase_orders status breakdown:', poStatusCounts);
+              }
+              
+              return filtered;
+            } else {
+              const errorText = await poResponse.text();
+              console.warn('⚠️ Error fetching purchase_orders:', poResponse.status, errorText);
               return [];
             }
-            
-            console.log('📦 purchase_orders raw data:', allPurchaseOrders?.length || 0, 'records');
-            
-            // Filter out completed/delivered/cancelled orders
-            const filtered = (allPurchaseOrders || []).filter((po: any) => 
-              po.status !== 'delivered' && 
-              po.status !== 'completed' && 
-              po.status !== 'cancelled' &&
-              po.status !== 'rejected' &&
-              po.status !== 'quote_rejected'
-            );
-            console.log('📦 purchase_orders: Found', allPurchaseOrders?.length || 0, 'total,', filtered.length, 'active');
-            
-            // Log status breakdown for purchase_orders
-            if (filtered.length > 0) {
-              const poStatusCounts = filtered.reduce((acc: any, po: any) => {
-                acc[po.status] = (acc[po.status] || 0) + 1;
-                return acc;
-              }, {});
-              console.log('📊 purchase_orders status breakdown:', poStatusCounts);
-            }
-            
-            return filtered;
           } catch (error: any) {
-            console.warn('⚠️ Exception fetching purchase_orders:', error);
+            if (error.name === 'AbortError') {
+              console.warn('⏱️ purchase_orders fetch timed out');
+            } else {
+              console.warn('⚠️ Exception fetching purchase_orders:', error);
+            }
             return [];
           }
         })()
