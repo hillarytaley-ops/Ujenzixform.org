@@ -330,18 +330,22 @@ export const ReceivingScanner: React.FC = () => {
       
       console.log('🔐 Using access token:', accessToken ? 'Found' : 'Using anon key');
       
-      const requestBody = {
-        _qr_code: qrCode,
+      // Ensure all parameters are properly formatted
+      const requestBody: Record<string, any> = {
+        _qr_code: qrCode?.trim() || null,
         _scan_type: 'receiving',
-        _scanner_device_id: navigator.userAgent.substring(0, 100),
-        _scanner_type: scannerType,
-        _material_condition: materialCondition,
-        _notes: notes || null
+        _scanner_device_id: navigator.userAgent?.substring(0, 100) || null,
+        _scanner_type: scannerType || 'web_scanner',
+        _material_condition: materialCondition || 'good',
+        _notes: notes?.trim() || null
       };
       
       console.log('📤 Sending RPC request:', {
         url: `${SUPABASE_URL}/rest/v1/rpc/record_qr_scan`,
-        body: requestBody
+        method: 'POST',
+        body: requestBody,
+        qrCode: qrCode,
+        qrCodeLength: qrCode?.length
       });
       
       // Call the record_qr_scan function via REST API with timeout
@@ -361,21 +365,48 @@ export const ReceivingScanner: React.FC = () => {
 
       console.log('📊 RPC Response status:', response.status);
       
-      let data: any;
+      // Read response as text first (don't assume it's JSON)
       let responseText = '';
+      let data: any = null;
+      
       try {
         responseText = await response.text();
-        data = responseText ? JSON.parse(responseText) : {};
-        console.log('📥 Raw response text:', responseText);
-        console.log('📥 Parsed response data:', data);
-      } catch (parseError) {
-        console.error('❌ Failed to parse response:', {
-          error: parseError,
+        console.log('📥 Raw response text (length:', responseText.length, '):', responseText.substring(0, 500));
+        
+        // Try to parse as JSON
+        if (responseText && responseText.trim().startsWith('{')) {
+          try {
+            data = JSON.parse(responseText);
+            console.log('📥 Parsed response data:', data);
+          } catch (jsonError) {
+            console.warn('⚠️ Response looks like JSON but failed to parse:', jsonError);
+            data = { rawText: responseText };
+          }
+        } else if (responseText && responseText.trim().startsWith('[')) {
+          // Sometimes Supabase returns arrays
+          try {
+            data = JSON.parse(responseText);
+            console.log('📥 Parsed response array:', data);
+          } catch (jsonError) {
+            console.warn('⚠️ Response looks like array but failed to parse:', jsonError);
+            data = { rawText: responseText };
+          }
+        } else {
+          // Not JSON - might be HTML error page or plain text
+          console.warn('⚠️ Response is not JSON:', responseText.substring(0, 200));
+          data = { 
+            error: 'Non-JSON response from server',
+            rawText: responseText.substring(0, 500),
+            isHtml: responseText.trim().startsWith('<')
+          };
+        }
+      } catch (readError) {
+        console.error('❌ Failed to read response:', {
+          error: readError,
           status: response.status,
-          statusText: response.statusText,
-          rawText: responseText
+          statusText: response.statusText
         });
-        data = { error: 'Failed to parse server response', rawText: responseText };
+        data = { error: 'Failed to read server response', readError: String(readError) };
       }
 
       // Check for HTTP errors first
@@ -383,17 +414,53 @@ export const ReceivingScanner: React.FC = () => {
         console.error('❌ Receiving scan HTTP error:', {
           status: response.status,
           statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries()),
           data: data,
           qrCode: qrCode,
-          rawResponse: responseText
+          rawResponse: responseText?.substring(0, 1000),
+          requestBody: requestBody
         });
         
         // Handle different error statuses
         if (response.status === 400) {
           // 400 usually means bad request - could be validation error or function error
-          // Supabase might return error in different formats
-          const errorMsg = data.message || data.error || data.details || data.hint || 
-                          (typeof data === 'string' ? data : 'Invalid request. Please check the QR code format.');
+          // Supabase PostgREST returns errors in various formats:
+          // - { message: "...", details: "...", hint: "...", code: "..." }
+          // - { error: "..." }
+          // - Plain text or HTML
+          let errorMsg = 'Invalid request. Please check the QR code format.';
+          
+          if (data) {
+            if (typeof data === 'string') {
+              errorMsg = data;
+            } else if (data.message) {
+              errorMsg = data.message;
+              if (data.details) errorMsg += ` (${data.details})`;
+              if (data.hint) errorMsg += ` Hint: ${data.hint}`;
+            } else if (data.error) {
+              errorMsg = typeof data.error === 'string' ? data.error : JSON.stringify(data.error);
+            } else if (data.error_code) {
+              // Function-level error code
+              errorMsg = data.error || 'Invalid QR code';
+            } else if (data.rawText) {
+              errorMsg = data.rawText.substring(0, 200);
+            } else {
+              // Try to extract any error-like field
+              const errorFields = Object.keys(data).filter(k => 
+                k.toLowerCase().includes('error') || 
+                k.toLowerCase().includes('message') ||
+                k.toLowerCase().includes('detail')
+              );
+              if (errorFields.length > 0) {
+                errorMsg = String(data[errorFields[0]]);
+              } else {
+                errorMsg = `Server error: ${JSON.stringify(data).substring(0, 200)}`;
+              }
+            }
+          } else if (responseText) {
+            errorMsg = responseText.substring(0, 200);
+          }
+          
           toast.error('❌ Invalid Request', {
             description: errorMsg,
             duration: 8000
@@ -409,8 +476,10 @@ export const ReceivingScanner: React.FC = () => {
             duration: 6000
           });
         } else {
+          const errorMsg = data?.message || data?.error || 
+                          (typeof data === 'string' ? data : 'Unknown error occurred');
           toast.error(`Failed to record receiving scan (${response.status})`, {
-            description: data.message || data.error || 'Unknown error occurred',
+            description: errorMsg,
             duration: 6000
           });
         }
