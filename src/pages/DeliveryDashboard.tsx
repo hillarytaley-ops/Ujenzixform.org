@@ -998,9 +998,14 @@ const DeliveryDashboard = () => {
                       d.status === 'ready_for_dispatch' ||
                       d.status === 'provider_assigned' ||
                       d.status === 'awaiting_delivery_provider' ||
+                      d.status === 'awaiting_delivery_request' ||
                       d.status === 'delivery_requested' ||
                       d.status === 'quote_accepted' ||
-                      d.status === 'order_created'
+                      d.status === 'quote_received_by_supplier' ||
+                      d.status === 'order_created' ||
+                      d.status === 'pending' ||
+                      d.status === 'confirmed' ||
+                      d.status === 'processing'
                     ).length > 0 && (
                       <Badge className="ml-1 bg-blue-500 text-white text-xs">
                         {activeDeliveries.filter(d => 
@@ -1012,9 +1017,14 @@ const DeliveryDashboard = () => {
                           d.status === 'ready_for_dispatch' ||
                           d.status === 'provider_assigned' ||
                           d.status === 'awaiting_delivery_provider' ||
+                          d.status === 'awaiting_delivery_request' ||
                           d.status === 'delivery_requested' ||
                           d.status === 'quote_accepted' ||
-                          d.status === 'order_created'
+                          d.status === 'quote_received_by_supplier' ||
+                          d.status === 'order_created' ||
+                          d.status === 'pending' ||
+                          d.status === 'confirmed' ||
+                          d.status === 'processing'
                         ).length}
                       </Badge>
                     )}
@@ -1062,8 +1072,10 @@ const DeliveryDashboard = () => {
                         d.status === 'ready_for_dispatch' ||
                         d.status === 'provider_assigned' ||
                         d.status === 'awaiting_delivery_provider' ||
+                        d.status === 'awaiting_delivery_request' ||
                         d.status === 'delivery_requested' ||
                         d.status === 'quote_accepted' ||
+                        d.status === 'quote_received_by_supplier' ||
                         d.status === 'order_created' ||
                         d.status === 'pending' ||
                         d.status === 'confirmed' ||
