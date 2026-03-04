@@ -1064,8 +1064,19 @@ const DeliveryDashboard = () => {
                         d.status === 'awaiting_delivery_provider' ||
                         d.status === 'delivery_requested' ||
                         d.status === 'quote_accepted' ||
-                        d.status === 'order_created'
+                        d.status === 'order_created' ||
+                        d.status === 'pending' ||
+                        d.status === 'confirmed' ||
+                        d.status === 'processing'
                       );
+                      
+                      // Debug logging
+                      if (activeDeliveries.length > 0 && scheduled.length === 0) {
+                        console.log('⚠️ Scheduled filter: Found', activeDeliveries.length, 'active deliveries but 0 scheduled');
+                        console.log('📋 All statuses in activeDeliveries:', [...new Set(activeDeliveries.map(d => d.status))]);
+                      } else if (scheduled.length > 0) {
+                        console.log('✅ Scheduled filter: Found', scheduled.length, 'scheduled deliveries');
+                      }
                       
                       return scheduled.length > 0 ? (
                         <div className="space-y-4">
