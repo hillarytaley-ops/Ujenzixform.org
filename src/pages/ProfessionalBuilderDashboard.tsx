@@ -827,63 +827,76 @@ const ProfessionalBuilderDashboardPage = () => {
     }, 10000); // Increased to 10 seconds
     
     try {
-      // Use Supabase client directly - it's usually faster and handles auth better
-      console.log('📁 Using Supabase client to fetch projects for userId:', userId);
+      // Use REST API directly with fetch to bypass Supabase client issues
+      console.log('📁 Fetching projects via REST API for userId:', userId);
       
-      // Check if user is authenticated first
-      const { data: sessionData } = await supabase.auth.getSession();
-      console.log('📁 Session check:', sessionData?.session ? 'Has session' : 'No session');
-      console.log('📁 Session user ID:', sessionData?.session?.user?.id);
-      console.log('📁 Query userId:', userId);
-      
-      // Try query with explicit timeout using AbortController pattern
-      let queryCompleted = false;
-      const queryTimeout = setTimeout(() => {
-        if (!queryCompleted) {
-          console.warn('📁 Query taking too long, will timeout soon...');
+      // Get access token from localStorage first (fast path)
+      let accessToken: string | null = null;
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          accessToken = parsed.access_token || null;
+          console.log('📁 Got token from localStorage');
         }
-      }, 3000);
+      } catch (e) {
+        console.warn('📁 Failed to get token from localStorage:', e);
+      }
       
-      // Try the simplest possible query
-      console.log('📁 Attempting query...');
-      const { data, error } = await supabase
-        .from('builder_projects')
-        .select('id, name, location, status, budget, spent, progress, created_at')
-        .eq('builder_id', userId);
+      // If no token in localStorage, try to get from Supabase (with timeout)
+      if (!accessToken) {
+        try {
+          const sessionPromise = supabase.auth.getSession();
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Session timeout')), 2000)
+          );
+          const sessionResult = await Promise.race([sessionPromise, timeoutPromise]) as any;
+          accessToken = sessionResult?.data?.session?.access_token || null;
+          console.log('📁 Got token from Supabase session');
+        } catch (e) {
+          console.warn('📁 Failed to get token from Supabase, using anon key');
+        }
+      }
       
-      queryCompleted = true;
-      clearTimeout(queryTimeout);
+      // Use REST API with fetch and AbortController for timeout
+      const controller = new AbortController();
+      const fetchTimeout = setTimeout(() => controller.abort(), 8000);
+      
+      console.log('📁 Making REST API request...');
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/builder_projects?builder_id=eq.${userId}&select=id,name,location,status,budget,spent,progress,created_at&order=created_at.desc`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          },
+          signal: controller.signal
+        }
+      );
+      
+      clearTimeout(fetchTimeout);
       clearTimeout(safetyTimeout);
       
-      if (error) {
-        console.error('📁 Supabase query error:', error);
-        console.error('📁 Error code:', error.code);
-        console.error('📁 Error message:', error.message);
-        console.error('📁 Error details:', JSON.stringify(error, null, 2));
-        
-        // If it's a permission error, log it clearly
-        if (error.code === 'PGRST301' || error.message?.includes('permission') || error.message?.includes('policy')) {
-          console.error('📁 ⚠️ RLS POLICY ISSUE - User may not have permission to read builder_projects');
-        }
-        
+      console.log('📁 Response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('📁 REST API error:', response.status, errorText);
         setProjects([]);
         setLoadingProjects(false);
         return;
       }
       
+      const data = await response.json();
       console.log('📁 Query completed successfully');
       console.log('📁 Raw data received:', data);
       
       if (data && Array.isArray(data)) {
-        console.log('📁 Projects data received from Supabase:', data);
-        // Sort by created_at in JavaScript
-        const sortedData = [...data].sort((a, b) => {
-          const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
-          const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
-          return dateB - dateA;
-        });
-        setProjects(sortedData);
-        console.log('📁 Loaded', sortedData.length, 'projects and updated state');
+        console.log('📁 Projects data received:', data);
+        setProjects(data);
+        console.log('📁 Loaded', data.length, 'projects and updated state');
       } else {
         console.log('📁 No projects data returned (data is null or not array)');
         setProjects([]);
