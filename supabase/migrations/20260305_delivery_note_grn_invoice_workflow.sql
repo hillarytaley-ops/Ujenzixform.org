@@ -562,6 +562,19 @@ ALTER TABLE delivery_notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE goods_received_notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies if they exist (to allow re-running migration)
+DROP POLICY IF EXISTS "Builders can view own delivery notes" ON delivery_notes;
+DROP POLICY IF EXISTS "Suppliers can view own delivery notes" ON delivery_notes;
+DROP POLICY IF EXISTS "Builders can update own delivery notes" ON delivery_notes;
+DROP POLICY IF EXISTS "Builders can view own GRNs" ON goods_received_notes;
+DROP POLICY IF EXISTS "Suppliers can view own GRNs" ON goods_received_notes;
+DROP POLICY IF EXISTS "Admins can view all GRNs" ON goods_received_notes;
+DROP POLICY IF EXISTS "Builders can view own invoices" ON invoices;
+DROP POLICY IF EXISTS "Suppliers can view own invoices" ON invoices;
+DROP POLICY IF EXISTS "Suppliers can update own invoices (when editable)" ON invoices;
+DROP POLICY IF EXISTS "Builders can acknowledge own invoices" ON invoices;
+DROP POLICY IF EXISTS "Admins can view all invoices" ON invoices;
+
 -- Delivery Notes Policies
 CREATE POLICY "Builders can view own delivery notes"
     ON delivery_notes FOR SELECT
