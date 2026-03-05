@@ -823,7 +823,14 @@ const ProfessionalBuilderDashboardPage = () => {
     // Safety timeout - don't hang forever
     const safetyTimeout = setTimeout(() => {
       console.log('📁 Projects fetch safety timeout');
-      setLoadingProjects(false);
+      // Don't set loading to false if we already have projects
+      setLoadingProjects(prev => {
+        if (projects.length > 0) {
+          console.log('📁 Safety timeout: Already have projects, keeping loading false');
+          return false;
+        }
+        return false;
+      });
     }, 8000);
     
     try {
@@ -876,8 +883,12 @@ const ProfessionalBuilderDashboardPage = () => {
             .order('created_at', { ascending: false });
           
           if (data) {
+            console.log('📁 Projects data from error fallback:', data);
             setProjects(data);
-            console.log('📁 Loaded', data.length, 'projects via fallback');
+            setLoadingProjects(false);
+            console.log('📁 Loaded', data.length, 'projects via error fallback');
+          } else {
+            setLoadingProjects(false);
           }
         } catch (e) {
           console.error('📁 Fallback also failed:', e);
