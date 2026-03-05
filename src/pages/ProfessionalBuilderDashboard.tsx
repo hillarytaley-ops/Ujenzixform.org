@@ -847,8 +847,9 @@ const ProfessionalBuilderDashboardPage = () => {
       
       if (response.ok) {
         const data = await response.json();
+        console.log('📁 Projects data received:', data);
         setProjects(data);
-        console.log('📁 Loaded', data.length, 'projects');
+        console.log('📁 Loaded', data.length, 'projects and updated state');
       } else {
         console.log('📁 Projects fetch failed:', response.status);
         // Try with Supabase client as fallback
