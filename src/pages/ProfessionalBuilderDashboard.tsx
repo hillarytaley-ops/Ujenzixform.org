@@ -36,7 +36,9 @@ import {
   Play,
   XCircle,
   Eye,
-  Map as MapIcon
+  Map as MapIcon,
+  FileSignature,
+  Receipt
 } from "lucide-react";
 import { BuilderProfileEdit } from "@/components/builders/BuilderProfileEdit";
 import { BuilderVideoPortfolio } from "@/components/builders/BuilderVideoPortfolio";
@@ -74,6 +76,9 @@ import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
 import { ProfileViewDialog } from "@/components/profile/ProfileViewDialog";
 import { ProjectDetails } from "@/components/projects/ProjectDetails";
 import { MapLocationPicker } from "@/components/location/MapLocationPicker";
+import { DeliveryNoteWorkflow } from "@/components/delivery/DeliveryNoteWorkflow";
+import { GRNView } from "@/components/delivery/GRNView";
+import { InvoiceManagement } from "@/components/invoices/InvoiceManagement";
 
 const ProfessionalBuilderDashboardPage = () => {
   // Use AuthContext for reliable user data
@@ -2574,7 +2579,71 @@ const ProfessionalBuilderDashboardPage = () => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="invoices">
+          <TabsContent value="invoices" className="space-y-6">
+            <div className="space-y-6">
+              {/* Delivery Notes Workflow */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileSignature className="h-5 w-5" />
+                    Delivery Notes & Inspection
+                  </CardTitle>
+                  <CardDescription>
+                    Sign delivery notes and verify materials received
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {user?.id && (
+                    <DeliveryNoteWorkflow 
+                      builderId={user.id}
+                      onComplete={() => {
+                        // Refresh data if needed
+                      }}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* GRN View */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Package className="h-5 w-5" />
+                    Goods Received Notes (GRN)
+                  </CardTitle>
+                  <CardDescription>
+                    View all GRNs for accepted deliveries
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {user?.id && (
+                    <GRNView userId={user.id} userRole="builder" />
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Invoice Management */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Receipt className="h-5 w-5" />
+                    Invoices
+                  </CardTitle>
+                  <CardDescription>
+                    View, acknowledge, and process invoices
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {user?.id && (
+                    <InvoiceManagement userId={user.id} userRole="builder" />
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Legacy Invoices Tab - Keeping for backward compatibility */}
+          <TabsContent value="invoices-legacy" className="hidden">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
