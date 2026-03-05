@@ -1944,13 +1944,26 @@ const ProfessionalBuilderDashboardPage = () => {
                       <p className="text-lg font-medium">No active projects</p>
                       <p className="text-sm mb-4">Create your first project to get started</p>
                       {console.log('📁 RENDERING EMPTY STATE - projects array:', projects)}
-                      <Button 
-                        onClick={() => setShowCreateProject(true)}
-                        className="bg-blue-600 hover:bg-blue-700"
-                      >
-                        <Briefcase className="h-4 w-4 mr-2" />
-                        Create Your First Project
-                      </Button>
+                      <div className="flex gap-2 justify-center">
+                        <Button 
+                          onClick={() => setShowCreateProject(true)}
+                          className="bg-blue-600 hover:bg-blue-700"
+                        >
+                          <Briefcase className="h-4 w-4 mr-2" />
+                          Create Your First Project
+                        </Button>
+                        <Button 
+                          onClick={() => {
+                            console.log('🔄 Manual refresh triggered');
+                            setLoadingProjects(true);
+                            fetchProjects();
+                          }}
+                          variant="outline"
+                        >
+                          <Clock className="h-4 w-4 mr-2" />
+                          Refresh Projects
+                        </Button>
+                      </div>
                     </div>
                   ) : (
                     <div className="space-y-4">
