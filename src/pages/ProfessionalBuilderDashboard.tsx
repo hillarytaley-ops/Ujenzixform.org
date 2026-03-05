@@ -1448,7 +1448,7 @@ const ProfessionalBuilderDashboardPage = () => {
                     <SelectValue placeholder="Select project (optional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No project (general order)</SelectItem>
+                    <SelectItem value="none">No project (general order)</SelectItem>
                     {projects.map((project) => (
                       <SelectItem key={project.id} value={project.id}>
                         <div className="flex items-center gap-2">
@@ -1460,7 +1460,7 @@ const ProfessionalBuilderDashboardPage = () => {
                   </SelectContent>
                 </Select>
               )}
-              <Link to={selectedProjectForOrder 
+              <Link to={selectedProjectForOrder && selectedProjectForOrder !== 'none'
                 ? `/suppliers?from=dashboard&project_id=${selectedProjectForOrder}`
                 : '/suppliers?from=dashboard'
               }>
