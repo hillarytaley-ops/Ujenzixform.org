@@ -121,72 +121,114 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Fetch project data
+  // Fetch project data with timeouts
   const fetchProjectData = async (showRefresh = false) => {
     if (showRefresh) setRefreshing(true);
     else setLoading(true);
     
+    // Safety timeout - always clear loading after 5 seconds
+    const safetyTimeout = setTimeout(() => {
+      console.log('📁 ProjectDetails: Safety timeout - clearing loading state');
+      setLoading(false);
+      setRefreshing(false);
+    }, 5000);
+    
     try {
       const accessToken = await getAccessToken();
       
-      // Fetch orders for this project
-      const ordersResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/purchase_orders?project_id=eq.${project.id}&order=created_at.desc`,
-        {
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`
+      // Fetch orders for this project with timeout
+      try {
+        const controller1 = new AbortController();
+        const timeout1 = setTimeout(() => controller1.abort(), 3000);
+        const ordersResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/purchase_orders?project_id=eq.${project.id}&order=created_at.desc`,
+          {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`
+            },
+            signal: controller1.signal
           }
+        );
+        clearTimeout(timeout1);
+        
+        if (ordersResponse.ok) {
+          const ordersData = await ordersResponse.json();
+          setOrders(ordersData);
         }
-      );
-      
-      if (ordersResponse.ok) {
-        const ordersData = await ordersResponse.json();
-        setOrders(ordersData);
+      } catch (e: any) {
+        if (e.name !== 'AbortError') {
+          console.warn('📁 Failed to fetch orders:', e);
+        }
       }
       
-      // Fetch deliveries for this project
-      const deliveriesResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/delivery_requests?project_id=eq.${project.id}&order=created_at.desc`,
-        {
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`
+      // Fetch deliveries for this project with timeout
+      try {
+        const controller2 = new AbortController();
+        const timeout2 = setTimeout(() => controller2.abort(), 3000);
+        const deliveriesResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/delivery_requests?project_id=eq.${project.id}&order=created_at.desc`,
+          {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`
+            },
+            signal: controller2.signal
           }
+        );
+        clearTimeout(timeout2);
+        
+        if (deliveriesResponse.ok) {
+          const deliveriesData = await deliveriesResponse.json();
+          setDeliveries(deliveriesData);
         }
-      );
-      
-      if (deliveriesResponse.ok) {
-        const deliveriesData = await deliveriesResponse.json();
-        setDeliveries(deliveriesData);
+      } catch (e: any) {
+        if (e.name !== 'AbortError') {
+          console.warn('📁 Failed to fetch deliveries:', e);
+        }
       }
       
-      // Fetch monitoring requests for this project
-      const monitoringResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/monitoring_service_requests?project_id=eq.${project.id}&order=created_at.desc`,
-        {
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`
+      // Fetch monitoring requests for this project with timeout
+      try {
+        const controller3 = new AbortController();
+        const timeout3 = setTimeout(() => controller3.abort(), 3000);
+        const monitoringResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/monitoring_service_requests?project_id=eq.${project.id}&order=created_at.desc`,
+          {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`
+            },
+            signal: controller3.signal
           }
+        );
+        clearTimeout(timeout3);
+        
+        if (monitoringResponse.ok) {
+          const monitoringData = await monitoringResponse.json();
+          setMonitoringRequests(monitoringData);
         }
-      );
-      
-      if (monitoringResponse.ok) {
-        const monitoringData = await monitoringResponse.json();
-        setMonitoringRequests(monitoringData);
+      } catch (e: any) {
+        if (e.name !== 'AbortError') {
+          console.warn('📁 Failed to fetch monitoring requests:', e);
+        }
       }
       
     } catch (error) {
-      console.error('Error fetching project data:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load project data. Please try again.",
-        variant: "destructive"
-      });
+      console.error('📁 Error fetching project data:', error);
+      // Don't show toast for timeout errors - just log
+      if (!(error as any)?.name?.includes('Abort')) {
+        toast({
+          title: "Error",
+          description: "Some project data failed to load. Showing available information.",
+          variant: "destructive"
+        });
+      }
     } finally {
+      clearTimeout(safetyTimeout);
       setLoading(false);
       setRefreshing(false);
+      console.log('📁 ProjectDetails: Loading complete, component should be visible');
     }
   };
 
