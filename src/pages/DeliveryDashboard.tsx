@@ -328,10 +328,39 @@ const DeliveryDashboard = () => {
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'delivery_requests'
+          table: 'delivery_requests',
+          filter: `provider_id=eq.${user.id}`
         },
         (payload) => {
           console.log('📦 Delivery request updated:', payload);
+          const oldStatus = payload.old?.status;
+          const newStatus = payload.new?.status;
+          
+          // When supplier dispatches, status changes from 'accepted' to 'in_transit'
+          if (newStatus === 'in_transit' && oldStatus !== 'in_transit') {
+            toast({
+              title: '🚚 Materials Dispatched!',
+              description: 'Materials are now in transit. Check "In Transit" tab.',
+              duration: 5000,
+            });
+            // Auto-switch to In Transit tab if on Deliveries
+            if (activeTab === 'deliveries') {
+              setDeliveriesSubTab('in_transit');
+            }
+          }
+          
+          // When provider receives, status changes to 'delivered'
+          if (newStatus === 'delivered' && oldStatus !== 'delivered') {
+            toast({
+              title: '✅ Delivery Complete!',
+              description: 'Delivery has been completed successfully. Check "Delivered" tab.',
+              duration: 5000,
+            });
+            if (activeTab === 'deliveries') {
+              setDeliveriesSubTab('delivered');
+            }
+          }
+          
           refetchData();
           loadNotificationCounts();
         }
