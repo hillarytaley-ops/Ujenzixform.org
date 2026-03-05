@@ -321,7 +321,9 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           quantity: dr.quantity || '',
           estimatedCost: dr.estimated_cost || dr.budget_range || 0,
           purchase_order_id: poId, // CRITICAL
-          delivery_request_id: dr.id // For accepting
+          delivery_request_id: dr.id, // For accepting
+          provider_id: dr.provider_id || null, // Provider who accepted (null = unaccepted)
+          provider_name: dr.provider_name || dr.delivery_provider_name || undefined // Provider name if available
         });
       }
       
@@ -349,7 +351,9 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           quantity: dr.quantity || '',
           estimatedCost: dr.estimated_cost || dr.budget_range || 0,
           purchase_order_id: undefined, // NULL purchase_order_id
-          delivery_request_id: dr.id // For accepting
+          delivery_request_id: dr.id, // For accepting
+          provider_id: dr.provider_id || null, // Provider who accepted (null = unaccepted)
+          provider_name: dr.provider_name || dr.delivery_provider_name || undefined // Provider name if available
         });
       }
       
@@ -841,24 +845,39 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
                   Start Navigation
                 </Button>
                 {notification.status === 'pending' && notification.delivery_request_id && (
-                  <Button
-                    size="sm"
-                    onClick={() => handleAcceptDelivery(notification.delivery_request_id!)}
-                    disabled={acceptingId === notification.delivery_request_id}
-                    className="flex-1 bg-green-600 hover:bg-green-700"
-                  >
-                    {acceptingId === notification.delivery_request_id ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                        Accepting...
-                      </>
+                  <>
+                    {/* Show if already accepted by another provider */}
+                    {notification.provider_id && notification.provider_id !== userId ? (
+                      <div className="flex-1 bg-amber-50 border border-amber-200 rounded p-2 text-center">
+                        <p className="text-xs font-semibold text-amber-700 flex items-center justify-center gap-1">
+                          <AlertTriangle className="h-3 w-3" />
+                          Already Accepted
+                        </p>
+                        <p className="text-xs text-amber-600 mt-1">
+                          {notification.provider_name ? `By: ${notification.provider_name}` : 'By another provider'}
+                        </p>
+                      </div>
                     ) : (
-                      <>
-                        <Check className="h-4 w-4 mr-1" />
-                        Accept
-                      </>
+                      <Button
+                        size="sm"
+                        onClick={() => handleAcceptDelivery(notification.delivery_request_id!)}
+                        disabled={acceptingId === notification.delivery_request_id || (notification.provider_id && notification.provider_id !== userId)}
+                        className="flex-1 bg-green-600 hover:bg-green-700"
+                      >
+                        {acceptingId === notification.delivery_request_id ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                            Accepting...
+                          </>
+                        ) : (
+                          <>
+                            <Check className="h-4 w-4 mr-1" />
+                            Accept
+                          </>
+                        )}
+                      </Button>
                     )}
-                  </Button>
+                  </>
                 )}
               </div>
 
