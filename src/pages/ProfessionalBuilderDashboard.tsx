@@ -1016,6 +1016,13 @@ const ProfessionalBuilderDashboardPage = () => {
     }
 
     setCreatingProject(true);
+    
+    // Safety timeout: Always clear loading state after 15 seconds max
+    const safetyTimeout = setTimeout(() => {
+      console.warn('⚠️ Project creation safety timeout - clearing loading state');
+      setCreatingProject(false);
+    }, 15000);
+    
     const userId = getUserId();
     
     if (!userId) {
@@ -1151,6 +1158,8 @@ const ProfessionalBuilderDashboardPage = () => {
         variant: "destructive",
       });
     } finally {
+      clearTimeout(safetyTimeout);
+      console.log('🔄 Clearing creatingProject state');
       setCreatingProject(false);
     }
   };
