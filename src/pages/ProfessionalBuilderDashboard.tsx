@@ -1929,6 +1929,10 @@ const ProfessionalBuilderDashboardPage = () => {
                   </Dialog>
                 </CardHeader>
                 <CardContent>
+                  {(() => {
+                    console.log('📁 RENDER CHECK - loadingProjects:', loadingProjects, 'projects.length:', projects.length, 'projects:', projects);
+                    return null;
+                  })()}
                   {loadingProjects ? (
                     <div className="text-center py-12">
                       <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4" />
@@ -1939,6 +1943,7 @@ const ProfessionalBuilderDashboardPage = () => {
                       <Building2 className="h-16 w-16 mx-auto mb-4 text-gray-300" />
                       <p className="text-lg font-medium">No active projects</p>
                       <p className="text-sm mb-4">Create your first project to get started</p>
+                      {console.log('📁 RENDERING EMPTY STATE - projects array:', projects)}
                       <Button 
                         onClick={() => setShowCreateProject(true)}
                         className="bg-blue-600 hover:bg-blue-700"
