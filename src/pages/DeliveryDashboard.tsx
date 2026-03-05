@@ -1038,8 +1038,8 @@ const DeliveryDashboard = () => {
                 <TabsContent value="scheduled" className="mt-4">
                   <div className="space-y-4">
                     {(() => {
-                      // Scheduled tab should ONLY show deliveries that have been ACCEPTED by this provider
-                      // Filter out statuses that indicate delivery hasn't been accepted yet
+                      // Scheduled tab should ONLY show deliveries that have been ACCEPTED by THIS provider
+                      // Must check both status AND provider_id to ensure it's truly accepted by this provider
                       const scheduled = activeDeliveries.filter(d => {
                         // Only include statuses that indicate the provider has accepted the delivery
                         const acceptedStatuses = [
@@ -1052,17 +1052,14 @@ const DeliveryDashboard = () => {
                           'provider_assigned'   // Provider assigned
                         ];
                         
-                        // Check if status is accepted
+                        // Check if status indicates acceptance
                         const hasAcceptedStatus = acceptedStatuses.includes(d.status);
                         
-                        // Check if provider_id matches (for delivery_requests) or delivery_provider_id matches (for purchase_orders)
-                        // Since activeDeliveries already comes from useDeliveryProviderData which filters by provider_id,
-                        // all deliveries in activeDeliveries should already be for this provider
-                        // So we just need to check the status
-                        const isProviderAssigned = 
-                          d.provider_id === user?.id || 
-                          d.delivery_provider_id === user?.id ||
-                          d.provider_id === user?.id; // Double check for delivery_requests
+                        // CRITICAL: Verify this delivery is actually assigned to THIS provider
+                        // Check both provider_id (for delivery_requests) and delivery_provider_id (for purchase_orders)
+                        const isThisProvider = 
+                          (d.provider_id && d.provider_id === user?.id) || 
+                          (d.delivery_provider_id && d.delivery_provider_id === user?.id);
                         
                         // Debug logging for first few deliveries
                         if (activeDeliveries.indexOf(d) < 3) {
@@ -1073,15 +1070,14 @@ const DeliveryDashboard = () => {
                             delivery_provider_id: d.delivery_provider_id,
                             user_id: user?.id,
                             hasAcceptedStatus,
-                            isProviderAssigned,
-                            willInclude: hasAcceptedStatus && isProviderAssigned
+                            isThisProvider,
+                            willInclude: hasAcceptedStatus && isThisProvider
                           });
                         }
                         
-                        // Only show if status indicates acceptance
-                        // Since activeDeliveries is already filtered by provider, we can trust that
-                        // all deliveries here are for this provider, so we just check status
-                        return hasAcceptedStatus;
+                        // Only show if BOTH: status indicates acceptance AND it's assigned to this provider
+                        // This ensures we don't show deliveries that are just "assigned" but not to this provider
+                        return hasAcceptedStatus && isThisProvider;
                       });
                       
                       // Debug logging
