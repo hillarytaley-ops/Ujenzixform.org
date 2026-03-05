@@ -830,14 +830,32 @@ const ProfessionalBuilderDashboardPage = () => {
       // Use Supabase client directly - it's usually faster and handles auth better
       console.log('📁 Using Supabase client to fetch projects...');
       
-      const { data, error } = await supabase
+      // Try with a timeout wrapper
+      const queryPromise = supabase
         .from('builder_projects')
         .select('id, name, location, description, start_date, expected_end_date, budget, spent, status, progress, project_type, created_at, updated_at, latitude, longitude, address')
         .eq('builder_id', userId)
         .order('created_at', { ascending: false })
         .limit(100);
       
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Query timeout after 8s')), 8000)
+      );
+      
+      const result = await Promise.race([queryPromise, timeoutPromise]).catch((err) => {
+        console.warn('📁 Query timed out, trying simpler query:', err);
+        // Try a simpler query with just essential fields
+        return supabase
+          .from('builder_projects')
+          .select('id, name, location, status, budget, spent, progress, created_at')
+          .eq('builder_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(50);
+      });
+      
       clearTimeout(safetyTimeout);
+      
+      const { data, error } = result as any;
       
       if (error) {
         console.error('📁 Supabase query error:', error);
