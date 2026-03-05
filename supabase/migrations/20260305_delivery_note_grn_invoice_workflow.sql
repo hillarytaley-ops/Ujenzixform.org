@@ -415,8 +415,14 @@ CREATE TRIGGER trigger_auto_create_grn
 -- ============================================================
 -- 8. FUNCTION: Auto-create Invoice when GRN is viewed by supplier
 -- ============================================================
-CREATE OR REPLACE FUNCTION auto_create_invoice()
-RETURNS TRIGGER AS $$
+-- Drop function first to avoid conflicts
+DROP FUNCTION IF EXISTS auto_create_invoice() CASCADE;
+
+CREATE FUNCTION auto_create_invoice()
+RETURNS TRIGGER 
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
 DECLARE
     v_invoice_number TEXT;
     v_grn_id UUID;
@@ -430,12 +436,17 @@ DECLARE
 BEGIN
     -- Only trigger when supplier views GRN (status changes to 'viewed_by_supplier')
     IF NEW.status = 'viewed_by_supplier' AND (OLD.status IS NULL OR OLD.status != 'viewed_by_supplier') THEN
-        -- Check if invoice already exists
-        IF EXISTS (SELECT 1 FROM public.invoices WHERE public.invoices.grn_id = NEW.id AND public.invoices.status != 'cancelled') THEN
+        -- Check if invoice already exists (use dynamic SQL to avoid validation issues)
+        IF EXISTS (
+            SELECT 1 
+            FROM invoices 
+            WHERE invoices.grn_id = NEW.id 
+            AND invoices.status != 'cancelled'
+        ) THEN
             RETURN NEW;
         END IF;
         
-        -- Use NEW record directly (no need to query the table again - avoids column validation issues)
+        -- Use NEW record directly (trigger provides all GRN data)
         v_grn_id := NEW.id;
         v_grn_purchase_order_id := NEW.purchase_order_id;
         v_grn_builder_id := NEW.builder_id;
@@ -448,21 +459,21 @@ BEGIN
             RETURN NEW;
         END IF;
         
-        -- Get PO total_amount separately (purchase_orders uses buyer_id, not builder_id)
-        SELECT public.purchase_orders.total_amount
+        -- Get PO total_amount (purchase_orders uses buyer_id, not builder_id - we only need total_amount)
+        SELECT total_amount
         INTO v_po_total_amount
-        FROM public.purchase_orders
-        WHERE public.purchase_orders.id = v_grn_purchase_order_id;
+        FROM purchase_orders
+        WHERE id = v_grn_purchase_order_id;
         
         IF NOT FOUND THEN
             v_po_total_amount := 0;
         END IF;
         
         -- Generate invoice number
-        SELECT COALESCE(MAX(CAST(SUBSTRING(public.invoices.invoice_number FROM '[0-9]+$') AS INTEGER)), 0) + 1
+        SELECT COALESCE(MAX(CAST(SUBSTRING(invoice_number FROM '[0-9]+$') AS INTEGER)), 0) + 1
         INTO v_invoice_number
-        FROM public.invoices
-        WHERE public.invoices.invoice_number LIKE 'INV-' || TO_CHAR(CURRENT_DATE, 'YYYY') || '-%';
+        FROM invoices
+        WHERE invoice_number LIKE 'INV-' || TO_CHAR(CURRENT_DATE, 'YYYY') || '-%';
         
         v_invoice_number := 'INV-' || TO_CHAR(CURRENT_DATE, 'YYYY') || '-' || LPAD(v_invoice_number::TEXT, 4, '0');
         
@@ -470,8 +481,8 @@ BEGIN
         v_subtotal := COALESCE(v_po_total_amount, 0);
         v_total := v_subtotal; -- Can add tax/discount later
         
-        -- Create invoice
-        INSERT INTO public.invoices (
+        -- Create invoice (using column names directly - no schema prefix needed in INSERT)
+        INSERT INTO invoices (
             invoice_number,
             purchase_order_id,
             grn_id,
@@ -496,7 +507,7 @@ BEGIN
             v_subtotal,
             v_total,
             CURRENT_DATE,
-            CURRENT_DATE + INTERVAL '30 days', -- 30 days payment terms
+            CURRENT_DATE + INTERVAL '30 days',
             'draft',
             'pending',
             TRUE,
@@ -508,7 +519,7 @@ BEGIN
     
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 -- Create trigger for auto-creating invoice
 DROP TRIGGER IF EXISTS trigger_auto_create_invoice ON goods_received_notes;
