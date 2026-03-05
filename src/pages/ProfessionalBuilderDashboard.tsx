@@ -2034,18 +2034,31 @@ const ProfessionalBuilderDashboardPage = () => {
                                 </span>
                               </div>
                               
-                              {/* View Details Button */}
-                              <Button 
-                                variant="outline" 
-                                className="w-full mt-3"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedProject(project);
-                                }}
-                              >
-                                <Eye className="h-4 w-4 mr-2" />
-                                View Details
-                              </Button>
+                              {/* Action Buttons */}
+                              <div className="flex gap-2 mt-3">
+                                <Button 
+                                  variant="outline" 
+                                  className="flex-1"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedProject(project);
+                                  }}
+                                >
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Details
+                                </Button>
+                                <Link 
+                                  to={`/suppliers?from=dashboard&project_id=${project.id}`}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <Button 
+                                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                                  >
+                                    <ShoppingCart className="h-4 w-4 mr-2" />
+                                    Order Materials
+                                  </Button>
+                                </Link>
+                              </div>
                             </CardContent>
                           </Card>
                         ))}
