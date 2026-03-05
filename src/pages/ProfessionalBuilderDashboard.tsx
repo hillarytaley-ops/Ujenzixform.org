@@ -828,37 +828,55 @@ const ProfessionalBuilderDashboardPage = () => {
     
     try {
       // Use Supabase client directly - it's usually faster and handles auth better
-      console.log('📁 Using Supabase client to fetch projects...');
+      console.log('📁 Using Supabase client to fetch projects for userId:', userId);
       
-      // Try with a timeout wrapper
-      const queryPromise = supabase
+      // First, try a very simple query with minimal columns and no order/limit
+      console.log('📁 Attempting simple query first...');
+      const simpleQuery = supabase
         .from('builder_projects')
-        .select('id, name, location, description, start_date, expected_end_date, budget, spent, status, progress, project_type, created_at, updated_at, latitude, longitude, address')
-        .eq('builder_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(100);
+        .select('id, name, location, status, budget, spent, progress, created_at')
+        .eq('builder_id', userId);
       
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Query timeout after 8s')), 8000)
+        setTimeout(() => reject(new Error('Query timeout after 5s')), 5000)
       );
       
-      const result = await Promise.race([queryPromise, timeoutPromise]).catch((err) => {
-        console.warn('📁 Query timed out, trying simpler query:', err);
-        // Try a simpler query with just essential fields
-        return supabase
-          .from('builder_projects')
-          .select('id, name, location, status, budget, spent, progress, created_at')
-          .eq('builder_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(50);
-      });
+      let result: any;
+      try {
+        result = await Promise.race([simpleQuery, timeoutPromise]);
+        clearTimeout(safetyTimeout);
+        console.log('📁 Simple query succeeded');
+      } catch (timeoutErr: any) {
+        console.warn('📁 Simple query timed out:', timeoutErr);
+        // If timeout, try even simpler - just count first
+        try {
+          const countResult = await supabase
+            .from('builder_projects')
+            .select('id', { count: 'exact', head: true })
+            .eq('builder_id', userId);
+          console.log('📁 Count query result:', countResult);
+          
+          // If count works, try fetching without order/limit
+          result = await supabase
+            .from('builder_projects')
+            .select('id, name, location, status, budget, spent, progress, created_at')
+            .eq('builder_id', userId)
+            .limit(20);
+          clearTimeout(safetyTimeout);
+        } catch (e) {
+          console.error('📁 Even count query failed:', e);
+          clearTimeout(safetyTimeout);
+          setProjects([]);
+          setLoadingProjects(false);
+          return;
+        }
+      }
       
-      clearTimeout(safetyTimeout);
-      
-      const { data, error } = result as any;
+      const { data, error } = result;
       
       if (error) {
         console.error('📁 Supabase query error:', error);
+        console.error('📁 Error details:', JSON.stringify(error, null, 2));
         setProjects([]);
         setLoadingProjects(false);
         return;
@@ -866,8 +884,12 @@ const ProfessionalBuilderDashboardPage = () => {
       
       if (data) {
         console.log('📁 Projects data received from Supabase:', data);
-        setProjects(data || []);
-        console.log('📁 Loaded', data?.length || 0, 'projects and updated state');
+        // Sort by created_at in JavaScript if needed
+        const sortedData = [...(data || [])].sort((a, b) => 
+          new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+        );
+        setProjects(sortedData);
+        console.log('📁 Loaded', sortedData.length, 'projects and updated state');
       } else {
         console.log('📁 No projects data returned');
         setProjects([]);
