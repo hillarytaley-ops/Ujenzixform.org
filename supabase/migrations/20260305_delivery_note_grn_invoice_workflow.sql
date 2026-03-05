@@ -340,7 +340,6 @@ CREATE OR REPLACE FUNCTION auto_create_grn()
 RETURNS TRIGGER AS $$
 DECLARE
     v_grn_number TEXT;
-    v_po_record RECORD;
 BEGIN
     -- Only trigger when builder accepts materials
     IF NEW.builder_decision = 'accepted' AND (OLD.builder_decision IS NULL OR OLD.builder_decision != 'accepted') THEN
@@ -349,19 +348,17 @@ BEGIN
             RETURN NEW;
         END IF;
         
-        -- Get purchase order details
-        SELECT po.* INTO v_po_record
-        FROM purchase_orders po
-        WHERE po.id = NEW.purchase_order_id;
-        
-        IF NOT FOUND THEN
+        -- Validate that required fields are present
+        IF NEW.builder_id IS NULL OR NEW.supplier_id IS NULL OR NEW.purchase_order_id IS NULL THEN
+            RAISE NOTICE 'Cannot create GRN: missing required fields (builder_id: %, supplier_id: %, purchase_order_id: %)', 
+                NEW.builder_id, NEW.supplier_id, NEW.purchase_order_id;
             RETURN NEW;
         END IF;
         
         -- Generate GRN number
         v_grn_number := generate_grn_number();
         
-        -- Create GRN
+        -- Create GRN using data from delivery_note (which already has all needed info)
         INSERT INTO goods_received_notes (
             delivery_note_id,
             purchase_order_id,
