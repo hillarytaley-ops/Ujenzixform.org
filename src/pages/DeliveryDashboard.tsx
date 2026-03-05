@@ -1063,24 +1063,29 @@ const DeliveryDashboard = () => {
                 <TabsContent value="scheduled" className="mt-4">
                   <div className="space-y-4">
                     {(() => {
-                      const scheduled = activeDeliveries.filter(d => 
-                        d.status === 'assigned' || 
-                        d.status === 'accepted' || 
-                        d.status === 'scheduled' ||
-                        d.status === 'pending_pickup' ||
-                        d.status === 'delivery_assigned' ||
-                        d.status === 'ready_for_dispatch' ||
-                        d.status === 'provider_assigned' ||
-                        d.status === 'awaiting_delivery_provider' ||
-                        d.status === 'awaiting_delivery_request' ||
-                        d.status === 'delivery_requested' ||
-                        d.status === 'quote_accepted' ||
-                        d.status === 'quote_received_by_supplier' ||
-                        d.status === 'order_created' ||
-                        d.status === 'pending' ||
-                        d.status === 'confirmed' ||
-                        d.status === 'processing'
-                      );
+                      // Scheduled tab should ONLY show deliveries that have been ACCEPTED by this provider
+                      // Filter out statuses that indicate delivery hasn't been accepted yet
+                      const scheduled = activeDeliveries.filter(d => {
+                        // Only include statuses that indicate the provider has accepted the delivery
+                        const acceptedStatuses = [
+                          'assigned',      // Provider has been assigned
+                          'accepted',      // Provider has accepted
+                          'scheduled',     // Delivery is scheduled
+                          'pending_pickup', // Waiting for pickup
+                          'delivery_assigned', // Delivery assigned to provider
+                          'ready_for_dispatch', // Ready for dispatch (provider accepted)
+                          'provider_assigned'   // Provider assigned
+                        ];
+                        
+                        // Also check if provider_id matches (for delivery_requests) or delivery_provider_id matches (for purchase_orders)
+                        const isProviderAssigned = 
+                          (d.provider_id === user?.id) || 
+                          (d.delivery_provider_id === user?.id) ||
+                          (d.provider_id && d.provider_id === user?.id);
+                        
+                        // Only show if status indicates acceptance AND provider is assigned
+                        return acceptedStatuses.includes(d.status) && isProviderAssigned;
+                      });
                       
                       // Debug logging
                       if (activeDeliveries.length > 0 && scheduled.length === 0) {
