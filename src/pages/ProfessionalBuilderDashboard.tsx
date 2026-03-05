@@ -1433,13 +1433,14 @@ const ProfessionalBuilderDashboardPage = () => {
               {/* Project Selector for Ordering */}
               {projects.length > 0 && (
                 <Select
-                  value={selectedProjectForOrder || ''}
+                  value={selectedProjectForOrder || 'none'}
                   onValueChange={(value) => {
-                    setSelectedProjectForOrder(value || null);
-                    if (value) {
-                      localStorage.setItem('cart_project_id', value);
-                    } else {
+                    if (value === 'none') {
+                      setSelectedProjectForOrder(null);
                       localStorage.removeItem('cart_project_id');
+                    } else {
+                      setSelectedProjectForOrder(value);
+                      localStorage.setItem('cart_project_id', value);
                     }
                   }}
                 >
