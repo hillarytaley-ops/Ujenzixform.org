@@ -1675,7 +1675,7 @@ const ProfessionalBuilderDashboardPage = () => {
             <TabsTrigger value="my-analytics">Analytics</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="projects" className="mt-4">
+          <TabsContent value="projects" className="mt-4" data-tab-content="projects">
             {selectedProject ? (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
                 {console.log('📁 Rendering ProjectDetails for:', selectedProject.id, selectedProject.name)}
@@ -2102,6 +2102,15 @@ const ProfessionalBuilderDashboardPage = () => {
                                     console.log('📁 Current selectedProject before update:', selectedProject);
                                     console.log('📁 Setting selectedProject to:', project);
                                     setSelectedProject(project);
+                                    // Ensure projects tab is active
+                                    setActiveTab('projects');
+                                    // Scroll to top of projects section
+                                    setTimeout(() => {
+                                      const projectsSection = document.querySelector('[data-tab-content="projects"]');
+                                      if (projectsSection) {
+                                        projectsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                      }
+                                    }, 100);
                                     console.log('📁 selectedProject state updated, component should re-render');
                                   }}
                                 >
