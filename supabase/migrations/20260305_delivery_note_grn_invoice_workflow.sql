@@ -431,18 +431,18 @@ BEGIN
     -- Only trigger when supplier views GRN (status changes to 'viewed_by_supplier')
     IF NEW.status = 'viewed_by_supplier' AND (OLD.status IS NULL OR OLD.status != 'viewed_by_supplier') THEN
         -- Check if invoice already exists
-        IF EXISTS (SELECT 1 FROM invoices WHERE grn_id = NEW.id AND status != 'cancelled') THEN
+        IF EXISTS (SELECT 1 FROM invoices WHERE invoices.grn_id = NEW.id AND invoices.status != 'cancelled') THEN
             RETURN NEW;
         END IF;
         
-        -- Get GRN details first (explicitly qualify table name to avoid ambiguity)
+        -- Get GRN details first (explicitly qualify all columns with table alias)
         SELECT 
             grn.id,
             grn.purchase_order_id,
             grn.builder_id,
             grn.supplier_id,
             grn.items
-        INTO 
+        INTO STRICT
             v_grn_id,
             v_grn_purchase_order_id,
             v_grn_builder_id,
@@ -451,15 +451,17 @@ BEGIN
         FROM goods_received_notes grn
         WHERE grn.id = NEW.id;
         
-        IF NOT FOUND OR v_grn_builder_id IS NULL THEN
+        -- Validate required fields
+        IF v_grn_builder_id IS NULL OR v_grn_supplier_id IS NULL OR v_grn_purchase_order_id IS NULL THEN
+            RAISE NOTICE 'Cannot create invoice: missing required fields in GRN %', NEW.id;
             RETURN NEW;
         END IF;
         
-        -- Get PO total_amount separately to avoid JOIN ambiguity
-        SELECT total_amount
+        -- Get PO total_amount separately (purchase_orders uses buyer_id, not builder_id)
+        SELECT po.total_amount
         INTO v_po_total_amount
-        FROM purchase_orders
-        WHERE id = v_grn_purchase_order_id;
+        FROM purchase_orders po
+        WHERE po.id = v_grn_purchase_order_id;
         
         IF NOT FOUND THEN
             v_po_total_amount := 0;
