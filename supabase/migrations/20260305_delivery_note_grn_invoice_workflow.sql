@@ -272,7 +272,7 @@ BEGIN
         FROM purchase_orders po
         WHERE po.id = NEW.id;
         
-        IF NOT FOUND THEN
+        IF NOT FOUND OR v_po_record.buyer_id IS NULL THEN
             RETURN NEW;
         END IF;
         
@@ -289,7 +289,7 @@ BEGIN
         -- Prepare items from purchase_order
         v_items := COALESCE(v_po_record.items, '[]'::JSONB);
         
-        -- Create delivery note
+        -- Create delivery note (using buyer_id from PO as builder_id)
         INSERT INTO delivery_notes (
             purchase_order_id,
             delivery_request_id,
@@ -307,7 +307,7 @@ BEGIN
             NEW.id,
             v_delivery_request_id,
             v_dn_number,
-            v_po_record.buyer_id,
+            v_po_record.buyer_id,  -- buyer_id from PO maps to builder_id in DN
             v_po_record.supplier_id,
             v_po_record.delivery_provider_id,
             v_po_record.delivery_address,
@@ -422,11 +422,14 @@ BEGIN
             RETURN NEW;
         END IF;
         
-        -- Get GRN and PO details
+        -- Get GRN details (GRN already has all needed info)
         SELECT 
-            grn.*,
-            po.total_amount,
-            po.items as po_items
+            grn.id,
+            grn.purchase_order_id,
+            grn.builder_id,
+            grn.supplier_id,
+            grn.items,
+            po.total_amount
         INTO v_grn_record
         FROM goods_received_notes grn
         JOIN purchase_orders po ON po.id = grn.purchase_order_id
