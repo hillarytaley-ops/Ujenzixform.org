@@ -914,6 +914,11 @@ const ProfessionalBuilderDashboardPage = () => {
   useEffect(() => {
     console.log('📁 Projects state changed:', projects.length, 'projects', projects);
   }, [projects]);
+  
+  // Debug: Log when selectedProject changes
+  useEffect(() => {
+    console.log('📁 selectedProject state changed:', selectedProject ? `${selectedProject.id} - ${selectedProject.name}` : 'null');
+  }, [selectedProject]);
 
   // Load projects on mount - with delay to ensure auth is ready
   useEffect(() => {
