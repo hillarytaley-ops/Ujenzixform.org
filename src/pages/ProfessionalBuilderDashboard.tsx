@@ -830,68 +830,62 @@ const ProfessionalBuilderDashboardPage = () => {
       // Use Supabase client directly - it's usually faster and handles auth better
       console.log('📁 Using Supabase client to fetch projects for userId:', userId);
       
-      // First, try a very simple query with minimal columns and no order/limit
-      console.log('📁 Attempting simple query first...');
-      const simpleQuery = supabase
+      // Check if user is authenticated first
+      const { data: sessionData } = await supabase.auth.getSession();
+      console.log('📁 Session check:', sessionData?.session ? 'Has session' : 'No session');
+      console.log('📁 Session user ID:', sessionData?.session?.user?.id);
+      console.log('📁 Query userId:', userId);
+      
+      // Try query with explicit timeout using AbortController pattern
+      let queryCompleted = false;
+      const queryTimeout = setTimeout(() => {
+        if (!queryCompleted) {
+          console.warn('📁 Query taking too long, will timeout soon...');
+        }
+      }, 3000);
+      
+      // Try the simplest possible query
+      console.log('📁 Attempting query...');
+      const { data, error } = await supabase
         .from('builder_projects')
         .select('id, name, location, status, budget, spent, progress, created_at')
         .eq('builder_id', userId);
       
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Query timeout after 5s')), 5000)
-      );
-      
-      let result: any;
-      try {
-        result = await Promise.race([simpleQuery, timeoutPromise]);
-        clearTimeout(safetyTimeout);
-        console.log('📁 Simple query succeeded');
-      } catch (timeoutErr: any) {
-        console.warn('📁 Simple query timed out:', timeoutErr);
-        // If timeout, try even simpler - just count first
-        try {
-          const countResult = await supabase
-            .from('builder_projects')
-            .select('id', { count: 'exact', head: true })
-            .eq('builder_id', userId);
-          console.log('📁 Count query result:', countResult);
-          
-          // If count works, try fetching without order/limit
-          result = await supabase
-            .from('builder_projects')
-            .select('id, name, location, status, budget, spent, progress, created_at')
-            .eq('builder_id', userId)
-            .limit(20);
-          clearTimeout(safetyTimeout);
-        } catch (e) {
-          console.error('📁 Even count query failed:', e);
-          clearTimeout(safetyTimeout);
-          setProjects([]);
-          setLoadingProjects(false);
-          return;
-        }
-      }
-      
-      const { data, error } = result;
+      queryCompleted = true;
+      clearTimeout(queryTimeout);
+      clearTimeout(safetyTimeout);
       
       if (error) {
         console.error('📁 Supabase query error:', error);
+        console.error('📁 Error code:', error.code);
+        console.error('📁 Error message:', error.message);
         console.error('📁 Error details:', JSON.stringify(error, null, 2));
+        
+        // If it's a permission error, log it clearly
+        if (error.code === 'PGRST301' || error.message?.includes('permission') || error.message?.includes('policy')) {
+          console.error('📁 ⚠️ RLS POLICY ISSUE - User may not have permission to read builder_projects');
+        }
+        
         setProjects([]);
         setLoadingProjects(false);
         return;
       }
       
-      if (data) {
+      console.log('📁 Query completed successfully');
+      console.log('📁 Raw data received:', data);
+      
+      if (data && Array.isArray(data)) {
         console.log('📁 Projects data received from Supabase:', data);
-        // Sort by created_at in JavaScript if needed
-        const sortedData = [...(data || [])].sort((a, b) => 
-          new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
-        );
+        // Sort by created_at in JavaScript
+        const sortedData = [...data].sort((a, b) => {
+          const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+          return dateB - dateA;
+        });
         setProjects(sortedData);
         console.log('📁 Loaded', sortedData.length, 'projects and updated state');
       } else {
-        console.log('📁 No projects data returned');
+        console.log('📁 No projects data returned (data is null or not array)');
         setProjects([]);
       }
     } catch (error: any) {
