@@ -1098,18 +1098,10 @@ const ProfessionalBuilderDashboardPage = () => {
         throw new Error('Project was created but no data was returned');
       }
 
-      // Refresh projects list
-      await fetchProjects();
-      
-      // Update stats
+      // Update stats immediately
       setStats(prev => ({ ...prev, activeProjects: prev.activeProjects + 1 }));
       
-      toast({
-        title: "🏗️ Project Created!",
-        description: `"${newProject.name}" has been created successfully. You can now order materials for this project.`,
-      });
-
-      // Reset form and close dialog
+      // Reset form and close dialog immediately (don't wait for fetchProjects)
       setShowCreateProject(false);
       setShowMapPicker(false);
       setNewProject({ 
@@ -1124,6 +1116,17 @@ const ProfessionalBuilderDashboardPage = () => {
         latitude: null,
         longitude: null,
         address: ''
+      });
+      
+      toast({
+        title: "🏗️ Project Created!",
+        description: `"${newProject.name}" has been created successfully. You can now order materials for this project.`,
+      });
+
+      // Refresh projects list in background (non-blocking, with timeout)
+      fetchProjects().catch((err) => {
+        console.warn('⚠️ Failed to refresh projects list (non-critical):', err);
+        // Don't show error toast - project was created successfully
       });
     } catch (error: any) {
       console.error('❌ Error creating project:', error);
