@@ -512,7 +512,7 @@ BEGIN
             auth.uid()
         );
         
-        RAISE NOTICE 'Auto-created Invoice % for GRN %', v_invoice_number, NEW.grn_number;
+        RAISE NOTICE 'Auto-created Invoice % for GRN %', v_invoice_number, (SELECT grn_number FROM goods_received_notes WHERE id = NEW.id);
     END IF;
     
     RETURN NEW;
