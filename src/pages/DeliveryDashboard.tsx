@@ -991,14 +991,11 @@ const DeliveryDashboard = () => {
                     Scheduled
                     {(() => {
                       // Only count accepted deliveries for this provider
+                      // activeDeliveries is already filtered by provider, so just check status
                       const acceptedStatuses = ['assigned', 'accepted', 'scheduled', 'pending_pickup', 'delivery_assigned', 'ready_for_dispatch', 'provider_assigned'];
-                      const scheduledCount = activeDeliveries.filter(d => {
-                        const isProviderAssigned = 
-                          (d.provider_id === user?.id) || 
-                          (d.delivery_provider_id === user?.id) ||
-                          (d.provider_id && d.provider_id === user?.id);
-                        return acceptedStatuses.includes(d.status) && isProviderAssigned;
-                      }).length;
+                      const scheduledCount = activeDeliveries.filter(d => 
+                        acceptedStatuses.includes(d.status)
+                      ).length;
                       
                       return scheduledCount > 0 ? (
                         <Badge className="ml-1 bg-blue-500 text-white text-xs">
