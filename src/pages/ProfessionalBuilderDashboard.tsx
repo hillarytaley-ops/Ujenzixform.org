@@ -1159,10 +1159,14 @@ const ProfessionalBuilderDashboardPage = () => {
         // Check if project already exists (avoid duplicates)
         const exists = prev.some(p => p.id === createdProject.id);
         if (exists) {
+          console.log('📁 Project already in state, skipping duplicate');
           return prev;
         }
         // Add new project at the beginning of the list
-        return [createdProject, ...prev];
+        console.log('📁 Adding project to state:', createdProject.id, createdProject.name);
+        const newProjects = [createdProject, ...prev];
+        console.log('📁 Projects state updated, total projects:', newProjects.length);
+        return newProjects;
       });
 
       // Update stats immediately
