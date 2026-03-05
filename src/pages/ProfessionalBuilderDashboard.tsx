@@ -1672,12 +1672,18 @@ const ProfessionalBuilderDashboardPage = () => {
 
           <TabsContent value="projects">
             {selectedProject ? (
-              <ProjectDetails 
-                project={selectedProject}
-                onBack={() => setSelectedProject(null)}
-                onUpdate={handleProjectUpdate}
-                userId={getUserId()}
-              />
+              <>
+                {console.log('📁 Rendering ProjectDetails for:', selectedProject.id, selectedProject.name)}
+                <ProjectDetails 
+                  project={selectedProject}
+                  onBack={() => {
+                    console.log('📁 Back button clicked, clearing selectedProject');
+                    setSelectedProject(null);
+                  }}
+                  onUpdate={handleProjectUpdate}
+                  userId={getUserId()}
+                />
+              </>
             ) : (
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
@@ -2086,7 +2092,12 @@ const ProfessionalBuilderDashboardPage = () => {
                                   className="flex-1"
                                   onClick={(e) => {
                                     e.stopPropagation();
+                                    e.preventDefault();
+                                    console.log('📁 View Details clicked for project:', project.id, project.name);
+                                    console.log('📁 Current selectedProject before update:', selectedProject);
+                                    console.log('📁 Setting selectedProject to:', project);
                                     setSelectedProject(project);
+                                    console.log('📁 selectedProject state updated, component should re-render');
                                   }}
                                 >
                                   <Eye className="h-4 w-4 mr-2" />
