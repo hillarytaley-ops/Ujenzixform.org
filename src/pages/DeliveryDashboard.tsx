@@ -989,45 +989,23 @@ const DeliveryDashboard = () => {
                   <TabsTrigger value="scheduled" className="flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
                     Scheduled
-                    {activeDeliveries.filter(d => 
-                      d.status === 'assigned' || 
-                      d.status === 'accepted' || 
-                      d.status === 'scheduled' ||
-                      d.status === 'pending_pickup' ||
-                      d.status === 'delivery_assigned' ||
-                      d.status === 'ready_for_dispatch' ||
-                      d.status === 'provider_assigned' ||
-                      d.status === 'awaiting_delivery_provider' ||
-                      d.status === 'awaiting_delivery_request' ||
-                      d.status === 'delivery_requested' ||
-                      d.status === 'quote_accepted' ||
-                      d.status === 'quote_received_by_supplier' ||
-                      d.status === 'order_created' ||
-                      d.status === 'pending' ||
-                      d.status === 'confirmed' ||
-                      d.status === 'processing'
-                    ).length > 0 && (
-                      <Badge className="ml-1 bg-blue-500 text-white text-xs">
-                        {activeDeliveries.filter(d => 
-                          d.status === 'assigned' || 
-                          d.status === 'accepted' || 
-                          d.status === 'scheduled' ||
-                          d.status === 'pending_pickup' ||
-                          d.status === 'delivery_assigned' ||
-                          d.status === 'ready_for_dispatch' ||
-                          d.status === 'provider_assigned' ||
-                          d.status === 'awaiting_delivery_provider' ||
-                          d.status === 'awaiting_delivery_request' ||
-                          d.status === 'delivery_requested' ||
-                          d.status === 'quote_accepted' ||
-                          d.status === 'quote_received_by_supplier' ||
-                          d.status === 'order_created' ||
-                          d.status === 'pending' ||
-                          d.status === 'confirmed' ||
-                          d.status === 'processing'
-                        ).length}
-                      </Badge>
-                    )}
+                    {(() => {
+                      // Only count accepted deliveries for this provider
+                      const acceptedStatuses = ['assigned', 'accepted', 'scheduled', 'pending_pickup', 'delivery_assigned', 'ready_for_dispatch', 'provider_assigned'];
+                      const scheduledCount = activeDeliveries.filter(d => {
+                        const isProviderAssigned = 
+                          (d.provider_id === user?.id) || 
+                          (d.delivery_provider_id === user?.id) ||
+                          (d.provider_id && d.provider_id === user?.id);
+                        return acceptedStatuses.includes(d.status) && isProviderAssigned;
+                      }).length;
+                      
+                      return scheduledCount > 0 ? (
+                        <Badge className="ml-1 bg-blue-500 text-white text-xs">
+                          {scheduledCount}
+                        </Badge>
+                      ) : null;
+                    })()}
                   </TabsTrigger>
                   <TabsTrigger value="in_transit" className="flex items-center gap-2">
                     <Truck className="h-4 w-4" />
