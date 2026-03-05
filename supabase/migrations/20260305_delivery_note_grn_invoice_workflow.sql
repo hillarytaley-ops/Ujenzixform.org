@@ -435,21 +435,21 @@ BEGIN
             RETURN NEW;
         END IF;
         
-        -- Get GRN details first
+        -- Get GRN details first (explicitly qualify table name to avoid ambiguity)
         SELECT 
-            id,
-            purchase_order_id,
-            builder_id,
-            supplier_id,
-            items
+            grn.id,
+            grn.purchase_order_id,
+            grn.builder_id,
+            grn.supplier_id,
+            grn.items
         INTO 
             v_grn_id,
             v_grn_purchase_order_id,
             v_grn_builder_id,
             v_grn_supplier_id,
             v_grn_items
-        FROM goods_received_notes
-        WHERE id = NEW.id;
+        FROM goods_received_notes grn
+        WHERE grn.id = NEW.id;
         
         IF NOT FOUND OR v_grn_builder_id IS NULL THEN
             RETURN NEW;
