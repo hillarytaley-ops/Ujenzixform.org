@@ -435,21 +435,12 @@ BEGIN
             RETURN NEW;
         END IF;
         
-        -- Get GRN details first (use public schema explicitly and qualify all columns)
-        SELECT 
-            public.goods_received_notes.id,
-            public.goods_received_notes.purchase_order_id,
-            public.goods_received_notes.builder_id,
-            public.goods_received_notes.supplier_id,
-            public.goods_received_notes.items
-        INTO STRICT
-            v_grn_id,
-            v_grn_purchase_order_id,
-            v_grn_builder_id,
-            v_grn_supplier_id,
-            v_grn_items
-        FROM public.goods_received_notes
-        WHERE public.goods_received_notes.id = NEW.id;
+        -- Use NEW record directly (no need to query the table again - avoids column validation issues)
+        v_grn_id := NEW.id;
+        v_grn_purchase_order_id := NEW.purchase_order_id;
+        v_grn_builder_id := NEW.builder_id;
+        v_grn_supplier_id := NEW.supplier_id;
+        v_grn_items := NEW.items;
         
         -- Validate required fields
         IF v_grn_builder_id IS NULL OR v_grn_supplier_id IS NULL OR v_grn_purchase_order_id IS NULL THEN
