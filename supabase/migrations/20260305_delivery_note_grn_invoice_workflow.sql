@@ -247,7 +247,11 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION auto_create_delivery_note()
 RETURNS TRIGGER AS $$
 DECLARE
-    v_po_record RECORD;
+    v_po_buyer_id UUID;
+    v_po_supplier_id UUID;
+    v_po_delivery_provider_id UUID;
+    v_po_delivery_address TEXT;
+    v_po_items JSONB;
     v_dn_number TEXT;
     v_items JSONB;
     v_delivery_request_id UUID;
@@ -259,20 +263,23 @@ BEGIN
             RETURN NEW;
         END IF;
         
-        -- Get purchase order details
+        -- Get purchase order details using individual variables
         SELECT 
-            po.id,
             po.buyer_id,
             po.supplier_id,
             po.delivery_provider_id,
             po.delivery_address,
-            po.items,
-            po.created_at
-        INTO v_po_record
+            po.items
+        INTO 
+            v_po_buyer_id,
+            v_po_supplier_id,
+            v_po_delivery_provider_id,
+            v_po_delivery_address,
+            v_po_items
         FROM purchase_orders po
         WHERE po.id = NEW.id;
         
-        IF NOT FOUND OR v_po_record.buyer_id IS NULL THEN
+        IF NOT FOUND OR v_po_buyer_id IS NULL THEN
             RETURN NEW;
         END IF;
         
@@ -287,7 +294,7 @@ BEGIN
         v_dn_number := generate_dn_number();
         
         -- Prepare items from purchase_order
-        v_items := COALESCE(v_po_record.items, '[]'::JSONB);
+        v_items := COALESCE(v_po_items, '[]'::JSONB);
         
         -- Create delivery note (using buyer_id from PO as builder_id)
         INSERT INTO delivery_notes (
@@ -307,10 +314,10 @@ BEGIN
             NEW.id,
             v_delivery_request_id,
             v_dn_number,
-            v_po_record.buyer_id,  -- buyer_id from PO maps to builder_id in DN
-            v_po_record.supplier_id,
-            v_po_record.delivery_provider_id,
-            v_po_record.delivery_address,
+            v_po_buyer_id,  -- buyer_id from PO maps to builder_id in DN
+            v_po_supplier_id,
+            v_po_delivery_provider_id,
+            v_po_delivery_address,
             CURRENT_DATE,
             NOW(),
             v_items,
