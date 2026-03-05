@@ -900,6 +900,11 @@ const ProfessionalBuilderDashboardPage = () => {
     }
   };
 
+  // Debug: Log when projects state changes
+  useEffect(() => {
+    console.log('📁 Projects state changed:', projects.length, 'projects', projects);
+  }, [projects]);
+
   // Load projects on mount - with delay to ensure auth is ready
   useEffect(() => {
     // Small delay to ensure auth context is ready
