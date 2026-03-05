@@ -125,9 +125,15 @@ const QuotesManagementContent: React.FC<QuotesManagementContentProps> = ({
   // Default to 'pending' to show Pending Response quotes as the primary view
   const [activeFilter, setActiveFilter] = useState<'all' | 'pending' | 'quoted' | 'confirmed'>('pending');
   
-  const pendingQuotes = quoteRequests.filter(q => q.status === 'pending');
-  const quotedQuotes = quoteRequests.filter(q => q.status === 'quoted');
-  const confirmedQuotes = quoteRequests.filter(q => q.status === 'confirmed' || q.status === 'accepted');
+  const pendingQuotes = quoteRequests.filter(q => q.status === 'pending' || q.status === 'quote_created' || q.status === 'quote_received_by_supplier');
+  // Awaiting Client: Quotes where supplier has responded and is waiting for builder to accept/reject
+  const quotedQuotes = quoteRequests.filter(q => 
+    q.status === 'quoted' || 
+    q.status === 'quote_responded' || 
+    q.status === 'quote_revised' || 
+    q.status === 'quote_viewed_by_builder'
+  );
+  const confirmedQuotes = quoteRequests.filter(q => q.status === 'confirmed' || q.status === 'accepted' || q.status === 'quote_accepted');
 
   // Filter quotes based on active filter
   const filteredQuotes = activeFilter === 'all' 
