@@ -34,6 +34,8 @@ interface Notification {
   estimatedCost?: number;
   purchase_order_id?: string; // CRITICAL for deduplication
   delivery_request_id?: string; // The actual delivery_request ID for accepting
+  provider_id?: string | null; // Provider who accepted this delivery (null = unaccepted)
+  provider_name?: string; // Name of provider who accepted (if available)
 }
 
 interface NotificationSettings {
