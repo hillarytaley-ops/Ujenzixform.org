@@ -808,7 +808,7 @@ const ProfessionalBuilderDashboardPage = () => {
     }
   };
 
-  // Fetch projects
+  // Fetch projects - Use Supabase client directly (faster and more reliable)
   const fetchProjects = async () => {
     const userId = getUserId();
     if (!userId) {
@@ -823,79 +823,42 @@ const ProfessionalBuilderDashboardPage = () => {
     // Safety timeout - don't hang forever
     const safetyTimeout = setTimeout(() => {
       console.log('📁 Projects fetch safety timeout');
-      // Don't set loading to false if we already have projects
-      setLoadingProjects(prev => {
-        if (projects.length > 0) {
-          console.log('📁 Safety timeout: Already have projects, keeping loading false');
-          return false;
-        }
-        return false;
-      });
-    }, 8000);
+      setLoadingProjects(false);
+    }, 10000); // Increased to 10 seconds
     
     try {
-      const accessToken = await getAccessToken();
+      // Use Supabase client directly - it's usually faster and handles auth better
+      console.log('📁 Using Supabase client to fetch projects...');
       
-      const controller = new AbortController();
-      const fetchTimeout = setTimeout(() => controller.abort(), 7000);
+      const { data, error } = await supabase
+        .from('builder_projects')
+        .select('id, name, location, description, start_date, expected_end_date, budget, spent, status, progress, project_type, created_at, updated_at, latitude, longitude, address')
+        .eq('builder_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(100);
       
-      const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/builder_projects?builder_id=eq.${userId}&order=created_at.desc`,
-        {
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${accessToken || SUPABASE_ANON_KEY}`
-          },
-          signal: controller.signal
-        }
-      );
+      clearTimeout(safetyTimeout);
       
-      clearTimeout(fetchTimeout);
+      if (error) {
+        console.error('📁 Supabase query error:', error);
+        setProjects([]);
+        setLoadingProjects(false);
+        return;
+      }
       
-      if (response.ok) {
-        const data = await response.json();
-        console.log('📁 Projects data received:', data);
-        setProjects(data);
-        console.log('📁 Loaded', data.length, 'projects and updated state');
+      if (data) {
+        console.log('📁 Projects data received from Supabase:', data);
+        setProjects(data || []);
+        console.log('📁 Loaded', data?.length || 0, 'projects and updated state');
       } else {
-        console.log('📁 Projects fetch failed:', response.status);
-        // Try with Supabase client as fallback
-        const { data, error } = await supabase
-          .from('builder_projects')
-          .select('*')
-          .eq('builder_id', userId)
-          .order('created_at', { ascending: false });
-        
-        if (!error && data) {
-          setProjects(data);
-          console.log('📁 Loaded', data.length, 'projects via fallback');
-        }
+        console.log('📁 No projects data returned');
+        setProjects([]);
       }
     } catch (error: any) {
-      console.error('Error fetching projects:', error);
-      if (error.name !== 'AbortError') {
-        // Try Supabase client as fallback
-        try {
-          const { data } = await supabase
-            .from('builder_projects')
-            .select('*')
-            .eq('builder_id', userId)
-            .order('created_at', { ascending: false });
-          
-          if (data) {
-            console.log('📁 Projects data from error fallback:', data);
-            setProjects(data);
-            setLoadingProjects(false);
-            console.log('📁 Loaded', data.length, 'projects via error fallback');
-          } else {
-            setLoadingProjects(false);
-          }
-        } catch (e) {
-          console.error('📁 Fallback also failed:', e);
-        }
-      }
-    } finally {
+      console.error('📁 Error fetching projects:', error);
       clearTimeout(safetyTimeout);
+      setProjects([]);
+    } finally {
       setLoadingProjects(false);
     }
   };
