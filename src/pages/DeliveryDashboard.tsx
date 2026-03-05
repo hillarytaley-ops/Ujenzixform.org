@@ -1039,18 +1039,21 @@ const DeliveryDashboard = () => {
                   <div className="space-y-4">
                     {(() => {
                       // Scheduled tab should ONLY show deliveries that have been ACCEPTED by THIS provider
-                      // Focus on 'accepted' status specifically, as that's what's set when provider accepts
+                      // When provider accepts, status becomes 'accepted' and provider_id is set
                       const scheduled = activeDeliveries.filter(d => {
-                        // CRITICAL: Verify this delivery is actually assigned to THIS provider
-                        // Check both provider_id (for delivery_requests) and delivery_provider_id (for purchase_orders)
-                        const isThisProvider = 
-                          (d.provider_id && d.provider_id === user?.id) || 
-                          (d.delivery_provider_id && d.delivery_provider_id === user?.id);
+                        // Check if provider_id matches this user (for delivery_requests)
+                        const providerMatches = d.provider_id === user?.id;
                         
-                        // Only show deliveries that are accepted by this provider
-                        // Status should be 'accepted' or 'assigned' (both mean provider accepted)
-                        // But MUST have provider_id matching this user
-                        const hasAcceptedStatus = d.status === 'accepted' || d.status === 'assigned';
+                        // Check if delivery_provider_id matches this user (for purchase_orders)
+                        const deliveryProviderMatches = d.delivery_provider_id === user?.id;
+                        
+                        // Must be assigned to this provider
+                        const isThisProvider = providerMatches || deliveryProviderMatches;
+                        
+                        // Status should be 'accepted' (set when provider accepts via Accept button)
+                        // Also allow 'assigned' if provider_id matches (some systems use 'assigned' after acceptance)
+                        const hasAcceptedStatus = d.status === 'accepted' || 
+                                                  (d.status === 'assigned' && isThisProvider);
                         
                         // Debug logging for first few deliveries
                         if (activeDeliveries.indexOf(d) < 3) {
@@ -1060,13 +1063,15 @@ const DeliveryDashboard = () => {
                             provider_id: d.provider_id,
                             delivery_provider_id: d.delivery_provider_id,
                             user_id: user?.id,
-                            hasAcceptedStatus,
+                            providerMatches,
+                            deliveryProviderMatches,
                             isThisProvider,
+                            hasAcceptedStatus,
                             willInclude: hasAcceptedStatus && isThisProvider
                           });
                         }
                         
-                        // Only show if BOTH: status is accepted/assigned AND it's assigned to this provider
+                        // Only show if BOTH: status indicates acceptance AND provider matches
                         return hasAcceptedStatus && isThisProvider;
                       });
                       
