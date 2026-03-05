@@ -1055,14 +1055,36 @@ const DeliveryDashboard = () => {
                           'provider_assigned'   // Provider assigned
                         ];
                         
-                        // Also check if provider_id matches (for delivery_requests) or delivery_provider_id matches (for purchase_orders)
-                        const isProviderAssigned = 
-                          (d.provider_id === user?.id) || 
-                          (d.delivery_provider_id === user?.id) ||
-                          (d.provider_id && d.provider_id === user?.id);
+                        // Check if status is accepted
+                        const hasAcceptedStatus = acceptedStatuses.includes(d.status);
                         
-                        // Only show if status indicates acceptance AND provider is assigned
-                        return acceptedStatuses.includes(d.status) && isProviderAssigned;
+                        // Check if provider_id matches (for delivery_requests) or delivery_provider_id matches (for purchase_orders)
+                        // Since activeDeliveries already comes from useDeliveryProviderData which filters by provider_id,
+                        // all deliveries in activeDeliveries should already be for this provider
+                        // So we just need to check the status
+                        const isProviderAssigned = 
+                          d.provider_id === user?.id || 
+                          d.delivery_provider_id === user?.id ||
+                          d.provider_id === user?.id; // Double check for delivery_requests
+                        
+                        // Debug logging for first few deliveries
+                        if (activeDeliveries.indexOf(d) < 3) {
+                          console.log('📋 Sample delivery for scheduled filter:', {
+                            id: d.id,
+                            status: d.status,
+                            provider_id: d.provider_id,
+                            delivery_provider_id: d.delivery_provider_id,
+                            user_id: user?.id,
+                            hasAcceptedStatus,
+                            isProviderAssigned,
+                            willInclude: hasAcceptedStatus && isProviderAssigned
+                          });
+                        }
+                        
+                        // Only show if status indicates acceptance
+                        // Since activeDeliveries is already filtered by provider, we can trust that
+                        // all deliveries here are for this provider, so we just check status
+                        return hasAcceptedStatus;
                       });
                       
                       // Debug logging
