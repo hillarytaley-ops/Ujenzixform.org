@@ -1039,21 +1039,12 @@ const DeliveryDashboard = () => {
                   <div className="space-y-4">
                     {(() => {
                       // Scheduled tab should ONLY show deliveries that have been ACCEPTED by THIS provider
-                      // When provider accepts, status becomes 'accepted' and provider_id is set
+                      // activeDeliveries is already filtered by provider_id in useDeliveryProviderData
+                      // So we just need to check status - only show 'accepted' status (set when provider clicks Accept)
                       const scheduled = activeDeliveries.filter(d => {
-                        // Check if provider_id matches this user (for delivery_requests)
-                        const providerMatches = d.provider_id === user?.id;
-                        
-                        // Check if delivery_provider_id matches this user (for purchase_orders)
-                        const deliveryProviderMatches = d.delivery_provider_id === user?.id;
-                        
-                        // Must be assigned to this provider
-                        const isThisProvider = providerMatches || deliveryProviderMatches;
-                        
-                        // Status should be 'accepted' (set when provider accepts via Accept button)
-                        // Also allow 'assigned' if provider_id matches (some systems use 'assigned' after acceptance)
-                        const hasAcceptedStatus = d.status === 'accepted' || 
-                                                  (d.status === 'assigned' && isThisProvider);
+                        // When provider accepts via Accept button, status is set to 'accepted'
+                        // Only show deliveries with 'accepted' status (not 'assigned' which might be system-assigned)
+                        const isAccepted = d.status === 'accepted';
                         
                         // Debug logging for first few deliveries
                         if (activeDeliveries.indexOf(d) < 3) {
@@ -1063,16 +1054,14 @@ const DeliveryDashboard = () => {
                             provider_id: d.provider_id,
                             delivery_provider_id: d.delivery_provider_id,
                             user_id: user?.id,
-                            providerMatches,
-                            deliveryProviderMatches,
-                            isThisProvider,
-                            hasAcceptedStatus,
-                            willInclude: hasAcceptedStatus && isThisProvider
+                            isAccepted,
+                            willInclude: isAccepted
                           });
                         }
                         
-                        // Only show if BOTH: status indicates acceptance AND provider matches
-                        return hasAcceptedStatus && isThisProvider;
+                        // Only show deliveries with 'accepted' status
+                        // activeDeliveries is already filtered to this provider, so we just check status
+                        return isAccepted;
                       });
                       
                       // Debug logging
