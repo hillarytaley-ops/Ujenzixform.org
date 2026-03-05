@@ -1074,10 +1074,14 @@ const ProfessionalBuilderDashboardPage = () => {
         expected_end_date: newProject.expected_end_date || null,
         budget: newProject.budget ? parseFloat(newProject.budget) : null,
         project_type: newProject.project_type || 'residential',
-        client_name: newProject.client_name?.trim() || null,
         status: 'active',
         progress: 0
       };
+      
+      // Only include client_name if it has a value (to avoid schema cache issues)
+      if (newProject.client_name?.trim()) {
+        projectData.client_name = newProject.client_name.trim();
+      }
 
       // Include GPS coordinates if available (for delivery location)
       if (newProject.latitude && newProject.longitude) {
