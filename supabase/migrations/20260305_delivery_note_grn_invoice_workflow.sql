@@ -410,8 +410,12 @@ CREATE OR REPLACE FUNCTION auto_create_invoice()
 RETURNS TRIGGER AS $$
 DECLARE
     v_invoice_number TEXT;
-    v_grn_record RECORD;
-    v_po_record RECORD;
+    v_grn_id UUID;
+    v_grn_purchase_order_id UUID;
+    v_grn_builder_id UUID;
+    v_grn_supplier_id UUID;
+    v_grn_items JSONB;
+    v_po_total_amount DECIMAL(12, 2);
     v_subtotal DECIMAL(12, 2);
     v_total DECIMAL(12, 2);
 BEGIN
@@ -422,7 +426,7 @@ BEGIN
             RETURN NEW;
         END IF;
         
-        -- Get GRN details (GRN already has all needed info)
+        -- Get GRN and PO details using separate variables
         SELECT 
             grn.id,
             grn.purchase_order_id,
@@ -430,12 +434,18 @@ BEGIN
             grn.supplier_id,
             grn.items,
             po.total_amount
-        INTO v_grn_record
+        INTO 
+            v_grn_id,
+            v_grn_purchase_order_id,
+            v_grn_builder_id,
+            v_grn_supplier_id,
+            v_grn_items,
+            v_po_total_amount
         FROM goods_received_notes grn
         JOIN purchase_orders po ON po.id = grn.purchase_order_id
         WHERE grn.id = NEW.id;
         
-        IF NOT FOUND THEN
+        IF NOT FOUND OR v_grn_builder_id IS NULL THEN
             RETURN NEW;
         END IF;
         
@@ -448,7 +458,7 @@ BEGIN
         v_invoice_number := 'INV-' || TO_CHAR(CURRENT_DATE, 'YYYY') || '-' || LPAD(v_invoice_number::TEXT, 4, '0');
         
         -- Calculate amounts (use PO total as base)
-        v_subtotal := COALESCE(v_grn_record.total_amount, 0);
+        v_subtotal := COALESCE(v_po_total_amount, 0);
         v_total := v_subtotal; -- Can add tax/discount later
         
         -- Create invoice
@@ -469,11 +479,11 @@ BEGIN
             created_by
         ) VALUES (
             v_invoice_number,
-            v_grn_record.purchase_order_id,
+            v_grn_purchase_order_id,
             NEW.id,
-            v_grn_record.supplier_id,
-            v_grn_record.builder_id,
-            v_grn_record.items,
+            v_grn_supplier_id,
+            v_grn_builder_id,
+            v_grn_items,
             v_subtotal,
             v_total,
             CURRENT_DATE,
