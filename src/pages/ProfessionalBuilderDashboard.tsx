@@ -1675,9 +1675,9 @@ const ProfessionalBuilderDashboardPage = () => {
             <TabsTrigger value="my-analytics">Analytics</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="projects">
+          <TabsContent value="projects" className="mt-4">
             {selectedProject ? (
-              <>
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
                 {console.log('📁 Rendering ProjectDetails for:', selectedProject.id, selectedProject.name)}
                 <ProjectDetails 
                   project={selectedProject}
@@ -1688,7 +1688,7 @@ const ProfessionalBuilderDashboardPage = () => {
                   onUpdate={handleProjectUpdate}
                   userId={getUserId()}
                 />
-              </>
+              </div>
             ) : (
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
