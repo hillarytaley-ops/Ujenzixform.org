@@ -18,6 +18,9 @@
 -- ============================================================
 -- 1. DELIVERY NOTES (DN) TABLE
 -- ============================================================
+-- Drop table if exists and recreate to ensure clean state (optional - comment out if you want to preserve existing data)
+-- DROP TABLE IF EXISTS delivery_notes CASCADE;
+
 CREATE TABLE IF NOT EXISTS delivery_notes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     purchase_order_id UUID NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
@@ -68,6 +71,8 @@ CREATE INDEX IF NOT EXISTS idx_delivery_notes_dn_number ON delivery_notes(dn_num
 -- ============================================================
 -- 2. GOODS RECEIVED NOTES (GRN) TABLE
 -- ============================================================
+-- DROP TABLE IF EXISTS goods_received_notes CASCADE;
+
 CREATE TABLE IF NOT EXISTS goods_received_notes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     delivery_note_id UUID NOT NULL REFERENCES delivery_notes(id) ON DELETE CASCADE,
