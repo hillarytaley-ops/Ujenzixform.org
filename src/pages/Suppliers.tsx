@@ -34,7 +34,7 @@ import Footer from "@/components/Footer";
 import { MaterialsGrid } from "@/components/suppliers/MaterialsGrid";
 import { CartSidebar } from "@/components/cart/CartSidebar";
 import { FloatingCartButton } from "@/components/cart/FloatingCartButton";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { DashboardLoader } from "@/components/ui/DashboardLoader";
 
