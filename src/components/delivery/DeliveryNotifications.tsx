@@ -124,8 +124,11 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
       const finalNotifications: Notification[] = [];
       const seenPurchaseOrderIds = new Set<string>(); // Track which purchase_orders we've already added
       
-      // STEP 1: Fetch delivery_requests with database-level deduplication
-      // Use DISTINCT ON in a subquery approach via RPC, or fetch and deduplicate immediately
+      // STEP 1: Fetch delivery_requests - only show unaccepted OR accepted by others
+      // Don't show deliveries already accepted by THIS provider (those are in Scheduled tab)
+      // Fetch all delivery_requests, then filter in JavaScript to show:
+      // - provider_id IS NULL (unaccepted) - can accept
+      // - provider_id IS NOT NULL AND provider_id != userId (accepted by another) - show as "Already Accepted"
       const drResponse = await fetch(
         `${url}/rest/v1/delivery_requests?order=created_at.desc&limit=100&select=*`,
         { headers, cache: 'no-store' }
@@ -334,6 +337,13 @@ export const DeliveryNotifications: React.FC<DeliveryNotificationsProps> = ({
           console.error(`🚫 BLOCKED: Already added notification for NULL PO delivery_request ${dr.id}`);
           continue;
         }
+        
+        // FILTER: Skip deliveries already accepted by THIS provider (they're in Scheduled tab)
+        if (dr.provider_id && dr.provider_id === userId) {
+          console.log(`📋 Skipping NULL PO delivery ${dr.id} - already accepted by this provider (should be in Scheduled tab)`);
+          continue;
+        }
+        
         addedNullPOIds.add(dr.id);
         finalNotifications.push({
           id: `dr-${dr.id}`,
