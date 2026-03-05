@@ -430,27 +430,34 @@ BEGIN
             RETURN NEW;
         END IF;
         
-        -- Get GRN and PO details using separate variables
+        -- Get GRN details first
         SELECT 
-            grn.id,
-            grn.purchase_order_id,
-            grn.builder_id,
-            grn.supplier_id,
-            grn.items,
-            po.total_amount
+            id,
+            purchase_order_id,
+            builder_id,
+            supplier_id,
+            items
         INTO 
             v_grn_id,
             v_grn_purchase_order_id,
             v_grn_builder_id,
             v_grn_supplier_id,
-            v_grn_items,
-            v_po_total_amount
-        FROM goods_received_notes grn
-        JOIN purchase_orders po ON po.id = grn.purchase_order_id
-        WHERE grn.id = NEW.id;
+            v_grn_items
+        FROM goods_received_notes
+        WHERE id = NEW.id;
         
         IF NOT FOUND OR v_grn_builder_id IS NULL THEN
             RETURN NEW;
+        END IF;
+        
+        -- Get PO total_amount separately to avoid JOIN ambiguity
+        SELECT total_amount
+        INTO v_po_total_amount
+        FROM purchase_orders
+        WHERE id = v_grn_purchase_order_id;
+        
+        IF NOT FOUND THEN
+            v_po_total_amount := 0;
         END IF;
         
         -- Generate invoice number
