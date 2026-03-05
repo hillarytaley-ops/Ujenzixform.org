@@ -1153,6 +1153,18 @@ const ProfessionalBuilderDashboardPage = () => {
         throw new Error('Project was created but no data was returned');
       }
 
+      // Add the created project directly to the projects state immediately
+      // This ensures it shows up right away, even if fetchProjects times out
+      setProjects(prev => {
+        // Check if project already exists (avoid duplicates)
+        const exists = prev.some(p => p.id === createdProject.id);
+        if (exists) {
+          return prev;
+        }
+        // Add new project at the beginning of the list
+        return [createdProject, ...prev];
+      });
+
       // Update stats immediately
       setStats(prev => ({ ...prev, activeProjects: prev.activeProjects + 1 }));
       
@@ -1179,9 +1191,10 @@ const ProfessionalBuilderDashboardPage = () => {
       });
 
       // Refresh projects list in background (non-blocking, with timeout)
+      // This will update the list with any server-side changes, but the project is already visible
       fetchProjects().catch((err) => {
         console.warn('⚠️ Failed to refresh projects list (non-critical):', err);
-        // Don't show error toast - project was created successfully
+        // Don't show error toast - project was created successfully and is already visible
       });
     } catch (error: any) {
       console.error('❌ Error creating project:', error);
