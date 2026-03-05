@@ -431,25 +431,25 @@ BEGIN
     -- Only trigger when supplier views GRN (status changes to 'viewed_by_supplier')
     IF NEW.status = 'viewed_by_supplier' AND (OLD.status IS NULL OR OLD.status != 'viewed_by_supplier') THEN
         -- Check if invoice already exists
-        IF EXISTS (SELECT 1 FROM invoices WHERE invoices.grn_id = NEW.id AND invoices.status != 'cancelled') THEN
+        IF EXISTS (SELECT 1 FROM public.invoices WHERE public.invoices.grn_id = NEW.id AND public.invoices.status != 'cancelled') THEN
             RETURN NEW;
         END IF;
         
-        -- Get GRN details first (explicitly qualify all columns with table alias)
+        -- Get GRN details first (use public schema explicitly and qualify all columns)
         SELECT 
-            grn.id,
-            grn.purchase_order_id,
-            grn.builder_id,
-            grn.supplier_id,
-            grn.items
+            public.goods_received_notes.id,
+            public.goods_received_notes.purchase_order_id,
+            public.goods_received_notes.builder_id,
+            public.goods_received_notes.supplier_id,
+            public.goods_received_notes.items
         INTO STRICT
             v_grn_id,
             v_grn_purchase_order_id,
             v_grn_builder_id,
             v_grn_supplier_id,
             v_grn_items
-        FROM goods_received_notes grn
-        WHERE grn.id = NEW.id;
+        FROM public.goods_received_notes
+        WHERE public.goods_received_notes.id = NEW.id;
         
         -- Validate required fields
         IF v_grn_builder_id IS NULL OR v_grn_supplier_id IS NULL OR v_grn_purchase_order_id IS NULL THEN
@@ -458,20 +458,20 @@ BEGIN
         END IF;
         
         -- Get PO total_amount separately (purchase_orders uses buyer_id, not builder_id)
-        SELECT po.total_amount
+        SELECT public.purchase_orders.total_amount
         INTO v_po_total_amount
-        FROM purchase_orders po
-        WHERE po.id = v_grn_purchase_order_id;
+        FROM public.purchase_orders
+        WHERE public.purchase_orders.id = v_grn_purchase_order_id;
         
         IF NOT FOUND THEN
             v_po_total_amount := 0;
         END IF;
         
         -- Generate invoice number
-        SELECT COALESCE(MAX(CAST(SUBSTRING(invoice_number FROM '[0-9]+$') AS INTEGER)), 0) + 1
+        SELECT COALESCE(MAX(CAST(SUBSTRING(public.invoices.invoice_number FROM '[0-9]+$') AS INTEGER)), 0) + 1
         INTO v_invoice_number
-        FROM invoices
-        WHERE invoice_number LIKE 'INV-' || TO_CHAR(CURRENT_DATE, 'YYYY') || '-%';
+        FROM public.invoices
+        WHERE public.invoices.invoice_number LIKE 'INV-' || TO_CHAR(CURRENT_DATE, 'YYYY') || '-%';
         
         v_invoice_number := 'INV-' || TO_CHAR(CURRENT_DATE, 'YYYY') || '-' || LPAD(v_invoice_number::TEXT, 4, '0');
         
@@ -480,7 +480,7 @@ BEGIN
         v_total := v_subtotal; -- Can add tax/discount later
         
         -- Create invoice
-        INSERT INTO invoices (
+        INSERT INTO public.invoices (
             invoice_number,
             purchase_order_id,
             grn_id,
@@ -512,7 +512,7 @@ BEGIN
             auth.uid()
         );
         
-        RAISE NOTICE 'Auto-created Invoice % for GRN %', v_invoice_number, (SELECT grn_number FROM goods_received_notes WHERE id = NEW.id);
+        RAISE NOTICE 'Auto-created Invoice % for GRN %', v_invoice_number, (SELECT public.goods_received_notes.grn_number FROM public.goods_received_notes WHERE public.goods_received_notes.id = NEW.id);
     END IF;
     
     RETURN NEW;
