@@ -1035,7 +1035,34 @@ const ProfessionalBuilderDashboardPage = () => {
       return;
     }
 
-    const accessToken = await getAccessToken();
+    // Get access token with timeout to prevent hanging
+    let accessToken: string | null = null;
+    try {
+      console.log('📁 Getting access token...');
+      const tokenPromise = getAccessToken();
+      const tokenTimeout = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Token fetch timeout')), 5000)
+      );
+      accessToken = await Promise.race([tokenPromise, tokenTimeout]);
+      console.log('📁 Access token obtained');
+    } catch (tokenError: any) {
+      console.warn('⚠️ Failed to get access token, trying localStorage fallback:', tokenError);
+      // Try to get token from localStorage as fallback
+      try {
+        const storedSession = localStorage.getItem('sb-' + SUPABASE_URL.split('//')[1].split('.')[0] + '-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          accessToken = parsed.access_token || SUPABASE_ANON_KEY;
+          console.log('📁 Using token from localStorage');
+        } else {
+          accessToken = SUPABASE_ANON_KEY;
+          console.log('📁 Using anon key as fallback');
+        }
+      } catch {
+        accessToken = SUPABASE_ANON_KEY;
+        console.log('📁 Using anon key as final fallback');
+      }
+    }
     
     try {
       const projectData: Record<string, any> = {
