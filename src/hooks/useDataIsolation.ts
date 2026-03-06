@@ -450,6 +450,8 @@ export const useDeliveryProviderData = () => {
             let allDeliveries: any[] = [];
             try {
               // Add timeout to join query (5 seconds max)
+              // Filter by provider_id AND status to exclude pending requests (which are visible to all providers via RLS)
+              // Only show requests that have been accepted/assigned to this provider
               const joinQueryPromise = supabase
                 .from('delivery_requests')
                 .select(`
@@ -460,6 +462,7 @@ export const useDeliveryProviderData = () => {
                   )
                 `)
                 .eq('provider_id', userId)
+                .in('status', ['accepted', 'assigned', 'picked_up', 'in_transit', 'dispatched', 'out_for_delivery', 'delivery_arrived'])
                 .order('created_at', { ascending: false })
                 .limit(100);
               
@@ -497,9 +500,10 @@ export const useDeliveryProviderData = () => {
               }
             } catch (joinError) {
               // Fall back to simple query if join fails
+              // Filter by provider_id AND status to exclude pending requests
               console.warn('⚠️ Join query failed, falling back to simple query:', joinError);
               const activeResponse = await fetch(
-                `${SUPABASE_URL}/rest/v1/delivery_requests?provider_id=eq.${userId}&select=*&order=created_at.desc&limit=100`,
+                `${SUPABASE_URL}/rest/v1/delivery_requests?provider_id=eq.${userId}&status=in.(accepted,assigned,picked_up,in_transit,dispatched,out_for_delivery,delivery_arrived)&select=*&order=created_at.desc&limit=100`,
                 {
                   headers: {
                     'apikey': SUPABASE_ANON_KEY,
