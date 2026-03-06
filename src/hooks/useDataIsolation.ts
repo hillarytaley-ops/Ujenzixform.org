@@ -444,36 +444,64 @@ export const useDeliveryProviderData = () => {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
             
-            const activeResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/delivery_requests?provider_id=eq.${userId}&select=*&order=created_at.desc&limit=100`,
-              {
-                headers: {
-                  'apikey': SUPABASE_ANON_KEY,
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Content-Type': 'application/json'
-                },
-                cache: 'no-store',
-                signal: controller.signal
-              }
-            );
+            // Use Supabase client for join query to get po_number directly
+            // This is more reliable than separate queries
+            const { data: deliveryRequestsData, error: drError } = await supabase
+              .from('delivery_requests')
+              .select(`
+                *,
+                purchase_orders!inner(
+                  id,
+                  po_number
+                )
+              `)
+              .eq('provider_id', userId)
+              .order('created_at', { ascending: false })
+              .limit(100);
             
-            clearTimeout(timeoutId);
-            
-            if (activeResponse.ok) {
-              const allDeliveries = await activeResponse.json();
-              const filtered = allDeliveries.filter((d: any) => 
-                d.status !== 'delivered' && 
-                d.status !== 'completed' && 
-                d.status !== 'cancelled'
+            // If join query fails, fall back to simple query
+            let allDeliveries: any[] = [];
+            if (drError || !deliveryRequestsData) {
+              console.warn('⚠️ Join query failed, using simple query:', drError?.message);
+              const activeResponse = await fetch(
+                `${SUPABASE_URL}/rest/v1/delivery_requests?provider_id=eq.${userId}&select=*&order=created_at.desc&limit=100`,
+                {
+                  headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                  },
+                  cache: 'no-store',
+                  signal: controller.signal
+                }
               );
-              const withPOId = filtered.filter((d: any) => d.purchase_order_id).length;
-              console.log('📦 delivery_requests: Found', allDeliveries.length, 'total,', filtered.length, 'active,', withPOId, 'with purchase_order_id');
-              return filtered;
+              
+              clearTimeout(timeoutId);
+              
+              if (activeResponse.ok) {
+                allDeliveries = await activeResponse.json();
+              }
             } else {
-              const errorText = await activeResponse.text();
-              console.warn('⚠️ Error fetching delivery_requests:', activeResponse.status, errorText);
-              return [];
+              clearTimeout(timeoutId);
+              // Flatten the joined data and add po_number directly
+              allDeliveries = deliveryRequestsData.map((dr: any) => ({
+                ...dr,
+                purchase_order_id: dr.purchase_order_id || dr.purchase_orders?.id,
+                po_number_from_join: dr.purchase_orders?.po_number || null
+              }));
+              console.log('✅ Fetched delivery_requests with po_number join:', allDeliveries.length, 'deliveries');
             }
+            
+            // Filter active deliveries
+            const filtered = allDeliveries.filter((d: any) => 
+              d.status !== 'delivered' && 
+              d.status !== 'completed' && 
+              d.status !== 'cancelled'
+            );
+            const withPOId = filtered.filter((d: any) => d.purchase_order_id).length;
+            const withPONumber = filtered.filter((d: any) => d.po_number_from_join || d.po_number).length;
+            console.log('📦 delivery_requests: Found', allDeliveries.length, 'total,', filtered.length, 'active,', withPOId, 'with purchase_order_id,', withPONumber, 'with po_number');
+            return filtered;
           } catch (error: any) {
             if (error.name === 'AbortError') {
               console.warn('⏱️ delivery_requests fetch timed out');
@@ -662,18 +690,21 @@ export const useDeliveryProviderData = () => {
       // Add delivery_requests
       if (activeData) {
         activeData.forEach((dr: any) => {
-          // Get order number from purchase_order if available
+          // Get order number - prioritize po_number_from_join (from direct join query)
           let orderNumber = null;
-          if (dr.purchase_order_id) {
+          if (dr.po_number_from_join && dr.po_number_from_join.trim() !== '') {
+            // Use po_number from direct join query (most reliable)
+            orderNumber = dr.po_number_from_join;
+            console.log('✅ Using po_number from join query for delivery_request', dr.id.slice(0, 8), ':', orderNumber);
+          } else if (dr.purchase_order_id) {
+            // Fall back to poNumberMap
             orderNumber = poNumberMap.get(dr.purchase_order_id);
-            // Only use fallback if we truly don't have a po_number
-            // This means the po_number wasn't found in the database
-            if (!orderNumber || orderNumber.trim() === '') {
-              console.warn('⚠️ No po_number found for purchase_order_id:', dr.purchase_order_id.slice(0, 8), '- using fallback');
-              // Fallback: generate from purchase_order_id (only as last resort)
-              orderNumber = `PO-${dr.purchase_order_id.slice(0, 8).toUpperCase()}`;
+            if (orderNumber && orderNumber.trim() !== '') {
+              console.log('✅ Using po_number from map for delivery_request', dr.id.slice(0, 8), ':', orderNumber);
             } else {
-              console.log('✅ Using actual po_number:', orderNumber, 'for delivery_request:', dr.id.slice(0, 8));
+              // Last resort: generate fallback
+              orderNumber = `PO-${dr.purchase_order_id.slice(0, 8).toUpperCase()}`;
+              console.warn('⚠️ No po_number found for delivery_request', dr.id.slice(0, 8), 'purchase_order_id:', dr.purchase_order_id?.slice(0, 8), '- using fallback:', orderNumber);
             }
           }
           
@@ -684,6 +715,9 @@ export const useDeliveryProviderData = () => {
             order_number: orderNumber
           });
         });
+        const withRealNumbers = allActiveDeliveries.filter((d: any) => d.order_number && (!d.order_number.startsWith('PO-') || (d.order_number.startsWith('PO-') && d.order_number.length > 11))).length;
+        console.log('✅ Processed', activeData.length, 'delivery_requests,', allActiveDeliveries.filter((d: any) => d.order_number).length, 'with order_number,', withRealNumbers, 'with real po_number (not fallback)');
+      }
         console.log('✅ Processed', activeData.length, 'delivery_requests,', allActiveDeliveries.filter((d: any) => d.order_number).length, 'with order_number');
       }
       
