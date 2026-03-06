@@ -537,23 +537,40 @@ export const useDeliveryProviderData = () => {
             
             // Filter active deliveries AND filter by provider_id (client-side safety check)
             // First, get the delivery_provider.id for this user_id to match against provider_id
+            // Add timeout to prevent blocking
             let providerIdToMatch: string | null = null;
             try {
               console.log('🔍 Looking up delivery_provider for userId:', userId.substring(0, 8));
-              const { data: deliveryProvider, error: dpError } = await supabase
+              
+              // Add 2 second timeout to provider lookup
+              const providerLookupPromise = supabase
                 .from('delivery_providers')
                 .select('id')
                 .eq('user_id', userId)
                 .single();
               
+              const providerTimeoutPromise = new Promise<never>((_, reject) => 
+                setTimeout(() => reject(new Error('Provider lookup timeout')), 2000)
+              );
+              
+              const { data: deliveryProvider, error: dpError } = await Promise.race([
+                providerLookupPromise,
+                providerTimeoutPromise
+              ]).catch((e: any) => {
+                console.warn('⚠️ Provider lookup timed out or failed:', e?.message || e);
+                return { data: null, error: e };
+              }) as any;
+              
               if (dpError) {
                 console.warn('⚠️ Error fetching delivery_provider.id:', dpError.message);
-              } else {
+              } else if (deliveryProvider) {
                 providerIdToMatch = deliveryProvider?.id || null;
                 console.log('🔍 Delivery provider lookup:', { 
                   userId: userId.substring(0, 8), 
                   providerId: providerIdToMatch?.substring(0, 8) || 'NULL' 
                 });
+              } else {
+                console.log('🔍 No delivery_provider found for userId:', userId.substring(0, 8));
               }
             } catch (e: any) {
               console.warn('⚠️ Exception fetching delivery_provider.id:', e?.message || e);
