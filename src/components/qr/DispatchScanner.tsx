@@ -955,7 +955,7 @@ export const DispatchScanner: React.FC = () => {
 
       const scannerConfig = {
         fps: 10,
-        qrbox: { width: 250, height: 250 },
+        qrbox: { width: 400, height: 400 },
         rememberLastUsedCamera: true,
         supportedScanTypes: [],
         formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
@@ -2022,11 +2022,11 @@ export const DispatchScanner: React.FC = () => {
             )}
             
             {/* Camera View - Larger and more prominent */}
-            <div className="relative bg-black rounded-xl overflow-hidden" style={{ minHeight: '350px' }}>
+            <div className="relative bg-black rounded-xl overflow-hidden" style={{ minHeight: '600px' }}>
               <div 
                 id={scannerContainerId} 
                 className="w-full"
-                style={{ minHeight: '350px' }}
+                style={{ minHeight: '600px' }}
               />
               
               {!isScanning && !cameraError && (
