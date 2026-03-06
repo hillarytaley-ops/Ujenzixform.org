@@ -645,11 +645,21 @@ export const useDeliveryProviderData = () => {
             console.log(`🔍 Querying purchase_orders for batch ${Math.floor(i/batchSize) + 1}:`, batch.length, 'IDs using Supabase client');
             
             try {
-              const { data: poNumbers, error: poError } = await supabase
+              // Add timeout to prevent hanging
+              const timeoutPromise = new Promise<never>((_, reject) => {
+                setTimeout(() => reject(new Error('Query timeout after 5 seconds')), 5000);
+              });
+              
+              const queryPromise = supabase
                 .from('purchase_orders')
                 .select('id, po_number')
                 .in('id', batch)
                 .limit(100);
+              
+              const { data: poNumbers, error: poError } = await Promise.race([
+                queryPromise,
+                timeoutPromise
+              ]) as any;
               
               if (poError) {
                 console.error(`❌ Batch ${Math.floor(i/batchSize) + 1} error:`, poError.message);
@@ -675,6 +685,10 @@ export const useDeliveryProviderData = () => {
               }
             } catch (e: any) {
               console.error(`❌ Batch ${Math.floor(i/batchSize) + 1} exception:`, e.message);
+              if (e.message.includes('timeout')) {
+                console.error('   ⏱️ Query timed out - RLS policy may be blocking or table may not exist');
+                console.error('   💡 Solution: Run migration 20260305_add_delivery_provider_purchase_orders_access.sql');
+              }
             }
           }
           console.log('✅ Total: Fetched order numbers for', poNumberMap.size, 'out of', uniquePOIds.length, 'purchase orders');

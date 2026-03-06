@@ -294,13 +294,20 @@ export class OrderService {
           .eq('id', orderId);
       }
 
-      // Log status change
-      await supabase.from('order_status_history').insert({
-        order_id: orderId,
-        status,
-        notes,
-        created_at: new Date().toISOString()
-      } as any);
+      // Log status change (optional - table may not exist)
+      try {
+        await supabase.from('order_status_history').insert({
+          order_id: orderId,
+          status,
+          notes,
+          created_at: new Date().toISOString()
+        } as any);
+      } catch (historyError: any) {
+        // Silently fail if table doesn't exist - not critical
+        if (!historyError.message?.includes('does not exist')) {
+          console.warn('Failed to log order status history:', historyError.message);
+        }
+      }
 
       return { success: true };
     } catch (error: any) {

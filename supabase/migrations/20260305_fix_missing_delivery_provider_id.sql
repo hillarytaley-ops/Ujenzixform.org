@@ -150,10 +150,22 @@ BEGIN
                 updated_at = NOW()
             WHERE id = po_id;
             
-            -- Log the status change
-            INSERT INTO order_status_history (order_id, status, notes, created_at)
-            VALUES (po_id, NEW.status, 'Delivery provider ' || NEW.status || ' - ' || v_provider_name, NOW())
-            ON CONFLICT DO NOTHING;
+            -- Log the status change (optional - table may not exist)
+            BEGIN
+                INSERT INTO order_status_history (order_id, status, notes, created_at)
+                VALUES (po_id, NEW.status, 'Delivery provider ' || NEW.status || ' - ' || v_provider_name, NOW())
+                ON CONFLICT DO NOTHING;
+            EXCEPTION WHEN OTHERS THEN
+                -- Table may not exist or other error - silently skip to avoid breaking the trigger
+                -- Check if it's a "table does not exist" error
+                IF SQLERRM LIKE '%does not exist%' OR SQLERRM LIKE '%relation%' THEN
+                    -- Table doesn't exist - this is OK, just skip
+                    NULL;
+                ELSE
+                    -- Other error - log warning but don't fail
+                    RAISE WARNING 'Failed to insert into order_status_history: %', SQLERRM;
+                END IF;
+            END;
         END IF;
     END IF;
     
