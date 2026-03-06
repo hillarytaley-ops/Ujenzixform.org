@@ -742,8 +742,6 @@ export const useDeliveryProviderData = () => {
         const withRealNumbers = allActiveDeliveries.filter((d: any) => d.order_number && (!d.order_number.startsWith('PO-') || (d.order_number.startsWith('PO-') && d.order_number.length > 11))).length;
         console.log('✅ Processed', activeData.length, 'delivery_requests,', allActiveDeliveries.filter((d: any) => d.order_number).length, 'with order_number,', withRealNumbers, 'with real po_number (not fallback)');
       }
-        console.log('✅ Processed', activeData.length, 'delivery_requests,', allActiveDeliveries.filter((d: any) => d.order_number).length, 'with order_number');
-      }
       
       // Add purchase_orders (convert to delivery_requests format)
       // Use enrichedPurchaseOrders if available, otherwise use purchaseOrdersData (basic data)
