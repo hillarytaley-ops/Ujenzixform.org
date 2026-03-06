@@ -221,6 +221,14 @@ const DeliveryDashboard = () => {
       }));
       setActiveDeliveries(formattedActive);
       console.log('🚚 Active deliveries loaded:', formattedActive.length, 'Statuses:', formattedActive.map(d => d.status));
+      
+      // Log order numbers for debugging
+      const withOrderNumbers = formattedActive.filter(d => d.order_number).length;
+      const orderNumbers = formattedActive.filter(d => d.order_number).map(d => ({ id: d.id.slice(0, 8), order_number: d.order_number }));
+      console.log('📋 Order numbers in active deliveries:', withOrderNumbers, 'out of', formattedActive.length);
+      if (orderNumbers.length > 0) {
+        console.log('📋 Sample order numbers:', orderNumbers.slice(0, 3));
+      }
     } else {
       // Ensure empty array if no data
       setActiveDeliveries([]);
@@ -1191,13 +1199,25 @@ const DeliveryDashboard = () => {
                                 <div className="space-y-4">
                                   {/* Delivery Header */}
                                   <div className="flex items-start justify-between">
-                                    <div>
-                                      <h3 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                                        {delivery.material_type}
-                                      </h3>
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <h3 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                                          {delivery.material_type}
+                                        </h3>
+                                        {delivery.order_number && (
+                                          <span className={`text-sm font-semibold px-2 py-1 rounded ${isDarkMode ? 'bg-blue-900 text-blue-300' : 'bg-blue-100 text-blue-700'}`}>
+                                            Order: {delivery.order_number}
+                                          </span>
+                                        )}
+                                      </div>
                                       <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                                         Being delivered to: {delivery.delivery_location}
                                       </p>
+                                      {delivery.purchase_order_id && !delivery.order_number && (
+                                        <p className={`text-xs mt-1 ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'}`}>
+                                          ⚠️ Order number not available (PO ID: {delivery.purchase_order_id.slice(0, 8)}...)
+                                        </p>
+                                      )}
                                     </div>
                                     <Badge className="bg-purple-100 text-purple-700 border-purple-300">
                                       <Truck className="h-3 w-3 mr-1" />
