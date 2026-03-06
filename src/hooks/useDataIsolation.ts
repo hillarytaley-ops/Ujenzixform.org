@@ -636,47 +636,45 @@ export const useDeliveryProviderData = () => {
       let poNumberMap = new Map<string, string>();
       if (uniquePOIds.length > 0) {
         try {
-          // Query purchase_orders to get po_numbers - use PostgREST 'in' filter properly
-          // Split into batches if too many IDs (PostgREST has URL length limits)
+          // Use Supabase client instead of direct fetch - better RLS handling
+          // Split into batches if too many IDs
           const batchSize = 50;
           for (let i = 0; i < uniquePOIds.length; i += batchSize) {
             const batch = uniquePOIds.slice(i, i + batchSize);
-            // PostgREST 'in' filter format: id=in.(uuid1,uuid2,uuid3)
-            // UUIDs need to be properly formatted
-            const idsFilter = batch.map(id => `"${id}"`).join(',');
-            const queryUrl = `${SUPABASE_URL}/rest/v1/purchase_orders?id=in.(${idsFilter})&select=id,po_number&limit=100`;
             
-            console.log(`🔍 Querying purchase_orders for batch ${Math.floor(i/batchSize) + 1}:`, batch.length, 'IDs');
-            console.log(`   Query URL (truncated): ${queryUrl.substring(0, 200)}...`);
+            console.log(`🔍 Querying purchase_orders for batch ${Math.floor(i/batchSize) + 1}:`, batch.length, 'IDs using Supabase client');
             
-            const poNumbersResponse = await fetch(queryUrl, {
-              headers: {
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json'
-              },
-              cache: 'no-store'
-            });
-            
-            if (poNumbersResponse.ok) {
-              const poNumbers = await poNumbersResponse.json();
-              console.log(`✅ Batch ${Math.floor(i/batchSize) + 1}: Received ${poNumbers.length} purchase orders from API`);
-              poNumbers.forEach((po: any) => {
-                if (po.id) {
-                  // Only use actual po_number from database, don't generate fallback here
-                  // Fallback will be generated later if needed
-                  if (po.po_number && po.po_number.trim() !== '') {
-                    poNumberMap.set(po.id, po.po_number);
-                    console.log('📋 Found po_number for', po.id.slice(0, 8), ':', po.po_number);
-                  } else {
-                    console.warn('⚠️ po_number is missing or empty for purchase_order:', po.id.slice(0, 8), '- purchase order exists but has no po_number!');
-                  }
+            try {
+              const { data: poNumbers, error: poError } = await supabase
+                .from('purchase_orders')
+                .select('id, po_number')
+                .in('id', batch)
+                .limit(100);
+              
+              if (poError) {
+                console.error(`❌ Batch ${Math.floor(i/batchSize) + 1} error:`, poError.message);
+                // If RLS error, log it specifically
+                if (poError.message.includes('policy') || poError.message.includes('permission') || poError.message.includes('RLS')) {
+                  console.error('   ⚠️ RLS POLICY ISSUE: Delivery provider may not have access to purchase_orders');
+                  console.error('   💡 Solution: Run migration 20260305_add_delivery_provider_purchase_orders_access.sql');
                 }
-              });
-            } else {
-              const errorText = await poNumbersResponse.text();
-              console.error('❌ Failed to fetch order numbers for batch:', poNumbersResponse.status, errorText);
-              console.error('   Query was:', queryUrl.substring(0, 300));
+              } else if (poNumbers) {
+                console.log(`✅ Batch ${Math.floor(i/batchSize) + 1}: Received ${poNumbers.length} purchase orders from Supabase`);
+                poNumbers.forEach((po: any) => {
+                  if (po.id) {
+                    // Only use actual po_number from database, don't generate fallback here
+                    // Fallback will be generated later if needed
+                    if (po.po_number && po.po_number.trim() !== '') {
+                      poNumberMap.set(po.id, po.po_number);
+                      console.log('📋 Found po_number for', po.id.slice(0, 8), ':', po.po_number);
+                    } else {
+                      console.warn('⚠️ po_number is missing or empty for purchase_order:', po.id.slice(0, 8), '- purchase order exists but has no po_number!');
+                    }
+                  }
+                });
+              }
+            } catch (e: any) {
+              console.error(`❌ Batch ${Math.floor(i/batchSize) + 1} exception:`, e.message);
             }
           }
           console.log('✅ Total: Fetched order numbers for', poNumberMap.size, 'out of', uniquePOIds.length, 'purchase orders');
