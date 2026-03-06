@@ -4,9 +4,11 @@
 -- Created: March 5, 2026
 -- ============================================================
 
--- Drop existing policy
+-- Drop existing policies (both old and new names)
 DROP POLICY IF EXISTS "Delivery providers can view pending requests" ON delivery_requests;
 DROP POLICY IF EXISTS "Delivery providers can update requests" ON delivery_requests;
+DROP POLICY IF EXISTS "Delivery providers can view assigned requests" ON delivery_requests;
+DROP POLICY IF EXISTS "Delivery providers can update assigned requests" ON delivery_requests;
 
 -- Policy 1: Delivery providers can view requests assigned to them
 -- Handles both cases: provider_id = auth.uid() OR provider_id = delivery_providers.id where user_id = auth.uid()
