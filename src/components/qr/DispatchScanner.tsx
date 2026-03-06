@@ -265,74 +265,64 @@ export const DispatchScanner: React.FC = () => {
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
         
         // Helper function to get fresh access token with refresh
-        // Try localStorage FIRST to avoid auth.getSession() timeout
+        // Checks expiration and refreshes if needed
         const getFreshAccessToken = async (): Promise<string> => {
-          // First, try localStorage (fastest, no network call)
+          // First, check localStorage but verify expiration
           try {
             const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
             if (stored) {
               const parsed = JSON.parse(stored);
               if (parsed.access_token) {
-                console.log('📦 Using token from localStorage (fast path)');
-                return parsed.access_token;
-              }
-            }
-          } catch (e) {
-            console.warn('⚠️ Could not get token from localStorage:', e);
-          }
-          
-          // If localStorage doesn't have token, try session with timeout
-          try {
-            const { data: { session }, error: sessionError } = await withTimeout(
-              supabase.auth.getSession(),
-              2000
-            );
-            
-            if (session?.access_token && !sessionError) {
-              // Check if token is expired (with 5 minute buffer)
-              const tokenExp = session.expires_at ? new Date(session.expires_at * 1000) : null;
-              const now = new Date();
-              const buffer = 5 * 60 * 1000; // 5 minutes
-              
-              if (tokenExp && tokenExp.getTime() > now.getTime() + buffer) {
-                // Token is still valid
-                return session.access_token;
-              } else {
-                // Token is expired or expiring soon, refresh it
-                console.log('🔄 Token expired or expiring soon, refreshing...');
-                try {
-                  const { data: { session: newSession }, error: refreshError } = await withTimeout(
-                    supabase.auth.refreshSession(),
-                    2000
-                  );
-                  
-                  if (newSession?.access_token && !refreshError) {
-                    console.log('✅ Token refreshed successfully');
-                    return newSession.access_token;
-                  } else {
-                    console.warn('⚠️ Token refresh failed, using localStorage...', refreshError);
-                  }
-                } catch (refreshErr) {
-                  console.warn('⚠️ Token refresh timeout, using localStorage...');
+                // Check if token is expired (with 5 minute buffer)
+                const tokenExp = parsed.expires_at ? new Date(parsed.expires_at * 1000) : null;
+                const now = new Date();
+                const buffer = 5 * 60 * 1000; // 5 minutes
+                
+                if (tokenExp && tokenExp.getTime() > now.getTime() + buffer) {
+                  // Token is still valid
+                  console.log('📦 Using token from localStorage (valid)');
+                  return parsed.access_token;
+                } else {
+                  // Token is expired, need to refresh
+                  console.log('🔄 Token in localStorage is expired, refreshing...');
                 }
               }
             }
           } catch (e) {
-            console.warn('⚠️ Error getting session (timeout expected), using localStorage...');
+            console.warn('⚠️ Could not get token from localStorage:', e);
           }
           
-          // Fallback to localStorage again (in case session had token but we couldn't check expiry)
+          // Token is expired or missing, refresh it
           try {
-            const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-            if (stored) {
-              const parsed = JSON.parse(stored);
-              if (parsed.access_token) {
-                console.log('📦 Using token from localStorage (fallback)');
-                return parsed.access_token;
+            console.log('🔄 Refreshing session...');
+            const { data: { session }, error: sessionError } = await withTimeout(
+              supabase.auth.getSession(), // This auto-refreshes expired tokens
+              5000 // Increased timeout for refresh
+            );
+            
+            if (session?.access_token && !sessionError) {
+              // Update localStorage with fresh token
+              try {
+                const sessionData = {
+                  access_token: session.access_token,
+                  refresh_token: session.refresh_token,
+                  expires_at: session.expires_at,
+                  expires_in: session.expires_in,
+                  token_type: session.token_type,
+                  user: session.user
+                };
+                localStorage.setItem('sb-wuuyjjpgzgeimiptuuws-auth-token', JSON.stringify(sessionData));
+                console.log('✅ Token refreshed and saved to localStorage');
+              } catch (e) {
+                console.warn('⚠️ Could not save refreshed token to localStorage:', e);
               }
+              
+              return session.access_token;
+            } else {
+              console.warn('⚠️ Session refresh failed:', sessionError);
             }
           } catch (e) {
-            console.warn('⚠️ Could not get token from localStorage:', e);
+            console.warn('⚠️ Error refreshing session:', e);
           }
           
           // Final fallback: anon key
@@ -514,66 +504,63 @@ export const DispatchScanner: React.FC = () => {
       const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
       
       // Helper function to get fresh access token with refresh
-      // Try localStorage FIRST to avoid auth.getSession() timeout
+      // Checks expiration and refreshes if needed
       const getFreshAccessToken = async (): Promise<string> => {
-        // First, try localStorage (fastest, no network call)
+        // First, check localStorage but verify expiration
         try {
           const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
           if (stored) {
             const parsed = JSON.parse(stored);
             if (parsed.access_token) {
-              return parsed.access_token;
+              // Check if token is expired (with 5 minute buffer)
+              const tokenExp = parsed.expires_at ? new Date(parsed.expires_at * 1000) : null;
+              const now = new Date();
+              const buffer = 5 * 60 * 1000; // 5 minutes
+              
+              if (tokenExp && tokenExp.getTime() > now.getTime() + buffer) {
+                // Token is still valid
+                return parsed.access_token;
+              } else {
+                // Token is expired, need to refresh
+                console.log('🔄 Token in localStorage is expired, refreshing...');
+              }
             }
           }
         } catch (e) {
           console.warn('⚠️ Could not get token from localStorage:', e);
         }
         
-        // If localStorage doesn't have token, try session with timeout
+        // Token is expired or missing, refresh it
         try {
+          console.log('🔄 Refreshing session...');
           const { data: { session }, error: sessionError } = await withTimeout(
-            supabase.auth.getSession(),
-            2000
+            supabase.auth.getSession(), // This auto-refreshes expired tokens
+            5000 // Increased timeout for refresh
           );
           
           if (session?.access_token && !sessionError) {
-            // Check if token is expired (with 5 minute buffer)
-            const tokenExp = session.expires_at ? new Date(session.expires_at * 1000) : null;
-            const now = new Date();
-            const buffer = 5 * 60 * 1000; // 5 minutes
-            
-            if (tokenExp && tokenExp.getTime() > now.getTime() + buffer) {
-              // Token is still valid
-              return session.access_token;
-            } else {
-              // Token is expired or expiring soon, refresh it
-              console.log('🔄 Token expired or expiring soon, refreshing...');
-              try {
-                const { data: { session: newSession }, error: refreshError } = await withTimeout(
-                  supabase.auth.refreshSession(),
-                  2000
-                );
-                
-                if (newSession?.access_token && !refreshError) {
-                  console.log('✅ Token refreshed successfully');
-                  return newSession.access_token;
-                } else {
-                  console.warn('⚠️ Token refresh failed, using localStorage...', refreshError);
-                }
-              } catch (refreshErr) {
-                console.warn('⚠️ Token refresh timeout, using localStorage...');
-              }
+            // Update localStorage with fresh token
+            try {
+              const sessionData = {
+                access_token: session.access_token,
+                refresh_token: session.refresh_token,
+                expires_at: session.expires_at,
+                expires_in: session.expires_in,
+                token_type: session.token_type,
+                user: session.user
+              };
+              localStorage.setItem('sb-wuuyjjpgzgeimiptuuws-auth-token', JSON.stringify(sessionData));
+              console.log('✅ Token refreshed and saved to localStorage');
+            } catch (e) {
+              console.warn('⚠️ Could not save refreshed token to localStorage:', e);
             }
+            
+            return session.access_token;
+          } else {
+            console.warn('⚠️ Session refresh failed:', sessionError);
           }
         } catch (e) {
-          console.warn('⚠️ Error getting session (timeout expected), using localStorage...');
-        }
-        
-        // Fallback to localStorage again (in case session had token but we couldn't check expiry)
-      const stored = getUserFromStorage();
-      if (stored?.accessToken) {
-          console.log('📦 Using token from localStorage (fallback)');
-          return stored.accessToken;
+          console.warn('⚠️ Error refreshing session:', e);
         }
         
         // Final fallback: anon key
@@ -1122,54 +1109,75 @@ export const DispatchScanner: React.FC = () => {
         // Helper function to get fresh access token with refresh
         const getFreshAccessToken = async (): Promise<string> => {
           try {
-            // First, try to get current session
+            // First, try to get current session (auto-refreshes if expired)
             const { data: { session }, error: sessionError } = await supabase.auth.getSession();
             
             if (session?.access_token && !sessionError) {
-              // Check if token is expired (with 5 minute buffer)
-              const tokenExp = session.expires_at ? new Date(session.expires_at * 1000) : null;
-              const now = new Date();
-              const buffer = 5 * 60 * 1000; // 5 minutes
-              
-              if (tokenExp && tokenExp.getTime() > now.getTime() + buffer) {
-                // Token is still valid
-                return session.access_token;
-              } else {
-                // Token is expired or expiring soon, refresh it
-                console.log('🔄 Token expired or expiring soon, refreshing...');
-                const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
-                
-                if (newSession?.access_token && !refreshError) {
-                  console.log('✅ Token refreshed successfully');
-                  return newSession.access_token;
-                } else {
-                  console.warn('⚠️ Token refresh failed, trying localStorage...', refreshError);
-                }
+              // Update localStorage with fresh token
+              try {
+                const sessionData = {
+                  access_token: session.access_token,
+                  refresh_token: session.refresh_token,
+                  expires_at: session.expires_at,
+                  expires_in: session.expires_in,
+                  token_type: session.token_type,
+                  user: session.user
+                };
+                localStorage.setItem('sb-wuuyjjpgzgeimiptuuws-auth-token', JSON.stringify(sessionData));
+                console.log('✅ Got fresh token from session and saved to localStorage');
+              } catch (e) {
+                console.warn('⚠️ Could not save token to localStorage:', e);
               }
+              
+              return session.access_token;
             } else {
               // No session, try to refresh
               console.log('🔄 No session found, attempting refresh...');
               const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
               
               if (newSession?.access_token && !refreshError) {
-                console.log('✅ Session refreshed successfully');
+                // Update localStorage with refreshed token
+                try {
+                  const sessionData = {
+                    access_token: newSession.access_token,
+                    refresh_token: newSession.refresh_token,
+                    expires_at: newSession.expires_at,
+                    expires_in: newSession.expires_in,
+                    token_type: newSession.token_type,
+                    user: newSession.user
+                  };
+                  localStorage.setItem('sb-wuuyjjpgzgeimiptuuws-auth-token', JSON.stringify(sessionData));
+                  console.log('✅ Session refreshed and saved to localStorage');
+                } catch (e) {
+                  console.warn('⚠️ Could not save refreshed token to localStorage:', e);
+                }
+                
                 return newSession.access_token;
               } else {
-                console.warn('⚠️ Session refresh failed, trying localStorage...', refreshError);
+                console.warn('⚠️ Session refresh failed:', refreshError);
               }
             }
           } catch (e) {
             console.warn('⚠️ Error getting/refreshing session:', e);
           }
           
-          // Fallback to localStorage
+          // Fallback to localStorage (only if session refresh failed)
           try {
             const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
             if (stored) {
               const parsed = JSON.parse(stored);
               if (parsed.access_token) {
-                console.log('📦 Using token from localStorage');
-                return parsed.access_token;
+                // Check if token is expired
+                const tokenExp = parsed.expires_at ? new Date(parsed.expires_at * 1000) : null;
+                const now = new Date();
+                const buffer = 5 * 60 * 1000; // 5 minutes
+                
+                if (tokenExp && tokenExp.getTime() > now.getTime() + buffer) {
+                  console.log('📦 Using token from localStorage (valid)');
+                  return parsed.access_token;
+                } else {
+                  console.warn('⚠️ Token in localStorage is expired, cannot use');
+                }
               }
             }
           } catch (e) {
