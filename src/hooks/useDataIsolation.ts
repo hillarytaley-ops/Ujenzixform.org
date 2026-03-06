@@ -671,6 +671,33 @@ export const useDeliveryProviderData = () => {
       const activeData: any[] = deliveryRequestsResult.status === 'fulfilled' ? (deliveryRequestsResult.value || []) : [];
       let purchaseOrdersData: any[] = purchaseOrdersResult.status === 'fulfilled' ? (purchaseOrdersResult.value || []) : [];
       
+      // Log results immediately - BEFORE po_number fetching
+      console.log('📦 IMMEDIATE RESULTS (before po_number fetch):', {
+        deliveryRequestsCount: activeData.length,
+        purchaseOrdersCount: purchaseOrdersData.length,
+        deliveryRequestStatuses: activeData.reduce((acc: any, d: any) => {
+          acc[d.status] = (acc[d.status] || 0) + 1;
+          return acc;
+        }, {}),
+        sampleDeliveryRequests: activeData.slice(0, 3).map((d: any) => ({
+          id: d.id?.substring(0, 8),
+          status: d.status,
+          provider_id: d.provider_id?.substring(0, 8),
+          purchase_order_id: d.purchase_order_id?.substring(0, 8)
+        }))
+      });
+      
+      // Set deliveries immediately with fallback order numbers (so they show up even if po_number fetch times out)
+      const immediateDeliveries = activeData.map((dr: any) => ({
+        ...dr,
+        order_number: dr.po_number_from_join || (dr.purchase_order_id ? `PO-${dr.purchase_order_id.slice(0, 8).toUpperCase()}` : null),
+        source: 'delivery_requests'
+      }));
+      console.log('📦 Setting deliveries immediately (with fallback order numbers):', immediateDeliveries.length);
+      setActiveDeliveries(immediateDeliveries);
+      setLoading(false); // Clear loading state so UI updates immediately
+      clearTimeout(safetyTimeout); // Clear safety timeout since we've set the data
+      
       if (deliveryRequestsResult.status === 'rejected') {
         console.warn('⚠️ delivery_requests fetch failed:', deliveryRequestsResult.reason);
       }
@@ -696,16 +723,28 @@ export const useDeliveryProviderData = () => {
         try {
           // Use Supabase client instead of direct fetch - better RLS handling
           // Split into batches if too many IDs
+          // Add overall timeout to po_number fetching (max 8 seconds total)
+          const poNumberFetchStartTime = Date.now();
+          const maxPoNumberFetchTime = 8000; // 8 seconds max
+          
           const batchSize = 50;
+          let batchesProcessed = 0;
           for (let i = 0; i < uniquePOIds.length; i += batchSize) {
-            const batch = uniquePOIds.slice(i, i + batchSize);
+            // Check if we've exceeded the max time
+            if (Date.now() - poNumberFetchStartTime > maxPoNumberFetchTime) {
+              console.warn('⏱️ po_number fetching exceeded max time, skipping remaining batches');
+              break;
+            }
             
-            console.log(`🔍 Querying purchase_orders for batch ${Math.floor(i/batchSize) + 1}:`, batch.length, 'IDs using Supabase client');
+            const batch = uniquePOIds.slice(i, i + batchSize);
+            batchesProcessed++;
+            
+            console.log(`🔍 Querying purchase_orders for batch ${batchesProcessed}:`, batch.length, 'IDs using Supabase client');
             
             try {
-              // Add timeout to prevent hanging
+              // Add timeout to prevent hanging (reduced to 3 seconds per batch)
               const timeoutPromise = new Promise<never>((_, reject) => {
-                setTimeout(() => reject(new Error('Query timeout after 5 seconds')), 5000);
+                setTimeout(() => reject(new Error('Query timeout after 3 seconds')), 3000);
               });
               
               const queryPromise = supabase
