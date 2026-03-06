@@ -466,7 +466,8 @@ export const useDeliveryProviderData = () => {
                 d.status !== 'completed' && 
                 d.status !== 'cancelled'
               );
-              console.log('📦 delivery_requests: Found', allDeliveries.length, 'total,', filtered.length, 'active');
+              const withPOId = filtered.filter((d: any) => d.purchase_order_id).length;
+              console.log('📦 delivery_requests: Found', allDeliveries.length, 'total,', filtered.length, 'active,', withPOId, 'with purchase_order_id');
               return filtered;
             } else {
               const errorText = await activeResponse.text();
@@ -567,11 +568,16 @@ export const useDeliveryProviderData = () => {
         .filter((dr: any) => dr.purchase_order_id)
         .map((dr: any) => dr.purchase_order_id);
       
+      // Remove duplicates
+      const uniquePOIds = [...new Set(deliveryRequestPOIds)];
+      console.log('🔍 Found', uniquePOIds.length, 'unique purchase_order_ids from delivery_requests');
+      
       let poNumberMap = new Map<string, string>();
-      if (deliveryRequestPOIds.length > 0) {
+      if (uniquePOIds.length > 0) {
         try {
+          // Query purchase_orders to get po_numbers
           const poNumbersResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/purchase_orders?id=in.(${deliveryRequestPOIds.join(',')})&select=id,po_number&limit=100`,
+            `${SUPABASE_URL}/rest/v1/purchase_orders?id=in.(${uniquePOIds.join(',')})&select=id,po_number&limit=100`,
             {
               headers: {
                 'apikey': SUPABASE_ANON_KEY,
@@ -585,11 +591,16 @@ export const useDeliveryProviderData = () => {
           if (poNumbersResponse.ok) {
             const poNumbers = await poNumbersResponse.json();
             poNumbers.forEach((po: any) => {
-              if (po.id && po.po_number) {
-                poNumberMap.set(po.id, po.po_number);
+              if (po.id) {
+                // Use po_number if available, otherwise generate fallback
+                const orderNum = po.po_number || `PO-${po.id.slice(0, 8).toUpperCase()}`;
+                poNumberMap.set(po.id, orderNum);
               }
             });
-            console.log('✅ Fetched order numbers for', poNumberMap.size, 'delivery requests');
+            console.log('✅ Fetched order numbers for', poNumberMap.size, 'out of', uniquePOIds.length, 'purchase orders');
+          } else {
+            const errorText = await poNumbersResponse.text();
+            console.warn('⚠️ Failed to fetch order numbers:', poNumbersResponse.status, errorText);
           }
         } catch (e) {
           console.warn('⚠️ Could not fetch order numbers (non-critical):', e);
@@ -615,9 +626,14 @@ export const useDeliveryProviderData = () => {
       if (activeData) {
         activeData.forEach((dr: any) => {
           // Get order number from purchase_order if available
-          const orderNumber = dr.purchase_order_id 
-            ? (poNumberMap.get(dr.purchase_order_id) || `PO-${dr.purchase_order_id.slice(0, 8).toUpperCase()}`)
-            : null;
+          let orderNumber = null;
+          if (dr.purchase_order_id) {
+            orderNumber = poNumberMap.get(dr.purchase_order_id);
+            if (!orderNumber) {
+              // Fallback: generate from purchase_order_id
+              orderNumber = `PO-${dr.purchase_order_id.slice(0, 8).toUpperCase()}`;
+            }
+          }
           
           allActiveDeliveries.push({
             ...dr,
@@ -626,6 +642,7 @@ export const useDeliveryProviderData = () => {
             order_number: orderNumber
           });
         });
+        console.log('✅ Processed', activeData.length, 'delivery_requests,', allActiveDeliveries.filter((d: any) => d.order_number).length, 'with order_number');
       }
       
       // Add purchase_orders (convert to delivery_requests format)
@@ -637,7 +654,12 @@ export const useDeliveryProviderData = () => {
         purchaseOrdersToProcess.forEach((po: any) => {
           // Check if this purchase_order already exists in delivery_requests
           const existing = allActiveDeliveries.find(d => d.purchase_order_id === po.id);
-          if (!existing) {
+          if (existing) {
+            // Update existing entry with order_number if missing
+            if (!existing.order_number && po.po_number) {
+              existing.order_number = po.po_number;
+            }
+          } else {
             allActiveDeliveries.push({
               id: po.id,
               purchase_order_id: po.id,
@@ -665,6 +687,24 @@ export const useDeliveryProviderData = () => {
         });
         console.log('✅ Added', purchaseOrdersToProcess.length, 'purchase orders to active deliveries');
       }
+      
+      // Final pass: Ensure all entries with purchase_order_id have order_number
+      allActiveDeliveries.forEach((delivery: any) => {
+        if (delivery.purchase_order_id && !delivery.order_number) {
+          // Try to get from poNumberMap first
+          const orderNum = poNumberMap.get(delivery.purchase_order_id);
+          if (orderNum) {
+            delivery.order_number = orderNum;
+          } else {
+            // Fallback: generate from purchase_order_id
+            delivery.order_number = `PO-${delivery.purchase_order_id.slice(0, 8).toUpperCase()}`;
+          }
+        }
+      });
+      
+      // Log order numbers for debugging
+      const withOrderNumbers = allActiveDeliveries.filter((d: any) => d.order_number).length;
+      console.log('📋 Order numbers assigned:', withOrderNumbers, 'out of', allActiveDeliveries.length, 'deliveries');
       
       console.log('📦 Active deliveries loaded:', {
         from_delivery_requests: activeData?.length || 0,
