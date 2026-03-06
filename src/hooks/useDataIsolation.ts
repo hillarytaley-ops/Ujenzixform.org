@@ -592,9 +592,14 @@ export const useDeliveryProviderData = () => {
             const poNumbers = await poNumbersResponse.json();
             poNumbers.forEach((po: any) => {
               if (po.id) {
-                // Use po_number if available, otherwise generate fallback
-                const orderNum = po.po_number || `PO-${po.id.slice(0, 8).toUpperCase()}`;
-                poNumberMap.set(po.id, orderNum);
+                // Only use actual po_number from database, don't generate fallback here
+                // Fallback will be generated later if needed
+                if (po.po_number && po.po_number.trim() !== '') {
+                  poNumberMap.set(po.id, po.po_number);
+                  console.log('📋 Found po_number for', po.id.slice(0, 8), ':', po.po_number);
+                } else {
+                  console.warn('⚠️ po_number is missing or empty for purchase_order:', po.id.slice(0, 8));
+                }
               }
             });
             console.log('✅ Fetched order numbers for', poNumberMap.size, 'out of', uniquePOIds.length, 'purchase orders');
@@ -607,10 +612,14 @@ export const useDeliveryProviderData = () => {
         }
       }
       
-      // Also add po_numbers from purchaseOrdersData
+      // Also add po_numbers from purchaseOrdersData (prioritize actual po_number)
       purchaseOrdersData.forEach((po: any) => {
-        if (po.id && po.po_number) {
-          poNumberMap.set(po.id, po.po_number);
+        if (po.id && po.po_number && po.po_number.trim() !== '') {
+          // Only set if not already in map, or if this is a better value
+          if (!poNumberMap.has(po.id) || poNumberMap.get(po.id)?.startsWith('PO-')) {
+            poNumberMap.set(po.id, po.po_number);
+            console.log('📋 Added po_number from purchaseOrdersData for', po.id.slice(0, 8), ':', po.po_number);
+          }
         }
       });
       
@@ -629,9 +638,14 @@ export const useDeliveryProviderData = () => {
           let orderNumber = null;
           if (dr.purchase_order_id) {
             orderNumber = poNumberMap.get(dr.purchase_order_id);
-            if (!orderNumber) {
-              // Fallback: generate from purchase_order_id
+            // Only use fallback if we truly don't have a po_number
+            // This means the po_number wasn't found in the database
+            if (!orderNumber || orderNumber.trim() === '') {
+              console.warn('⚠️ No po_number found for purchase_order_id:', dr.purchase_order_id.slice(0, 8), '- using fallback');
+              // Fallback: generate from purchase_order_id (only as last resort)
               orderNumber = `PO-${dr.purchase_order_id.slice(0, 8).toUpperCase()}`;
+            } else {
+              console.log('✅ Using actual po_number:', orderNumber, 'for delivery_request:', dr.id.slice(0, 8));
             }
           }
           
@@ -655,15 +669,20 @@ export const useDeliveryProviderData = () => {
           // Check if this purchase_order already exists in delivery_requests
           const existing = allActiveDeliveries.find(d => d.purchase_order_id === po.id);
           if (existing) {
-            // Update existing entry with order_number if missing
-            if (!existing.order_number && po.po_number) {
+            // Update existing entry with order_number if missing (use actual po_number, not fallback)
+            if (!existing.order_number && po.po_number && po.po_number.trim() !== '') {
               existing.order_number = po.po_number;
+              console.log('✅ Updated existing entry with po_number:', po.po_number);
+            } else if (!existing.order_number) {
+              // Only use fallback if po_number is truly missing
+              existing.order_number = `PO-${po.id.slice(0, 8).toUpperCase()}`;
+              console.warn('⚠️ Using fallback order number for purchase_order:', po.id.slice(0, 8));
             }
           } else {
             allActiveDeliveries.push({
               id: po.id,
               purchase_order_id: po.id,
-              order_number: po.po_number || `PO-${po.id.slice(0, 8).toUpperCase()}`,
+              order_number: (po.po_number && po.po_number.trim() !== '') ? po.po_number : `PO-${po.id.slice(0, 8).toUpperCase()}`,
               provider_id: userId,
               status: po.status,
               pickup_location: po.supplier?.address || po.supplier?.location || po.pickup_address || 'Supplier location',
@@ -689,15 +708,27 @@ export const useDeliveryProviderData = () => {
       }
       
       // Final pass: Ensure all entries with purchase_order_id have order_number
+      // Prioritize actual po_number from database, only use fallback if truly missing
       allActiveDeliveries.forEach((delivery: any) => {
         if (delivery.purchase_order_id && !delivery.order_number) {
-          // Try to get from poNumberMap first
+          // Try to get from poNumberMap first (this should have the actual po_number from database)
           const orderNum = poNumberMap.get(delivery.purchase_order_id);
-          if (orderNum) {
+          if (orderNum && orderNum.trim() !== '') {
+            // Use the actual po_number from database
             delivery.order_number = orderNum;
+            console.log('✅ Final pass: Updated with actual po_number:', orderNum);
           } else {
-            // Fallback: generate from purchase_order_id
+            // Only use fallback if we truly don't have a po_number in the database
             delivery.order_number = `PO-${delivery.purchase_order_id.slice(0, 8).toUpperCase()}`;
+            console.warn('⚠️ Final pass: No po_number in database for purchase_order_id:', delivery.purchase_order_id.slice(0, 8), '- using fallback');
+          }
+        } else if (delivery.purchase_order_id && delivery.order_number) {
+          // Check if we have a better po_number in the map (actual database value)
+          const orderNum = poNumberMap.get(delivery.purchase_order_id);
+          if (orderNum && orderNum.trim() !== '' && delivery.order_number.startsWith('PO-') && delivery.order_number.length === 11) {
+            // Replace fallback with actual po_number if available
+            delivery.order_number = orderNum;
+            console.log('✅ Final pass: Replaced fallback with actual po_number:', orderNum);
           }
         }
       });
