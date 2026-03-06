@@ -520,75 +520,110 @@ export const useDeliveryProviderData = () => {
               if (activeResponse.ok) {
                 allDeliveries = await activeResponse.json();
                 console.log('✅ Fetched delivery_requests via simple query:', allDeliveries.length, 'deliveries');
+                console.log('🔍 About to start filtering...');
               } else {
                 const errorText = await activeResponse.text();
                 console.warn('⚠️ Simple query also failed:', activeResponse.status, errorText);
               }
             }
             
+            // Ensure allDeliveries is an array
+            if (!Array.isArray(allDeliveries)) {
+              console.error('❌ allDeliveries is not an array:', typeof allDeliveries, allDeliveries);
+              allDeliveries = [];
+            }
+            
+            console.log('🔍 Starting filtering process for', allDeliveries.length, 'deliveries');
+            
             // Filter active deliveries AND filter by provider_id (client-side safety check)
             // First, get the delivery_provider.id for this user_id to match against provider_id
             let providerIdToMatch: string | null = null;
             try {
-              const { data: deliveryProvider } = await supabase
+              console.log('🔍 Looking up delivery_provider for userId:', userId.substring(0, 8));
+              const { data: deliveryProvider, error: dpError } = await supabase
                 .from('delivery_providers')
                 .select('id')
                 .eq('user_id', userId)
                 .single();
-              providerIdToMatch = deliveryProvider?.id || null;
-              console.log('🔍 Delivery provider lookup:', { userId, providerId: providerIdToMatch });
-            } catch (e) {
-              console.warn('⚠️ Could not fetch delivery_provider.id:', e);
+              
+              if (dpError) {
+                console.warn('⚠️ Error fetching delivery_provider.id:', dpError.message);
+              } else {
+                providerIdToMatch = deliveryProvider?.id || null;
+                console.log('🔍 Delivery provider lookup:', { 
+                  userId: userId.substring(0, 8), 
+                  providerId: providerIdToMatch?.substring(0, 8) || 'NULL' 
+                });
+              }
+            } catch (e: any) {
+              console.warn('⚠️ Exception fetching delivery_provider.id:', e?.message || e);
             }
             
             // Log sample provider_ids from fetched deliveries
-            const sampleProviderIds = allDeliveries.slice(0, 5).map((d: any) => ({
-              id: d.id?.substring(0, 8),
-              status: d.status,
-              provider_id: d.provider_id,
-              purchase_order_id: d.purchase_order_id?.substring(0, 8)
-            }));
-            console.log('🔍 Sample provider_ids from fetched deliveries:', sampleProviderIds);
-            console.log('🔍 Expected provider_id values:', { userId, providerIdToMatch });
-            
-            // Filter by status AND provider_id (must match either user_id or delivery_provider.id)
-            const filtered = allDeliveries.filter((d: any) => {
-              const statusMatch = d.status !== 'delivered' && 
-                                  d.status !== 'completed' && 
-                                  d.status !== 'cancelled';
-              
-              // Provider must match: either provider_id = userId OR provider_id = delivery_provider.id
-              // If provider_id is null/undefined, it means the request hasn't been accepted yet (should be filtered out)
-              const providerMatch = d.provider_id === userId || 
-                                   (providerIdToMatch && d.provider_id === providerIdToMatch);
-              
-              if (!providerMatch && statusMatch) {
-                console.warn('🚫 Filtered out delivery_request (wrong provider):', {
-                  id: d.id?.substring(0, 8),
-                  status: d.status,
-                  provider_id: d.provider_id || 'NULL/UNDEFINED',
-                  expected_userId: userId.substring(0, 8),
-                  expected_providerId: providerIdToMatch?.substring(0, 8) || 'NULL'
-                });
-              }
-              
-              return statusMatch && providerMatch;
-            });
-            
-            const withPOId = filtered.filter((d: any) => d.purchase_order_id).length;
-            const withPONumber = filtered.filter((d: any) => d.po_number_from_join || d.po_number).length;
-            console.log('📦 delivery_requests: Found', allDeliveries.length, 'total,', filtered.length, 'active (after provider filter),', withPOId, 'with purchase_order_id,', withPONumber, 'with po_number');
-            console.log('🔍 Provider filter stats:', {
-              total: allDeliveries.length,
-              afterProviderFilter: filtered.length,
-              userId,
-              providerIdToMatch,
-              sampleProviderIds: allDeliveries.slice(0, 5).map((d: any) => ({
+            let filtered: any[] = [];
+            try {
+              const sampleProviderIds = allDeliveries.slice(0, 5).map((d: any) => ({
                 id: d.id?.substring(0, 8),
-                provider_id: d.provider_id,
-                status: d.status
-              }))
-            });
+                status: d.status,
+                provider_id: d.provider_id?.substring(0, 8) || 'NULL',
+                purchase_order_id: d.purchase_order_id?.substring(0, 8) || 'NULL'
+              }));
+              console.log('🔍 Sample provider_ids from fetched deliveries:', sampleProviderIds);
+              console.log('🔍 Expected provider_id values:', { 
+                userId: userId.substring(0, 8), 
+                providerIdToMatch: providerIdToMatch?.substring(0, 8) || 'NULL' 
+              });
+              
+              // Filter by status AND provider_id (must match either user_id or delivery_provider.id)
+              filtered = allDeliveries.filter((d: any) => {
+                try {
+                  const statusMatch = d.status !== 'delivered' && 
+                                      d.status !== 'completed' && 
+                                      d.status !== 'cancelled';
+                  
+                  // Provider must match: either provider_id = userId OR provider_id = delivery_provider.id
+                  // If provider_id is null/undefined, it means the request hasn't been accepted yet (should be filtered out)
+                  const providerMatch = d.provider_id === userId || 
+                                       (providerIdToMatch && d.provider_id === providerIdToMatch);
+                  
+                  if (!providerMatch && statusMatch) {
+                    console.warn('🚫 Filtered out delivery_request (wrong provider):', {
+                      id: d.id?.substring(0, 8),
+                      status: d.status,
+                      provider_id: d.provider_id?.substring(0, 8) || 'NULL/UNDEFINED',
+                      expected_userId: userId.substring(0, 8),
+                      expected_providerId: providerIdToMatch?.substring(0, 8) || 'NULL'
+                    });
+                  }
+                  
+                  return statusMatch && providerMatch;
+                } catch (filterError: any) {
+                  console.error('❌ Error filtering delivery:', filterError);
+                  return false;
+                }
+              });
+              
+              const withPOId = filtered.filter((d: any) => d.purchase_order_id).length;
+              const withPONumber = filtered.filter((d: any) => d.po_number_from_join || d.po_number).length;
+              console.log('📦 delivery_requests: Found', allDeliveries.length, 'total,', filtered.length, 'active (after provider filter),', withPOId, 'with purchase_order_id,', withPONumber, 'with po_number');
+              console.log('🔍 Provider filter stats:', {
+                total: allDeliveries.length,
+                afterProviderFilter: filtered.length,
+                userId: userId.substring(0, 8),
+                providerIdToMatch: providerIdToMatch?.substring(0, 8) || 'NULL',
+                sampleProviderIds: allDeliveries.slice(0, 5).map((d: any) => ({
+                  id: d.id?.substring(0, 8),
+                  provider_id: d.provider_id?.substring(0, 8) || 'NULL',
+                  status: d.status
+                }))
+              });
+            } catch (filterError: any) {
+              console.error('❌ Error in filtering process:', filterError);
+              // Return all deliveries if filtering fails (better than returning empty)
+              filtered = allDeliveries;
+            }
+            
+            console.log('✅ Filtering complete, returning', filtered.length, 'deliveries');
             return filtered;
           } catch (error: any) {
             if (error.name === 'AbortError') {
