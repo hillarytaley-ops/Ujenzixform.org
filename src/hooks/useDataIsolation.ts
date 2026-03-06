@@ -360,11 +360,11 @@ export const useDeliveryProviderData = () => {
     setLoading(true);
     setError(null);
     
-    // Safety timeout - finish loading after 15 seconds max (increased for enrichment)
+    // Safety timeout - finish loading after 20 seconds max (increased to allow for filtering and po_number fetch)
     const safetyTimeout = setTimeout(() => {
       console.log('📦 useDeliveryProviderData: Safety timeout reached - showing data even if incomplete');
       setLoading(false);
-    }, 15000);
+    }, 20000);
 
     try {
       console.log('📦 Step 1: Fetching profile and registration (with timeout)...');
@@ -667,7 +667,7 @@ export const useDeliveryProviderData = () => {
         })()
       ]);
       
-      // Extract results
+      // Extract results - these should already be filtered by provider_id
       const activeData: any[] = deliveryRequestsResult.status === 'fulfilled' ? (deliveryRequestsResult.value || []) : [];
       let purchaseOrdersData: any[] = purchaseOrdersResult.status === 'fulfilled' ? (purchaseOrdersResult.value || []) : [];
       
@@ -688,15 +688,28 @@ export const useDeliveryProviderData = () => {
       });
       
       // Set deliveries immediately with fallback order numbers (so they show up even if po_number fetch times out)
-      const immediateDeliveries = activeData.map((dr: any) => ({
-        ...dr,
-        order_number: dr.po_number_from_join || (dr.purchase_order_id ? `PO-${dr.purchase_order_id.slice(0, 8).toUpperCase()}` : null),
-        source: 'delivery_requests'
-      }));
-      console.log('📦 Setting deliveries immediately (with fallback order numbers):', immediateDeliveries.length);
-      setActiveDeliveries(immediateDeliveries);
-      setLoading(false); // Clear loading state so UI updates immediately
-      clearTimeout(safetyTimeout); // Clear safety timeout since we've set the data
+      // This ensures UI updates immediately after filtering completes
+      try {
+        const immediateDeliveries = activeData.map((dr: any) => ({
+          ...dr,
+          order_number: dr.po_number_from_join || (dr.purchase_order_id ? `PO-${dr.purchase_order_id.slice(0, 8).toUpperCase()}` : null),
+          source: 'delivery_requests'
+        }));
+        console.log('📦 Setting deliveries immediately (with fallback order numbers):', immediateDeliveries.length);
+        console.log('📋 Sample immediate deliveries:', immediateDeliveries.slice(0, 3).map((d: any) => ({
+          id: d.id?.substring(0, 8),
+          status: d.status,
+          order_number: d.order_number
+        })));
+        setActiveDeliveries(immediateDeliveries);
+        setLoading(false); // Clear loading state so UI updates immediately
+        clearTimeout(safetyTimeout); // Clear safety timeout since we've set the data
+        console.log('✅ Deliveries set successfully, loading cleared');
+      } catch (e) {
+        console.error('❌ Error setting immediate deliveries:', e);
+        // Still clear loading to prevent infinite spinner
+        setLoading(false);
+      }
       
       if (deliveryRequestsResult.status === 'rejected') {
         console.warn('⚠️ delivery_requests fetch failed:', deliveryRequestsResult.reason);
