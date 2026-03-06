@@ -444,25 +444,48 @@ export const useDeliveryProviderData = () => {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
             
-            // Use Supabase client for join query to get po_number directly
-            // This is more reliable than separate queries
-            const { data: deliveryRequestsData, error: drError } = await supabase
-              .from('delivery_requests')
-              .select(`
-                *,
-                purchase_orders!inner(
-                  id,
-                  po_number
-                )
-              `)
-              .eq('provider_id', userId)
-              .order('created_at', { ascending: false })
-              .limit(100);
-            
-            // If join query fails, fall back to simple query
+            // Try join query first, but use left join so it doesn't fail if purchase_orders don't exist
             let allDeliveries: any[] = [];
-            if (drError || !deliveryRequestsData) {
-              console.warn('⚠️ Join query failed, using simple query:', drError?.message);
+            try {
+              const { data: deliveryRequestsData, error: drError } = await supabase
+                .from('delivery_requests')
+                .select(`
+                  *,
+                  purchase_orders(
+                    id,
+                    po_number
+                  )
+                `)
+                .eq('provider_id', userId)
+                .order('created_at', { ascending: false })
+                .limit(100);
+              
+              clearTimeout(timeoutId);
+              
+              if (drError) {
+                console.warn('⚠️ Join query failed, using simple query:', drError.message);
+                throw drError; // Fall through to simple query
+              }
+              
+              if (deliveryRequestsData && deliveryRequestsData.length > 0) {
+                // Flatten the joined data and add po_number directly
+                allDeliveries = deliveryRequestsData.map((dr: any) => {
+                  const po = Array.isArray(dr.purchase_orders) ? dr.purchase_orders[0] : dr.purchase_orders;
+                  return {
+                    ...dr,
+                    purchase_order_id: dr.purchase_order_id || po?.id,
+                    po_number_from_join: po?.po_number || null
+                  };
+                });
+                const withPONumber = allDeliveries.filter((d: any) => d.po_number_from_join).length;
+                console.log('✅ Fetched delivery_requests with po_number join:', allDeliveries.length, 'deliveries,', withPONumber, 'with po_number');
+              } else {
+                console.warn('⚠️ Join query returned no data, using simple query');
+                throw new Error('No data from join');
+              }
+            } catch (joinError) {
+              // Fall back to simple query if join fails
+              console.warn('⚠️ Join query failed, falling back to simple query:', joinError);
               const activeResponse = await fetch(
                 `${SUPABASE_URL}/rest/v1/delivery_requests?provider_id=eq.${userId}&select=*&order=created_at.desc&limit=100`,
                 {
@@ -480,16 +503,11 @@ export const useDeliveryProviderData = () => {
               
               if (activeResponse.ok) {
                 allDeliveries = await activeResponse.json();
+                console.log('✅ Fetched delivery_requests via simple query:', allDeliveries.length, 'deliveries');
+              } else {
+                const errorText = await activeResponse.text();
+                console.warn('⚠️ Simple query also failed:', activeResponse.status, errorText);
               }
-            } else {
-              clearTimeout(timeoutId);
-              // Flatten the joined data and add po_number directly
-              allDeliveries = deliveryRequestsData.map((dr: any) => ({
-                ...dr,
-                purchase_order_id: dr.purchase_order_id || dr.purchase_orders?.id,
-                po_number_from_join: dr.purchase_orders?.po_number || null
-              }));
-              console.log('✅ Fetched delivery_requests with po_number join:', allDeliveries.length, 'deliveries');
             }
             
             // Filter active deliveries
@@ -598,7 +616,10 @@ export const useDeliveryProviderData = () => {
       
       // Remove duplicates
       const uniquePOIds = [...new Set(deliveryRequestPOIds)];
-      console.log('🔍 Found', uniquePOIds.length, 'unique purchase_order_ids from delivery_requests:', uniquePOIds.map(id => id.slice(0, 8)));
+      console.log('🔍 Found', uniquePOIds.length, 'unique purchase_order_ids from delivery_requests');
+      uniquePOIds.forEach((id, idx) => {
+        console.log(`   ${idx + 1}. Full UUID: ${id} (length: ${id.length})`);
+      });
       
       let poNumberMap = new Map<string, string>();
       if (uniquePOIds.length > 0) {
@@ -609,22 +630,25 @@ export const useDeliveryProviderData = () => {
           for (let i = 0; i < uniquePOIds.length; i += batchSize) {
             const batch = uniquePOIds.slice(i, i + batchSize);
             // PostgREST 'in' filter format: id=in.(uuid1,uuid2,uuid3)
-            const idsFilter = batch.join(',');
+            // UUIDs need to be properly formatted
+            const idsFilter = batch.map(id => `"${id}"`).join(',');
+            const queryUrl = `${SUPABASE_URL}/rest/v1/purchase_orders?id=in.(${idsFilter})&select=id,po_number&limit=100`;
             
-            const poNumbersResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/purchase_orders?id=in.(${idsFilter})&select=id,po_number&limit=100`,
-              {
-                headers: {
-                  'apikey': SUPABASE_ANON_KEY,
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Content-Type': 'application/json'
-                },
-                cache: 'no-store'
-              }
-            );
+            console.log(`🔍 Querying purchase_orders for batch ${Math.floor(i/batchSize) + 1}:`, batch.length, 'IDs');
+            console.log(`   Query URL (truncated): ${queryUrl.substring(0, 200)}...`);
+            
+            const poNumbersResponse = await fetch(queryUrl, {
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+              },
+              cache: 'no-store'
+            });
             
             if (poNumbersResponse.ok) {
               const poNumbers = await poNumbersResponse.json();
+              console.log(`✅ Batch ${Math.floor(i/batchSize) + 1}: Received ${poNumbers.length} purchase orders from API`);
               poNumbers.forEach((po: any) => {
                 if (po.id) {
                   // Only use actual po_number from database, don't generate fallback here
@@ -637,10 +661,10 @@ export const useDeliveryProviderData = () => {
                   }
                 }
               });
-              console.log(`✅ Batch ${Math.floor(i/batchSize) + 1}: Fetched ${poNumbers.length} purchase orders`);
             } else {
               const errorText = await poNumbersResponse.text();
-              console.warn('⚠️ Failed to fetch order numbers for batch:', poNumbersResponse.status, errorText);
+              console.error('❌ Failed to fetch order numbers for batch:', poNumbersResponse.status, errorText);
+              console.error('   Query was:', queryUrl.substring(0, 300));
             }
           }
           console.log('✅ Total: Fetched order numbers for', poNumberMap.size, 'out of', uniquePOIds.length, 'purchase orders');
