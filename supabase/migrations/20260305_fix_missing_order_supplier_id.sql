@@ -104,7 +104,7 @@ BEGIN
     
     -- Try to find the supplier by checking delivery requests or other orders from same buyer
     -- Look for other orders from same buyer to see what supplier_id they use
-    SELECT DISTINCT po.supplier_id
+    SELECT po.supplier_id
     INTO v_correct_supplier_id
     FROM purchase_orders po
     WHERE po.buyer_id = v_order.buyer_id
@@ -146,7 +146,7 @@ BEGIN
     END IF;
     
     -- Method 2: Find supplier from other orders by same buyer around same time
-    SELECT DISTINCT po.supplier_id
+    SELECT po.supplier_id
     INTO v_correct_supplier_id
     FROM purchase_orders po
     WHERE po.buyer_id = v_order.buyer_id
