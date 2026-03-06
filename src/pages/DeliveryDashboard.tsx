@@ -85,6 +85,7 @@ interface ActiveDelivery {
   special_instructions?: string;
   created_at?: string;
   purchase_order_id?: string; // Link to the order for QR scanning
+  order_number?: string; // Purchase order number for display
 }
 
 interface DeliveryHistory {
@@ -215,7 +216,8 @@ const DeliveryDashboard = () => {
         urgency: d.urgency || d.priority_level || 'normal',
         special_instructions: d.special_instructions,
         created_at: d.created_at,
-        purchase_order_id: d.purchase_order_id
+        purchase_order_id: d.purchase_order_id,
+        order_number: d.order_number // Include order number from the hook
       }));
       setActiveDeliveries(formattedActive);
       console.log('🚚 Active deliveries loaded:', formattedActive.length, 'Statuses:', formattedActive.map(d => d.status));
