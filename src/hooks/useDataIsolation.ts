@@ -452,6 +452,16 @@ export const useDeliveryProviderData = () => {
               // Add timeout to join query (5 seconds max)
               // Filter by provider_id AND status to exclude pending requests (which are visible to all providers via RLS)
               // Only show requests that have been accepted/assigned to this provider
+              // Note: provider_id might be delivery_providers.id OR delivery_providers.user_id, so we need to check both
+              // First, try to get the delivery_provider.id for this user_id
+              const { data: deliveryProvider } = await supabase
+                .from('delivery_providers')
+                .select('id')
+                .eq('user_id', userId)
+                .single();
+              
+              const providerIdToMatch = deliveryProvider?.id || userId; // Fallback to userId if no delivery_provider record
+              
               const joinQueryPromise = supabase
                 .from('delivery_requests')
                 .select(`
@@ -461,7 +471,7 @@ export const useDeliveryProviderData = () => {
                     po_number
                   )
                 `)
-                .eq('provider_id', userId)
+                .or(`provider_id.eq.${userId},provider_id.eq.${providerIdToMatch}`)
                 .in('status', ['accepted', 'assigned', 'picked_up', 'in_transit', 'dispatched', 'out_for_delivery', 'delivery_arrived'])
                 .order('created_at', { ascending: false })
                 .limit(100);
@@ -501,9 +511,21 @@ export const useDeliveryProviderData = () => {
             } catch (joinError) {
               // Fall back to simple query if join fails
               // Filter by provider_id AND status to exclude pending requests
+              // Need to check both provider_id = userId and provider_id = delivery_providers.id
               console.warn('⚠️ Join query failed, falling back to simple query:', joinError);
+              
+              // Get delivery_provider.id for this user_id
+              const { data: deliveryProvider } = await supabase
+                .from('delivery_providers')
+                .select('id')
+                .eq('user_id', userId)
+                .single();
+              
+              const providerIdToMatch = deliveryProvider?.id || userId;
+              
+              // Use OR filter to match either user_id or delivery_provider.id
               const activeResponse = await fetch(
-                `${SUPABASE_URL}/rest/v1/delivery_requests?provider_id=eq.${userId}&status=in.(accepted,assigned,picked_up,in_transit,dispatched,out_for_delivery,delivery_arrived)&select=*&order=created_at.desc&limit=100`,
+                `${SUPABASE_URL}/rest/v1/delivery_requests?or=(provider_id.eq.${userId},provider_id.eq.${providerIdToMatch})&status=in.(accepted,assigned,picked_up,in_transit,dispatched,out_for_delivery,delivery_arrived)&select=*&order=created_at.desc&limit=100`,
                 {
                   headers: {
                     'apikey': SUPABASE_ANON_KEY,
