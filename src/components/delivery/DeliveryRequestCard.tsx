@@ -37,6 +37,8 @@ interface DeliveryRequest {
   urgency?: 'normal' | 'urgent' | 'emergency';
   special_instructions?: string;
   created_at?: string;
+  order_number?: string; // Purchase order number
+  purchase_order_id?: string; // Purchase order ID
   // Date-based scheduling fields
   pickup_date?: string;
   delivery_date?: string;
@@ -306,8 +308,13 @@ export const DeliveryRequestCard: React.FC<DeliveryRequestCardProps> = ({
                   {formatStatus(delivery.status)}
                 </Badge>
                 {getUrgencyBadge(delivery.urgency)}
+                {delivery.order_number && (
+                  <span className={`text-sm font-semibold ${isDarkMode ? 'text-blue-300' : 'text-blue-600'}`}>
+                    Order: {delivery.order_number}
+                  </span>
+                )}
                 <span className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                  {delivery.id}
+                  {delivery.id.slice(0, 8)}...
                 </span>
                 {delivery.created_at && (
                   <span className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>

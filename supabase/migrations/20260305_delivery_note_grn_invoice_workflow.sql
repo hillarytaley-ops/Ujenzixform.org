@@ -21,45 +21,104 @@
 -- Drop table if exists and recreate to ensure clean state (optional - comment out if you want to preserve existing data)
 -- DROP TABLE IF EXISTS delivery_notes CASCADE;
 
-CREATE TABLE IF NOT EXISTS delivery_notes (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    purchase_order_id UUID NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
-    delivery_request_id UUID REFERENCES delivery_requests(id) ON DELETE SET NULL,
-    dn_number TEXT UNIQUE NOT NULL, -- e.g., DN-2026-001
-    builder_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    supplier_id UUID NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
-    delivery_provider_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-    
-    -- Delivery details
-    delivery_address TEXT NOT NULL,
-    delivery_date DATE NOT NULL,
-    delivery_time TIMESTAMPTZ,
-    items JSONB NOT NULL, -- Array of delivered items with quantities
-    
-    -- Signature tracking
-    builder_signature TEXT, -- Base64 encoded signature image
-    builder_signed_at TIMESTAMPTZ,
-    builder_signed_by UUID REFERENCES auth.users(id),
-    
-    -- Status workflow
-    status TEXT NOT NULL DEFAULT 'pending_signature' 
-        CHECK (status IN ('pending_signature', 'signed', 'forwarded_to_supplier', 'inspection_pending', 'inspection_completed', 'accepted', 'rejected', 'cancelled')),
-    
-    -- Inspection details
-    inspection_verified BOOLEAN DEFAULT FALSE,
-    inspection_verified_at TIMESTAMPTZ,
-    inspection_notes TEXT,
-    
-    -- Acceptance/Rejection
-    builder_decision TEXT CHECK (builder_decision IN ('accepted', 'rejected', NULL)),
-    builder_decision_at TIMESTAMPTZ,
-    rejection_reason TEXT,
-    
-    -- Metadata
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    created_by UUID REFERENCES auth.users(id)
-);
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'delivery_notes') THEN
+        CREATE TABLE delivery_notes (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            purchase_order_id UUID NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
+            delivery_request_id UUID REFERENCES delivery_requests(id) ON DELETE SET NULL,
+            dn_number TEXT UNIQUE NOT NULL, -- e.g., DN-2026-001
+            builder_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+            supplier_id UUID NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
+            delivery_provider_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+            
+            -- Delivery details
+            delivery_address TEXT NOT NULL,
+            delivery_date DATE NOT NULL,
+            delivery_time TIMESTAMPTZ,
+            items JSONB NOT NULL, -- Array of delivered items with quantities
+            
+            -- Signature tracking
+            builder_signature TEXT, -- Base64 encoded signature image
+            builder_signed_at TIMESTAMPTZ,
+            builder_signed_by UUID REFERENCES auth.users(id),
+            
+            -- Status workflow
+            status TEXT NOT NULL DEFAULT 'pending_signature' 
+                CHECK (status IN ('pending_signature', 'signed', 'forwarded_to_supplier', 'inspection_pending', 'inspection_completed', 'accepted', 'rejected', 'cancelled')),
+            
+            -- Inspection details
+            inspection_verified BOOLEAN DEFAULT FALSE,
+            inspection_verified_at TIMESTAMPTZ,
+            inspection_notes TEXT,
+            
+            -- Acceptance/Rejection
+            builder_decision TEXT CHECK (builder_decision IN ('accepted', 'rejected', NULL)),
+            builder_decision_at TIMESTAMPTZ,
+            rejection_reason TEXT,
+            
+            -- Metadata
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW(),
+            created_by UUID REFERENCES auth.users(id)
+        );
+    ELSE
+        -- Add missing columns to existing table
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_notes' AND column_name = 'purchase_order_id') THEN
+            ALTER TABLE delivery_notes ADD COLUMN purchase_order_id UUID REFERENCES purchase_orders(id) ON DELETE CASCADE;
+        END IF;
+        
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_notes' AND column_name = 'dn_number') THEN
+            ALTER TABLE delivery_notes ADD COLUMN dn_number TEXT UNIQUE;
+        END IF;
+        
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_notes' AND column_name = 'builder_id') THEN
+            ALTER TABLE delivery_notes ADD COLUMN builder_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
+        END IF;
+        
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_notes' AND column_name = 'supplier_id') THEN
+            ALTER TABLE delivery_notes ADD COLUMN supplier_id UUID REFERENCES suppliers(id) ON DELETE CASCADE;
+        END IF;
+        
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_notes' AND column_name = 'delivery_provider_id') THEN
+            ALTER TABLE delivery_notes ADD COLUMN delivery_provider_id UUID REFERENCES auth.users(id) ON DELETE SET NULL;
+        END IF;
+        
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_notes' AND column_name = 'delivery_address') THEN
+            ALTER TABLE delivery_notes ADD COLUMN delivery_address TEXT;
+        END IF;
+        
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_notes' AND column_name = 'delivery_date') THEN
+            ALTER TABLE delivery_notes ADD COLUMN delivery_date DATE;
+        END IF;
+        
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_notes' AND column_name = 'items') THEN
+            ALTER TABLE delivery_notes ADD COLUMN items JSONB NOT NULL DEFAULT '[]'::JSONB;
+        END IF;
+        
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_notes' AND column_name = 'status') THEN
+            ALTER TABLE delivery_notes ADD COLUMN status TEXT NOT NULL DEFAULT 'pending_signature'
+                CHECK (status IN ('pending_signature', 'signed', 'forwarded_to_supplier', 'inspection_pending', 'inspection_completed', 'accepted', 'rejected', 'cancelled'));
+        END IF;
+        
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_notes' AND column_name = 'builder_signature') THEN
+            ALTER TABLE delivery_notes ADD COLUMN builder_signature TEXT;
+        END IF;
+        
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_notes' AND column_name = 'builder_signed_at') THEN
+            ALTER TABLE delivery_notes ADD COLUMN builder_signed_at TIMESTAMPTZ;
+        END IF;
+        
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_notes' AND column_name = 'builder_decision') THEN
+            ALTER TABLE delivery_notes ADD COLUMN builder_decision TEXT CHECK (builder_decision IN ('accepted', 'rejected', NULL));
+        END IF;
+        
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'delivery_notes' AND column_name = 'inspection_verified') THEN
+            ALTER TABLE delivery_notes ADD COLUMN inspection_verified BOOLEAN DEFAULT FALSE;
+        END IF;
+    END IF;
+END $$;
 
 -- Indexes for delivery_notes
 CREATE INDEX IF NOT EXISTS idx_delivery_notes_po ON delivery_notes(purchase_order_id);
@@ -73,30 +132,69 @@ CREATE INDEX IF NOT EXISTS idx_delivery_notes_dn_number ON delivery_notes(dn_num
 -- ============================================================
 -- DROP TABLE IF EXISTS goods_received_notes CASCADE;
 
-CREATE TABLE IF NOT EXISTS goods_received_notes (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    delivery_note_id UUID NOT NULL REFERENCES delivery_notes(id) ON DELETE CASCADE,
-    purchase_order_id UUID NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
-    grn_number TEXT UNIQUE NOT NULL, -- e.g., GRN-2026-001
-    builder_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    supplier_id UUID NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
-    
-    -- Goods details
-    items JSONB NOT NULL, -- Array of received items with quantities
-    total_quantity INTEGER,
-    condition_notes TEXT,
-    received_date DATE NOT NULL,
-    received_time TIMESTAMPTZ,
-    
-    -- Status
-    status TEXT NOT NULL DEFAULT 'generated'
-        CHECK (status IN ('generated', 'viewed_by_supplier', 'viewed_by_admin', 'acknowledged')),
-    
-    -- Metadata
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    created_by UUID REFERENCES auth.users(id)
-);
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'goods_received_notes') THEN
+        CREATE TABLE goods_received_notes (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            delivery_note_id UUID NOT NULL REFERENCES delivery_notes(id) ON DELETE CASCADE,
+            purchase_order_id UUID NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
+            grn_number TEXT UNIQUE NOT NULL, -- e.g., GRN-2026-001
+            builder_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+            supplier_id UUID NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
+            
+            -- Goods details
+            items JSONB NOT NULL, -- Array of received items with quantities
+            total_quantity INTEGER,
+            condition_notes TEXT,
+            received_date DATE NOT NULL,
+            received_time TIMESTAMPTZ,
+            
+            -- Status
+            status TEXT NOT NULL DEFAULT 'generated'
+                CHECK (status IN ('generated', 'viewed_by_supplier', 'viewed_by_admin', 'acknowledged')),
+            
+            -- Metadata
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW(),
+            created_by UUID REFERENCES auth.users(id)
+        );
+    ELSE
+        -- Add missing columns to existing table
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'goods_received_notes' AND column_name = 'delivery_note_id') THEN
+            ALTER TABLE goods_received_notes ADD COLUMN delivery_note_id UUID REFERENCES delivery_notes(id) ON DELETE CASCADE;
+        END IF;
+        
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'goods_received_notes' AND column_name = 'purchase_order_id') THEN
+            ALTER TABLE goods_received_notes ADD COLUMN purchase_order_id UUID REFERENCES purchase_orders(id) ON DELETE CASCADE;
+        END IF;
+        
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'goods_received_notes' AND column_name = 'grn_number') THEN
+            ALTER TABLE goods_received_notes ADD COLUMN grn_number TEXT UNIQUE;
+        END IF;
+        
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'goods_received_notes' AND column_name = 'builder_id') THEN
+            ALTER TABLE goods_received_notes ADD COLUMN builder_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
+        END IF;
+        
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'goods_received_notes' AND column_name = 'supplier_id') THEN
+            ALTER TABLE goods_received_notes ADD COLUMN supplier_id UUID REFERENCES suppliers(id) ON DELETE CASCADE;
+        END IF;
+        
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'goods_received_notes' AND column_name = 'items') THEN
+            ALTER TABLE goods_received_notes ADD COLUMN items JSONB NOT NULL DEFAULT '[]'::JSONB;
+        END IF;
+        
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'goods_received_notes' AND column_name = 'received_date') THEN
+            ALTER TABLE goods_received_notes ADD COLUMN received_date DATE;
+        END IF;
+        
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'goods_received_notes' AND column_name = 'status') THEN
+            ALTER TABLE goods_received_notes ADD COLUMN status TEXT NOT NULL DEFAULT 'generated'
+                CHECK (status IN ('generated', 'viewed_by_supplier', 'viewed_by_admin', 'acknowledged'));
+        END IF;
+    END IF;
+END $$;
 
 -- Indexes for goods_received_notes
 CREATE INDEX IF NOT EXISTS idx_grn_delivery_note ON goods_received_notes(delivery_note_id);
@@ -205,7 +303,11 @@ END $$;
 -- 4. FUNCTION: Generate DN Number
 -- ============================================================
 CREATE OR REPLACE FUNCTION generate_dn_number()
-RETURNS TEXT AS $$
+RETURNS TEXT
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 DECLARE
     new_number TEXT;
     year_part TEXT;
@@ -222,13 +324,17 @@ BEGIN
     new_number := 'DN-' || year_part || '-' || LPAD(seq_num::TEXT, 4, '0');
     RETURN new_number;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- ============================================================
 -- 5. FUNCTION: Generate GRN Number
 -- ============================================================
 CREATE OR REPLACE FUNCTION generate_grn_number()
-RETURNS TEXT AS $$
+RETURNS TEXT
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 DECLARE
     new_number TEXT;
     year_part TEXT;
@@ -244,15 +350,19 @@ BEGIN
     new_number := 'GRN-' || year_part || '-' || LPAD(seq_num::TEXT, 4, '0');
     RETURN new_number;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- ============================================================
 -- 6. FUNCTION: Auto-create Delivery Note when delivery completed
 -- ============================================================
 CREATE OR REPLACE FUNCTION auto_create_delivery_note()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 DECLARE
-    v_po_buyer_id UUID;
+    v_po_builder_id UUID;
     v_po_supplier_id UUID;
     v_po_delivery_provider_id UUID;
     v_po_delivery_address TEXT;
@@ -276,7 +386,7 @@ BEGIN
             po.delivery_address,
             po.items
         INTO 
-            v_po_buyer_id,
+            v_po_builder_id,
             v_po_supplier_id,
             v_po_delivery_provider_id,
             v_po_delivery_address,
@@ -284,7 +394,7 @@ BEGIN
         FROM purchase_orders po
         WHERE po.id = NEW.id;
         
-        IF NOT FOUND OR v_po_buyer_id IS NULL THEN
+        IF NOT FOUND OR v_po_builder_id IS NULL THEN
             RETURN NEW;
         END IF;
         
@@ -301,7 +411,7 @@ BEGIN
         -- Prepare items from purchase_order
         v_items := COALESCE(v_po_items, '[]'::JSONB);
         
-        -- Create delivery note (using buyer_id from PO as builder_id)
+        -- Create delivery note (using buyer_id from PO as builder_id in DN)
         INSERT INTO delivery_notes (
             purchase_order_id,
             delivery_request_id,
@@ -319,7 +429,7 @@ BEGIN
             NEW.id,
             v_delivery_request_id,
             v_dn_number,
-            v_po_buyer_id,  -- buyer_id from PO maps to builder_id in DN
+            v_po_builder_id,  -- buyer_id from PO maps to builder_id in DN
             v_po_supplier_id,
             v_po_delivery_provider_id,
             v_po_delivery_address,
@@ -335,7 +445,7 @@ BEGIN
     
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 -- Create trigger for auto-creating DN
 DROP TRIGGER IF EXISTS trigger_auto_create_dn ON purchase_orders;
@@ -349,7 +459,11 @@ CREATE TRIGGER trigger_auto_create_dn
 -- 7. FUNCTION: Auto-create GRN when materials accepted
 -- ============================================================
 CREATE OR REPLACE FUNCTION auto_create_grn()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 DECLARE
     v_grn_number TEXT;
 BEGIN
@@ -402,7 +516,7 @@ BEGIN
     
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 -- Create trigger for auto-creating GRN
 DROP TRIGGER IF EXISTS trigger_auto_create_grn ON delivery_notes;
@@ -422,6 +536,7 @@ CREATE FUNCTION auto_create_invoice()
 RETURNS TRIGGER 
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
 DECLARE
     v_invoice_number TEXT;
@@ -459,7 +574,7 @@ BEGIN
             RETURN NEW;
         END IF;
         
-        -- Get PO total_amount (purchase_orders uses buyer_id, not builder_id - we only need total_amount)
+        -- Get PO total_amount (purchase_orders uses buyer_id - we only need total_amount)
         SELECT total_amount
         INTO v_po_total_amount
         FROM purchase_orders
@@ -533,12 +648,16 @@ CREATE TRIGGER trigger_auto_create_invoice
 -- 9. FUNCTION: Update updated_at timestamp
 -- ============================================================
 CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
     NEW.updated_at = NOW();
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- Apply updated_at triggers
 DROP TRIGGER IF EXISTS update_delivery_notes_updated_at ON delivery_notes;

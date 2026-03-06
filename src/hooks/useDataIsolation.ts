@@ -494,7 +494,7 @@ export const useDeliveryProviderData = () => {
             
             // Use direct fetch with minimal columns and status filter
             const poResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/purchase_orders?delivery_provider_id=eq.${userId}&status=in.(shipped,in_transit,dispatched,out_for_delivery,delivery_arrived,processing)&select=id,status,delivery_provider_id,delivery_address,items,total_amount,created_at,updated_at,supplier_id,buyer_id,delivery_provider_name,delivery_assigned_at&order=created_at.desc&limit=100`,
+              `${SUPABASE_URL}/rest/v1/purchase_orders?delivery_provider_id=eq.${userId}&status=in.(shipped,in_transit,dispatched,out_for_delivery,delivery_arrived,processing)&select=id,status,delivery_provider_id,delivery_address,items,total_amount,created_at,updated_at,supplier_id,buyer_id,delivery_provider_name,delivery_assigned_at,po_number&order=created_at.desc&limit=100`,
               {
                 headers: {
                   'apikey': SUPABASE_ANON_KEY,
@@ -561,6 +561,48 @@ export const useDeliveryProviderData = () => {
         console.warn('⚠️ purchase_orders fetch failed:', purchaseOrdersResult.reason);
       }
       
+      // Fetch order numbers for delivery_requests that have purchase_order_id
+      // This is a lightweight query that won't cause timeout
+      const deliveryRequestPOIds = activeData
+        .filter((dr: any) => dr.purchase_order_id)
+        .map((dr: any) => dr.purchase_order_id);
+      
+      let poNumberMap = new Map<string, string>();
+      if (deliveryRequestPOIds.length > 0) {
+        try {
+          const poNumbersResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/purchase_orders?id=in.(${deliveryRequestPOIds.join(',')})&select=id,po_number&limit=100`,
+            {
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+              },
+              cache: 'no-store'
+            }
+          );
+          
+          if (poNumbersResponse.ok) {
+            const poNumbers = await poNumbersResponse.json();
+            poNumbers.forEach((po: any) => {
+              if (po.id && po.po_number) {
+                poNumberMap.set(po.id, po.po_number);
+              }
+            });
+            console.log('✅ Fetched order numbers for', poNumberMap.size, 'delivery requests');
+          }
+        } catch (e) {
+          console.warn('⚠️ Could not fetch order numbers (non-critical):', e);
+        }
+      }
+      
+      // Also add po_numbers from purchaseOrdersData
+      purchaseOrdersData.forEach((po: any) => {
+        if (po.id && po.po_number) {
+          poNumberMap.set(po.id, po.po_number);
+        }
+      });
+      
       // Skip enrichment for now to avoid timeout - use basic data directly
       // Enrichment can be done later if needed, but it's blocking the fetch
       let enrichedPurchaseOrders = purchaseOrdersData || [];
@@ -572,10 +614,16 @@ export const useDeliveryProviderData = () => {
       // Add delivery_requests
       if (activeData) {
         activeData.forEach((dr: any) => {
+          // Get order number from purchase_order if available
+          const orderNumber = dr.purchase_order_id 
+            ? (poNumberMap.get(dr.purchase_order_id) || `PO-${dr.purchase_order_id.slice(0, 8).toUpperCase()}`)
+            : null;
+          
           allActiveDeliveries.push({
             ...dr,
             source: 'delivery_requests',
-            purchase_order_id: dr.purchase_order_id || null
+            purchase_order_id: dr.purchase_order_id || null,
+            order_number: orderNumber
           });
         });
       }
@@ -593,6 +641,7 @@ export const useDeliveryProviderData = () => {
             allActiveDeliveries.push({
               id: po.id,
               purchase_order_id: po.id,
+              order_number: po.po_number || `PO-${po.id.slice(0, 8).toUpperCase()}`,
               provider_id: userId,
               status: po.status,
               pickup_location: po.supplier?.address || po.supplier?.location || po.pickup_address || 'Supplier location',

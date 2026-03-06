@@ -88,7 +88,11 @@ END $$;
 
 -- Function to update project spending when orders are added/updated
 CREATE OR REPLACE FUNCTION update_project_spending()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 DECLARE
     v_materials_total NUMERIC(15, 2);
     v_delivery_total NUMERIC(15, 2);
@@ -123,7 +127,7 @@ BEGIN
     
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- Trigger for purchase_orders
 DROP TRIGGER IF EXISTS trg_update_project_spending_orders ON purchase_orders;
@@ -134,7 +138,11 @@ CREATE TRIGGER trg_update_project_spending_orders
 
 -- Function to update project spending from delivery requests
 CREATE OR REPLACE FUNCTION update_project_spending_delivery()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 DECLARE
     v_delivery_total NUMERIC(15, 2);
 BEGIN
@@ -155,7 +163,7 @@ BEGIN
     
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- Trigger for delivery_requests
 DROP TRIGGER IF EXISTS trg_update_project_spending_delivery ON delivery_requests;
@@ -166,7 +174,11 @@ CREATE TRIGGER trg_update_project_spending_delivery
 
 -- Function to update project spending from monitoring requests
 CREATE OR REPLACE FUNCTION update_project_spending_monitoring()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 DECLARE
     v_monitoring_total NUMERIC(15, 2);
 BEGIN
@@ -188,7 +200,7 @@ BEGIN
     
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- Trigger for monitoring_service_requests
 DROP TRIGGER IF EXISTS trg_update_project_spending_monitoring ON monitoring_service_requests;
