@@ -541,6 +541,16 @@ export const useDeliveryProviderData = () => {
               console.warn('⚠️ Could not fetch delivery_provider.id:', e);
             }
             
+            // Log sample provider_ids from fetched deliveries
+            const sampleProviderIds = allDeliveries.slice(0, 5).map((d: any) => ({
+              id: d.id?.substring(0, 8),
+              status: d.status,
+              provider_id: d.provider_id,
+              purchase_order_id: d.purchase_order_id?.substring(0, 8)
+            }));
+            console.log('🔍 Sample provider_ids from fetched deliveries:', sampleProviderIds);
+            console.log('🔍 Expected provider_id values:', { userId, providerIdToMatch });
+            
             // Filter by status AND provider_id (must match either user_id or delivery_provider.id)
             const filtered = allDeliveries.filter((d: any) => {
               const statusMatch = d.status !== 'delivered' && 
@@ -548,16 +558,17 @@ export const useDeliveryProviderData = () => {
                                   d.status !== 'cancelled';
               
               // Provider must match: either provider_id = userId OR provider_id = delivery_provider.id
+              // If provider_id is null/undefined, it means the request hasn't been accepted yet (should be filtered out)
               const providerMatch = d.provider_id === userId || 
                                    (providerIdToMatch && d.provider_id === providerIdToMatch);
               
               if (!providerMatch && statusMatch) {
-                console.warn('🚫 Filtered out delivery_request:', {
+                console.warn('🚫 Filtered out delivery_request (wrong provider):', {
                   id: d.id?.substring(0, 8),
                   status: d.status,
-                  provider_id: d.provider_id,
+                  provider_id: d.provider_id || 'NULL/UNDEFINED',
                   expected_userId: userId.substring(0, 8),
-                  expected_providerId: providerIdToMatch?.substring(0, 8)
+                  expected_providerId: providerIdToMatch?.substring(0, 8) || 'NULL'
                 });
               }
               
