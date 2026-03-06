@@ -441,13 +441,16 @@ export const useDeliveryProviderData = () => {
         // 1. Fetch from delivery_requests
         (async () => {
           try {
+            console.log('📦 Starting delivery_requests fetch for provider:', userId);
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
             
             // Try join query first, but use left join so it doesn't fail if purchase_orders don't exist
+            console.log('📦 Attempting join query for delivery_requests with purchase_orders...');
             let allDeliveries: any[] = [];
             try {
-              const { data: deliveryRequestsData, error: drError } = await supabase
+              // Add timeout to join query (5 seconds max)
+              const joinQueryPromise = supabase
                 .from('delivery_requests')
                 .select(`
                   *,
@@ -459,6 +462,15 @@ export const useDeliveryProviderData = () => {
                 .eq('provider_id', userId)
                 .order('created_at', { ascending: false })
                 .limit(100);
+              
+              const joinTimeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Join query timeout')), 5000)
+              );
+              
+              const { data: deliveryRequestsData, error: drError } = await Promise.race([
+                joinQueryPromise,
+                joinTimeoutPromise
+              ]) as any;
               
               clearTimeout(timeoutId);
               
