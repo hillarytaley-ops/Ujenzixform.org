@@ -127,6 +127,43 @@ export const DispatchScanner: React.FC = () => {
     }
   }, [supplierId]);
 
+  // Add custom styles to ensure video fills container and remove dark space
+  useEffect(() => {
+    const styleId = 'dispatch-scanner-custom-styles';
+    if (document.getElementById(styleId)) return; // Already added
+    
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = `
+      #${scannerContainerId} {
+        width: 100% !important;
+        height: 100% !important;
+        min-height: 500px !important;
+      }
+      #${scannerContainerId} video {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important;
+      }
+      #${scannerContainerId} canvas {
+        width: 100% !important;
+        height: 100% !important;
+      }
+      #${scannerContainerId} .html5-qrcode-element {
+        width: 100% !important;
+        height: 100% !important;
+      }
+    `;
+    document.head.appendChild(style);
+    
+    return () => {
+      const existingStyle = document.getElementById(styleId);
+      if (existingStyle) {
+        existingStyle.remove();
+      }
+    };
+  }, []);
+
   // Debug: Log when orders state changes
   useEffect(() => {
     console.log('📦 Orders state updated:', {
@@ -950,24 +987,52 @@ export const DispatchScanner: React.FC = () => {
       if (selectedCameraId) {
         cameraConfig = selectedCameraId;
       } else {
-        cameraConfig = { facingMode: facing };
+        // Request better video quality for better QR code detection
+        cameraConfig = { 
+          facingMode: facing,
+          width: { ideal: 1280, min: 640 },
+          height: { ideal: 720, min: 480 }
+        };
       }
 
+      // Calculate qrbox size based on viewport - use 70% of viewport width, max 400px, min 250px
+      const viewportWidth = window.innerWidth;
+      const qrboxSize = Math.max(250, Math.min(Math.floor(viewportWidth * 0.7), 400));
+      
       const scannerConfig = {
-        fps: 10,
-        qrbox: { width: 400, height: 400 },
+        fps: 30, // Increased FPS for better detection
+        qrbox: function(viewfinderWidth: number, viewfinderHeight: number) {
+          // Use calculated size but ensure it fits within viewfinder (80% of smaller dimension)
+          const maxSize = Math.min(viewfinderWidth, viewfinderHeight) * 0.8;
+          const size = Math.min(qrboxSize, maxSize);
+          return { width: Math.floor(size), height: Math.floor(size) };
+        },
+        aspectRatio: 1.0, // Square aspect ratio
         rememberLastUsedCamera: true,
         supportedScanTypes: [],
         formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+        disableFlip: false, // Allow rotation
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true // Use native barcode detector if available
+        }
       };
+
+      console.log('🎥 Starting scanner with config:', { 
+        cameraConfig, 
+        qrboxSize,
+        viewportWidth,
+        fps: scannerConfig.fps 
+      });
 
       await scannerRef.current.start(
         cameraConfig,
         scannerConfig,
         (decodedText, decodedResult) => {
+          console.log('✅ QR CODE DETECTED!', { decodedText, decodedResult });
           const now = Date.now();
           
           if (decodedText === lastScannedRef.current && now - lastScanTimeRef.current < 3000) {
+            console.log('⏭️ Skipping duplicate scan (within 3 seconds)');
             return;
           }
           
@@ -991,8 +1056,11 @@ export const DispatchScanner: React.FC = () => {
             gainNode.gain.value = 0.3;
             oscillator.start();
             setTimeout(() => oscillator.stop(), 150);
-          } catch (e) {}
+          } catch (e) {
+            console.warn('⚠️ Could not play beep sound:', e);
+          }
           
+          toast.success(`✅ QR Code scanned: ${decodedText.substring(0, 20)}...`);
           processQRScan(decodedText, 'mobile_camera');
         },
         (errorMessage) => {
@@ -1003,7 +1071,8 @@ export const DispatchScanner: React.FC = () => {
             'No MultiFormat Readers were able to detect the code',
             'QR code parse error',
             'QR code not found',
-            'No QR code detected'
+            'No QR code detected',
+            'QR code parse error, error ='
           ];
           
           const shouldIgnore = ignoredErrors.some(ignored => 
@@ -1011,7 +1080,7 @@ export const DispatchScanner: React.FC = () => {
           );
           
           if (!shouldIgnore) {
-            console.log('📷 Scanner message:', errorMessage);
+            console.log('📷 Scanner message (non-ignored):', errorMessage);
           }
         }
       );
@@ -2022,11 +2091,11 @@ export const DispatchScanner: React.FC = () => {
             )}
             
             {/* Camera View - Larger and more prominent */}
-            <div className="relative bg-black rounded-xl overflow-hidden" style={{ minHeight: '600px' }}>
+            <div className="relative bg-black rounded-xl overflow-hidden w-full" style={{ aspectRatio: '4/3', minHeight: '500px', maxHeight: '70vh' }}>
               <div 
                 id={scannerContainerId} 
-                className="w-full"
-                style={{ minHeight: '600px' }}
+                className="w-full h-full"
+                style={{ width: '100%', height: '100%', minHeight: '500px' }}
               />
               
               {!isScanning && !cameraError && (
