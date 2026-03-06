@@ -502,27 +502,27 @@ export const useDeliveryProviderData = () => {
               // Fall back to simple query if join fails
               // Filter by status to exclude pending requests (RLS policy will handle provider_id matching)
               console.warn('⚠️ Join query failed, falling back to simple query:', joinError);
-              const activeResponse = await fetch(
+            const activeResponse = await fetch(
                 `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.(accepted,assigned,picked_up,in_transit,dispatched,out_for_delivery,delivery_arrived)&select=*&order=created_at.desc&limit=100`,
-                {
-                  headers: {
-                    'apikey': SUPABASE_ANON_KEY,
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json'
-                  },
-                  cache: 'no-store',
-                  signal: controller.signal
-                }
-              );
-              
-              clearTimeout(timeoutId);
-              
-              if (activeResponse.ok) {
+              {
+                headers: {
+                  'apikey': SUPABASE_ANON_KEY,
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json'
+                },
+                cache: 'no-store',
+                signal: controller.signal
+              }
+            );
+            
+            clearTimeout(timeoutId);
+            
+            if (activeResponse.ok) {
                 allDeliveries = await activeResponse.json();
                 console.log('✅ Fetched delivery_requests via simple query:', allDeliveries.length, 'deliveries');
                 console.log('🔍 About to start filtering...');
-              } else {
-                const errorText = await activeResponse.text();
+            } else {
+              const errorText = await activeResponse.text();
                 console.warn('⚠️ Simple query also failed:', activeResponse.status, errorText);
               }
             }
@@ -786,80 +786,70 @@ export const useDeliveryProviderData = () => {
       let poNumberMap = new Map<string, string>();
       if (uniquePOIds.length > 0) {
         try {
-          // Use Supabase client instead of direct fetch - better RLS handling
-          // Split into batches if too many IDs
-          // Add overall timeout to po_number fetching (max 8 seconds total)
-          const poNumberFetchStartTime = Date.now();
-          const maxPoNumberFetchTime = 8000; // 8 seconds max
+          console.log('🔍 Fetching po_numbers for', uniquePOIds.length, 'purchase orders using single query...');
           
-          const batchSize = 50;
-          let batchesProcessed = 0;
-          for (let i = 0; i < uniquePOIds.length; i += batchSize) {
-            // Check if we've exceeded the max time
-            if (Date.now() - poNumberFetchStartTime > maxPoNumberFetchTime) {
-              console.warn('⏱️ po_number fetching exceeded max time, skipping remaining batches');
-              break;
-            }
+          // Use single query with all IDs - PostgreSQL can handle large IN clauses efficiently
+          // Use direct REST API for better performance and timeout control
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+          
+          // Build the query with all IDs in a single IN clause
+          // PostgREST syntax: id=in.(uuid1,uuid2,uuid3)
+          const idsParam = uniquePOIds.join(',');
+          const queryUrl = `${SUPABASE_URL}/rest/v1/purchase_orders?id=in.(${idsParam})&select=id,po_number&limit=1000`;
+          
+          try {
+            const poResponse = await fetch(queryUrl, {
+              headers: {
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=representation'
+              },
+              cache: 'no-store',
+              signal: controller.signal
+            });
             
-            const batch = uniquePOIds.slice(i, i + batchSize);
-            batchesProcessed++;
+            clearTimeout(timeoutId);
             
-            console.log(`🔍 Querying purchase_orders for batch ${batchesProcessed}:`, batch.length, 'IDs using Supabase client');
-            
-            try {
-              // Add timeout to prevent hanging (reduced to 3 seconds per batch)
-              const timeoutPromise = new Promise<never>((_, reject) => {
-                setTimeout(() => reject(new Error('Query timeout after 3 seconds')), 3000);
+            if (poResponse.ok) {
+              const poNumbers = await poResponse.json();
+              console.log(`✅ Received ${poNumbers.length} purchase orders with po_numbers`);
+              
+              poNumbers.forEach((po: any) => {
+                if (po.id && po.po_number && po.po_number.trim() !== '') {
+                  poNumberMap.set(po.id, po.po_number);
+                  console.log('📋 Found po_number for', po.id.slice(0, 8), ':', po.po_number);
+                } else if (po.id) {
+                  console.warn('⚠️ po_number is missing or empty for purchase_order:', po.id.slice(0, 8));
+                }
               });
               
-              const queryPromise = supabase
-                .from('purchase_orders')
-                .select('id, po_number')
-                .in('id', batch)
-                .limit(100);
-              
-              const { data: poNumbers, error: poError } = await Promise.race([
-                queryPromise,
-                timeoutPromise
-              ]) as any;
-              
-              if (poError) {
-                console.error(`❌ Batch ${Math.floor(i/batchSize) + 1} error:`, poError.message);
-                // If RLS error, log it specifically
-                if (poError.message.includes('policy') || poError.message.includes('permission') || poError.message.includes('RLS')) {
-                  console.error('   ⚠️ RLS POLICY ISSUE: Delivery provider may not have access to purchase_orders');
-                  console.error('   💡 Solution: Run migration 20260305_add_delivery_provider_purchase_orders_access.sql');
-                }
-              } else if (poNumbers) {
-                console.log(`✅ Batch ${Math.floor(i/batchSize) + 1}: Received ${poNumbers.length} purchase orders from Supabase`);
-                poNumbers.forEach((po: any) => {
-                  if (po.id) {
-                    // Only use actual po_number from database, don't generate fallback here
-                    // Fallback will be generated later if needed
-                    if (po.po_number && po.po_number.trim() !== '') {
-                      poNumberMap.set(po.id, po.po_number);
-                      console.log('📋 Found po_number for', po.id.slice(0, 8), ':', po.po_number);
-                    } else {
-                      console.warn('⚠️ po_number is missing or empty for purchase_order:', po.id.slice(0, 8), '- purchase order exists but has no po_number!');
-                    }
-                  }
-                });
-              }
-            } catch (e: any) {
-              console.error(`❌ Batch ${Math.floor(i/batchSize) + 1} exception:`, e.message);
-              if (e.message.includes('timeout')) {
-                console.error('   ⏱️ Query timed out - RLS policy may be blocking or table may not exist');
+              console.log('✅ Total: Fetched order numbers for', poNumberMap.size, 'out of', uniquePOIds.length, 'purchase orders');
+            } else {
+              const errorText = await poResponse.text();
+              console.error('❌ Error fetching po_numbers:', poResponse.status, errorText);
+              if (poResponse.status === 401 || poResponse.status === 403) {
+                console.error('   ⚠️ RLS POLICY ISSUE: Delivery provider may not have access to purchase_orders');
                 console.error('   💡 Solution: Run migration 20260305_add_delivery_provider_purchase_orders_access.sql');
               }
             }
+          } catch (fetchError: any) {
+            clearTimeout(timeoutId);
+            if (fetchError.name === 'AbortError') {
+              console.error('⏱️ po_number query timed out after 5 seconds');
+              console.error('   💡 This might be due to RLS policy blocking access or too many IDs');
+              console.error('   💡 Solution: Run migration 20260305_add_delivery_provider_purchase_orders_access.sql');
+            } else {
+              console.error('❌ Exception fetching po_numbers:', fetchError.message);
+            }
           }
-          console.log('✅ Total: Fetched order numbers for', poNumberMap.size, 'out of', uniquePOIds.length, 'purchase orders');
           
           // Log which purchase_order_ids didn't get po_numbers
           const missingPOIds = uniquePOIds.filter(id => !poNumberMap.has(id));
           if (missingPOIds.length > 0) {
-            console.warn('⚠️ Missing po_numbers for', missingPOIds.length, 'purchase_order_ids:', missingPOIds.map(id => id.slice(0, 8)));
-            console.warn('   This could mean: 1) purchase_orders don\'t exist, 2) po_number is null/empty, or 3) query failed');
+            console.warn('⚠️ Missing po_numbers for', missingPOIds.length, 'purchase_order_ids');
+            console.warn('   This could mean: 1) purchase_orders don\'t exist, 2) po_number is null/empty, 3) query failed, or 4) RLS blocking');
           }
         } catch (e) {
           console.error('❌ Error fetching order numbers:', e);
@@ -1005,13 +995,21 @@ export const useDeliveryProviderData = () => {
       
       // Log order numbers for debugging
       const withOrderNumbers = allActiveDeliveries.filter((d: any) => d.order_number).length;
+      const withRealOrderNumbers = allActiveDeliveries.filter((d: any) => 
+        d.order_number && (!d.order_number.startsWith('PO-') || (d.order_number.startsWith('PO-') && d.order_number.length > 11))
+      ).length;
       console.log('📋 Order numbers assigned:', withOrderNumbers, 'out of', allActiveDeliveries.length, 'deliveries');
+      console.log('📋 Real order numbers (not fallback):', withRealOrderNumbers, 'out of', allActiveDeliveries.length);
+      
+      // Note: allActiveDeliveries will be set at the end with setActiveDeliveries(allActiveDeliveries)
+      // The po_numbers are already updated in the allActiveDeliveries array above
       
       console.log('📦 Active deliveries loaded:', {
         from_delivery_requests: activeData?.length || 0,
         from_purchase_orders: purchaseOrdersData?.length || 0,
         total: allActiveDeliveries.length,
-        userId: userId
+        userId: userId,
+        withRealOrderNumbers: withRealOrderNumbers
       });
       
       // Debug: Log all statuses found
@@ -1090,7 +1088,9 @@ export const useDeliveryProviderData = () => {
         }
       }
       
-      setActiveDeliveries(allActiveDeliveries);
+      // Create new array reference to ensure React detects changes
+      setActiveDeliveries([...allActiveDeliveries]);
+      console.log('✅ Final: Set active deliveries with', allActiveDeliveries.length, 'deliveries');
 
       // Fetch completed deliveries for THIS provider only
       // Fetch from BOTH delivery_requests AND purchase_orders tables
