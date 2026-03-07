@@ -1912,14 +1912,23 @@ export const useDeliveryProviderData = () => {
       });
       
       // Helper function to check if order number is REAL (not a fallback)
+      // BUT: Include orders even without order_number if they're marked as delivered
+      // This ensures we don't lose valid delivered orders that might have missing order_number
       const historyHasRealOrderNumber = (d: any) => {
+        // If order is delivered/completed, include it even without order_number
+        // (matches supplier dashboard logic: all items receive_scanned = true)
+        if (['delivered', 'completed', 'received'].includes(d.status)) {
+          return true; // Include delivered orders even without order_number
+        }
+        
+        // For non-delivered orders, require real order_number
         if (!d.order_number || !d.order_number.trim()) return false;
         // Fallback format is exactly "PO-" + 8 hex chars (e.g., PO-91623C3B)
         const isFallback = /^PO-[A-F0-9]{8}$/i.test(d.order_number);
         return !isFallback;
       };
       
-      // Filter out fake orders from history too
+      // Filter out fake orders from history, but keep delivered orders
       const filteredHistory = sortedHistory.filter(historyHasRealOrderNumber);
       
       console.log('📦 Delivery history loaded:', {
