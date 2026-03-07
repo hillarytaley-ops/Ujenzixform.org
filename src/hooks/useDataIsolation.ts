@@ -1254,9 +1254,132 @@ export const useDeliveryProviderData = () => {
         }
       }
       
+      // ============================================================
+      // CATEGORIZE DELIVERIES BASED ON MATERIAL_ITEMS SCAN STATUS
+      // Same logic as supplier dashboard QR Codes Management
+      // ============================================================
+      // Fetch material_items for all purchase_orders to determine actual status
+      const categorizedDeliveries = await (async () => {
+        try {
+          // Get all unique purchase_order_ids from active deliveries
+          const purchaseOrderIds = [...new Set(
+            allActiveDeliveries
+              .map((d: any) => d.purchase_order_id)
+              .filter(Boolean)
+          )];
+          
+          if (purchaseOrderIds.length === 0) {
+            console.log('📦 No purchase_order_ids found, using status-based categorization');
+            return allActiveDeliveries;
+          }
+          
+          console.log('📦 Fetching material_items for', purchaseOrderIds.length, 'purchase orders...');
+          
+          // Fetch material_items in batches (max 100 per query)
+          const batches: string[][] = [];
+          for (let i = 0; i < purchaseOrderIds.length; i += 100) {
+            batches.push(purchaseOrderIds.slice(i, i + 100));
+          }
+          
+          const materialItemsMap = new Map<string, any[]>();
+          
+          for (const batch of batches) {
+            const idsList = batch.join(',');
+            try {
+              const itemsResponse = await fetch(
+                `${SUPABASE_URL}/rest/v1/material_items?purchase_order_id=in.(${idsList})&select=id,purchase_order_id,dispatch_scanned,receive_scanned&limit=1000`,
+                {
+                  headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                  },
+                  cache: 'no-store',
+                  signal: AbortSignal.timeout(5000)
+                }
+              );
+              
+              if (itemsResponse.ok) {
+                const items = await itemsResponse.json();
+                // Group items by purchase_order_id
+                items.forEach((item: any) => {
+                  const poId = item.purchase_order_id;
+                  if (!materialItemsMap.has(poId)) {
+                    materialItemsMap.set(poId, []);
+                  }
+                  materialItemsMap.get(poId)!.push(item);
+                });
+              }
+            } catch (e: any) {
+              console.warn('⚠️ Error fetching material_items batch:', e?.message || e);
+            }
+          }
+          
+          console.log('📦 Fetched material_items for', materialItemsMap.size, 'purchase orders');
+          
+          // Categorize each delivery based on material_items scan status
+          // Logic matches EnhancedQRCodeManager:
+          // - Scheduled: No items have dispatch_scanned = true
+          // - In Transit: All items have dispatch_scanned = true, and some have receive_scanned = true
+          // - Delivered: All items have receive_scanned = true
+          
+          const categorized = allActiveDeliveries.map((delivery: any) => {
+            const poId = delivery.purchase_order_id;
+            const items = materialItemsMap.get(poId) || [];
+            
+            if (items.length === 0) {
+              // No material_items found, use status-based categorization
+              return { ...delivery, _categorized_status: delivery.status };
+            }
+            
+            const hasDispatchedItems = items.some((item: any) => item.dispatch_scanned === true);
+            const hasReceivedItems = items.some((item: any) => item.receive_scanned === true);
+            const allItemsDispatched = items.every((item: any) => item.dispatch_scanned === true);
+            const allItemsReceived = items.every((item: any) => item.receive_scanned === true);
+            
+            let categorizedStatus = delivery.status; // Default to original status
+            
+            if (allItemsReceived) {
+              // All items received = delivered
+              categorizedStatus = 'delivered';
+            } else if (allItemsDispatched && hasReceivedItems) {
+              // All dispatched, some received = in transit
+              categorizedStatus = 'in_transit';
+            } else if (hasDispatchedItems) {
+              // Some or all dispatched, none received = dispatched/in_transit
+              categorizedStatus = 'in_transit';
+            } else {
+              // No items dispatched = scheduled
+              categorizedStatus = 'scheduled';
+            }
+            
+            return {
+              ...delivery,
+              _categorized_status: categorizedStatus,
+              _items_count: items.length,
+              _dispatched_count: items.filter((i: any) => i.dispatch_scanned).length,
+              _received_count: items.filter((i: any) => i.receive_scanned).length
+            };
+          });
+          
+          const statusCounts = categorized.reduce((acc: any, d: any) => {
+            acc[d._categorized_status] = (acc[d._categorized_status] || 0) + 1;
+            return acc;
+          }, {});
+          
+          console.log('📊 Categorized deliveries by material_items scan status:', statusCounts);
+          
+          return categorized;
+        } catch (e: any) {
+          console.warn('⚠️ Error categorizing deliveries by material_items:', e?.message || e);
+          // Fallback to original deliveries if categorization fails
+          return allActiveDeliveries;
+        }
+      })();
+      
       // Create new array reference to ensure React detects changes
-      setActiveDeliveries([...allActiveDeliveries]);
-      console.log('✅ Final: Set active deliveries with', allActiveDeliveries.length, 'deliveries');
+      setActiveDeliveries([...categorizedDeliveries]);
+      console.log('✅ Final: Set active deliveries with', categorizedDeliveries.length, 'deliveries (categorized by material_items)');
 
       // Fetch completed deliveries for THIS provider only
       // Fetch from BOTH delivery_requests AND purchase_orders tables

@@ -1097,12 +1097,18 @@ const DeliveryDashboard = () => {
                     <Calendar className="h-4 w-4" />
                     Scheduled
                     {(() => {
-                      // Only count accepted deliveries for this provider
-                      // activeDeliveries is already filtered by provider, so just check status
-                      const acceptedStatuses = ['assigned', 'accepted', 'scheduled', 'pending_pickup', 'delivery_assigned', 'ready_for_dispatch', 'provider_assigned'];
-                      const scheduledCount = activeDeliveries.filter(d => 
-                        acceptedStatuses.includes(d.status)
-                      ).length;
+                      // Use _categorized_status if available (from material_items scan status), otherwise fallback to status
+                      const scheduledCount = activeDeliveries.filter(d => {
+                        const status = d._categorized_status || d.status;
+                        // Scheduled: no items dispatched yet
+                        return status === 'scheduled' || 
+                               status === 'accepted' || 
+                               status === 'assigned' || 
+                               status === 'pending_pickup' || 
+                               status === 'delivery_assigned' || 
+                               status === 'ready_for_dispatch' || 
+                               status === 'provider_assigned';
+                      }).length;
                       
                       return scheduledCount > 0 ? (
                         <Badge className="ml-1 bg-blue-500 text-white text-xs">
@@ -1114,23 +1120,24 @@ const DeliveryDashboard = () => {
                   <TabsTrigger value="in_transit" className="flex items-center gap-2">
                     <Truck className="h-4 w-4" />
                     In Transit
-                    {activeDeliveries.filter(d => 
-                      d.status === 'in_transit' || 
-                      d.status === 'picked_up' ||
-                      d.status === 'on_the_way' ||
-                      d.status === 'near_destination' ||
-                      d.status === 'dispatched'
-                    ).length > 0 && (
-                      <Badge className="ml-1 bg-purple-500 text-white text-xs">
-                        {activeDeliveries.filter(d => 
-                          d.status === 'in_transit' || 
-                          d.status === 'picked_up' ||
-                          d.status === 'on_the_way' ||
-                          d.status === 'near_destination' ||
-                          d.status === 'dispatched'
-                        ).length}
-                      </Badge>
-                    )}
+                    {(() => {
+                      const inTransitCount = activeDeliveries.filter(d => {
+                        const status = d._categorized_status || d.status;
+                        return status === 'in_transit' || 
+                               status === 'picked_up' ||
+                               status === 'on_the_way' ||
+                               status === 'near_destination' ||
+                               status === 'dispatched' ||
+                               status === 'shipped' ||
+                               status === 'out_for_delivery';
+                      }).length;
+                      
+                      return inTransitCount > 0 ? (
+                        <Badge className="ml-1 bg-purple-500 text-white text-xs">
+                          {inTransitCount}
+                        </Badge>
+                      ) : null;
+                    })()}
                   </TabsTrigger>
                   <TabsTrigger value="delivered" className="flex items-center gap-2">
                     <CheckCircle className="h-4 w-4" />
@@ -1145,36 +1152,24 @@ const DeliveryDashboard = () => {
                 <TabsContent value="scheduled" className="mt-4">
                   <div className="space-y-4">
                     {(() => {
-                      // Scheduled tab should ONLY show deliveries that have been ACCEPTED by THIS provider
-                      // activeDeliveries is already filtered by provider_id in useDeliveryProviderData
-                      // So we just need to check status - only show 'accepted' status (set when provider clicks Accept)
+                      // Use _categorized_status from material_items scan status (same logic as supplier dashboard)
+                      // Scheduled = no items dispatched yet
                       const scheduled = activeDeliveries.filter(d => {
-                        // When provider accepts via Accept button, status is set to 'accepted'
-                        // Only show deliveries with 'accepted' status (not 'assigned' which might be system-assigned)
-                        const isAccepted = d.status === 'accepted';
-                        
-                        // Debug logging for first few deliveries
-                        if (activeDeliveries.indexOf(d) < 3) {
-                          console.log('📋 Sample delivery for scheduled filter:', {
-                            id: d.id,
-                            status: d.status,
-                            provider_id: d.provider_id,
-                            delivery_provider_id: d.delivery_provider_id,
-                            user_id: user?.id,
-                            isAccepted,
-                            willInclude: isAccepted
-                          });
-                        }
-                        
-                        // Only show deliveries with 'accepted' status
-                        // activeDeliveries is already filtered to this provider, so we just check status
-                        return isAccepted;
+                        const status = d._categorized_status || d.status;
+                        // Scheduled: no items have dispatch_scanned = true
+                        return status === 'scheduled' || 
+                               status === 'accepted' || 
+                               status === 'assigned' || 
+                               status === 'pending_pickup' || 
+                               status === 'delivery_assigned' || 
+                               status === 'ready_for_dispatch' || 
+                               status === 'provider_assigned';
                       });
                       
                       // Debug logging
                       if (activeDeliveries.length > 0 && scheduled.length === 0) {
                         console.log('⚠️ Scheduled filter: Found', activeDeliveries.length, 'active deliveries but 0 scheduled');
-                        console.log('📋 All statuses in activeDeliveries:', [...new Set(activeDeliveries.map(d => d.status))]);
+                        console.log('📋 All statuses in activeDeliveries:', [...new Set(activeDeliveries.map(d => d._categorized_status || d.status))]);
                       } else if (scheduled.length > 0) {
                         console.log('✅ Scheduled filter: Found', scheduled.length, 'scheduled deliveries');
                       }
@@ -1220,31 +1215,38 @@ const DeliveryDashboard = () => {
                 <TabsContent value="in_transit" className="mt-4">
                   <div className="space-y-4">
                     {(() => {
-                      const inTransit = activeDeliveries.filter(d => 
-                        d.status === 'in_transit' || 
-                        d.status === 'picked_up' ||
-                        d.status === 'on_the_way' ||
-                        d.status === 'near_destination' ||
-                        d.status === 'dispatched' ||
-                        d.status === 'shipped' ||
-                        d.status === 'out_for_delivery' ||
-                        d.status === 'delivery_arrived' ||
-                        d.status === 'ready_for_dispatch' ||
-                        d.status === 'processing' // Some orders may be in processing after dispatch
-                      );
+                      // Use _categorized_status from material_items scan status
+                      // In Transit = all items dispatched, some received
+                      const inTransit = activeDeliveries.filter(d => {
+                        const status = d._categorized_status || d.status;
+                        return status === 'in_transit' || 
+                               status === 'picked_up' ||
+                               status === 'on_the_way' ||
+                               status === 'near_destination' ||
+                               status === 'dispatched' ||
+                               status === 'shipped' ||
+                               status === 'out_for_delivery' ||
+                               status === 'delivery_arrived' ||
+                               status === 'ready_for_dispatch' ||
+                               status === 'processing';
+                      });
                       
                       // Debug logging
                       if (activeDeliveries.length > 0 && inTransit.length === 0) {
                         console.log('⚠️ In Transit filter: Found', activeDeliveries.length, 'active deliveries but 0 in transit');
-                        console.log('📋 All statuses in activeDeliveries:', [...new Set(activeDeliveries.map(d => d.status))]);
+                        console.log('📋 All statuses in activeDeliveries:', [...new Set(activeDeliveries.map(d => d._categorized_status || d.status))]);
                         console.log('📋 Sample deliveries:', activeDeliveries.slice(0, 3).map(d => ({
                           id: d.id,
-                          status: d.status,
-                          source: d.source
+                          status: d._categorized_status || d.status,
+                          original_status: d.status,
+                          source: d.source,
+                          items_count: d._items_count,
+                          dispatched_count: d._dispatched_count,
+                          received_count: d._received_count
                         })));
                       } else if (inTransit.length > 0) {
                         console.log('✅ In Transit filter: Found', inTransit.length, 'in transit deliveries');
-                        console.log('📋 In Transit statuses:', [...new Set(inTransit.map(d => d.status))]);
+                        console.log('📋 In Transit statuses:', [...new Set(inTransit.map(d => d._categorized_status || d.status))]);
                       }
                       
                       return inTransit.length > 0 ? (
