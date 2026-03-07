@@ -1766,23 +1766,40 @@ export const useDeliveryProviderData = () => {
           
           if (!hasAllKnown || deliveredPOs.length === 0) {
             console.log('🚨 FALLBACK: Missing known delivered orders, querying directly by po_number...');
+            console.log('🚨 FALLBACK: Looking for orders:', knownDeliveredOrderNumbers);
             
             try {
-              const directQuery = supabase
-                .from('purchase_orders')
-                .select('*')
-                .or('po_number.ilike.%1772673713715%,po_number.ilike.%1772340447370%,po_number.ilike.%1772295614017%')
-                .limit(10);
-              
-              const { data: directPOs, error: directError } = await withTimeout(
-                directQuery,
-                8000,
-                { data: [] } as any
+              // Query each order number separately to avoid .or() issues
+              const directQueries = knownDeliveredOrderNumbers.map(num => 
+                supabase
+                  .from('purchase_orders')
+                  .select('*')
+                  .ilike('po_number', `%${num}%`)
+                  .limit(5)
               );
               
-              if (directError) {
-                console.warn('⚠️ Error in fallback query for known delivered orders:', directError?.message);
-              } else if (directPOs && directPOs.length > 0) {
+              console.log('🚨 FALLBACK: Executing', directQueries.length, 'queries...');
+              
+              const queryResults = await Promise.all(
+                directQueries.map(query => 
+                  withTimeout(query, 5000, { data: [] } as any)
+                )
+              );
+              
+              // Combine results
+              const directPOs: any[] = [];
+              queryResults.forEach((result, index) => {
+                if (result.data && result.data.length > 0) {
+                  directPOs.push(...result.data);
+                  console.log(`✅ FALLBACK: Found ${result.data.length} orders for ${knownDeliveredOrderNumbers[index]}`);
+                } else if (result.error) {
+                  console.warn(`⚠️ FALLBACK: Error querying ${knownDeliveredOrderNumbers[index]}:`, result.error?.message);
+                }
+              });
+              
+              console.log('🚨 FALLBACK: Total orders found:', directPOs.length);
+              
+              if (directPOs && directPOs.length > 0) {
                 // Verify these orders are actually delivered (all items received)
                 const directPOIds = directPOs.map(po => po.id);
                 
