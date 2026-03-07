@@ -356,9 +356,96 @@ export const useDeliveryProviderData = () => {
     }
 
     console.log('📦 useDeliveryProviderData: Fetching data for userId:', userId);
-    console.log('💡 TIP: If no deliveries show, check console logs below for status breakdown and run diagnostic SQL: supabase/migrations/20260304_diagnose_delivery_dashboard.sql');
     setLoading(true);
     setError(null);
+    
+    // ⚡ FAST PATH: Immediately load accepted orders to show in Schedule tab
+    // This runs first and sets data instantly, then the full fetch continues in background
+    try {
+      const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+      
+      let accessToken = SUPABASE_ANON_KEY;
+      try {
+        const storedSession = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+        if (storedSession) {
+          const parsed = JSON.parse(storedSession);
+          accessToken = parsed.access_token || SUPABASE_ANON_KEY;
+        }
+      } catch (e) {}
+      
+      console.log('⚡ FAST PATH: Loading accepted orders immediately for provider:', userId);
+      
+      // First, try to get the delivery_provider.id for this user
+      let providerIdToUse = userId;
+      try {
+        const providerLookup = await fetch(
+          `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${userId}&select=id&limit=1`,
+          {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`
+            }
+          }
+        );
+        if (providerLookup.ok) {
+          const providers = await providerLookup.json();
+          if (providers.length > 0) {
+            providerIdToUse = providers[0].id;
+            console.log('⚡ FAST PATH: Found delivery_provider.id:', providerIdToUse);
+          }
+        }
+      } catch (e) {}
+      
+      // Quick fetch of accepted orders with order_number - filter by provider_id
+      // Use OR filter to match either user_id or delivery_provider.id
+      const fastResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/delivery_requests?or=(provider_id.eq.${userId},provider_id.eq.${providerIdToUse})&status=eq.accepted&select=*,purchase_orders!left(id,po_number)&order=created_at.desc&limit=50`,
+        {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          cache: 'no-store'
+        }
+      );
+      
+      if (fastResponse.ok) {
+        const fastData = await fastResponse.json();
+        
+        // Helper to check if order number is real
+        const isRealOrder = (orderNum: string | null) => {
+          if (!orderNum || !orderNum.trim()) return false;
+          return !/^PO-[A-F0-9]{8}$/i.test(orderNum);
+        };
+        
+        // Process and filter to only show real orders
+        const quickDeliveries = fastData
+          .map((dr: any) => {
+            const po = Array.isArray(dr.purchase_orders) ? dr.purchase_orders[0] : dr.purchase_orders;
+            const orderNumber = dr.order_number && isRealOrder(dr.order_number) 
+              ? dr.order_number 
+              : (po?.po_number && isRealOrder(po.po_number) ? po.po_number : null);
+            return {
+              ...dr,
+              order_number: orderNumber,
+              source: 'delivery_requests'
+            };
+          })
+          .filter((d: any) => isRealOrder(d.order_number));
+        
+        if (quickDeliveries.length > 0) {
+          console.log('⚡ FAST PATH: Found', quickDeliveries.length, 'accepted orders with real order numbers');
+          setActiveDeliveries(quickDeliveries);
+          setLoading(false); // Show data immediately!
+        } else {
+          console.log('⚡ FAST PATH: No accepted orders found, continuing full fetch...');
+        }
+      }
+    } catch (e) {
+      console.warn('⚡ FAST PATH failed, continuing with full fetch:', e);
+    }
     
     // Safety timeout - finish loading after 20 seconds max (increased to allow for filtering and po_number fetch)
     const safetyTimeout = setTimeout(() => {
