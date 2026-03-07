@@ -478,6 +478,7 @@ export const useDeliveryProviderData = () => {
         setTimeout(() => reject(new Error('Profile/registration timeout')), 3000)
       );
       
+      let providerReg: any = null;
       try {
         const [profileResult, registrationResult] = await Promise.race([
           Promise.allSettled([profilePromise, registrationPromise]),
@@ -497,9 +498,13 @@ export const useDeliveryProviderData = () => {
           }
         }
         
-        // Registration is not critical, just log it
+        // Store registration data for later use in stats
         if (registrationResult?.status === 'fulfilled') {
-          console.log('✅ Registration loaded');
+          const { data: registrationData, error: registrationError } = registrationResult.value;
+          if (!registrationError && registrationData) {
+            providerReg = registrationData;
+            console.log('✅ Registration loaded');
+          }
         }
       } catch (e) {
         console.warn('⚠️ Error fetching profile/registration (non-critical):', e);
@@ -637,7 +642,7 @@ export const useDeliveryProviderData = () => {
                 .from('delivery_providers')
                 .select('id')
                 .eq('user_id', userId)
-                .single();
+                .maybeSingle();
               
               const providerTimeoutPromise = new Promise<never>((_, reject) => 
                 setTimeout(() => reject(new Error('Provider lookup timeout')), 2000)
@@ -1245,7 +1250,7 @@ export const useDeliveryProviderData = () => {
             .from('delivery_providers')
             .select('id')
             .eq('user_id', userId)
-            .single();
+            .maybeSingle();
           
           const providerTimeoutPromise = new Promise<never>((_, reject) => 
             setTimeout(() => reject(new Error('Provider lookup timeout')), 3000)
