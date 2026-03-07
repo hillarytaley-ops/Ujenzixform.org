@@ -6,6 +6,9 @@
 --
 -- Solution: Add RLS policy allowing delivery providers to read material_items
 -- for purchase_orders that are assigned to them via delivery_requests.
+--
+-- Note: delivery_providers.user_id directly references auth.users(id),
+-- so we check dp.user_id = auth.uid() directly without joining profiles.
 -- ============================================================
 
 -- Drop existing policy if it exists (to avoid conflicts)
@@ -16,24 +19,16 @@ CREATE POLICY "Delivery providers can view assigned material items"
 ON material_items
 FOR SELECT
 USING (
-  -- Check if user is a delivery provider
-  EXISTS (
-    SELECT 1
-    FROM delivery_providers dp
-    JOIN profiles p ON dp.user_id = p.id
-    WHERE p.user_id = auth.uid()
-  )
-  AND
   -- Check if the material_item belongs to a purchase_order assigned to this provider
+  -- delivery_providers.user_id directly references auth.users(id), so we can check directly
   EXISTS (
     SELECT 1
     FROM purchase_orders po
     JOIN delivery_requests dr ON dr.purchase_order_id = po.id
     JOIN delivery_providers dp ON dr.provider_id = dp.id
-    JOIN profiles p ON dp.user_id = p.id
     WHERE po.id = material_items.purchase_order_id
-    AND p.user_id = auth.uid()
-    AND dr.status IN ('accepted', 'assigned', 'picked_up', 'in_transit', 'dispatched', 'out_for_delivery', 'delivery_arrived')
+    AND dp.user_id = auth.uid()
+    AND dr.status IN ('accepted', 'assigned', 'picked_up', 'in_transit', 'dispatched', 'out_for_delivery', 'delivery_arrived', 'delivered', 'completed')
   )
 );
 
@@ -44,44 +39,28 @@ CREATE POLICY "Delivery providers can update assigned material items"
 ON material_items
 FOR UPDATE
 USING (
-  -- Check if user is a delivery provider
-  EXISTS (
-    SELECT 1
-    FROM delivery_providers dp
-    JOIN profiles p ON dp.user_id = p.id
-    WHERE p.user_id = auth.uid()
-  )
-  AND
   -- Check if the material_item belongs to a purchase_order assigned to this provider
+  -- delivery_providers.user_id directly references auth.users(id), so we can check directly
   EXISTS (
     SELECT 1
     FROM purchase_orders po
     JOIN delivery_requests dr ON dr.purchase_order_id = po.id
     JOIN delivery_providers dp ON dr.provider_id = dp.id
-    JOIN profiles p ON dp.user_id = p.id
     WHERE po.id = material_items.purchase_order_id
-    AND p.user_id = auth.uid()
-    AND dr.status IN ('accepted', 'assigned', 'picked_up', 'in_transit', 'dispatched', 'out_for_delivery', 'delivery_arrived')
+    AND dp.user_id = auth.uid()
+    AND dr.status IN ('accepted', 'assigned', 'picked_up', 'in_transit', 'dispatched', 'out_for_delivery', 'delivery_arrived', 'delivered', 'completed')
   )
 )
 WITH CHECK (
   -- Same check for WITH CHECK
   EXISTS (
     SELECT 1
-    FROM delivery_providers dp
-    JOIN profiles p ON dp.user_id = p.id
-    WHERE p.user_id = auth.uid()
-  )
-  AND
-  EXISTS (
-    SELECT 1
     FROM purchase_orders po
     JOIN delivery_requests dr ON dr.purchase_order_id = po.id
     JOIN delivery_providers dp ON dr.provider_id = dp.id
-    JOIN profiles p ON dp.user_id = p.id
     WHERE po.id = material_items.purchase_order_id
-    AND p.user_id = auth.uid()
-    AND dr.status IN ('accepted', 'assigned', 'picked_up', 'in_transit', 'dispatched', 'out_for_delivery', 'delivery_arrived')
+    AND dp.user_id = auth.uid()
+    AND dr.status IN ('accepted', 'assigned', 'picked_up', 'in_transit', 'dispatched', 'out_for_delivery', 'delivery_arrived', 'delivered', 'completed')
   )
 );
 
