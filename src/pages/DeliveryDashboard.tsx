@@ -1617,7 +1617,6 @@ const DeliveryDashboard = () => {
                                   </div>
                                   <div className="flex items-center gap-4">
                                     <div className="text-right">
-                                      <p className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{formatCurrency(delivery.price)}</p>
                                       <Badge variant="outline" className={`text-xs ${
                                         delivery.status === 'delivered' || delivery.status === 'completed' 
                                           ? 'border-green-300 text-green-600' 
