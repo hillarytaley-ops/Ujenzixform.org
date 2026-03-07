@@ -86,6 +86,11 @@ interface ActiveDelivery {
   created_at?: string;
   purchase_order_id?: string; // Link to the order for QR scanning
   order_number?: string; // Purchase order number for display
+  // Categorization fields for tab filtering based on material_items scan status
+  _categorized_status?: string;
+  _items_count?: number;
+  _dispatched_count?: number;
+  _received_count?: number;
 }
 
 interface DeliveryHistory {
