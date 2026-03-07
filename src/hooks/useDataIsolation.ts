@@ -1806,22 +1806,56 @@ export const useDeliveryProviderData = () => {
       // Combine both sources and remove duplicates (prefer delivery_requests if both exist)
       const allHistory: any[] = [];
       const seenIds = new Set<string>();
+      const seenOrderNumbers = new Set<string>();
       
       // Add delivery_requests first
       (historyData || []).forEach((dr: any) => {
+        // Ensure order_number is set from po_number if available
+        if (!dr.order_number && dr.po_number) {
+          dr.order_number = dr.po_number;
+        }
         allHistory.push(dr);
         seenIds.add(dr.id);
         if (dr.purchase_order_id) {
           seenIds.add(dr.purchase_order_id);
         }
+        // Track by order_number to avoid duplicates
+        if (dr.order_number) {
+          seenOrderNumbers.add(dr.order_number);
+        }
       });
       
       // Add purchase_orders that aren't already in delivery_requests
       deliveredFromPOs.forEach((po: any) => {
-        if (!seenIds.has(po.id) && !seenIds.has(po.purchase_order_id)) {
+        // Check by ID, purchase_order_id, and order_number to avoid duplicates
+        const isDuplicate = seenIds.has(po.id) || 
+                           seenIds.has(po.purchase_order_id) ||
+                           (po.order_number && seenOrderNumbers.has(po.order_number));
+        
+        if (!isDuplicate) {
           allHistory.push(po);
           seenIds.add(po.id);
+          if (po.purchase_order_id) {
+            seenIds.add(po.purchase_order_id);
+          }
+          if (po.order_number) {
+            seenOrderNumbers.add(po.order_number);
+          }
+        } else {
+          console.log('⏭️ Skipping duplicate history entry:', {
+            id: po.id?.substring(0, 8),
+            order_number: po.order_number,
+            source: po.source
+          });
         }
+      });
+      
+      console.log('📦 Combined history:', {
+        from_delivery_requests: historyData?.length || 0,
+        from_purchase_orders: deliveredFromPOs.length,
+        total_before_dedup: (historyData?.length || 0) + deliveredFromPOs.length,
+        total_after_dedup: allHistory.length,
+        unique_order_numbers: seenOrderNumbers.size
       });
       
       // Sort by completed_at if available, otherwise by updated_at (most recent first)
