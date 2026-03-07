@@ -1761,9 +1761,12 @@ export const useDeliveryProviderData = () => {
       console.log('📦 History: Finding ALL orders where ALL material_items are receive_scanned = true');
       console.log('📦 History: This will find ALL delivered orders (NOT filtered by provider) to match supplier dashboard');
       console.log('═══════════════════════════════════════════════════════════════════════════════');
-      let deliveredPOs: any[] = [];
       
-      try {
+      // CRITICAL: Run this independently to ensure it ALWAYS executes
+      const fetchDeliveredPOs = async () => {
+        let deliveredPOs: any[] = [];
+        
+        try {
         // Step 1: Query ALL material_items where receive_scanned = true
         const { data: receivedItems, error: itemsError } = await supabase
           .from('material_items')
