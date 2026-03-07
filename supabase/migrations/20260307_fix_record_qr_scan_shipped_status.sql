@@ -40,6 +40,7 @@ DECLARE
   v_delivery_provider_id UUID;
   is_invalidated_value BOOLEAN;
   delivery_request_id UUID;
+  v_all_items_received BOOLEAN;
 BEGIN
   current_user_id := auth.uid();
   
