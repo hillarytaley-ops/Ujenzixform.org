@@ -343,10 +343,35 @@ export const ReceivingScanner: React.FC = () => {
       // DIRECT DATABASE UPDATE: Look up the material_item by QR code and update it
       // This bypasses the RPC function which may not exist
       
+      // Clean up the QR code - handle different formats
+      let cleanQRCode = qrCode.trim();
+      console.log('📦 Raw QR code scanned:', cleanQRCode);
+      
+      // If QR code is a URL, extract the code part
+      if (cleanQRCode.includes('/qr/') || cleanQRCode.includes('?code=')) {
+        const urlMatch = cleanQRCode.match(/(?:\/qr\/|[?&]code=)([^&\s]+)/);
+        if (urlMatch) {
+          cleanQRCode = urlMatch[1];
+          console.log('📦 Extracted QR code from URL:', cleanQRCode);
+        }
+      }
+      
+      // Remove any URL encoding that might have been applied
+      try {
+        cleanQRCode = decodeURIComponent(cleanQRCode);
+      } catch (e) {
+        // Already decoded or not encoded
+      }
+      
       // Step 1: Find the material_item with this QR code
-      console.log('📦 Looking up material_item with QR code:', qrCode);
-      const lookupResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${encodeURIComponent(qrCode)}&select=*`,
+      console.log('📦 Looking up material_item with QR code:', cleanQRCode);
+      
+      // Try multiple lookup strategies
+      let items: any[] = [];
+      
+      // Strategy 1: Exact match
+      let lookupResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${cleanQRCode}&select=*`,
         {
           headers: {
             'apikey': ANON_KEY,
@@ -356,23 +381,76 @@ export const ReceivingScanner: React.FC = () => {
         }
       );
       
-      if (!lookupResponse.ok) {
-        const errorText = await lookupResponse.text();
-        console.error('❌ Failed to lookup material_item:', lookupResponse.status, errorText);
-        toast.error('❌ Lookup Failed', {
-          description: 'Could not find QR code in system. Please try again.',
-          duration: 5000
-        });
-        return;
+      if (lookupResponse.ok) {
+        items = await lookupResponse.json();
+        console.log('📦 Strategy 1 (exact match) found:', items.length, 'items');
       }
       
-      const items = await lookupResponse.json();
-      console.log('📦 Found material_items:', items);
+      // Strategy 2: Try with ilike if exact match fails (case insensitive)
+      if (items.length === 0) {
+        console.log('📦 Trying case-insensitive match...');
+        lookupResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/material_items?qr_code=ilike.${cleanQRCode}&select=*`,
+          {
+            headers: {
+              'apikey': ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Accept': 'application/json'
+            }
+          }
+        );
+        if (lookupResponse.ok) {
+          items = await lookupResponse.json();
+          console.log('📦 Strategy 2 (ilike) found:', items.length, 'items');
+        }
+      }
+      
+      // Strategy 3: Try searching by partial match (QR code might be embedded in a longer string)
+      if (items.length === 0 && cleanQRCode.length > 8) {
+        console.log('📦 Trying partial match...');
+        // Try with just the last part of the code (might be a UUID or similar)
+        const partialCode = cleanQRCode.slice(-36); // UUID length
+        lookupResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/material_items?qr_code=ilike.*${partialCode}*&select=*`,
+          {
+            headers: {
+              'apikey': ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Accept': 'application/json'
+            }
+          }
+        );
+        if (lookupResponse.ok) {
+          items = await lookupResponse.json();
+          console.log('📦 Strategy 3 (partial) found:', items.length, 'items');
+        }
+      }
+      
+      // Strategy 4: Try looking up by ID if QR code looks like a UUID
+      if (items.length === 0 && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanQRCode)) {
+        console.log('📦 QR code looks like UUID, trying id lookup...');
+        lookupResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/material_items?id=eq.${cleanQRCode}&select=*`,
+          {
+            headers: {
+              'apikey': ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Accept': 'application/json'
+            }
+          }
+        );
+        if (lookupResponse.ok) {
+          items = await lookupResponse.json();
+          console.log('📦 Strategy 4 (id lookup) found:', items.length, 'items');
+        }
+      }
       
       if (!items || items.length === 0) {
+        console.error('❌ QR code not found in database:', cleanQRCode);
+        console.log('💡 TIP: Check that material_items table has a record with qr_code =', cleanQRCode);
         toast.error('❓ QR Code Not Found', {
-          description: 'This QR code is not registered in the system.',
-          duration: 5000
+          description: `QR code "${cleanQRCode.substring(0, 20)}..." is not registered. It may not be a delivery item.`,
+          duration: 6000
         });
         return;
       }
