@@ -391,29 +391,38 @@ const DeliveryDashboard = () => {
           const oldStatus = payload.old?.status;
           const newStatus = payload.new?.status;
           
-          // When supplier dispatches, status changes from 'accepted' to 'in_transit'
-          if (newStatus === 'in_transit' && oldStatus !== 'in_transit') {
+          // When supplier dispatches, status changes to 'in_transit', 'dispatched', or 'shipped'
+          const dispatchedStatuses = ['in_transit', 'dispatched', 'shipped', 'out_for_delivery'];
+          const wasNotDispatched = !dispatchedStatuses.includes(oldStatus);
+          const isNowDispatched = dispatchedStatuses.includes(newStatus);
+          
+          if (isNowDispatched && wasNotDispatched) {
             toast({
               title: '🚚 Materials Dispatched!',
-              description: 'Materials are now in transit. Check "In Transit" tab.',
+              description: 'Materials are now in transit. Switching to "In Transit" tab.',
               duration: 5000,
             });
-            // Auto-switch to In Transit tab if on Deliveries
-            if (activeTab === 'deliveries') {
-              setDeliveriesSubTab('in_transit');
-            }
+            // NAVIGATE to Deliveries > In Transit tab regardless of current tab
+            setActiveTab('deliveries');
+            setDeliveriesSubTab('in_transit');
+            console.log('🧭 Auto-navigating to Deliveries > In Transit tab');
           }
           
-          // When provider receives, status changes to 'delivered'
-          if (newStatus === 'delivered' && oldStatus !== 'delivered') {
+          // When provider receives, status changes to 'delivered' or 'completed'
+          const deliveredStatuses = ['delivered', 'completed'];
+          const wasNotDelivered = !deliveredStatuses.includes(oldStatus);
+          const isNowDelivered = deliveredStatuses.includes(newStatus);
+          
+          if (isNowDelivered && wasNotDelivered) {
             toast({
               title: '✅ Delivery Complete!',
-              description: 'Delivery has been completed successfully. Check "Delivered" tab.',
+              description: 'Delivery has been completed successfully. Switching to "Delivered" tab.',
               duration: 5000,
             });
-            if (activeTab === 'deliveries') {
-              setDeliveriesSubTab('delivered');
-            }
+            // NAVIGATE to Deliveries > Delivered tab regardless of current tab
+            setActiveTab('deliveries');
+            setDeliveriesSubTab('delivered');
+            console.log('🧭 Auto-navigating to Deliveries > Delivered tab');
           }
           
           refetchData();
@@ -430,29 +439,43 @@ const DeliveryDashboard = () => {
         },
         (payload) => {
           console.log('📦 Purchase order status updated:', payload.new.status);
-          // When supplier dispatches, status changes to in_transit
-          if (payload.new.status === 'in_transit' && payload.old.status !== 'in_transit') {
+          const oldStatus = payload.old?.status;
+          const newStatus = payload.new?.status;
+          
+          // When supplier dispatches, status changes to in_transit, dispatched, or shipped
+          const dispatchedStatuses = ['in_transit', 'dispatched', 'shipped', 'out_for_delivery'];
+          const wasNotDispatched = !dispatchedStatuses.includes(oldStatus);
+          const isNowDispatched = dispatchedStatuses.includes(newStatus);
+          
+          if (isNowDispatched && wasNotDispatched) {
             toast({
               title: '🚚 Materials Dispatched!',
-              description: 'Materials are now in transit. Check "In Transit" tab.',
+              description: 'Supplier has dispatched materials. Switching to "In Transit" tab.',
               duration: 5000,
             });
-            // Auto-switch to In Transit tab if on Deliveries
-            if (activeTab === 'deliveries') {
-              setDeliveriesSubTab('in_transit');
-            }
+            // NAVIGATE to Deliveries > In Transit tab regardless of current tab
+            setActiveTab('deliveries');
+            setDeliveriesSubTab('in_transit');
+            console.log('🧭 Auto-navigating to Deliveries > In Transit tab (from PO update)');
           }
+          
           // When delivery is completed
-          if (payload.new.status === 'delivered' || payload.new.status === 'completed') {
+          const deliveredStatuses = ['delivered', 'completed'];
+          const wasNotDelivered = !deliveredStatuses.includes(oldStatus);
+          const isNowDelivered = deliveredStatuses.includes(newStatus);
+          
+          if (isNowDelivered && wasNotDelivered) {
             toast({
               title: '✅ Delivery Complete!',
-              description: 'Delivery has been completed successfully.',
+              description: 'Delivery has been completed successfully. Switching to "Delivered" tab.',
               duration: 5000,
             });
-            if (activeTab === 'deliveries') {
-              setDeliveriesSubTab('delivered');
-            }
+            // NAVIGATE to Deliveries > Delivered tab regardless of current tab
+            setActiveTab('deliveries');
+            setDeliveriesSubTab('delivered');
+            console.log('🧭 Auto-navigating to Deliveries > Delivered tab (from PO update)');
           }
+          
           refetchData();
         }
       )
