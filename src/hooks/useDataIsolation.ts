@@ -1828,8 +1828,11 @@ export const useDeliveryProviderData = () => {
           }
         }
       } catch (e: any) {
-        console.warn('⚠️ Exception in supplier dashboard logic for history:', e?.message || e);
+        console.error('❌ CRITICAL ERROR in supplier dashboard logic for history:', e?.message || e);
+        console.error('❌ Stack trace:', e?.stack);
       }
+      
+      console.log('📦 History: Supplier dashboard logic completed. Found', deliveredPOs.length, 'delivered purchase_orders');
       
       // Enrich delivered purchase orders with supplier/buyer info
       let enrichedDeliveredPOs = deliveredPOs || [];
