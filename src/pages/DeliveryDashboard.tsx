@@ -1555,7 +1555,17 @@ const DeliveryDashboard = () => {
                         </p>
                       </div>
                     </div>
-                    <ReceivingScanner />
+                    <ReceivingScanner 
+                      onDeliveryComplete={() => {
+                        setActiveTab('deliveries');
+                        setDeliveriesSubTab('delivered');
+                        toast({
+                          title: '✅ Delivery Complete!',
+                          description: 'Order has been scanned as delivered. Switching to "Delivered" tab.',
+                          duration: 5000,
+                        });
+                      }}
+                    />
                   </div>
 
                   {/* Scanning Instructions */}

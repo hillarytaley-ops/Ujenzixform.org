@@ -23,7 +23,11 @@ interface ScanResult {
   timestamp: Date;
 }
 
-export const ReceivingScanner: React.FC = () => {
+interface ReceivingScannerProps {
+  onDeliveryComplete?: () => void;
+}
+
+export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryComplete }) => {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannerContainerId = 'receiving-qr-scanner';
   const [isScanning, setIsScanning] = useState(false);
@@ -825,6 +829,12 @@ export const ReceivingScanner: React.FC = () => {
               );
               
               console.log('✅ All items delivered - order marked as complete');
+              
+              // Trigger callback to switch to delivered tab
+              if (onDeliveryComplete) {
+                console.log('🔄 Triggering onDeliveryComplete callback');
+                onDeliveryComplete();
+              }
             }
           }
         } catch (e) {
