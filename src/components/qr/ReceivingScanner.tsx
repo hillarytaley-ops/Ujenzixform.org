@@ -202,15 +202,16 @@ export const ReceivingScanner: React.FC = () => {
           console.log('🎯 Decoded result:', decodedResult);
           
           // Debounce: prevent scanning same code within 3 seconds
-          if (decodedText === lastScannedRef.current && now - lastScanTimeRef.current < 3000) {
-            console.log('🔄 Debounced duplicate scan:', decodedText);
+          // Only debounce for 1 second (was 3 seconds - too long)
+          if (decodedText === lastScannedRef.current && now - lastScanTimeRef.current < 1000) {
+            console.log('🔄 Debounced duplicate scan (within 1s):', decodedText);
             return;
           }
           
           lastScannedRef.current = decodedText;
           lastScanTimeRef.current = now;
           
-          console.log('✅ Processing QR Code:', decodedText);
+          console.log('✅ PROCESSING QR CODE NOW:', decodedText);
           
           // Vibrate on successful scan (mobile)
           if (navigator.vibrate) {
