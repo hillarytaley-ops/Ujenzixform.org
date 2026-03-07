@@ -172,12 +172,22 @@ export const ReceivingScanner: React.FC = () => {
         console.log('📷 Using facing mode:', facing);
       }
 
+      // Adjust scanner config based on device type
+      // Desktop/laptop webcams need different settings than mobile cameras
+      const qrboxSize = isMobile ? { width: 250, height: 250 } : { width: 300, height: 300 };
+      const scannerFps = isMobile ? 10 : 15; // Higher FPS for desktop
+      
       const scannerConfig = {
-        fps: 10,
-        qrbox: { width: 250, height: 250 },
+        fps: scannerFps,
+        qrbox: qrboxSize,
         rememberLastUsedCamera: true,
         supportedScanTypes: [],
         formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+        aspectRatio: isMobile ? 1.0 : 1.333, // 4:3 for desktop
+        disableFlip: false, // Allow flipped images (mirror mode)
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true // Use native API if available
+        }
       };
 
       console.log('🎥 Starting scanner with config:', scannerConfig);
@@ -718,13 +728,48 @@ export const ReceivingScanner: React.FC = () => {
           )}
           
           {/* Camera View - html5-qrcode creates its own video element */}
-          <div className="relative bg-black rounded-lg overflow-hidden min-h-[300px]">
+          <div className="relative bg-black rounded-lg overflow-hidden" style={{ minHeight: isMobile ? '300px' : '400px' }}>
             {/* Scanner container - html5-qrcode will render here */}
             <div 
               id={scannerContainerId} 
               className="w-full"
-              style={{ minHeight: '300px' }}
+              style={{ minHeight: isMobile ? '300px' : '400px' }}
             />
+            
+            {/* Scanning Frame Overlay for Desktop/Laptop - helps users position QR code */}
+            {isScanning && !isMobile && (
+              <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                {/* Scanning frame with animated corners */}
+                <div className="relative" style={{ width: '300px', height: '300px' }}>
+                  {/* Corner brackets */}
+                  <div className="absolute top-0 left-0 w-12 h-12 border-t-4 border-l-4 border-green-500 rounded-tl-lg"></div>
+                  <div className="absolute top-0 right-0 w-12 h-12 border-t-4 border-r-4 border-green-500 rounded-tr-lg"></div>
+                  <div className="absolute bottom-0 left-0 w-12 h-12 border-b-4 border-l-4 border-green-500 rounded-bl-lg"></div>
+                  <div className="absolute bottom-0 right-0 w-12 h-12 border-b-4 border-r-4 border-green-500 rounded-br-lg"></div>
+                  
+                  {/* Scanning line animation */}
+                  <div 
+                    className="absolute left-4 right-4 h-1 bg-gradient-to-r from-transparent via-green-500 to-transparent"
+                    style={{
+                      animation: 'scanLine 2s ease-in-out infinite',
+                      top: '50%'
+                    }}
+                  ></div>
+                  <style>{`
+                    @keyframes scanLine {
+                      0%, 100% { top: 10%; opacity: 0.5; }
+                      50% { top: 90%; opacity: 1; }
+                    }
+                  `}</style>
+                  
+                  {/* Center crosshair */}
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6">
+                    <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-green-500/50"></div>
+                    <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-green-500/50"></div>
+                  </div>
+                </div>
+              </div>
+            )}
             
             {/* Not scanning overlay */}
             {!isScanning && !cameraError && (
@@ -732,7 +777,7 @@ export const ReceivingScanner: React.FC = () => {
                 <div className="text-center text-white">
                   <Camera className="h-12 w-12 mx-auto mb-2 opacity-50" />
                   <p className="text-sm opacity-70">Camera not active</p>
-                  <p className="text-xs opacity-50">Tap "Start Scanner" to begin</p>
+                  <p className="text-xs opacity-50">Click "Start Scanner" to begin</p>
                 </div>
               </div>
             )}
@@ -740,8 +785,17 @@ export const ReceivingScanner: React.FC = () => {
             {/* Scanning indicator */}
             {isScanning && (
               <div className="absolute bottom-4 left-0 right-0 text-center pointer-events-none">
-                <span className="bg-green-600 text-white text-sm px-3 py-1 rounded-full animate-pulse">
+                <span className="bg-green-600 text-white text-sm px-3 py-1 rounded-full animate-pulse shadow-lg">
                   🔍 Scanning for QR codes...
+                </span>
+              </div>
+            )}
+            
+            {/* Desktop scanning tips */}
+            {isScanning && !isMobile && (
+              <div className="absolute top-4 left-0 right-0 text-center pointer-events-none">
+                <span className="bg-black/60 text-white text-xs px-3 py-1 rounded-full">
+                  📷 Position QR code within the green frame
                 </span>
               </div>
             )}
@@ -808,6 +862,21 @@ export const ReceivingScanner: React.FC = () => {
                 <li>Ensure QR code is well-lit</li>
                 <li>Keep phone steady while scanning</li>
                 <li>Use flash in low light conditions</li>
+              </ul>
+            </div>
+          )}
+
+          {/* Desktop/Laptop Tips */}
+          {!isMobile && isScanning && (
+            <div className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
+              <p className="font-medium mb-1 text-blue-800 dark:text-blue-200">💻 Laptop/Desktop Scanning Tips:</p>
+              <ul className="list-disc list-inside space-y-0.5 text-blue-700 dark:text-blue-300">
+                <li>Position QR code within the <strong>green frame</strong></li>
+                <li>Hold the QR code <strong>8-15 inches</strong> from the webcam</li>
+                <li>Ensure good lighting - avoid backlighting</li>
+                <li>Keep the QR code <strong>flat and steady</strong></li>
+                <li>If not detecting, try <strong>moving closer or further</strong></li>
+                <li>You can also use "Physical Scanner Input" below for USB scanners</li>
               </ul>
             </div>
           )}
