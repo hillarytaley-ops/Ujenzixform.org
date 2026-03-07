@@ -255,6 +255,12 @@ export const ReceivingScanner: React.FC = () => {
           
           console.log('✅ PROCESSING QR CODE NOW:', decodedText);
           
+          // Show success message immediately
+          toast.success('✅ QR Code Scanned Successfully!', {
+            description: `Processing: ${decodedText.substring(0, 30)}...`,
+            duration: 3000,
+          });
+          
           // Vibrate on successful scan (mobile)
           if (navigator.vibrate) {
             navigator.vibrate([100, 50, 100]);
