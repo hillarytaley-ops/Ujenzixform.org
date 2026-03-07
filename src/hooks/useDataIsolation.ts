@@ -1518,6 +1518,7 @@ export const useDeliveryProviderData = () => {
         }
         
         // Fallback query: by user_id directly (in case some records use user_id as provider_id)
+        // ALWAYS include this query, even if providerId lookup failed
         queries.push(
           supabase
             .from('delivery_requests')
@@ -1539,6 +1540,49 @@ export const useDeliveryProviderData = () => {
               return [];
             })
         );
+        
+        // Also try querying by delivery_provider_id from purchase_orders
+        // Some orders might be linked through purchase_orders.delivery_provider_id = userId
+        if (!providerId) {
+          // If provider lookup failed, try to find delivery_requests via purchase_orders
+          try {
+            const poQuery = supabase
+              .from('purchase_orders')
+              .select('id, delivery_provider_id')
+              .eq('delivery_provider_id', userId)
+              .limit(100);
+            
+            const poTimeout = new Promise<never>((_, reject) => 
+              setTimeout(() => reject(new Error('PO lookup timeout')), 3000)
+            );
+            
+            const { data: pos } = await Promise.race([poQuery, poTimeout]).catch(() => ({ data: [] })) as any;
+            
+            if (pos && pos.length > 0) {
+              const poIds = pos.map((po: any) => po.id);
+              queries.push(
+                supabase
+                  .from('delivery_requests')
+                  .select('*')
+                  .in('purchase_order_id', poIds)
+                  .not('status', 'eq', 'cancelled')
+                  .order('updated_at', { ascending: false })
+                  .limit(200)
+                  .then(({ data, error }) => {
+                    if (error) {
+                      console.warn('⚠️ Error fetching delivery_requests via purchase_orders:', error);
+                      return [];
+                    }
+                    console.log('✅ Fetched', data?.length || 0, 'delivery_requests via purchase_orders for history check');
+                    return data || [];
+                  })
+                  .catch(() => [])
+              );
+            }
+          } catch (e) {
+            console.warn('⚠️ Exception querying delivery_requests via purchase_orders:', e);
+          }
+        }
         
         // Execute all queries in parallel and merge results
         const results = await Promise.all(queries);
@@ -1706,12 +1750,29 @@ export const useDeliveryProviderData = () => {
       // 2. From purchase_orders table - fetch delivered items
       // CRITICAL: Also fetch orders where all material_items are receive_scanned = true
       // This matches the supplier dashboard logic (QR Code Management)
-      const { data: allPOsForProvider, error: poHistoryError } = await supabase
-        .from('purchase_orders')
-        .select('*')
-        .eq('delivery_provider_id', userId)
-        .order('updated_at', { ascending: false })
-        .limit(200); // Fetch more to check material_items scan status
+      // Use userId directly (delivery_provider_id in purchase_orders is the auth user_id, not delivery_provider.id)
+      let allPOsForProvider: any[] = [];
+      let poHistoryError: any = null;
+      
+      try {
+        const { data, error } = await supabase
+          .from('purchase_orders')
+          .select('*')
+          .eq('delivery_provider_id', userId)
+          .order('updated_at', { ascending: false })
+          .limit(200); // Fetch more to check material_items scan status
+        
+        if (error) {
+          poHistoryError = error;
+          console.warn('⚠️ Error fetching purchase_orders for history:', error);
+        } else {
+          allPOsForProvider = data || [];
+          console.log('📦 Fetched', allPOsForProvider.length, 'purchase_orders for history check');
+        }
+      } catch (e: any) {
+        poHistoryError = e;
+        console.warn('⚠️ Exception fetching purchase_orders for history:', e?.message || e);
+      }
 
       if (poHistoryError) {
         console.warn('Error fetching purchase_orders for history:', poHistoryError);
