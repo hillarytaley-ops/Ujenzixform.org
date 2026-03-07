@@ -1447,6 +1447,7 @@ export const useDeliveryProviderData = () => {
 
       // Fetch completed deliveries for THIS provider only
       // Fetch from BOTH delivery_requests AND purchase_orders tables
+      console.log('📦 Starting history fetch for userId:', userId);
       
       // 1. From delivery_requests table
       // Get delivery_provider.id first, then query by that (provider_id in delivery_requests is delivery_provider.id, not user_id)
@@ -1454,6 +1455,7 @@ export const useDeliveryProviderData = () => {
       let historyError: any = null;
       
       try {
+        console.log('📦 History: Starting delivery_requests history fetch...');
         // First, get the delivery_provider.id for this user with timeout
         let providerId: string | null = null;
         try {
