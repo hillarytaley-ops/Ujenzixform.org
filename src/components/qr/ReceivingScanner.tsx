@@ -334,7 +334,14 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
             // Audio not supported
           }
           
-          processQRScan(decodedText, 'mobile_camera');
+          // Call processQRScan and handle errors
+          processQRScan(decodedText, 'mobile_camera').catch((error) => {
+            console.error('❌ Error in processQRScan:', error);
+            toast.error('❌ Scan Processing Error', {
+              description: 'Failed to process QR code. Please try again.',
+              duration: 5000,
+            });
+          });
         },
         (errorMessage) => {
           // Filter out common expected errors that occur during normal scanning
@@ -795,17 +802,17 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       
       const updatedItems = await updateResponse.json();
       const updatedItem = updatedItems[0] || item;
-      console.log('✅ Material item updated:', updatedItem);
-      
-      // IMMEDIATELY switch to delivered tab when item is successfully scanned
-      // This happens right after the item is marked as received
-      if (onDeliveryComplete) {
-        console.log('🔄 Triggering onDeliveryComplete callback - moving to Delivered tab NOW');
-        onDeliveryComplete();
-      }
+      console.log('✅ Material item updated successfully:', updatedItem.id);
+      console.log('📋 Updated item data:', { 
+        id: updatedItem.id, 
+        receive_scanned: updatedItem.receive_scanned, 
+        status: updatedItem.status,
+        purchase_order_id: updatedItem.purchase_order_id 
+      });
       
       // Step 3: Update delivery_request status immediately when item is scanned
       // This moves the order to "Delivered" tab as soon as ANY item is scanned
+      let deliveryRequestUpdated = false;
       if (item.purchase_order_id) {
         try {
           console.log('📦 Updating delivery_request for purchase_order_id:', item.purchase_order_id);
@@ -833,23 +840,41 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
             const updatedDeliveryRequest = await deliveryRequestResponse.json();
             console.log('✅ Delivery request updated to delivered status:', updatedDeliveryRequest);
             console.log('📋 Updated delivery_request data:', JSON.stringify(updatedDeliveryRequest, null, 2));
+            deliveryRequestUpdated = true;
           } else {
             const errorText = await deliveryRequestResponse.text();
             console.error('❌ Could not update delivery_request status:', deliveryRequestResponse.status, errorText);
-            toast.error('⚠️ Status Update Failed', {
-              description: 'Item scanned but could not update delivery status. Please refresh the page.',
-              duration: 5000,
+            console.error('   This might be due to RLS policies or missing delivery_request record');
+            toast.warning('⚠️ Status Update Warning', {
+              description: 'Item scanned successfully, but delivery status update may have failed. Tab will still switch.',
+              duration: 4000,
             });
           }
         } catch (e) {
           console.error('❌ Error updating delivery_request:', e);
-          toast.error('❌ Update Error', {
-            description: 'Failed to update delivery status. Please check console for details.',
-            duration: 5000,
+          toast.warning('⚠️ Update Warning', {
+            description: 'Item scanned successfully, but delivery status update failed. Tab will still switch.',
+            duration: 4000,
           });
         }
       } else {
         console.warn('⚠️ No purchase_order_id found for item:', item.id);
+        console.warn('   Item data:', { id: item.id, purchase_order_id: item.purchase_order_id });
+      }
+      
+      // IMMEDIATELY switch to delivered tab when item is successfully scanned
+      // This happens regardless of whether delivery_request update succeeded
+      if (onDeliveryComplete) {
+        console.log('🔄 Triggering onDeliveryComplete callback - moving to Delivered tab NOW');
+        console.log('   Delivery request updated:', deliveryRequestUpdated);
+        try {
+          onDeliveryComplete();
+          console.log('✅ onDeliveryComplete callback executed successfully');
+        } catch (callbackError) {
+          console.error('❌ Error in onDeliveryComplete callback:', callbackError);
+        }
+      } else {
+        console.warn('⚠️ No onDeliveryComplete callback provided');
       }
       
       // Step 4: Check if all items in the order are now delivered
