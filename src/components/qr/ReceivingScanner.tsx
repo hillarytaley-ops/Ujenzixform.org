@@ -385,126 +385,126 @@ export const ReceivingScanner: React.FC = () => {
       console.log('📦 Will search for QR code variants:', qrCodeVariants);
       
       // Step 1: Find the material_item with this QR code
-      console.log('📦 Looking up material_item with QR code variants:', qrCodeVariants);
+      // Use Supabase client for proper query handling
+      console.log('📦 Looking up material_item with QR code:', cleanQRCode);
+      console.log('📦 QR code variants to try:', qrCodeVariants);
       
-      // Try multiple lookup strategies
       let items: any[] = [];
-      let lookupResponse: Response;
       
-      // Strategy 1: Try exact match for each variant
-      for (const variant of qrCodeVariants) {
-        if (items.length > 0) break;
+      // Use Supabase client which handles encoding properly
+      try {
+        // Strategy 1: Exact match on qr_code
+        const { data: exactMatch, error: exactError } = await supabase
+          .from('material_items')
+          .select('*')
+          .eq('qr_code', cleanQRCode)
+          .limit(1);
         
-        lookupResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${variant}&select=*`,
-          {
-            headers: {
-              'apikey': ANON_KEY,
-              'Authorization': `Bearer ${accessToken}`,
-              'Accept': 'application/json'
-            }
-          }
-        );
+        if (!exactError && exactMatch && exactMatch.length > 0) {
+          items = exactMatch;
+          console.log('✅ Found with exact qr_code match:', items[0].qr_code);
+        }
         
-        if (lookupResponse.ok) {
-          items = await lookupResponse.json();
-          if (items.length > 0) {
-            console.log('📦 Found with exact match on variant:', variant);
-          }
-        }
-      }
-      
-      // Strategy 2: Try ilike (contains) for each variant
-      if (items.length === 0) {
-        for (const variant of qrCodeVariants) {
-          if (items.length > 0) break;
-          
-          console.log('📦 Trying ilike match for:', variant);
-          lookupResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/material_items?qr_code=ilike.*${variant}*&select=*`,
-            {
-              headers: {
-                'apikey': ANON_KEY,
-                'Authorization': `Bearer ${accessToken}`,
-                'Accept': 'application/json'
-              }
-            }
-          );
-          if (lookupResponse.ok) {
-            items = await lookupResponse.json();
-            if (items.length > 0) {
-              console.log('📦 Found with ilike match on variant:', variant);
-            }
-          }
-        }
-      }
-      
-      // Strategy 3: Try looking up by ID if QR code looks like a UUID
-      if (items.length === 0) {
-        for (const variant of qrCodeVariants) {
-          if (items.length > 0) break;
-          
-          if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(variant)) {
-            console.log('📦 Variant looks like UUID, trying id lookup:', variant);
-            lookupResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/material_items?id=eq.${variant}&select=*`,
-              {
-                headers: {
-                  'apikey': ANON_KEY,
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Accept': 'application/json'
-                }
-              }
-            );
-            if (lookupResponse.ok) {
-              items = await lookupResponse.json();
-              if (items.length > 0) {
-                console.log('📦 Found with id lookup:', variant);
-              }
-            }
-          }
-        }
-      }
-      
-      // Strategy 4: Last resort - search ALL recent material items and match client-side
-      if (items.length === 0) {
-        console.log('📦 Last resort: fetching recent items to search client-side...');
-        lookupResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/material_items?select=*&order=created_at.desc&limit=200`,
-          {
-            headers: {
-              'apikey': ANON_KEY,
-              'Authorization': `Bearer ${accessToken}`,
-              'Accept': 'application/json'
-            }
-          }
-        );
-        if (lookupResponse.ok) {
-          const recentItems = await lookupResponse.json();
-          console.log('📦 Fetched', recentItems.length, 'recent items to search');
-          
-          // Try to find a match
+        // Strategy 2: Try other variants
+        if (items.length === 0) {
           for (const variant of qrCodeVariants) {
-            const found = recentItems.find((item: any) => 
-              item.qr_code?.includes(variant) || 
-              variant.includes(item.qr_code) ||
-              item.id === variant
-            );
-            if (found) {
-              items = [found];
-              console.log('📦 Found via client-side search:', found.qr_code);
+            if (items.length > 0) break;
+            if (variant === cleanQRCode) continue; // Skip already tried
+            
+            const { data, error } = await supabase
+              .from('material_items')
+              .select('*')
+              .eq('qr_code', variant)
+              .limit(1);
+            
+            if (!error && data && data.length > 0) {
+              items = data;
+              console.log('✅ Found with variant match:', variant);
               break;
             }
           }
         }
+        
+        // Strategy 3: Case-insensitive search (ilike)
+        if (items.length === 0) {
+          const { data, error } = await supabase
+            .from('material_items')
+            .select('*')
+            .ilike('qr_code', `%${cleanQRCode}%`)
+            .limit(5);
+          
+          if (!error && data && data.length > 0) {
+            items = data;
+            console.log('✅ Found with ilike search:', items.length, 'items');
+          }
+        }
+        
+        // Strategy 4: Fetch recent items and search client-side
+        if (items.length === 0) {
+          console.log('📦 Fetching recent items for client-side search...');
+          const { data: recentItems, error } = await supabase
+            .from('material_items')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(500);
+          
+          if (!error && recentItems && recentItems.length > 0) {
+            console.log('📦 Searching through', recentItems.length, 'recent items...');
+            
+            // Try to find a match - check if scanned QR contains or is contained in stored QR
+            const found = recentItems.find((item: any) => {
+              if (!item.qr_code) return false;
+              const storedQR = item.qr_code.toLowerCase();
+              const scannedQR = cleanQRCode.toLowerCase();
+              
+              // Check various matching conditions
+              return storedQR === scannedQR ||
+                     storedQR.includes(scannedQR) ||
+                     scannedQR.includes(storedQR) ||
+                     // Check if the numeric parts match
+                     storedQR.replace(/[^0-9]/g, '').includes(scannedQR.replace(/[^0-9]/g, '')) ||
+                     scannedQR.replace(/[^0-9]/g, '').includes(storedQR.replace(/[^0-9]/g, ''));
+            });
+            
+            if (found) {
+              items = [found];
+              console.log('✅ Found via client-side search! Stored QR:', found.qr_code);
+            } else {
+              // Log some sample QR codes from database for debugging
+              console.log('📦 Sample QR codes in database:');
+              recentItems.slice(0, 5).forEach((item: any) => {
+                console.log('  -', item.qr_code);
+              });
+            }
+          }
+        }
+      } catch (lookupError) {
+        console.error('❌ Lookup error:', lookupError);
       }
       
       if (!items || items.length === 0) {
-        console.error('❌ QR code not found in database:', cleanQRCode);
-        console.log('💡 TIP: Check that material_items table has a record with qr_code =', cleanQRCode);
+        console.error('❌ QR CODE NOT FOUND IN DATABASE!');
+        console.error('   Scanned value:', cleanQRCode);
+        console.error('   Variants tried:', qrCodeVariants);
+        
+        // Fetch sample to show expected format
+        try {
+          const { data: sampleItems } = await supabase
+            .from('material_items')
+            .select('qr_code')
+            .not('qr_code', 'is', null)
+            .order('created_at', { ascending: false })
+            .limit(3);
+          
+          if (sampleItems && sampleItems.length > 0) {
+            console.error('   📝 Expected QR code format (examples from database):');
+            sampleItems.forEach((s: any) => console.error('     -', s.qr_code));
+          }
+        } catch (e) { /* ignore */ }
+        
         toast.error('❓ QR Code Not Found', {
-          description: `QR code "${cleanQRCode.substring(0, 20)}..." is not registered. It may not be a delivery item.`,
-          duration: 6000
+          description: `"${cleanQRCode.substring(0, 25)}..." not in system. Open console (F12) for QR format details.`,
+          duration: 8000
         });
         return;
       }
