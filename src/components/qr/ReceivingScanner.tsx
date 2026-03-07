@@ -233,7 +233,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       await scannerRef.current.start(
         cameraConfig,
         scannerConfig,
-        (decodedText, decodedResult) => {
+        async (decodedText, decodedResult) => {
           const now = Date.now();
           
           console.log('🎯 QR DETECTED! Raw text:', decodedText);
