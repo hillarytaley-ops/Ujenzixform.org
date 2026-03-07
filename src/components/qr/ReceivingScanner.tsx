@@ -251,64 +251,61 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
             return;
           }
           
-          // EARLY CHECK: Verify QR code hasn't been scanned in database before processing
-          // This prevents re-scanning even after page refresh - MUST complete before continuing
+          // Mark as processed immediately (session-based check)
+          lastScannedRef.current = decodedText;
+          lastScanTimeRef.current = now;
+          recentlyProcessedRef.current.set(decodedText, now);
+          
+          console.log('✅ PROCESSING QR CODE NOW:', decodedText);
+          
+          // EARLY CHECK: Verify QR code hasn't been scanned in database (non-blocking)
+          // This prevents re-scanning even after page refresh, but doesn't block if check fails
           const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
           const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
           
-          let accessToken = ANON_KEY;
-          try {
-            const { data: sessionData } = await supabase.auth.getSession();
-            if (sessionData?.session?.access_token) {
-              accessToken = sessionData.session.access_token;
-            }
-          } catch (e) {
-            console.warn('Could not get session:', e);
-          }
-          
-          try {
-            const checkResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${encodeURIComponent(decodedText)}&select=receive_scanned,status&limit=1`,
-              {
-                headers: {
-                  'apikey': ANON_KEY,
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Accept': 'application/json'
+          // Run check in background (don't await - process immediately)
+          (async () => {
+            try {
+              let accessToken = ANON_KEY;
+              try {
+                const { data: sessionData } = await supabase.auth.getSession();
+                if (sessionData?.session?.access_token) {
+                  accessToken = sessionData.session.access_token;
+                }
+              } catch (e) {
+                console.warn('Could not get session:', e);
+              }
+              
+              const checkResponse = await fetch(
+                `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${encodeURIComponent(decodedText)}&select=receive_scanned,status&limit=1`,
+                {
+                  headers: {
+                    'apikey': ANON_KEY,
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Accept': 'application/json'
+                  }
+                }
+              );
+              
+              if (checkResponse.ok) {
+                const checkData = await checkResponse.json();
+                if (checkData && checkData.length > 0) {
+                  const item = checkData[0];
+                  if (item.receive_scanned === true || item.status === 'received' || item.status === 'delivered') {
+                    console.log('⏭️ QR code already scanned in database:', decodedText);
+                    toast.warning('⚠️ Already Scanned', {
+                      description: 'This QR code has already been scanned. Processing will be skipped.',
+                      duration: 3000,
+                    });
+                    // Note: We'll still process it, but the actual processing function will check again
+                  }
                 }
               }
-            );
-            
-            if (checkResponse.ok) {
-              const checkData = await checkResponse.json();
-              if (checkData && checkData.length > 0) {
-                const item = checkData[0];
-                if (item.receive_scanned === true || item.status === 'received' || item.status === 'delivered') {
-                  console.log('⏭️ QR code already scanned in database - BLOCKING:', decodedText);
-                  toast.error('🚫 Already Scanned', {
-                    description: 'This QR code has already been scanned and received. Cannot scan again.',
-                    duration: 5000,
-                  });
-                  return; // STOP HERE - don't process
-                }
-              }
+            } catch (checkError) {
+              console.warn('⚠️ Could not check database (non-blocking):', checkError);
+              // Don't block - allow processing to continue
             }
-          } catch (checkError) {
-            console.error('❌ Error checking database for existing scan:', checkError);
-            toast.error('❌ Check Failed', {
-              description: 'Could not verify QR code status. Please try again.',
-              duration: 3000,
-            });
-            return; // STOP if check fails - don't allow scanning if we can't verify
-          }
-          
-          // Only mark as processed and continue if check passed
-          lastScannedRef.current = decodedText;
-          lastScanTimeRef.current = now;
-          
-          // Mark as processed (for entire session - never process same code twice)
-          recentlyProcessedRef.current.set(decodedText, now);
-          
-          console.log('✅ QR CODE VERIFIED - PROCESSING NOW:', decodedText);
+          })();
           
           // Show success message immediately
           toast.success('✅ QR Code Scanned Successfully!', {
