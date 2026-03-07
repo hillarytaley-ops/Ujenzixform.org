@@ -1640,6 +1640,51 @@ export const useDeliveryProviderData = () => {
           historyData = [];
         }
         
+        // Enrich delivery_requests with order_number from purchase_orders if missing
+        if (historyData.length > 0) {
+          try {
+            const poIdsForHistory = historyData
+              .map(dr => dr.purchase_order_id)
+              .filter(Boolean);
+            
+            if (poIdsForHistory.length > 0) {
+              // Fetch po_numbers for these purchase_orders
+              const poNumbersResponse = await fetch(
+                `${SUPABASE_URL}/rest/v1/purchase_orders?id=in.(${poIdsForHistory.join(',')})&select=id,po_number&limit=100`,
+                {
+                  headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                  },
+                  cache: 'no-store',
+                  signal: AbortSignal.timeout(5000)
+                }
+              );
+              
+              if (poNumbersResponse.ok) {
+                const poNumbers = await poNumbersResponse.json();
+                const poNumberMap = new Map(poNumbers.map((po: any) => [po.id, po.po_number]));
+                
+                // Enrich historyData with order_number
+                historyData = historyData.map((dr: any) => {
+                  if (!dr.order_number && dr.purchase_order_id) {
+                    const poNumber = poNumberMap.get(dr.purchase_order_id);
+                    if (poNumber) {
+                      dr.order_number = poNumber;
+                    }
+                  }
+                  return dr;
+                });
+                
+                console.log('✅ Enriched', historyData.filter(dr => dr.order_number).length, 'delivery_requests with order_number');
+              }
+            }
+          } catch (e: any) {
+            console.warn('⚠️ Error enriching delivery_requests with order_number:', e?.message || e);
+          }
+        }
+        
         // Sort by completed_at if available, otherwise by updated_at (most recent first)
         historyData = historyData.sort((a: any, b: any) => {
           const dateA = new Date(a.completed_at || a.delivered_at || a.updated_at || a.created_at);
@@ -1648,6 +1693,7 @@ export const useDeliveryProviderData = () => {
         }).slice(0, 100);
         
         console.log('📦 Final delivery_requests history count:', historyData.length);
+        console.log('📋 History order numbers:', historyData.map(dr => dr.order_number || dr.po_number || 'N/A').filter(n => n !== 'N/A'));
       } catch (e) {
         historyError = e;
         console.error('❌ Error fetching delivery history:', e);
