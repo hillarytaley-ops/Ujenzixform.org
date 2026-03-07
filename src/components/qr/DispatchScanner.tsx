@@ -1040,26 +1040,17 @@ export const DispatchScanner: React.FC = () => {
             return;
           }
           
-          // Check if this QR code was recently processed (within last 10 seconds)
-          const processedTime = recentlyProcessedRef.current.get(decodedText);
-          if (processedTime && now - processedTime < 10000) {
-            console.log('⏭️ Skipping recently processed QR code (within 10s):', decodedText);
+          // Check if this QR code was already processed in this session (never process same code twice)
+          if (recentlyProcessedRef.current.has(decodedText)) {
+            console.log('⏭️ Skipping already processed QR code:', decodedText);
             return;
           }
           
           lastScannedRef.current = decodedText;
           lastScanTimeRef.current = now;
           
-          // Mark as processed
+          // Mark as processed (for entire session - never process same code twice)
           recentlyProcessedRef.current.set(decodedText, now);
-          
-          // Clean up old entries (older than 30 seconds) to prevent memory leak
-          const thirtySecondsAgo = now - 30000;
-          for (const [qrCode, timestamp] of recentlyProcessedRef.current.entries()) {
-            if (timestamp < thirtySecondsAgo) {
-              recentlyProcessedRef.current.delete(qrCode);
-            }
-          }
           
           // Vibrate on successful scan (mobile)
           if (navigator.vibrate) {
