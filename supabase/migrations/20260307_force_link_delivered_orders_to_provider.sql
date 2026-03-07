@@ -101,8 +101,13 @@ BEGIN
           updated_at = NOW()
         WHERE id = v_po_record.id;
         
-        RAISE NOTICE 'Updated purchase_order % (status: delivered, provider_id: %)', 
-          v_po_record.id, COALESCE(v_provider_id, 'unchanged');
+        IF v_provider_id IS NOT NULL THEN
+          RAISE NOTICE 'Updated purchase_order % (status: delivered, provider_id: %)', 
+            v_po_record.id, v_provider_id;
+        ELSE
+          RAISE NOTICE 'Updated purchase_order % (status: delivered, provider_id: unchanged)', 
+            v_po_record.id;
+        END IF;
       ELSE
         RAISE NOTICE 'Purchase_order % already has status delivered and provider_id', v_po_record.id;
       END IF;
