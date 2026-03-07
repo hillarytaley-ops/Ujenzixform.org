@@ -11,7 +11,7 @@ DROP FUNCTION IF EXISTS public.record_qr_scan(TEXT, TEXT);
 DROP FUNCTION IF EXISTS public.record_qr_scan(TEXT);
 
 -- Update the record_qr_scan function to use 'dispatched' instead of 'shipped'
--- This matches the exact signature from 20260305_auto_update_delivery_requests_on_scan.sql
+-- This matches the exact signature and logic from 20260305_auto_update_delivery_requests_on_scan.sql
 -- but fixes the status value from 'shipped' to 'dispatched'
 CREATE OR REPLACE FUNCTION public.record_qr_scan(
   _qr_code TEXT,
@@ -175,75 +175,71 @@ BEGIN
       SELECT id INTO delivery_request_id
       FROM delivery_requests
       WHERE purchase_order_id = order_id
-        AND status IN ('accepted', 'assigned', 'pending', 'pending_pickup', 'delivery_assigned', 'ready_for_dispatch', 'provider_assigned')
+        AND status IN ('accepted', 'assigned', 'pending')
       LIMIT 1;
       
-      -- AUTO-UPDATE delivery_requests.status to 'in_transit'
       IF delivery_request_id IS NOT NULL THEN
         UPDATE delivery_requests
         SET status = 'in_transit',
             updated_at = NOW()
-        WHERE id = delivery_request_id
-          AND status IN ('accepted', 'assigned', 'pending', 'pending_pickup', 'delivery_assigned', 'ready_for_dispatch', 'provider_assigned');
+        WHERE id = delivery_request_id;
         
         RAISE NOTICE 'Updated delivery_request % status to in_transit (supplier dispatched)', delivery_request_id;
       END IF;
+      
+      RAISE NOTICE 'Updated purchase_order % status to dispatched', order_id;
     END IF;
-    
-    result := jsonb_build_object(
-      'success', true,
-      'message', 'Item dispatched successfully. Order status updated to DISPATCHED. Awaiting receiving scan.',
-      'qr_code', _qr_code,
-      'material_item_id', item_record.id,
-      'order_id', order_id,
-      'scan_event_id', scan_event_id
-    );
     
   ELSIF _scan_type = 'receiving' THEN
-    -- Check if already received
-    IF item_record.receive_scanned = TRUE THEN
-      RETURN jsonb_build_object(
-        'success', false,
-        'error', 'This QR code has already been scanned for RECEIVING. Each QR can only be received once.',
-        'error_code', 'ALREADY_RECEIVED',
-        'qr_code', _qr_code,
-        'material_type', item_record.material_type,
-        'receive_scanned_at', item_record.receive_scanned_at,
-        'receive_scanned_by', item_record.receive_scanned_by
-      );
-    END IF;
-    
-    -- Update material item
     UPDATE material_items
     SET status = 'received',
-        receive_scan_id = scan_event_id,
+        receiving_scan_id = scan_event_id,
         receive_scanned = TRUE,
         receive_scanned_at = NOW(),
         receive_scanned_by = current_user_id,
         updated_at = NOW()
     WHERE qr_code = _qr_code;
     
-    -- Check if all items are received
+    -- Auto-invalidate if both dispatch and receive are done
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns 
+      WHERE table_schema = 'public' 
+        AND table_name = 'material_items' 
+        AND column_name = 'is_invalidated'
+    ) THEN
+      UPDATE material_items
+      SET is_invalidated = TRUE,
+          invalidated_at = NOW(),
+          status = 'verified'
+      WHERE qr_code = _qr_code
+        AND dispatch_scanned = TRUE
+        AND receive_scanned = TRUE;
+    ELSE
+      UPDATE material_items
+      SET status = 'verified'
+      WHERE qr_code = _qr_code
+        AND dispatch_scanned = TRUE
+        AND receive_scanned = TRUE;
+    END IF;
+    
+    -- Check if all items in order are received - update to 'delivered'
     IF order_id IS NOT NULL THEN
-      -- Check if all items for this order are received
-      SELECT 
-        COUNT(*) = COUNT(*) FILTER (WHERE receive_scanned = TRUE)
-      INTO result
-      FROM material_items
-      WHERE purchase_order_id = order_id;
-      
-      -- If all items received, update purchase_order and delivery_request
-      IF result = TRUE THEN
-        -- Update purchase_order
+      IF NOT EXISTS (
+        SELECT 1 FROM material_items 
+        WHERE purchase_order_id = order_id 
+          AND (receive_scanned = FALSE OR receive_scanned IS NULL)
+      ) THEN
         UPDATE purchase_orders
-        SET 
-          status = 'delivered',
-          delivered_at = COALESCE(delivered_at, NOW()),
-          updated_at = NOW()
-        WHERE id = order_id
-          AND status NOT IN ('delivered', 'completed', 'cancelled');
+        SET status = 'delivered',
+            updated_at = NOW()
+        WHERE id = order_id;
         
-        -- Find and update delivery_request
+        -- ============================================================
+        -- AUTO-UPDATE delivery_requests.status to 'delivered'
+        -- This moves the delivery from In Transit to Delivered tab
+        -- ============================================================
+        -- Find the delivery_request linked to this purchase_order
+        -- Update if status is NOT already 'delivered' or 'completed'
         SELECT id INTO delivery_request_id
         FROM delivery_requests
         WHERE purchase_order_id = order_id
@@ -252,47 +248,47 @@ BEGIN
         
         IF delivery_request_id IS NOT NULL THEN
           UPDATE delivery_requests
-          SET 
-            status = 'delivered',
-            delivered_at = COALESCE(delivered_at, NOW()),
-            updated_at = NOW()
-          WHERE id = delivery_request_id
-            AND status NOT IN ('delivered', 'completed', 'cancelled');
+          SET status = 'delivered',
+              delivered_at = NOW(),
+              updated_at = NOW()
+          WHERE id = delivery_request_id;
           
-          RAISE NOTICE 'Updated delivery_request % status to delivered (all items received)', delivery_request_id;
+          RAISE NOTICE 'Updated delivery_request % status to delivered (provider received)', delivery_request_id;
         END IF;
+        
+        RAISE NOTICE 'All items received - Updated purchase_order % status to delivered', order_id;
       END IF;
     END IF;
-    
-    result := jsonb_build_object(
-      'success', true,
-      'message', 'Item received successfully.',
-      'qr_code', _qr_code,
-      'material_item_id', item_record.id,
-      'order_id', order_id,
-      'scan_event_id', scan_event_id,
-      'all_items_received', result
-    );
-  ELSE
-    RETURN jsonb_build_object(
-      'success', false,
-      'error', 'Invalid scan_type. Must be "dispatch" or "receiving".',
-      'error_code', 'INVALID_SCAN_TYPE'
-    );
+      
+  ELSIF _scan_type = 'verification' THEN
+    UPDATE material_items
+    SET status = 'verified',
+        verification_scan_id = scan_event_id,
+        updated_at = NOW()
+    WHERE qr_code = _qr_code;
   END IF;
   
-  RETURN result;
-EXCEPTION
-  WHEN OTHERS THEN
-    RETURN jsonb_build_object(
-      'success', false,
-      'error', SQLERRM,
-      'error_code', 'DATABASE_ERROR'
-    );
+  -- Refresh item record to get updated values
+  SELECT * INTO item_record
+  FROM material_items
+  WHERE qr_code = _qr_code;
+  
+  -- Return success with item details
+  RETURN jsonb_build_object(
+    'success', true,
+    'scan_event_id', scan_event_id,
+    'qr_code', _qr_code,
+    'material_type', item_record.material_type,
+    'status', item_record.status,
+    'dispatch_scanned', item_record.dispatch_scanned,
+    'receive_scanned', item_record.receive_scanned,
+    'is_invalidated', COALESCE(item_record.is_invalidated, FALSE),
+    'invalidated_at', item_record.invalidated_at
+  );
 END;
 $$;
 
--- Grant permissions
+-- Grant execute permission
 GRANT EXECUTE ON FUNCTION public.record_qr_scan TO authenticated;
 
 -- Add comment
