@@ -1834,6 +1834,7 @@ export const useDeliveryProviderData = () => {
               }
             }
           }
+        }
         } catch (e: any) {
           console.error('❌ CRITICAL ERROR in supplier dashboard logic for history:', e?.message || e);
           console.error('❌ Stack trace:', e?.stack);
