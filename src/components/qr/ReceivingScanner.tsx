@@ -545,6 +545,8 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       console.log('📦 QR code variants to try:', qrCodeVariants);
       console.log('📦 Starting database lookup...');
       console.log('⏱️ Before database lookup:', Date.now() - startTime, 'ms');
+      console.log('🔐 Access token available:', accessToken ? 'YES' : 'NO');
+      console.log('🔐 Access token length:', accessToken?.length || 0);
       
       let items: any[] = [];
       
@@ -560,18 +562,35 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         console.log('⏱️ About to fetch:', Date.now() - startTime, 'ms');
         
         const fetchStartTime = Date.now();
-        const restResponse = await fetch(
-          fetchUrl,
-          {
-            headers: {
-              'apikey': ANON_KEY,
-              'Authorization': `Bearer ${accessToken}`,
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-              'Prefer': 'return=representation'
+        
+        // Add timeout to prevent hanging
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        
+        let restResponse: Response;
+        try {
+          restResponse = await fetch(
+            fetchUrl,
+            {
+              headers: {
+                'apikey': ANON_KEY,
+                'Authorization': `Bearer ${accessToken}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Prefer': 'return=representation'
+              },
+              signal: controller.signal
             }
+          );
+          clearTimeout(timeoutId);
+        } catch (fetchError: any) {
+          clearTimeout(timeoutId);
+          if (fetchError.name === 'AbortError') {
+            console.error('❌ Database fetch timeout after 10 seconds');
+            throw new Error('Database query timeout - please try again');
           }
-        );
+          throw fetchError;
+        }
         
         const fetchDuration = Date.now() - fetchStartTime;
         console.log('⏱️ Fetch completed in:', fetchDuration, 'ms');

@@ -1792,6 +1792,48 @@ export const DispatchScanner: React.FC = () => {
         // Calculate remaining items
         const remainingItems = selectedOrder.items.filter(i => !i.dispatch_scanned && i.qr_code !== qrCode).length;
         
+        // STEP 1: Update delivery_request to 'dispatched' status when supplier dispatches
+        // This moves the order to "In Transit" tab for delivery provider
+        if (selectedOrder.id) {
+          try {
+            console.log('📦 Updating delivery_request to dispatched for purchase_order_id:', selectedOrder.id);
+            
+            // Get fresh access token
+            const freshToken = await getFreshAccessToken();
+            if (!freshToken) {
+              console.warn('⚠️ Could not get access token for delivery_request update');
+            } else {
+              const deliveryRequestResponse = await fetch(
+                `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${selectedOrder.id}`,
+                {
+                  method: 'PATCH',
+                  headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${freshToken}`,
+                    'Content-Type': 'application/json',
+                    'Prefer': 'return=representation'
+                  },
+                  body: JSON.stringify({
+                    status: 'dispatched',
+                    updated_at: new Date().toISOString()
+                  })
+                }
+              );
+              
+              if (deliveryRequestResponse.ok) {
+                const updatedDeliveryRequest = await deliveryRequestResponse.json();
+                console.log('✅ Delivery request updated to dispatched status:', updatedDeliveryRequest);
+              } else {
+                const errorText = await deliveryRequestResponse.text();
+                console.warn('⚠️ Could not update delivery_request to dispatched:', deliveryRequestResponse.status, errorText);
+              }
+            }
+          } catch (e) {
+            console.warn('⚠️ Error updating delivery_request to dispatched:', e);
+            // Don't block the success flow if this fails
+          }
+        }
+        
         if (remainingItems === 0) {
           // All items scanned!
           toast.success('🎉 ALL ITEMS DISPATCHED!', {
