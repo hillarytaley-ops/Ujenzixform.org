@@ -1862,11 +1862,13 @@ export const useDeliveryProviderData = () => {
       }
       
       // Transform purchase_orders to delivery_requests format for consistency
+      // CRITICAL: Show ALL delivered orders (where all items are received), just like supplier dashboard
+      // Don't filter by provider_id - supplier dashboard shows all delivered orders regardless of provider
       const deliveredFromPOs = (enrichedDeliveredPOs || []).map((po: any) => ({
         id: po.id,
         purchase_order_id: po.id,
-        provider_id: userId,
-        status: po.status,
+        provider_id: po.delivery_provider_id || userId, // Use actual provider_id from PO if available
+        status: 'delivered', // Always mark as delivered since all items are received
         order_number: po.po_number || null, // CRITICAL: Include order_number for matching with supplier dashboard
         pickup_location: po.supplier?.address || po.supplier?.location || 'Supplier location',
         pickup_address: po.supplier?.address || po.supplier?.location || 'Supplier location',
@@ -1885,6 +1887,8 @@ export const useDeliveryProviderData = () => {
         updated_at: po.updated_at,
         source: 'purchase_orders'
       }));
+      
+      console.log('📦 Transformed', deliveredFromPOs.length, 'delivered purchase_orders to history format (ALL delivered orders, not filtered by provider)');
       
       // Combine both sources and remove duplicates (prefer delivery_requests if both exist)
       const allHistory: any[] = [];
