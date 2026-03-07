@@ -1543,37 +1543,108 @@ export const useDeliveryProviderData = () => {
         };
         
         try {
+          // CRITICAL FIX: First get delivery_provider.id from user_id
+          // delivery_provider_id in purchase_orders and provider_id in delivery_requests store delivery_provider.id (UUID), not user_id
+          console.log('🚀 fetchDeliveredPOs: Step 0 - Getting delivery_provider.id for user_id...');
+          
+          let deliveryProviderId: string | null = null;
+          try {
+            const providerLookupPromise = supabase
+              .from('delivery_providers')
+              .select('id')
+              .eq('user_id', userId)
+              .maybeSingle();
+            
+            const { data: provider, error: providerError } = await withTimeout(
+              providerLookupPromise,
+              5000,
+              { data: null, error: { message: 'Provider lookup timeout' } } as any
+            );
+            
+            if (providerError || !provider) {
+              console.warn('⚠️ Could not get delivery_provider.id, trying fallback queries with user_id directly');
+            } else {
+              deliveryProviderId = provider.id;
+              console.log('✅ Found delivery_provider.id:', deliveryProviderId.substring(0, 8));
+            }
+          } catch (e: any) {
+            console.warn('⚠️ Error looking up delivery_provider.id:', e?.message);
+          }
+          
           // CRITICAL FIX: First get purchase_orders for this provider, then query material_items for those POs only
           // This avoids RLS blocking when querying ALL material_items globally
           console.log('🚀 fetchDeliveredPOs: Step 1 - Getting purchase_orders for provider...');
           
           // Get purchase_orders where this provider is the delivery_provider_id
-          const poQueryPromise = supabase
-            .from('purchase_orders')
-            .select('id, po_number, status, delivery_provider_id, delivered_at, updated_at, created_at')
-            .eq('delivery_provider_id', userId)
-            .limit(500);
+          // Use delivery_provider.id if available, otherwise try user_id as fallback
+          let providerPOs: any[] = [];
+          if (deliveryProviderId) {
+            const poQueryPromise = supabase
+              .from('purchase_orders')
+              .select('id, po_number, status, delivery_provider_id, delivered_at, updated_at, created_at')
+              .eq('delivery_provider_id', deliveryProviderId)
+              .limit(500);
+            
+            const { data: poData, error: poQueryError } = await withTimeout(
+              poQueryPromise,
+              8000,
+              { data: null, error: { message: 'Purchase orders query timeout' } } as any
+            );
+            
+            if (poQueryError) {
+              console.warn('⚠️ Error fetching purchase_orders by delivery_provider_id:', poQueryError?.message);
+            } else if (poData) {
+              providerPOs = poData;
+            }
+          }
           
-          let { data: providerPOs, error: poQueryError } = await withTimeout(
-            poQueryPromise,
-            8000,
-            { data: null, error: { message: 'Purchase orders query timeout' } } as any
-          );
+          // Fallback: Try querying by user_id directly (in case some orders have user_id stored)
+          if (providerPOs.length === 0) {
+            console.log('🔄 Fallback: Trying purchase_orders query by user_id...');
+            const fallbackQuery = supabase
+              .from('purchase_orders')
+              .select('id, po_number, status, delivery_provider_id, delivered_at, updated_at, created_at')
+              .eq('delivery_provider_id', userId)
+              .limit(500);
+            
+            const { data: fallbackData } = await withTimeout(
+              fallbackQuery,
+              5000,
+              { data: [] } as any
+            );
+            
+            if (fallbackData && fallbackData.length > 0) {
+              providerPOs = fallbackData;
+              console.log('✅ Fallback: Found', providerPOs.length, 'purchase_orders by user_id');
+            }
+          }
           
           console.log('🚀 fetchDeliveredPOs: Purchase orders query completed', { 
-            ordersCount: providerPOs?.length || 0, 
-            hasError: !!poQueryError 
+            ordersCount: providerPOs.length, 
+            usingProviderId: !!deliveryProviderId
           });
           
           // Also get purchase_order_ids from delivery_requests where this provider is assigned
+          // Use delivery_provider.id if available, otherwise try user_id as fallback
           let deliveryRequestPOIds: string[] = [];
           try {
-            const drQuery = supabase
-              .from('delivery_requests')
-              .select('purchase_order_id')
-              .eq('provider_id', userId)
-              .not('purchase_order_id', 'is', null)
-              .limit(500);
+            let drQuery;
+            if (deliveryProviderId) {
+              drQuery = supabase
+                .from('delivery_requests')
+                .select('purchase_order_id')
+                .eq('provider_id', deliveryProviderId)
+                .not('purchase_order_id', 'is', null)
+                .limit(500);
+            } else {
+              // Fallback: try user_id directly
+              drQuery = supabase
+                .from('delivery_requests')
+                .select('purchase_order_id')
+                .eq('provider_id', userId)
+                .not('purchase_order_id', 'is', null)
+                .limit(500);
+            }
             
             const { data: drData } = await withTimeout(
               drQuery,
