@@ -18,6 +18,9 @@
 -- We'll update delivery_requests to ensure they have the correct provider_id
 -- and status = 'delivered'
 
+-- Temporarily disable the trigger to avoid delivery_request_id column error
+ALTER TABLE purchase_orders DISABLE TRIGGER IF EXISTS trigger_auto_create_dn;
+
 DO $$
 DECLARE
   v_order_numbers TEXT[] := ARRAY['1772295614017', '1772673713715', '1772340447370'];
@@ -73,16 +76,21 @@ BEGIN
       RAISE NOTICE 'Using provider_id: %', v_provider_id;
       
       -- Update purchase_order to ensure status is 'delivered' and has provider_id
-      UPDATE purchase_orders
-      SET 
-        status = 'delivered',
-        delivery_provider_id = COALESCE(delivery_provider_id, v_provider_id),
-        delivered_at = COALESCE(delivered_at, NOW()),
-        updated_at = NOW()
-      WHERE id = v_po_record.id
-        AND (status != 'delivered' OR delivery_provider_id IS NULL);
-      
-      RAISE NOTICE 'Updated purchase_order %', v_po_record.id;
+      -- Trigger is disabled, so we can update safely
+      IF v_po_record.status != 'delivered' OR v_po_record.delivery_provider_id IS NULL THEN
+        UPDATE purchase_orders
+        SET 
+          status = 'delivered',
+          delivery_provider_id = COALESCE(delivery_provider_id, v_provider_id),
+          delivered_at = COALESCE(delivered_at, NOW()),
+          updated_at = NOW()
+        WHERE id = v_po_record.id;
+        
+        RAISE NOTICE 'Updated purchase_order % (status: delivered, provider_id: %)', 
+          v_po_record.id, COALESCE(v_provider_id, 'unchanged');
+      ELSE
+        RAISE NOTICE 'Purchase_order % already has status delivered and provider_id', v_po_record.id;
+      END IF;
       
       -- Update or create delivery_request to ensure it's linked and marked as delivered
       SELECT id, provider_id, status
@@ -190,6 +198,9 @@ BEGIN
   END LOOP;
   
 END $$;
+
+-- Re-enable the trigger
+ALTER TABLE purchase_orders ENABLE TRIGGER IF EXISTS trigger_auto_create_dn;
 
 -- Grant necessary permissions
 GRANT SELECT, UPDATE ON purchase_orders TO authenticated;
