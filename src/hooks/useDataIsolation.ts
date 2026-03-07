@@ -1835,6 +1835,11 @@ export const useDeliveryProviderData = () => {
             }
           }
         }
+        } catch (e: any) {
+          console.error('❌ CRITICAL ERROR in supplier dashboard logic for history:', e?.message || e);
+          console.error('❌ Stack trace:', e?.stack);
+          console.error('❌ This error prevents provider dashboard from matching supplier dashboard delivered count!');
+        }
         
         console.log('═══════════════════════════════════════════════════════════════════════════════');
         console.log('✅ History: Supplier dashboard logic COMPLETED');
