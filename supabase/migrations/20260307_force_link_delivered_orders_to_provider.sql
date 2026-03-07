@@ -19,7 +19,22 @@
 -- and status = 'delivered'
 
 -- Temporarily disable the trigger to avoid delivery_request_id column error
-ALTER TABLE purchase_orders DISABLE TRIGGER IF EXISTS trigger_auto_create_dn;
+-- Use DO block to safely check if trigger exists before disabling
+DO $$
+BEGIN
+  -- Check if trigger exists and disable it
+  IF EXISTS (
+    SELECT 1 
+    FROM pg_trigger 
+    WHERE tgname = 'trigger_auto_create_dn' 
+    AND tgrelid = 'purchase_orders'::regclass
+  ) THEN
+    ALTER TABLE purchase_orders DISABLE TRIGGER trigger_auto_create_dn;
+    RAISE NOTICE 'Disabled trigger_auto_create_dn';
+  ELSE
+    RAISE NOTICE 'Trigger trigger_auto_create_dn does not exist, skipping disable';
+  END IF;
+END $$;
 
 DO $$
 DECLARE
@@ -199,8 +214,21 @@ BEGIN
   
 END $$;
 
--- Re-enable the trigger
-ALTER TABLE purchase_orders ENABLE TRIGGER IF EXISTS trigger_auto_create_dn;
+-- Re-enable the trigger (safely check if it exists first)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 
+    FROM pg_trigger 
+    WHERE tgname = 'trigger_auto_create_dn' 
+    AND tgrelid = 'purchase_orders'::regclass
+  ) THEN
+    ALTER TABLE purchase_orders ENABLE TRIGGER trigger_auto_create_dn;
+    RAISE NOTICE 'Re-enabled trigger_auto_create_dn';
+  ELSE
+    RAISE NOTICE 'Trigger trigger_auto_create_dn does not exist, skipping enable';
+  END IF;
+END $$;
 
 -- Grant necessary permissions
 GRANT SELECT, UPDATE ON purchase_orders TO authenticated;
