@@ -1233,13 +1233,78 @@ export const useDeliveryProviderData = () => {
       // Fetch from BOTH delivery_requests AND purchase_orders tables
       
       // 1. From delivery_requests table
-      const { data: historyData, error: historyError } = await supabase
-        .from('delivery_requests')
-        .select('*')
-        .eq('provider_id', userId)
-        .in('status', ['delivered', 'completed', 'cancelled']) // Include all past statuses
-        .order('updated_at', { ascending: false }) // Most recent first
-        .limit(100); // Increased limit for better history view
+      // Get delivery_provider.id first, then query by that (provider_id in delivery_requests is delivery_provider.id, not user_id)
+      let historyData: any[] = [];
+      let historyError: any = null;
+      
+      try {
+        // First, get the delivery_provider.id for this user
+        let providerId: string | null = null;
+        try {
+          const { data: provider } = await supabase
+            .from('delivery_providers')
+            .select('id')
+            .eq('user_id', userId)
+            .single();
+          
+          if (provider?.id) {
+            providerId = provider.id;
+            console.log('✅ Found delivery_provider.id for history query:', providerId);
+          } else {
+            console.warn('⚠️ No delivery_provider found for user_id:', userId);
+          }
+        } catch (e) {
+          console.warn('⚠️ Could not fetch delivery_provider.id:', e);
+        }
+        
+        // Query by provider_id (delivery_provider.id) if we have it
+        if (providerId) {
+          const { data: byProviderId, error: err1 } = await supabase
+            .from('delivery_requests')
+            .select('*')
+            .eq('provider_id', providerId)
+            .in('status', ['delivered', 'completed', 'cancelled'])
+            .order('updated_at', { ascending: false })
+            .limit(100);
+          
+          if (err1) {
+            console.warn('Error fetching history by provider_id:', err1);
+            historyError = err1;
+          } else {
+            historyData = byProviderId || [];
+            console.log('✅ Fetched', historyData.length, 'delivered delivery_requests by provider_id');
+          }
+        } else {
+          // Fallback: Also try by user_id directly (in case some records use user_id as provider_id)
+          const { data: byUserId, error: err2 } = await supabase
+            .from('delivery_requests')
+            .select('*')
+            .eq('provider_id', userId) // Some records might use user_id directly
+            .in('status', ['delivered', 'completed', 'cancelled'])
+            .order('updated_at', { ascending: false })
+            .limit(100);
+          
+          if (!err2 && byUserId) {
+            historyData = byUserId;
+            console.log('✅ Fetched', historyData.length, 'delivered delivery_requests by user_id (fallback)');
+          }
+        }
+        
+        // Remove duplicates and sort
+        const uniqueHistory = Array.from(
+          new Map(historyData.map((d: any) => [d.id, d])).values()
+        ).sort((a: any, b: any) => {
+          const dateA = new Date(a.updated_at || a.created_at);
+          const dateB = new Date(b.updated_at || b.created_at);
+          return dateB.getTime() - dateA.getTime();
+        });
+        
+        historyData = uniqueHistory.slice(0, 100);
+        console.log('📦 Final delivery history count:', historyData.length);
+      } catch (e) {
+        historyError = e;
+        console.error('❌ Error fetching delivery history:', e);
+      }
 
       if (historyError) {
         console.warn('Error fetching delivery history from delivery_requests:', historyError);

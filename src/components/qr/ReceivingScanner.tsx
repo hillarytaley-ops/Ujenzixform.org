@@ -817,7 +817,82 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         try {
           console.log('📦 Updating delivery_request for purchase_order_id:', item.purchase_order_id);
           
+          // First, get the current user's delivery_provider.id to ensure delivery_request has it
+          let providerId: string | null = null;
+          try {
+            // Try to get delivery_provider.id for this user
+            const providerResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${currentUserId}&select=id&limit=1`,
+              {
+                headers: {
+                  'apikey': ANON_KEY,
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Accept': 'application/json'
+                }
+              }
+            );
+            if (providerResponse.ok) {
+              const providerData = await providerResponse.json();
+              if (providerData && providerData.length > 0) {
+                providerId = providerData[0].id;
+                console.log('✅ Found delivery_provider.id:', providerId);
+              } else {
+                console.warn('⚠️ No delivery_provider found for user_id:', currentUserId);
+              }
+            }
+          } catch (e) {
+            console.warn('⚠️ Could not fetch delivery_provider.id:', e);
+          }
+          
+          // First, check if delivery_request exists and get its current state
+          let existingDeliveryRequest: any = null;
+          try {
+            const checkResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${item.purchase_order_id}&select=*&limit=1`,
+              {
+                headers: {
+                  'apikey': ANON_KEY,
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Accept': 'application/json'
+                }
+              }
+            );
+            if (checkResponse.ok) {
+              const checkData = await checkResponse.json();
+              if (checkData && checkData.length > 0) {
+                existingDeliveryRequest = checkData[0];
+                console.log('📋 Found existing delivery_request:', {
+                  id: existingDeliveryRequest.id,
+                  status: existingDeliveryRequest.status,
+                  provider_id: existingDeliveryRequest.provider_id
+                });
+              } else {
+                console.warn('⚠️ No delivery_request found for purchase_order_id:', item.purchase_order_id);
+              }
+            }
+          } catch (e) {
+            console.warn('⚠️ Could not check existing delivery_request:', e);
+          }
+          
           // Update delivery_request to 'delivered' when item is received
+          // Also ensure provider_id is set so it appears in deliveryHistory
+          const updateBody: any = {
+            status: 'delivered',
+            completed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+          
+          // Set provider_id if we found it and it's not already set
+          if (providerId) {
+            // Only update provider_id if it's not already set or if it's set to user_id (wrong value)
+            if (!existingDeliveryRequest?.provider_id || existingDeliveryRequest.provider_id === currentUserId) {
+              updateBody.provider_id = providerId;
+              console.log('📦 Setting provider_id on delivery_request:', providerId);
+            } else {
+              console.log('📦 delivery_request already has provider_id:', existingDeliveryRequest.provider_id);
+            }
+          }
+          
           const deliveryRequestResponse = await fetch(
             `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${item.purchase_order_id}`,
             {
@@ -828,11 +903,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
                 'Content-Type': 'application/json',
                 'Prefer': 'return=representation'
               },
-              body: JSON.stringify({
-                status: 'delivered',
-                completed_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-              })
+              body: JSON.stringify(updateBody)
             }
           );
           
@@ -840,11 +911,15 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
             const updatedDeliveryRequest = await deliveryRequestResponse.json();
             console.log('✅ Delivery request updated to delivered status:', updatedDeliveryRequest);
             console.log('📋 Updated delivery_request data:', JSON.stringify(updatedDeliveryRequest, null, 2));
+            console.log('📋 Delivery request provider_id:', updatedDeliveryRequest[0]?.provider_id || 'NOT SET');
+            console.log('📋 Delivery request status:', updatedDeliveryRequest[0]?.status);
             deliveryRequestUpdated = true;
           } else {
             const errorText = await deliveryRequestResponse.text();
             console.error('❌ Could not update delivery_request status:', deliveryRequestResponse.status, errorText);
             console.error('   This might be due to RLS policies or missing delivery_request record');
+            console.error('   Purchase order ID:', item.purchase_order_id);
+            console.error('   Provider ID attempted:', providerId);
             toast.warning('⚠️ Status Update Warning', {
               description: 'Item scanned successfully, but delivery status update may have failed. Tab will still switch.',
               duration: 4000,
