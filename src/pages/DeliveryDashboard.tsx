@@ -1135,17 +1135,43 @@ const DeliveryDashboard = () => {
                         const status = d._categorized_status || d.status;
                         // CRITICAL: Exclude delivered orders - they should NOT appear in In Transit tab
                         if (status === 'delivered' || status === 'completed') {
+                          // Log if we're excluding a delivered order
+                          if (d.order_number?.includes('1772673713715') || d.order_number?.includes('1772340447370')) {
+                            console.log('🚫 Badge count: Excluding delivered order:', {
+                              order_number: d.order_number,
+                              _categorized_status: d._categorized_status,
+                              original_status: d.status
+                            });
+                          }
                           return false;
                         }
                         // Only count orders that are truly in transit (dispatched but not all items received)
-                        return status === 'in_transit' || 
+                        const matches = status === 'in_transit' || 
                                status === 'picked_up' ||
                                status === 'on_the_way' ||
                                status === 'near_destination' ||
                                status === 'dispatched' ||
                                status === 'shipped' ||
                                status === 'out_for_delivery';
+                        
+                        // Log if we're including an order in the count
+                        if (matches && (d.order_number?.includes('1772673713715') || d.order_number?.includes('1772340447370'))) {
+                          console.log('⚠️ Badge count: Including order in In Transit count:', {
+                            order_number: d.order_number,
+                            _categorized_status: d._categorized_status,
+                            original_status: d.status,
+                            items_count: d._items_count,
+                            received_count: d._received_count
+                          });
+                        }
+                        
+                        return matches;
                       }).length;
+                      
+                      // Log the final badge count
+                      if (inTransitCount > 0) {
+                        console.log('📊 Badge count calculation: In Transit count =', inTransitCount);
+                      }
                       
                       // Only show badge if there are actually in-transit orders (not delivered)
                       return inTransitCount > 0 ? (
