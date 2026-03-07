@@ -1449,6 +1449,107 @@ export const useDeliveryProviderData = () => {
       // Fetch from BOTH delivery_requests AND purchase_orders tables
       console.log('📦 Starting history fetch for userId:', userId);
       
+      // ═══════════════════════════════════════════════════════════════════════════════
+      // CRITICAL: Run purchase_orders fetch FIRST and INDEPENDENTLY
+      // This ensures it ALWAYS executes and finds ALL delivered orders (not filtered by provider)
+      // This matches the supplier dashboard exactly
+      // ═══════════════════════════════════════════════════════════════════════════════
+      console.log('═══════════════════════════════════════════════════════════════════════════════');
+      console.log('📦 History: STEP 1 - Fetching ALL delivered orders from purchase_orders (supplier dashboard logic)');
+      console.log('📦 History: This runs FIRST and INDEPENDENTLY to ensure it ALWAYS executes');
+      console.log('═══════════════════════════════════════════════════════════════════════════════');
+      
+      // Run purchase_orders fetch FIRST (before delivery_requests) to ensure it always executes
+      const fetchDeliveredPOs = async () => {
+        let deliveredPOs: any[] = [];
+        
+        try {
+          // Step 1: Query ALL material_items where receive_scanned = true
+          const { data: receivedItems, error: itemsError } = await supabase
+            .from('material_items')
+            .select('id, purchase_order_id, receive_scanned')
+            .eq('receive_scanned', true)
+            .limit(2000);
+          
+          if (itemsError) {
+            console.warn('⚠️ Error fetching received material_items:', itemsError);
+          } else if (receivedItems && receivedItems.length > 0) {
+            console.log('📦 History: Found', receivedItems.length, 'material_items with receive_scanned = true');
+            
+            // Step 2: Get all unique purchase_order_ids that have at least one received item
+            const poIdsWithReceivedItems = [...new Set(receivedItems.map(item => item.purchase_order_id))];
+            console.log('📦 History: Found', poIdsWithReceivedItems.length, 'purchase_orders with at least one received item');
+            
+            if (poIdsWithReceivedItems.length > 0) {
+              // Step 3: Fetch ALL material_items for these purchase_orders to check if ALL are received
+              const { data: allItemsForPOs, error: allItemsError } = await supabase
+                .from('material_items')
+                .select('id, purchase_order_id, receive_scanned')
+                .in('purchase_order_id', poIdsWithReceivedItems)
+                .limit(2000);
+              
+              if (allItemsError) {
+                console.warn('⚠️ Error fetching all material_items for purchase_orders:', allItemsError);
+              } else if (allItemsForPOs && allItemsForPOs.length > 0) {
+                // Step 4: Group all items by purchase_order_id
+                const allItemsByPO = new Map<string, any[]>();
+                allItemsForPOs.forEach(item => {
+                  const poId = item.purchase_order_id;
+                  if (!allItemsByPO.has(poId)) {
+                    allItemsByPO.set(poId, []);
+                  }
+                  allItemsByPO.get(poId)!.push(item);
+                });
+                
+                // Step 5: Find purchase_orders where ALL items are received (EXACT supplier dashboard logic)
+                const deliveredPOIds: string[] = [];
+                allItemsByPO.forEach((items, poId) => {
+                  // EXACT supplier logic: allItemsReceived = items.every(item => item.receive_scanned === true)
+                  const allItemsReceived = items.every(item => item.receive_scanned === true);
+                  if (allItemsReceived && items.length > 0) {
+                    deliveredPOIds.push(poId);
+                    console.log('✅ History: Found delivered PO (all items received):', poId.substring(0, 8), 'items:', items.length);
+                  }
+                });
+                
+                console.log('📦 History: Found', deliveredPOIds.length, 'purchase_orders where ALL items are received (supplier dashboard logic)');
+                
+                // Step 6: Fetch the actual purchase_orders
+                if (deliveredPOIds.length > 0) {
+                  const { data: deliveredPOsData, error: poError } = await supabase
+                    .from('purchase_orders')
+                    .select('*')
+                    .in('id', deliveredPOIds)
+                    .order('updated_at', { ascending: false });
+                  
+                  if (poError) {
+                    console.warn('⚠️ Error fetching delivered purchase_orders:', poError);
+                  } else {
+                    deliveredPOs = deliveredPOsData || [];
+                    console.log('📦 History: Fetched', deliveredPOs.length, 'delivered purchase_orders using EXACT supplier dashboard logic');
+                  }
+                }
+              }
+            }
+          }
+        } catch (e: any) {
+          console.error('❌ CRITICAL ERROR in supplier dashboard logic for history:', e?.message || e);
+          console.error('❌ Stack trace:', e?.stack);
+          console.error('❌ This error prevents provider dashboard from matching supplier dashboard delivered count!');
+        }
+        
+        console.log('═══════════════════════════════════════════════════════════════════════════════');
+        console.log('✅ History: Supplier dashboard logic COMPLETED');
+        console.log('✅ Found', deliveredPOs.length, 'delivered purchase_orders (should match supplier dashboard: 2)');
+        console.log('📋 Order numbers found:', deliveredPOs.map(po => po.po_number || po.id?.substring(0, 8)).join(', '));
+        console.log('═══════════════════════════════════════════════════════════════════════════════');
+        
+        return deliveredPOs;
+      };
+      
+      // Execute purchase_orders fetch FIRST (don't await - run in parallel with delivery_requests)
+      const deliveredPOsPromise = fetchDeliveredPOs();
+      
       // 1. From delivery_requests table
       // Get delivery_provider.id first, then query by that (provider_id in delivery_requests is delivery_provider.id, not user_id)
       let historyData: any[] = [];
@@ -1750,110 +1851,17 @@ export const useDeliveryProviderData = () => {
       }
       
       // ═══════════════════════════════════════════════════════════════════════════════
-      // 2. From purchase_orders table - fetch delivered items
-      // CRITICAL: Use EXACT same logic as supplier dashboard (EnhancedQRCodeManager.tsx line 861)
-      // Supplier dashboard logic: order is "delivered" if ALL material_items have receive_scanned = true
-      // This ensures provider dashboard shows the SAME delivered orders as supplier dashboard
-      // IMPORTANT: This section MUST run regardless of delivery_requests errors
+      // 2. Await the purchase_orders fetch that was started FIRST (above)
+      // This ensures it ALWAYS executes, even if delivery_requests section hangs
       // ═══════════════════════════════════════════════════════════════════════════════
       console.log('═══════════════════════════════════════════════════════════════════════════════');
-      console.log('📦 History: STEP 2 - Using EXACT supplier dashboard logic');
-      console.log('📦 History: Finding ALL orders where ALL material_items are receive_scanned = true');
-      console.log('📦 History: This will find ALL delivered orders (NOT filtered by provider) to match supplier dashboard');
+      console.log('📦 History: STEP 2 - Awaiting purchase_orders fetch (supplier dashboard logic)');
       console.log('═══════════════════════════════════════════════════════════════════════════════');
       
-      // CRITICAL: Run this independently to ensure it ALWAYS executes
-      const fetchDeliveredPOs = async () => {
-        let deliveredPOs: any[] = [];
-        
-        try {
-        // Step 1: Query ALL material_items where receive_scanned = true
-        const { data: receivedItems, error: itemsError } = await supabase
-          .from('material_items')
-          .select('id, purchase_order_id, receive_scanned')
-          .eq('receive_scanned', true)
-          .limit(2000);
-        
-        if (itemsError) {
-          console.warn('⚠️ Error fetching received material_items:', itemsError);
-        } else if (receivedItems && receivedItems.length > 0) {
-          console.log('📦 History: Found', receivedItems.length, 'material_items with receive_scanned = true');
-          
-          // Step 2: Get all unique purchase_order_ids that have at least one received item
-          const poIdsWithReceivedItems = [...new Set(receivedItems.map(item => item.purchase_order_id))];
-          console.log('📦 History: Found', poIdsWithReceivedItems.length, 'purchase_orders with at least one received item');
-          
-          if (poIdsWithReceivedItems.length > 0) {
-            // Step 3: Fetch ALL material_items for these purchase_orders to check if ALL are received
-            const { data: allItemsForPOs, error: allItemsError } = await supabase
-              .from('material_items')
-              .select('id, purchase_order_id, receive_scanned')
-              .in('purchase_order_id', poIdsWithReceivedItems)
-              .limit(2000);
-            
-            if (allItemsError) {
-              console.warn('⚠️ Error fetching all material_items for purchase_orders:', allItemsError);
-            } else if (allItemsForPOs && allItemsForPOs.length > 0) {
-              // Step 4: Group all items by purchase_order_id
-              const allItemsByPO = new Map<string, any[]>();
-              allItemsForPOs.forEach(item => {
-                const poId = item.purchase_order_id;
-                if (!allItemsByPO.has(poId)) {
-                  allItemsByPO.set(poId, []);
-                }
-                allItemsByPO.get(poId)!.push(item);
-              });
-              
-              // Step 5: Find purchase_orders where ALL items are received (EXACT supplier dashboard logic)
-              const deliveredPOIds: string[] = [];
-              allItemsByPO.forEach((items, poId) => {
-                // EXACT supplier logic: allItemsReceived = items.every(item => item.receive_scanned === true)
-                const allItemsReceived = items.every(item => item.receive_scanned === true);
-                if (allItemsReceived && items.length > 0) {
-                  deliveredPOIds.push(poId);
-                  console.log('✅ History: Found delivered PO (all items received):', poId.substring(0, 8), 'items:', items.length);
-                }
-              });
-              
-              console.log('📦 History: Found', deliveredPOIds.length, 'purchase_orders where ALL items are received (supplier dashboard logic)');
-              
-              // Step 6: Fetch the actual purchase_orders
-              if (deliveredPOIds.length > 0) {
-                const { data: deliveredPOsData, error: poError } = await supabase
-                  .from('purchase_orders')
-                  .select('*')
-                  .in('id', deliveredPOIds)
-                  .order('updated_at', { ascending: false });
-                
-                if (poError) {
-                  console.warn('⚠️ Error fetching delivered purchase_orders:', poError);
-                } else {
-                  deliveredPOs = deliveredPOsData || [];
-                  console.log('📦 History: Fetched', deliveredPOs.length, 'delivered purchase_orders using EXACT supplier dashboard logic');
-                }
-              }
-            }
-          }
-        }
-        } catch (e: any) {
-          console.error('❌ CRITICAL ERROR in supplier dashboard logic for history:', e?.message || e);
-          console.error('❌ Stack trace:', e?.stack);
-          console.error('❌ This error prevents provider dashboard from matching supplier dashboard delivered count!');
-        }
-        
-        console.log('═══════════════════════════════════════════════════════════════════════════════');
-        console.log('✅ History: Supplier dashboard logic COMPLETED');
-        console.log('✅ Found', deliveredPOs.length, 'delivered purchase_orders (should match supplier dashboard: 2)');
-        console.log('📋 Order numbers found:', deliveredPOs.map(po => po.po_number || po.id?.substring(0, 8)).join(', '));
-        console.log('═══════════════════════════════════════════════════════════════════════════════');
-        
-        return deliveredPOs;
-      };
-      
-      // CRITICAL: Execute the function and await it
+      // Await the purchase_orders fetch that was started FIRST
       let deliveredPOs: any[] = [];
       try {
-        deliveredPOs = await fetchDeliveredPOs();
+        deliveredPOs = await deliveredPOsPromise;
         console.log('✅ Successfully fetched', deliveredPOs.length, 'delivered purchase_orders from supplier dashboard logic');
       } catch (e: any) {
         console.error('❌ CRITICAL ERROR executing supplier dashboard logic:', e?.message || e);
