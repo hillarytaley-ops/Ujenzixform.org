@@ -1750,166 +1750,83 @@ export const useDeliveryProviderData = () => {
       }
       
       // 2. From purchase_orders table - fetch delivered items
-      // CRITICAL: Also fetch orders where all material_items are receive_scanned = true
-      // This matches the supplier dashboard logic (QR Code Management)
-      // IMPORTANT: Query ALL purchase_orders and filter by material_items to find delivered ones
-      // Some orders might not have delivery_provider_id set correctly
-      console.log('📦 History: Starting purchase_orders history fetch for userId:', userId);
-      let allPOsForProvider: any[] = [];
-      let poHistoryError: any = null;
+      // CRITICAL: Use EXACT same logic as supplier dashboard (EnhancedQRCodeManager.tsx line 861)
+      // Supplier dashboard logic: order is "delivered" if ALL material_items have receive_scanned = true
+      // This ensures provider dashboard shows the SAME delivered orders as supplier dashboard
+      console.log('📦 History: Using EXACT supplier dashboard logic - finding orders where ALL material_items are receive_scanned = true');
+      let deliveredPOs: any[] = [];
       
       try {
-        // Query ALL purchase_orders (we'll filter by material_items to find delivered ones)
-        // This ensures we don't miss orders where delivery_provider_id might not be set
-        const { data, error } = await supabase
-        .from('purchase_orders')
-        .select('*')
-        .order('updated_at', { ascending: false })
-          .limit(500); // Fetch more to check material_items
+        // Step 1: Query ALL material_items where receive_scanned = true
+        const { data: receivedItems, error: itemsError } = await supabase
+          .from('material_items')
+          .select('id, purchase_order_id, receive_scanned')
+          .eq('receive_scanned', true)
+          .limit(2000);
         
-        if (error) {
-          poHistoryError = error;
-          console.warn('⚠️ Error fetching purchase_orders for history:', error);
-        } else {
-          allPOsForProvider = data || [];
-          console.log('📦 History: Fetched', allPOsForProvider.length, 'purchase_orders (all) for history check');
+        if (itemsError) {
+          console.warn('⚠️ Error fetching received material_items:', itemsError);
+        } else if (receivedItems && receivedItems.length > 0) {
+          console.log('📦 History: Found', receivedItems.length, 'material_items with receive_scanned = true');
+          
+          // Step 2: Get all unique purchase_order_ids that have at least one received item
+          const poIdsWithReceivedItems = [...new Set(receivedItems.map(item => item.purchase_order_id))];
+          console.log('📦 History: Found', poIdsWithReceivedItems.length, 'purchase_orders with at least one received item');
+          
+          if (poIdsWithReceivedItems.length > 0) {
+            // Step 3: Fetch ALL material_items for these purchase_orders to check if ALL are received
+            const { data: allItemsForPOs, error: allItemsError } = await supabase
+              .from('material_items')
+              .select('id, purchase_order_id, receive_scanned')
+              .in('purchase_order_id', poIdsWithReceivedItems)
+              .limit(2000);
+            
+            if (allItemsError) {
+              console.warn('⚠️ Error fetching all material_items for purchase_orders:', allItemsError);
+            } else if (allItemsForPOs && allItemsForPOs.length > 0) {
+              // Step 4: Group all items by purchase_order_id
+              const allItemsByPO = new Map<string, any[]>();
+              allItemsForPOs.forEach(item => {
+                const poId = item.purchase_order_id;
+                if (!allItemsByPO.has(poId)) {
+                  allItemsByPO.set(poId, []);
+                }
+                allItemsByPO.get(poId)!.push(item);
+              });
+              
+              // Step 5: Find purchase_orders where ALL items are received (EXACT supplier dashboard logic)
+              const deliveredPOIds: string[] = [];
+              allItemsByPO.forEach((items, poId) => {
+                // EXACT supplier logic: allItemsReceived = items.every(item => item.receive_scanned === true)
+                const allItemsReceived = items.every(item => item.receive_scanned === true);
+                if (allItemsReceived && items.length > 0) {
+                  deliveredPOIds.push(poId);
+                  console.log('✅ History: Found delivered PO (all items received):', poId.substring(0, 8), 'items:', items.length);
+                }
+              });
+              
+              console.log('📦 History: Found', deliveredPOIds.length, 'purchase_orders where ALL items are received (supplier dashboard logic)');
+              
+              // Step 6: Fetch the actual purchase_orders
+              if (deliveredPOIds.length > 0) {
+                const { data: deliveredPOsData, error: poError } = await supabase
+                  .from('purchase_orders')
+                  .select('*')
+                  .in('id', deliveredPOIds)
+                  .order('updated_at', { ascending: false });
+                
+                if (poError) {
+                  console.warn('⚠️ Error fetching delivered purchase_orders:', poError);
+                } else {
+                  deliveredPOs = deliveredPOsData || [];
+                  console.log('📦 History: Fetched', deliveredPOs.length, 'delivered purchase_orders using EXACT supplier dashboard logic');
+                }
+              }
+            }
+          }
         }
       } catch (e: any) {
-        poHistoryError = e;
-        console.warn('⚠️ Exception fetching purchase_orders for history:', e?.message || e);
-      }
-
-      if (poHistoryError) {
-        console.warn('Error fetching purchase_orders for history:', poHistoryError);
-      }
-      
-      // Fetch material_items for all purchase_orders to determine which are truly delivered
-      // CRITICAL: Also ensure known delivered orders are found and included
-      let deliveredPOs: any[] = [];
-      const knownDeliveredOrderNumbers = ['1772673713715', '1772340447370'];
-      
-      if (allPOsForProvider && allPOsForProvider.length > 0) {
-        try {
-          // First, find known delivered orders by po_number
-          const knownPOs: any[] = [];
-          for (const orderNum of knownDeliveredOrderNumbers) {
-            const matchingPO = allPOsForProvider.find(po => (po.po_number || '').includes(orderNum));
-            if (matchingPO && !knownPOs.find(k => k.id === matchingPO.id)) {
-              knownPOs.push(matchingPO);
-              console.log('✅ History: Found known delivered order by po_number:', matchingPO.po_number);
-            }
-          }
-          
-          const poIds = allPOsForProvider.map(po => po.id);
-          
-          // Fetch material_items in batches
-          const batches: string[][] = [];
-          for (let i = 0; i < poIds.length; i += 100) {
-            batches.push(poIds.slice(i, i + 100));
-          }
-          
-          const materialItemsMap = new Map<string, any[]>();
-          
-          for (const batch of batches) {
-            const idsList = batch.join(',');
-            try {
-              const itemsResponse = await fetch(
-                `${SUPABASE_URL}/rest/v1/material_items?purchase_order_id=in.(${idsList})&select=id,purchase_order_id,dispatch_scanned,receive_scanned&limit=1000`,
-                {
-                  headers: {
-                    'apikey': SUPABASE_ANON_KEY,
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json'
-                  },
-                  cache: 'no-store',
-                  signal: AbortSignal.timeout(5000)
-                }
-              );
-              
-              if (itemsResponse.ok) {
-                const items = await itemsResponse.json();
-                items.forEach((item: any) => {
-                  const poId = item.purchase_order_id;
-                  if (!materialItemsMap.has(poId)) {
-                    materialItemsMap.set(poId, []);
-                  }
-                  materialItemsMap.get(poId)!.push(item);
-                });
-              }
-            } catch (e: any) {
-              console.warn('⚠️ Error fetching material_items batch for history:', e?.message || e);
-            }
-          }
-          
-          // Filter to only include orders where:
-          // 1. Status is 'delivered'/'completed'/'received', OR
-          // 2. All material_items are receive_scanned = true (matches supplier dashboard logic)
-          // CRITICAL: Also check if order_number matches the two known delivered orders
-          console.log('📦 History: Filtering', allPOsForProvider.length, 'purchase_orders to find delivered ones...');
-          console.log('📦 History: Material items map has', materialItemsMap.size, 'purchase orders with items');
-          
-          // Known delivered orders from supplier dashboard - match by the numeric part
-          const knownDeliveredOrderNumbers = ['1772673713715', '1772340447370'];
-          
-          deliveredPOs = allPOsForProvider.filter((po: any) => {
-            const poNumber = po.po_number || '';
-            
-            // Check if this is a known delivered order (force include) - match by numeric part
-            if (knownDeliveredOrderNumbers.some(knownNum => poNumber.includes(knownNum))) {
-              console.log('✅ History: Found known delivered PO (forced include):', poNumber);
-              return true;
-            }
-            
-            // Check status first
-            if (['delivered', 'completed', 'received'].includes(po.status)) {
-              console.log('✅ History: Found delivered PO by status:', poNumber, 'status:', po.status);
-              return true;
-            }
-            
-            // Check material_items scan status (same logic as supplier dashboard)
-            const items = materialItemsMap.get(po.id) || [];
-            if (items.length === 0) {
-              return false; // No items = not delivered
-            }
-            
-            // All items must be receive_scanned = true
-            const allItemsReceived = items.every((item: any) => item.receive_scanned === true);
-            if (allItemsReceived) {
-              console.log('✅ History: Found delivered PO by material_items scan:', poNumber, 'items:', items.length, 'all received');
-            }
-            return allItemsReceived;
-          });
-          
-          console.log('📦 History: Found', deliveredPOs.length, 'delivered purchase_orders (by status or material_items scan) out of', allPOsForProvider.length, 'total');
-          
-          // CRITICAL: Force add known delivered orders if they weren't found
-          knownPOs.forEach(knownPO => {
-            if (!deliveredPOs.find(d => d.id === knownPO.id)) {
-              console.log('✅ History: Force adding known delivered order:', knownPO.po_number);
-              deliveredPOs.push(knownPO);
-            }
-          });
-          
-          console.log('📦 History: Final count after force adding known orders:', deliveredPOs.length);
-        } catch (e: any) {
-          console.warn('⚠️ Error checking material_items for history:', e?.message || e);
-          // Fallback: use status-based filtering only, but include known orders
-          deliveredPOs = allPOsForProvider.filter((po: any) => 
-            ['delivered', 'completed', 'received'].includes(po.status)
-          );
-          
-          // Still force add known orders
-          const knownDeliveredOrderNumbers = ['1772673713715', '1772340447370'];
-          allPOsForProvider.forEach(po => {
-            const poNumber = po.po_number || '';
-            if (knownDeliveredOrderNumbers.some(knownNum => poNumber.includes(knownNum))) {
-              if (!deliveredPOs.find(d => d.id === po.id)) {
-                console.log('✅ History: Force adding known delivered order (fallback):', poNumber);
-                deliveredPOs.push(po);
-              }
-            }
-          });
-        }
+        console.warn('⚠️ Exception in supplier dashboard logic for history:', e?.message || e);
       }
       
       // Enrich delivered purchase orders with supplier/buyer info
