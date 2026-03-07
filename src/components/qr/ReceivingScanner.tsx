@@ -736,37 +736,51 @@ export const ReceivingScanner: React.FC = () => {
               style={{ minHeight: isMobile ? '300px' : '400px' }}
             />
             
-            {/* Scanning Frame Overlay for Desktop/Laptop - helps users position QR code */}
-            {isScanning && !isMobile && (
+            {/* Scanning Frame Overlay - helps users position QR code */}
+            {isScanning && (
               <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                {/* Scanning frame with animated corners */}
-                <div className="relative" style={{ width: '300px', height: '300px' }}>
-                  {/* Corner brackets */}
-                  <div className="absolute top-0 left-0 w-12 h-12 border-t-4 border-l-4 border-green-500 rounded-tl-lg"></div>
-                  <div className="absolute top-0 right-0 w-12 h-12 border-t-4 border-r-4 border-green-500 rounded-tr-lg"></div>
-                  <div className="absolute bottom-0 left-0 w-12 h-12 border-b-4 border-l-4 border-green-500 rounded-bl-lg"></div>
-                  <div className="absolute bottom-0 right-0 w-12 h-12 border-b-4 border-r-4 border-green-500 rounded-br-lg"></div>
+                {/* Scanning frame with animated corners - responsive sizing */}
+                <div 
+                  className="relative"
+                  style={{ 
+                    width: 'min(80%, 350px)', 
+                    height: 'min(70%, 350px)',
+                    minWidth: '200px',
+                    minHeight: '200px'
+                  }}
+                >
+                  {/* Corner brackets - using larger sizes */}
+                  <div className="absolute top-0 left-0 border-t-4 border-l-4 border-green-400 rounded-tl-lg" style={{ width: '20%', height: '20%', minWidth: '40px', minHeight: '40px' }}></div>
+                  <div className="absolute top-0 right-0 border-t-4 border-r-4 border-green-400 rounded-tr-lg" style={{ width: '20%', height: '20%', minWidth: '40px', minHeight: '40px' }}></div>
+                  <div className="absolute bottom-0 left-0 border-b-4 border-l-4 border-green-400 rounded-bl-lg" style={{ width: '20%', height: '20%', minWidth: '40px', minHeight: '40px' }}></div>
+                  <div className="absolute bottom-0 right-0 border-b-4 border-r-4 border-green-400 rounded-br-lg" style={{ width: '20%', height: '20%', minWidth: '40px', minHeight: '40px' }}></div>
                   
                   {/* Scanning line animation */}
                   <div 
-                    className="absolute left-4 right-4 h-1 bg-gradient-to-r from-transparent via-green-500 to-transparent"
+                    className="absolute left-[10%] right-[10%] h-1 bg-gradient-to-r from-transparent via-green-400 to-transparent rounded-full"
                     style={{
                       animation: 'scanLine 2s ease-in-out infinite',
-                      top: '50%'
+                      top: '50%',
+                      boxShadow: '0 0 10px rgba(74, 222, 128, 0.8)'
                     }}
                   ></div>
                   <style>{`
                     @keyframes scanLine {
-                      0%, 100% { top: 10%; opacity: 0.5; }
-                      50% { top: 90%; opacity: 1; }
+                      0%, 100% { top: 15%; opacity: 0.6; }
+                      50% { top: 85%; opacity: 1; }
                     }
                   `}</style>
                   
-                  {/* Center crosshair */}
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6">
-                    <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-green-500/50"></div>
-                    <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-green-500/50"></div>
-                  </div>
+                  {/* Center target - small dot */}
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-green-400/30 border border-green-400/50"></div>
+                  
+                  {/* Frame border glow effect */}
+                  <div 
+                    className="absolute inset-0 rounded-lg"
+                    style={{
+                      boxShadow: 'inset 0 0 30px rgba(74, 222, 128, 0.15), 0 0 20px rgba(0, 0, 0, 0.5)'
+                    }}
+                  ></div>
                 </div>
               </div>
             )}
@@ -791,10 +805,10 @@ export const ReceivingScanner: React.FC = () => {
               </div>
             )}
             
-            {/* Desktop scanning tips */}
-            {isScanning && !isMobile && (
+            {/* Scanning tip banner */}
+            {isScanning && (
               <div className="absolute top-4 left-0 right-0 text-center pointer-events-none">
-                <span className="bg-black/60 text-white text-xs px-3 py-1 rounded-full">
+                <span className="bg-black/70 text-white text-xs sm:text-sm px-3 py-1.5 rounded-full shadow-lg">
                   📷 Position QR code within the green frame
                 </span>
               </div>
