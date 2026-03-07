@@ -735,7 +735,39 @@ export const ReceivingScanner: React.FC = () => {
       const updatedItem = updatedItems[0] || item;
       console.log('✅ Material item updated:', updatedItem);
       
-      // Step 3: Check if all items in the order are now delivered
+      // Step 3: Update delivery_request status immediately when item is scanned
+      if (item.purchase_order_id) {
+        try {
+          // Update delivery_request to 'delivered' when item is received
+          const deliveryRequestResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${item.purchase_order_id}`,
+            {
+              method: 'PATCH',
+              headers: {
+                'apikey': ANON_KEY,
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=representation'
+              },
+              body: JSON.stringify({
+                status: 'delivered',
+                completed_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              })
+            }
+          );
+          
+          if (deliveryRequestResponse.ok) {
+            console.log('✅ Delivery request updated to delivered status');
+          } else {
+            console.warn('⚠️ Could not update delivery_request status:', await deliveryRequestResponse.text());
+          }
+        } catch (e) {
+          console.warn('⚠️ Error updating delivery_request:', e);
+        }
+      }
+      
+      // Step 4: Check if all items in the order are now delivered
       if (item.purchase_order_id) {
         try {
           // Count remaining undelivered items
