@@ -334,11 +334,19 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
             // Audio not supported
           }
           
-          // Call processQRScan and handle errors
-          processQRScan(decodedText, 'mobile_camera').catch((error) => {
+          // Call processQRScan and handle errors with timeout
+          const processPromise = processQRScan(decodedText, 'mobile_camera');
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Scan processing timeout after 30 seconds')), 30000)
+          );
+          
+          Promise.race([processPromise, timeoutPromise]).catch((error) => {
             console.error('❌ Error in processQRScan:', error);
+            console.error('❌ Error type:', error?.constructor?.name);
+            console.error('❌ Error message:', error?.message);
+            console.error('❌ Full error:', error);
             toast.error('❌ Scan Processing Error', {
-              description: 'Failed to process QR code. Please try again.',
+              description: error?.message || 'Failed to process QR code. Please try again.',
               duration: 5000,
             });
           });
@@ -433,10 +441,12 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
   };
 
   const processQRScan = async (qrCode: string, scannerType: 'mobile_camera' | 'physical_scanner' | 'web_scanner') => {
+    const startTime = Date.now();
     try {
       console.log('🔍 Processing QR scan for RECEIVING:', qrCode);
       console.log('📱 Scanner type:', scannerType);
       console.log('📦 Material condition:', materialCondition);
+      console.log('⏱️ Process started at:', new Date().toISOString());
       
       // Show immediate feedback
       toast.info('Processing scan...', { duration: 2000 });
@@ -530,6 +540,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       // Use Supabase client for proper query handling
       console.log('📦 Looking up material_item with QR code:', cleanQRCode);
       console.log('📦 QR code variants to try:', qrCodeVariants);
+      console.log('📦 Starting database lookup...');
       
       let items: any[] = [];
       
@@ -710,10 +721,13 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         console.error('❌ Lookup error:', lookupError);
       }
       
+      console.log('📦 Database lookup complete. Found items:', items?.length || 0);
+      
       if (!items || items.length === 0) {
         console.error('❌ QR CODE NOT FOUND IN DATABASE!');
         console.error('   Scanned value:', cleanQRCode);
         console.error('   Variants tried:', qrCodeVariants);
+        console.error('   This QR code does not exist in material_items table');
         
         // Fetch sample to show expected format
         try {
@@ -1040,22 +1054,31 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       setManualQRCode('');
       setNotes('');
       
-    } catch (error) {
-      console.error('Scan processing error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      if (errorMessage.includes('timeout') || errorMessage.includes('Timeout')) {
-        toast.error('Request Timeout', {
-          description: 'The scan request took too long. Please check your connection and try again.',
-          duration: 5000
-        });
-      } else {
-        toast.error('Failed to process scan', {
-          description: errorMessage,
-          duration: 5000
-        });
-      }
-    }
-  };
+        } catch (error) {
+          const elapsed = Date.now() - startTime;
+          console.error('❌ Scan processing error after', elapsed, 'ms:', error);
+          console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+          console.error('❌ Error details:', {
+            message: error instanceof Error ? error.message : String(error),
+            name: error instanceof Error ? error.name : 'Unknown',
+            qrCode: qrCode.substring(0, 50) + '...'
+          });
+          
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          if (errorMessage.includes('timeout') || errorMessage.includes('Timeout')) {
+            toast.error('Request Timeout', {
+              description: 'The scan request took too long. Please check your connection and try again.',
+              duration: 5000
+            });
+          } else {
+            toast.error('Failed to process scan', {
+              description: errorMessage,
+              duration: 5000
+            });
+          }
+          throw error; // Re-throw to be caught by outer catch
+        }
+      };
 
   const handleManualScan = () => {
     if (!manualQRCode.trim()) {
