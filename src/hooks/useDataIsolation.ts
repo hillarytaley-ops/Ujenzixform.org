@@ -1752,24 +1752,27 @@ export const useDeliveryProviderData = () => {
       // 2. From purchase_orders table - fetch delivered items
       // CRITICAL: Also fetch orders where all material_items are receive_scanned = true
       // This matches the supplier dashboard logic (QR Code Management)
-      // Use userId directly (delivery_provider_id in purchase_orders is the auth user_id, not delivery_provider.id)
+      // IMPORTANT: Query ALL purchase_orders and filter by material_items to find delivered ones
+      // Some orders might not have delivery_provider_id set correctly
+      console.log('📦 History: Starting purchase_orders history fetch for userId:', userId);
       let allPOsForProvider: any[] = [];
       let poHistoryError: any = null;
       
       try {
+        // Query ALL purchase_orders (we'll filter by material_items to find delivered ones)
+        // This ensures we don't miss orders where delivery_provider_id might not be set
         const { data, error } = await supabase
           .from('purchase_orders')
           .select('*')
-          .eq('delivery_provider_id', userId)
           .order('updated_at', { ascending: false })
-          .limit(200); // Fetch more to check material_items scan status
+          .limit(500); // Fetch more to check material_items
         
         if (error) {
           poHistoryError = error;
           console.warn('⚠️ Error fetching purchase_orders for history:', error);
         } else {
           allPOsForProvider = data || [];
-          console.log('📦 Fetched', allPOsForProvider.length, 'purchase_orders for history check');
+          console.log('📦 History: Fetched', allPOsForProvider.length, 'purchase_orders (all) for history check');
         }
       } catch (e: any) {
         poHistoryError = e;
