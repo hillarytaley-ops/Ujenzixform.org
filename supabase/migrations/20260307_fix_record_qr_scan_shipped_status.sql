@@ -4,6 +4,11 @@
 -- Created: March 7, 2026
 -- ============================================================
 
+-- Drop all existing versions of record_qr_scan to avoid ambiguity
+DROP FUNCTION IF EXISTS public.record_qr_scan(TEXT, TEXT, UUID);
+DROP FUNCTION IF EXISTS public.record_qr_scan(TEXT, TEXT);
+DROP FUNCTION IF EXISTS public.record_qr_scan(TEXT);
+
 -- Update the record_qr_scan function to use 'dispatched' instead of 'shipped'
 CREATE OR REPLACE FUNCTION public.record_qr_scan(
     _qr_code TEXT,
