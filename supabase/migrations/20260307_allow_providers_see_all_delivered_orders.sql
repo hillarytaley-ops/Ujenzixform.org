@@ -48,21 +48,13 @@ USING (
   -- Method 4: NEW - Allow access to delivered orders where provider is involved
   -- This ensures providers can see delivered orders in their history, matching supplier dashboard
   -- But only for orders where they are the assigned provider (via delivery_requests or purchase_orders)
+  -- NOTE: We only check purchase_orders.status, NOT material_items scan status (to avoid circular reference)
   EXISTS (
     SELECT 1
     FROM purchase_orders po
     WHERE po.id = material_items.purchase_order_id
-    AND (
-      -- Order is marked as delivered
-      po.status IN ('delivered', 'completed')
-      OR
-      -- OR all items for this order are received (delivered)
-      (
-        SELECT COUNT(*) = COUNT(*) FILTER (WHERE receive_scanned = TRUE)
-        FROM material_items mi
-        WHERE mi.purchase_order_id = po.id
-      ) = TRUE
-    )
+    -- Order is marked as delivered (we don't check material_items.receive_scanned to avoid circular reference)
+    AND po.status IN ('delivered', 'completed')
     -- Only allow if provider is assigned to this delivery (via delivery_requests or purchase_orders)
     AND (
       -- Check via delivery_requests.provider_id
