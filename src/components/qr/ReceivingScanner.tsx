@@ -822,35 +822,70 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       // Step 2: Update the material_item to mark as received
       console.log('📦 Updating material_item to received:', item.id);
       
-      // Get current user ID
+      // Get current user ID with timeout
       let currentUserId: string | null = null;
       try {
-        const { data: userData } = await supabase.auth.getUser();
+        console.log('👤 Getting current user ID...');
+        const getUserPromise = supabase.auth.getUser();
+        const getUserTimeout = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('getUser timeout after 3 seconds')), 3000)
+        );
+        const { data: userData } = await Promise.race([getUserPromise, getUserTimeout]) as any;
         currentUserId = userData?.user?.id || null;
+        console.log('👤 Current user ID:', currentUserId || 'NOT FOUND');
       } catch (e) {
-        console.warn('Could not get current user:', e);
+        console.warn('⚠️ Could not get current user (using fallback):', e);
+        // Try to get from session data if available
+        try {
+          const session = await supabase.auth.getSession();
+          currentUserId = session.data?.session?.user?.id || null;
+        } catch (e2) {
+          console.warn('⚠️ Could not get user from session either:', e2);
+        }
       }
       
-      const updateResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/material_items?id=eq.${item.id}`,
-        {
-          method: 'PATCH',
-          headers: {
-            'apikey': ANON_KEY,
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=representation'
-          },
-          body: JSON.stringify({
-            receive_scanned: true,
-            receive_scanned_at: new Date().toISOString(),
-            receive_scanned_by: currentUserId,
-            status: 'received',
-            material_condition: materialCondition,
-            updated_at: new Date().toISOString()
-          })
+      console.log('📦 Starting material_item update fetch...');
+      const updateStartTime = Date.now();
+      const updateController = new AbortController();
+      const updateTimeoutId = setTimeout(() => updateController.abort(), 10000); // 10 second timeout
+      
+      let updateResponse: Response;
+      try {
+        updateResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/material_items?id=eq.${item.id}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'apikey': ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify({
+              receive_scanned: true,
+              receive_scanned_at: new Date().toISOString(),
+              receive_scanned_by: currentUserId,
+              status: 'received',
+              material_condition: materialCondition,
+              updated_at: new Date().toISOString()
+            }),
+            signal: updateController.signal
+          }
+        );
+        clearTimeout(updateTimeoutId);
+        console.log('⏱️ Material item update fetch completed in:', Date.now() - updateStartTime, 'ms');
+      } catch (fetchError: any) {
+        clearTimeout(updateTimeoutId);
+        if (fetchError.name === 'AbortError') {
+          console.error('❌ Material item update timed out after 10 seconds');
+          toast.error('Request Timeout', {
+            description: 'Material item update took too long. Please check your connection.',
+            duration: 5000
+          });
+          return;
         }
-      );
+        throw fetchError;
+      }
       
       if (!updateResponse.ok) {
         const errorText = await updateResponse.text();
@@ -882,17 +917,33 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           // First, get the current user's delivery_provider.id to ensure delivery_request has it
           let providerId: string | null = null;
           try {
+            console.log('🔍 Fetching delivery_provider.id for user:', currentUserId);
+            const providerController = new AbortController();
+            const providerTimeoutId = setTimeout(() => providerController.abort(), 5000); // 5 second timeout
+            
             // Try to get delivery_provider.id for this user
-            const providerResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${currentUserId}&select=id&limit=1`,
-              {
-                headers: {
-                  'apikey': ANON_KEY,
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Accept': 'application/json'
+            let providerResponse: Response;
+            try {
+              providerResponse = await fetch(
+                `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${currentUserId}&select=id&limit=1`,
+                {
+                  headers: {
+                    'apikey': ANON_KEY,
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Accept': 'application/json'
+                  },
+                  signal: providerController.signal
                 }
+              );
+              clearTimeout(providerTimeoutId);
+            } catch (fetchError: any) {
+              clearTimeout(providerTimeoutId);
+              if (fetchError.name === 'AbortError') {
+                console.warn('⚠️ Provider lookup timed out, continuing without provider_id');
+                throw new Error('Provider lookup timeout');
               }
-            );
+              throw fetchError;
+            }
             if (providerResponse.ok) {
               const providerData = await providerResponse.json();
               if (providerData && providerData.length > 0) {
@@ -909,16 +960,32 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           // First, check if delivery_request exists and get its current state
           let existingDeliveryRequest: any = null;
           try {
-            const checkResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${item.purchase_order_id}&select=*&limit=1`,
-              {
-                headers: {
-                  'apikey': ANON_KEY,
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Accept': 'application/json'
+            console.log('🔍 Checking existing delivery_request...');
+            const checkController = new AbortController();
+            const checkTimeoutId = setTimeout(() => checkController.abort(), 5000); // 5 second timeout
+            
+            let checkResponse: Response;
+            try {
+              checkResponse = await fetch(
+                `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${item.purchase_order_id}&select=*&limit=1`,
+                {
+                  headers: {
+                    'apikey': ANON_KEY,
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Accept': 'application/json'
+                  },
+                  signal: checkController.signal
                 }
+              );
+              clearTimeout(checkTimeoutId);
+            } catch (fetchError: any) {
+              clearTimeout(checkTimeoutId);
+              if (fetchError.name === 'AbortError') {
+                console.warn('⚠️ Delivery request check timed out, continuing without check');
+                throw new Error('Delivery request check timeout');
               }
-            );
+              throw fetchError;
+            }
             if (checkResponse.ok) {
               const checkData = await checkResponse.json();
               if (checkData && checkData.length > 0) {
@@ -955,21 +1022,45 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
             }
           }
           
-          const deliveryRequestResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${item.purchase_order_id}`,
-            {
-              method: 'PATCH',
-              headers: {
-                'apikey': ANON_KEY,
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json',
-                'Prefer': 'return=representation'
-              },
-              body: JSON.stringify(updateBody)
-            }
-          );
+          console.log('📦 Updating delivery_request status to delivered...');
+          const deliveryUpdateController = new AbortController();
+          const deliveryUpdateTimeoutId = setTimeout(() => deliveryUpdateController.abort(), 10000); // 10 second timeout
           
-          if (deliveryRequestResponse.ok) {
+          let deliveryRequestResponse: Response | null = null;
+          try {
+            deliveryRequestResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${item.purchase_order_id}`,
+              {
+                method: 'PATCH',
+                headers: {
+                  'apikey': ANON_KEY,
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json',
+                  'Prefer': 'return=representation'
+                },
+                body: JSON.stringify(updateBody),
+                signal: deliveryUpdateController.signal
+              }
+            );
+            clearTimeout(deliveryUpdateTimeoutId);
+            console.log('⏱️ Delivery request update completed');
+          } catch (fetchError: any) {
+            clearTimeout(deliveryUpdateTimeoutId);
+            if (fetchError.name === 'AbortError') {
+              console.error('❌ Delivery request update timed out after 10 seconds');
+              toast.warning('⚠️ Update Timeout', {
+                description: 'Delivery status update timed out, but item was scanned. Tab will still switch.',
+                duration: 5000,
+              });
+              // Continue anyway - item is scanned, just status update failed
+              deliveryRequestUpdated = false;
+              deliveryRequestResponse = null;
+            } else {
+              throw fetchError;
+            }
+          }
+          
+          if (deliveryRequestResponse && deliveryRequestResponse.ok) {
             const updatedDeliveryRequest = await deliveryRequestResponse.json();
             console.log('✅ Delivery request updated to delivered status:', updatedDeliveryRequest);
             console.log('📋 Updated delivery_request data:', JSON.stringify(updatedDeliveryRequest, null, 2));
