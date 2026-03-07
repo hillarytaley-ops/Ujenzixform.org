@@ -95,6 +95,51 @@ BEGIN
   RAISE NOTICE 'Fixed % delivery_requests that had all items scanned but were not marked as delivered', fixed_count;
 END $$;
 
+-- ============================================================
+-- DIRECT FIX: Update delivery_requests where purchase_order is 'delivered'
+-- This catches cases where purchase_order status is 'delivered' but delivery_request is not
+-- ============================================================
+UPDATE delivery_requests dr
+SET 
+  status = 'delivered',
+  delivered_at = COALESCE(dr.delivered_at, po.updated_at, NOW()),
+  completed_at = COALESCE(dr.completed_at, po.updated_at, NOW()),
+  updated_at = NOW()
+FROM purchase_orders po
+WHERE dr.purchase_order_id = po.id
+  AND po.status IN ('delivered', 'completed')
+  AND dr.status NOT IN ('delivered', 'completed', 'cancelled');
+
+-- ============================================================
+-- DIRECT FIX: Update delivery_requests where all material_items are scanned
+-- This catches cases where items are scanned but status wasn't updated
+-- ============================================================
+UPDATE delivery_requests dr
+SET 
+  status = 'delivered',
+  delivered_at = COALESCE(dr.delivered_at, NOW()),
+  completed_at = COALESCE(dr.completed_at, NOW()),
+  updated_at = NOW()
+WHERE dr.purchase_order_id IN (
+  SELECT po.id
+  FROM purchase_orders po
+  WHERE EXISTS (
+    SELECT 1 FROM material_items mi
+    WHERE mi.purchase_order_id = po.id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM material_items mi
+    WHERE mi.purchase_order_id = po.id
+      AND (mi.receive_scanned = FALSE OR mi.receive_scanned IS NULL)
+  )
+  AND EXISTS (
+    SELECT 1 FROM material_items mi
+    WHERE mi.purchase_order_id = po.id
+      AND mi.receive_scanned = TRUE
+  )
+)
+AND dr.status NOT IN ('delivered', 'completed', 'cancelled');
+
 -- Grant execute permission
 GRANT EXECUTE ON FUNCTION fix_scanned_orders_delivery_status TO authenticated;
 
