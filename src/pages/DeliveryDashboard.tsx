@@ -262,7 +262,12 @@ const DeliveryDashboard = () => {
         special_instructions: d.special_instructions,
         created_at: d.created_at,
         purchase_order_id: d.purchase_order_id,
-        order_number: d.order_number // Include order number from the hook
+        order_number: d.order_number, // Include order number from the hook
+        // CRITICAL: Preserve categorization fields for tab filtering
+        _categorized_status: d._categorized_status,
+        _items_count: d._items_count,
+        _dispatched_count: d._dispatched_count,
+        _received_count: d._received_count
       }));
       setActiveDeliveries(formattedActive);
       console.log('🚚 Active deliveries loaded:', formattedActive.length, 'Statuses:', formattedActive.map(d => d.status));
