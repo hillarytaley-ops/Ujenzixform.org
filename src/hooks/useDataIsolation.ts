@@ -1835,9 +1835,14 @@ export const useDeliveryProviderData = () => {
       } catch (e: any) {
         console.error('❌ CRITICAL ERROR in supplier dashboard logic for history:', e?.message || e);
         console.error('❌ Stack trace:', e?.stack);
+        console.error('❌ This error prevents provider dashboard from matching supplier dashboard delivered count!');
       }
       
-      console.log('📦 History: Supplier dashboard logic completed. Found', deliveredPOs.length, 'delivered purchase_orders');
+      console.log('═══════════════════════════════════════════════════════════════════════════════');
+      console.log('✅ History: Supplier dashboard logic COMPLETED');
+      console.log('✅ Found', deliveredPOs.length, 'delivered purchase_orders (should match supplier dashboard: 2)');
+      console.log('📋 Order numbers found:', deliveredPOs.map(po => po.po_number || po.id?.substring(0, 8)).join(', '));
+      console.log('═══════════════════════════════════════════════════════════════════════════════');
       
       // Enrich delivered purchase orders with supplier/buyer info
       let enrichedDeliveredPOs = deliveredPOs || [];
