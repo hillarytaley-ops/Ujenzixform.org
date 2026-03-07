@@ -340,261 +340,187 @@ export const ReceivingScanner: React.FC = () => {
       
       console.log('🔐 Using access token:', accessToken ? 'Found' : 'Using anon key');
       
-      // Ensure all parameters are properly formatted
-      const requestBody: Record<string, any> = {
-        _qr_code: qrCode?.trim() || null,
-        _scan_type: 'receiving',
-        _scanner_device_id: navigator.userAgent?.substring(0, 100) || null,
-        _scanner_type: scannerType || 'web_scanner',
-        _material_condition: materialCondition || 'good',
-        _notes: notes?.trim() || null
-      };
+      // DIRECT DATABASE UPDATE: Look up the material_item by QR code and update it
+      // This bypasses the RPC function which may not exist
       
-      console.log('📤 Sending RPC request:', {
-        url: `${SUPABASE_URL}/rest/v1/rpc/record_qr_scan`,
-        method: 'POST',
-        body: requestBody,
-        qrCode: qrCode,
-        qrCodeLength: qrCode?.length
-      });
-      
-      // Call the record_qr_scan function via REST API with timeout
-      const response = await fetchWithTimeout(
-        `${SUPABASE_URL}/rest/v1/rpc/record_qr_scan`,
+      // Step 1: Find the material_item with this QR code
+      console.log('📦 Looking up material_item with QR code:', qrCode);
+      const lookupResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${encodeURIComponent(qrCode)}&select=*`,
         {
-          method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
             'apikey': ANON_KEY,
             'Authorization': `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify(requestBody)
-        },
-        10000 // 10 second timeout
-      );
-
-      console.log('📊 RPC Response status:', response.status);
-      
-      // Read response as text first (don't assume it's JSON)
-      let responseText = '';
-      let data: any = null;
-      
-      try {
-        responseText = await response.text();
-        console.log('📥 Raw response text (length:', responseText.length, '):', responseText.substring(0, 500));
-        
-        // Try to parse as JSON
-        if (responseText && responseText.trim().startsWith('{')) {
-          try {
-            data = JSON.parse(responseText);
-            console.log('📥 Parsed response data:', data);
-          } catch (jsonError) {
-            console.warn('⚠️ Response looks like JSON but failed to parse:', jsonError);
-            data = { rawText: responseText };
+            'Accept': 'application/json'
           }
-        } else if (responseText && responseText.trim().startsWith('[')) {
-          // Sometimes Supabase returns arrays
-          try {
-            data = JSON.parse(responseText);
-            console.log('📥 Parsed response array:', data);
-          } catch (jsonError) {
-            console.warn('⚠️ Response looks like array but failed to parse:', jsonError);
-            data = { rawText: responseText };
-          }
-        } else {
-          // Not JSON - might be HTML error page or plain text
-          console.warn('⚠️ Response is not JSON:', responseText.substring(0, 200));
-          data = { 
-            error: 'Non-JSON response from server',
-            rawText: responseText.substring(0, 500),
-            isHtml: responseText.trim().startsWith('<')
-          };
         }
-      } catch (readError) {
-        console.error('❌ Failed to read response:', {
-          error: readError,
-          status: response.status,
-          statusText: response.statusText
+      );
+      
+      if (!lookupResponse.ok) {
+        const errorText = await lookupResponse.text();
+        console.error('❌ Failed to lookup material_item:', lookupResponse.status, errorText);
+        toast.error('❌ Lookup Failed', {
+          description: 'Could not find QR code in system. Please try again.',
+          duration: 5000
         });
-        data = { error: 'Failed to read server response', readError: String(readError) };
+        return;
       }
-
-      // Check for HTTP errors first
-      if (!response.ok) {
-        console.error('❌ Receiving scan HTTP error:', {
-          status: response.status,
-          statusText: response.statusText,
-          headers: Object.fromEntries(response.headers.entries()),
-          data: data,
-          qrCode: qrCode,
-          rawResponse: responseText?.substring(0, 1000),
-          requestBody: requestBody
+      
+      const items = await lookupResponse.json();
+      console.log('📦 Found material_items:', items);
+      
+      if (!items || items.length === 0) {
+        toast.error('❓ QR Code Not Found', {
+          description: 'This QR code is not registered in the system.',
+          duration: 5000
         });
-        
-        // Handle different error statuses
-        if (response.status === 400) {
-          // 400 usually means bad request - could be validation error or function error
-          // Supabase PostgREST returns errors in various formats:
-          // - { message: "...", details: "...", hint: "...", code: "..." }
-          // - { error: "..." }
-          // - Plain text or HTML
-          let errorMsg = 'Invalid request. Please check the QR code format.';
-          
-          if (data) {
-            if (typeof data === 'string') {
-              errorMsg = data;
-            } else if (data.message) {
-              errorMsg = data.message;
-              if (data.details) errorMsg += ` (${data.details})`;
-              if (data.hint) errorMsg += ` Hint: ${data.hint}`;
-            } else if (data.error) {
-              errorMsg = typeof data.error === 'string' ? data.error : JSON.stringify(data.error);
-            } else if (data.error_code) {
-              // Function-level error code
-              errorMsg = data.error || 'Invalid QR code';
-            } else if (data.rawText) {
-              errorMsg = data.rawText.substring(0, 200);
-            } else {
-              // Try to extract any error-like field
-              const errorFields = Object.keys(data).filter(k => 
-                k.toLowerCase().includes('error') || 
-                k.toLowerCase().includes('message') ||
-                k.toLowerCase().includes('detail')
-              );
-              if (errorFields.length > 0) {
-                errorMsg = String(data[errorFields[0]]);
-              } else {
-                errorMsg = `Server error: ${JSON.stringify(data).substring(0, 200)}`;
+        return;
+      }
+      
+      const item = items[0];
+      
+      // Check if already received
+      if (item.receiving_scanned || item.status === 'delivered' || item.status === 'received') {
+        toast.error('⚠️ Already Received', {
+          description: `This item (${item.material_type || 'Material'}) has already been scanned and confirmed.`,
+          duration: 5000
+        });
+        return;
+      }
+      
+      // Check if not yet dispatched
+      if (!item.dispatch_scanned && item.status !== 'dispatched' && item.status !== 'in_transit') {
+        toast.warning('🚫 Not Dispatched Yet', {
+          description: 'This item has not been dispatched by the supplier yet. Please wait for dispatch.',
+          duration: 5000
+        });
+        return;
+      }
+      
+      // Step 2: Update the material_item to mark as received
+      console.log('📦 Updating material_item to received:', item.id);
+      const updateResponse = await fetch(
+        `${SUPABASE_URL}/rest/v1/material_items?id=eq.${item.id}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'apikey': ANON_KEY,
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify({
+            receiving_scanned: true,
+            receiving_scanned_at: new Date().toISOString(),
+            status: 'delivered',
+            material_condition: materialCondition,
+            receiving_notes: notes || null,
+            updated_at: new Date().toISOString()
+          })
+        }
+      );
+      
+      if (!updateResponse.ok) {
+        const errorText = await updateResponse.text();
+        console.error('❌ Failed to update material_item:', updateResponse.status, errorText);
+        toast.error('❌ Update Failed', {
+          description: 'Could not mark item as received. Please try again.',
+          duration: 5000
+        });
+        return;
+      }
+      
+      const updatedItems = await updateResponse.json();
+      const updatedItem = updatedItems[0] || item;
+      console.log('✅ Material item updated:', updatedItem);
+      
+      // Step 3: Check if all items in the order are now delivered
+      if (item.purchase_order_id) {
+        try {
+          // Count remaining undelivered items
+          const countResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/material_items?purchase_order_id=eq.${item.purchase_order_id}&receiving_scanned=eq.false&select=id`,
+            {
+              headers: {
+                'apikey': ANON_KEY,
+                'Authorization': `Bearer ${accessToken}`,
+                'Accept': 'application/json'
               }
             }
-          } else if (responseText) {
-            errorMsg = responseText.substring(0, 200);
-          }
+          );
           
-          toast.error('❌ Invalid Request', {
-            description: errorMsg,
-            duration: 8000
-          });
-        } else if (response.status === 401) {
-          toast.error('🔐 Authentication Error', {
-            description: 'Your session may have expired. Please refresh the page.',
-            duration: 6000
-          });
-        } else if (response.status === 403) {
-          toast.error('🚫 Permission Denied', {
-            description: 'You do not have permission to perform this action.',
-            duration: 6000
-          });
-        } else {
-          const errorMsg = data?.message || data?.error || 
-                          (typeof data === 'string' ? data : 'Unknown error occurred');
-          toast.error(`Failed to record receiving scan (${response.status})`, {
-            description: errorMsg,
-            duration: 6000
-          });
+          if (countResponse.ok) {
+            const remainingItems = await countResponse.json();
+            console.log('📦 Remaining undelivered items:', remainingItems.length);
+            
+            if (remainingItems.length === 0) {
+              // All items delivered - update purchase_order status
+              await fetch(
+                `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${item.purchase_order_id}`,
+                {
+                  method: 'PATCH',
+                  headers: {
+                    'apikey': ANON_KEY,
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({
+                    status: 'delivered',
+                    delivery_status: 'delivered',
+                    delivered_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                  })
+                }
+              );
+              
+              // Also update delivery_request if exists
+              await fetch(
+                `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${item.purchase_order_id}`,
+                {
+                  method: 'PATCH',
+                  headers: {
+                    'apikey': ANON_KEY,
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({
+                    status: 'delivered',
+                    completed_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                  })
+                }
+              );
+              
+              console.log('✅ All items delivered - order marked as complete');
+            }
+          }
+        } catch (e) {
+          console.warn('Could not check/update order status:', e);
         }
-        return;
       }
+      
+      // Success! Add to results
+      const scanResult: ScanResult = {
+        qr_code: qrCode,
+        material_type: item.material_type || 'Material',
+        category: item.category || 'General',
+        quantity: item.quantity || 1,
+        unit: item.unit || 'unit',
+        status: 'delivered',
+        timestamp: new Date()
+      };
 
-      // Even if HTTP status is OK, check if the function returned an error
-      const scanData = data as any;
-      if (scanData && scanData.success === false) {
-        console.error('❌ Receiving scan function error:', scanData);
-        
-        // Handle specific error codes with appropriate messages
-        const errorCode = scanData.error_code;
-        let errorTitle = 'Scan Failed';
-        let errorDescription = scanData.error || 'Invalid QR code';
-        
-        switch (errorCode) {
-          case 'ALREADY_RECEIVED':
-            errorTitle = '⚠️ Already Scanned';
-            errorDescription = 'This QR code has already been scanned and confirmed for delivery.';
-            break;
-          case 'NOT_DISPATCHED':
-            errorTitle = '🚫 Not Dispatched Yet';
-            errorDescription = 'This item has not been dispatched by the supplier yet.';
-            break;
-          case 'QR_INVALIDATED':
-            errorTitle = '🚫 QR Code Invalidated';
-            errorDescription = 'This QR code is no longer valid.';
-            break;
-          case 'QR_NOT_FOUND':
-            errorTitle = '❓ QR Code Not Found';
-            errorDescription = 'This QR code is not registered in the system.';
-            break;
-          default:
-            errorTitle = '❌ Scan Failed';
-        }
-        
-        toast.error(errorTitle, {
-          description: errorDescription,
-          duration: 5000
-        });
-        return;
-      }
+      setScanResults(prev => [scanResult, ...prev.slice(0, 9)]);
+      
+      toast.success('✅ Item Received!', {
+        description: `${item.material_type || 'Material'} - ${item.quantity || 1} ${item.unit || 'unit(s)'} confirmed`,
+        duration: 5000
+      });
 
-      // If we get here, the scan was successful
-      if (scanData && scanData.success !== false) {
-        const scanResult: ScanResult = {
-          qr_code: scanData.qr_code,
-          material_type: scanData.material_type,
-          category: scanData.category,
-          quantity: scanData.quantity,
-          unit: scanData.unit,
-          status: scanData.new_status,
-          timestamp: new Date()
-        };
-
-        setScanResults(prev => [scanResult, ...prev.slice(0, 9)]);
-        
-        // Show success with invalidation notice if applicable
-        if (scanData.is_invalidated) {
-          toast.success('✅ Item Received & QR Invalidated', {
-            description: `${scanData.material_type} - Both dispatch and receive completed. QR code is now invalid.`,
-            duration: 6000
-          });
-        } else {
-          toast.success('📦 Item Received', {
-            description: `${scanData.material_type} - ${scanData.quantity} ${scanData.unit}`
-          });
-        }
-
-        // Reset form
-        setManualQRCode('');
-        setNotes('');
-      } else {
-        // Handle specific error codes with appropriate messages
-        const errorCode = scanData.error_code;
-        let errorTitle = 'Scan Failed';
-        let errorDescription = scanData.error || 'Invalid QR code';
-        
-        switch (errorCode) {
-          case 'ALREADY_RECEIVED':
-            errorTitle = '⚠️ Already Scanned';
-            errorDescription = 'This QR code has already been scanned and confirmed for delivery.';
-            break;
-          case 'NOT_DISPATCHED':
-            errorTitle = '🚫 Not Dispatched Yet';
-            errorDescription = 'This item has not been dispatched by the supplier yet.';
-            break;
-          case 'QR_INVALIDATED':
-            errorTitle = '🚫 QR Code Invalidated';
-            errorDescription = 'This QR code is no longer valid.';
-            break;
-          case 'QR_NOT_FOUND':
-            errorTitle = '❓ QR Code Not Found';
-            errorDescription = 'This QR code is not registered in the system.';
-            break;
-          default:
-            errorTitle = '❌ Scan Failed';
-        }
-        
-        toast.error(errorTitle, {
-          description: errorDescription,
-          duration: 5000
-        });
-      }
+      // Reset form
+      setManualQRCode('');
+      setNotes('');
+      
     } catch (error) {
       console.error('Scan processing error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
