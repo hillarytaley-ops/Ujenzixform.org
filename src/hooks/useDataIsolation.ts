@@ -453,11 +453,13 @@ export const useDeliveryProviderData = () => {
               // Filter by provider_id AND status to exclude pending requests (which are visible to all providers via RLS)
               // Only show requests that have been accepted/assigned to this provider
               // RLS policy will handle matching provider_id (either user_id or delivery_providers.id)
+              // Query delivery_requests with order_number directly (now stored in table)
+              // Also fetch from purchase_orders as backup
               const joinQueryPromise = supabase
                 .from('delivery_requests')
                 .select(`
                   *,
-                  purchase_orders(
+                  purchase_orders!left(
                     id,
                     po_number
                   )
@@ -483,17 +485,21 @@ export const useDeliveryProviderData = () => {
               }
               
               if (deliveryRequestsData && deliveryRequestsData.length > 0) {
-                // Flatten the joined data and add po_number directly
+                // Flatten the joined data and prioritize order_number from delivery_requests table
                 allDeliveries = deliveryRequestsData.map((dr: any) => {
                   const po = Array.isArray(dr.purchase_orders) ? dr.purchase_orders[0] : dr.purchase_orders;
+                  // PRIORITY: 1) dr.order_number (stored directly), 2) po.po_number (from join), 3) null
+                  const realOrderNumber = dr.order_number && dr.order_number.trim() && !dr.order_number.match(/^PO-[A-F0-9]{8}$/i)
+                    ? dr.order_number  // Real order number stored in delivery_requests
+                    : (po?.po_number && po.po_number.trim() ? po.po_number : null);  // Fallback to join
                   return {
                     ...dr,
                     purchase_order_id: dr.purchase_order_id || po?.id,
-                    po_number_from_join: po?.po_number || null
+                    po_number_from_join: realOrderNumber  // Use the best available order number
                   };
                 });
                 const withPONumber = allDeliveries.filter((d: any) => d.po_number_from_join).length;
-                console.log('✅ Fetched delivery_requests with po_number join:', allDeliveries.length, 'deliveries,', withPONumber, 'with po_number');
+                console.log('✅ Fetched delivery_requests with order_number:', allDeliveries.length, 'deliveries,', withPONumber, 'with real order_number');
               } else {
                 console.warn('⚠️ Join query returned no data, using simple query');
                 throw new Error('No data from join');
@@ -502,8 +508,9 @@ export const useDeliveryProviderData = () => {
               // Fall back to simple query if join fails
               // Filter by status to exclude pending requests (RLS policy will handle provider_id matching)
               console.warn('⚠️ Join query failed, falling back to simple query:', joinError);
+            // Fetch delivery_requests including order_number column
             const activeResponse = await fetch(
-                `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.(accepted,assigned,picked_up,in_transit,dispatched,out_for_delivery,delivery_arrived)&select=*&order=created_at.desc&limit=100`,
+                `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.(accepted,assigned,picked_up,in_transit,dispatched,out_for_delivery,delivery_arrived)&select=*,order_number&order=created_at.desc&limit=100`,
               {
                 headers: {
                   'apikey': SUPABASE_ANON_KEY,
@@ -890,21 +897,41 @@ export const useDeliveryProviderData = () => {
       // Add delivery_requests
       if (activeData) {
         activeData.forEach((dr: any) => {
-          // Get order number - prioritize po_number_from_join (from direct join query)
+          // Get order number - PRIORITY ORDER:
+          // 1. dr.order_number (stored directly in delivery_requests table)
+          // 2. po_number_from_join (from join query with purchase_orders)
+          // 3. poNumberMap (separately fetched)
+          // 4. Fallback (PO-xxxxxxxx) - ONLY as last resort
           let orderNumber = null;
-          if (dr.po_number_from_join && dr.po_number_from_join.trim() !== '') {
-            // Use po_number from direct join query (most reliable)
+          
+          // Check if it's a real order number (not a fallback format like PO-12345678)
+          const isRealOrderNumber = (num: string | null) => {
+            if (!num || !num.trim()) return false;
+            // Fallback format is exactly "PO-" + 8 hex chars (uppercase)
+            // Real order numbers are longer or have different format (e.g., PO-1772776419681-YMFXN)
+            return !num.match(/^PO-[A-F0-9]{8}$/i);
+          };
+          
+          // 1. Check dr.order_number first (stored in delivery_requests table)
+          if (dr.order_number && isRealOrderNumber(dr.order_number)) {
+            orderNumber = dr.order_number;
+            console.log('✅ Using order_number from delivery_requests table for', dr.id.slice(0, 8), ':', orderNumber);
+          }
+          // 2. Check po_number_from_join (from join query)
+          else if (dr.po_number_from_join && isRealOrderNumber(dr.po_number_from_join)) {
             orderNumber = dr.po_number_from_join;
             console.log('✅ Using po_number from join query for delivery_request', dr.id.slice(0, 8), ':', orderNumber);
-          } else if (dr.purchase_order_id) {
-            // Fall back to poNumberMap
-            orderNumber = poNumberMap.get(dr.purchase_order_id);
-            if (orderNumber && orderNumber.trim() !== '') {
+          }
+          // 3. Check poNumberMap (separately fetched)
+          else if (dr.purchase_order_id) {
+            const mapNumber = poNumberMap.get(dr.purchase_order_id);
+            if (mapNumber && isRealOrderNumber(mapNumber)) {
+              orderNumber = mapNumber;
               console.log('✅ Using po_number from map for delivery_request', dr.id.slice(0, 8), ':', orderNumber);
             } else {
-              // Last resort: generate fallback
+              // 4. Last resort: generate fallback
               orderNumber = `PO-${dr.purchase_order_id.slice(0, 8).toUpperCase()}`;
-              console.warn('⚠️ No po_number found for delivery_request', dr.id.slice(0, 8), 'purchase_order_id:', dr.purchase_order_id?.slice(0, 8), '- using fallback:', orderNumber);
+              console.warn('⚠️ No real po_number found for delivery_request', dr.id.slice(0, 8), 'purchase_order_id:', dr.purchase_order_id?.slice(0, 8), '- using fallback:', orderNumber);
             }
           }
           
