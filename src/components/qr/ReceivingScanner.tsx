@@ -551,13 +551,17 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       // Use REST API directly (more reliable than Supabase client for this)
       try {
         console.log('🔎 Strategy 1: Exact match lookup via REST API...');
+        console.log('⏱️ Before Strategy 1 fetch:', Date.now() - startTime, 'ms');
         
         // Strategy 1: Exact match on qr_code using REST API
         console.log('🔎 Strategy 1: Making REST API call...');
-        console.log('   URL:', `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${encodeURIComponent(cleanQRCode)}&select=*&limit=1`);
+        const fetchUrl = `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${encodeURIComponent(cleanQRCode)}&select=*&limit=1`;
+        console.log('   URL:', fetchUrl);
+        console.log('⏱️ About to fetch:', Date.now() - startTime, 'ms');
         
+        const fetchStartTime = Date.now();
         const restResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${encodeURIComponent(cleanQRCode)}&select=*&limit=1`,
+          fetchUrl,
           {
             headers: {
               'apikey': ANON_KEY,
@@ -569,10 +573,14 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           }
         );
         
+        const fetchDuration = Date.now() - fetchStartTime;
+        console.log('⏱️ Fetch completed in:', fetchDuration, 'ms');
         console.log('🔎 Strategy 1 REST response status:', restResponse.status, restResponse.statusText);
         
         if (restResponse.ok) {
+          console.log('⏱️ Before parsing JSON:', Date.now() - startTime, 'ms');
           const restData = await restResponse.json();
+          console.log('⏱️ After parsing JSON:', Date.now() - startTime, 'ms');
           console.log('🔎 Strategy 1 result:', { found: restData?.length || 0, data: restData });
           
           if (restData && restData.length > 0) {
