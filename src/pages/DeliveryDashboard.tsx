@@ -1556,9 +1556,15 @@ const DeliveryDashboard = () => {
                       </div>
                     </div>
                     <ReceivingScanner 
-                      onDeliveryComplete={() => {
+                      onDeliveryComplete={async () => {
+                        // Refresh data first to get updated status
+                        console.log('🔄 Refreshing delivery data after scan...');
+                        await refetchData();
+                        
+                        // Then switch to delivered tab
                         setActiveTab('deliveries');
                         setDeliveriesSubTab('delivered');
+                        
                         toast({
                           title: '✅ Delivery Complete!',
                           description: 'Order has been scanned as delivered. Switching to "Delivered" tab.',

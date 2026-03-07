@@ -811,6 +811,8 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       // This moves the order to "Delivered" tab as soon as ANY item is scanned
       if (item.purchase_order_id) {
         try {
+          console.log('📦 Updating delivery_request for purchase_order_id:', item.purchase_order_id);
+          
           // Update delivery_request to 'delivered' when item is received
           const deliveryRequestResponse = await fetch(
             `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${item.purchase_order_id}`,
@@ -831,13 +833,26 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           );
           
           if (deliveryRequestResponse.ok) {
-            console.log('✅ Delivery request updated to delivered status');
+            const updatedDeliveryRequest = await deliveryRequestResponse.json();
+            console.log('✅ Delivery request updated to delivered status:', updatedDeliveryRequest);
+            console.log('📋 Updated delivery_request data:', JSON.stringify(updatedDeliveryRequest, null, 2));
           } else {
-            console.warn('⚠️ Could not update delivery_request status:', await deliveryRequestResponse.text());
+            const errorText = await deliveryRequestResponse.text();
+            console.error('❌ Could not update delivery_request status:', deliveryRequestResponse.status, errorText);
+            toast.error('⚠️ Status Update Failed', {
+              description: 'Item scanned but could not update delivery status. Please refresh the page.',
+              duration: 5000,
+            });
           }
         } catch (e) {
-          console.warn('⚠️ Error updating delivery_request:', e);
+          console.error('❌ Error updating delivery_request:', e);
+          toast.error('❌ Update Error', {
+            description: 'Failed to update delivery status. Please check console for details.',
+            duration: 5000,
+          });
         }
+      } else {
+        console.warn('⚠️ No purchase_order_id found for item:', item.id);
       }
       
       // Step 4: Check if all items in the order are now delivered
