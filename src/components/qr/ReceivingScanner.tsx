@@ -491,6 +491,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       }
       
       console.log('🔐 Access token status:', accessToken !== ANON_KEY ? 'Authenticated token found' : 'Using anon key (RLS may block)');
+      console.log('⏱️ After auth token fetch:', Date.now() - startTime, 'ms');
       
       // DIRECT DATABASE UPDATE: Look up the material_item by QR code and update it
       // This bypasses the RPC function which may not exist
@@ -498,6 +499,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       // Clean up the QR code - handle different formats
       let cleanQRCode = qrCode.trim();
       console.log('📦 Raw QR code scanned:', cleanQRCode);
+      console.log('⏱️ After QR cleanup:', Date.now() - startTime, 'ms');
       
       // If QR code is a URL, extract the code part
       if (cleanQRCode.includes('/qr/') || cleanQRCode.includes('?code=')) {
@@ -535,12 +537,14 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       }
       
       console.log('📦 Will search for QR code variants:', qrCodeVariants);
+      console.log('⏱️ After QR variant generation:', Date.now() - startTime, 'ms');
       
       // Step 1: Find the material_item with this QR code
       // Use Supabase client for proper query handling
       console.log('📦 Looking up material_item with QR code:', cleanQRCode);
       console.log('📦 QR code variants to try:', qrCodeVariants);
       console.log('📦 Starting database lookup...');
+      console.log('⏱️ Before database lookup:', Date.now() - startTime, 'ms');
       
       let items: any[] = [];
       
