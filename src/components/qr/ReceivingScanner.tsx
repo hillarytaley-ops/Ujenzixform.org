@@ -394,6 +394,8 @@ export const ReceivingScanner: React.FC = () => {
       
       // Use Supabase client which handles encoding properly
       try {
+        console.log('🔎 Strategy 1: Exact match lookup starting...');
+        
         // Strategy 1: Exact match on qr_code
         const { data: exactMatch, error: exactError } = await supabase
           .from('material_items')
@@ -401,22 +403,36 @@ export const ReceivingScanner: React.FC = () => {
           .eq('qr_code', cleanQRCode)
           .limit(1);
         
+        console.log('🔎 Strategy 1 result:', { exactMatch, exactError });
+        
+        if (exactError) {
+          console.error('❌ Strategy 1 error:', exactError);
+        }
+        
         if (!exactError && exactMatch && exactMatch.length > 0) {
           items = exactMatch;
           console.log('✅ Found with exact qr_code match:', items[0].qr_code);
+        } else {
+          console.log('⚠️ Strategy 1: No exact match found');
         }
         
         // Strategy 2: Try other variants
         if (items.length === 0) {
+          console.log('🔎 Strategy 2: Trying variants...');
           for (const variant of qrCodeVariants) {
             if (items.length > 0) break;
             if (variant === cleanQRCode) continue; // Skip already tried
             
+            console.log('   Trying variant:', variant);
             const { data, error } = await supabase
               .from('material_items')
               .select('*')
               .eq('qr_code', variant)
               .limit(1);
+            
+            if (error) {
+              console.error('   Variant error:', error);
+            }
             
             if (!error && data && data.length > 0) {
               items = data;
@@ -428,11 +444,14 @@ export const ReceivingScanner: React.FC = () => {
         
         // Strategy 3: Case-insensitive search (ilike)
         if (items.length === 0) {
+          console.log('🔎 Strategy 3: Case-insensitive (ilike) search...');
           const { data, error } = await supabase
             .from('material_items')
             .select('*')
             .ilike('qr_code', `%${cleanQRCode}%`)
             .limit(5);
+          
+          console.log('🔎 Strategy 3 result:', { found: data?.length || 0, error });
           
           if (!error && data && data.length > 0) {
             items = data;
