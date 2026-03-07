@@ -2299,6 +2299,7 @@ export const useDeliveryProviderData = () => {
         deliveredPOs = await deliveredPOsPromise;
         console.log('✅ Successfully fetched', deliveredPOs.length, 'delivered purchase_orders from supplier dashboard logic');
         console.log('📋 Order numbers in deliveredPOs:', deliveredPOs.map(po => po.po_number || po.id?.substring(0, 8)).join(', '));
+        console.log('📋 Full deliveredPOs details:', deliveredPOs.map(po => ({ id: po.id?.substring(0, 8), po_number: po.po_number, status: po.status })));
       } catch (e: any) {
         console.error('❌ CRITICAL ERROR executing supplier dashboard logic:', e?.message || e);
         console.error('❌ Stack trace:', e?.stack);
@@ -2433,6 +2434,7 @@ export const useDeliveryProviderData = () => {
       
       // Enrich delivered purchase orders with supplier/buyer info
       let enrichedDeliveredPOs = deliveredPOs || [];
+      console.log('🔄 Starting enrichment for', enrichedDeliveredPOs.length, 'delivered purchase orders...');
       if (enrichedDeliveredPOs.length > 0) {
         try {
           const supplierIds = [...new Set(enrichedDeliveredPOs.map((po: any) => po.supplier_id).filter(Boolean))];
@@ -2466,6 +2468,7 @@ export const useDeliveryProviderData = () => {
       // Transform purchase_orders to delivery_requests format for consistency
       // CRITICAL: Show ALL delivered orders (where all items are received), just like supplier dashboard
       // Don't filter by provider_id - supplier dashboard shows all delivered orders regardless of provider
+      console.log('🔄 Transforming', enrichedDeliveredPOs.length, 'enriched delivered purchase orders to history format...');
       const deliveredFromPOs = (enrichedDeliveredPOs || []).map((po: any) => ({
         id: po.id,
         purchase_order_id: po.id,
