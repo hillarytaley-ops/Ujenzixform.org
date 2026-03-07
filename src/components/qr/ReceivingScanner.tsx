@@ -822,26 +822,21 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       // Step 2: Update the material_item to mark as received
       console.log('📦 Updating material_item to received:', item.id);
       
-      // Get current user ID with timeout
+      // Get current user ID with timeout - skip if it takes too long (not critical)
       let currentUserId: string | null = null;
       try {
         console.log('👤 Getting current user ID...');
         const getUserPromise = supabase.auth.getUser();
         const getUserTimeout = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('getUser timeout after 3 seconds')), 3000)
+          setTimeout(() => reject(new Error('getUser timeout after 2 seconds')), 2000)
         );
         const { data: userData } = await Promise.race([getUserPromise, getUserTimeout]) as any;
         currentUserId = userData?.user?.id || null;
         console.log('👤 Current user ID:', currentUserId || 'NOT FOUND');
       } catch (e) {
-        console.warn('⚠️ Could not get current user (using fallback):', e);
-        // Try to get from session data if available
-        try {
-          const session = await supabase.auth.getSession();
-          currentUserId = session.data?.session?.user?.id || null;
-        } catch (e2) {
-          console.warn('⚠️ Could not get user from session either:', e2);
-        }
+        console.warn('⚠️ Could not get current user (skipping - not critical):', e);
+        // Don't try getSession() fallback - it will also timeout. Just continue without user ID.
+        // The update will still work, just without receive_scanned_by field
       }
       
       console.log('📦 Starting material_item update fetch...');
@@ -897,7 +892,26 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         return;
       }
       
-      const updatedItems = await updateResponse.json();
+      // Parse JSON with timeout to prevent hanging
+      console.log('📦 Parsing material_item update response...');
+      let updatedItems: any[];
+      try {
+        const jsonPromise = updateResponse.json();
+        const jsonTimeout = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('JSON parsing timeout after 5 seconds')), 5000)
+        );
+        updatedItems = await Promise.race([jsonPromise, jsonTimeout]) as any[];
+        console.log('✅ JSON parsed successfully');
+      } catch (jsonError: any) {
+        console.error('❌ JSON parsing error:', jsonError);
+        // Continue with original item if JSON parsing fails
+        updatedItems = [item];
+        toast.warning('⚠️ Response Parse Warning', {
+          description: 'Item was updated but response parsing failed. Continuing...',
+          duration: 3000
+        });
+      }
+      
       const updatedItem = updatedItems[0] || item;
       console.log('✅ Material item updated successfully:', updatedItem.id);
       console.log('📋 Updated item data:', { 
@@ -1061,13 +1075,28 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           }
           
           if (deliveryRequestResponse && deliveryRequestResponse.ok) {
-            const updatedDeliveryRequest = await deliveryRequestResponse.json();
-            console.log('✅ Delivery request updated to delivered status:', updatedDeliveryRequest);
-            console.log('📋 Updated delivery_request data:', JSON.stringify(updatedDeliveryRequest, null, 2));
-            console.log('📋 Delivery request provider_id:', updatedDeliveryRequest[0]?.provider_id || 'NOT SET');
-            console.log('📋 Delivery request status:', updatedDeliveryRequest[0]?.status);
-            deliveryRequestUpdated = true;
-          } else {
+            // Parse JSON with timeout
+            let updatedDeliveryRequest: any[];
+            try {
+              const jsonPromise = deliveryRequestResponse.json();
+              const jsonTimeout = new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error('JSON parsing timeout after 5 seconds')), 5000)
+              );
+              updatedDeliveryRequest = await Promise.race([jsonPromise, jsonTimeout]) as any[];
+              console.log('✅ Delivery request JSON parsed successfully');
+            } catch (jsonError: any) {
+              console.error('❌ Delivery request JSON parsing error:', jsonError);
+              updatedDeliveryRequest = [];
+            }
+            
+            if (updatedDeliveryRequest && updatedDeliveryRequest.length > 0) {
+              console.log('✅ Delivery request updated to delivered status:', updatedDeliveryRequest);
+              console.log('📋 Updated delivery_request data:', JSON.stringify(updatedDeliveryRequest, null, 2));
+              console.log('📋 Delivery request provider_id:', updatedDeliveryRequest[0]?.provider_id || 'NOT SET');
+              console.log('📋 Delivery request status:', updatedDeliveryRequest[0]?.status);
+              deliveryRequestUpdated = true;
+            }
+          } else if (deliveryRequestResponse) {
             const errorText = await deliveryRequestResponse.text();
             console.error('❌ Could not update delivery_request status:', deliveryRequestResponse.status, errorText);
             console.error('   This might be due to RLS policies or missing delivery_request record');
