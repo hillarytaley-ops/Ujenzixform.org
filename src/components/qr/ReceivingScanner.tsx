@@ -1242,8 +1242,6 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
                       },
                       body: JSON.stringify({
                         status: 'delivered',
-                        delivery_status: 'delivered',
-                        delivered_at: new Date().toISOString(),
                         updated_at: new Date().toISOString()
                       }),
                       signal: poController.signal
