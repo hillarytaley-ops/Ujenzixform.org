@@ -746,24 +746,37 @@ export const useDeliveryProviderData = () => {
         }))
       });
       
-      // Set deliveries immediately with fallback order numbers (so they show up even if po_number fetch times out)
-      // This ensures UI updates immediately after filtering completes
+      // Set deliveries immediately - ONLY show deliveries with REAL order numbers
+      // Filter out any fake/fallback order numbers (PO-XXXXXXXX format)
       try {
-        const immediateDeliveries = activeData.map((dr: any) => ({
+        // Helper to check if order number is real (not a fallback)
+        const isRealOrder = (orderNum: string | null) => {
+          if (!orderNum || !orderNum.trim()) return false;
+          // Fallback format is exactly "PO-" + 8 hex chars
+          return !/^PO-[A-F0-9]{8}$/i.test(orderNum);
+        };
+        
+        // Map deliveries and get order numbers
+        const mappedDeliveries = activeData.map((dr: any) => ({
           ...dr,
-          order_number: dr.po_number_from_join || (dr.purchase_order_id ? `PO-${dr.purchase_order_id.slice(0, 8).toUpperCase()}` : null),
+          order_number: dr.order_number || dr.po_number_from_join || null, // ONLY use real order numbers
           source: 'delivery_requests'
         }));
-        console.log('📦 Setting deliveries immediately (with fallback order numbers):', immediateDeliveries.length);
-        console.log('📋 Sample immediate deliveries:', immediateDeliveries.slice(0, 3).map((d: any) => ({
+        
+        // FILTER OUT fake orders - only show those with real order numbers
+        const realDeliveries = mappedDeliveries.filter((d: any) => isRealOrder(d.order_number));
+        
+        console.log('📦 Setting ONLY REAL deliveries:', realDeliveries.length, 'out of', activeData.length, 'total');
+        console.log('🚨 Filtered out', activeData.length - realDeliveries.length, 'fake orders');
+        console.log('📋 Sample real deliveries:', realDeliveries.slice(0, 3).map((d: any) => ({
           id: d.id?.substring(0, 8),
           status: d.status,
           order_number: d.order_number
         })));
-        setActiveDeliveries(immediateDeliveries);
+        setActiveDeliveries(realDeliveries);
         setLoading(false); // Clear loading state so UI updates immediately
         clearTimeout(safetyTimeout); // Clear safety timeout since we've set the data
-        console.log('✅ Deliveries set successfully, loading cleared');
+        console.log('✅ Real deliveries set successfully, loading cleared');
       } catch (e) {
         console.error('❌ Error setting immediate deliveries:', e);
         // Still clear loading to prevent infinite spinner
@@ -1022,14 +1035,28 @@ export const useDeliveryProviderData = () => {
       
       // Log order numbers for debugging
       const withOrderNumbers = allActiveDeliveries.filter((d: any) => d.order_number).length;
-      const withRealOrderNumbers = allActiveDeliveries.filter((d: any) => 
-        d.order_number && (!d.order_number.startsWith('PO-') || (d.order_number.startsWith('PO-') && d.order_number.length > 11))
-      ).length;
+      
+      // Helper function to check if order number is REAL (not a fallback)
+      const hasRealOrderNumber = (d: any) => {
+        if (!d.order_number || !d.order_number.trim()) return false;
+        // Fallback format is exactly "PO-" + 8 hex chars (e.g., PO-91623C3B)
+        // Real order numbers are longer (e.g., PO-1772776419681-YMFXN)
+        const isFallback = /^PO-[A-F0-9]{8}$/i.test(d.order_number);
+        return !isFallback;
+      };
+      
+      const withRealOrderNumbers = allActiveDeliveries.filter(hasRealOrderNumber).length;
       console.log('📋 Order numbers assigned:', withOrderNumbers, 'out of', allActiveDeliveries.length, 'deliveries');
       console.log('📋 Real order numbers (not fallback):', withRealOrderNumbers, 'out of', allActiveDeliveries.length);
       
-      // Note: allActiveDeliveries will be set at the end with setActiveDeliveries(allActiveDeliveries)
-      // The po_numbers are already updated in the allActiveDeliveries array above
+      // ⚠️ IMPORTANT: Filter OUT deliveries with fake/fallback order numbers!
+      // Only show deliveries that have REAL order numbers from actual purchase orders
+      const filteredRealDeliveries = allActiveDeliveries.filter(hasRealOrderNumber);
+      console.log('🚨 FILTERING: Removed', allActiveDeliveries.length - filteredRealDeliveries.length, 'fake orders. Showing only', filteredRealDeliveries.length, 'REAL orders');
+      
+      // Replace allActiveDeliveries with only real orders
+      allActiveDeliveries.length = 0;
+      filteredRealDeliveries.forEach(d => allActiveDeliveries.push(d));
       
       console.log('📦 Active deliveries loaded:', {
         from_delivery_requests: activeData?.length || 0,
@@ -1232,12 +1259,25 @@ export const useDeliveryProviderData = () => {
         return dateB.getTime() - dateA.getTime(); // Descending (most recent first)
       });
       
+      // Helper function to check if order number is REAL (not a fallback)
+      const historyHasRealOrderNumber = (d: any) => {
+        if (!d.order_number || !d.order_number.trim()) return false;
+        // Fallback format is exactly "PO-" + 8 hex chars (e.g., PO-91623C3B)
+        const isFallback = /^PO-[A-F0-9]{8}$/i.test(d.order_number);
+        return !isFallback;
+      };
+      
+      // Filter out fake orders from history too
+      const filteredHistory = sortedHistory.filter(historyHasRealOrderNumber);
+      
       console.log('📦 Delivery history loaded:', {
         from_delivery_requests: historyData?.length || 0,
         from_purchase_orders: deliveredPOs?.length || 0,
-        total: sortedHistory.length
+        total_before_filter: sortedHistory.length,
+        total_after_filter: filteredHistory.length,
+        removed_fake: sortedHistory.length - filteredHistory.length
       }, 'items (most recent first)');
-      setDeliveryHistory(sortedHistory);
+      setDeliveryHistory(filteredHistory);
 
       // Fetch ALL pending requests from multiple tables for testing
       // All registered providers can see and accept any pending request
