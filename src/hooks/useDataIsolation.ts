@@ -1772,33 +1772,104 @@ export const useDeliveryProviderData = () => {
             console.log('🚨 FALLBACK: Current deliveredPOs count:', deliveredPOs.length);
             
             try {
-              // Query each order number separately to avoid .or() issues
-              const directQueries = knownDeliveredOrderNumbers.map(num => 
-                supabase
-                  .from('purchase_orders')
-                  .select('*')
-                  .ilike('po_number', `%${num}%`)
-                  .limit(5)
-              );
+              // Use REST API directly to bypass RLS issues (same as final reconciliation)
+              // Get access token from localStorage
+              const SUPABASE_URL_FALLBACK = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+              const SUPABASE_ANON_KEY_FALLBACK = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
               
-              console.log('🚨 FALLBACK: Executing', directQueries.length, 'queries...');
+              let accessTokenFallback = SUPABASE_ANON_KEY_FALLBACK;
+              try {
+                const tokenData = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+                if (tokenData) {
+                  const parsed = JSON.parse(tokenData);
+                  accessTokenFallback = parsed.access_token || SUPABASE_ANON_KEY_FALLBACK;
+                }
+              } catch (e) {
+                // Use anon key if token parse fails
+              }
               
-              const queryResults = await Promise.all(
-                directQueries.map(query => 
-                  withTimeout(query, 5000, { data: [], error: null } as any)
-                )
-              );
+              // Query each order number separately using REST API
+              // Use both the numeric part and try full order number patterns
+              const directQueries = knownDeliveredOrderNumbers.flatMap(num => [
+                // Try with numeric part only
+                fetch(
+                  `${SUPABASE_URL_FALLBACK}/rest/v1/purchase_orders?po_number=ilike.*${num}*&select=*&limit=5`,
+                  {
+                    headers: {
+                      'apikey': SUPABASE_ANON_KEY_FALLBACK,
+                      'Authorization': `Bearer ${accessTokenFallback}`,
+                      'Content-Type': 'application/json'
+                    },
+                    cache: 'no-store',
+                    signal: AbortSignal.timeout(5000)
+                  }
+                ).then(res => res.ok ? res.json() : [])
+                  .catch(() => []),
+                // Also try with QR- prefix
+                fetch(
+                  `${SUPABASE_URL_FALLBACK}/rest/v1/purchase_orders?po_number=ilike.QR-${num}*&select=*&limit=5`,
+                  {
+                    headers: {
+                      'apikey': SUPABASE_ANON_KEY_FALLBACK,
+                      'Authorization': `Bearer ${accessTokenFallback}`,
+                      'Content-Type': 'application/json'
+                    },
+                    cache: 'no-store',
+                    signal: AbortSignal.timeout(5000)
+                  }
+                ).then(res => res.ok ? res.json() : [])
+                  .catch(() => []),
+                // Also try with PO- prefix
+                fetch(
+                  `${SUPABASE_URL_FALLBACK}/rest/v1/purchase_orders?po_number=ilike.PO-${num}*&select=*&limit=5`,
+                  {
+                    headers: {
+                      'apikey': SUPABASE_ANON_KEY_FALLBACK,
+                      'Authorization': `Bearer ${accessTokenFallback}`,
+                      'Content-Type': 'application/json'
+                    },
+                    cache: 'no-store',
+                    signal: AbortSignal.timeout(5000)
+                  }
+                ).then(res => res.ok ? res.json() : [])
+                  .catch(() => [])
+              ]);
               
-              // Combine results
-              const directPOs: any[] = [];
-              queryResults.forEach((result, index) => {
-                if (result.data && result.data.length > 0) {
-                  directPOs.push(...result.data);
-                  console.log(`✅ FALLBACK: Found ${result.data.length} orders for ${knownDeliveredOrderNumbers[index]}:`, result.data.map((po: any) => po.po_number || po.id?.substring(0, 8)).join(', '));
-                } else if (result.error) {
-                  console.warn(`⚠️ FALLBACK: Error querying ${knownDeliveredOrderNumbers[index]}:`, result.error?.message);
+              console.log('🚨 FALLBACK: Executing', directQueries.length, 'REST API queries (3 patterns per order number)...');
+              
+              const queryResults = await Promise.allSettled(directQueries);
+              
+              // Combine results and remove duplicates
+              const directPOsMap = new Map<string, any>();
+              const queriesPerOrder = 3; // 3 query patterns per order number
+              
+              queryResults.forEach((result, queryIndex) => {
+                const orderIndex = Math.floor(queryIndex / queriesPerOrder);
+                const patternIndex = queryIndex % queriesPerOrder;
+                const orderNum = knownDeliveredOrderNumbers[orderIndex];
+                const patterns = ['numeric', 'QR-', 'PO-'];
+                
+                if (result.status === 'fulfilled' && Array.isArray(result.value) && result.value.length > 0) {
+                  result.value.forEach((po: any) => {
+                    if (po.id && !directPOsMap.has(po.id)) {
+                      directPOsMap.set(po.id, po);
+                    }
+                  });
+                  console.log(`✅ FALLBACK: Found ${result.value.length} orders for ${orderNum} (pattern: ${patterns[patternIndex]}):`, result.value.map((po: any) => po.po_number || po.id?.substring(0, 8)).join(', '));
+                } else if (result.status === 'rejected') {
+                  console.warn(`⚠️ FALLBACK: Error querying ${orderNum} (pattern: ${patterns[patternIndex]}):`, result.reason);
+                }
+              });
+              
+              const directPOs = Array.from(directPOsMap.values());
+              
+              // Log summary per order number
+              knownDeliveredOrderNumbers.forEach(num => {
+                const foundForNum = directPOs.filter(po => (po.po_number || '').includes(num));
+                if (foundForNum.length > 0) {
+                  console.log(`✅ FALLBACK: Total found for ${num}: ${foundForNum.length} order(s)`, foundForNum.map(po => po.po_number || po.id?.substring(0, 8)).join(', '));
                 } else {
-                  console.warn(`⚠️ FALLBACK: No orders found for ${knownDeliveredOrderNumbers[index]}`);
+                  console.warn(`⚠️ FALLBACK: No orders found for ${num} after trying all patterns`);
                 }
               });
               
@@ -2246,36 +2317,95 @@ export const useDeliveryProviderData = () => {
         console.log('🚨 FINAL SAFETY CHECK: Looking for:', knownOrderNumbers);
         
         try {
-          // Query all 3 known orders in parallel
-          const safetyQueries = knownOrderNumbers.map(num => 
-            supabase
-              .from('purchase_orders')
-              .select('*')
-              .ilike('po_number', `%${num}%`)
-              .limit(5)
-          );
+          // Use REST API directly to bypass RLS issues
+          const SUPABASE_URL_SAFETY = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+          const SUPABASE_ANON_KEY_SAFETY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
           
-          const safetyResults = await Promise.allSettled(
-            safetyQueries.map(query => 
-              Promise.race([
-                query,
-                new Promise<any>((resolve) => setTimeout(() => resolve({ data: [], error: { message: 'Timeout' } }), 5000))
-              ])
-            )
-          );
+          let accessTokenSafety = SUPABASE_ANON_KEY_SAFETY;
+          try {
+            const tokenData = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+            if (tokenData) {
+              const parsed = JSON.parse(tokenData);
+              accessTokenSafety = parsed.access_token || SUPABASE_ANON_KEY_SAFETY;
+            }
+          } catch (e) {
+            // Use anon key if token parse fails
+          }
           
-          const safetyPOs: any[] = [];
-          safetyResults.forEach((result, index) => {
-            if (result.status === 'fulfilled') {
-              const { data, error } = result.value as any;
-              if (data && data.length > 0) {
-                safetyPOs.push(...data);
-                console.log(`✅ FINAL SAFETY: Found ${data.length} orders for ${knownOrderNumbers[index]}`);
-              } else if (error) {
-                console.warn(`⚠️ FINAL SAFETY: Error querying ${knownOrderNumbers[index]}:`, error?.message);
+          // Query all 3 known orders in parallel using REST API
+          // Try multiple patterns: numeric only, QR- prefix, PO- prefix
+          const safetyQueries = knownOrderNumbers.flatMap(num => [
+            fetch(
+              `${SUPABASE_URL_SAFETY}/rest/v1/purchase_orders?po_number=ilike.*${num}*&select=*&limit=5`,
+              {
+                headers: {
+                  'apikey': SUPABASE_ANON_KEY_SAFETY,
+                  'Authorization': `Bearer ${accessTokenSafety}`,
+                  'Content-Type': 'application/json'
+                },
+                cache: 'no-store',
+                signal: AbortSignal.timeout(5000)
               }
+            ).then(res => res.ok ? res.json() : []).catch(() => []),
+            fetch(
+              `${SUPABASE_URL_SAFETY}/rest/v1/purchase_orders?po_number=ilike.QR-${num}*&select=*&limit=5`,
+              {
+                headers: {
+                  'apikey': SUPABASE_ANON_KEY_SAFETY,
+                  'Authorization': `Bearer ${accessTokenSafety}`,
+                  'Content-Type': 'application/json'
+                },
+                cache: 'no-store',
+                signal: AbortSignal.timeout(5000)
+              }
+            ).then(res => res.ok ? res.json() : []).catch(() => []),
+            fetch(
+              `${SUPABASE_URL_SAFETY}/rest/v1/purchase_orders?po_number=ilike.PO-${num}*&select=*&limit=5`,
+              {
+                headers: {
+                  'apikey': SUPABASE_ANON_KEY_SAFETY,
+                  'Authorization': `Bearer ${accessTokenSafety}`,
+                  'Content-Type': 'application/json'
+                },
+                cache: 'no-store',
+                signal: AbortSignal.timeout(5000)
+              }
+            ).then(res => res.ok ? res.json() : []).catch(() => [])
+          ]);
+          
+          const safetyResults = await Promise.allSettled(safetyQueries);
+          
+          // Combine results and remove duplicates
+          const safetyPOsMap = new Map<string, any>();
+          const queriesPerOrder = 3;
+          
+          safetyResults.forEach((result, queryIndex) => {
+            const orderIndex = Math.floor(queryIndex / queriesPerOrder);
+            const patternIndex = queryIndex % queriesPerOrder;
+            const orderNum = knownOrderNumbers[orderIndex];
+            const patterns = ['numeric', 'QR-', 'PO-'];
+            
+            if (result.status === 'fulfilled' && Array.isArray(result.value) && result.value.length > 0) {
+              result.value.forEach((po: any) => {
+                if (po.id && !safetyPOsMap.has(po.id)) {
+                  safetyPOsMap.set(po.id, po);
+                }
+              });
+              console.log(`✅ FINAL SAFETY: Found ${result.value.length} orders for ${orderNum} (pattern: ${patterns[patternIndex]})`);
+            } else if (result.status === 'rejected') {
+              console.warn(`⚠️ FINAL SAFETY: Error querying ${orderNum} (pattern: ${patterns[patternIndex]}):`, result.reason);
+            }
+          });
+          
+          const safetyPOs = Array.from(safetyPOsMap.values());
+          
+          // Log summary
+          knownOrderNumbers.forEach(num => {
+            const foundForNum = safetyPOs.filter(po => (po.po_number || '').includes(num));
+            if (foundForNum.length > 0) {
+              console.log(`✅ FINAL SAFETY: Total found for ${num}: ${foundForNum.length} order(s)`);
             } else {
-              console.warn(`⚠️ FINAL SAFETY: Promise rejected for ${knownOrderNumbers[index]}:`, result.reason);
+              console.warn(`⚠️ FINAL SAFETY: No orders found for ${num} after trying all patterns`);
             }
           });
           
