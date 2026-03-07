@@ -1105,70 +1105,112 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         console.warn('⚠️ No onDeliveryComplete callback provided');
       }
       
-      // Step 4: Check if all items in the order are now delivered
+      // Step 4: Check if all items in the order are now delivered (non-blocking, with timeouts)
+      // This runs AFTER the callback, so it won't block the tab switch
       if (item.purchase_order_id) {
-        try {
-          // Count remaining undelivered items (use correct field name: receive_scanned)
-          const countResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/material_items?purchase_order_id=eq.${item.purchase_order_id}&receive_scanned=eq.false&select=id`,
-            {
-              headers: {
-                'apikey': ANON_KEY,
-                'Authorization': `Bearer ${accessToken}`,
-                'Accept': 'application/json'
+        // Run this asynchronously without blocking
+        (async () => {
+          try {
+            console.log('📦 Checking if all items are delivered...');
+            const countController = new AbortController();
+            const countTimeoutId = setTimeout(() => countController.abort(), 5000); // 5 second timeout
+            
+            let countResponse: Response;
+            try {
+              countResponse = await fetch(
+                `${SUPABASE_URL}/rest/v1/material_items?purchase_order_id=eq.${item.purchase_order_id}&receive_scanned=eq.false&select=id`,
+                {
+                  headers: {
+                    'apikey': ANON_KEY,
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Accept': 'application/json'
+                  },
+                  signal: countController.signal
+                }
+              );
+              clearTimeout(countTimeoutId);
+            } catch (fetchError: any) {
+              clearTimeout(countTimeoutId);
+              if (fetchError.name === 'AbortError') {
+                console.warn('⚠️ Item count check timed out, skipping');
+                return;
+              }
+              throw fetchError;
+            }
+            
+            if (countResponse.ok) {
+              const remainingItems = await countResponse.json();
+              console.log('📦 Remaining undelivered items:', remainingItems.length);
+              
+              if (remainingItems.length === 0) {
+                // All items delivered - update purchase_order status (with timeout)
+                const poController = new AbortController();
+                const poTimeoutId = setTimeout(() => poController.abort(), 5000);
+                
+                try {
+                  await fetch(
+                    `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${item.purchase_order_id}`,
+                    {
+                      method: 'PATCH',
+                      headers: {
+                        'apikey': ANON_KEY,
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                      },
+                      body: JSON.stringify({
+                        status: 'delivered',
+                        delivery_status: 'delivered',
+                        delivered_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
+                      }),
+                      signal: poController.signal
+                    }
+                  );
+                  clearTimeout(poTimeoutId);
+                } catch (e: any) {
+                  clearTimeout(poTimeoutId);
+                  if (e.name !== 'AbortError') {
+                    console.warn('⚠️ Could not update purchase_order:', e);
+                  }
+                }
+                
+                // Also update delivery_request if exists (with timeout)
+                const drController = new AbortController();
+                const drTimeoutId = setTimeout(() => drController.abort(), 5000);
+                
+                try {
+                  await fetch(
+                    `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${item.purchase_order_id}`,
+                    {
+                      method: 'PATCH',
+                      headers: {
+                        'apikey': ANON_KEY,
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                      },
+                      body: JSON.stringify({
+                        status: 'delivered',
+                        completed_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
+                      }),
+                      signal: drController.signal
+                    }
+                  );
+                  clearTimeout(drTimeoutId);
+                } catch (e: any) {
+                  clearTimeout(drTimeoutId);
+                  if (e.name !== 'AbortError') {
+                    console.warn('⚠️ Could not update delivery_request:', e);
+                  }
+                }
+                
+                console.log('✅ All items delivered - order marked as complete');
               }
             }
-          );
-          
-          if (countResponse.ok) {
-            const remainingItems = await countResponse.json();
-            console.log('📦 Remaining undelivered items:', remainingItems.length);
-            
-            if (remainingItems.length === 0) {
-              // All items delivered - update purchase_order status
-              await fetch(
-                `${SUPABASE_URL}/rest/v1/purchase_orders?id=eq.${item.purchase_order_id}`,
-                {
-                  method: 'PATCH',
-                  headers: {
-                    'apikey': ANON_KEY,
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json'
-                  },
-                  body: JSON.stringify({
-                    status: 'delivered',
-                    delivery_status: 'delivered',
-                    delivered_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                  })
-                }
-              );
-              
-              // Also update delivery_request if exists
-              await fetch(
-                `${SUPABASE_URL}/rest/v1/delivery_requests?purchase_order_id=eq.${item.purchase_order_id}`,
-                {
-                  method: 'PATCH',
-                  headers: {
-                    'apikey': ANON_KEY,
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json'
-                  },
-                  body: JSON.stringify({
-                    status: 'delivered',
-                    completed_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                  })
-                }
-              );
-              
-              console.log('✅ All items delivered - order marked as complete');
-              // Note: Callback already triggered when first item was scanned (Step 3)
-            }
+          } catch (e) {
+            console.warn('⚠️ Could not check/update order status (non-blocking):', e);
           }
-        } catch (e) {
-          console.warn('Could not check/update order status:', e);
-        }
+        })(); // Fire and forget - don't await
       }
       
       // Success! Add to results
