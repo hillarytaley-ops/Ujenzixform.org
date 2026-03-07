@@ -252,19 +252,21 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           }
           
           // EARLY CHECK: Verify QR code hasn't been scanned in database before processing
-          // This prevents re-scanning even after page refresh
+          // This prevents re-scanning even after page refresh - MUST complete before continuing
+          const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+          const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+          
+          let accessToken = ANON_KEY;
           try {
-            const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
-            const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
-            
-            let accessToken = ANON_KEY;
-            try {
-              const { data: sessionData } = await supabase.auth.getSession();
-              if (sessionData?.session?.access_token) {
-                accessToken = sessionData.session.access_token;
-              }
-            } catch (e) {}
-            
+            const { data: sessionData } = await supabase.auth.getSession();
+            if (sessionData?.session?.access_token) {
+              accessToken = sessionData.session.access_token;
+            }
+          } catch (e) {
+            console.warn('Could not get session:', e);
+          }
+          
+          try {
             const checkResponse = await fetch(
               `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${encodeURIComponent(decodedText)}&select=receive_scanned,status&limit=1`,
               {
@@ -281,27 +283,32 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
               if (checkData && checkData.length > 0) {
                 const item = checkData[0];
                 if (item.receive_scanned === true || item.status === 'received' || item.status === 'delivered') {
-                  console.log('⏭️ QR code already scanned in database - skipping:', decodedText);
-                  toast.warning('⚠️ Already Scanned', {
-                    description: 'This QR code has already been scanned and received.',
-                    duration: 3000,
+                  console.log('⏭️ QR code already scanned in database - BLOCKING:', decodedText);
+                  toast.error('🚫 Already Scanned', {
+                    description: 'This QR code has already been scanned and received. Cannot scan again.',
+                    duration: 5000,
                   });
-                  return;
+                  return; // STOP HERE - don't process
                 }
               }
             }
           } catch (checkError) {
-            console.warn('⚠️ Could not check database for existing scan:', checkError);
-            // Continue processing if check fails (don't block on network error)
+            console.error('❌ Error checking database for existing scan:', checkError);
+            toast.error('❌ Check Failed', {
+              description: 'Could not verify QR code status. Please try again.',
+              duration: 3000,
+            });
+            return; // STOP if check fails - don't allow scanning if we can't verify
           }
           
+          // Only mark as processed and continue if check passed
           lastScannedRef.current = decodedText;
           lastScanTimeRef.current = now;
           
           // Mark as processed (for entire session - never process same code twice)
           recentlyProcessedRef.current.set(decodedText, now);
           
-          console.log('✅ PROCESSING QR CODE NOW:', decodedText);
+          console.log('✅ QR CODE VERIFIED - PROCESSING NOW:', decodedText);
           
           // Show success message immediately
           toast.success('✅ QR Code Scanned Successfully!', {
@@ -793,6 +800,13 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       const updatedItem = updatedItems[0] || item;
       console.log('✅ Material item updated:', updatedItem);
       
+      // IMMEDIATELY switch to delivered tab when item is successfully scanned
+      // This happens right after the item is marked as received
+      if (onDeliveryComplete) {
+        console.log('🔄 Triggering onDeliveryComplete callback - moving to Delivered tab NOW');
+        onDeliveryComplete();
+      }
+      
       // Step 3: Update delivery_request status immediately when item is scanned
       // This moves the order to "Delivered" tab as soon as ANY item is scanned
       if (item.purchase_order_id) {
@@ -817,13 +831,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           );
           
           if (deliveryRequestResponse.ok) {
-            console.log('✅ Delivery request updated to delivered status - moving to Delivered tab');
-            
-            // Trigger callback to switch to delivered tab IMMEDIATELY when item is scanned
-            if (onDeliveryComplete) {
-              console.log('🔄 Triggering onDeliveryComplete callback (item scanned)');
-              onDeliveryComplete();
-            }
+            console.log('✅ Delivery request updated to delivered status');
           } else {
             console.warn('⚠️ Could not update delivery_request status:', await deliveryRequestResponse.text());
           }
