@@ -1328,8 +1328,15 @@ export const useDeliveryProviderData = () => {
             const items = materialItemsMap.get(poId) || [];
             
             if (items.length === 0) {
-              // No material_items found, use status-based categorization
-              return { ...delivery, _categorized_status: delivery.status };
+              // No material_items found, categorize based on status
+              // If status is 'accepted' or 'assigned', it's scheduled (waiting for dispatch)
+              // Otherwise, keep the original status
+              const fallbackStatus = (delivery.status === 'accepted' || delivery.status === 'assigned' || 
+                                      delivery.status === 'pending_pickup' || delivery.status === 'delivery_assigned' ||
+                                      delivery.status === 'ready_for_dispatch' || delivery.status === 'provider_assigned')
+                ? 'scheduled' 
+                : delivery.status;
+              return { ...delivery, _categorized_status: fallbackStatus };
             }
             
             const hasDispatchedItems = items.some((item: any) => item.dispatch_scanned === true);
