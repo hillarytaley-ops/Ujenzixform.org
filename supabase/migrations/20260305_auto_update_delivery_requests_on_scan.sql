@@ -234,10 +234,11 @@ BEGIN
         -- This moves the delivery from In Transit to Delivered tab
         -- ============================================================
         -- Find the delivery_request linked to this purchase_order
+        -- Update if status is NOT already 'delivered' or 'completed'
         SELECT id INTO delivery_request_id
         FROM delivery_requests
         WHERE purchase_order_id = order_id
-          AND status IN ('in_transit', 'shipped', 'dispatched', 'picked_up', 'on_the_way')
+          AND status NOT IN ('delivered', 'completed', 'cancelled')
         LIMIT 1;
         
         IF delivery_request_id IS NOT NULL THEN
