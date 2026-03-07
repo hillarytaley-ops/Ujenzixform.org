@@ -757,8 +757,9 @@ export const useDeliveryProviderData = () => {
             const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
             
             // Use direct fetch with minimal columns and status filter
+            // Include 'delivered' and 'completed' statuses to sync with delivery_requests, but filter them out later
             const poResponse = await fetch(
-              `${SUPABASE_URL}/rest/v1/purchase_orders?delivery_provider_id=eq.${userId}&status=in.(shipped,in_transit,dispatched,out_for_delivery,delivery_arrived,processing)&select=id,status,delivery_provider_id,delivery_address,items,total_amount,created_at,updated_at,supplier_id,buyer_id,delivery_provider_name,delivery_assigned_at,po_number&order=created_at.desc&limit=100`,
+              `${SUPABASE_URL}/rest/v1/purchase_orders?delivery_provider_id=eq.${userId}&status=in.(shipped,in_transit,dispatched,out_for_delivery,delivery_arrived,processing,delivered,completed)&select=id,status,delivery_provider_id,delivery_address,items,total_amount,created_at,updated_at,supplier_id,buyer_id,delivery_provider_name,delivery_assigned_at,po_number,delivered_at,completed_at&order=created_at.desc&limit=100`,
               {
                 headers: {
                   'apikey': SUPABASE_ANON_KEY,
@@ -777,16 +778,15 @@ export const useDeliveryProviderData = () => {
               const allPurchaseOrders = await poResponse.json() || [];
               console.log('📦 purchase_orders raw data:', allPurchaseOrders.length, 'records');
               
-              // Filter out completed/delivered/cancelled orders (shouldn't be needed with status filter, but just in case)
+              // Keep all purchase_orders (including delivered/completed) for status syncing
+              // We'll filter out delivered/completed when adding as new entries, but use them to sync existing delivery_requests
               const filtered = allPurchaseOrders.filter((po: any) => 
-                po.status !== 'delivered' && 
-                po.status !== 'completed' && 
                 po.status !== 'cancelled' &&
                 po.status !== 'rejected' &&
                 po.status !== 'quote_rejected'
               );
               
-              console.log('📦 purchase_orders: Found', allPurchaseOrders.length, 'total,', filtered.length, 'active');
+              console.log('📦 purchase_orders: Found', allPurchaseOrders.length, 'total,', filtered.length, 'active (including delivered for sync)');
               
               // Log status breakdown for purchase_orders
               if (filtered.length > 0) {
@@ -1066,30 +1066,54 @@ export const useDeliveryProviderData = () => {
               existing.order_number = `PO-${po.id.slice(0, 8).toUpperCase()}`;
               console.warn('⚠️ Using fallback order number for purchase_order:', po.id.slice(0, 8));
             }
+            
+            // CRITICAL: Sync status from purchase_orders to delivery_requests
+            // If purchase_order is 'shipped'/'dispatched' but delivery_request is still 'accepted', update it
+            // If purchase_order is 'delivered' but delivery_request is still 'in_transit', update it
+            if (po.status === 'shipped' || po.status === 'dispatched') {
+              if (existing.status === 'accepted' || existing.status === 'assigned' || existing.status === 'pending') {
+                console.log('🔄 Syncing status: purchase_order is', po.status, 'but delivery_request is', existing.status, '- updating to in_transit');
+                existing.status = 'in_transit';
+                existing.updated_at = po.updated_at || new Date().toISOString();
+              }
+            } else if (po.status === 'delivered' || po.status === 'completed') {
+              if (existing.status !== 'delivered' && existing.status !== 'completed') {
+                console.log('🔄 Syncing status: purchase_order is', po.status, 'but delivery_request is', existing.status, '- updating to delivered');
+                existing.status = 'delivered';
+                existing.completed_at = po.delivered_at || po.completed_at || po.updated_at || new Date().toISOString();
+                existing.delivered_at = po.delivered_at || po.completed_at || po.updated_at || new Date().toISOString();
+                existing.updated_at = po.updated_at || new Date().toISOString();
+              }
+            }
           } else {
-            allActiveDeliveries.push({
-              id: po.id,
-              purchase_order_id: po.id,
-              order_number: (po.po_number && po.po_number.trim() !== '') ? po.po_number : `PO-${po.id.slice(0, 8).toUpperCase()}`,
-              provider_id: userId,
-              status: po.status,
-              pickup_location: po.supplier?.address || po.supplier?.location || po.pickup_address || 'Supplier location',
-              pickup_address: po.supplier?.address || po.supplier?.location || po.pickup_address || 'Supplier location',
-              delivery_location: po.delivery_address || 'Delivery location',
-              delivery_address: po.delivery_address || 'Delivery location',
-              material_type: Array.isArray(po.items) ? po.items.map((i: any) => i.name || i.material_type).join(', ') : 'Construction Materials',
-              quantity: Array.isArray(po.items) ? po.items.reduce((sum: number, i: any) => sum + (i.quantity || 1), 0) : 1,
-              builder_name: po.buyer?.full_name || po.builder_name || 'Builder',
-              builder_phone: po.buyer?.phone || po.builder_phone || '',
-              builder_email: po.buyer?.email || po.builder_email || '',
-              price: po.total_amount || 0,
-              estimated_cost: po.total_amount || 0,
-              created_at: po.created_at,
-              updated_at: po.updated_at,
-              source: 'purchase_orders',
-              delivery_provider_name: po.delivery_provider_name,
-              delivery_assigned_at: po.delivery_assigned_at
-            });
+            // Only add as new entry if not delivered/completed (those should only sync existing delivery_requests)
+            if (po.status !== 'delivered' && po.status !== 'completed') {
+              allActiveDeliveries.push({
+                id: po.id,
+                purchase_order_id: po.id,
+                order_number: (po.po_number && po.po_number.trim() !== '') ? po.po_number : `PO-${po.id.slice(0, 8).toUpperCase()}`,
+                provider_id: userId,
+                status: po.status,
+                pickup_location: po.supplier?.address || po.supplier?.location || po.pickup_address || 'Supplier location',
+                pickup_address: po.supplier?.address || po.supplier?.location || po.pickup_address || 'Supplier location',
+                delivery_location: po.delivery_address || 'Delivery location',
+                delivery_address: po.delivery_address || 'Delivery location',
+                material_type: Array.isArray(po.items) ? po.items.map((i: any) => i.name || i.material_type).join(', ') : 'Construction Materials',
+                quantity: Array.isArray(po.items) ? po.items.reduce((sum: number, i: any) => sum + (i.quantity || 1), 0) : 1,
+                builder_name: po.buyer?.full_name || po.builder_name || 'Builder',
+                builder_phone: po.buyer?.phone || po.builder_phone || '',
+                builder_email: po.buyer?.email || po.builder_email || '',
+                price: po.total_amount || 0,
+                estimated_cost: po.total_amount || 0,
+                created_at: po.created_at,
+                updated_at: po.updated_at,
+                source: 'purchase_orders',
+                delivery_provider_name: po.delivery_provider_name,
+                delivery_assigned_at: po.delivery_assigned_at
+              });
+            } else {
+              console.log('⏭️ Skipping purchase_order', po.id.slice(0, 8), 'with status', po.status, '- will only sync existing delivery_requests');
+            }
           }
         });
         console.log('✅ Added', purchaseOrdersToProcess.length, 'purchase orders to active deliveries');
