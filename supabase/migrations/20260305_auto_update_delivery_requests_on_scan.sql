@@ -154,13 +154,13 @@ BEGIN
         updated_at = NOW()
     WHERE qr_code = _qr_code;
     
-    -- Update purchase_order status to 'shipped'
+    -- Update purchase_order status to 'dispatched' (not 'shipped' - that's not a valid status)
     IF order_id IS NOT NULL THEN
       UPDATE purchase_orders
-      SET status = 'shipped',
+      SET status = 'dispatched',
           updated_at = NOW()
       WHERE id = order_id
-        AND status IN ('confirmed', 'processing', 'pending', 'accepted');
+        AND status IN ('confirmed', 'processing', 'pending', 'accepted', 'order_created', 'awaiting_delivery_request', 'delivery_requested', 'delivery_assigned', 'ready_for_dispatch');
       
       -- ============================================================
       -- AUTO-UPDATE delivery_requests.status to 'in_transit'
