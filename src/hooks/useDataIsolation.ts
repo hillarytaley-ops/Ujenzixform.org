@@ -1327,6 +1327,11 @@ export const useDeliveryProviderData = () => {
             const poId = delivery.purchase_order_id;
             const items = materialItemsMap.get(poId) || [];
             
+            // Special logging for the specific order
+            const isTargetOrder = delivery.order_number?.includes('1772673713715') || 
+                                 delivery.po_number?.includes('1772673713715') ||
+                                 poId?.toString().includes('d8683262');
+            
             if (items.length === 0) {
               // No material_items found, categorize based on status
               // If status is 'accepted' or 'assigned', it's scheduled (waiting for dispatch)
@@ -1336,6 +1341,16 @@ export const useDeliveryProviderData = () => {
                                       delivery.status === 'ready_for_dispatch' || delivery.status === 'provider_assigned')
                 ? 'scheduled' 
                 : delivery.status;
+              
+              if (isTargetOrder) {
+                console.log('🔍 Target order (no items found):', {
+                  order_number: delivery.order_number,
+                  purchase_order_id: poId?.substring(0, 8),
+                  status: delivery.status,
+                  fallback_status: fallbackStatus
+                });
+              }
+              
               return { ...delivery, _categorized_status: fallbackStatus };
             }
             
@@ -1358,6 +1373,20 @@ export const useDeliveryProviderData = () => {
             } else {
               // No items dispatched = scheduled
               categorizedStatus = 'scheduled';
+            }
+            
+            if (isTargetOrder) {
+              console.log('🔍 Target order categorization:', {
+                order_number: delivery.order_number,
+                purchase_order_id: poId?.substring(0, 8),
+                items_count: items.length,
+                allItemsReceived,
+                allItemsDispatched,
+                hasReceivedItems,
+                hasDispatchedItems,
+                original_status: delivery.status,
+                categorized_status: categorizedStatus
+              });
             }
             
             return {

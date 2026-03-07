@@ -1231,20 +1231,46 @@ const DeliveryDashboard = () => {
                       // EXCLUDE delivered orders (they should be in Delivered tab)
                       const inTransit = activeDeliveries.filter(d => {
                         const status = d._categorized_status || d.status;
+                        const isTargetOrder = d.order_number?.includes('1772673713715') || 
+                                             d.po_number?.includes('1772673713715');
+                        
                         // Exclude delivered orders
                         if (status === 'delivered' || status === 'completed') {
+                          if (isTargetOrder) {
+                            console.log('🚫 Excluding target order from In Transit (delivered):', {
+                              order_number: d.order_number,
+                              _categorized_status: d._categorized_status,
+                              original_status: d.status,
+                              items_count: d._items_count,
+                              received_count: d._received_count
+                            });
+                          }
                           return false;
                         }
-                        return status === 'in_transit' || 
-                               status === 'picked_up' ||
-                               status === 'on_the_way' ||
-                               status === 'near_destination' ||
-                               status === 'dispatched' ||
-                               status === 'shipped' ||
-                               status === 'out_for_delivery' ||
-                               status === 'delivery_arrived' ||
-                               status === 'ready_for_dispatch' ||
-                               status === 'processing';
+                        
+                        const matches = status === 'in_transit' || 
+                                       status === 'picked_up' ||
+                                       status === 'on_the_way' ||
+                                       status === 'near_destination' ||
+                                       status === 'dispatched' ||
+                                       status === 'shipped' ||
+                                       status === 'out_for_delivery' ||
+                                       status === 'delivery_arrived' ||
+                                       status === 'ready_for_dispatch' ||
+                                       status === 'processing';
+                        
+                        if (isTargetOrder) {
+                          console.log('🔍 Target order In Transit filter check:', {
+                            order_number: d.order_number,
+                            _categorized_status: d._categorized_status,
+                            original_status: d.status,
+                            matches,
+                            items_count: d._items_count,
+                            received_count: d._received_count
+                          });
+                        }
+                        
+                        return matches;
                       });
                       
                       // Debug logging - check for delivered orders that shouldn't be in transit
