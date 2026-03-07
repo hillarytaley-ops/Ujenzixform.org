@@ -21,9 +21,12 @@
 DO $$
 DECLARE
   v_order_numbers TEXT[] := ARRAY['1772295614017', '1772673713715', '1772340447370'];
+  v_order_number TEXT;
   v_po_record RECORD;
   v_dr_record RECORD;
   v_provider_id UUID;
+  v_total_items INTEGER;
+  v_received_items INTEGER;
 BEGIN
   -- Loop through each order number
   FOREACH v_order_number IN ARRAY v_order_numbers
@@ -132,28 +135,22 @@ BEGIN
       
       -- Verify all material_items are receive_scanned = true
       -- (This is what makes an order "delivered" according to supplier dashboard logic)
-      DO $$
-      DECLARE
-        v_total_items INTEGER;
-        v_received_items INTEGER;
-      BEGIN
-        SELECT 
-          COUNT(*),
-          COUNT(*) FILTER (WHERE receive_scanned = TRUE)
-        INTO v_total_items, v_received_items
-        FROM material_items
-        WHERE purchase_order_id = v_po_record.id;
-        
-        IF v_total_items > 0 AND v_received_items = v_total_items THEN
-          RAISE NOTICE '✅ Order %: All % items are receive_scanned = true (DELIVERED)', 
-            v_order_number, v_total_items;
-        ELSIF v_total_items > 0 THEN
-          RAISE WARNING '⚠️ Order %: Only %/% items are receive_scanned (not fully delivered)', 
-            v_order_number, v_received_items, v_total_items;
-        ELSE
-          RAISE WARNING '⚠️ Order %: No material_items found', v_order_number;
-        END IF;
-      END $$;
+      SELECT 
+        COUNT(*),
+        COUNT(*) FILTER (WHERE receive_scanned = TRUE)
+      INTO v_total_items, v_received_items
+      FROM material_items
+      WHERE purchase_order_id = v_po_record.id;
+      
+      IF v_total_items > 0 AND v_received_items = v_total_items THEN
+        RAISE NOTICE '✅ Order %: All % items are receive_scanned = true (DELIVERED)', 
+          v_order_number, v_total_items;
+      ELSIF v_total_items > 0 THEN
+        RAISE WARNING '⚠️ Order %: Only %/% items are receive_scanned (not fully delivered)', 
+          v_order_number, v_received_items, v_total_items;
+      ELSE
+        RAISE WARNING '⚠️ Order %: No material_items found', v_order_number;
+      END IF;
       
     ELSE
       RAISE WARNING 'Order % not found in purchase_orders', v_order_number;
