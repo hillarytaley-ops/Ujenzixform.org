@@ -1461,15 +1461,32 @@ export const useDeliveryProviderData = () => {
       
       // Run purchase_orders fetch FIRST (before delivery_requests) to ensure it always executes
       const fetchDeliveredPOs = async () => {
+        console.log('🚀 fetchDeliveredPOs: Function STARTED');
         let deliveredPOs: any[] = [];
         
         try {
+          console.log('🚀 fetchDeliveredPOs: About to query material_items...');
           // Step 1: Query ALL material_items where receive_scanned = true
-          const { data: receivedItems, error: itemsError } = await supabase
+          // Add timeout to prevent hanging
+          const queryPromise = supabase
             .from('material_items')
             .select('id, purchase_order_id, receive_scanned')
             .eq('receive_scanned', true)
             .limit(2000);
+          
+          const timeoutPromise = new Promise<never>((_, reject) => 
+            setTimeout(() => reject(new Error('Material items query timeout')), 10000)
+          );
+          
+          const { data: receivedItems, error: itemsError } = await Promise.race([
+            queryPromise,
+            timeoutPromise
+          ]).catch((e: any) => {
+            console.error('❌ Material items query failed or timed out:', e?.message || e);
+            return { data: null, error: e };
+          }) as any;
+          
+          console.log('🚀 fetchDeliveredPOs: Material items query completed');
           
           if (itemsError) {
             console.warn('⚠️ Error fetching received material_items:', itemsError);
@@ -1482,11 +1499,26 @@ export const useDeliveryProviderData = () => {
             
             if (poIdsWithReceivedItems.length > 0) {
               // Step 3: Fetch ALL material_items for these purchase_orders to check if ALL are received
-              const { data: allItemsForPOs, error: allItemsError } = await supabase
+              console.log('🚀 fetchDeliveredPOs: About to query all material_items for POs...');
+              const allItemsQueryPromise = supabase
                 .from('material_items')
                 .select('id, purchase_order_id, receive_scanned')
                 .in('purchase_order_id', poIdsWithReceivedItems)
                 .limit(2000);
+              
+              const allItemsTimeoutPromise = new Promise<never>((_, reject) => 
+                setTimeout(() => reject(new Error('All items query timeout')), 10000)
+              );
+              
+              const { data: allItemsForPOs, error: allItemsError } = await Promise.race([
+                allItemsQueryPromise,
+                allItemsTimeoutPromise
+              ]).catch((e: any) => {
+                console.error('❌ All items query failed or timed out:', e?.message || e);
+                return { data: null, error: e };
+              }) as any;
+              
+              console.log('🚀 fetchDeliveredPOs: All items query completed');
               
               if (allItemsError) {
                 console.warn('⚠️ Error fetching all material_items for purchase_orders:', allItemsError);
@@ -1516,11 +1548,26 @@ export const useDeliveryProviderData = () => {
                 
                 // Step 6: Fetch the actual purchase_orders
                 if (deliveredPOIds.length > 0) {
-                  const { data: deliveredPOsData, error: poError } = await supabase
+                  console.log('🚀 fetchDeliveredPOs: About to query purchase_orders...');
+                  const poQueryPromise = supabase
                     .from('purchase_orders')
                     .select('*')
                     .in('id', deliveredPOIds)
                     .order('updated_at', { ascending: false });
+                  
+                  const poTimeoutPromise = new Promise<never>((_, reject) => 
+                    setTimeout(() => reject(new Error('Purchase orders query timeout')), 10000)
+                  );
+                  
+                  const { data: deliveredPOsData, error: poError } = await Promise.race([
+                    poQueryPromise,
+                    poTimeoutPromise
+                  ]).catch((e: any) => {
+                    console.error('❌ Purchase orders query failed or timed out:', e?.message || e);
+                    return { data: null, error: e };
+                  }) as any;
+                  
+                  console.log('🚀 fetchDeliveredPOs: Purchase orders query completed');
                   
                   if (poError) {
                     console.warn('⚠️ Error fetching delivered purchase_orders:', poError);
@@ -1599,8 +1646,8 @@ export const useDeliveryProviderData = () => {
           // Primary query: by provider_id (delivery_provider.id) - fetch ALL to check material_items
           queries.push(
             supabase
-              .from('delivery_requests')
-              .select('*')
+        .from('delivery_requests')
+        .select('*')
               .eq('provider_id', providerId)
               .not('status', 'eq', 'cancelled') // Exclude cancelled, but include all others
               .order('updated_at', { ascending: false })
@@ -1650,11 +1697,11 @@ export const useDeliveryProviderData = () => {
           // If provider lookup failed, try to find delivery_requests via purchase_orders
           try {
             const poQuery = supabase
-              .from('purchase_orders')
+        .from('purchase_orders')
               .select('id, delivery_provider_id')
-              .eq('delivery_provider_id', userId)
-              .limit(100);
-            
+        .eq('delivery_provider_id', userId)
+        .limit(100);
+
             const poTimeout = new Promise<never>((_, reject) => 
               setTimeout(() => reject(new Error('PO lookup timeout')), 3000)
             );
