@@ -893,7 +893,8 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
               receive_scanned_at: new Date().toISOString(),
               receive_scanned_by: currentUserId,
               status: 'received',
-              material_condition: materialCondition,
+              // Note: material_condition column doesn't exist in material_items table
+              // Condition is tracked via status field (good = 'received', damaged = 'damaged')
               updated_at: new Date().toISOString()
             }),
             signal: updateController.signal
