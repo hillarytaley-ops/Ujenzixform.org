@@ -326,20 +326,46 @@ export const ReceivingScanner: React.FC = () => {
       // Show immediate feedback
       toast.info('Processing scan...', { duration: 2000 });
       
-      // Get auth token
+      // Get auth token - use Supabase session for proper authentication
       const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
       const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
       
+      // Get current session from Supabase (most reliable method)
       let accessToken = ANON_KEY;
       try {
-        const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          accessToken = parsed.access_token || ANON_KEY;
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        if (sessionData?.session?.access_token) {
+          accessToken = sessionData.session.access_token;
+          console.log('🔐 Using Supabase session token (authenticated)');
+        } else {
+          console.warn('⚠️ No active Supabase session, trying localStorage fallback...');
+          // Fallback to localStorage if session not available
+          try {
+            const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              accessToken = parsed.access_token || ANON_KEY;
+              console.log('🔐 Using localStorage token (fallback)');
+            } else {
+              console.error('❌ No access token found - RLS policies will block access!');
+            }
+          } catch (e) {
+            console.error('❌ Error reading localStorage token:', e);
+          }
         }
-      } catch (e) {}
+      } catch (e) {
+        console.error('❌ Error getting Supabase session:', e);
+        // Fallback to localStorage
+        try {
+          const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            accessToken = parsed.access_token || ANON_KEY;
+          }
+        } catch (e2) {}
+      }
       
-      console.log('🔐 Using access token:', accessToken ? 'Found' : 'Using anon key');
+      console.log('🔐 Access token status:', accessToken !== ANON_KEY ? 'Authenticated token found' : 'Using anon key (RLS may block)');
       
       // DIRECT DATABASE UPDATE: Look up the material_item by QR code and update it
       // This bypasses the RPC function which may not exist
