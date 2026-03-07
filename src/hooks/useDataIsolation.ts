@@ -1040,7 +1040,9 @@ export const useDeliveryProviderData = () => {
             ...dr,
             source: 'delivery_requests',
             purchase_order_id: dr.purchase_order_id || null,
-            order_number: orderNumber
+            order_number: orderNumber,
+            po_status: null, // Will be populated when purchase_orders are merged
+            purchase_order_status: null // Alias for po_status
           });
         });
         const withRealNumbers = allActiveDeliveries.filter((d: any) => d.order_number && (!d.order_number.startsWith('PO-') || (d.order_number.startsWith('PO-') && d.order_number.length > 11))).length;
@@ -1066,6 +1068,10 @@ export const useDeliveryProviderData = () => {
               existing.order_number = `PO-${po.id.slice(0, 8).toUpperCase()}`;
               console.warn('⚠️ Using fallback order number for purchase_order:', po.id.slice(0, 8));
             }
+            
+            // CRITICAL: Store purchase_order status for categorization
+            existing.po_status = po.status;
+            existing.purchase_order_status = po.status; // Alias
             
             // CRITICAL: Sync status from purchase_orders to delivery_requests
             // If purchase_order is 'shipped'/'dispatched' but delivery_request is still 'accepted', update it
@@ -1094,6 +1100,8 @@ export const useDeliveryProviderData = () => {
               order_number: (po.po_number && po.po_number.trim() !== '') ? po.po_number : `PO-${po.id.slice(0, 8).toUpperCase()}`,
               provider_id: userId,
               status: po.status,
+              po_status: po.status, // Store purchase_order status for categorization
+              purchase_order_status: po.status, // Alias
               pickup_location: po.supplier?.address || po.supplier?.location || po.pickup_address || 'Supplier location',
               pickup_address: po.supplier?.address || po.supplier?.location || po.pickup_address || 'Supplier location',
               delivery_location: po.delivery_address || 'Delivery location',
@@ -1334,25 +1342,35 @@ export const useDeliveryProviderData = () => {
             
             if (items.length === 0) {
               // No material_items found - could be RLS blocking or fetch failure
-              // CRITICAL: Check if order status is 'delivered' or 'completed' - these should be categorized as delivered
-              // Also check if this order is in the known delivered orders list (from supplier dashboard)
+              // CRITICAL: Check multiple sources to determine if order is delivered:
+              // 1. delivery.status (delivery_request status)
+              // 2. delivery.po_status (purchase_order status) - if available
+              // 3. Known delivered order numbers (from supplier dashboard)
               const knownDeliveredOrderNumbers = ['1772673713715', '1772340447370', '1772295614017'];
               const orderNumberMatch = knownDeliveredOrderNumbers.some(num => 
                 delivery.order_number?.includes(num) || 
                 delivery.po_number?.includes(num)
               );
               
-              const isDeliveredByStatus = delivery.status === 'delivered' || 
-                                         delivery.status === 'completed' ||
-                                         orderNumberMatch; // If order number matches known delivered orders, it's delivered
+              // Check delivery_request status
+              const drStatusDelivered = delivery.status === 'delivered' || delivery.status === 'completed';
+              
+              // Check purchase_order status (if available in delivery object)
+              const poStatusDelivered = delivery.po_status === 'delivered' || 
+                                       delivery.po_status === 'completed' ||
+                                       delivery.purchase_order_status === 'delivered' ||
+                                       delivery.purchase_order_status === 'completed';
+              
+              const isDeliveredByStatus = drStatusDelivered || poStatusDelivered || orderNumberMatch;
               
               if (isDeliveredByStatus) {
-                // Order is marked as delivered or matches known delivered orders - categorize as delivered even without material_items
+                // Order is marked as delivered - categorize as delivered even without material_items
                 if (isTargetOrder || orderNumberMatch) {
-                  console.log('✅ Target order (no items found but status/order_number indicates delivered):', {
+                  console.log('✅ Target order (no items found but status indicates delivered):', {
                     order_number: delivery.order_number,
                     purchase_order_id: poId?.substring(0, 8),
-                    status: delivery.status,
+                    delivery_request_status: delivery.status,
+                    purchase_order_status: delivery.po_status || delivery.purchase_order_status,
                     orderNumberMatch,
                     categorized_status: 'delivered'
                   });
@@ -1372,7 +1390,8 @@ export const useDeliveryProviderData = () => {
                 console.log('🔍 Target order (no items found):', {
                   order_number: delivery.order_number,
                   purchase_order_id: poId?.substring(0, 8),
-                  status: delivery.status,
+                  delivery_request_status: delivery.status,
+                  purchase_order_status: delivery.po_status || delivery.purchase_order_status,
                   fallback_status: fallbackStatus
                 });
               }

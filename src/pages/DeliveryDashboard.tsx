@@ -1285,17 +1285,27 @@ const DeliveryDashboard = () => {
                       // In Transit = all items dispatched, some received
                       // EXCLUDE delivered orders (they should be in Delivered tab)
                       const inTransit = activeDeliveries.filter(d => {
-                        const status = d._categorized_status || d.status;
+                        const categorizedStatus = d._categorized_status || d.status;
+                        const originalStatus = d.status;
+                        const poStatus = d.po_status || d.purchase_order_status;
                         const isTargetOrder = d.order_number?.includes('1772673713715') || 
                                              d.po_number?.includes('1772673713715');
                         
-                        // Exclude delivered orders
-                        if (status === 'delivered' || status === 'completed') {
+                        // CRITICAL: Exclude delivered orders - check ALL status sources
+                        const isDelivered = categorizedStatus === 'delivered' || 
+                                           categorizedStatus === 'completed' ||
+                                           originalStatus === 'delivered' || 
+                                           originalStatus === 'completed' ||
+                                           poStatus === 'delivered' ||
+                                           poStatus === 'completed';
+                        
+                        if (isDelivered) {
                           if (isTargetOrder) {
                             console.log('🚫 Excluding target order from In Transit (delivered):', {
                               order_number: d.order_number,
                               _categorized_status: d._categorized_status,
                               original_status: d.status,
+                              po_status: poStatus,
                               items_count: d._items_count,
                               received_count: d._received_count
                             });
@@ -1303,22 +1313,23 @@ const DeliveryDashboard = () => {
                           return false;
                         }
                         
-                        const matches = status === 'in_transit' || 
-                                       status === 'picked_up' ||
-                                       status === 'on_the_way' ||
-                                       status === 'near_destination' ||
-                                       status === 'dispatched' ||
-                                       status === 'shipped' ||
-                                       status === 'out_for_delivery' ||
-                                       status === 'delivery_arrived' ||
-                                       status === 'ready_for_dispatch' ||
-                                       status === 'processing';
+                        const matches = categorizedStatus === 'in_transit' || 
+                                       categorizedStatus === 'picked_up' ||
+                                       categorizedStatus === 'on_the_way' ||
+                                       categorizedStatus === 'near_destination' ||
+                                       categorizedStatus === 'dispatched' ||
+                                       categorizedStatus === 'shipped' ||
+                                       categorizedStatus === 'out_for_delivery' ||
+                                       categorizedStatus === 'delivery_arrived' ||
+                                       categorizedStatus === 'ready_for_dispatch' ||
+                                       categorizedStatus === 'processing';
                         
                         if (isTargetOrder) {
                           console.log('🔍 Target order In Transit filter check:', {
                             order_number: d.order_number,
                             _categorized_status: d._categorized_status,
                             original_status: d.status,
+                            po_status: poStatus,
                             matches,
                             items_count: d._items_count,
                             received_count: d._received_count
