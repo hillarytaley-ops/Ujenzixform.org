@@ -76,8 +76,40 @@ export const ReceivingScanner: React.FC = () => {
     detectDeviceInfo();
     listAvailableCameras();
     
+    // Add global error handler to catch unhandled promise rejections from html5-qrcode library
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const error = event.reason;
+      const errorMessage = error?.message || error?.toString() || '';
+      
+      // Filter out non-critical internal library errors
+      const ignoredPatterns = [
+        'O',
+        'decodeRow2pairs',
+        'decodeRow',
+        'doDecode',
+        'NotFoundException'
+      ];
+      
+      const shouldIgnore = ignoredPatterns.some(pattern => 
+        errorMessage.includes(pattern) || 
+        (errorMessage.length <= 2 && /^[A-Z]$/.test(errorMessage))
+      );
+      
+      if (shouldIgnore) {
+        // Suppress non-critical errors
+        event.preventDefault();
+        return;
+      }
+      
+      // Log other errors for debugging
+      console.warn('⚠️ Unhandled promise rejection from scanner:', errorMessage);
+    };
+    
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    
     return () => {
       stopScanning();
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
     };
   }, []);
 
@@ -160,7 +192,8 @@ export const ReceivingScanner: React.FC = () => {
 
       // Create new scanner instance
       console.log('🎥 Creating Html5Qrcode instance for container:', scannerContainerId);
-      scannerRef.current = new Html5Qrcode(scannerContainerId, { verbose: true });
+      // Set verbose to false to reduce noise from internal library errors
+      scannerRef.current = new Html5Qrcode(scannerContainerId, { verbose: false });
       
       // Use facingMode for mobile, or specific camera ID if selected
       let cameraConfig: any;
@@ -244,10 +277,17 @@ export const ReceivingScanner: React.FC = () => {
             'No MultiFormat Readers were able to detect the code',
             'QR code parse error',
             'QR code not found',
-            'No QR code detected'
+            'No QR code detected',
+            'O', // Internal library error (minified) - non-critical
+            'decodeRow2pairs', // Internal library decoding errors
+            'decodeRow', // Internal library decoding errors
+            'doDecode' // Internal library decoding errors
           ];
           
-          const shouldIgnore = ignoredErrors.some(ignored => 
+          // Check if error message is a single character or very short (likely minified/internal)
+          const isShortError = errorMessage && errorMessage.length <= 2;
+          
+          const shouldIgnore = isShortError || ignoredErrors.some(ignored => 
             errorMessage.includes(ignored) || errorMessage.toLowerCase().includes(ignored.toLowerCase())
           );
           
