@@ -1489,28 +1489,29 @@ export const useDeliveryProviderData = () => {
         
         // Query by provider_id (delivery_provider.id) if we have it
         // Also try by user_id as fallback (some records might use user_id directly)
+        // CRITICAL: Fetch ALL delivery_requests (not just 'delivered' status) to check material_items scan status
         const queries: Promise<any>[] = [];
         
         if (providerId) {
-          // Primary query: by provider_id (delivery_provider.id)
+          // Primary query: by provider_id (delivery_provider.id) - fetch ALL to check material_items
           queries.push(
             supabase
               .from('delivery_requests')
               .select('*')
               .eq('provider_id', providerId)
-              .in('status', ['delivered', 'completed', 'cancelled'])
+              .not('status', 'eq', 'cancelled') // Exclude cancelled, but include all others
               .order('updated_at', { ascending: false })
-              .limit(100)
+              .limit(200) // Fetch more to check material_items scan status
               .then(({ data, error }) => {
                 if (error) {
-                  console.warn('⚠️ Error fetching history by provider_id:', error);
+                  console.warn('⚠️ Error fetching delivery_requests by provider_id:', error);
                   return [];
                 }
-                console.log('✅ Fetched', data?.length || 0, 'delivered delivery_requests by provider_id');
+                console.log('✅ Fetched', data?.length || 0, 'delivery_requests by provider_id for history check');
                 return data || [];
               })
               .catch((e) => {
-                console.warn('⚠️ Exception fetching history by provider_id:', e);
+                console.warn('⚠️ Exception fetching delivery_requests by provider_id:', e);
                 return [];
               })
           );
@@ -1522,38 +1523,131 @@ export const useDeliveryProviderData = () => {
             .from('delivery_requests')
             .select('*')
             .eq('provider_id', userId)
-            .in('status', ['delivered', 'completed', 'cancelled'])
+            .not('status', 'eq', 'cancelled') // Exclude cancelled, but include all others
             .order('updated_at', { ascending: false })
-            .limit(100)
+            .limit(200) // Fetch more to check material_items scan status
             .then(({ data, error }) => {
               if (error) {
-                console.warn('⚠️ Error fetching history by user_id:', error);
+                console.warn('⚠️ Error fetching delivery_requests by user_id:', error);
                 return [];
               }
-              console.log('✅ Fetched', data?.length || 0, 'delivered delivery_requests by user_id (fallback)');
+              console.log('✅ Fetched', data?.length || 0, 'delivery_requests by user_id (fallback) for history check');
               return data || [];
             })
             .catch((e) => {
-              console.warn('⚠️ Exception fetching history by user_id:', e);
+              console.warn('⚠️ Exception fetching delivery_requests by user_id:', e);
               return [];
             })
         );
         
         // Execute all queries in parallel and merge results
         const results = await Promise.all(queries);
-        historyData = results.flat();
+        const allDeliveryRequests = results.flat();
         
-        // Remove duplicates and sort
-        const uniqueHistory = Array.from(
-          new Map(historyData.map((d: any) => [d.id, d])).values()
-        ).sort((a: any, b: any) => {
+        // Remove duplicates
+        const uniqueDRs = Array.from(
+          new Map(allDeliveryRequests.map((d: any) => [d.id, d])).values()
+        );
+        
+        // Fetch material_items for all delivery_requests to determine which are truly delivered
+        // (matches supplier dashboard logic: all items receive_scanned = true)
+        if (uniqueDRs.length > 0) {
+          try {
+            const poIds = uniqueDRs
+              .map(dr => dr.purchase_order_id)
+              .filter(Boolean);
+            
+            if (poIds.length > 0) {
+              // Fetch material_items in batches
+              const batches: string[][] = [];
+              for (let i = 0; i < poIds.length; i += 100) {
+                batches.push(poIds.slice(i, i + 100));
+              }
+              
+              const materialItemsMap = new Map<string, any[]>();
+              
+              for (const batch of batches) {
+                const idsList = batch.join(',');
+                try {
+                  const itemsResponse = await fetch(
+                    `${SUPABASE_URL}/rest/v1/material_items?purchase_order_id=in.(${idsList})&select=id,purchase_order_id,dispatch_scanned,receive_scanned&limit=1000`,
+                    {
+                      headers: {
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                      },
+                      cache: 'no-store',
+                      signal: AbortSignal.timeout(5000)
+                    }
+                  );
+                  
+                  if (itemsResponse.ok) {
+                    const items = await itemsResponse.json();
+                    items.forEach((item: any) => {
+                      const poId = item.purchase_order_id;
+                      if (!materialItemsMap.has(poId)) {
+                        materialItemsMap.set(poId, []);
+                      }
+                      materialItemsMap.get(poId)!.push(item);
+                    });
+                  }
+                } catch (e: any) {
+                  console.warn('⚠️ Error fetching material_items batch for delivery_requests history:', e?.message || e);
+                }
+              }
+              
+              // Filter to only include delivery_requests where:
+              // 1. Status is 'delivered'/'completed', OR
+              // 2. All material_items are receive_scanned = true (matches supplier dashboard logic)
+              historyData = uniqueDRs.filter((dr: any) => {
+                // Check status first
+                if (['delivered', 'completed'].includes(dr.status)) {
+                  return true;
+                }
+                
+                // Check material_items scan status (same logic as supplier dashboard)
+                const poId = dr.purchase_order_id;
+                if (!poId) {
+                  return false; // No purchase_order_id = can't check items
+                }
+                
+                const items = materialItemsMap.get(poId) || [];
+                if (items.length === 0) {
+                  return false; // No items = not delivered
+                }
+                
+                // All items must be receive_scanned = true
+                const allItemsReceived = items.every((item: any) => item.receive_scanned === true);
+                return allItemsReceived;
+              });
+              
+              console.log('📦 History: Found', historyData.length, 'delivered delivery_requests (by status or material_items scan) out of', uniqueDRs.length, 'total');
+            } else {
+              // No purchase_order_ids, use status-based filtering only
+              historyData = uniqueDRs.filter((dr: any) => 
+                ['delivered', 'completed'].includes(dr.status)
+              );
+            }
+          } catch (e: any) {
+            console.warn('⚠️ Error checking material_items for delivery_requests history:', e?.message || e);
+            // Fallback: use status-based filtering only
+            historyData = uniqueDRs.filter((dr: any) => 
+              ['delivered', 'completed'].includes(dr.status)
+            );
+          }
+        } else {
+          historyData = [];
+        }
+        
+        // Sort by completed_at if available, otherwise by updated_at (most recent first)
+        historyData = historyData.sort((a: any, b: any) => {
           const dateA = new Date(a.completed_at || a.delivered_at || a.updated_at || a.created_at);
           const dateB = new Date(b.completed_at || b.delivered_at || b.updated_at || b.created_at);
           return dateB.getTime() - dateA.getTime();
-        });
+        }).slice(0, 100);
         
-        historyData = uniqueHistory.slice(0, 100);
-        console.log('📦 Final delivery history count:', historyData.length);
+        console.log('📦 Final delivery_requests history count:', historyData.length);
       } catch (e) {
         historyError = e;
         console.error('❌ Error fetching delivery history:', e);
@@ -1564,16 +1658,92 @@ export const useDeliveryProviderData = () => {
       }
       
       // 2. From purchase_orders table - fetch delivered items
-      const { data: deliveredPOs, error: poHistoryError } = await supabase
+      // CRITICAL: Also fetch orders where all material_items are receive_scanned = true
+      // This matches the supplier dashboard logic (QR Code Management)
+      const { data: allPOsForProvider, error: poHistoryError } = await supabase
         .from('purchase_orders')
         .select('*')
         .eq('delivery_provider_id', userId)
-        .in('status', ['delivered', 'completed', 'received']) // Include delivered statuses
         .order('updated_at', { ascending: false })
-        .limit(100);
+        .limit(200); // Fetch more to check material_items scan status
 
       if (poHistoryError) {
-        console.warn('Error fetching delivery history from purchase_orders:', poHistoryError);
+        console.warn('Error fetching purchase_orders for history:', poHistoryError);
+      }
+      
+      // Fetch material_items for all purchase_orders to determine which are truly delivered
+      let deliveredPOs: any[] = [];
+      if (allPOsForProvider && allPOsForProvider.length > 0) {
+        try {
+          const poIds = allPOsForProvider.map(po => po.id);
+          
+          // Fetch material_items in batches
+          const batches: string[][] = [];
+          for (let i = 0; i < poIds.length; i += 100) {
+            batches.push(poIds.slice(i, i + 100));
+          }
+          
+          const materialItemsMap = new Map<string, any[]>();
+          
+          for (const batch of batches) {
+            const idsList = batch.join(',');
+            try {
+              const itemsResponse = await fetch(
+                `${SUPABASE_URL}/rest/v1/material_items?purchase_order_id=in.(${idsList})&select=id,purchase_order_id,dispatch_scanned,receive_scanned&limit=1000`,
+                {
+                  headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                  },
+                  cache: 'no-store',
+                  signal: AbortSignal.timeout(5000)
+                }
+              );
+              
+              if (itemsResponse.ok) {
+                const items = await itemsResponse.json();
+                items.forEach((item: any) => {
+                  const poId = item.purchase_order_id;
+                  if (!materialItemsMap.has(poId)) {
+                    materialItemsMap.set(poId, []);
+                  }
+                  materialItemsMap.get(poId)!.push(item);
+                });
+              }
+            } catch (e: any) {
+              console.warn('⚠️ Error fetching material_items batch for history:', e?.message || e);
+            }
+          }
+          
+          // Filter to only include orders where:
+          // 1. Status is 'delivered'/'completed'/'received', OR
+          // 2. All material_items are receive_scanned = true (matches supplier dashboard logic)
+          deliveredPOs = allPOsForProvider.filter((po: any) => {
+            // Check status first
+            if (['delivered', 'completed', 'received'].includes(po.status)) {
+              return true;
+            }
+            
+            // Check material_items scan status (same logic as supplier dashboard)
+            const items = materialItemsMap.get(po.id) || [];
+            if (items.length === 0) {
+              return false; // No items = not delivered
+            }
+            
+            // All items must be receive_scanned = true
+            const allItemsReceived = items.every((item: any) => item.receive_scanned === true);
+            return allItemsReceived;
+          });
+          
+          console.log('📦 History: Found', deliveredPOs.length, 'delivered purchase_orders (by status or material_items scan) out of', allPOsForProvider.length, 'total');
+        } catch (e: any) {
+          console.warn('⚠️ Error checking material_items for history:', e?.message || e);
+          // Fallback: use status-based filtering only
+          deliveredPOs = allPOsForProvider.filter((po: any) => 
+            ['delivered', 'completed', 'received'].includes(po.status)
+          );
+        }
       }
       
       // Enrich delivered purchase orders with supplier/buyer info
