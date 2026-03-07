@@ -397,6 +397,9 @@ export const ReceivingScanner: React.FC = () => {
         console.log('🔎 Strategy 1: Exact match lookup via REST API...');
         
         // Strategy 1: Exact match on qr_code using REST API
+        console.log('🔎 Strategy 1: Making REST API call...');
+        console.log('   URL:', `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${encodeURIComponent(cleanQRCode)}&select=*&limit=1`);
+        
         const restResponse = await fetch(
           `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${encodeURIComponent(cleanQRCode)}&select=*&limit=1`,
           {
@@ -404,22 +407,23 @@ export const ReceivingScanner: React.FC = () => {
               'apikey': ANON_KEY,
               'Authorization': `Bearer ${accessToken}`,
               'Accept': 'application/json',
-              'Content-Type': 'application/json'
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation'
             }
           }
         );
         
-        console.log('🔎 Strategy 1 REST response status:', restResponse.status);
+        console.log('🔎 Strategy 1 REST response status:', restResponse.status, restResponse.statusText);
         
         if (restResponse.ok) {
           const restData = await restResponse.json();
-          console.log('🔎 Strategy 1 result:', { found: restData?.length || 0 });
+          console.log('🔎 Strategy 1 result:', { found: restData?.length || 0, data: restData });
           
           if (restData && restData.length > 0) {
             items = restData;
             console.log('✅ Found with exact qr_code match:', items[0].qr_code);
           } else {
-            console.log('⚠️ Strategy 1: No exact match found');
+            console.log('⚠️ Strategy 1: No exact match found (empty array returned)');
           }
         } else {
           const errorText = await restResponse.text();
@@ -499,16 +503,20 @@ export const ReceivingScanner: React.FC = () => {
                 headers: {
                   'apikey': ANON_KEY,
                   'Authorization': `Bearer ${accessToken}`,
-                  'Accept': 'application/json'
+                  'Accept': 'application/json',
+                  'Prefer': 'return=representation'
                 }
               }
             );
             
+            console.log('📦 Strategy 4 REST response status:', recentResponse.status, recentResponse.statusText);
+            
             if (recentResponse.ok) {
               const recentItems = await recentResponse.json();
-              console.log('📦 Searching through', recentItems?.length || 0, 'recent items...');
+              console.log('📦 Strategy 4: Received', recentItems?.length || 0, 'items from database');
               
               if (recentItems && recentItems.length > 0) {
+                console.log('📦 Searching through', recentItems.length, 'recent items...');
                 // Try to find a match - check if scanned QR contains or is contained in stored QR
                 const found = recentItems.find((item: any) => {
                   if (!item.qr_code) return false;
@@ -529,15 +537,32 @@ export const ReceivingScanner: React.FC = () => {
                   console.log('✅ Found via client-side search! Stored QR:', found.qr_code);
                 } else {
                   // Log some sample QR codes from database for debugging
-                  console.log('📦 Sample QR codes in database:');
-                  recentItems.slice(0, 5).forEach((item: any) => {
-                    console.log('  -', item.qr_code);
+                  console.log('📦 Sample QR codes in database (first 10):');
+                  recentItems.slice(0, 10).forEach((item: any, idx: number) => {
+                    console.log(`  ${idx + 1}.`, item.qr_code || '(no qr_code)', '| Status:', item.status, '| Dispatch:', item.dispatch_scanned);
                   });
+                  
+                  // Check if scanned QR matches any partial
+                  const scannedTimestamp = cleanQRCode.match(/1772673713715/);
+                  if (scannedTimestamp) {
+                    const partialMatch = recentItems.find((item: any) => 
+                      item.qr_code && item.qr_code.includes('1772673713715')
+                    );
+                    if (partialMatch) {
+                      console.log('⚠️ Found partial match by timestamp:', partialMatch.qr_code);
+                    }
+                  }
                 }
+              } else {
+                console.error('❌ Strategy 4: Database returned 0 items! This might be an RLS (Row Level Security) issue.');
+                console.error('   The delivery provider may not have permission to view material_items.');
               }
+            } else {
+              const errorText = await recentResponse.text();
+              console.error('❌ Strategy 4 REST error:', recentResponse.status, errorText);
             }
           } catch (e) {
-            console.error('❌ Strategy 4 error:', e);
+            console.error('❌ Strategy 4 exception:', e);
           }
         }
       } catch (lookupError) {
