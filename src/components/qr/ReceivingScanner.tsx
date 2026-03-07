@@ -33,6 +33,7 @@ export const ReceivingScanner: React.FC = () => {
   const [notes, setNotes] = useState('');
   const lastScannedRef = useRef<string>('');
   const lastScanTimeRef = useRef<number>(0);
+  const recentlyProcessedRef = useRef<Map<string, number>>(new Map());
   const [userRole, setUserRole] = useState<string | null>(null);
   const [facing, setFacing] = useState<'environment' | 'user'>('environment');
   const [availableCameras, setAvailableCameras] = useState<{ id: string; label: string }[]>([]);
@@ -234,15 +235,32 @@ export const ReceivingScanner: React.FC = () => {
           console.log('🎯 QR DETECTED! Raw text:', decodedText);
           console.log('🎯 Decoded result:', decodedResult);
           
-          // Debounce: prevent scanning same code within 3 seconds
-          // Only debounce for 1 second (was 3 seconds - too long)
+          // Quick debounce: prevent rapid duplicate scans within 1 second
           if (decodedText === lastScannedRef.current && now - lastScanTimeRef.current < 1000) {
             console.log('🔄 Debounced duplicate scan (within 1s):', decodedText);
             return;
           }
           
+          // Check if this QR code was recently processed (within last 10 seconds)
+          const processedTime = recentlyProcessedRef.current.get(decodedText);
+          if (processedTime && now - processedTime < 10000) {
+            console.log('⏭️ Skipping recently processed QR code (within 10s):', decodedText);
+            return;
+          }
+          
           lastScannedRef.current = decodedText;
           lastScanTimeRef.current = now;
+          
+          // Mark as processed
+          recentlyProcessedRef.current.set(decodedText, now);
+          
+          // Clean up old entries (older than 30 seconds) to prevent memory leak
+          const thirtySecondsAgo = now - 30000;
+          for (const [qrCode, timestamp] of recentlyProcessedRef.current.entries()) {
+            if (timestamp < thirtySecondsAgo) {
+              recentlyProcessedRef.current.delete(qrCode);
+            }
+          }
           
           console.log('✅ PROCESSING QR CODE NOW:', decodedText);
           
@@ -339,6 +357,7 @@ export const ReceivingScanner: React.FC = () => {
     setIsScanning(false);
     lastScannedRef.current = '';
     lastScanTimeRef.current = 0;
+    recentlyProcessedRef.current.clear();
   };
 
   const toggleCamera = async () => {
