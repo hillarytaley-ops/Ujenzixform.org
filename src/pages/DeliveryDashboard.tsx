@@ -1247,6 +1247,25 @@ const DeliveryDashboard = () => {
                                status === 'processing';
                       });
                       
+                      // Debug logging - check for delivered orders that shouldn't be in transit
+                      const deliveredInTransit = activeDeliveries.filter(d => {
+                        const status = d._categorized_status || d.status;
+                        return (status === 'delivered' || status === 'completed') && 
+                               (d.status === 'dispatched' || d.status === 'in_transit' || d.status === 'shipped');
+                      });
+                      
+                      if (deliveredInTransit.length > 0) {
+                        console.log('🚨 FOUND DELIVERED ORDERS IN ACTIVE DELIVERIES:', deliveredInTransit.map(d => ({
+                          id: d.id?.substring(0, 8),
+                          order_number: d.order_number,
+                          _categorized_status: d._categorized_status,
+                          original_status: d.status,
+                          items_count: d._items_count,
+                          dispatched_count: d._dispatched_count,
+                          received_count: d._received_count
+                        })));
+                      }
+                      
                       // Debug logging
                       if (activeDeliveries.length > 0 && inTransit.length === 0) {
                         console.log('⚠️ In Transit filter: Found', activeDeliveries.length, 'active deliveries but 0 in transit');
@@ -1263,6 +1282,15 @@ const DeliveryDashboard = () => {
                       } else if (inTransit.length > 0) {
                         console.log('✅ In Transit filter: Found', inTransit.length, 'in transit deliveries');
                         console.log('📋 In Transit statuses:', [...new Set(inTransit.map(d => d._categorized_status || d.status))]);
+                        console.log('📋 In Transit deliveries details:', inTransit.map(d => ({
+                          id: d.id?.substring(0, 8),
+                          order_number: d.order_number,
+                          _categorized_status: d._categorized_status,
+                          original_status: d.status,
+                          items_count: d._items_count,
+                          dispatched_count: d._dispatched_count,
+                          received_count: d._received_count
+                        })));
                       }
                       
                       return inTransit.length > 0 ? (

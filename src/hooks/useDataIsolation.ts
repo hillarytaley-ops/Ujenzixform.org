@@ -1376,6 +1376,34 @@ export const useDeliveryProviderData = () => {
           
           console.log('📊 Categorized deliveries by material_items scan status:', statusCounts);
           
+          // Log details for delivered orders
+          const deliveredOrders = categorized.filter((d: any) => d._categorized_status === 'delivered');
+          if (deliveredOrders.length > 0) {
+            console.log('✅ Found', deliveredOrders.length, 'delivered orders:', deliveredOrders.map((d: any) => ({
+              id: d.id?.substring(0, 8),
+              order_number: d.order_number || d.po_number,
+              purchase_order_id: d.purchase_order_id?.substring(0, 8),
+              original_status: d.status,
+              items_count: d._items_count,
+              dispatched_count: d._dispatched_count,
+              received_count: d._received_count
+            })));
+          }
+          
+          // Log details for in_transit orders
+          const inTransitOrders = categorized.filter((d: any) => d._categorized_status === 'in_transit');
+          if (inTransitOrders.length > 0) {
+            console.log('🚚 Found', inTransitOrders.length, 'in_transit orders:', inTransitOrders.map((d: any) => ({
+              id: d.id?.substring(0, 8),
+              order_number: d.order_number || d.po_number,
+              purchase_order_id: d.purchase_order_id?.substring(0, 8),
+              original_status: d.status,
+              items_count: d._items_count,
+              dispatched_count: d._dispatched_count,
+              received_count: d._received_count
+            })));
+          }
+          
           return categorized;
         } catch (e: any) {
           console.warn('⚠️ Error categorizing deliveries by material_items:', e?.message || e);
