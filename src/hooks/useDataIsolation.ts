@@ -1238,64 +1238,101 @@ export const useDeliveryProviderData = () => {
       let historyError: any = null;
       
       try {
-        // First, get the delivery_provider.id for this user
+        // First, get the delivery_provider.id for this user with timeout
         let providerId: string | null = null;
         try {
-          const { data: provider } = await supabase
+          const providerLookupPromise = supabase
             .from('delivery_providers')
             .select('id')
             .eq('user_id', userId)
             .single();
           
-          if (provider?.id) {
+          const providerTimeoutPromise = new Promise<never>((_, reject) => 
+            setTimeout(() => reject(new Error('Provider lookup timeout')), 3000)
+          );
+          
+          const { data: provider, error: providerError } = await Promise.race([
+            providerLookupPromise,
+            providerTimeoutPromise
+          ]).catch((e: any) => {
+            console.warn('⚠️ Provider lookup timed out or failed:', e?.message || e);
+            return { data: null, error: e };
+          }) as any;
+          
+          if (providerError) {
+            console.warn('⚠️ Error fetching delivery_provider.id:', providerError.message);
+          } else if (provider?.id) {
             providerId = provider.id;
             console.log('✅ Found delivery_provider.id for history query:', providerId);
           } else {
             console.warn('⚠️ No delivery_provider found for user_id:', userId);
           }
         } catch (e) {
-          console.warn('⚠️ Could not fetch delivery_provider.id:', e);
+          console.warn('⚠️ Exception fetching delivery_provider.id:', e);
         }
         
         // Query by provider_id (delivery_provider.id) if we have it
+        // Also try by user_id as fallback (some records might use user_id directly)
+        const queries: Promise<any>[] = [];
+        
         if (providerId) {
-          const { data: byProviderId, error: err1 } = await supabase
-            .from('delivery_requests')
-            .select('*')
-            .eq('provider_id', providerId)
-            .in('status', ['delivered', 'completed', 'cancelled'])
-            .order('updated_at', { ascending: false })
-            .limit(100);
-          
-          if (err1) {
-            console.warn('Error fetching history by provider_id:', err1);
-            historyError = err1;
-          } else {
-            historyData = byProviderId || [];
-            console.log('✅ Fetched', historyData.length, 'delivered delivery_requests by provider_id');
-          }
-        } else {
-          // Fallback: Also try by user_id directly (in case some records use user_id as provider_id)
-          const { data: byUserId, error: err2 } = await supabase
-            .from('delivery_requests')
-            .select('*')
-            .eq('provider_id', userId) // Some records might use user_id directly
-            .in('status', ['delivered', 'completed', 'cancelled'])
-            .order('updated_at', { ascending: false })
-            .limit(100);
-          
-          if (!err2 && byUserId) {
-            historyData = byUserId;
-            console.log('✅ Fetched', historyData.length, 'delivered delivery_requests by user_id (fallback)');
-          }
+          // Primary query: by provider_id (delivery_provider.id)
+          queries.push(
+            supabase
+              .from('delivery_requests')
+              .select('*')
+              .eq('provider_id', providerId)
+              .in('status', ['delivered', 'completed', 'cancelled'])
+              .order('updated_at', { ascending: false })
+              .limit(100)
+              .then(({ data, error }) => {
+                if (error) {
+                  console.warn('⚠️ Error fetching history by provider_id:', error);
+                  return [];
+                }
+                console.log('✅ Fetched', data?.length || 0, 'delivered delivery_requests by provider_id');
+                return data || [];
+              })
+              .catch((e) => {
+                console.warn('⚠️ Exception fetching history by provider_id:', e);
+                return [];
+              })
+          );
         }
+        
+        // Fallback query: by user_id directly (in case some records use user_id as provider_id)
+        queries.push(
+          supabase
+            .from('delivery_requests')
+            .select('*')
+            .eq('provider_id', userId)
+            .in('status', ['delivered', 'completed', 'cancelled'])
+            .order('updated_at', { ascending: false })
+            .limit(100)
+            .then(({ data, error }) => {
+              if (error) {
+                console.warn('⚠️ Error fetching history by user_id:', error);
+                return [];
+              }
+              console.log('✅ Fetched', data?.length || 0, 'delivered delivery_requests by user_id (fallback)');
+              return data || [];
+            })
+            .catch((e) => {
+              console.warn('⚠️ Exception fetching history by user_id:', e);
+              return [];
+            })
+        );
+        
+        // Execute all queries in parallel and merge results
+        const results = await Promise.all(queries);
+        historyData = results.flat();
         
         // Remove duplicates and sort
         const uniqueHistory = Array.from(
           new Map(historyData.map((d: any) => [d.id, d])).values()
         ).sort((a: any, b: any) => {
-          const dateA = new Date(a.updated_at || a.created_at);
-          const dateB = new Date(b.updated_at || b.created_at);
+          const dateA = new Date(a.completed_at || a.delivered_at || a.updated_at || a.created_at);
+          const dateB = new Date(b.completed_at || b.delivered_at || b.updated_at || b.created_at);
           return dateB.getTime() - dateA.getTime();
         });
         
