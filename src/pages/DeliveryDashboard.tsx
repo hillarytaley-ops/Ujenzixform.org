@@ -1123,6 +1123,10 @@ const DeliveryDashboard = () => {
                     {(() => {
                       const inTransitCount = activeDeliveries.filter(d => {
                         const status = d._categorized_status || d.status;
+                        // Exclude delivered orders
+                        if (status === 'delivered' || status === 'completed') {
+                          return false;
+                        }
                         return status === 'in_transit' || 
                                status === 'picked_up' ||
                                status === 'on_the_way' ||
@@ -1142,9 +1146,16 @@ const DeliveryDashboard = () => {
                   <TabsTrigger value="delivered" className="flex items-center gap-2">
                     <CheckCircle className="h-4 w-4" />
                     Delivered
-                    {deliveryHistory.length > 0 && (
-                      <Badge className="ml-1 bg-green-500 text-white text-xs">{deliveryHistory.length}</Badge>
-                    )}
+                    {(() => {
+                      const deliveredFromActive = activeDeliveries.filter(d => {
+                        const status = d._categorized_status || d.status;
+                        return status === 'delivered' || status === 'completed';
+                      }).length;
+                      const total = deliveryHistory.length + deliveredFromActive;
+                      return total > 0 ? (
+                        <Badge className="ml-1 bg-green-500 text-white text-xs">{total}</Badge>
+                      ) : null;
+                    })()}
                   </TabsTrigger>
                 </TabsList>
 
@@ -1217,8 +1228,13 @@ const DeliveryDashboard = () => {
                     {(() => {
                       // Use _categorized_status from material_items scan status
                       // In Transit = all items dispatched, some received
+                      // EXCLUDE delivered orders (they should be in Delivered tab)
                       const inTransit = activeDeliveries.filter(d => {
                         const status = d._categorized_status || d.status;
+                        // Exclude delivered orders
+                        if (status === 'delivered' || status === 'completed') {
+                          return false;
+                        }
                         return status === 'in_transit' || 
                                status === 'picked_up' ||
                                status === 'on_the_way' ||
@@ -1382,7 +1398,13 @@ const DeliveryDashboard = () => {
                         <div>
                           <CardTitle className={isDarkMode ? 'text-white' : ''}>Delivery History</CardTitle>
                           <CardDescription className={isDarkMode ? 'text-gray-400' : ''}>
-                            Your past deliveries • Most recent first • {deliveryHistory.length} total
+                            Your past deliveries • Most recent first • {(() => {
+                              const deliveredFromActive = activeDeliveries.filter(d => {
+                                const status = d._categorized_status || d.status;
+                                return status === 'delivered' || status === 'completed';
+                              }).length;
+                              return deliveryHistory.length + deliveredFromActive;
+                            })()} total
                           </CardDescription>
                         </div>
                         <Button variant="outline" size="sm" onClick={() => refetchData()}>
@@ -1392,21 +1414,49 @@ const DeliveryDashboard = () => {
                       </div>
                     </CardHeader>
                     <CardContent>
-                      {deliveryHistory.length === 0 ? (
-                        <div className="text-center py-12">
-                          <Package className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                          <p className={`text-lg font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                            No delivery history yet
-                          </p>
-                          <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                            Your completed deliveries will appear here
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                          {[...deliveryHistory]
-                            .sort((a, b) => new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime())
-                            .map((delivery, index) => {
+                      {(() => {
+                        // Combine deliveryHistory with delivered orders from activeDeliveries
+                        // (orders that are categorized as 'delivered' based on material_items scan status)
+                        const deliveredFromActive = activeDeliveries
+                          .filter(d => {
+                            const status = d._categorized_status || d.status;
+                            return status === 'delivered' || status === 'completed';
+                          })
+                          .map(d => ({
+                            id: d.id,
+                            pickup_location: d.pickup_location || d.pickup_address || 'N/A',
+                            delivery_location: d.delivery_location || d.delivery_address || 'N/A',
+                            material_type: d.material_type || d.item_description || 'Materials',
+                            status: d._categorized_status || d.status,
+                            completed_at: d.delivered_at || d.completed_at || d.updated_at || d.created_at,
+                            price: d.price || d.delivery_fee || d.estimated_cost || 0,
+                            rating: d.rating || 0,
+                            order_number: d.order_number || d.po_number || 'N/A'
+                          }));
+                        
+                        // Combine with deliveryHistory and remove duplicates
+                        const allDelivered = [...deliveredFromActive, ...deliveryHistory];
+                        const uniqueDelivered = allDelivered.filter((d, index, self) => 
+                          index === self.findIndex(t => t.id === d.id)
+                        );
+                        
+                        const sortedDelivered = uniqueDelivered.sort((a, b) => 
+                          new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime()
+                        );
+                        
+                        return sortedDelivered.length === 0 ? (
+                          <div className="text-center py-12">
+                            <Package className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                            <p className={`text-lg font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                              No delivery history yet
+                            </p>
+                            <p className={`text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                              Your completed deliveries will appear here
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            {sortedDelivered.map((delivery, index) => {
                               const completedDate = new Date(delivery.completed_at);
                               const isToday = completedDate.toDateString() === new Date().toDateString();
                               const isYesterday = completedDate.toDateString() === new Date(Date.now() - 86400000).toDateString();
@@ -1464,8 +1514,9 @@ const DeliveryDashboard = () => {
                                 </div>
                               );
                             })}
-                        </div>
-                      )}
+                          </div>
+                        );
+                      })()}
                     </CardContent>
                   </Card>
                 </TabsContent>
