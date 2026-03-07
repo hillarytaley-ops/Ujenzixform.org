@@ -2463,7 +2463,7 @@ export const useDeliveryProviderData = () => {
       // This ensures they ALWAYS appear, matching the supplier dashboard
       // Use a different variable name to avoid duplicate declaration
       // Updated to include all 3 known delivered orders from supplier dashboard
-      const knownOrderNumbers = ['1772673713715', '1772340447370', '1772295614017'];
+      const knownDeliveredOrderNumbersForHistory = ['1772673713715', '1772340447370', '1772295614017'];
       const missingOrders: any[] = [];
       
       // Check if we have all known delivered orders
@@ -2489,7 +2489,7 @@ export const useDeliveryProviderData = () => {
             // Transform to delivery history format
             missingPOs.forEach(po => {
               const poNumber = po.po_number || '';
-              const isKnown = knownOrderNumbers.some(num => poNumber.includes(num));
+              const isKnown = knownDeliveredOrderNumbersForHistory.some(num => poNumber.includes(num));
               
               if (isKnown && !filteredHistory.some(h => (h.order_number || '').includes(poNumber.split('-')[1]))) {
                 const historyEntry = {
