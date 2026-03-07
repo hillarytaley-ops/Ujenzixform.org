@@ -45,10 +45,10 @@ BEGIN
       AND COUNT(mi.id) FILTER (WHERE mi.receive_scanned = TRUE) > 0
   LOOP
     -- Get delivery_request for this purchase_order
-    SELECT id, status INTO v_dr_id, v_old_status
-    FROM delivery_requests
-    WHERE purchase_order_id = v_po.purchase_order_id
-      AND status NOT IN ('delivered', 'completed', 'cancelled')
+    SELECT dr.id, dr.status INTO v_dr_id, v_old_status
+    FROM delivery_requests dr
+    WHERE dr.purchase_order_id = v_po.purchase_order_id
+      AND dr.status NOT IN ('delivered', 'completed', 'cancelled')
     LIMIT 1;
     
     -- If delivery_request exists and status is not 'delivered', update it
