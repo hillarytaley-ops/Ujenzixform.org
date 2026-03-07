@@ -1749,13 +1749,18 @@ export const useDeliveryProviderData = () => {
         console.warn('Error fetching delivery history from delivery_requests:', historyError);
       }
       
+      // ═══════════════════════════════════════════════════════════════════════════════
       // 2. From purchase_orders table - fetch delivered items
       // CRITICAL: Use EXACT same logic as supplier dashboard (EnhancedQRCodeManager.tsx line 861)
       // Supplier dashboard logic: order is "delivered" if ALL material_items have receive_scanned = true
       // This ensures provider dashboard shows the SAME delivered orders as supplier dashboard
       // IMPORTANT: This section MUST run regardless of delivery_requests errors
-      console.log('📦 History: Using EXACT supplier dashboard logic - finding orders where ALL material_items are receive_scanned = true');
-      console.log('📦 History: This will find ALL delivered orders (not filtered by provider) to match supplier dashboard');
+      // ═══════════════════════════════════════════════════════════════════════════════
+      console.log('═══════════════════════════════════════════════════════════════════════════════');
+      console.log('📦 History: STEP 2 - Using EXACT supplier dashboard logic');
+      console.log('📦 History: Finding ALL orders where ALL material_items are receive_scanned = true');
+      console.log('📦 History: This will find ALL delivered orders (NOT filtered by provider) to match supplier dashboard');
+      console.log('═══════════════════════════════════════════════════════════════════════════════');
       let deliveredPOs: any[] = [];
       
       try {
