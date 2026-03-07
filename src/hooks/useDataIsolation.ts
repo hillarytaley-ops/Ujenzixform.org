@@ -380,32 +380,36 @@ export const useDeliveryProviderData = () => {
       let providerIdToUse = userId;
       try {
         const providerLookup = await fetch(
-          `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${userId}&select=id&limit=1`,
+          `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${userId}&select=id`,
           {
             headers: {
               'apikey': SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${accessToken}`
+              'Authorization': `Bearer ${accessToken}`,
+              'Accept': 'application/json',
+              'Prefer': 'return=representation'
             }
           }
         );
         if (providerLookup.ok) {
           const providers = await providerLookup.json();
-          if (providers.length > 0) {
+          if (Array.isArray(providers) && providers.length > 0) {
             providerIdToUse = providers[0].id;
             console.log('⚡ FAST PATH: Found delivery_provider.id:', providerIdToUse);
           }
         }
-      } catch (e) {}
+      } catch (e) {
+        console.log('⚡ FAST PATH: delivery_providers lookup skipped:', e);
+      }
       
       // Quick fetch of accepted orders with order_number - filter by provider_id
-      // Use OR filter to match either user_id or delivery_provider.id
+      // Use simple query without join (join syntax can cause 400 errors)
       const fastResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/delivery_requests?or=(provider_id.eq.${userId},provider_id.eq.${providerIdToUse})&status=eq.accepted&select=*,purchase_orders!left(id,po_number)&order=created_at.desc&limit=50`,
+        `${SUPABASE_URL}/rest/v1/delivery_requests?provider_id=eq.${providerIdToUse}&status=eq.accepted&select=*&order=created_at.desc&limit=50`,
         {
           headers: {
             'apikey': SUPABASE_ANON_KEY,
             'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json'
+            'Accept': 'application/json'
           },
           cache: 'no-store'
         }
@@ -541,16 +545,10 @@ export const useDeliveryProviderData = () => {
               // Only show requests that have been accepted/assigned to this provider
               // RLS policy will handle matching provider_id (either user_id or delivery_providers.id)
               // Query delivery_requests with order_number directly (now stored in table)
-              // Also fetch from purchase_orders as backup
+              // Use simple select without join to avoid 400 errors
               const joinQueryPromise = supabase
                 .from('delivery_requests')
-                .select(`
-                  *,
-                  purchase_orders!left(
-                    id,
-                    po_number
-                  )
-                `)
+                .select('*')
                 .in('status', ['accepted', 'assigned', 'picked_up', 'in_transit', 'dispatched', 'out_for_delivery', 'delivery_arrived'])
                 .order('created_at', { ascending: false })
                 .limit(100);
@@ -572,37 +570,35 @@ export const useDeliveryProviderData = () => {
               }
               
               if (deliveryRequestsData && deliveryRequestsData.length > 0) {
-                // Flatten the joined data and prioritize order_number from delivery_requests table
+                // Process data and use order_number from delivery_requests table
                 allDeliveries = deliveryRequestsData.map((dr: any) => {
-                  const po = Array.isArray(dr.purchase_orders) ? dr.purchase_orders[0] : dr.purchase_orders;
-                  // PRIORITY: 1) dr.order_number (stored directly), 2) po.po_number (from join), 3) null
+                  // Use order_number stored directly in delivery_requests table
                   const realOrderNumber = dr.order_number && dr.order_number.trim() && !dr.order_number.match(/^PO-[A-F0-9]{8}$/i)
-                    ? dr.order_number  // Real order number stored in delivery_requests
-                    : (po?.po_number && po.po_number.trim() ? po.po_number : null);  // Fallback to join
+                    ? dr.order_number
+                    : null;
                   return {
                     ...dr,
-                    purchase_order_id: dr.purchase_order_id || po?.id,
-                    po_number_from_join: realOrderNumber  // Use the best available order number
+                    po_number_from_join: realOrderNumber
                   };
                 });
                 const withPONumber = allDeliveries.filter((d: any) => d.po_number_from_join).length;
-                console.log('✅ Fetched delivery_requests with order_number:', allDeliveries.length, 'deliveries,', withPONumber, 'with real order_number');
+                console.log('✅ Fetched delivery_requests:', allDeliveries.length, 'deliveries,', withPONumber, 'with real order_number');
               } else {
-                console.warn('⚠️ Join query returned no data, using simple query');
-                throw new Error('No data from join');
+                console.warn('⚠️ Query returned no data, using fallback');
+                throw new Error('No data from query');
               }
             } catch (joinError) {
               // Fall back to simple query if join fails
               // Filter by status to exclude pending requests (RLS policy will handle provider_id matching)
               console.warn('⚠️ Join query failed, falling back to simple query:', joinError);
-            // Fetch delivery_requests including order_number column
+            // Fetch delivery_requests - simple query without joins
             const activeResponse = await fetch(
-                `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.(accepted,assigned,picked_up,in_transit,dispatched,out_for_delivery,delivery_arrived)&select=*,order_number&order=created_at.desc&limit=100`,
+                `${SUPABASE_URL}/rest/v1/delivery_requests?status=in.(accepted,assigned,picked_up,in_transit,dispatched,out_for_delivery,delivery_arrived)&select=*&order=created_at.desc&limit=100`,
               {
                 headers: {
                   'apikey': SUPABASE_ANON_KEY,
                   'Authorization': `Bearer ${accessToken}`,
-                  'Content-Type': 'application/json'
+                  'Accept': 'application/json'
                 },
                 cache: 'no-store',
                 signal: controller.signal
@@ -1374,52 +1370,45 @@ export const useDeliveryProviderData = () => {
       const restHeaders = {
         'apikey': SUPABASE_ANON_KEY,
         'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
+        'Accept': 'application/json'
       };
       
       // From delivery_requests table - using REST API
       let pendingData: any[] = [];
       try {
         const pendingResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/delivery_requests?status=eq.pending&provider_id=is.null&order=created_at.desc&limit=50`,
+          `${SUPABASE_URL}/rest/v1/delivery_requests?status=eq.pending&select=*&order=created_at.desc&limit=50`,
           { headers: restHeaders, cache: 'no-store' }
         );
         if (pendingResponse.ok) {
           pendingData = await pendingResponse.json();
           console.log('📦 Fetched pending delivery_requests:', pendingData?.length || 0);
+        } else {
+          console.log('📦 Pending delivery_requests query returned:', pendingResponse.status);
         }
       } catch (e) {
-        console.warn('Error fetching pending delivery_requests');
+        console.warn('Error fetching pending delivery_requests:', e);
       }
 
-      // Also fetch from deliveries table
+      // Skip deliveries table - it may not exist or have different structure
+      // Just use delivery_requests and delivery_notifications
       let deliveriesData: any[] = [];
-      try {
-        const deliveriesResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/deliveries?status=eq.pending&provider_id=is.null&order=created_at.desc&limit=50`,
-          { headers: restHeaders, cache: 'no-store' }
-        );
-        if (deliveriesResponse.ok) {
-          deliveriesData = await deliveriesResponse.json();
-          console.log('📦 Fetched pending deliveries:', deliveriesData?.length || 0);
-        }
-      } catch (e) {
-        console.warn('Error fetching pending deliveries');
-      }
 
       // Also fetch from delivery_notifications table
       let notificationsData: any[] = [];
       try {
         const notifResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/delivery_notifications?status=in.(pending,notified)&order=created_at.desc&limit=50`,
+          `${SUPABASE_URL}/rest/v1/delivery_notifications?select=*&order=created_at.desc&limit=50`,
           { headers: restHeaders, cache: 'no-store' }
         );
         if (notifResponse.ok) {
           notificationsData = await notifResponse.json();
           console.log('📦 Fetched delivery_notifications:', notificationsData?.length || 0);
+        } else {
+          console.log('📦 Delivery_notifications query returned:', notifResponse.status);
         }
       } catch (e) {
-        console.warn('Error fetching delivery_notifications');
+        console.warn('Error fetching delivery_notifications:', e);
       }
 
       // Combine all pending requests
