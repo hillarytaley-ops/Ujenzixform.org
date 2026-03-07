@@ -1543,112 +1543,148 @@ export const useDeliveryProviderData = () => {
         };
         
         try {
-          console.log('🚀 fetchDeliveredPOs: About to query material_items...');
-          // Step 1: Query ALL material_items where receive_scanned = true
-          // Add timeout to prevent hanging
-          const queryPromise = supabase
-            .from('material_items')
-            .select('id, purchase_order_id, receive_scanned')
-            .eq('receive_scanned', true)
-            .limit(2000);
+          // CRITICAL FIX: First get purchase_orders for this provider, then query material_items for those POs only
+          // This avoids RLS blocking when querying ALL material_items globally
+          console.log('🚀 fetchDeliveredPOs: Step 1 - Getting purchase_orders for provider...');
           
-          const { data: receivedItems, error: itemsError } = await withTimeout(
-            queryPromise,
+          // Get purchase_orders where this provider is the delivery_provider_id
+          const poQueryPromise = supabase
+            .from('purchase_orders')
+            .select('id, po_number, status, delivery_provider_id, delivered_at, updated_at, created_at')
+            .eq('delivery_provider_id', userId)
+            .limit(500);
+          
+          let { data: providerPOs, error: poQueryError } = await withTimeout(
+            poQueryPromise,
             8000,
-            { data: null, error: { message: 'Material items query timeout' } } as any
+            { data: null, error: { message: 'Purchase orders query timeout' } } as any
           );
           
-          console.log('🚀 fetchDeliveredPOs: Material items query completed', { 
-            itemsCount: receivedItems?.length || 0, 
-            hasError: !!itemsError 
+          console.log('🚀 fetchDeliveredPOs: Purchase orders query completed', { 
+            ordersCount: providerPOs?.length || 0, 
+            hasError: !!poQueryError 
           });
           
-          if (itemsError || !receivedItems) {
-            console.warn('⚠️ Error fetching received material_items:', itemsError?.message || 'No data returned');
-          } else if (receivedItems.length > 0) {
-            console.log('📦 History: Found', receivedItems.length, 'material_items with receive_scanned = true');
+          // Also get purchase_order_ids from delivery_requests where this provider is assigned
+          let deliveryRequestPOIds: string[] = [];
+          try {
+            const drQuery = supabase
+              .from('delivery_requests')
+              .select('purchase_order_id')
+              .eq('provider_id', userId)
+              .not('purchase_order_id', 'is', null)
+              .limit(500);
             
-            // Step 2: Get all unique purchase_order_ids that have at least one received item
-            const poIdsWithReceivedItems = [...new Set(receivedItems.map(item => item.purchase_order_id))];
-            console.log('📦 History: Found', poIdsWithReceivedItems.length, 'purchase_orders with at least one received item');
+            const { data: drData } = await withTimeout(
+              drQuery,
+              5000,
+              { data: [] } as any
+            );
             
-            if (poIdsWithReceivedItems.length > 0) {
-              // Step 3: Fetch ALL material_items for these purchase_orders to check if ALL are received
-              console.log('🚀 fetchDeliveredPOs: About to query all material_items for POs...');
-              
-              const allItemsQueryPromise = supabase
-                .from('material_items')
-                .select('id, purchase_order_id, receive_scanned')
-                .in('purchase_order_id', poIdsWithReceivedItems)
-                .limit(2000);
-              
-              const { data: allItemsForPOs, error: allItemsError } = await withTimeout(
-                allItemsQueryPromise,
-                8000,
-                { data: null, error: { message: 'All items query timeout' } } as any
-              );
-              
-              console.log('🚀 fetchDeliveredPOs: All items query completed', { 
-                itemsCount: allItemsForPOs?.length || 0, 
-                hasError: !!allItemsError 
-              });
-              
-              if (allItemsError || !allItemsForPOs) {
-                console.warn('⚠️ Error fetching all material_items for purchase_orders:', allItemsError?.message || 'No data returned');
-              } else if (allItemsForPOs.length > 0) {
-                // Step 4: Group all items by purchase_order_id
-                const allItemsByPO = new Map<string, any[]>();
-                allItemsForPOs.forEach(item => {
-                  const poId = item.purchase_order_id;
-                  if (!allItemsByPO.has(poId)) {
-                    allItemsByPO.set(poId, []);
-                  }
-                  allItemsByPO.get(poId)!.push(item);
-                });
-                
-                // Step 5: Find purchase_orders where ALL items are received (EXACT supplier dashboard logic)
-                const deliveredPOIds: string[] = [];
-                allItemsByPO.forEach((items, poId) => {
-                  // EXACT supplier logic: allItemsReceived = items.every(item => item.receive_scanned === true)
-                  const allItemsReceived = items.every(item => item.receive_scanned === true);
-                  if (allItemsReceived && items.length > 0) {
-                    deliveredPOIds.push(poId);
-                    console.log('✅ History: Found delivered PO (all items received):', poId.substring(0, 8), 'items:', items.length);
-                  }
-                });
-                
-                console.log('📦 History: Found', deliveredPOIds.length, 'purchase_orders where ALL items are received (supplier dashboard logic)');
-                console.log('📋 Delivered PO IDs:', deliveredPOIds.map(id => id.substring(0, 8)).join(', '));
-                
-                // Step 6: Fetch the actual purchase_orders
-                if (deliveredPOIds.length > 0) {
-                  console.log('🚀 fetchDeliveredPOs: About to query purchase_orders for', deliveredPOIds.length, 'delivered orders...');
-                  
-                  const poQueryPromise = supabase
-                    .from('purchase_orders')
-                    .select('*')
-                    .in('id', deliveredPOIds)
-                    .order('updated_at', { ascending: false });
-                  
-                  const { data: deliveredPOsData, error: poError } = await withTimeout(
-                    poQueryPromise,
-                    8000,
-                    { data: null, error: { message: 'Purchase orders query timeout' } } as any
-                  );
-                  
-                  console.log('🚀 fetchDeliveredPOs: Purchase orders query completed', { 
-                    ordersCount: deliveredPOsData?.length || 0, 
-                    hasError: !!poError 
-                  });
-                  
-                  if (poError || !deliveredPOsData) {
-                    console.warn('⚠️ Error fetching delivered purchase_orders:', poError?.message || 'No data returned');
-                  } else {
-                    deliveredPOs = deliveredPOsData;
-                    console.log('📦 History: Fetched', deliveredPOs.length, 'delivered purchase_orders using EXACT supplier dashboard logic');
-                  }
+            if (drData) {
+              deliveryRequestPOIds = drData.map((dr: any) => dr.purchase_order_id).filter(Boolean);
+              console.log('📦 History: Found', deliveryRequestPOIds.length, 'purchase_order_ids from delivery_requests');
+            }
+          } catch (e: any) {
+            console.warn('⚠️ Error fetching delivery_requests for provider:', e?.message);
+          }
+          
+          // Combine both sources of purchase_order_ids
+          const allPOIds = new Set<string>();
+          if (providerPOs) {
+            providerPOs.forEach(po => {
+              if (po.id) allPOIds.add(po.id);
+            });
+          }
+          deliveryRequestPOIds.forEach(poId => allPOIds.add(poId));
+          
+          const poIds = Array.from(allPOIds);
+          
+          if (poIds.length === 0) {
+            console.warn('⚠️ No purchase_orders found for this provider');
+            return deliveredPOs; // Return empty if no purchase orders found
+          }
+          console.log('📦 History: Found', poIds.length, 'purchase_orders for this provider');
+          
+          if (poIds.length === 0) {
+            return deliveredPOs;
+          }
+          
+          // Step 2: Query material_items for ONLY these purchase_orders
+          console.log('🚀 fetchDeliveredPOs: Step 2 - Querying material_items for provider POs...');
+          
+          // Query in batches to avoid timeout
+          const batches: string[][] = [];
+          for (let i = 0; i < poIds.length; i += 100) {
+            batches.push(poIds.slice(i, i + 100));
+          }
+          
+          const allItemsByPO = new Map<string, any[]>();
+          
+          for (const batch of batches) {
+            const itemsQueryPromise = supabase
+              .from('material_items')
+              .select('id, purchase_order_id, receive_scanned, dispatch_scanned')
+              .in('purchase_order_id', batch)
+              .limit(2000);
+            
+            const { data: items, error: itemsError } = await withTimeout(
+              itemsQueryPromise,
+              8000,
+              { data: [] } as any
+            );
+            
+            if (itemsError) {
+              console.warn('⚠️ Error fetching material_items batch:', itemsError?.message);
+            } else if (items && items.length > 0) {
+              items.forEach(item => {
+                const poId = item.purchase_order_id;
+                if (!allItemsByPO.has(poId)) {
+                  allItemsByPO.set(poId, []);
                 }
-              }
+                allItemsByPO.get(poId)!.push(item);
+              });
+            }
+          }
+          
+          console.log('📦 History: Fetched material_items for', allItemsByPO.size, 'purchase_orders');
+          
+          // Step 3: Find purchase_orders where ALL items are received (EXACT supplier dashboard logic)
+          const deliveredPOIds: string[] = [];
+          allItemsByPO.forEach((items, poId) => {
+            if (items.length === 0) return; // Skip if no items found
+            
+            // EXACT supplier logic: allItemsReceived = items.every(item => item.receive_scanned === true)
+            const allItemsReceived = items.every(item => item.receive_scanned === true);
+            if (allItemsReceived) {
+              deliveredPOIds.push(poId);
+              console.log('✅ History: Found delivered PO (all items received):', poId.substring(0, 8), 'items:', items.length);
+            }
+          });
+          
+          console.log('📦 History: Found', deliveredPOIds.length, 'purchase_orders where ALL items are received (supplier dashboard logic)');
+          
+          // Step 4: Get full purchase_order data for delivered orders
+          if (deliveredPOIds.length > 0) {
+            console.log('🚀 fetchDeliveredPOs: Step 3 - Fetching full purchase_order data...');
+            
+            const deliveredPOsQuery = supabase
+              .from('purchase_orders')
+              .select('*')
+              .in('id', deliveredPOIds)
+              .order('updated_at', { ascending: false });
+            
+            const { data: deliveredPOsData, error: poError } = await withTimeout(
+              deliveredPOsQuery,
+              8000,
+              { data: [] } as any
+            );
+            
+            if (poError) {
+              console.warn('⚠️ Error fetching delivered purchase_orders:', poError?.message);
+            } else if (deliveredPOsData) {
+              deliveredPOs = deliveredPOsData;
+              console.log('📦 History: Fetched', deliveredPOs.length, 'delivered purchase_orders using EXACT supplier dashboard logic');
             }
           }
         } catch (e: any) {
