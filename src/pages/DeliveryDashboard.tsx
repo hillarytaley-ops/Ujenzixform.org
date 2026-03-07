@@ -102,6 +102,7 @@ interface DeliveryHistory {
   completed_at: string;
   price: number;
   rating: number;
+  order_number?: string; // Include order_number for display and matching
 }
 
 const DeliveryDashboard = () => {
@@ -290,6 +291,14 @@ const DeliveryDashboard = () => {
     }
     // Transform delivery history - ONLY THIS PROVIDER'S HISTORY
     if (isolatedHistory && isolatedHistory.length > 0) {
+      console.log('📦 Transforming delivery history:', isolatedHistory.length, 'items');
+      console.log('📋 Sample history items:', isolatedHistory.slice(0, 3).map(d => ({
+        id: d.id?.substring(0, 8),
+        order_number: d.order_number || d.po_number,
+        status: d.status,
+        purchase_order_id: d.purchase_order_id?.substring(0, 8)
+      })));
+      
       const formattedHistory: DeliveryHistory[] = isolatedHistory.map((d: any) => ({
         id: d.id,
         pickup_location: d.pickup_location || d.pickup_address || 'N/A',
@@ -298,9 +307,17 @@ const DeliveryDashboard = () => {
         status: d.status,
         completed_at: d.completed_at || d.delivered_at || d.updated_at || d.created_at,
         price: d.price || d.delivery_fee || d.estimated_cost || 0,
-        rating: d.rating || 0
+        rating: d.rating || 0,
+        // CRITICAL: Preserve order_number for display and matching
+        order_number: d.order_number || d.po_number || (d.purchase_order_id ? `PO-${d.purchase_order_id.slice(0, 8).toUpperCase()}` : 'N/A')
       }));
+      
+      console.log('✅ Formatted delivery history:', formattedHistory.length, 'items');
+      console.log('📋 Formatted history order numbers:', formattedHistory.map(d => d.order_number).filter(Boolean));
       setDeliveryHistory(formattedHistory);
+    } else {
+      console.log('⚠️ No isolatedHistory found or empty');
+      setDeliveryHistory([]);
     }
     // Set pending requests that this provider can accept
     if (isolatedPendingRequests) {

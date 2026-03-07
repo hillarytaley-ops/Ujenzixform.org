@@ -1784,6 +1784,7 @@ export const useDeliveryProviderData = () => {
         purchase_order_id: po.id,
         provider_id: userId,
         status: po.status,
+        order_number: po.po_number || null, // CRITICAL: Include order_number for matching with supplier dashboard
         pickup_location: po.supplier?.address || po.supplier?.location || 'Supplier location',
         pickup_address: po.supplier?.address || po.supplier?.location || 'Supplier location',
         delivery_location: po.delivery_address || 'Delivery location',
