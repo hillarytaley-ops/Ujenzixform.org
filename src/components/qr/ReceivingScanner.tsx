@@ -822,21 +822,53 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       // Step 2: Update the material_item to mark as received
       console.log('📦 Updating material_item to received:', item.id);
       
-      // Get current user ID with timeout - skip if it takes too long (not critical)
+      // Get current user ID - try multiple methods with timeouts
       let currentUserId: string | null = null;
+      
+      // Method 1: Try getUser() with timeout
       try {
-        console.log('👤 Getting current user ID...');
+        console.log('👤 Getting current user ID (method 1: getUser)...');
         const getUserPromise = supabase.auth.getUser();
         const getUserTimeout = new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error('getUser timeout after 2 seconds')), 2000)
         );
         const { data: userData } = await Promise.race([getUserPromise, getUserTimeout]) as any;
         currentUserId = userData?.user?.id || null;
-        console.log('👤 Current user ID:', currentUserId || 'NOT FOUND');
+        if (currentUserId) {
+          console.log('✅ Got user ID from getUser:', currentUserId);
+        }
       } catch (e) {
-        console.warn('⚠️ Could not get current user (skipping - not critical):', e);
-        // Don't try getSession() fallback - it will also timeout. Just continue without user ID.
-        // The update will still work, just without receive_scanned_by field
+        console.warn('⚠️ getUser() failed, trying localStorage fallback...');
+      }
+      
+      // Method 2: Try to extract from localStorage token if getUser failed
+      if (!currentUserId) {
+        try {
+          console.log('👤 Getting current user ID (method 2: localStorage token)...');
+          const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            // Try to get user ID from the token (JWT payload)
+            if (parsed.access_token) {
+              // Decode JWT to get user ID (simple base64 decode)
+              try {
+                const payload = JSON.parse(atob(parsed.access_token.split('.')[1]));
+                currentUserId = payload.sub || null;
+                if (currentUserId) {
+                  console.log('✅ Got user ID from localStorage token:', currentUserId);
+                }
+              } catch (e) {
+                console.warn('⚠️ Could not decode token:', e);
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('⚠️ Could not get user ID from localStorage:', e);
+        }
+      }
+      
+      if (!currentUserId) {
+        console.warn('⚠️ Could not get current user ID - some features may not work');
       }
       
       console.log('📦 Starting material_item update fetch...');
@@ -929,49 +961,58 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           console.log('📦 Updating delivery_request for purchase_order_id:', item.purchase_order_id);
           
           // First, get the current user's delivery_provider.id to ensure delivery_request has it
+          // This is CRITICAL for the order to appear in "Delivered" tab
           let providerId: string | null = null;
-          try {
-            console.log('🔍 Fetching delivery_provider.id for user:', currentUserId);
-            const providerController = new AbortController();
-            const providerTimeoutId = setTimeout(() => providerController.abort(), 5000); // 5 second timeout
-            
-            // Try to get delivery_provider.id for this user
-            let providerResponse: Response;
+          
+          if (currentUserId) {
             try {
-              providerResponse = await fetch(
-                `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${currentUserId}&select=id&limit=1`,
-                {
-                  headers: {
-                    'apikey': ANON_KEY,
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Accept': 'application/json'
-                  },
-                  signal: providerController.signal
+              console.log('🔍 Fetching delivery_provider.id for user:', currentUserId);
+              const providerController = new AbortController();
+              const providerTimeoutId = setTimeout(() => providerController.abort(), 5000); // 5 second timeout
+              
+              // Try to get delivery_provider.id for this user
+              let providerResponse: Response | null = null;
+              try {
+                providerResponse = await fetch(
+                  `${SUPABASE_URL}/rest/v1/delivery_providers?user_id=eq.${currentUserId}&select=id&limit=1`,
+                  {
+                    headers: {
+                      'apikey': ANON_KEY,
+                      'Authorization': `Bearer ${accessToken}`,
+                      'Accept': 'application/json'
+                    },
+                    signal: providerController.signal
+                  }
+                );
+                clearTimeout(providerTimeoutId);
+              } catch (fetchError: any) {
+                clearTimeout(providerTimeoutId);
+                if (fetchError.name === 'AbortError') {
+                  console.warn('⚠️ Provider lookup timed out, will try alternative method');
+                  // Don't throw - try alternative method below
+                } else {
+                  throw fetchError;
                 }
-              );
-              clearTimeout(providerTimeoutId);
-            } catch (fetchError: any) {
-              clearTimeout(providerTimeoutId);
-              if (fetchError.name === 'AbortError') {
-                console.warn('⚠️ Provider lookup timed out, continuing without provider_id');
-                throw new Error('Provider lookup timeout');
               }
-              throw fetchError;
-            }
-            if (providerResponse.ok) {
-              const providerData = await providerResponse.json();
-              if (providerData && providerData.length > 0) {
-                providerId = providerData[0].id;
-                console.log('✅ Found delivery_provider.id:', providerId);
-              } else {
-                console.warn('⚠️ No delivery_provider found for user_id:', currentUserId);
+              
+              if (providerResponse && providerResponse.ok) {
+                const providerData = await providerResponse.json();
+                if (providerData && providerData.length > 0) {
+                  providerId = providerData[0].id;
+                  console.log('✅ Found delivery_provider.id:', providerId);
+                } else {
+                  console.warn('⚠️ No delivery_provider found for user_id:', currentUserId);
+                }
               }
+            } catch (e) {
+              console.warn('⚠️ Could not fetch delivery_provider.id:', e);
             }
-          } catch (e) {
-            console.warn('⚠️ Could not fetch delivery_provider.id:', e);
+          } else {
+            console.warn('⚠️ Cannot fetch provider_id - currentUserId is null');
           }
           
           // First, check if delivery_request exists and get its current state
+          // This is important to get the existing provider_id if lookup fails
           let existingDeliveryRequest: any = null;
           try {
             console.log('🔍 Checking existing delivery_request...');
@@ -1009,6 +1050,12 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
                   status: existingDeliveryRequest.status,
                   provider_id: existingDeliveryRequest.provider_id
                 });
+                
+                // CRITICAL: Use existing provider_id if we don't have one yet
+                if (!providerId && existingDeliveryRequest.provider_id) {
+                  providerId = existingDeliveryRequest.provider_id;
+                  console.log('✅ Using provider_id from existing delivery_request:', providerId);
+                }
               } else {
                 console.warn('⚠️ No delivery_request found for purchase_order_id:', item.purchase_order_id);
               }
@@ -1025,15 +1072,21 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
             updated_at: new Date().toISOString()
           };
           
-          // Set provider_id if we found it and it's not already set
+          // CRITICAL: Always set provider_id if we have it
+          // This ensures the order appears in "Delivered" tab
           if (providerId) {
-            // Only update provider_id if it's not already set or if it's set to user_id (wrong value)
-            if (!existingDeliveryRequest?.provider_id || existingDeliveryRequest.provider_id === currentUserId) {
-              updateBody.provider_id = providerId;
-              console.log('📦 Setting provider_id on delivery_request:', providerId);
-            } else {
-              console.log('📦 delivery_request already has provider_id:', existingDeliveryRequest.provider_id);
-            }
+            // Always update provider_id to ensure it's set correctly
+            updateBody.provider_id = providerId;
+            console.log('📦 Setting provider_id on delivery_request:', providerId);
+            console.log('   This is CRITICAL for the order to appear in "Delivered" tab');
+          } else {
+            console.error('❌ CRITICAL: No provider_id available - order may not appear in Delivered tab!');
+            console.error('   currentUserId:', currentUserId);
+            console.error('   existingDeliveryRequest?.provider_id:', existingDeliveryRequest?.provider_id);
+            toast.error('⚠️ Warning', {
+              description: 'Could not set provider_id. Order may not appear in Delivered tab.',
+              duration: 5000
+            });
           }
           
           console.log('📦 Updating delivery_request status to delivered...');
