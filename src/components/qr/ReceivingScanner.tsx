@@ -1069,7 +1069,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           // Also ensure provider_id is set so it appears in deliveryHistory
           const updateBody: any = {
             status: 'delivered',
-            completed_at: new Date().toISOString(),
+            delivered_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           };
           
@@ -1271,7 +1271,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
                       },
                       body: JSON.stringify({
                         status: 'delivered',
-                        completed_at: new Date().toISOString(),
+                        delivered_at: new Date().toISOString(),
                         updated_at: new Date().toISOString()
                       }),
                       signal: drController.signal

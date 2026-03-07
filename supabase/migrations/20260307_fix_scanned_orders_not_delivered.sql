@@ -56,7 +56,6 @@ BEGIN
       UPDATE delivery_requests
       SET status = 'delivered',
           delivered_at = COALESCE(delivered_at, NOW()),
-          completed_at = COALESCE(completed_at, NOW()),
           updated_at = NOW()
       WHERE id = v_dr_id;
       
@@ -103,7 +102,6 @@ UPDATE delivery_requests dr
 SET 
   status = 'delivered',
   delivered_at = COALESCE(dr.delivered_at, po.updated_at, NOW()),
-  completed_at = COALESCE(dr.completed_at, po.updated_at, NOW()),
   updated_at = NOW()
 FROM purchase_orders po
 WHERE dr.purchase_order_id = po.id
@@ -118,7 +116,6 @@ UPDATE delivery_requests dr
 SET 
   status = 'delivered',
   delivered_at = COALESCE(dr.delivered_at, NOW()),
-  completed_at = COALESCE(dr.completed_at, NOW()),
   updated_at = NOW()
 WHERE dr.purchase_order_id IN (
   SELECT po.id
