@@ -251,6 +251,50 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
             return;
           }
           
+          // EARLY CHECK: Verify QR code hasn't been scanned in database before processing
+          // This prevents re-scanning even after page refresh
+          try {
+            const SUPABASE_URL = 'https://wuuyjjpgzgeimiptuuws.supabase.co';
+            const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
+            
+            let accessToken = ANON_KEY;
+            try {
+              const { data: sessionData } = await supabase.auth.getSession();
+              if (sessionData?.session?.access_token) {
+                accessToken = sessionData.session.access_token;
+              }
+            } catch (e) {}
+            
+            const checkResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${encodeURIComponent(decodedText)}&select=receive_scanned,status&limit=1`,
+              {
+                headers: {
+                  'apikey': ANON_KEY,
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Accept': 'application/json'
+                }
+              }
+            );
+            
+            if (checkResponse.ok) {
+              const checkData = await checkResponse.json();
+              if (checkData && checkData.length > 0) {
+                const item = checkData[0];
+                if (item.receive_scanned === true || item.status === 'received' || item.status === 'delivered') {
+                  console.log('⏭️ QR code already scanned in database - skipping:', decodedText);
+                  toast.warning('⚠️ Already Scanned', {
+                    description: 'This QR code has already been scanned and received.',
+                    duration: 3000,
+                  });
+                  return;
+                }
+              }
+            }
+          } catch (checkError) {
+            console.warn('⚠️ Could not check database for existing scan:', checkError);
+            // Continue processing if check fails (don't block on network error)
+          }
+          
           lastScannedRef.current = decodedText;
           lastScanTimeRef.current = now;
           
@@ -684,8 +728,8 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       
       const item = items[0];
       
-      // Check if already received
-      if (item.receiving_scanned || item.status === 'delivered' || item.status === 'received') {
+      // Check if already received (check correct field name: receive_scanned, not receiving_scanned)
+      if (item.receive_scanned === true || item.status === 'delivered' || item.status === 'received') {
         toast.error('⚠️ Already Received', {
           description: `This item (${item.material_type || 'Material'}) has already been scanned and confirmed.`,
           duration: 5000
@@ -704,6 +748,16 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       
       // Step 2: Update the material_item to mark as received
       console.log('📦 Updating material_item to received:', item.id);
+      
+      // Get current user ID
+      let currentUserId: string | null = null;
+      try {
+        const { data: userData } = await supabase.auth.getUser();
+        currentUserId = userData?.user?.id || null;
+      } catch (e) {
+        console.warn('Could not get current user:', e);
+      }
+      
       const updateResponse = await fetch(
         `${SUPABASE_URL}/rest/v1/material_items?id=eq.${item.id}`,
         {
@@ -715,11 +769,11 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
             'Prefer': 'return=representation'
           },
           body: JSON.stringify({
-            receiving_scanned: true,
-            receiving_scanned_at: new Date().toISOString(),
-            status: 'delivered',
+            receive_scanned: true,
+            receive_scanned_at: new Date().toISOString(),
+            receive_scanned_by: currentUserId,
+            status: 'received',
             material_condition: materialCondition,
-            receiving_notes: notes || null,
             updated_at: new Date().toISOString()
           })
         }
@@ -740,6 +794,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       console.log('✅ Material item updated:', updatedItem);
       
       // Step 3: Update delivery_request status immediately when item is scanned
+      // This moves the order to "Delivered" tab as soon as ANY item is scanned
       if (item.purchase_order_id) {
         try {
           // Update delivery_request to 'delivered' when item is received
@@ -762,7 +817,13 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           );
           
           if (deliveryRequestResponse.ok) {
-            console.log('✅ Delivery request updated to delivered status');
+            console.log('✅ Delivery request updated to delivered status - moving to Delivered tab');
+            
+            // Trigger callback to switch to delivered tab IMMEDIATELY when item is scanned
+            if (onDeliveryComplete) {
+              console.log('🔄 Triggering onDeliveryComplete callback (item scanned)');
+              onDeliveryComplete();
+            }
           } else {
             console.warn('⚠️ Could not update delivery_request status:', await deliveryRequestResponse.text());
           }
@@ -774,9 +835,9 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       // Step 4: Check if all items in the order are now delivered
       if (item.purchase_order_id) {
         try {
-          // Count remaining undelivered items
+          // Count remaining undelivered items (use correct field name: receive_scanned)
           const countResponse = await fetch(
-            `${SUPABASE_URL}/rest/v1/material_items?purchase_order_id=eq.${item.purchase_order_id}&receiving_scanned=eq.false&select=id`,
+            `${SUPABASE_URL}/rest/v1/material_items?purchase_order_id=eq.${item.purchase_order_id}&receive_scanned=eq.false&select=id`,
             {
               headers: {
                 'apikey': ANON_KEY,
@@ -829,12 +890,7 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
               );
               
               console.log('✅ All items delivered - order marked as complete');
-              
-              // Trigger callback to switch to delivered tab
-              if (onDeliveryComplete) {
-                console.log('🔄 Triggering onDeliveryComplete callback');
-                onDeliveryComplete();
-              }
+              // Note: Callback already triggered when first item was scanned (Step 3)
             }
           }
         } catch (e) {
