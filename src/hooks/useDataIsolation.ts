@@ -1464,6 +1464,14 @@ export const useDeliveryProviderData = () => {
         console.log('🚀 fetchDeliveredPOs: Function STARTED');
         let deliveredPOs: any[] = [];
         
+        // Helper: wrap promise with timeout
+        const withTimeout = <T,>(promise: Promise<T>, ms: number, fallback: T): Promise<T> => {
+          return Promise.race([
+            promise,
+            new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))
+          ]);
+        };
+        
         try {
           console.log('🚀 fetchDeliveredPOs: About to query material_items...');
           // Step 1: Query ALL material_items where receive_scanned = true
@@ -1474,23 +1482,20 @@ export const useDeliveryProviderData = () => {
             .eq('receive_scanned', true)
             .limit(2000);
           
-          const timeoutPromise = new Promise<never>((_, reject) => 
-            setTimeout(() => reject(new Error('Material items query timeout')), 10000)
+          const { data: receivedItems, error: itemsError } = await withTimeout(
+            queryPromise,
+            8000,
+            { data: null, error: { message: 'Material items query timeout' } } as any
           );
           
-          const { data: receivedItems, error: itemsError } = await Promise.race([
-            queryPromise,
-            timeoutPromise
-          ]).catch((e: any) => {
-            console.error('❌ Material items query failed or timed out:', e?.message || e);
-            return { data: null, error: e };
-          }) as any;
+          console.log('🚀 fetchDeliveredPOs: Material items query completed', { 
+            itemsCount: receivedItems?.length || 0, 
+            hasError: !!itemsError 
+          });
           
-          console.log('🚀 fetchDeliveredPOs: Material items query completed');
-          
-          if (itemsError) {
-            console.warn('⚠️ Error fetching received material_items:', itemsError);
-          } else if (receivedItems && receivedItems.length > 0) {
+          if (itemsError || !receivedItems) {
+            console.warn('⚠️ Error fetching received material_items:', itemsError?.message || 'No data returned');
+          } else if (receivedItems.length > 0) {
             console.log('📦 History: Found', receivedItems.length, 'material_items with receive_scanned = true');
             
             // Step 2: Get all unique purchase_order_ids that have at least one received item
@@ -1500,29 +1505,27 @@ export const useDeliveryProviderData = () => {
             if (poIdsWithReceivedItems.length > 0) {
               // Step 3: Fetch ALL material_items for these purchase_orders to check if ALL are received
               console.log('🚀 fetchDeliveredPOs: About to query all material_items for POs...');
+              
               const allItemsQueryPromise = supabase
                 .from('material_items')
                 .select('id, purchase_order_id, receive_scanned')
                 .in('purchase_order_id', poIdsWithReceivedItems)
                 .limit(2000);
               
-              const allItemsTimeoutPromise = new Promise<never>((_, reject) => 
-                setTimeout(() => reject(new Error('All items query timeout')), 10000)
+              const { data: allItemsForPOs, error: allItemsError } = await withTimeout(
+                allItemsQueryPromise,
+                8000,
+                { data: null, error: { message: 'All items query timeout' } } as any
               );
               
-              const { data: allItemsForPOs, error: allItemsError } = await Promise.race([
-                allItemsQueryPromise,
-                allItemsTimeoutPromise
-              ]).catch((e: any) => {
-                console.error('❌ All items query failed or timed out:', e?.message || e);
-                return { data: null, error: e };
-              }) as any;
+              console.log('🚀 fetchDeliveredPOs: All items query completed', { 
+                itemsCount: allItemsForPOs?.length || 0, 
+                hasError: !!allItemsError 
+              });
               
-              console.log('🚀 fetchDeliveredPOs: All items query completed');
-              
-              if (allItemsError) {
-                console.warn('⚠️ Error fetching all material_items for purchase_orders:', allItemsError);
-              } else if (allItemsForPOs && allItemsForPOs.length > 0) {
+              if (allItemsError || !allItemsForPOs) {
+                console.warn('⚠️ Error fetching all material_items for purchase_orders:', allItemsError?.message || 'No data returned');
+              } else if (allItemsForPOs.length > 0) {
                 // Step 4: Group all items by purchase_order_id
                 const allItemsByPO = new Map<string, any[]>();
                 allItemsForPOs.forEach(item => {
@@ -1549,30 +1552,28 @@ export const useDeliveryProviderData = () => {
                 // Step 6: Fetch the actual purchase_orders
                 if (deliveredPOIds.length > 0) {
                   console.log('🚀 fetchDeliveredPOs: About to query purchase_orders...');
+                  
                   const poQueryPromise = supabase
                     .from('purchase_orders')
                     .select('*')
                     .in('id', deliveredPOIds)
                     .order('updated_at', { ascending: false });
                   
-                  const poTimeoutPromise = new Promise<never>((_, reject) => 
-                    setTimeout(() => reject(new Error('Purchase orders query timeout')), 10000)
+                  const { data: deliveredPOsData, error: poError } = await withTimeout(
+                    poQueryPromise,
+                    8000,
+                    { data: null, error: { message: 'Purchase orders query timeout' } } as any
                   );
                   
-                  const { data: deliveredPOsData, error: poError } = await Promise.race([
-                    poQueryPromise,
-                    poTimeoutPromise
-                  ]).catch((e: any) => {
-                    console.error('❌ Purchase orders query failed or timed out:', e?.message || e);
-                    return { data: null, error: e };
-                  }) as any;
+                  console.log('🚀 fetchDeliveredPOs: Purchase orders query completed', { 
+                    ordersCount: deliveredPOsData?.length || 0, 
+                    hasError: !!poError 
+                  });
                   
-                  console.log('🚀 fetchDeliveredPOs: Purchase orders query completed');
-                  
-                  if (poError) {
-                    console.warn('⚠️ Error fetching delivered purchase_orders:', poError);
+                  if (poError || !deliveredPOsData) {
+                    console.warn('⚠️ Error fetching delivered purchase_orders:', poError?.message || 'No data returned');
                   } else {
-                    deliveredPOs = deliveredPOsData || [];
+                    deliveredPOs = deliveredPOsData;
                     console.log('📦 History: Fetched', deliveredPOs.length, 'delivered purchase_orders using EXACT supplier dashboard logic');
                   }
                 }
