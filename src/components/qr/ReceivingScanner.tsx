@@ -456,9 +456,21 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
       const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind1dXlqanBnemdlaW1pcHR1dXdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1OTY4NjMsImV4cCI6MjA3MTE3Mjg2M30.7r2Fd-perL2cC7IR4R06GLWrY9xKkxa0ZDnmmSCWgTo';
       
       // Get current session from Supabase (most reliable method)
+      // Add timeout to prevent hanging
       let accessToken = ANON_KEY;
       try {
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        console.log('🔐 Attempting to get Supabase session...');
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Session fetch timeout after 5 seconds')), 5000)
+        );
+        
+        const { data: sessionData, error: sessionError } = await Promise.race([
+          sessionPromise,
+          timeoutPromise
+        ]) as any;
+        
+        console.log('🔐 Session fetch completed');
         if (sessionData?.session?.access_token) {
           accessToken = sessionData.session.access_token;
           console.log('🔐 Using Supabase session token (authenticated)');
@@ -479,15 +491,20 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
           }
         }
       } catch (e) {
-        console.error('❌ Error getting Supabase session:', e);
+        console.error('❌ Error getting Supabase session (will use fallback):', e);
         // Fallback to localStorage
         try {
           const stored = localStorage.getItem('sb-wuuyjjpgzgeimiptuuws-auth-token');
           if (stored) {
             const parsed = JSON.parse(stored);
             accessToken = parsed.access_token || ANON_KEY;
+            console.log('🔐 Using localStorage token (error fallback)');
+          } else {
+            console.warn('⚠️ No localStorage token available, using anon key');
           }
-        } catch (e2) {}
+        } catch (e2) {
+          console.error('❌ Error reading localStorage token:', e2);
+        }
       }
       
       console.log('🔐 Access token status:', accessToken !== ANON_KEY ? 'Authenticated token found' : 'Using anon key (RLS may block)');
