@@ -1133,10 +1133,11 @@ const DeliveryDashboard = () => {
                     {(() => {
                       const inTransitCount = activeDeliveries.filter(d => {
                         const status = d._categorized_status || d.status;
-                        // Exclude delivered orders
+                        // CRITICAL: Exclude delivered orders - they should NOT appear in In Transit tab
                         if (status === 'delivered' || status === 'completed') {
                           return false;
                         }
+                        // Only count orders that are truly in transit (dispatched but not all items received)
                         return status === 'in_transit' || 
                                status === 'picked_up' ||
                                status === 'on_the_way' ||
@@ -1146,6 +1147,7 @@ const DeliveryDashboard = () => {
                                status === 'out_for_delivery';
                       }).length;
                       
+                      // Only show badge if there are actually in-transit orders (not delivered)
                       return inTransitCount > 0 ? (
                         <Badge className="ml-1 bg-purple-500 text-white text-xs">
                           {inTransitCount}
@@ -1325,8 +1327,23 @@ const DeliveryDashboard = () => {
                           original_status: d.status,
                           items_count: d._items_count,
                           dispatched_count: d._dispatched_count,
-                          received_count: d._received_count
+                          received_count: d._received_count,
+                          // Check if this should actually be delivered
+                          should_be_delivered: d._items_count > 0 && d._received_count === d._items_count
                         })));
+                        
+                        // Check for any orders that should be delivered but are showing as in_transit
+                        const misclassified = inTransit.filter(d => 
+                          d._items_count > 0 && d._received_count === d._items_count && d._items_count > 0
+                        );
+                        if (misclassified.length > 0) {
+                          console.error('🚨 MISCLASSIFIED ORDERS IN IN TRANSIT:', misclassified.map(d => ({
+                            order_number: d.order_number,
+                            items_count: d._items_count,
+                            received_count: d._received_count,
+                            _categorized_status: d._categorized_status
+                          })));
+                        }
                       }
                       
                       return inTransit.length > 0 ? (
