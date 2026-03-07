@@ -1828,9 +1828,13 @@ export const useDeliveryProviderData = () => {
           // Filter to only include orders where:
           // 1. Status is 'delivered'/'completed'/'received', OR
           // 2. All material_items are receive_scanned = true (matches supplier dashboard logic)
+          console.log('📦 History: Filtering', allPOsForProvider.length, 'purchase_orders to find delivered ones...');
+          console.log('📦 History: Material items map has', materialItemsMap.size, 'purchase orders with items');
+          
           deliveredPOs = allPOsForProvider.filter((po: any) => {
             // Check status first
             if (['delivered', 'completed', 'received'].includes(po.status)) {
+              console.log('✅ History: Found delivered PO by status:', po.po_number || po.id, 'status:', po.status);
               return true;
             }
             
@@ -1842,6 +1846,9 @@ export const useDeliveryProviderData = () => {
             
             // All items must be receive_scanned = true
             const allItemsReceived = items.every((item: any) => item.receive_scanned === true);
+            if (allItemsReceived) {
+              console.log('✅ History: Found delivered PO by material_items scan:', po.po_number || po.id, 'items:', items.length, 'all received');
+            }
             return allItemsReceived;
           });
           
