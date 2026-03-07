@@ -363,74 +363,114 @@ export const ReceivingScanner: React.FC = () => {
         // Already decoded or not encoded
       }
       
+      // Build a list of possible QR code values to search for
+      const qrCodeVariants: string[] = [cleanQRCode];
+      
+      // If it doesn't start with UJP-, try adding the prefix
+      if (!cleanQRCode.startsWith('UJP-')) {
+        qrCodeVariants.push('UJP-' + cleanQRCode);
+      }
+      
+      // If it starts with QR-, try replacing with UJP-
+      if (cleanQRCode.startsWith('QR-')) {
+        qrCodeVariants.push('UJP-' + cleanQRCode.substring(3));
+      }
+      
+      // Extract any numeric sequences that might be item IDs
+      const numericMatches = cleanQRCode.match(/\d{5,}/g);
+      if (numericMatches) {
+        numericMatches.forEach(num => qrCodeVariants.push(num));
+      }
+      
+      console.log('📦 Will search for QR code variants:', qrCodeVariants);
+      
       // Step 1: Find the material_item with this QR code
-      console.log('📦 Looking up material_item with QR code:', cleanQRCode);
+      console.log('📦 Looking up material_item with QR code variants:', qrCodeVariants);
       
       // Try multiple lookup strategies
       let items: any[] = [];
+      let lookupResponse: Response;
       
-      // Strategy 1: Exact match
-      let lookupResponse = await fetch(
-        `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${cleanQRCode}&select=*`,
-        {
-          headers: {
-            'apikey': ANON_KEY,
-            'Authorization': `Bearer ${accessToken}`,
-            'Accept': 'application/json'
+      // Strategy 1: Try exact match for each variant
+      for (const variant of qrCodeVariants) {
+        if (items.length > 0) break;
+        
+        lookupResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${variant}&select=*`,
+          {
+            headers: {
+              'apikey': ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Accept': 'application/json'
+            }
+          }
+        );
+        
+        if (lookupResponse.ok) {
+          items = await lookupResponse.json();
+          if (items.length > 0) {
+            console.log('📦 Found with exact match on variant:', variant);
           }
         }
-      );
-      
-      if (lookupResponse.ok) {
-        items = await lookupResponse.json();
-        console.log('📦 Strategy 1 (exact match) found:', items.length, 'items');
       }
       
-      // Strategy 2: Try with ilike if exact match fails (case insensitive)
+      // Strategy 2: Try ilike (contains) for each variant
       if (items.length === 0) {
-        console.log('📦 Trying case-insensitive match...');
-        lookupResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/material_items?qr_code=ilike.${cleanQRCode}&select=*`,
-          {
-            headers: {
-              'apikey': ANON_KEY,
-              'Authorization': `Bearer ${accessToken}`,
-              'Accept': 'application/json'
+        for (const variant of qrCodeVariants) {
+          if (items.length > 0) break;
+          
+          console.log('📦 Trying ilike match for:', variant);
+          lookupResponse = await fetch(
+            `${SUPABASE_URL}/rest/v1/material_items?qr_code=ilike.*${variant}*&select=*`,
+            {
+              headers: {
+                'apikey': ANON_KEY,
+                'Authorization': `Bearer ${accessToken}`,
+                'Accept': 'application/json'
+              }
+            }
+          );
+          if (lookupResponse.ok) {
+            items = await lookupResponse.json();
+            if (items.length > 0) {
+              console.log('📦 Found with ilike match on variant:', variant);
             }
           }
-        );
-        if (lookupResponse.ok) {
-          items = await lookupResponse.json();
-          console.log('📦 Strategy 2 (ilike) found:', items.length, 'items');
         }
       }
       
-      // Strategy 3: Try searching by partial match (QR code might be embedded in a longer string)
-      if (items.length === 0 && cleanQRCode.length > 8) {
-        console.log('📦 Trying partial match...');
-        // Try with just the last part of the code (might be a UUID or similar)
-        const partialCode = cleanQRCode.slice(-36); // UUID length
-        lookupResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/material_items?qr_code=ilike.*${partialCode}*&select=*`,
-          {
-            headers: {
-              'apikey': ANON_KEY,
-              'Authorization': `Bearer ${accessToken}`,
-              'Accept': 'application/json'
+      // Strategy 3: Try looking up by ID if QR code looks like a UUID
+      if (items.length === 0) {
+        for (const variant of qrCodeVariants) {
+          if (items.length > 0) break;
+          
+          if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(variant)) {
+            console.log('📦 Variant looks like UUID, trying id lookup:', variant);
+            lookupResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/material_items?id=eq.${variant}&select=*`,
+              {
+                headers: {
+                  'apikey': ANON_KEY,
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Accept': 'application/json'
+                }
+              }
+            );
+            if (lookupResponse.ok) {
+              items = await lookupResponse.json();
+              if (items.length > 0) {
+                console.log('📦 Found with id lookup:', variant);
+              }
             }
           }
-        );
-        if (lookupResponse.ok) {
-          items = await lookupResponse.json();
-          console.log('📦 Strategy 3 (partial) found:', items.length, 'items');
         }
       }
       
-      // Strategy 4: Try looking up by ID if QR code looks like a UUID
-      if (items.length === 0 && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanQRCode)) {
-        console.log('📦 QR code looks like UUID, trying id lookup...');
+      // Strategy 4: Last resort - search ALL recent material items and match client-side
+      if (items.length === 0) {
+        console.log('📦 Last resort: fetching recent items to search client-side...');
         lookupResponse = await fetch(
-          `${SUPABASE_URL}/rest/v1/material_items?id=eq.${cleanQRCode}&select=*`,
+          `${SUPABASE_URL}/rest/v1/material_items?select=*&order=created_at.desc&limit=200`,
           {
             headers: {
               'apikey': ANON_KEY,
@@ -440,8 +480,22 @@ export const ReceivingScanner: React.FC = () => {
           }
         );
         if (lookupResponse.ok) {
-          items = await lookupResponse.json();
-          console.log('📦 Strategy 4 (id lookup) found:', items.length, 'items');
+          const recentItems = await lookupResponse.json();
+          console.log('📦 Fetched', recentItems.length, 'recent items to search');
+          
+          // Try to find a match
+          for (const variant of qrCodeVariants) {
+            const found = recentItems.find((item: any) => 
+              item.qr_code?.includes(variant) || 
+              variant.includes(item.qr_code) ||
+              item.id === variant
+            );
+            if (found) {
+              items = [found];
+              console.log('📦 Found via client-side search:', found.qr_code);
+              break;
+            }
+          }
         }
       }
       
