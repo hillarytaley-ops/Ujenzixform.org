@@ -392,110 +392,152 @@ export const ReceivingScanner: React.FC = () => {
       
       let items: any[] = [];
       
-      // Use Supabase client which handles encoding properly
+      // Use REST API directly (more reliable than Supabase client for this)
       try {
-        console.log('🔎 Strategy 1: Exact match lookup starting...');
+        console.log('🔎 Strategy 1: Exact match lookup via REST API...');
         
-        // Strategy 1: Exact match on qr_code
-        const { data: exactMatch, error: exactError } = await supabase
-          .from('material_items')
-          .select('*')
-          .eq('qr_code', cleanQRCode)
-          .limit(1);
+        // Strategy 1: Exact match on qr_code using REST API
+        const restResponse = await fetch(
+          `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${encodeURIComponent(cleanQRCode)}&select=*&limit=1`,
+          {
+            headers: {
+              'apikey': ANON_KEY,
+              'Authorization': `Bearer ${accessToken}`,
+              'Accept': 'application/json',
+              'Content-Type': 'application/json'
+            }
+          }
+        );
         
-        console.log('🔎 Strategy 1 result:', { exactMatch, exactError });
+        console.log('🔎 Strategy 1 REST response status:', restResponse.status);
         
-        if (exactError) {
-          console.error('❌ Strategy 1 error:', exactError);
-        }
-        
-        if (!exactError && exactMatch && exactMatch.length > 0) {
-          items = exactMatch;
-          console.log('✅ Found with exact qr_code match:', items[0].qr_code);
+        if (restResponse.ok) {
+          const restData = await restResponse.json();
+          console.log('🔎 Strategy 1 result:', { found: restData?.length || 0 });
+          
+          if (restData && restData.length > 0) {
+            items = restData;
+            console.log('✅ Found with exact qr_code match:', items[0].qr_code);
+          } else {
+            console.log('⚠️ Strategy 1: No exact match found');
+          }
         } else {
-          console.log('⚠️ Strategy 1: No exact match found');
+          const errorText = await restResponse.text();
+          console.error('❌ Strategy 1 REST error:', restResponse.status, errorText);
         }
         
-        // Strategy 2: Try other variants
+        // Strategy 2: Try other variants via REST API
         if (items.length === 0) {
-          console.log('🔎 Strategy 2: Trying variants...');
+          console.log('🔎 Strategy 2: Trying variants via REST API...');
           for (const variant of qrCodeVariants) {
             if (items.length > 0) break;
             if (variant === cleanQRCode) continue; // Skip already tried
             
             console.log('   Trying variant:', variant);
-            const { data, error } = await supabase
-              .from('material_items')
-              .select('*')
-              .eq('qr_code', variant)
-              .limit(1);
-            
-            if (error) {
-              console.error('   Variant error:', error);
-            }
-            
-            if (!error && data && data.length > 0) {
-              items = data;
-              console.log('✅ Found with variant match:', variant);
-              break;
-            }
-          }
-        }
-        
-        // Strategy 3: Case-insensitive search (ilike)
-        if (items.length === 0) {
-          console.log('🔎 Strategy 3: Case-insensitive (ilike) search...');
-          const { data, error } = await supabase
-            .from('material_items')
-            .select('*')
-            .ilike('qr_code', `%${cleanQRCode}%`)
-            .limit(5);
-          
-          console.log('🔎 Strategy 3 result:', { found: data?.length || 0, error });
-          
-          if (!error && data && data.length > 0) {
-            items = data;
-            console.log('✅ Found with ilike search:', items.length, 'items');
-          }
-        }
-        
-        // Strategy 4: Fetch recent items and search client-side
-        if (items.length === 0) {
-          console.log('📦 Fetching recent items for client-side search...');
-          const { data: recentItems, error } = await supabase
-            .from('material_items')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(500);
-          
-          if (!error && recentItems && recentItems.length > 0) {
-            console.log('📦 Searching through', recentItems.length, 'recent items...');
-            
-            // Try to find a match - check if scanned QR contains or is contained in stored QR
-            const found = recentItems.find((item: any) => {
-              if (!item.qr_code) return false;
-              const storedQR = item.qr_code.toLowerCase();
-              const scannedQR = cleanQRCode.toLowerCase();
+            try {
+              const variantResponse = await fetch(
+                `${SUPABASE_URL}/rest/v1/material_items?qr_code=eq.${encodeURIComponent(variant)}&select=*&limit=1`,
+                {
+                  headers: {
+                    'apikey': ANON_KEY,
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Accept': 'application/json'
+                  }
+                }
+              );
               
-              // Check various matching conditions
-              return storedQR === scannedQR ||
-                     storedQR.includes(scannedQR) ||
-                     scannedQR.includes(storedQR) ||
-                     // Check if the numeric parts match
-                     storedQR.replace(/[^0-9]/g, '').includes(scannedQR.replace(/[^0-9]/g, '')) ||
-                     scannedQR.replace(/[^0-9]/g, '').includes(storedQR.replace(/[^0-9]/g, ''));
-            });
-            
-            if (found) {
-              items = [found];
-              console.log('✅ Found via client-side search! Stored QR:', found.qr_code);
-            } else {
-              // Log some sample QR codes from database for debugging
-              console.log('📦 Sample QR codes in database:');
-              recentItems.slice(0, 5).forEach((item: any) => {
-                console.log('  -', item.qr_code);
-              });
+              if (variantResponse.ok) {
+                const variantData = await variantResponse.json();
+                if (variantData && variantData.length > 0) {
+                  items = variantData;
+                  console.log('✅ Found with variant match:', variant);
+                  break;
+                }
+              }
+            } catch (e) {
+              console.error('   Variant error:', e);
             }
+          }
+        }
+        
+        // Strategy 3: Case-insensitive search (ilike) via REST API
+        if (items.length === 0) {
+          console.log('🔎 Strategy 3: Case-insensitive (ilike) search via REST API...');
+          try {
+            const ilikeResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/material_items?qr_code=ilike.*${encodeURIComponent(cleanQRCode)}*&select=*&limit=5`,
+              {
+                headers: {
+                  'apikey': ANON_KEY,
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Accept': 'application/json'
+                }
+              }
+            );
+            
+            if (ilikeResponse.ok) {
+              const ilikeData = await ilikeResponse.json();
+              console.log('🔎 Strategy 3 result:', { found: ilikeData?.length || 0 });
+              
+              if (ilikeData && ilikeData.length > 0) {
+                items = ilikeData;
+                console.log('✅ Found with ilike search:', items.length, 'items');
+              }
+            }
+          } catch (e) {
+            console.error('❌ Strategy 3 error:', e);
+          }
+        }
+        
+        // Strategy 4: Fetch recent items and search client-side via REST API
+        if (items.length === 0) {
+          console.log('📦 Strategy 4: Fetching recent items for client-side search via REST API...');
+          try {
+            const recentResponse = await fetch(
+              `${SUPABASE_URL}/rest/v1/material_items?select=*&order=created_at.desc&limit=500`,
+              {
+                headers: {
+                  'apikey': ANON_KEY,
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Accept': 'application/json'
+                }
+              }
+            );
+            
+            if (recentResponse.ok) {
+              const recentItems = await recentResponse.json();
+              console.log('📦 Searching through', recentItems?.length || 0, 'recent items...');
+              
+              if (recentItems && recentItems.length > 0) {
+                // Try to find a match - check if scanned QR contains or is contained in stored QR
+                const found = recentItems.find((item: any) => {
+                  if (!item.qr_code) return false;
+                  const storedQR = item.qr_code.toLowerCase();
+                  const scannedQR = cleanQRCode.toLowerCase();
+                  
+                  // Check various matching conditions
+                  return storedQR === scannedQR ||
+                         storedQR.includes(scannedQR) ||
+                         scannedQR.includes(storedQR) ||
+                         // Check if the numeric parts match
+                         storedQR.replace(/[^0-9]/g, '').includes(scannedQR.replace(/[^0-9]/g, '')) ||
+                         scannedQR.replace(/[^0-9]/g, '').includes(storedQR.replace(/[^0-9]/g, ''));
+                });
+                
+                if (found) {
+                  items = [found];
+                  console.log('✅ Found via client-side search! Stored QR:', found.qr_code);
+                } else {
+                  // Log some sample QR codes from database for debugging
+                  console.log('📦 Sample QR codes in database:');
+                  recentItems.slice(0, 5).forEach((item: any) => {
+                    console.log('  -', item.qr_code);
+                  });
+                }
+              }
+            }
+          } catch (e) {
+            console.error('❌ Strategy 4 error:', e);
           }
         }
       } catch (lookupError) {
