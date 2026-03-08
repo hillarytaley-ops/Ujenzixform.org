@@ -129,23 +129,25 @@ BEGIN
             updated_at = NOW()
         WHERE id = order_id;
         
+        -- Only update delivery_requests that are in transit (exclude cancelled/completed)
         UPDATE delivery_requests
         SET status = 'delivered',
             delivered_at = NOW(),
             updated_at = NOW()
         WHERE purchase_order_id = order_id
-          AND status != 'delivered';
+          AND status NOT IN ('delivered', 'completed', 'cancelled');
       END IF;
     END IF;
   END IF;
   
-  -- Return success
+  -- Return success (order_completed helps UI show correct feedback for multi-item orders)
   RETURN jsonb_build_object(
     'success', true,
     'scan_event_id', scan_event_id,
     'qr_code', item_record.qr_code,
     'material_type', item_record.material_type,
-    'status', 'received'
+    'status', 'received',
+    'order_completed', COALESCE(v_all_items_received, FALSE)
   );
 END;
 $$;

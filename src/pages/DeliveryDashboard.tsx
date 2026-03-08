@@ -1647,7 +1647,7 @@ const DeliveryDashboard = () => {
                           <Alert className="mb-4 bg-purple-50 border-purple-200">
                             <Truck className="h-4 w-4 text-purple-600" />
                             <AlertDescription className="text-purple-700">
-                              Materials have been dispatched by supplier. Navigate to delivery location and scan QR codes upon arrival to complete delivery.
+                              Materials have been dispatched by supplier. Navigate to delivery location and <strong>scan all QR codes</strong> (one per item) upon arrival to complete delivery. Each order moves to &quot;Delivered&quot; only when every item is scanned.
                             </AlertDescription>
                           </Alert>
                           {inTransit.map((delivery) => (
@@ -1670,6 +1670,13 @@ const DeliveryDashboard = () => {
                                       <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                                         Being delivered to: {delivery.delivery_location}
                                       </p>
+                                      {(delivery._items_count ?? 0) > 1 && (
+                                        <p className={`text-sm font-medium mt-1 flex items-center gap-1 ${delivery._received_count === delivery._items_count ? 'text-green-600 dark:text-green-400' : isDarkMode ? 'text-amber-400' : 'text-amber-600'}`}>
+                                          <Scan className="h-3.5 w-3.5" />
+                                          {delivery._received_count ?? 0} of {delivery._items_count} items scanned
+                                          {delivery._received_count === delivery._items_count ? ' ✓' : ' — scan remaining to complete delivery'}
+                                        </p>
+                                      )}
                                       {delivery.purchase_order_id && !delivery.order_number && (
                                         <p className={`text-xs mt-1 ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'}`}>
                                           ⚠️ Order number not available (PO ID: {delivery.purchase_order_id.slice(0, 8)}...)
@@ -1724,14 +1731,21 @@ const DeliveryDashboard = () => {
                                       onClick={() => {
                                         setSelectedDeliveryForScan(delivery.id);
                                         setActiveTab('scanning');
+                                        const itemsCount = delivery._items_count ?? 0;
+                                        const scannedCount = delivery._received_count ?? 0;
+                                        const remaining = itemsCount - scannedCount;
                                         toast({
                                           title: "📍 Ready to Scan",
-                                          description: "Scan QR codes when you arrive at the delivery location.",
+                                          description: remaining > 0 && itemsCount > 1 
+                                            ? `Scan ${remaining} remaining QR code${remaining > 1 ? 's' : ''} (${scannedCount} of ${itemsCount} done) to complete delivery.`
+                                            : "Scan QR codes when you arrive at the delivery location.",
                                         });
                                       }}
                                     >
                                       <Scan className="h-4 w-4 mr-2" />
-                                      Scan QR to Complete Delivery
+                                      {delivery._items_count && delivery._items_count > 1 && (delivery._received_count ?? 0) < delivery._items_count
+                                        ? `Scan to Complete (${delivery._received_count ?? 0}/${delivery._items_count} scanned)`
+                                        : "Scan QR to Complete Delivery"}
                                     </Button>
                                     {delivery.customer_phone && (
                                       <Button 
@@ -1979,15 +1993,17 @@ const DeliveryDashboard = () => {
                       </div>
                     </div>
                     <ReceivingScanner 
-                      onDeliveryComplete={async () => {
+                      onDeliveryComplete={async (orderCompleted) => {
                         // CRITICAL: Wait for database update to propagate first
-                        console.log('🔄 Delivery scan complete - waiting for database update to propagate...');
-                        await new Promise(resolve => setTimeout(resolve, 2000)); // Increased wait time
+                        console.log('🔄 Delivery scan complete - orderCompleted:', orderCompleted);
+                        await new Promise(resolve => setTimeout(resolve, 1500));
                         
-                        // Switch to delivered tab IMMEDIATELY (user feedback)
-                        console.log('🔄 Switching to Delivered tab immediately...');
-                        setActiveTab('deliveries');
-                        setDeliveriesSubTab('delivered');
+                        // Only switch to Delivered tab when full order is complete (avoids confusion for multi-item orders)
+                        if (orderCompleted) {
+                          console.log('🔄 Full order delivered - switching to Delivered tab');
+                          setActiveTab('deliveries');
+                          setDeliveriesSubTab('delivered');
+                        }
                         
                         // Aggressive refresh with multiple retries to ensure updated data
                         console.log('🔄 Starting aggressive data refresh...');
@@ -2029,10 +2045,12 @@ const DeliveryDashboard = () => {
                           console.warn('⚠️ Final refresh failed (non-critical):', finalError);
                         }
                         
-                        // Show success toast
+                        // Show success toast based on whether full order was completed
                         toast({
-                          title: '✅ Delivery Complete!',
-                          description: 'Order has been scanned as delivered. Viewing "Delivered" tab.',
+                          title: orderCompleted ? '✅ Delivery Complete!' : '✅ Item Scanned',
+                          description: orderCompleted 
+                            ? 'All items received. Order moved to "Delivered" tab.' 
+                            : 'Item scan recorded. Scan remaining QR codes to complete delivery.',
                           duration: 5000,
                         });
                         

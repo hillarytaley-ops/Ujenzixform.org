@@ -24,7 +24,8 @@ interface ScanResult {
 }
 
 interface ReceivingScannerProps {
-  onDeliveryComplete?: () => void;
+  /** Called after successful scan. Passes true if the full order was completed (all items received). */
+  onDeliveryComplete?: (orderCompleted?: boolean) => void;
 }
 
 export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryComplete }) => {
@@ -1255,13 +1256,14 @@ export const ReceivingScanner: React.FC<ReceivingScannerProps> = ({ onDeliveryCo
         return;
       }
       
-      // Step 3: IMMEDIATELY switch to delivered tab when item is successfully scanned
-      // RPC or REST API has already updated delivery_request status if all items are received
+      // Step 3: Notify callback - pass orderCompleted so UI can show correct feedback
+      // (order_completed = true when all items in the order were scanned)
       if (onDeliveryComplete) {
-        console.log('🔄 Triggering onDeliveryComplete callback - moving to Delivered tab NOW');
+        const orderCompleted = scanResult?.order_completed === true;
+        console.log('🔄 Triggering onDeliveryComplete callback, orderCompleted:', orderCompleted);
         console.log('   Scan result:', scanResult);
         try {
-          onDeliveryComplete();
+          onDeliveryComplete(orderCompleted);
           console.log('✅ onDeliveryComplete callback executed successfully');
         } catch (callbackError) {
           console.error('❌ Error in onDeliveryComplete callback:', callbackError);

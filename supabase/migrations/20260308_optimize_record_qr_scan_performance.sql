@@ -356,7 +356,7 @@ BEGIN
   WHERE id = item_record.id
   LIMIT 1;
   
-  -- Return success with item details
+  -- Return success with item details (order_completed for multi-item order feedback)
   func_result := jsonb_build_object(
     'success', true,
     'scan_event_id', scan_event_id,
@@ -366,7 +366,8 @@ BEGIN
     'dispatch_scanned', item_record.dispatch_scanned,
     'receive_scanned', item_record.receive_scanned,
     'is_invalidated', COALESCE(item_record.is_invalidated, FALSE),
-    'invalidated_at', item_record.invalidated_at
+    'invalidated_at', item_record.invalidated_at,
+    'order_completed', COALESCE(v_all_items_received, FALSE)
   );
   
   RETURN func_result;
