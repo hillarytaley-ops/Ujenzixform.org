@@ -440,13 +440,8 @@ const DeliveryDashboard = () => {
                 } else if (po.created_at) {
                   completedAt = po.created_at + '';
                 } else {
-                  // Fallback: use ISO-like string without creating Date object
-                  // Format: YYYY-MM-DDTHH:mm:ss.sssZ (approximate)
-                  const ts = Date.now ? Date.now() : 0;
-                  const year = 2024;
-                  const month = '03';
-                  const day = '07';
-                  completedAt = year + '-' + month + '-' + day + 'T00:00:00.000Z';
+                  // Fallback: use hardcoded ISO string - NO Date operations at all
+                  completedAt = '2024-03-07T00:00:00.000Z';
                 }
                 
                 // Get price - avoid Number() constructor
